@@ -69,7 +69,6 @@ export const MembersInlineProvider = ({
   allowUnassigned?: boolean;
 }) => {
   const [_members, _setMembers] = useState<IUser[]>(members || []);
-
   return (
     <MembersInlineContext.Provider
       value={{

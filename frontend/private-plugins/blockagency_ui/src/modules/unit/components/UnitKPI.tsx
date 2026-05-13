@@ -18,8 +18,8 @@ const PILLS: {
     active: 'bg-foreground text-background',
   },
   {
-    key: 'available',
-    label: 'Available',
+    key: 'vacant',
+    label: 'Vacant',
     color: 'text-green-600',
     active: 'bg-green-600 text-white',
   },
@@ -28,12 +28,6 @@ const PILLS: {
     label: 'Reserved',
     color: 'text-amber-500',
     active: 'bg-amber-500 text-white',
-  },
-  {
-    key: 'sold',
-    label: 'Sold',
-    color: 'text-blue-500',
-    active: 'bg-blue-500 text-white',
   },
   {
     key: 'leased',
@@ -54,9 +48,8 @@ export const UnitKPI = ({ activeStatus, onStatusChange }: Props) => {
 
   const values: Record<StatusFilter, number> = {
     all: totalCount,
-    available: counts?.available ?? 0,
+    vacant: counts?.vacant ?? 0,
     reserved: counts?.reserved ?? 0,
-    sold: counts?.sold ?? 0,
     leased: counts?.leased ?? 0,
   };
 
@@ -78,7 +71,7 @@ export const UnitKPI = ({ activeStatus, onStatusChange }: Props) => {
             {label}
             <span
               className={cn(
-                'text-xs font-semibold tabular-nums min-w-[1.25rem] text-center',
+                'text-xs font-semibold tabular-nums min-w-5 text-center',
                 isActive ? 'opacity-90' : 'opacity-70',
               )}
             >

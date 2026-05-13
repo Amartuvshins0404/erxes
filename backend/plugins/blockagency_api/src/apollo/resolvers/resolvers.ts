@@ -6,4 +6,12 @@ export const customResolvers = {
   BlockAgency,
   BlockListing,
   BlockAgencyUnit,
+  BlockMember: {
+    member: async ({memberId}) => {
+      return {
+        __typename: "User",
+        _id: memberId
+      }
+    }
+  }
 };

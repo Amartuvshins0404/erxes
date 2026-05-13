@@ -1,3 +1,5 @@
+import { IUser } from 'ui-modules';
+
 export interface IAgencyMember {
   _id: string;
   memberId: string;
@@ -13,4 +15,5 @@ export interface IAgencyMember {
   certificatePhotos?: string[];
   createdAt: string;
   updatedAt: string;
+  member?: IUser;
 }

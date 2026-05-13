@@ -49,6 +49,13 @@ export const GET_AGENCY_MEMBERS = gql`
       city
       certificatePhotos
       agencyId
+      member {
+        _id
+        details {
+          avatar
+          fullName
+        }
+      }
     }
   }
 `;

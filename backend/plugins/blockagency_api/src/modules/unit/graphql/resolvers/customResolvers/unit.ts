@@ -1,3 +1,4 @@
+import { sendTRPCMessage } from 'erxes-api-shared/utils';
 import { IContext } from '~/connectionResolvers';
 
 export const BlockAgencyUnit = {
@@ -11,5 +12,11 @@ export const BlockAgencyUnit = {
       .select('name')
       .lean();
     return agency ? { name: agency.name } : null;
+  },
+  member: async ({ memberId }) => {
+    return {
+      __typename: 'User',
+      _id: memberId,
+    };
   },
 };

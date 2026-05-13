@@ -1,6 +1,15 @@
 import { Schema, Model, Document } from 'mongoose';
 
-export type BlockUnitStatus = 'available' | 'reserved' | 'sold' | 'leased';
+export type BlockUnitStatus =
+  | 'vacant'
+  | 'reserved'
+  | 'leased'
+  | 'leaseExpireSoon'
+  | 'leaseRenewal'
+  | 'underFitout'
+  | 'cancelled'
+  | 'internalUse'
+  | 'onHold';
 
 export interface IBlockUnitAssignment {
   blockUnitId: string;
@@ -16,7 +25,8 @@ export interface IBlockUnitAssignment {
 }
 
 export interface IBlockUnitAssignmentDocument
-  extends IBlockUnitAssignment, Document {}
+  extends IBlockUnitAssignment,
+    Document {}
 
 export type IBlockUnitAssignmentModel = Model<IBlockUnitAssignmentDocument>;
 
@@ -33,8 +43,18 @@ export const blockUnitAssignmentSchema =
       memberId: { type: String, index: true },
       status: {
         type: String,
-        enum: ['available', 'reserved', 'sold', 'leased'],
-        default: 'available',
+        enum: [
+          'vacant',
+          'reserved',
+          'leased',
+          'leaseExpireSoon',
+          'leaseRenewal',
+          'underFitout',
+          'cancelled',
+          'internalUse',
+          'onHold',
+        ],
+        default: 'vacant',
         index: true,
       },
       assignedAt: { type: Date, default: Date.now },

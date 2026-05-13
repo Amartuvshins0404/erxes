@@ -5,7 +5,6 @@ import { useForm } from 'react-hook-form';
 import { Can, SelectMember } from 'ui-modules';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useParams } from 'react-router';
 import { useAddMember } from '../hooks/useAddMember';
 import { GET_AGENCY_MEMBERS } from '../graphql';
 import { useAgencyInfo } from '../hooks/useAgencyInfo';

@@ -3,8 +3,6 @@ import { unitColumns } from './unitColumns';
 import { useGetUnits } from '../hooks/useGetUnits';
 import { BlockUnitStatus } from '../types/unit';
 
-const PER_PAGE = 20;
-
 type Props = { status?: BlockUnitStatus };
 
 export const UnitRecordTable = ({ status }: Props) => {

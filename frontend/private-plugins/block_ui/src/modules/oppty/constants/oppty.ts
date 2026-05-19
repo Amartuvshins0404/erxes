@@ -6,7 +6,6 @@ export const OPPTY_STATUSES = {
   PROPERTY_VIEWING: 'property_viewing',
   UNIT_SELECTED: 'unit_selected',
   NEGOTIATION: 'negotiation',
-  RESERVATION: 'reservation',
   CONTRACT_DRAFTING_SIGNING: 'contract_drafting_signing',
   CLOSED_SUCCESSFUL: 'closed_successful',
   CLOSED_UNSUCCESSFUL: 'closed_unsuccessful',

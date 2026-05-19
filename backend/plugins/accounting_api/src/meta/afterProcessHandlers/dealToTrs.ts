@@ -1,7 +1,11 @@
 import { fixNum, sendTRPCMessage } from 'erxes-api-shared/utils';
 import { nanoid } from 'nanoid';
 import { IModels } from '~/connectionResolvers';
-import { JOURNALS, TR_SIDES } from '~/modules/accounting/@types/constants';
+import {
+  JOURNALS,
+  TR_SIDES,
+  TR_STATUSES,
+} from '~/modules/accounting/@types/constants';
 import {
   ITransaction,
   ITransactionDocument,
@@ -33,6 +37,7 @@ export const dealToTrs = async ({
     payments: Record<string, { accountId: string }>;
     defaultPayment: { accountId: string };
     defaultNegPayment: { accountId: string };
+    trStatus?: string;
   };
 }) => {
   const activeProductsData = deal.productsData?.filter((pd) => pd.tickUsed);
@@ -47,6 +52,7 @@ export const dealToTrs = async ({
   let oldOtherTrs: ITransactionDocument[] = [];
 
   const [contentType, contentId] = ['sales:deal', deal._id];
+  const number = deal.number;
 
   const oldTrs = await models.Transactions.find({
     contentType,
@@ -73,9 +79,11 @@ export const dealToTrs = async ({
     _id: mainId,
     ptrId,
     parentId,
+    number,
     date,
     journal: JOURNALS.INV_SALE,
     side: TR_SIDES.CREDIT,
+    status: config.trStatus || TR_STATUSES.COMPLETE,
     followInfos: {
       saleOutAccountId: config.saleOutAccountId,
       saleCostAccountId: config.saleCostAccountId,
@@ -178,6 +186,7 @@ export const dealToTrs = async ({
       _id: nanoid(),
       ptrId,
       parentId,
+      number,
       date,
       journal,
       side,
@@ -212,6 +221,7 @@ export const dealToTrs = async ({
         _id: nanoid(),
         ptrId,
         parentId,
+        number,
         date,
         journal,
         side,

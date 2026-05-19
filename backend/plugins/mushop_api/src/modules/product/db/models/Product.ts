@@ -51,6 +51,8 @@ export const loadMushopProductClass = (
         entityId,
       }).lean();
 
+      console.log('existing', existing)
+
       const synced = await models.MushopProduct.findOneAndUpdate(
         { subdomain, entityId },
         {
@@ -62,6 +64,8 @@ export const loadMushopProductClass = (
         },
         { upsert: true, new: true, setDefaultsOnInsert: true },
       );
+
+      console.log('synced', synced)
 
       if (synced) {
         if (!existing) {

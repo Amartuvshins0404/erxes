@@ -7,6 +7,7 @@ export const GET_OPENCODE = gql`
       identifierId
       name
       url
+      token
       provider
       serverId
       createdAt

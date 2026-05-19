@@ -20,11 +20,15 @@ interface IQueryParams {
   ids?: string[];
   excludeIds?: boolean;
   status?: string;
+  mentionOwnerId: string;
+  mentionUserId: string;
   searchValue?: string;
   number?: string;
   ptrStatus: string;
   customerType?: string;
   customerId?: string;
+  contentType?: string;
+  contentId?: string;
 
   accountIds?: string[];
   accountKind?: string;
@@ -106,6 +110,7 @@ const getAccountIds = async (
       departmentId: accountDepartmentId,
       currency: accountCurrency,
       journal: accountJournal,
+      permissionMode: 'read',
     },
     user,
   );
@@ -132,6 +137,8 @@ const generateFilter = async (
     journals,
     customerType,
     customerId,
+    contentType,
+    contentId,
     brandId,
     branchId,
     departmentId,
@@ -139,6 +146,8 @@ const generateFilter = async (
     statuses,
     ptrStatus,
     status,
+    mentionOwnerId,
+    mentionUserId,
     createdUserId,
     modifiedUserId,
     startDate,
@@ -149,6 +158,7 @@ const generateFilter = async (
     endCreatedDate,
   } = params;
   const filter: any = {};
+  const orFilter: any[] = [];
 
   if (createdUserId) {
     filter.createdBy = createdUserId;
@@ -209,26 +219,37 @@ const generateFilter = async (
     filter.status = { $in: TR_STATUSES.ACTIVE };
   }
 
-  if (ids?.length) {
-    filter._id = { [excludeIds ? '$nin' : '$in']: ids };
-  }
-
-  if (number) {
-    const regex = new RegExp(`.*${escapeRegExp(number)}.*`, 'i');
-    filter.number = { $in: [regex] };
-  }
-
-  if (searchValue) {
-    const regex = new RegExp(`.*${escapeRegExp(searchValue)}.*`, 'i');
-    filter.description = regex;
-  }
-
   if (ptrStatus) {
     filter.ptrStatus = ptrStatus;
   }
 
   if (status) {
     filter.status = status;
+  }
+
+  if (mentionOwnerId) {
+    filter.mentionOwnerId = mentionOwnerId;
+  }
+
+  if (mentionUserId) {
+    filter.mentionUserId = { $in: mentionUserId };
+  }
+
+  if (ids?.length) {
+    filter._id = { [excludeIds ? '$nin' : '$in']: ids };
+  }
+
+  if (number) {
+    const regex = new RegExp(`.*${escapeRegExp(number)}.*`, 'i');
+    orFilter.push(
+      { number: { $regex: regex } },
+      { ptrNumber: { $regex: regex } },
+    );
+  }
+
+  if (searchValue) {
+    const regex = new RegExp(`.*${escapeRegExp(searchValue)}.*`, 'i');
+    filter.description = regex;
   }
 
   if (brandId) {
@@ -275,11 +296,20 @@ const generateFilter = async (
   if (customerId) {
     filter.customerId = customerId;
   }
+  if (contentType) {
+    filter.contentType = contentType;
+  }
+  if (contentId) {
+    filter.contentId = contentId;
+  }
 
   if (currency) {
     filter['details.currency'] = currency;
   }
 
+  if (orFilter.length) {
+    return { ...filter, $or: orFilter };
+  }
   return filter;
 };
 
@@ -311,8 +341,9 @@ const transactionCommon = {
   async accTransactionDetail(
     _root,
     params: { _id: string },
-    { models }: IContext,
+    { models, user, checkPermission }: IContext,
   ) {
+    await checkPermission('readTransactions');
     const transaction = await models.Transactions.findOne({
       _id: params._id,
     }).lean();
@@ -321,7 +352,13 @@ const transactionCommon = {
       throw new Error('Transaction not found');
     }
 
-    return transaction;
+    const [checkedTransaction] = await checkPermissionTrs(
+      models,
+      [transaction],
+      user,
+    );
+
+    return checkedTransaction;
   },
 
   async accTransactionsMain(
@@ -333,10 +370,10 @@ const transactionCommon = {
     const filter = await generateFilter(subdomain, models, params, user);
 
     // Set default orderBy
-    params.orderBy ??= { date: 1 };
+    params.orderBy ??= { ptrNumber: -1 };
     params.orderBy = {
       ...params.orderBy,
-      ptrId: params.orderBy?.ptrId ?? 1,
+      ptrId: params.orderBy?.ptrNumber ?? 1,
     };
 
     return await cursorPaginate({
@@ -366,9 +403,9 @@ const transactionCommon = {
       pagintationArgs.perPage = ids.length;
     }
 
-    let sort: any = { date: 1 };
+    let sort: any = { ptrNumber: -1 };
     if (sortField) {
-      sort = { [sortField]: sortDirection ?? 1 };
+      sort = { [sortField]: sortDirection ?? 1, ptrNumber: -1 };
     }
 
     return await defaultPaginate(
@@ -404,11 +441,10 @@ const transactionCommon = {
       params.limit = ids.length;
     }
 
-    params.orderBy ??= { date: 1 };
+    params.orderBy ??= { ptrNumber: -1 };
     params.orderBy = {
       ...params.orderBy,
-      ptrId: params.orderBy?.ptrId ?? 1,
-      _id: params.orderBy?._id ?? 1,
+      ptrNumber: -1,
     };
 
     return await cursorPaginateAggregation({
@@ -450,9 +486,9 @@ const transactionCommon = {
     const $limit = Number(pageArgs.perPage || '20');
     const $skip = (Number(pageArgs.page || '1') - 1) * $limit;
 
-    let $sort: any = { date: 1 };
+    let $sort: any = { ptrNumber: -1 };
     if (sortField) {
-      $sort = { [sortField]: sortDirection ?? 1 };
+      $sort = { [sortField]: sortDirection ?? 1, ptrNumber: -1 };
     }
 
     return await models.Transactions.aggregate([

@@ -17,18 +17,6 @@ const CategoriesPage = lazy(() =>
   })),
 );
 
-const ProvidersPage = lazy(() =>
-  import('~/pages/ProvidersPage').then((module) => ({
-    default: module.ProvidersPage,
-  })),
-);
-
-const BannersPage = lazy(() =>
-  import('~/pages/BannersPage').then((module) => ({
-    default: module.BannersPage,
-  })),
-);
-
 const RegistrationIndexPage = lazy(() =>
   import('~/pages/RegistrationIndexPage').then((module) => ({
     default: module.RegistrationIndexPage,
@@ -74,8 +62,6 @@ const MtoMain = () => {
         {!isSlaveMode && (
           <Route path="/categories" element={<CategoriesPage />} />
         )}
-        <Route path="/providers" element={<ProvidersPage />} />
-        {!isSlaveMode && <Route path="/banners" element={<BannersPage />} />}
         <Route path="/registration" element={<RegistrationIndexPage />} />
         <Route path="/registrations" element={<RegistrationsPage />} />
         <Route path="/fillform" element={<RegistrationSchemasPage />} />

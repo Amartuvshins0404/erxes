@@ -2,8 +2,6 @@ import { NavigationMenuLinkItem } from 'erxes-ui';
 import {
   IconActivity,
   IconTags,
-  IconBuildingStore,
-  IconPhoto,
   IconList,
   IconForms,
 } from '@tabler/icons-react';
@@ -29,12 +27,6 @@ export const MtoNavigation = () => {
         />
       )}
       <NavigationMenuLinkItem
-        name="Providers"
-        icon={IconBuildingStore}
-        pathPrefix="mto"
-        path="providers"
-      />
-      <NavigationMenuLinkItem
         name="Registrations"
         icon={IconList}
         pathPrefix="mto"
@@ -46,14 +38,6 @@ export const MtoNavigation = () => {
           icon={IconForms}
           pathPrefix="mto"
           path="fillform"
-        />
-      )}
-      {!isSlaveMode && (
-        <NavigationMenuLinkItem
-          name="Banners"
-          icon={IconPhoto}
-          pathPrefix="mto"
-          path="banners"
         />
       )}
     </>

@@ -1,6 +1,9 @@
 import { getEnv } from 'erxes-api-shared/utils';
 import { IOpencodeServerDocument } from './@types/opencode';
 
+const LOCAL_DEPLOYER_URL = 'http://localhost:4200';
+const PROD_DEPLOYER_URL = 'https://deployer.erxes.io';
+
 interface DeployPayload {
   orgId: string;
   agentId: string;
@@ -11,7 +14,8 @@ interface DeployPayload {
 interface DeployResponse {
   serverName: string;
   serverUrl: string;
-  serverPassword: string;
+  gatewayToken: string;
+  serverPassword?: string;
   serverId: number;
 }
 
@@ -61,13 +65,17 @@ export const normalizeOpencodeProvider = (provider: string) => {
 };
 
 const getDeployerUrl = () => {
-  const deployer = getEnv({ name: 'DEPLOYER_URL' });
+  const deployer = getEnv({ name: 'DEPLOYER_URL' }).trim();
 
-  if (!deployer) {
-    throw new Error('DEPLOYER_URL environment variable is required');
+  if (deployer) {
+    return deployer.replace(/\/$/, '');
   }
 
-  return deployer;
+  if (getEnv({ name: 'NODE_ENV' }).trim() !== 'production') {
+    return LOCAL_DEPLOYER_URL;
+  }
+
+  return PROD_DEPLOYER_URL;
 };
 
 const getErrorMessage = async (response: Response, fallback: string) => {
@@ -169,6 +177,21 @@ export const getOpencodeServerInfo = async (
   }
 
   return response.json();
+};
+
+export const getOpencodeGatewayToken = async (
+  serverName: string,
+): Promise<string> => {
+  const deployer = getDeployerUrl();
+  const response = await fetch(`${deployer}/opencode/${serverName}/gateway-token`);
+
+  if (!response.ok) {
+    const message = await getErrorMessage(response, 'Gateway token fetch failed');
+    throw new Error(`Failed to get gateway token: ${message}`);
+  }
+
+  const data = (await response.json()) as { token: string };
+  return data.token;
 };
 
 export const getOpencodeServerPassword = async (

@@ -8,7 +8,7 @@ import { ProductDetailSheet } from '../components/ProductDetailSheet';
 
 export const ProductsPage = () => {
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col h-full">
       <PageHeader>
         <PageHeader.Start>
           <Breadcrumb>
@@ -32,7 +32,7 @@ export const ProductsPage = () => {
         <ProductsFilter />
       </PageSubHeader>
 
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 flex flex-col overflow-hidden">
         <ProductsTable />
       </div>
 

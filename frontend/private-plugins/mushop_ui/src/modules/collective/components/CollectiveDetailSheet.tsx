@@ -1,25 +1,33 @@
 import {
-  Avatar,
   Badge,
   Button,
+  Command,
   FocusSheet,
   InfoCard,
+  Popover,
   ScrollArea,
   Sheet,
   Sidebar,
   Spinner,
   Table,
   Tabs,
+  toast,
+  Tooltip,
   useQueryState,
 } from 'erxes-ui';
-import { IconBuildingStore } from '@tabler/icons-react';
+import { IconPlus, IconX } from '@tabler/icons-react';
+import { useMemo, useState } from 'react';
 import { useCollectiveDetail } from '../hooks/useCollectiveDetail';
+import { useUpdateCollectiveSuppliers } from '../hooks/useUpdateCollectiveSuppliers';
+import { useSuppliers } from '../../supplier/hooks/useSuppliers';
 import { humanizeSyncError } from '../utils/humanizeSyncError';
 import {
   ICollective,
   ICollectiveSupplier,
   ICollectiveSyncResult,
 } from '../types';
+
+const MIN_COLLECTIVE_SUPPLIERS = 2;
 
 const statusVariant = (status?: string) => {
   if (status === 'active') return 'success' as const;
@@ -54,22 +62,114 @@ const Row = ({
 const SupplierLine = ({
   supplier,
   fallbackId,
+  onRemove,
+  removable,
+  disabled,
 }: {
   supplier?: ICollectiveSupplier | null;
   fallbackId: string;
+  onRemove?: () => void;
+  removable?: boolean;
+  disabled?: boolean;
 }) => (
   <Table.Row>
-    <Table.Cell className="bg-sidebar p-2 w-40 h-auto min-h-10 text-muted-foreground">
-      Supplier
-    </Table.Cell>
-    <Table.Cell className="p-2 h-auto min-h-10 whitespace-normal">
+    <Table.Cell className="bg-sidebar p-2 w-40 h-auto max-h-10 text-muted-foreground">
       {supplier?.name || fallbackId}
+    </Table.Cell>
+    <Table.Cell className="p-1 pl-2 h-auto min-h-10 whitespace-normal">
+      <div className="flex justify-between items-center gap-2">
+        <Badge variant={verificationVariant(supplier?.verificationStatus)}>
+          {supplier?.verificationStatus || 'unknown'}
+        </Badge>
+        {onRemove && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-4 cursor-pointer"
+            disabled={disabled || !removable}
+            onClick={onRemove}
+            title={
+              removable
+                ? 'Remove supplier'
+                : `At least ${MIN_COLLECTIVE_SUPPLIERS} suppliers are required`
+            }
+          >
+            <IconX className="size-4" />
+          </Button>
+        )}
+      </div>
     </Table.Cell>
   </Table.Row>
 );
 
+const AddSupplierPopover = ({
+  currentIds,
+  onAdd,
+  disabled,
+}: {
+  currentIds: string[];
+  onAdd: (supplierId: string) => void;
+  disabled?: boolean;
+}) => {
+  const [open, setOpen] = useState(false);
+  const { suppliers = [], loading } = useSuppliers();
+
+  const currentSet = useMemo(() => new Set(currentIds), [currentIds]);
+  const available = useMemo(
+    () => (suppliers || []).filter((s: any) => !currentSet.has(s._id)),
+    [suppliers, currentSet],
+  );
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <Popover.Trigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-6"
+          disabled={disabled}
+        >
+          <IconPlus className="size-4" />
+        </Button>
+      </Popover.Trigger>
+
+      <Popover.Content align="end" className="p-0 w-64">
+        <Command>
+          <Command.Input placeholder="Search suppliers..." />
+          <Command.List>
+            {loading && (
+              <div className="flex justify-center p-4">
+                <Spinner />
+              </div>
+            )}
+            {!loading && available.length === 0 && (
+              <div className="p-3 text-muted-foreground text-sm text-center">
+                No suppliers available
+              </div>
+            )}
+            {!loading &&
+              available.map((s: any) => (
+                <Command.Item
+                  key={s._id}
+                  value={`${s.name || ''} ${s._id}`}
+                  onSelect={() => {
+                    setOpen(false);
+                    onAdd(s._id);
+                  }}
+                >
+                  {s.name || s._id}
+                </Command.Item>
+              ))}
+          </Command.List>
+        </Command>
+      </Popover.Content>
+    </Popover>
+  );
+};
+
 const CollectiveOverview = ({ collective }: { collective: ICollective }) => {
   const {
+    _id,
     name,
     description,
     targetSubdomain,
@@ -83,6 +183,34 @@ const CollectiveOverview = ({ collective }: { collective: ICollective }) => {
     updatedAt,
     createdBy,
   } = collective;
+
+  const { updateSuppliers, loading: savingSuppliers } =
+    useUpdateCollectiveSuppliers(_id);
+
+  const applySupplierIds = async (nextIds: string[]) => {
+    try {
+      await updateSuppliers({ variables: { _id, supplierIds: nextIds } });
+      toast({ variant: 'success', title: 'Suppliers updated' });
+    } catch (e: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Failed to update suppliers',
+        description: e?.message,
+      });
+    }
+  };
+
+  const handleRemove = (supplierId: string) => {
+    const next = supplierIds.filter((id) => id !== supplierId);
+    applySupplierIds(next);
+  };
+
+  const handleAdd = (supplierId: string) => {
+    if (supplierIds.includes(supplierId)) return;
+    applySupplierIds([...supplierIds, supplierId]);
+  };
+
+  const removable = supplierIds.length > MIN_COLLECTIVE_SUPPLIERS;
 
   return (
     <div className="flex flex-col gap-4 p-4">
@@ -136,19 +264,36 @@ const CollectiveOverview = ({ collective }: { collective: ICollective }) => {
         </InfoCard.Content>
       </InfoCard>
 
-      {suppliers.length > 0 && (
-        <InfoCard title="Suppliers">
-          <InfoCard.Content className="shadow-none p-0 overflow-hidden">
-            <Table>
-              <Table.Body className="bt:[&_td]:px-2 bt:[&_tr:first-child_td]:border-t bt:[&_td]:h-10">
-                {suppliers.map((s) => (
-                  <SupplierLine supplier={s} fallbackId={s._id} />
-                ))}
-              </Table.Body>
-            </Table>
-          </InfoCard.Content>
-        </InfoCard>
-      )}
+      <div className="flex flex-col bg-foreground/5 rounded-xl p-1 pt-0">
+        <div className="flex justify-between items-center pr-1 pl-2 h-7">
+          <h3 className="font-medium font-mono text-xs uppercase">Suppliers</h3>
+          <AddSupplierPopover
+            currentIds={supplierIds}
+            onAdd={handleAdd}
+            disabled={savingSuppliers}
+          />
+        </div>
+        <div className="flex flex-col flex-auto gap-3 bg-background shadow-sm p-0 rounded-lg overflow-hidden">
+          <Table>
+            <Table.Body className="bt:[&_td]:px-2 bt:[&_tr:first-child_td]:border-t bt:[&_td]:h-10">
+              {supplierIds.map((id) => {
+                const supplier =
+                  suppliers.find((s) => s._id === id) || undefined;
+                return (
+                  <SupplierLine
+                    key={id}
+                    supplier={supplier}
+                    fallbackId={id}
+                    removable={removable}
+                    disabled={savingSuppliers}
+                    onRemove={() => handleRemove(id)}
+                  />
+                );
+              })}
+            </Table.Body>
+          </Table>
+        </div>
+      </div>
     </div>
   );
 };

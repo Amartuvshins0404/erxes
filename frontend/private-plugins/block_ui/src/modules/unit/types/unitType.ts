@@ -29,6 +29,14 @@ export interface IUnitType {
   updatedAt: Date;
 }
 
+export interface IUnitActiveContract {
+  _id: string;
+  status?: string;
+  statusType?: string;
+  statusLabel?: string;
+  statusColor?: string;
+}
+
 export interface IUnit {
   _id: string;
   number: string;
@@ -37,10 +45,13 @@ export interface IUnit {
   zoning: string;
   building: string;
   status: string;
+  activeContract?: IUnitActiveContract | null;
   blockSubdomain?: string;
   blockEntityId?: string;
   agencySubdomain?: string;
   agencyEntityId?: string;
+  projectData?: { _id: string; name?: string } | null;
+  locked?: boolean;
 }
 
 export interface IUnitAttachment {

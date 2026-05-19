@@ -17,6 +17,16 @@ import {
   loadContractClass,
 } from '@/contract/db/models/Contract';
 import { IOfferModel, loadOfferClass } from '@/contract/db/models/Offer';
+import { IContractPaymentDocument } from '@/contract/@types/payment';
+import {
+  IContractPaymentModel,
+  loadContractPaymentClass,
+} from '@/contract/db/models/Payment';
+import { IContractStatusDocument } from '@/contract/@types/status';
+import {
+  IContractStatusModel,
+  loadContractStatusClass,
+} from '@/contract/db/models/Status';
 import { IBlockDeveloperDocument } from '@/developer/db/@types/developer';
 import {
   IBlockDeveloperModel,
@@ -76,6 +86,8 @@ export interface IModels {
   Invoice: IInvoiceModel;
   Oppty: IOpptyModel;
   OpptyStatus: IOpptyStatusModel;
+  ContractStatus: IContractStatusModel;
+  ContractPayment: IContractPaymentModel;
 }
 
 export interface IContext extends IMainContext {
@@ -137,8 +149,16 @@ export const loadClasses = (
 
   models.Contract = db.model<IContractDocument, IContractModel>(
     'block_contracts',
-    loadContractClass(models),
+    loadContractClass(
+      models,
+      blockEventHandlers?.('block', 'contracts') as any,
+    ),
   );
+
+  models.ContractPayment = db.model<
+    IContractPaymentDocument,
+    IContractPaymentModel
+  >('block_contract_payments', loadContractPaymentClass(models));
 
   models.ProjectMember = db.model<IProjectMemberDocument, IProjectMemberModel>(
     'block_project_members',
@@ -177,6 +197,11 @@ export const loadClasses = (
   models.OpptyStatus = db.model<IOpptyStatusDocument, IOpptyStatusModel>(
     'block_oppty_statuses',
     loadOpptyStatusClass(models),
+  );
+
+  models.ContractStatus = db.model<IContractStatusDocument, IContractStatusModel>(
+    'block_contract_statuses',
+    loadContractStatusClass(models),
   );
 
   return models;

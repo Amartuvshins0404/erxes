@@ -9,6 +9,8 @@ export const MUSHOP_SUPPLIER_DETAIL = gql`
       about
       logo
       coverImage
+      attachments
+      urls
       registrationNumber
       address
       primaryEmail

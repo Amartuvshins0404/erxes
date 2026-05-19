@@ -183,21 +183,6 @@ export const GET_CAR_COUNT_BY_TAGS = gql`
   }
 `;
 
-export const GET_DEALS_BY_IDS = gql`
-  query CarsRelatedDeals($_ids: [String]) {
-    deals(_ids: $_ids) {
-      list {
-        _id
-        name
-        status
-        stage {
-          name
-        }
-      }
-    }
-  }
-`;
-
 const MUTATION_FIELDS = `
   ownerId: $ownerId
   description: $description

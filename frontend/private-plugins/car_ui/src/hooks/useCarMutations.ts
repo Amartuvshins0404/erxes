@@ -54,7 +54,7 @@ const removeCarsFromCache = (
           ),
         };
       },
-      cars(existing: readonly unknown[] = [], { readField }) {
+      cars(existing, { readField }) {
         if (!Array.isArray(existing)) {
           return existing;
         }

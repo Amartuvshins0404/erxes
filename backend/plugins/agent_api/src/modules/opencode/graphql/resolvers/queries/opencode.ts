@@ -1,6 +1,7 @@
 import { IContext } from '~/connectionResolvers';
 import { ensureLegacyIdentifierLinks } from '~/modules/assistantOrg/utils';
 import {
+  getOpencodeGatewayToken,
   getOpencodeServerInfo,
   getOpencodeServerPassword,
   isOpencodeServerReady,
@@ -22,7 +23,26 @@ export const opencodeQueries = {
     }
 
     if (opencode.status !== SERVER_STATUSES.DEPLOYING) {
-      return { ...opencode, identifierId: opencode.identifierId };
+      if (opencode.token) {
+        return { ...opencode, identifierId: opencode.identifierId };
+      }
+
+      try {
+        const token = await getOpencodeGatewayToken(opencode.name);
+        return models.OpencodeServer.findOneAndUpdate(
+          { _id: opencode._id },
+          { $set: { token } },
+          { new: true },
+        )
+          .lean()
+          .then((updated) =>
+            updated
+              ? { ...updated, identifierId: updated.identifierId }
+              : { ...opencode, token, identifierId: opencode.identifierId },
+          );
+      } catch {
+        return { ...opencode, identifierId: opencode.identifierId };
+      }
     }
 
     try {
@@ -33,6 +53,10 @@ export const opencodeQueries = {
         (await isOpencodeServerReady(serverUrl));
       const nextStatus =
         ready ? SERVER_STATUSES.APPROVED : SERVER_STATUSES.DEPLOYING;
+      const token =
+        ready && !opencode.token
+          ? await getOpencodeGatewayToken(opencode.name).catch(() => undefined)
+          : opencode.token;
 
       return models.OpencodeServer.findOneAndUpdate(
         { _id: opencode._id },
@@ -40,6 +64,7 @@ export const opencodeQueries = {
           $set: {
             status: nextStatus,
             url: serverUrl,
+            ...(token ? { token } : {}),
             serverId: String(remote.serverId || opencode.serverId),
           },
         },

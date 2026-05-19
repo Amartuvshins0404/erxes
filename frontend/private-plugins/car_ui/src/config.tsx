@@ -1,24 +1,15 @@
 import { IconCarSuv } from '@tabler/icons-react';
-import { lazy, Suspense } from 'react';
 import { IUIConfig } from 'erxes-ui';
-
-const MainNavigation = lazy(() =>
-  import('./modules/MainNavigation').then((module) => ({
-    default: module.MainNavigation,
-  })),
-);
+import { MainNavigation } from './modules/MainNavigation';
 
 export const CONFIG: IUIConfig = {
   name: 'car',
   path: 'car',
+  icon: IconCarSuv,
   navigationGroup: {
     name: 'car',
     icon: IconCarSuv,
-    content: () => (
-      <Suspense fallback={<div />}>
-        <MainNavigation />
-      </Suspense>
-    ),
+    content: () => <MainNavigation />,
   },
   modules: [
     {

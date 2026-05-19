@@ -8,27 +8,15 @@ const UnitDetailOverview = lazy(() =>
   })),
 );
 
-const UnitDocument = lazy(() =>
-  import('./UnitDocument').then((module) => ({
-    default: module.UnitDocument,
-  })),
-);
-
-const UnitMedia = lazy(() =>
-  import('./UnitMedia').then((module) => ({
-    default: module.UnitMedia,
-  })),
-);
-
 const UnitContract = lazy(() =>
   import('./UnitContract').then((module) => ({
     default: module.UnitContract,
   })),
 );
 
-const UnitOffers = lazy(() =>
-  import('./UnitOffers').then((module) => ({
-    default: module.UnitOffers,
+const UnitOpportunity = lazy(() =>
+  import('./UnitOpportunity').then((module) => ({
+    default: module.UnitOpportunity,
   })),
 );
 
@@ -42,11 +30,10 @@ export const UnitTabs = () => {
       {activeUnitTab === UNIT_DOCUMENT_TABS_KEYS.overview && (
         <UnitDetailOverview />
       )}
-      {activeUnitTab === UNIT_DOCUMENT_TABS_KEYS.document && <UnitDocument />}
-      {activeUnitTab === UNIT_DOCUMENT_TABS_KEYS.media && <UnitMedia />}
+      {activeUnitTab === UNIT_DOCUMENT_TABS_KEYS.opportunities && (
+        <UnitOpportunity />
+      )}
       {activeUnitTab === UNIT_DOCUMENT_TABS_KEYS.contracts && <UnitContract />}
-      {activeUnitTab === UNIT_DOCUMENT_TABS_KEYS.offers && <UnitOffers />}
-
     </Suspense>
   );
 };

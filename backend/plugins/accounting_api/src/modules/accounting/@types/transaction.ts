@@ -31,9 +31,12 @@ export interface ITransaction {
   fullDate?: Date;
   description?: string;
   status?: string;
+  mentionOwnerId?: string;
+  mentionUserIds?: string[];
   ptrId?: string;
   parentId?: string;
   number?: string;
+  ptrNumber?: string;
   journal: string;
   ptrStatus?: string;
 
@@ -108,6 +111,7 @@ export interface IHiddenTransaction extends Document {
   parentId: string;
   ptrId: string;
   ptrStatus: string;
+  journal?: string;
   originId?: string;
   originType?: string;
   originSubId?: string;

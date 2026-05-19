@@ -11,11 +11,37 @@ export const types = `
     errors: [String]
   }
 
+  type MushopCollectiveSocialLink {
+    facebook: String
+    twitter: String
+    instagram: String
+    linkedin: String
+    youtube: String
+    website: String
+  }
+
   type MushopCollective {
     _id: String!
     name: String
     description: String
+    about: String
+    logo: String
+    coverImage: String
+    attachments: [String]
+    urls: [String]
+    registrationNumber: String
+    address: JSON
+    primaryEmail: String
+    primaryPhone: String
+    emails: [String]
+    phones: [String]
+    dateFounded: String
+    website: String
+    socialLinks: MushopCollectiveSocialLink
+    ownerUserId: String
+
     targetSubdomain: String
+    targetPosToken: String
     supplierIds: [String]
     suppliers: [MushopSupplier]
     status: String
@@ -35,7 +61,7 @@ export const types = `
   }
 `;
 
-const collectiveQueryParams = `
+const queryParams = `
   searchValue: String
   status: String
   targetSubdomain: String
@@ -44,14 +70,17 @@ const collectiveQueryParams = `
 
 export const queries = `
   mushopCollectiveDetail(_id: String!): MushopCollective
-  mushopCollectives(${collectiveQueryParams}${GQL_CURSOR_PARAM_DEFS}): MushopCollectiveListResponse
+  mushopCollectives(${queryParams}${GQL_CURSOR_PARAM_DEFS}): MushopCollectiveListResponse
 `;
 
 export const mutations = `
   mushopCreateCollective(
-    name: String!
-    description: String
     targetSubdomain: String!
+    supplierIds: [String!]!
+  ): MushopCollective
+
+  mushopUpdateCollectiveSuppliers(
+    _id: String!
     supplierIds: [String!]!
   ): MushopCollective
 

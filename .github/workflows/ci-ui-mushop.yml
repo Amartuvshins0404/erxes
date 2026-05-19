@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - mushop
     paths:
       - 'frontend/private-plugins/mushop_ui/**'
       - 'frontend/libs/**'

@@ -37,4 +37,45 @@ export const permissions: IPermissionConfig = {
       ],
     },
   ],
+  defaultGroups: [
+    {
+      id: 'car:admin',
+      name: 'Car Admin',
+      description: 'Full access to the Car plugin',
+      permissions: [
+        {
+          plugin: 'car',
+          module: 'car',
+          actions: ['showCars', 'manageCars'],
+          scope: 'all',
+        },
+      ],
+    },
+    {
+      id: 'car:user',
+      name: 'Car User',
+      description: 'Standard car team member',
+      permissions: [
+        {
+          plugin: 'car',
+          module: 'car',
+          actions: ['showCars', 'manageCars'],
+          scope: 'group',
+        },
+      ],
+    },
+    {
+      id: 'car:viewer',
+      name: 'Car Viewer',
+      description: 'Read-only access to cars and categories',
+      permissions: [
+        {
+          plugin: 'car',
+          module: 'car',
+          actions: ['showCars'],
+          scope: 'group',
+        },
+      ],
+    },
+  ],
 };

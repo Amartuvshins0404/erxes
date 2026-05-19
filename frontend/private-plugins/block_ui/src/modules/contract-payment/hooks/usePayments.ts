@@ -1,0 +1,205 @@
+import { useMutation, useQuery } from '@apollo/client';
+import {
+  EnumCursorDirection,
+  mergeCursorData,
+  validateFetchMore,
+} from 'erxes-ui';
+import {
+  GET_CONTRACT_PAYMENTS,
+  GET_PROJECT_PAYMENTS,
+} from '@/contract-payment/graphql/queries';
+import {
+  MARK_PAYMENT_PAID,
+  MARK_PAYMENT_UNPAID,
+} from '@/contract-payment/graphql/mutations';
+import { IContractPayment } from '@/contract-payment/types';
+
+const PAYMENTS_PER_PAGE = 30;
+
+type ProjectPaymentsResponse = {
+  blockGetProjectPayments: {
+    list: IContractPayment[];
+    pageInfo: {
+      hasNextPage: boolean;
+      hasPreviousPage: boolean;
+      startCursor: string | null;
+      endCursor: string | null;
+    };
+    totalCount: number;
+  };
+};
+
+export const useProjectPayments = (projectId?: string, paid?: boolean) => {
+  const { data, loading, refetch, fetchMore } =
+    useQuery<ProjectPaymentsResponse>(GET_PROJECT_PAYMENTS, {
+      variables: { projectId, paid, limit: PAYMENTS_PER_PAGE },
+      skip: !projectId,
+      notifyOnNetworkStatusChange: true,
+    });
+
+  const list = data?.blockGetProjectPayments?.list || [];
+  const pageInfo = data?.blockGetProjectPayments?.pageInfo;
+  const totalCount = data?.blockGetProjectPayments?.totalCount || 0;
+
+  const handleFetchMore = ({
+    direction,
+  }: {
+    direction: EnumCursorDirection;
+  }) => {
+    if (
+      !validateFetchMore({
+        direction,
+        pageInfo,
+      })
+    ) {
+      return;
+    }
+
+    fetchMore({
+      variables: {
+        cursor:
+          direction === EnumCursorDirection.FORWARD
+            ? pageInfo?.endCursor
+            : pageInfo?.startCursor,
+        direction:
+          direction === EnumCursorDirection.FORWARD ? 'forward' : 'backward',
+        limit: PAYMENTS_PER_PAGE,
+      },
+      updateQuery: (prev, { fetchMoreResult }) => {
+        if (!fetchMoreResult) return prev;
+        return Object.assign({}, prev, {
+          blockGetProjectPayments: mergeCursorData<IContractPayment>({
+            direction,
+            fetchMoreResult: fetchMoreResult.blockGetProjectPayments as any,
+            prevResult: prev.blockGetProjectPayments as any,
+          }) as any,
+        });
+      },
+    });
+  };
+
+  return {
+    payments: list,
+    pageInfo,
+    totalCount,
+    handleFetchMore,
+    loading,
+    refetch,
+  };
+};
+
+type ContractPaymentsResponse = {
+  blockGetContractPayments: {
+    list: IContractPayment[];
+    pageInfo: {
+      hasNextPage: boolean;
+      hasPreviousPage: boolean;
+      startCursor: string | null;
+      endCursor: string | null;
+    };
+    totalCount: number;
+  };
+};
+
+export const useContractPayments = (contractId?: string) => {
+  const { data, loading, refetch, fetchMore } =
+    useQuery<ContractPaymentsResponse>(GET_CONTRACT_PAYMENTS, {
+      variables: { contractId, limit: PAYMENTS_PER_PAGE },
+      skip: !contractId,
+      notifyOnNetworkStatusChange: true,
+    });
+
+  const list = data?.blockGetContractPayments?.list || [];
+  const pageInfo = data?.blockGetContractPayments?.pageInfo;
+  const totalCount = data?.blockGetContractPayments?.totalCount || 0;
+
+  const handleFetchMore = ({
+    direction,
+  }: {
+    direction: EnumCursorDirection;
+  }) => {
+    if (!validateFetchMore({ direction, pageInfo })) {
+      return;
+    }
+
+    fetchMore({
+      variables: {
+        contractId,
+        cursor:
+          direction === EnumCursorDirection.FORWARD
+            ? pageInfo?.endCursor
+            : pageInfo?.startCursor,
+        direction:
+          direction === EnumCursorDirection.FORWARD ? 'forward' : 'backward',
+        limit: PAYMENTS_PER_PAGE,
+      },
+      updateQuery: (prev, { fetchMoreResult }) => {
+        if (!fetchMoreResult) return prev;
+        return Object.assign({}, prev, {
+          blockGetContractPayments: mergeCursorData<IContractPayment>({
+            direction,
+            fetchMoreResult: fetchMoreResult.blockGetContractPayments as any,
+            prevResult: prev.blockGetContractPayments as any,
+          }) as any,
+        });
+      },
+    });
+  };
+
+  return {
+    payments: list,
+    pageInfo,
+    totalCount,
+    handleFetchMore,
+    loading,
+    refetch,
+  };
+};
+
+export const useMarkPaymentPaid = () => {
+  const [markPaid, { loading }] = useMutation(MARK_PAYMENT_PAID);
+  return {
+    markPaid: async (
+      id: string,
+      input?: { paidAmount?: number; paidDate?: string; note?: string },
+    ) => {
+      const { data } = await markPaid({
+        variables: { id, ...input },
+        optimisticResponse: {
+          blockMarkContractPaymentPaid: {
+            __typename: 'BlockContractPayment',
+            _id: id,
+            paid: true,
+            paidAmount: input?.paidAmount ?? null,
+            paidDate: input?.paidDate ?? new Date().toISOString(),
+            note: input?.note ?? null,
+          },
+        },
+      });
+      return data?.blockMarkContractPaymentPaid;
+    },
+    loading,
+  };
+};
+
+export const useMarkPaymentUnpaid = () => {
+  const [markUnpaid, { loading }] = useMutation(MARK_PAYMENT_UNPAID);
+  return {
+    markUnpaid: async (id: string) => {
+      const { data } = await markUnpaid({
+        variables: { id },
+        optimisticResponse: {
+          blockMarkContractPaymentUnpaid: {
+            __typename: 'BlockContractPayment',
+            _id: id,
+            paid: false,
+            paidAmount: null,
+            paidDate: null,
+          },
+        },
+      });
+      return data?.blockMarkContractPaymentUnpaid;
+    },
+    loading,
+  };
+};

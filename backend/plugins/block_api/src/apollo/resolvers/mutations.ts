@@ -15,6 +15,8 @@ import { unitTypesMutations } from '~/modules/unit/graphql/resolvers/mutations/u
 import { opptyMutations } from '@/oppty/graphql/mutations/oppty';
 import { blockNoteMutations } from '@/note/graphql/resolvers/mutations/note';
 import { statusMutations } from '@/oppty/graphql/mutations/status';
+import { contractStatusMutations } from '@/contract/graphql/resolvers/mutations/status';
+import { contractPaymentMutations } from '@/contract/graphql/resolvers/mutations/payment';
 
 export const mutations = {
   ...projectMutations,
@@ -34,4 +36,6 @@ export const mutations = {
   ...opptyMutations,
   ...blockNoteMutations,
   ...statusMutations,
+  ...contractStatusMutations,
+  ...contractPaymentMutations,
 };

@@ -88,11 +88,11 @@ function ProjectItem({ project }: ProjectItemProps) {
             </Sidebar.Menu>
             <Sidebar.Menu>
               <NavigationMenuLinkItem
-                name="Finance & Leases"
+                name="Finance"
                 className="pl-6 font-medium"
                 pathPrefix="block/project"
                 icon={IconFileInvoice}
-                path={`${project._id}/finance-lease`}
+                path={`${project._id}/payments`}
               />
             </Sidebar.Menu>
           </Sidebar.GroupContent>

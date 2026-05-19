@@ -3,7 +3,7 @@ import { generateModels } from '~/connectionResolvers';
 
 const router: Router = Router();
 
-router.post('/updateSupplier', async (req: Request, res: Response) => {
+const syncSupplierRecord = async (req: Request, res: Response) => {
   try {
     const { subdomain, payload } = req.body || {};
     const { entityId, data } = payload || {};
@@ -15,12 +15,15 @@ router.post('/updateSupplier', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'payload.entityId is required' });
 
     const models = await generateModels(subdomain);
+
     await models.Supplier.syncFromSupplier(entityId, subdomain, input, userId);
 
     return res.status(200).json({ success: true });
   } catch (e: any) {
     return res.status(400).json({ error: e.message });
   }
-});
+};
+
+router.post('/updateSupplier', syncSupplierRecord);
 
 export { router };

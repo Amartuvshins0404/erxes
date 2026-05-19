@@ -45,7 +45,8 @@ export const PROJECT_TABS = {
   CONTACT: 'contact',
   TARGET: 'target',
   SPECIFICATIONS: 'specifications',
-  STATUS: 'status',
+  OPPTY_STATUSES: 'opportunity statuses',
+  CONTRACT_STATUSES: 'contract statuses',
 };
 
 export const BLOCK_PROJECT_STATUS = {

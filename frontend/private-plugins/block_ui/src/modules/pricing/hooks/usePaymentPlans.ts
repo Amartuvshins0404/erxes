@@ -8,13 +8,17 @@ import { useParams } from 'react-router-dom';
 import { useQueryState } from 'erxes-ui';
 
 export const usePaymentPlansByProject = () => {
-  const { id } = useParams();
-  const [projectId] = useQueryState('projectId');
+  const { id, projectId: projectIdParam } = useParams<{
+    id?: string;
+    projectId?: string;
+  }>();
+  const [projectIdQuery] = useQueryState('projectId');
+  const project = id || projectIdParam || projectIdQuery;
   const { data, loading, error, refetch } = useQuery<{
     blockGetProjectPaymentPlans: IPaymentPlan[];
   }>(GET_PAYMENT_PLANS_BY_PROJECT, {
-    variables: { project: id || projectId },
-    skip: !id && !projectId,
+    variables: { project },
+    skip: !project,
   });
 
   return {

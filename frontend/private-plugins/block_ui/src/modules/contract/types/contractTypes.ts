@@ -10,13 +10,6 @@ export enum ContractAmountType {
   PER_UNIT = 'perUnit',
 }
 
-export enum ContractStatus {
-  DRAFT = 'draft',
-  SIGNED = 'signed',
-  COMPLETED = 'completed',
-  CANCELLED = 'cancelled',
-}
-
 export enum ContractInterestType {
   SIMPLE = 'SIMPLE',
   FLAT = 'FLAT',
@@ -50,7 +43,7 @@ export interface IContractInput {
   date?: string;
   amount?: number;
   amountType?: ContractAmountType;
-  status?: ContractStatus;
+  status?: string;
   startDate?: string;
   endDate?: string;
   isLifeTime?: boolean;

@@ -2,9 +2,9 @@ import { IconPackages } from '@tabler/icons-react';
 import { lazy, Suspense } from 'react';
 import { IUIConfig } from 'erxes-ui';
 
-const SupplierNavigation = lazy(() =>
-  import('@/SupplierNavigation').then((module) => ({
-    default: module.SupplierNavigation,
+const NavigationList = lazy(() =>
+  import('@/NavigationList').then((module) => ({
+    default: module.NavigationList,
   })),
 );
 
@@ -12,18 +12,18 @@ export const CONFIG: IUIConfig = {
   name: 'supplier',
   path: 'supplier',
   navigationGroup: {
-    name: 'Supplier',
+    name: 'supplier',
     icon: IconPackages,
     content: () => (
       <Suspense fallback={<div />}>
-        <SupplierNavigation />
+        <NavigationList />
       </Suspense>
     ),
   },
 
   modules: [
     {
-      name: 'Supplier',
+      name: 'supplier',
       icon: IconPackages,
       path: 'supplier',
     },

@@ -1,5 +1,10 @@
 import { generateFieldsFromSchema } from 'erxes-api-shared/core-modules';
+import { Schema } from 'mongoose';
 import { IModels } from '~/connectionResolvers';
+
+type SchemaWithNestedPaths = Schema & {
+  paths: Record<string, { schema?: Schema }>;
+};
 
 const buildCategoryField = (
   name: string,
@@ -31,7 +36,7 @@ const buildSelectionField = (
 });
 
 export const generateCarFields = async (models: IModels) => {
-  const schema = models.Cars.schema as any;
+  const schema = models.Cars.schema as SchemaWithNestedPaths;
   let fields: any[] = [];
 
   if (schema) {

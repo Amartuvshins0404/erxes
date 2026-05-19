@@ -70,7 +70,7 @@ jobs:
           context: .
           file: backend/plugins/btkadmin_api/Dockerfile
           push: true
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           tags: |
             erxes/erxes-next-btkadmin_api:latest
             erxes/erxes-next-btkadmin_api:${{ env.DATE }}-${{ env.SHORT_SHA }}

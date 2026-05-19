@@ -15,6 +15,7 @@ interface RegistrationFormSheetProps {
   onOpenChange: (open: boolean) => void;
   membershipTypeId: string | null;
   summaryTitle?: string;
+  onSubmitted?: () => void;
 }
 
 export function RegistrationFormSheet({
@@ -22,6 +23,7 @@ export function RegistrationFormSheet({
   onOpenChange,
   membershipTypeId,
   summaryTitle,
+  onSubmitted,
 }: RegistrationFormSheetProps) {
   const [clientPortalRemoteId, setClientPortalRemoteId] = useState<
     string | undefined
@@ -52,6 +54,7 @@ export function RegistrationFormSheet({
 
   function handleSubmitted() {
     onOpenChange(false);
+    onSubmitted?.();
   }
 
   return (

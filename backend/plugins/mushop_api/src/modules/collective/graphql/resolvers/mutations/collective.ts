@@ -1,37 +1,103 @@
 import { IContext } from '~/connectionResolvers';
-import { ICollective } from '@/collective/@types/collective';
 import { syncCollectiveProducts } from '@/collective/utils/syncCollectiveProducts';
+import { provisionCollectivePos } from '@/collective/utils/provisionCollectivePos';
+import { purgeCollectiveSupplier } from '@/collective/utils/purgeCollectiveSupplier';
 import { Resolver } from 'erxes-api-shared/core-types';
+import { COLLECTIVE_STATUS } from '~/modules/collective/@types/collective';
 
 export const collectiveMutations: Record<string, Resolver> = {
   mushopCreateCollective: async (
     _root: undefined,
-    args: {
-      name: string;
-      description?: string;
+    {
+      targetSubdomain,
+      supplierIds,
+    }: {
       targetSubdomain: string;
       supplierIds: string[];
     },
-    { models, user }: IContext,
+    { models }: IContext,
   ) => {
-    const doc: ICollective = {
-      name: args.name,
-      description: args.description,
-      targetSubdomain: args.targetSubdomain,
-      supplierIds: args.supplierIds,
-    };
+    const pos = await provisionCollectivePos({ targetSubdomain });
 
-    const collective = await models.Collective.createCollective(
-      doc,
-      user?._id,
-    );
-
-    syncCollectiveProducts({
-      models,
-      collectiveId: collective._id,
-    }).catch((e) => {
-      console.error('syncCollectiveProducts failed:', e);
+    const collective = await models.Collective.createCollective({
+      targetSubdomain,
+      targetPosToken: pos.token,
+      supplierIds,
     });
+
+    try {
+      syncCollectiveProducts({
+        models,
+        collectiveId: collective._id,
+      });
+    } catch (error) {
+      models.Collective.updateSyncProgress(collective._id, {
+        status: COLLECTIVE_STATUS.FAILED,
+      });
+
+      throw new Error(
+        `Failed to sync collective products: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+
+    return collective;
+  },
+
+  mushopUpdateCollectiveSuppliers: async (
+    _root: undefined,
+    { _id, supplierIds }: { _id: string; supplierIds: string[] },
+    { models }: IContext,
+  ) => {
+    const { collective, added, removed } =
+      await models.Collective.updateSuppliers(_id, supplierIds);
+
+    if (removed.length && collective.targetPosToken) {
+      const removedSuppliers = await models.Supplier.find({
+        _id: { $in: removed },
+      }).lean();
+
+      for (const supplier of removedSuppliers) {
+        if (!supplier.posToken) continue;
+
+        try {
+          await purgeCollectiveSupplier({
+            supplierSubdomain: supplier.subdomain,
+            supplierPosToken: supplier.posToken,
+            supplierId: supplier._id,
+            targetSubdomain: collective.targetSubdomain,
+            targetPosToken: collective.targetPosToken,
+            collectiveId: collective._id,
+          });
+        } catch (e) {
+          console.error(
+            `Failed to purge supplier ${supplier._id} from collective ${collective._id}:`,
+            e,
+          );
+        }
+      }
+    }
+
+    if (added.length) {
+      try {
+        syncCollectiveProducts({
+          models,
+          collectiveId: collective._id,
+          supplierIds: added,
+        });
+      } catch (error) {
+        models.Collective.updateSyncProgress(collective._id, {
+          status: COLLECTIVE_STATUS.FAILED,
+        });
+
+        throw new Error(
+          `Failed to sync collective products: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
+    }
 
     return collective;
   },
@@ -39,17 +105,23 @@ export const collectiveMutations: Record<string, Resolver> = {
   mushopResyncCollective: async (
     _root: undefined,
     { _id }: { _id: string },
-    { models, user }: IContext,
+    { models }: IContext,
   ) => {
-    if (!user) throw new Error('Login required');
-
     const collective = await models.Collective.getCollective(_id);
 
-    syncCollectiveProducts({ models, collectiveId: collective._id }).catch(
-      (e) => {
-        console.error('syncCollectiveProducts failed:', e);
-      },
-    );
+    try {
+      syncCollectiveProducts({ models, collectiveId: collective._id });
+    } catch (error) {
+      models.Collective.updateSyncProgress(collective._id, {
+        status: COLLECTIVE_STATUS.FAILED,
+      });
+
+      throw new Error(
+        `Failed to sync collective products: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
 
     return collective;
   },
@@ -57,14 +129,20 @@ export const collectiveMutations: Record<string, Resolver> = {
   mushopRemoveCollective: async (
     _root: undefined,
     { _id }: { _id: string },
-    { models, user }: IContext,
+    { models }: IContext,
   ) => {
-    if (!user) throw new Error('Login required');
     return models.Collective.removeCollective(_id);
   },
 };
 
-
 collectiveMutations.mushopCreateCollective.wrapperConfig = {
-  skipPermission: true
+  skipPermission: true,
+};
+
+collectiveMutations.mushopUpdateCollectiveSuppliers.wrapperConfig = {
+  skipPermission: true,
+};
+
+collectiveMutations.mushopResyncCollective.wrapperConfig = {
+  skipPermission: true,
 };

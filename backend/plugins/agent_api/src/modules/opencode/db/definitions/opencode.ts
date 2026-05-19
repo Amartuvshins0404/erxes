@@ -9,6 +9,7 @@ export const opencodeServerSchema = schemaWrapper(
       identifierId: { type: String, label: 'Identifier ID' },
       name: { type: String, label: 'Name' },
       url: { type: String, label: 'Url' },
+      token: { type: String, label: 'Token' },
       provider: { type: String, label: 'Provider' },
       serverId: { type: String, label: 'Server ID' },
       serverPassword: { type: String, label: 'Server password' },

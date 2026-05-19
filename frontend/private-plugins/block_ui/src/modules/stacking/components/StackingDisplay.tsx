@@ -4,9 +4,12 @@ import {
 } from '@/building/hooks/useBuildings';
 import { IZoning } from '@/building/types/buildingTypes';
 import { useProjects } from '@/project/hooks/useProjects';
+import {
+  CONTRACT_STAGE_COLORS,
+  LOCKED_UNIT_COLOR,
+} from '@/contract-status/constants';
 import { StackingUnitItem } from '@/stacking/components/StackingUnitItem';
 import { UnitDetailSheet } from '@/unit/components/UnitDetailSheet';
-import { UNIT_LEASE_STATUS, UNIT_SALE_STATUS } from '@/unit/constants/unit';
 import { useUnits } from '@/unit/hooks/useUnits';
 import {
   IconBuildingPlus,
@@ -94,8 +97,8 @@ export const StackingZone = ({ zone }: { zone: IZoning }) => {
   });
 
   const notUsedSizeByUnit = units?.reduce(
-    (acc, { unitType, status }) =>
-      !status || status === 'available' ? acc + unitType?.size : acc,
+    (acc, { unitType, activeContract }) =>
+      !activeContract ? acc + (unitType?.size || 0) : acc,
     0,
   );
 
@@ -120,20 +123,26 @@ export const StackingZone = ({ zone }: { zone: IZoning }) => {
 };
 
 export const StatusExplanation = () => {
-  const ALL_STATUS = { ...UNIT_SALE_STATUS, ...UNIT_LEASE_STATUS };
-  
+  const stages = [
+    { en: 'Available', color: 'var(--border)' },
+    CONTRACT_STAGE_COLORS.reserved,
+    CONTRACT_STAGE_COLORS.draft,
+    { ...CONTRACT_STAGE_COLORS.signed, en: 'Signed' },
+    { en: 'Locked', color: LOCKED_UNIT_COLOR },
+  ];
+
   return (
     <Tooltip.Provider>
       <div className="w-full flex items-center p-4 pt-0 gap-3">
-        {Object.values(ALL_STATUS).map((status) => (
-          <Tooltip key={status.en}>
+        {stages.map((stage) => (
+          <Tooltip key={stage.en}>
             <Tooltip.Trigger asChild>
               <div
                 className="flex-1 h-2 cursor-pointer blk:rounded-lg"
-                style={{ backgroundColor: status.color }}
+                style={{ backgroundColor: stage.color }}
               />
             </Tooltip.Trigger>
-            <Tooltip.Content>{status.mn}</Tooltip.Content>
+            <Tooltip.Content>{stage.en}</Tooltip.Content>
           </Tooltip>
         ))}
       </div>

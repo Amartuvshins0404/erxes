@@ -19,7 +19,7 @@ import {
   useQueryState,
 } from 'erxes-ui';
 import { format } from 'date-fns';
-import { OpptyActivityLog } from './OpptyActivityLog';
+import { lazy, Suspense } from 'react';
 import { OpptyEditSheet } from './OpptyEdit';
 import { OpptyDelete } from './OpptyDelete';
 import { IOppty } from '../types/opptyTypes';
@@ -28,6 +28,12 @@ import { FieldsInDetail, RelationWidgetSideTabs } from 'ui-modules';
 import { useOpptyCustomFieldEdit } from '@/oppty/hooks/useOpptyCustomFieldEdit';
 import { UNIT_AREA_TYPE, UNIT_MARKET_TYPE } from '@/unit/constants/unit';
 import { useUnitTypes } from '@/unit/hooks/useUnitTypes';
+
+const OpptyActivityLog = lazy(() =>
+  import('./OpptyActivityLog').then((m) => ({
+    default: m.OpptyActivityLog,
+  })),
+);
 
 export const OPPTY_TABS = {
   GENERAL: 'general',
@@ -54,6 +60,11 @@ export const OpptyDetailSheet = () => {
     useQueryState<string>('activeOpptyId');
   const [activeTab, setActiveTab] = useQueryState<OpptyTabs>('oppty_tab', {
     defaultValue: 'general',
+  });
+
+  const { oppty, loading } = useGetOppty({
+    variables: { _id: activeOpptyId || '' },
+    skip: !activeOpptyId,
   });
 
   return (
@@ -89,25 +100,29 @@ export const OpptyDetailSheet = () => {
           {(!activeTab || activeTab === 'general') && activeOpptyId && (
             <ScrollArea className="flex-auto h-full">
               <div className="p-4">
-                <OpptyDetail opptyId={activeOpptyId} />
+                <OpptyDetail oppty={oppty} loading={loading} />
               </div>
             </ScrollArea>
           )}
           {activeTab === 'properties' && activeOpptyId && (
             <ScrollArea className="flex-auto h-full">
               <div className="p-4">
-                <OpptyProperties opptyId={activeOpptyId} />
+                <OpptyProperties oppty={oppty} loading={loading} />
               </div>
             </ScrollArea>
           )}
           {activeTab === 'activity-log' && activeOpptyId && (
             <ScrollArea className="flex-auto h-full">
-              <OpptyActivityLog opptyId={activeOpptyId} />
+              <Suspense fallback={<Spinner containerClassName="py-8" />}>
+                <OpptyActivityLog opptyId={activeOpptyId} />
+              </Suspense>
             </ScrollArea>
           )}
           <RelationWidgetSideTabs
             contentId={activeOpptyId || ''}
             contentType="block:oppty"
+            customerId={oppty?.customerId || undefined}
+            access={{ customer: 'read' }}
             hookOptions={{
               hiddenPlugins: ['sales', 'operation'],
               hiddenModules: ['oppty', 'company', 'ticket'],
@@ -172,11 +187,13 @@ const renderTableRow = (
   );
 };
 
-const OpptyDetail = ({ opptyId }: { opptyId: string }) => {
-  const { oppty, loading } = useGetOppty({
-    variables: { _id: opptyId },
-  });
-
+const OpptyDetail = ({
+  oppty,
+  loading,
+}: {
+  oppty?: IOppty;
+  loading: boolean;
+}) => {
   const { statuses } = useBlockStatusesByType({
     projectId: oppty?.projectId || '',
   });
@@ -396,11 +413,13 @@ const OpptyPropertyRowDetail = ({
   );
 };
 
-const OpptyProperties = ({ opptyId }: { opptyId: string }) => {
-  const { oppty, loading } = useGetOppty({
-    variables: { _id: opptyId },
-  });
-
+const OpptyProperties = ({
+  oppty,
+  loading,
+}: {
+  oppty?: IOppty;
+  loading: boolean;
+}) => {
   if (loading) return <Spinner />;
   if (!oppty) return <div>Opportunity not found</div>;
 

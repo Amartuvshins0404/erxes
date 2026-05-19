@@ -11,6 +11,11 @@ import { Model } from 'mongoose';
 import { IModels } from '~/connectionResolvers';
 import { generateOpptyUpdateActivityLogs } from '../../meta/activity-log';
 import { DEFAULT_STATUS_TYPES } from '@/oppty/constants';
+import {
+  ContractAmountType,
+  ContractPartyType,
+} from '@/contract/@types/contract';
+import { BlockProjectPaymentPlanType } from '@/project/@types/payment';
 
 export interface IOpptyModel extends Model<IOpptyDocument> {
   getOppty(_id: string): Promise<IOpptyDocument>;
@@ -87,11 +92,91 @@ export const loadOpptyClass = (
         }
       }
 
+      const movingToWon =
+        wonStatus &&
+        input.status &&
+        wonStatus._id.equals(input.status) &&
+        !wonStatus._id.equals(prevOppty.status);
+
+      const propertyRows = input.propertyRows ?? prevOppty.propertyRows ?? [];
+      const mainRow = propertyRows.find((r) => r.isMain && r.unitId);
+      const mainUnitId = mainRow?.unitId;
+
+      if (movingToWon && !mainUnitId) {
+        throw new Error(
+          'Cannot move opportunity to won stage without a main unit.',
+        );
+      }
+
       const updatedOppty = await models.Oppty.findOneAndUpdate(
         { _id },
         { $set: input },
         { new: true },
       );
+
+      if (movingToWon && mainUnitId && updatedOppty) {
+        const customerId = updatedOppty.customerId || prevOppty.customerId;
+
+        const lastContract = await models.Contract.findOne({})
+          .sort({ createdAt: -1 })
+          .select('number');
+
+        let nextNumber = 1;
+        if (lastContract?.number) {
+          const match = lastContract.number.match(/(\d+)$/);
+          if (match) {
+            nextNumber = parseInt(match[1], 10) + 1;
+          }
+        }
+
+        const reservedStage = await models.ContractStatus.findOne({
+          projectId: updatedOppty.projectId,
+          type: 'reserved',
+        }).sort({ order: 1 });
+
+        const createdContract = await models.Contract.create({
+          number: `CT-${String(nextNumber).padStart(5, '0')}`,
+          unit: mainUnitId,
+          currency: 'MNT',
+          date: new Date(),
+          amount: 0,
+          amountType: ContractAmountType.PER_UNIT,
+          status: reservedStage?._id,
+          party: customerId
+            ? { type: ContractPartyType.CUSTOMER, id: customerId }
+            : undefined,
+          paymentPlan: { type: BlockProjectPaymentPlanType.SALE },
+          user: updatedOppty.assignedUserId,
+        });
+
+        if (createdContract) {
+          createActivityLog({
+            activityType: 'contract.created_from_oppty',
+            target: {
+              _id: createdContract._id.toString(),
+              moduleName: 'block',
+              collectionName: 'block_contracts',
+              text:
+                createdContract.number || String(createdContract._id),
+            },
+            action: {
+              type: 'contract.created_from_oppty',
+              description: 'created from opportunity',
+            },
+            changes: {
+              current: {
+                opptyId: updatedOppty._id.toString(),
+                opptyNumber: updatedOppty.number,
+              },
+            },
+            metadata: {
+              opptyId: updatedOppty._id.toString(),
+              opptyNumber: updatedOppty.number,
+              projectId: updatedOppty.projectId?.toString(),
+            },
+          });
+        }
+      }
 
       graphqlPubsub.publish(`blockOpptyChanged:${_id}`, {
         blockOpptyChanged: { type: 'update', oppty: updatedOppty },

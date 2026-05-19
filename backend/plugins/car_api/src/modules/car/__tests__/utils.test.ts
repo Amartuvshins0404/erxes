@@ -16,6 +16,19 @@ jest.mock('erxes-api-shared/utils', () => ({
   validSearchText: (values: string[]) => values.filter(Boolean).join(' '),
 }));
 
+const mockRequireCoreTRPC = jest.fn();
+
+jest.mock('../core', () => ({
+  requireCoreTRPC: (...args: any[]) => mockRequireCoreTRPC(...args),
+  requireArrayResult: (value: unknown, description: string) => {
+    if (!Array.isArray(value)) {
+      throw new Error(`${description} must return an array`);
+    }
+
+    return value;
+  },
+}));
+
 import {
   buildCarSearchText,
   extractMergeRelations,
@@ -23,7 +36,10 @@ import {
   normalizeMergeCarIds,
   normalizeRelationContentType,
 } from '../utils';
-import { resolveClientPortalEntityIds } from '../clientPortal';
+import {
+  getClientPortalCarIds,
+  resolveClientPortalEntityIds,
+} from '../clientPortal';
 import {
   CAR_SEGMENT_CONTENT_TYPE,
   CORE_COMPANY_CONTENT_TYPE,
@@ -32,6 +48,10 @@ import {
 } from '../constants';
 
 describe('car utils', () => {
+  beforeEach(() => {
+    mockRequireCoreTRPC.mockReset();
+  });
+
   it('builds search text from the main searchable car fields', () => {
     expect(
       buildCarSearchText({
@@ -126,5 +146,39 @@ describe('car utils', () => {
         { customerId: 'customer-2' },
       ),
     ).toThrow('Client portal customer mismatch');
+  });
+
+  it('loads unique client portal car ids from customer and company relations', async () => {
+    mockRequireCoreTRPC
+      .mockResolvedValueOnce(['car-1', 'car-2'])
+      .mockResolvedValueOnce(['car-2', 'car-3', '']);
+
+    await expect(
+      getClientPortalCarIds('test-subdomain', {
+        customerId: 'customer-1',
+        companyId: 'company-1',
+      }),
+    ).resolves.toEqual(['car-1', 'car-2', 'car-3']);
+
+    expect(mockRequireCoreTRPC).toHaveBeenCalledWith({
+      subdomain: 'test-subdomain',
+      module: 'relation',
+      action: 'getRelationIds',
+      input: {
+        contentType: CORE_CUSTOMER_CONTENT_TYPE,
+        contentId: 'customer-1',
+        relatedContentType: ROOT_CAR_CONTENT_TYPE,
+      },
+    });
+    expect(mockRequireCoreTRPC).toHaveBeenCalledWith({
+      subdomain: 'test-subdomain',
+      module: 'relation',
+      action: 'getRelationIds',
+      input: {
+        contentType: CORE_COMPANY_CONTENT_TYPE,
+        contentId: 'company-1',
+        relatedContentType: ROOT_CAR_CONTENT_TYPE,
+      },
+    });
   });
 });

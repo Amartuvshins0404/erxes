@@ -10,11 +10,6 @@ import {
   mutations as ConfigMutations,
 } from '@/config/graphql/schemas/config';
 
-import {
-  types as BannerTypes,
-  queries as BannerQueries,
-  mutations as BannerMutations,
-} from '@/banner/graphql/schemas/banner';
 
 import {
   types as RegistrationTypes,
@@ -27,21 +22,18 @@ export const types = `
   ${TypeExtensions}
   ${ProviderTypes}
   ${ConfigTypes}
-  ${BannerTypes}
   ${RegistrationTypes}
 `;
 
 export const queries = `
   ${ProviderQueries}
   ${ConfigQueries}
-  ${BannerQueries}
   ${RegistrationQueries}
 `;
 
 export const mutations = `
   ${ProviderMutations}
   ${ConfigMutations}
-  ${BannerMutations}
   ${RegistrationMutations}
 `;
 

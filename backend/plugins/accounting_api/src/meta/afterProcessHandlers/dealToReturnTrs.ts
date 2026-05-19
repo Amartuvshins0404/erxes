@@ -5,6 +5,7 @@ import {
   JOURNALS,
   TR_FOLLOW_TYPES,
   TR_SIDES,
+  TR_STATUSES,
 } from '~/modules/accounting/@types/constants';
 import {
   ITransaction,
@@ -25,6 +26,7 @@ export const dealToReturnTrs = async ({
     dateRule: 'alwaysNow' | 'syncedDateOrNow';
     defaultPayment: { accountId: string };
     returnType: 'delete' | 'fullTr' | 'onlySale';
+    trStatus?: string;
   };
 }) => {
   let date = new Date();
@@ -34,6 +36,7 @@ export const dealToReturnTrs = async ({
   let oldOtherTrs: ITransactionDocument[] = [];
 
   const [contentType, contentId] = ['sales:deal', deal._id];
+  const number = deal.number;
 
   const oldTrs = await models.Transactions.find({
     contentType,
@@ -87,9 +90,11 @@ export const dealToReturnTrs = async ({
     _id: mainId,
     ptrId,
     parentId,
+    number,
     date,
     journal: JOURNALS.INV_SALE_RETURN,
     side: TR_SIDES.DEBIT,
+    status: config.trStatus || TR_STATUSES.COMPLETE,
     followInfos: {
       ...firstSaleTr.followInfos,
       saleTransactionId: firstSaleTr._id,
@@ -145,6 +150,7 @@ export const dealToReturnTrs = async ({
         _id: nanoid(),
         ptrId,
         parentId,
+        number,
         date,
         journal,
         side,

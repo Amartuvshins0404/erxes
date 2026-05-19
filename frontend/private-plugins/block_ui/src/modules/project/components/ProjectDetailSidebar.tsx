@@ -9,8 +9,7 @@ export const ProjectDetailSidebar = () => {
     PROJECT_TABS.GENERAL,
     PROJECT_TABS.PRICING,
     PROJECT_TABS.AMENITIES,
-    // PROJECT_TABS.SEO,
-    // PROJECT_TABS.POLICIES,
+
     PROJECT_TABS.SPECIFICATIONS,
     PROJECT_TABS.TARGET,
     PROJECT_TABS.CONTACT,
@@ -25,7 +24,12 @@ export const ProjectDetailSidebar = () => {
     PROJECT_TABS.UNITS,
   ];
 
-  const settings = [PROJECT_TABS.MEMBERS, PROJECT_TABS.INSIDER, PROJECT_TABS.STATUS];
+  const settings = [
+    PROJECT_TABS.MEMBERS,
+    PROJECT_TABS.INSIDER,
+    PROJECT_TABS.OPPTY_STATUSES,
+    PROJECT_TABS.CONTRACT_STATUSES,
+  ];
 
   return (
     <Sidebar

@@ -201,24 +201,13 @@ export const UNIT_ORIENTATION = {
 
 export const UNIT_DOCUMENT_TABS = {
   overview: {
-    mn: 'Ерөнхий мэдээлэл',
     en: 'Overview',
   },
-  document: {
-    mn: 'Документ',
-    en: 'Document',
-  },
-  media: {
-    mn: 'Медиа',
-    en: 'Media',
+  opportunities: {
+    en: 'Opportunities',
   },
   contracts: {
-    mn: 'Гэрээ',
     en: 'Contracts',
-  },
-  offers: {
-    mn: 'Үнийн санал',
-    en: 'Offers',
   },
 };
 

@@ -1,6 +1,5 @@
 import type { ComponentProps } from 'react';
 import { useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Empty, RecordTable } from 'erxes-ui';
 import { IconCarSuv } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
@@ -12,10 +11,11 @@ import { ICar } from '~/types/car';
 const CarsRow = ({
   original,
   children,
+  onOpenCar,
   ...props
-}: ComponentProps<typeof RecordTable.Row>) => {
-  const navigate = useNavigate();
-
+}: ComponentProps<typeof RecordTable.Row> & {
+  onOpenCar?: (carId: string) => void;
+}) => {
   return (
     <RecordTable.Row
       {...props}
@@ -26,14 +26,14 @@ const CarsRow = ({
 
         if (
           target.closest(
-            'a,button,input,[role="checkbox"],[data-radix-collection-item]',
+            'a,button,input,[role="checkbox"],[cmdk-item],[data-radix-collection-item]',
           )
         ) {
           return;
         }
 
         if (original?._id) {
-          navigate(`/car/${original._id}`);
+          onOpenCar?.(original._id);
         }
       }}
     >
@@ -45,19 +45,29 @@ const CarsRow = ({
 export const CarsRecordTable = ({
   cars,
   loading,
-  totalCount,
+  fetchingMore,
+  hasMore,
+  onFetchMore,
   sortField,
   sortDirection,
   onSort,
+  onOpenCar,
+  onEditCar,
   onMergeSelected,
+  onTagsUpdated,
 }: {
   cars: ICar[];
   loading: boolean;
-  totalCount: number;
+  fetchingMore: boolean;
+  hasMore: boolean;
+  onFetchMore?: () => void;
   sortField: string | null;
   sortDirection: number | null;
   onSort: (field: string) => void;
+  onOpenCar: (carId: string) => void;
+  onEditCar: (car: ICar) => void;
   onMergeSelected: (cars: ICar[]) => void;
+  onTagsUpdated?: () => void;
 }) => {
   const { t } = useTranslation('car');
   const columns = useMemo(
@@ -66,9 +76,10 @@ export const CarsRecordTable = ({
         sortField,
         sortDirection,
         onSort,
+        onEditCar,
         t,
       }),
-    [onSort, sortDirection, sortField, t],
+    [onEditCar, onOpenCar, onSort, sortDirection, sortField, t],
   );
 
   return (
@@ -76,28 +87,42 @@ export const CarsRecordTable = ({
       <RecordTable.Provider
         columns={columns}
         data={cars}
-        stickyColumns={['checkbox', 'plateNumber']}
+        stickyColumns={['more', 'checkbox', 'plateNumber']}
         tableId="cars-record-table"
-        className="m-3 mb-0 overflow-hidden rounded-xl border bg-sidebar/40"
+        className="m-3 mb-0 overflow-hidden"
       >
         <CarsCommandBar
-          totalCount={totalCount}
           onMergeSelected={onMergeSelected}
+          onTagsUpdated={onTagsUpdated}
         />
         {loading ? (
-          <RecordTable>
-            <RecordTable.Header />
-            <RecordTable.Body>
-              <RecordTable.RowSkeleton rows={12} />
-            </RecordTable.Body>
-          </RecordTable>
+          <RecordTable.Scroll>
+            <RecordTable>
+              <RecordTable.Header />
+              <RecordTable.Body>
+                <RecordTable.RowSkeleton rows={12} />
+              </RecordTable.Body>
+            </RecordTable>
+          </RecordTable.Scroll>
         ) : cars.length ? (
-          <RecordTable>
-            <RecordTable.Header />
-            <RecordTable.Body>
-              <RecordTable.RowList Row={CarsRow} />
-            </RecordTable.Body>
-          </RecordTable>
+          <RecordTable.Scroll>
+            <RecordTable>
+              <RecordTable.Header />
+              <RecordTable.Body>
+                <RecordTable.RowList
+                  Row={(props) => (
+                    <CarsRow {...props} onOpenCar={onOpenCar} />
+                  )}
+                />
+                {hasMore ? (
+                  <RecordTable.RowSkeleton
+                    rows={fetchingMore ? 3 : 1}
+                    handleInView={onFetchMore}
+                  />
+                ) : null}
+              </RecordTable.Body>
+            </RecordTable>
+          </RecordTable.Scroll>
         ) : (
           <div className="p-6">
             <Empty>

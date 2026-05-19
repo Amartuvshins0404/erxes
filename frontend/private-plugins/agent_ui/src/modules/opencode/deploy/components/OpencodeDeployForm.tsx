@@ -57,7 +57,7 @@ export const OpencodeDeployForm = () => {
         <div className="space-y-2">
           <h3 className="text-sm font-medium">Add AI Agent</h3>
           <p className="text-muted-foreground text-xs">
-            Enter the provider and API token for this Opencode AI agent.
+            Enter the provider and API token for this AI Agent.
           </p>
         </div>
         <Form.Field

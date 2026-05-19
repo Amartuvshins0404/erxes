@@ -1,12 +1,13 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useInView } from 'react-intersection-observer';
 import { Badge, Button, Empty, ScrollArea, Separator, Spinner } from 'erxes-ui';
 import { IconCarSuv, IconLinkPlus, IconTrash } from '@tabler/icons-react';
 import { useManageRelations, useRelations } from 'ui-modules';
 import { useTranslation } from 'react-i18next';
 
 import { SelectCarsDialog } from '~/components/select/SelectCarsDialog';
-import { useCars } from '~/hooks/useCarsData';
+import { useCarsMain } from '~/hooks/useCarsData';
 import { getCarDisplayName } from '~/lib/car';
 import { ROOT_CAR_CONTENT_TYPE } from '~/lib/constants';
 
@@ -33,10 +34,17 @@ export const CarsRelationWidget = ({
     [ownEntities],
   );
 
-  const { cars, loading: loadingCars } = useCars(
+  const {
+    cars,
+    loading: loadingCars,
+    fetchingMore,
+    hasMore,
+    fetchMoreCars,
+  } = useCarsMain(
     {
       ids: relatedCarIds,
-      perPage: relatedCarIds.length || 20,
+      page: 1,
+      perPage: 20,
       sortField: 'plateNumber',
       sortDirection: 1,
     },
@@ -44,6 +52,14 @@ export const CarsRelationWidget = ({
       skip: relatedCarIds.length === 0,
     },
   );
+
+  const { ref: bottomRef } = useInView({
+    onChange: (inView) => {
+      if (inView) {
+        fetchMoreCars?.();
+      }
+    },
+  });
 
   const handleSaveRelations = (nextIds: string[]) => {
     manageRelations({
@@ -155,6 +171,19 @@ export const CarsRelationWidget = ({
                 </div>
               </div>
             ))}
+            {hasMore ? (
+              <div
+                ref={bottomRef}
+                className="flex h-10 items-center gap-2 text-sm text-muted-foreground"
+              >
+                <Spinner className="size-4" />
+                <span className={fetchingMore ? 'animate-pulse' : undefined}>
+                  {t('Loading more cars...', {
+                    defaultValue: 'Loading more cars...',
+                  })}
+                </span>
+              </div>
+            ) : null}
           </div>
         </ScrollArea>
       )}

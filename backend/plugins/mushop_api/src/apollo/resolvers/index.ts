@@ -5,6 +5,7 @@ import {
   MushopCollective,
   MushopCollectiveSyncResult,
 } from '@/collective/graphql/resolvers/customResolvers/collective';
+import { MushopCollectivePackage } from '@/collective-package/graphql/resolvers/customResolvers/collectivePackage';
 import { mutations } from './mutations';
 import { queries } from './queries';
 import { subscriptionTypeResolvers } from '@/subscription/graphql/resolvers/queries/mushopSubscription';
@@ -21,6 +22,7 @@ const resolvers: any = {
   MushopProduct,
   MushopCollective,
   MushopCollectiveSyncResult,
+  MushopCollectivePackage,
   ...subscriptionTypeResolvers,
   ...apolloCustomScalars,
   ...extensionResolvers,

@@ -1,13 +1,16 @@
+import { EventDispatcherReturn } from 'erxes-api-shared/core-modules';
 import { getFullDate } from 'erxes-api-shared/utils';
+import moment from 'moment';
 import { Model, connection } from 'mongoose';
 import { nanoid } from 'nanoid';
 import { IModels } from '~/connectionResolvers';
-import { PTR_STATUSES, TR_SIDES } from '../../@types/constants';
+import { PTR_STATUSES, TR_SIDES, TR_STATUSES } from '../../@types/constants';
 import { ITransaction, ITransactionDocument } from '../../@types/transaction';
-import { commonSave } from '../../utils/commonSave';
-import { transactionSchema } from '../definitions/transaction';
-import { setPtrStatus } from './utils';
 import { commonRemove } from '../../utils/commonRemove';
+import { commonSave } from '../../utils/commonSave';
+import { assertCanWriteTransactionAccounts } from '../../utils/trPermissions';
+import { transactionSchema } from '../definitions/transaction';
+import { generateTrStatusActivityLog, setPtrStatus } from './utils';
 
 export interface ITransactionModel extends Model<ITransactionDocument> {
   getTransaction(selector: any): Promise<ITransactionDocument>;
@@ -51,7 +54,37 @@ export interface ITransactionModel extends Model<ITransactionDocument> {
   }): Promise<{ n: number; ok: number }>;
 }
 
-export const loadTransactionClass = (models: IModels, subdomain: string) => {
+const normalizeParentWorkflowDocs = (
+  docs: (ITransaction & { _id?: string })[],
+  userId: string,
+  oldTr?: ITransactionDocument,
+) => {
+  const firstDoc = docs[0];
+
+  if (!firstDoc) {
+    return docs;
+  }
+
+  const status = firstDoc.status;
+  const isReturned = status === TR_STATUSES.RETURNED;
+  const mentionOwnerId = isReturned
+    ? userId
+    : firstDoc.mentionOwnerId || oldTr?.mentionOwnerId;
+  let mentionUserIds = firstDoc.mentionUserIds || oldTr?.mentionUserIds || [];
+
+  if (isReturned) {
+    mentionUserIds = oldTr?.mentionOwnerId ? [oldTr.mentionOwnerId] : [];
+  }
+
+  return docs.map((doc) => ({
+    ...doc,
+    status,
+    mentionOwnerId,
+    mentionUserIds,
+  }));
+};
+
+export const loadTransactionClass = ( models: IModels, subdomain: string, { sendDbEventLog, createActivityLog, }: EventDispatcherReturn, ) => {
   class Transaction {
     /**
      *
@@ -103,8 +136,84 @@ export const loadTransactionClass = (models: IModels, subdomain: string) => {
       return { mainTr: transaction, otherTrs };
     }
 
+    static async generatePtrNumber() {
+      const todayStr = moment().format('YYYYMMDDhh').toString();
+
+      let suffix = '001';
+      let latestOrder;
+
+      let number = `${todayStr}_${suffix}`;
+
+      const latestTr = await models.Transactions.aggregate([
+        {
+          $match: {
+            number: { $regex: new RegExp(`^${todayStr}_`) },
+          },
+        },
+        {
+          $project: {
+            number: 1,
+            number_len: { $strLenCP: '$number' },
+          },
+        },
+        { $sort: { number_len: -1, number: -1 } },
+        { $limit: 1 },
+      ]);
+
+      if (latestTr.length) {
+        latestOrder = latestTr[0];
+      }
+
+      if (latestOrder?._id) {
+        const parts = latestOrder.number.split('_');
+        const latestNum = Number.parseInt(parts[1], 10);
+
+        suffix = String(latestNum + 1).padStart(3, '0');
+        number = `${todayStr}_${suffix}`;
+      }
+
+      return number;
+    }
+
+    static async getPtrNumber(tr: ITransactionDocument, ptrNumber?: string) {
+      const { _id, parentId } = tr;
+      const number = ptrNumber || (await this.generatePtrNumber());
+
+      const duplicatedTrs = await models.Transactions.findOne({
+        ptrNumber: number,
+        parentId: { $ne: parentId },
+      }).lean();
+      if (!duplicatedTrs) {
+        await models.Transactions.updateOne(
+          { _id },
+          { $set: { ptrNumber: number } },
+        );
+
+        if (!tr.number) {
+          await models.Transactions.updateOne({ _id }, { $set: { number } });
+        }
+        return number;
+      }
+
+      return await this.getPtrNumber(tr);
+    }
+
+    static async syncParentWorkflowIdentifiers(
+      parentId: string,
+      ptrNumber: string,
+    ) {
+      if (!parentId || !ptrNumber) {
+        return;
+      }
+
+      await models.Transactions.updateMany(
+        { parentId },
+        { $set: { parentId, ptrNumber } },
+      );
+    }
+
     /**
-     * Create a transaction
+     * Create a one transaction
      */
     public static async createTransaction(doc: ITransaction, userId: string) {
       if (!doc.details?.length) {
@@ -138,7 +247,7 @@ export const loadTransactionClass = (models: IModels, subdomain: string) => {
     }
 
     /**
-     * Update transaction
+     * Update a one transaction
      */
     public static async updateTransaction(
       _id: string,
@@ -191,6 +300,9 @@ export const loadTransactionClass = (models: IModels, subdomain: string) => {
       docs: ITransaction[],
       userId: string,
     ) {
+      docs = normalizeParentWorkflowDocs(docs, userId);
+      await assertCanWriteTransactionAccounts({ models, docs, userId });
+
       const transactions: ITransactionDocument[] = [];
       let errMsg = '';
 
@@ -199,6 +311,7 @@ export const loadTransactionClass = (models: IModels, subdomain: string) => {
       try {
         const ptrId = nanoid();
         let parentId = '';
+        let ptrNumber = '';
 
         for (const doc of docs) {
           if (doc._id?.substring(0, 4) === 'temp') {
@@ -211,8 +324,22 @@ export const loadTransactionClass = (models: IModels, subdomain: string) => {
               ptrId,
             });
             parentId = firstTrs.mainTr.parentId;
+            ptrNumber = await this.getPtrNumber(firstTrs.mainTr, ptrNumber);
             transactions.push(firstTrs.mainTr);
+
             if (firstTrs.otherTrs?.length) {
+              await models.Transactions.updateMany(
+                {
+                  _id: { $in: firstTrs.otherTrs.map((ot) => ot._id) },
+                  $or: [
+                    { number: { $exists: false } },
+                    { number: null },
+                    { number: '' },
+                  ],
+                },
+                { $set: { number: ptrNumber } },
+              );
+
               for (const otherTr of firstTrs.otherTrs) {
                 transactions.push(otherTr);
               }
@@ -222,6 +349,8 @@ export const loadTransactionClass = (models: IModels, subdomain: string) => {
               ...doc,
               ptrId,
               parentId,
+              number: doc.number ?? ptrNumber,
+              ptrNumber,
             });
             transactions.push(trs.mainTr);
             if (trs.otherTrs?.length) {
@@ -232,9 +361,28 @@ export const loadTransactionClass = (models: IModels, subdomain: string) => {
           }
         }
 
+        await this.syncParentWorkflowIdentifiers(parentId, ptrNumber);
         await setPtrStatus(models, transactions);
 
         await session.commitTransaction();
+
+        sendDbEventLog({
+          action: 'create',
+          docId: parentId,
+          currentDocument: transactions,
+        });
+
+        const activityLog = generateTrStatusActivityLog({
+          parentId,
+          userId,
+          status: transactions[0]?.status,
+          mentionOwnerId: transactions[0]?.mentionOwnerId,
+          mentionUserIds: transactions[0]?.mentionUserIds,
+        });
+
+        if (activityLog) {
+          createActivityLog(activityLog);
+        }
       } catch (e) {
         errMsg = e.message;
         await session.abortTransaction();
@@ -265,11 +413,27 @@ export const loadTransactionClass = (models: IModels, subdomain: string) => {
         throw new Error('Not found old transactions');
       }
 
-      const ptrId = oldTrs[0].ptrId;
+      const {
+        ptrId,
+        status: oldStatus,
+        mentionOwnerId: oldMentOwnerId,
+        mentionUserIds: oldMentUserIds,
+      } = oldTrs[0];
 
       if (!ptrId) {
         throw new Error('Not found old transactions ptr');
       }
+
+      const ptrNumber =
+        oldTrs[0].ptrNumber || (await this.getPtrNumber(oldTrs[0]));
+
+      docs = normalizeParentWorkflowDocs(docs, userId, oldTrs[0]);
+      await assertCanWriteTransactionAccounts({
+        models,
+        docs,
+        userId,
+        oldTrs,
+      });
 
       const oldTrIds = oldTrs.map((ot) => ot._id);
 
@@ -277,6 +441,7 @@ export const loadTransactionClass = (models: IModels, subdomain: string) => {
       const editTrDocs: ITransaction[] = [];
 
       for (const doc of docs) {
+        delete doc.ptrNumber;
         if (oldTrIds.includes(doc._id || '')) {
           editTrDocs.push(doc);
         } else {
@@ -300,7 +465,7 @@ export const loadTransactionClass = (models: IModels, subdomain: string) => {
             subdomain,
             models,
             userId,
-            { ...doc, ptrId, parentId },
+            { ...doc, ptrId, parentId, ptrNumber },
             oldTrs.find((ot) => ot._id === doc._id),
           );
           transactions.push(trs.mainTr);
@@ -316,6 +481,7 @@ export const loadTransactionClass = (models: IModels, subdomain: string) => {
             ...doc,
             ptrId,
             parentId,
+            ptrNumber,
           });
           transactions.push(trs.mainTr);
           if (trs.otherTrs?.length) {
@@ -331,9 +497,32 @@ export const loadTransactionClass = (models: IModels, subdomain: string) => {
           });
         }
 
+        await this.syncParentWorkflowIdentifiers(parentId, ptrNumber);
         await setPtrStatus(models, transactions);
 
         await session.commitTransaction();
+
+        sendDbEventLog({
+          action: 'update',
+          docId: parentId,
+          currentDocument: transactions,
+          prevDocument: oldTrs,
+        });
+
+        const activityLog = generateTrStatusActivityLog({
+          parentId,
+          userId,
+          status: transactions[0]?.status,
+          mentionOwnerId: transactions[0]?.mentionOwnerId,
+          mentionUserIds: transactions[0]?.mentionUserIds,
+          oldStatus,
+          oldMentionOwnerId: oldMentOwnerId,
+          oldMentionUserIds: oldMentUserIds,
+        });
+
+        if (activityLog) {
+          createActivityLog(activityLog);
+        }
       } catch (e) {
         errMsg = e.message;
         await session.abortTransaction();
@@ -430,9 +619,15 @@ export const loadTransactionClass = (models: IModels, subdomain: string) => {
         await commonRemove(subdomain, models, tr);
       }
 
-      return await models.Transactions.deleteMany({
+      const response = await models.Transactions.deleteMany({
         _id: { $in: deleteTrIds },
       });
+
+      sendDbEventLog({
+        action: 'deleteMany',
+        docIds: parentIds,
+      });
+      return response;
     }
   }
 

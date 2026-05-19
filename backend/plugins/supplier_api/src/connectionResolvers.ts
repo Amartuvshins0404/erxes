@@ -8,9 +8,15 @@ import {
   loadSupplierClass,
   ISupplierModel,
 } from '@/supplier/db/models/Supplier';
+import { ICollectiveDocument } from '@/collective/@types/collective';
+import {
+  loadCollectiveClass,
+  ICollectiveModel,
+} from '@/collective/db/models/Collective';
 
 export interface IModels {
   Supplier: ISupplierModel;
+  Collective: ICollectiveModel;
 }
 
 export interface IContext extends IMainContext {
@@ -29,6 +35,11 @@ export const loadClasses = (
   models.Supplier = db.model<ISupplierDocument, ISupplierModel>(
     'suppliers',
     loadSupplierClass(models, supplierEventHandlers('suppliers', 'suppliers')),
+  );
+
+  models.Collective = db.model<ICollectiveDocument, ICollectiveModel>(
+    'collectives',
+    loadCollectiveClass(models),
   );
 
   return models;

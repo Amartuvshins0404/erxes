@@ -4,6 +4,7 @@ import { format } from 'date-fns';
 
 import { useAtomValue, atom } from 'jotai';
 import { allOpptysMapState } from '@/oppty/states/allOpptysMapState';
+import { IOppty } from '@/oppty/types/opptyTypes';
 import { MembersInline, useCustomerDetail } from 'ui-modules';
 import { useQueryState } from 'erxes-ui';
 import { SelectCustomerSource } from '@/oppty/components/SelectCustomerSource';
@@ -38,7 +39,7 @@ export const OpptysBoardCard = ({ id, column }: BoardCardProps) => {
     projectId,
     unitType,
     tenureType,
-  } = oppty;
+  } = oppty || ({} as Partial<IOppty>);
 
   const rows = propertyRows || [];
 
@@ -110,7 +111,11 @@ export const OpptysBoardCard = ({ id, column }: BoardCardProps) => {
         <div className="flex flex-wrap gap-1 mt-1">
           {mainUnit?.number && (
             <Badge>
-              {mainUnit.number} · {mainUnit.unitType.size}m² · {Number(mainUnit.unitType.price).toLocaleString()} 
+              {mainUnit.number}
+              {mainUnit.unitType?.size != null &&
+                ` · ${mainUnit.unitType.size}m²`}
+              {mainUnit.unitType?.price != null &&
+                ` · ${Number(mainUnit.unitType.price).toLocaleString()}`}
             </Badge>
           )}
           {unitTypeName && (

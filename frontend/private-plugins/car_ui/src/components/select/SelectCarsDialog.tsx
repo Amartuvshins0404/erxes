@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useDebounce } from 'use-debounce';
+import { useInView } from 'react-intersection-observer';
 import { IconCarSuv, IconSearch } from '@tabler/icons-react';
 import {
   Badge,
@@ -13,7 +14,7 @@ import {
 } from 'erxes-ui';
 import { useTranslation } from 'react-i18next';
 
-import { useCars } from '~/hooks/useCarsData';
+import { useCarsMain } from '~/hooks/useCarsData';
 import { getCarDisplayName } from '~/lib/car';
 
 export const SelectCarsDialog = ({
@@ -32,8 +33,16 @@ export const SelectCarsDialog = ({
   const [debouncedSearch] = useDebounce(searchValue, 300);
   const [draftIds, setDraftIds] = useState<string[]>(selectedIds);
 
-  const { cars, loading } = useCars(
+  const {
+    cars,
+    totalCount,
+    loading,
+    fetchingMore,
+    hasMore,
+    fetchMoreCars,
+  } = useCarsMain(
     {
+      page: 1,
       searchValue: debouncedSearch || undefined,
       perPage: 40,
       sortField: 'createdAt',
@@ -41,6 +50,14 @@ export const SelectCarsDialog = ({
     },
     { skip: !open },
   );
+
+  const { ref: bottomRef } = useInView({
+    onChange: (inView) => {
+      if (inView) {
+        fetchMoreCars?.();
+      }
+    },
+  });
 
   useEffect(() => {
     if (open) {
@@ -71,7 +88,8 @@ export const SelectCarsDialog = ({
               'Search cars and choose which ones should stay related.',
           },
         )}
-        className="max-w-2xl p-0"
+        className="grid max-w-2xl grid-rows-[auto_auto_1fr_auto] gap-0 overflow-hidden p-0"
+        style={{ height: 'min(720px, calc(100dvh - 2rem))' }}
       >
         <div className="border-b px-6 py-4">
           <div className="relative">
@@ -87,13 +105,21 @@ export const SelectCarsDialog = ({
           </div>
         </div>
 
-        <ScrollArea className="max-h-[55vh]">
+        <ScrollArea className="min-h-0">
           <div className="space-y-2 p-4">
             <div className="flex items-center justify-between text-sm text-muted-foreground">
               <span>
                 {t('Selected cars', { defaultValue: 'Selected cars' })}
               </span>
-              <Badge variant="secondary">{selectedCount}</Badge>
+              <div className="flex items-center gap-2">
+                <span>
+                  {t('Total cars count', {
+                    count: totalCount,
+                    defaultValue: '{{count}} total',
+                  })}
+                </span>
+                <Badge variant="secondary">{selectedCount}</Badge>
+              </div>
             </div>
 
             {loading ? (
@@ -168,10 +194,24 @@ export const SelectCarsDialog = ({
                 </Empty.Header>
               </Empty>
             )}
+
+            {hasMore ? (
+              <div
+                ref={bottomRef}
+                className="flex h-10 items-center gap-2 px-2 text-sm text-muted-foreground"
+              >
+                <Spinner className="size-4" />
+                <span className={fetchingMore ? 'animate-pulse' : undefined}>
+                  {t('Loading more cars...', {
+                    defaultValue: 'Loading more cars...',
+                  })}
+                </span>
+              </div>
+            ) : null}
           </div>
         </ScrollArea>
 
-        <Dialog.Footer className="border-t px-6 py-4">
+        <Dialog.Footer className="border-t bg-background px-6 py-4">
           <Dialog.Close asChild>
             <Button variant="secondary">
               {t('Cancel', { defaultValue: 'Cancel' })}

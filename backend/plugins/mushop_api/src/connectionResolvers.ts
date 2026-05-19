@@ -27,6 +27,11 @@ import {
   loadCollectiveClass,
   ICollectiveModel,
 } from '@/collective/db/models/Collective';
+import { ICollectivePackageDocument } from '@/collective-package/@types/collectivePackage';
+import {
+  loadCollectivePackageClass,
+  ICollectivePackageModel,
+} from '@/collective-package/db/models/CollectivePackage';
 
 export interface IModels {
   Supplier: ISupplierModel;
@@ -34,6 +39,7 @@ export interface IModels {
   MushopSubscription: IMushopSubscriptionModel;
   MushopSubscriptionPlan: IMushopSubscriptionPlanModel;
   Collective: ICollectiveModel;
+  CollectivePackage: ICollectivePackageModel;
 }
 
 export interface IContext extends IMainContext {
@@ -93,6 +99,14 @@ export const loadClasses = (
   models.Collective = db.model<ICollectiveDocument, ICollectiveModel>(
     'mushop_collectives',
     loadCollectiveClass(models),
+  );
+
+  models.CollectivePackage = db.model<
+    ICollectivePackageDocument,
+    ICollectivePackageModel
+  >(
+    'mushop_collective_packages',
+    loadCollectivePackageClass(models),
   );
 
   return models;

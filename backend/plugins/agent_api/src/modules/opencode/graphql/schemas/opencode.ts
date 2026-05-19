@@ -5,6 +5,7 @@ export const types = `
     identifierId: String
     name: String
     url: String
+    token: String
     provider: String
     serverId: String
     status: String

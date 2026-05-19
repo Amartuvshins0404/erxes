@@ -27,6 +27,11 @@ import {
   queries as CollectiveQueries,
   types as CollectiveTypes,
 } from '@/collective/graphql/schemas/collective';
+import {
+  mutations as CollectivePackageMutations,
+  queries as CollectivePackageQueries,
+  types as CollectivePackageTypes,
+} from '@/collective-package/graphql/schemas/collectivePackage';
 import { TypeExtensions } from './extensions';
 
 export const types = `
@@ -38,6 +43,7 @@ export const types = `
   ${SubscriptionPlanTypes}
   ${CustomerInvoiceTypes}
   ${CollectiveTypes}
+  ${CollectivePackageTypes}
 `;
 
 export const queries = `
@@ -47,6 +53,7 @@ export const queries = `
   ${SubscriptionPlanQueries}
   ${CustomerInvoiceQueries}
   ${CollectiveQueries}
+  ${CollectivePackageQueries}
 `;
 
 export const mutations = `
@@ -55,6 +62,7 @@ export const mutations = `
   ${SubscriptionMutations}
   ${SubscriptionPlanMutations}
   ${CollectiveMutations}
+  ${CollectivePackageMutations}
 `;
 
 export default { types, queries, mutations };

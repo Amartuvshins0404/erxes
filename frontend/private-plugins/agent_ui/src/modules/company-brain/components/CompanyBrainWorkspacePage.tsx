@@ -24,6 +24,7 @@ import { PageHeader } from 'ui-modules';
 import { z } from 'zod';
 import { AssistantOrgManageSheet } from '~/modules/assistant-orgs/components/AssistantOrgManageSheet';
 import { useCreateIdentifier } from '~/modules/assistant-orgs/hooks/useCreateAssistantOrg';
+import { useDeleteIdentifier } from '~/modules/assistant-orgs/hooks/useDeleteAssistantOrg';
 import {
   Identifier,
   useIdentifiers,
@@ -86,9 +87,6 @@ const AssistantWorkspaceCard = ({
   return (
     <div className="group flex min-h-56 flex-col gap-4 rounded-xl border border-border bg-card p-5 transition-all hover:border-primary/30 hover:shadow-md">
       <div className="flex items-start justify-between gap-3">
-        <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary">
-          <IconSparkles className="h-6 w-6" />
-        </div>
         <div className="flex items-center gap-2">
           <span className="rounded-full border border-border bg-muted px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
             {loading ? 'Loading' : getStatusLabel(agent?.status)}
@@ -136,9 +134,6 @@ const AiAgentWorkspaceCard = ({
   return (
     <div className="group flex min-h-56 flex-col gap-4 rounded-xl border border-border bg-card p-5 transition-all hover:border-primary/30 hover:shadow-md">
       <div className="flex items-start justify-between gap-3">
-        <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600">
-          <IconCode className="h-6 w-6" />
-        </div>
         <div className="flex items-center gap-2">
           <span className="rounded-full border border-border bg-muted px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
             {loading ? 'Loading' : getStatusLabel(opencode?.status)}
@@ -186,6 +181,8 @@ export const CompanyBrainWorkspacePage = ({
   const { identifiers, loading } = useIdentifiers(mode);
   const { createIdentifier, loading: creatingIdentifier } =
     useCreateIdentifier();
+  const { deleteIdentifier, loading: deletingIdentifier } =
+    useDeleteIdentifier();
   const { deployAgent, loading: deployingAssistant } = useAgentDeploy();
   const { deployOpencode, loading: deployingAgent } = useOpencodeDeploy();
   const [open, setOpen] = useState(false);
@@ -234,7 +231,10 @@ export const CompanyBrainWorkspacePage = ({
   });
 
   const isSubmitting =
-    creatingIdentifier || deployingAssistant || deployingAgent;
+    creatingIdentifier ||
+    deletingIdentifier ||
+    deployingAssistant ||
+    deployingAgent;
 
   const onSubmit = async (values: WorkspaceFormValues) => {
     let createdIdentifier: Identifier | null = null;
@@ -287,22 +287,37 @@ export const CompanyBrainWorkspacePage = ({
       );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
+      let cleanupMessage = '';
+      let description = message;
+
+      if (mode === 'agent' && createdIdentifier?._id) {
+        try {
+          await deleteIdentifier(createdIdentifier._id);
+          cleanupMessage = ' The failed agent was removed.';
+        } catch (cleanupError) {
+          const cleanupErrorMessage =
+            cleanupError instanceof Error
+              ? cleanupError.message
+              : String(cleanupError);
+
+          cleanupMessage = ` Failed to remove the identifier: ${cleanupErrorMessage}`;
+        }
+
+        setOpen(false);
+        navigate('/agent/agents');
+        description = `${message}.${cleanupMessage}`;
+      } else if (createdIdentifier?._id) {
+        description = `${message}. The identifier was created, so you can retry from its detail page.`;
+      }
 
       toast({
         variant: 'destructive',
         title: mode === 'assistant' ? 'Add AI Assistant failed' : 'Add AI Agent failed',
-        description:
-          createdIdentifier?._id
-            ? `${message}. The identifier was created, so you can retry from its detail page.`
-            : message,
+        description,
       });
 
-      if (createdIdentifier?._id) {
-        navigate(
-          mode === 'assistant'
-            ? `/agent/assistant/${createdIdentifier._id}`
-            : `/agent/agents/${createdIdentifier._id}`,
-        );
+      if (mode === 'assistant' && createdIdentifier?._id) {
+        navigate(`/agent/assistant/${createdIdentifier._id}`);
       }
     }
   };
@@ -404,7 +419,6 @@ export const CompanyBrainWorkspacePage = ({
               onSubmit={form.handleSubmit(onSubmit)}
             >
               <Sheet.Header>
-                {mode === 'assistant' ? <IconSparkles /> : <IconCode />}
                 <Sheet.Title>{config.buttonLabel}</Sheet.Title>
                 <Sheet.Close />
               </Sheet.Header>
@@ -494,8 +508,8 @@ export const CompanyBrainWorkspacePage = ({
                           />
                         </Form.Control>
                         <p className="text-xs text-muted-foreground">
-                          Required. OpenClaw uses this token during bootstrap so
-                          the bot can come online and send the pairing code.
+                          Required. uses this token during bootstrap so the bot
+                          can come online and send the pairing code.
                         </p>
                         <Form.Message />
                       </Form.Item>

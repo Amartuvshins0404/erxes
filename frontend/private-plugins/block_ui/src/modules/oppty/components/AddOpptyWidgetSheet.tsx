@@ -9,9 +9,11 @@ import { currentUserState } from 'ui-modules';
 export const AddOpptyWidgetSheet = ({
   customerId,
   onComplete,
+  defaultValues,
 }: {
   customerId?: string;
   onComplete?: (opptyId: string) => void;
+  defaultValues?: Partial<TWidgetOppty>;
 }) => {
   const [open, setOpen] = useAtom(opptyWidgetSheetState);
   const currentUser = useAtomValue(currentUserState);
@@ -65,6 +67,7 @@ export const AddOpptyWidgetSheet = ({
         <OpptyWidgetForm
           defaultValues={{
             assignedUserId: currentUser?._id || undefined,
+            ...defaultValues,
           }}
           onSubmit={onSubmit}
           loading={loading}

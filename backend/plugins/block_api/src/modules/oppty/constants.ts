@@ -7,7 +7,6 @@ export const DEFAULT_STATUS_TYPES = {
   QUALIFIED: 'qualified',
   SITE_VISIT: 'site_visit',
   NEGOTIATION: 'negotiation',
-  RESERVED: 'reserved',
   CLOSED_WON: 'closed_won',
   CLOSED_LOST: 'closed_lost',
 };
@@ -40,13 +39,6 @@ export const DEFAULT_STATUSES = {
       name: 'Negotiation',
       color: '#DDA0DD',
       type: DEFAULT_STATUS_TYPES.NEGOTIATION,
-    },
-  },
-  [DEFAULT_STATUS_TYPES.RESERVED]: {
-    RESERVED: {
-      name: 'Reserved',
-      color: '#FF6B6B',
-      type: DEFAULT_STATUS_TYPES.RESERVED,
     },
   },
   [DEFAULT_STATUS_TYPES.CLOSED_WON]: {
@@ -86,11 +78,6 @@ export const DEFAULT_STATUS_TYPE_VALUES = {
     type: DEFAULT_STATUS_TYPES.NEGOTIATION,
     name: startCase(DEFAULT_STATUS_TYPES.NEGOTIATION),
   },
-  [DEFAULT_STATUS_TYPES.RESERVED]: {
-    color: '#FF6B6B',
-    type: DEFAULT_STATUS_TYPES.RESERVED,
-    name: startCase(DEFAULT_STATUS_TYPES.RESERVED),
-  },
   [DEFAULT_STATUS_TYPES.CLOSED_WON]: {
     color: '#FFEAA7',
     type: DEFAULT_STATUS_TYPES.CLOSED_WON,
@@ -111,7 +98,6 @@ export const OPPTY_STATUSES: Record<string, string> = {
   PROPERTY_VIEWING: 'property_viewing',
   UNIT_SELECTED: 'unit_selected',
   NEGOTIATION: 'negotiation',
-  RESERVATION: 'reservation',
   CONTRACT_DRAFTING_SIGNING: 'contract_drafting_signing',
   CLOSED_SUCCESSFUL: 'closed_successful',
   CLOSED_UNSUCCESSFUL: 'closed_unsuccessful',

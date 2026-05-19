@@ -144,4 +144,20 @@ export const unitMutations = {
   ) => {
     return models.Unit.transferUnit(input);
   },
+
+  blockToggleUnitLock: async (
+    _parent: undefined,
+    { _id, locked }: { _id: string; locked: boolean },
+    { models }: IContext,
+  ) => {
+    const unit = await models.Unit.findOne({ _id });
+    if (!unit) {
+      throw new Error('Unit not found');
+    }
+    return models.Unit.findOneAndUpdate(
+      { _id },
+      { $set: { locked } },
+      { new: true },
+    );
+  },
 };

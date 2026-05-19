@@ -122,14 +122,7 @@ export const carMutations: Record<string, CarResolver> = {
       $or: carsOrFilter,
     }).lean();
 
-    if (existingCar) {
-      await assertCanManageClientPortalCar(
-        subdomain,
-        existingCar._id,
-        entityIds,
-      );
-    }
-
+    // Legacy client portal add is an upsert by plate/VIN before linking the portal entity.
     const car = existingCar
       ? await models.Cars.updateCar(existingCar._id, __(doc))
       : await models.Cars.createCar(__(doc), user);

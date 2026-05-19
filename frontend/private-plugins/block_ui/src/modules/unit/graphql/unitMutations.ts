@@ -72,6 +72,15 @@ export const BLOCK_TRANSFER_UNIT = gql`
   }
 `;
 
+export const BLOCK_TOGGLE_UNIT_LOCK = gql`
+  mutation BlockToggleUnitLock($id: String!, $locked: Boolean!) {
+    blockToggleUnitLock(_id: $id, locked: $locked) {
+      _id
+      locked
+    }
+  }
+`;
+
 export const BLOCK_CREATE_UNIT_TYPE = gql`
   mutation BlockCreateUnitType($input: UnitTypeInput!) {
     blockCreateUnitType(input: $input) {

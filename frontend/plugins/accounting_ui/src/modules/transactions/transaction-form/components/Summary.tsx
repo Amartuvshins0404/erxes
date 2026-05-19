@@ -3,6 +3,7 @@ import { IconGavel, IconTrashX } from '@tabler/icons-react';
 import { ITransaction, ITrDetail } from '@/transactions/types/Transaction';
 import { ITransactionGroupForm, TTrDoc } from '../types/JournalForms';
 import { TR_SIDES } from '../../types/constants';
+import { TrRightSidebar } from './TrRightSidebar';
 import { useAtomValue } from 'jotai';
 import { useTransactionsRemove } from '../hooks/useTransactionsRemove';
 import { useWatch } from 'react-hook-form';
@@ -10,6 +11,7 @@ import {
   Button,
   CurrencyCode,
   CurrencyFormatedDisplay,
+  Input,
   useConfirm,
   useQueryState,
 } from 'erxes-ui';
@@ -42,7 +44,7 @@ export const sumDtAndCt = (trDocs: TTrDoc[], followTrDocs: ITransaction[]) => {
 
 export const Summary = ({ form }: { form: ITransactionGroupForm }) => {
   const navigate = useNavigate();
-  const { trDocs } = useWatch({ control: form.control });
+  const { ptrNumber, trDocs } = useWatch({ control: form.control });
   const followTrDocs = useAtomValue(followTrDocsState);
   const [parentId] = useQueryState<string>('parentId');
 
@@ -50,6 +52,9 @@ export const Summary = ({ form }: { form: ITransactionGroupForm }) => {
   const { confirm } = useConfirm();
 
   const [sumDebit, sumCredit] = sumDtAndCt(trDocs as TTrDoc[], followTrDocs);
+  const hasHiddenTransaction = (trDocs || []).some(
+    (trDoc: any) => trDoc?.permission === 'hidden',
+  );
 
   const handleDelete = () =>
     confirm({
@@ -68,6 +73,9 @@ export const Summary = ({ form }: { form: ITransactionGroupForm }) => {
 
   return (
     <div className="flex justify-end items-center col-span-2 xl:col-span-3 gap-6">
+      <div className="flex items-center gap-2 text-sm">
+        <span className="text-accent-foreground">[{ptrNumber}]</span>
+      </div>
       <div className="flex items-center gap-2 text-sm">
         <span className="text-accent-foreground">Дебет дүн:</span>
         <span className="text-primary font-bold">
@@ -101,7 +109,15 @@ export const Summary = ({ form }: { form: ITransactionGroupForm }) => {
           />
         </span>
       </div>
-      <Button type="submit">
+      <Button
+        type="submit"
+        disabled={hasHiddenTransaction}
+        title={
+          hasHiddenTransaction
+            ? 'Унших эрх хүрэхгүй гүйлгээ байгаа тул хадгалах боломжгүй'
+            : undefined
+        }
+      >
         <IconGavel />
         Хадгалах
       </Button>
@@ -113,6 +129,7 @@ export const Summary = ({ form }: { form: ITransactionGroupForm }) => {
         <IconTrashX />
         {`Устгах`}
       </Button>
+      <TrRightSidebar form={form} />
     </div>
   );
 };

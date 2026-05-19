@@ -9,6 +9,7 @@ export const supplierMutations = {
     { models, user, subdomain }: IContext,
   ) => {
     const supplier = await models.Supplier.updateSupplier(user._id, input);
+
     if (supplier) {
       await sendMessage({
         subdomain,
@@ -19,6 +20,7 @@ export const supplierMutations = {
         },
       });
     }
+
     return supplier;
   },
 
@@ -28,7 +30,10 @@ export const supplierMutations = {
     { models, user, subdomain }: IContext,
   ) => {
     if (!user) throw new Error('Login required');
-    const supplier = await models.Supplier.updateVerificationStatus(_id, status);
+    const supplier = await models.Supplier.updateVerificationStatus(
+      _id,
+      status,
+    );
     if (supplier) {
       await sendMessage({
         subdomain,

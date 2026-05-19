@@ -1,4 +1,9 @@
-import { QueryHookOptions, useQuery } from '@apollo/client';
+import {
+  NetworkStatus,
+  QueryHookOptions,
+  useQuery,
+} from '@apollo/client';
+import { useCallback } from 'react';
 
 import {
   GET_CAR_CATEGORIES,
@@ -8,14 +13,12 @@ import {
   GET_CAR_DETAIL,
   GET_CARS,
   GET_CARS_MAIN,
-  GET_DEALS_BY_IDS,
 } from '~/graphql/documents';
 import {
   ICar,
   ICarCategory,
   ICarCounts,
   ICarsMainResponse,
-  IDeal,
 } from '~/types/car';
 
 export const useCarsMain = (
@@ -24,19 +27,82 @@ export const useCarsMain = (
     carsMain: ICarsMainResponse;
   }>,
 ) => {
-  const { data, loading, error, refetch } = useQuery<{
+  const { data, loading, error, refetch, fetchMore, networkStatus } = useQuery<{
     carsMain: ICarsMainResponse;
   }>(GET_CARS_MAIN, {
     variables,
+    fetchPolicy: 'network-only',
+    nextFetchPolicy: 'network-only',
+    notifyOnNetworkStatusChange: true,
     ...options,
   });
 
-  return {
-    cars: data?.carsMain?.list || [],
-    totalCount: data?.carsMain?.totalCount || 0,
+  const cars = data?.carsMain?.list || [];
+  const totalCount = data?.carsMain?.totalCount || 0;
+  const perPage =
+    typeof variables.perPage === 'number' && variables.perPage > 0
+      ? variables.perPage
+      : 20;
+  const hasMore = cars.length < totalCount;
+  const fetchingMore = networkStatus === NetworkStatus.fetchMore;
+  const initialLoading = loading && !fetchingMore;
+
+  const fetchMoreCars = useCallback(() => {
+    if (!hasMore || fetchingMore || loading) {
+      return;
+    }
+
+    return fetchMore({
+      variables: {
+        ...variables,
+        page: Math.floor(cars.length / perPage) + 1,
+        perPage,
+      },
+      updateQuery: (previous, { fetchMoreResult }) => {
+        if (!fetchMoreResult?.carsMain) {
+          return previous;
+        }
+
+        const mergedById = new Map<string, ICar>();
+
+        [...(previous.carsMain?.list || []), ...fetchMoreResult.carsMain.list]
+          .filter(Boolean)
+          .forEach((car) => {
+            mergedById.set(car._id, car);
+          });
+
+        return {
+          ...previous,
+          carsMain: {
+            ...fetchMoreResult.carsMain,
+            list: Array.from(mergedById.values()),
+            totalCount:
+              fetchMoreResult.carsMain.totalCount ||
+              previous.carsMain?.totalCount ||
+              0,
+          },
+        };
+      },
+    });
+  }, [
+    cars.length,
+    fetchMore,
+    fetchingMore,
+    hasMore,
     loading,
+    perPage,
+    variables,
+  ]);
+
+  return {
+    cars,
+    totalCount,
+    loading: initialLoading,
     error,
     refetch,
+    fetchMoreCars,
+    fetchingMore,
+    hasMore,
   };
 };
 
@@ -146,26 +212,6 @@ export const useCarCountByTags = (
 
   return {
     counts: data?.carCountByTags || {},
-    loading,
-    error,
-  };
-};
-
-export const useDealsByIds = (
-  ids: string[],
-  options?: QueryHookOptions<{ deals: { list: IDeal[] } }>,
-) => {
-  const { data, loading, error } = useQuery<{ deals: { list: IDeal[] } }>(
-    GET_DEALS_BY_IDS,
-    {
-      variables: { _ids: ids },
-      skip: ids.length === 0,
-      ...options,
-    },
-  );
-
-  return {
-    deals: data?.deals?.list || [],
     loading,
     error,
   };

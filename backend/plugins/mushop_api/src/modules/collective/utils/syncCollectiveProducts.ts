@@ -6,67 +6,58 @@ import {
   ICollectiveSupplierSyncResult,
 } from '@/collective/@types/collective';
 
-const buildProductDoc = (product: any): Record<string, any> => {
-  return {
-    name: product.name,
-    shortName: product.shortName,
-    code: product.code,
-    type: product.type,
-    description: product.description,
-    barcodes: product.barcodes ?? [],
-    barcodeDescription: product.barcodeDescription,
-    variants: product.variants ?? {},
-    unitPrice: product.unitPrice,
-    categoryId: product.categoryId,
-    tagIds: product.tagIds ?? [],
-    attachment: product.attachment,
-    attachmentMore: product.attachmentMore ?? [],
-    scopeBrandIds: product.scopeBrandIds ?? [],
-    uom: product.uom,
-    subUoms: product.subUoms,
-    currency: product.currency,
-    pdfAttachment: product.pdfAttachment,
-    vendorId: product.vendorId,
-    propertiesData: product.propertiesData,
-    status: 'active',
-  };
-};
-
 interface CollectiveWebhookResult {
   total: number;
   created: number;
   failed: number;
   results: Array<{
     code?: string;
+    entityId?: string;
     ok: boolean;
     productId?: string;
     error?: string;
   }>;
 }
 
-const postToCollectiveWebhook = async ({
+const postToSupplierPush = async ({
+  supplierSubdomain,
   targetSubdomain,
+  targetPosToken,
   collectiveId,
-  products,
+  posToken,
+  supplierId,
+  supplierName,
 }: {
+  supplierSubdomain: string;
   targetSubdomain: string;
+  targetPosToken: string;
   collectiveId: string;
-  products: Record<string, any>[];
+  posToken: string;
+  supplierId: string;
+  supplierName?: string;
 }): Promise<CollectiveWebhookResult> => {
   const { SUPPLIER_API_URL, MUSHOP_SECRET } = process.env;
+
   if (!SUPPLIER_API_URL || !MUSHOP_SECRET) {
     throw new Error('SUPPLIER_API_URL or MUSHOP_SECRET is not configured');
   }
 
   const baseUrl = isDev
     ? SUPPLIER_API_URL
-    : SUPPLIER_API_URL.replace('<subdomain>', targetSubdomain);
+    : SUPPLIER_API_URL.replace('<subdomain>', supplierSubdomain);
 
-  const endpoint = `${baseUrl}/pl:supplier/webhook/mushop/collective`;
+  const endpoint = `${baseUrl}/pl:supplier/webhook/mushop/collective-push`;
 
   const body = JSON.stringify({
-    subdomain: targetSubdomain,
-    payload: { collectiveId, products },
+    subdomain: supplierSubdomain,
+    payload: {
+      collectiveId,
+      targetSubdomain,
+      targetPosToken,
+      posToken,
+      supplierId,
+      supplierName,
+    },
   });
 
   const signature = crypto
@@ -86,7 +77,8 @@ const postToCollectiveWebhook = async ({
 
   if (!res.ok) {
     const text = await res.text().catch(() => '');
-    throw new Error(`Collective webhook HTTP ${res.status}: ${text}`);
+
+    throw new Error(`Supplier push HTTP ${res.status}: ${text}`);
   }
 
   return (await res.json()) as CollectiveWebhookResult;
@@ -95,20 +87,35 @@ const postToCollectiveWebhook = async ({
 export const syncCollectiveProducts = async ({
   models,
   collectiveId,
+  supplierIds,
 }: {
   models: IModels;
   collectiveId: string;
+  supplierIds?: string[];
 }): Promise<void> => {
   const collective = await models.Collective.findOne({ _id: collectiveId });
 
   if (!collective) return;
 
+  if (!collective.targetPosToken) {
+    await models.Collective.updateSyncProgress(collectiveId, {
+      status: COLLECTIVE_STATUS.FAILED,
+    });
+    throw new Error(
+      `Collective ${collectiveId} has no targetPosToken; cannot sync`,
+    );
+  }
+
   await models.Collective.updateSyncProgress(collectiveId, {
     status: COLLECTIVE_STATUS.SYNCING,
   });
 
+  const filterIds = supplierIds?.length
+    ? supplierIds
+    : collective.supplierIds;
+
   const suppliers = await models.Supplier.find({
-    _id: { $in: collective.supplierIds },
+    _id: { $in: filterIds },
   }).lean();
 
   const results: ICollectiveSupplierSyncResult[] = [];
@@ -117,43 +124,41 @@ export const syncCollectiveProducts = async ({
   let totalFailed = 0;
 
   for (const supplier of suppliers) {
-    const products = await models.MushopProduct.find({
-      subdomain: supplier.subdomain,
-      status: 'approved',
-    }).lean();
-
     const result: ICollectiveSupplierSyncResult = {
       supplierId: supplier._id,
       subdomain: supplier.subdomain,
-      total: products.length,
+      total: 0,
       created: 0,
       failed: 0,
       errors: [],
     };
 
-    if (!products.length) {
+    if (!supplier.posToken) {
+      result.errors = ['supplier has no posToken configured'];
       results.push(result);
-
       continue;
     }
 
-    const docs = products.map(buildProductDoc);
-
     try {
-      const response = await postToCollectiveWebhook({
+      const response = await postToSupplierPush({
+        supplierSubdomain: supplier.subdomain,
         targetSubdomain: collective.targetSubdomain,
+        targetPosToken: collective.targetPosToken,
         collectiveId: collective._id,
-        products: docs,
+        posToken: supplier.posToken,
+        supplierId: supplier._id,
+        supplierName: supplier.name,
       });
 
+      result.total = response.total;
       result.created = response.created;
       result.failed = response.failed;
       result.errors = response.results
         .filter((r) => !r.ok)
         .map((r) => `${r.code ?? '<no-code>'}: ${r.error ?? 'unknown'}`);
     } catch (e: any) {
-      result.failed = products.length;
       result.errors = [`transport: ${e?.message ?? String(e)}`];
+      result.failed = 1;
     }
 
     totalCreated += result.created;

@@ -1,4 +1,9 @@
 export const ROOT_CAR_CONTENT_TYPE = 'car:car';
+export const LEGACY_ROOT_CAR_CONTENT_TYPE = 'cars:car';
+export const CAR_RELATION_CONTENT_TYPES = [
+  ROOT_CAR_CONTENT_TYPE,
+  LEGACY_ROOT_CAR_CONTENT_TYPE,
+] as const;
 export const CAR_SEGMENT_CONTENT_TYPE = 'car:car.car';
 
 export const CORE_CUSTOMER_CONTENT_TYPE = 'core:customer';

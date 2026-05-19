@@ -22,7 +22,7 @@ export const AgentDeployScreen = () => {
       <>
         <div className="flex flex-col gap-4">
           <div className="space-y-2">
-            <h3 className="text-sm font-medium">OpenClaw not deployed</h3>
+            <h3 className="text-sm font-medium">Assistant not deployed</h3>
             <p className="text-muted-foreground text-xs">
               Configure this AI Assistant from the right-side panel instead of
               the inline form.
@@ -38,7 +38,6 @@ export const AgentDeployScreen = () => {
         <Sheet open={open} onOpenChange={setOpen}>
           <Sheet.View className="p-0 md:w-[calc(100vw-theme(spacing.4))] sm:max-w-xl">
             <Sheet.Header>
-              <IconSparkles />
               <Sheet.Title>Add AI Assistant</Sheet.Title>
               <Sheet.Close />
             </Sheet.Header>

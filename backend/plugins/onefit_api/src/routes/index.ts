@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import * as formidable from 'formidable';
+import multer from 'multer';
 import * as os from 'os';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -31,38 +31,33 @@ router.use('/webhook', [validationMiddleware, contextMiddleware], []);
 
 const DOMAIN = getEnv({ name: 'DOMAIN' });
 
-const isValidPath = (filepath: string): boolean => {
-  const resolved = path.resolve(filepath);
-  const tempDir = path.resolve(os.tmpdir());
-  return resolved.startsWith(tempDir);
-};
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, os.tmpdir()),
+    filename: (_req, file, cb) => {
+      const ext = path.extname(file.originalname);
+      cb(null, `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`);
+    },
+  }),
+});
 
-router.post('/upload-file', async (req: Request, res: Response) => {
-  const subdomain = getSubdomain(req);
-  const maxHeight = Number(req.query.maxHeight) || 0;
-  const maxWidth = Number(req.query.maxWidth) || 0;
-  const kind = (req.query.kind as string) || 'main';
+router.post(
+  '/upload-file',
+  upload.any(),
+  async (req: Request, res: Response) => {
+    const subdomain = getSubdomain(req);
+    const maxHeight = Number(req.query.maxHeight) || 0;
+    const maxWidth = Number(req.query.maxWidth) || 0;
+    const kind = (req.query.kind as string) || 'main';
 
-  const form = new formidable.IncomingForm({
-    uploadDir: os.tmpdir(),
-    keepExtensions: true,
-  });
+    const files = req.files as Express.Multer.File[] | undefined;
+    const file = files?.[0];
 
-  form.parse(req, async (error, _fields, files) => {
-    if (error) {
-      return res
-        .status(400)
-        .send(`File upload parsing error: ${error.message}`);
+    if (!file?.path) {
+      return res.status(400).send('No file uploaded');
     }
 
-    const uploaded = files.file || files.upload;
-    const file = Array.isArray(uploaded) ? uploaded[0] : uploaded;
-
-    if (!file?.filepath || !isValidPath(file.filepath)) {
-      return res.status(400).send('Invalid or unsafe file path');
-    }
-
-    const mimetype = file?.mimetype;
+    const mimetype = file.mimetype;
 
     if (!mimetype) {
       return res
@@ -83,7 +78,6 @@ router.post('/upload-file', async (req: Request, res: Response) => {
           const masterClient = getMasterClient();
           const onefitSecret = getOneFitSecret();
 
-          // Build headers for master request
           const headers: Record<string, string> = {};
           if (subdomain) {
             headers['x-subdomain'] = subdomain;
@@ -102,13 +96,11 @@ router.post('/upload-file', async (req: Request, res: Response) => {
               : (req.headers.cookie as string);
           }
 
-          // Upload to master
           const result = await masterClient.uploadFile(
             {
-              filePath: file.filepath,
-              fileName:
-                file.originalFilename || file.originalFilename || 'file',
-              mimetype: file.mimetype || mimetype,
+              filePath: file.path,
+              fileName: file.originalname || 'file',
+              mimetype: file.mimetype,
               maxHeight: maxHeight || undefined,
               maxWidth: maxWidth || undefined,
               kind,
@@ -148,10 +140,9 @@ router.post('/upload-file', async (req: Request, res: Response) => {
         queryParams.toString() ? `?${queryParams.toString()}` : ''
       }`;
 
-      // Forward file to core-api
       const formData = new FormData();
-      formData.append('file', fs.createReadStream(file.filepath), {
-        filename: file.originalFilename || 'file',
+      formData.append('file', fs.createReadStream(file.path), {
+        filename: file.originalname || 'file',
         contentType: mimetype,
       });
 
@@ -159,7 +150,6 @@ router.post('/upload-file', async (req: Request, res: Response) => {
         ...formData.getHeaders(),
       };
 
-      // Forward relevant headers
       if (req.headers.authorization) {
         headers['authorization'] = req.headers.authorization as string;
       }
@@ -196,35 +186,24 @@ router.post('/upload-file', async (req: Request, res: Response) => {
       console.error('Upload error:', e);
       return res.status(500).send(filterXSS(e.message || 'Upload failed'));
     }
-  });
-});
+  },
+);
 
-router.post('/decode-qr', async (req: Request, res: Response) => {
-  const form = new formidable.IncomingForm({
-    uploadDir: os.tmpdir(),
-    keepExtensions: true,
-  });
+router.post(
+  '/decode-qr',
+  upload.any(),
+  async (req: Request, res: Response) => {
+    const files = req.files as Express.Multer.File[] | undefined;
+    const file = files?.[0];
 
-  form.parse(req, async (error, _fields, files) => {
-    if (error) {
-      return res.status(400).json({
-        error: filterXSS(`File parsing error: ${error.message}`),
-      });
-    }
-
-    const uploaded = files.file || files.image;
-    const file = Array.isArray(uploaded) ? uploaded[0] : uploaded;
-
-    if (!file?.filepath || !isValidPath(file.filepath)) {
-      return res.status(400).json({
-        error: 'Invalid or unsafe file path',
-      });
+    if (!file?.path) {
+      return res.status(400).json({ error: 'No file uploaded' });
     }
 
     const mimetype = file.mimetype;
     if (!mimetype || !ALLOWED_IMAGE_MIMES.includes(mimetype)) {
       try {
-        fs.unlinkSync(file.filepath);
+        fs.unlinkSync(file.path);
       } catch {
         // ignore
       }
@@ -234,10 +213,10 @@ router.post('/decode-qr', async (req: Request, res: Response) => {
     }
 
     try {
-      const result = await decodeQrFromImagePath(file.filepath);
+      const result = await decodeQrFromImagePath(file.path);
 
       try {
-        fs.unlinkSync(file.filepath);
+        fs.unlinkSync(file.path);
       } catch {
         // ignore cleanup errors
       }
@@ -245,7 +224,7 @@ router.post('/decode-qr', async (req: Request, res: Response) => {
       return res.status(200).json(result);
     } catch (e: unknown) {
       try {
-        fs.unlinkSync(file.filepath);
+        fs.unlinkSync(file.path);
       } catch {
         // ignore
       }
@@ -254,7 +233,7 @@ router.post('/decode-qr', async (req: Request, res: Response) => {
         error: filterXSS(message),
       });
     }
-  });
-});
+  },
+);
 
 export { router };

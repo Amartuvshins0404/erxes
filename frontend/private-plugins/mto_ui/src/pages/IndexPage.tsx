@@ -1,7 +1,5 @@
 import {
-  IconBuildingStore,
   IconTags,
-  IconPhoto,
   IconClipboardList,
   IconForms,
 } from '@tabler/icons-react';
@@ -20,13 +18,7 @@ export function IndexPage() {
           <div className="flex flex-col gap-4">
             <h1 className="text-2xl font-bold">Mto</h1>
             <div className="flex flex-wrap gap-4">
-              <Button asChild>
-                <Link to="/mto/providers">
-                  <IconBuildingStore />
-                  Providers
-                </Link>
-              </Button>
-              <Button asChild>
+<Button asChild>
                 <Link to="/mto/registration">
                   <IconClipboardList />
                   Registration
@@ -45,14 +37,6 @@ export function IndexPage() {
                   <Link to="/mto/categories">
                     <IconTags />
                     Categories
-                  </Link>
-                </Button>
-              )}
-              {!isSlaveMode && (
-                <Button asChild>
-                  <Link to="/mto/banners">
-                    <IconPhoto />
-                    Banners
                   </Link>
                 </Button>
               )}

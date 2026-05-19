@@ -7,7 +7,6 @@ export const useContracts = (unit?: string) => {
     blockGetContracts: IContract[];
   }>(GET_CONTRACTS, {
     variables: { unit },
-    skip: !unit,
   });
 
   return {

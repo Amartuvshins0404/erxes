@@ -6,9 +6,5 @@ export const useIsCollective = (): boolean => {
     | (Record<string, unknown> & { bundle?: { type?: string } })
     | null;
 
-  const bundle = org?.bundle || {};
-
-  console.log('bundle', bundle);
-
-  return bundle?.type === 'mushop-coshop';
+  return org?.bundle?.type === 'mushop-coshop';
 };

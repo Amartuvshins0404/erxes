@@ -10,8 +10,17 @@ export const BLOCK_GET_UNITS = gql`
         _id
         name
         size
+        price
       }
       status
+      locked
+      activeContract {
+        _id
+        status
+        statusType
+        statusLabel
+        statusColor
+      }
     }
   }
 `;
@@ -59,6 +68,14 @@ export const BLOCK_GET_UNIT = gql`
         _id
         name
       }
+      activeContract {
+        _id
+        status
+        statusType
+        statusLabel
+        statusColor
+      }
+      locked
     }
   }
 `;

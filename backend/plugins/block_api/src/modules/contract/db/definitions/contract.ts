@@ -1,7 +1,6 @@
 import { Schema } from 'mongoose';
 import {
   ContractPartyType,
-  ContractStatus,
   ContractAmountType,
 } from '@/contract/@types/contract';
 
@@ -56,9 +55,9 @@ export const contractSchema = new Schema(
     amount: { type: Number, required: true },
     amountType: { type: String, enum: Object.values(ContractAmountType) },
     status: {
-      type: String,
-      enum: Object.values(ContractStatus),
-      default: ContractStatus.DRAFT,
+      type: Schema.Types.ObjectId,
+      ref: 'block_contract_statuses',
+      index: true,
     },
     startDate: { type: Date },
     endDate: { type: Date },

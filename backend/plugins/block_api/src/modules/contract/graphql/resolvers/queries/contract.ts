@@ -11,10 +11,10 @@ export const contractQueries = {
 
   blockGetContracts: async (
     _parent: undefined,
-    { unit }: { unit: string },
+    { unit }: { unit?: string },
     { models }: IContext,
   ) => {
-    return models.Contract.find({ unit });
+    return models.Contract.find(unit ? { unit } : {});
   },
 };
 

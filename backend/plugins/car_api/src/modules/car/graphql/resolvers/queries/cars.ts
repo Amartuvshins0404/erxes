@@ -11,8 +11,10 @@ import { ROOT_CAR_CONTENT_TYPE } from '~/modules/car/constants';
 import { requireArrayResult, requireCoreTRPC } from '~/modules/car/core';
 import {
   assertCanManageClientPortalCar,
+  getClientPortalCarIds,
   resolveClientPortalEntityIds,
 } from '~/modules/car/clientPortal';
+import type { ClientPortalEntityInput } from '~/modules/car/clientPortal';
 import {
   buildSearchRegex,
   getActiveCarsSelector,
@@ -20,6 +22,7 @@ import {
 } from '~/modules/car/utils';
 
 type CarResolver = Resolver<any, any, IContext>;
+type CpCarsFilter = ICarsFilter & ClientPortalEntityInput;
 
 const buildSort = ({ sortField, sortDirection }: ICarsFilter) => {
   if (!sortField) {
@@ -121,6 +124,28 @@ const generateCategoryFilter = (
   }
 
   return filter;
+};
+
+const generateClientPortalCarsFilter = async (
+  subdomain: string,
+  commonQuerySelector: Record<string, any>,
+  params: CpCarsFilter,
+  cpUser: IContext['cpUser'],
+) => {
+  const entityIds = resolveClientPortalEntityIds(cpUser, {
+    customerId: params.customerId,
+    companyId: params.companyId,
+  });
+  const relatedCarIds = await getClientPortalCarIds(subdomain, entityIds);
+  const filter = await generateCarsFilter(
+    subdomain,
+    commonQuerySelector,
+    params,
+  );
+
+  return {
+    $and: [filter, { _id: { $in: relatedCarIds } }],
+  };
 };
 
 export const carQueries: Record<string, CarResolver> = {
@@ -258,6 +283,49 @@ export const carQueries: Record<string, CarResolver> = {
     return await models.CarCategories.findOne({ _id });
   },
 
+  async cpCars(
+    _root,
+    params: CpCarsFilter,
+    { subdomain, commonQuerySelector = {}, models, cpUser }: IContext,
+  ) {
+    const filter = await generateClientPortalCarsFilter(
+      subdomain,
+      commonQuerySelector,
+      params,
+      cpUser,
+    );
+
+    return await paginate(models.Cars.find(filter).sort(buildSort(params)), {
+      page: params.page,
+      perPage: params.perPage,
+      ids: params.ids,
+      excludeIds: params.excludeIds,
+    });
+  },
+
+  async cpCarsMain(
+    _root,
+    params: CpCarsFilter,
+    { subdomain, commonQuerySelector = {}, models, cpUser }: IContext,
+  ) {
+    const filter = await generateClientPortalCarsFilter(
+      subdomain,
+      commonQuerySelector,
+      params,
+      cpUser,
+    );
+
+    return {
+      list: await paginate(models.Cars.find(filter).sort(buildSort(params)), {
+        page: params.page,
+        perPage: params.perPage,
+        ids: params.ids,
+        excludeIds: params.excludeIds,
+      }),
+      totalCount: await models.Cars.countDocuments(filter),
+    };
+  },
+
   async cpCarDetail(
     _root,
     {
@@ -360,6 +428,14 @@ export const carQueries: Record<string, CarResolver> = {
   },
 };
 
+carQueries.cpCars.wrapperConfig = {
+  forClientPortal: true,
+  cpUserRequired: true,
+};
+carQueries.cpCarsMain.wrapperConfig = {
+  forClientPortal: true,
+  cpUserRequired: true,
+};
 carQueries.cpCarDetail.wrapperConfig = {
   forClientPortal: true,
   cpUserRequired: true,

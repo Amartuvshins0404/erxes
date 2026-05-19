@@ -68,6 +68,7 @@ export const MTO_REGISTRATION_APPLICATIONS = gql`
         schemaVersion
         status
         instanceId
+        cpUserId
       }
       totalCount
       pageInfo {

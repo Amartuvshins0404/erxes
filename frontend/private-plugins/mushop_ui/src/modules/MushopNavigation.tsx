@@ -27,12 +27,12 @@ export const MushopNavigation = () => {
         path="subscribers"
         pathPrefix="mushop"
       />
-      {/* <NavigationMenuLinkItem
+      <NavigationMenuLinkItem
         name="collectives"
         icon={IconBuildingStore}
         path="collectives"
         pathPrefix="mushop"
-      /> */}
+      />
     </>
   );
 };

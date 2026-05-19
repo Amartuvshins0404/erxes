@@ -1,5 +1,5 @@
 import { Suspense, lazy } from 'react';
-import { Route, Routes } from 'react-router';
+import { Navigate, Route, Routes } from 'react-router';
 
 import { Spinner } from 'erxes-ui';
 
@@ -9,9 +9,9 @@ const CarsIndexPage = lazy(() =>
   })),
 );
 
-const CarDetailPage = lazy(() =>
-  import('~/pages/cars/CarDetailPage').then((module) => ({
-    default: module.CarDetailPage,
+const CarCategoriesPage = lazy(() =>
+  import('~/pages/categories/CarCategoriesPage').then((module) => ({
+    default: module.CarCategoriesPage,
   })),
 );
 
@@ -20,7 +20,9 @@ const Main = () => {
     <Suspense fallback={<Spinner />}>
       <Routes>
         <Route path="/" element={<CarsIndexPage />} />
-        <Route path="/:carId" element={<CarDetailPage />} />
+        <Route path="/categories" element={<CarCategoriesPage />} />
+        <Route path="/:carId" element={<CarsIndexPage />} />
+        <Route path="*" element={<Navigate to="/car" replace />} />
       </Routes>
     </Suspense>
   );

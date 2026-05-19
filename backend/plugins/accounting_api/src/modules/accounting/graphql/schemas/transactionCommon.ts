@@ -32,6 +32,9 @@ const transactionFields = `
   date: Date
   description: String
   journal: String
+  status: String
+  mentionOwnerId: String
+  mentionUserIds: [String]
   side: String
   originType: String
   followInfos: JSON
@@ -55,6 +58,8 @@ const transactionFields = `
   ctaxAmount: Float
 
   extraData: JSON
+  contentType: String
+  contentId: String
 `;
 
 export const types = () => `
@@ -72,7 +77,7 @@ export const types = () => `
 
     ${transactionFields}
 
-    status: String
+    ptrNumber: String
     ptrStatus: String
 
     createdAt: Date
@@ -107,8 +112,8 @@ export const types = () => `
 
     ${transactionFields}
 
-    status: String
     ptrStatus: String
+    ptrNumber: String
 
     createdAt: Date
     updatedAt: Date
@@ -161,11 +166,15 @@ const trsQueryParams = `
   ids: [String],
   excludeIds: Boolean,
   status: String,
+  mentionOwnerId: String
+  mentionUserIds: String
   searchValue: String,
   number: String,
   ptrStatus: String,
   customerType: String,
   customerId: String,
+  contentType: String,
+  contentId: String,
 
   accountIds: [String],
   accountKind: String,

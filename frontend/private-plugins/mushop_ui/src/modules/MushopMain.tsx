@@ -33,7 +33,7 @@ const MushopMain = () => {
         <Route path="suppliers" element={<SuppliersPage />} />
         <Route path="products" element={<ProductsPage />} />
         <Route path="subscribers" element={<SubscribersPage />} />
-        {/* <Route path="collectives" element={<CollectivesPage />} /> */}
+        <Route path="collectives" element={<CollectivesPage />} />
       </Routes>
     </Suspense>
   );

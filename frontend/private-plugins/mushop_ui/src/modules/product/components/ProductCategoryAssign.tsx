@@ -83,14 +83,14 @@ const Content = () => {
 };
 
 const InlineCell = () => {
-  const { category, initialCategory, open, setOpen } = useCtx();
+  const { categoryId, category, initialCategory, open, setOpen } = useCtx();
   const displayValue = category?.name ?? initialCategory?.name;
 
   return (
     <PopoverScoped open={open} onOpenChange={setOpen}>
       <Popover.Trigger asChild>
         <RecordTableInlineCell>
-          {displayValue ?? (
+          {displayValue ? <span className={`${!categoryId && 'text-muted-foreground'}`}>{displayValue}</span> : (
             <span className="text-muted-foreground/60">Assign category...</span>
           )}
         </RecordTableInlineCell>

@@ -96,6 +96,50 @@ export const sendMessage = async ({ subdomain, path, payload, platform }: SendMe
   await Promise.all(targets.map((consumer) => sendToConsumer(consumer, subdomain, path, payload)));
 };
 
+interface RequestMessagePayload {
+  subdomain: string;
+  path: string;
+  payload: IPayload;
+  platform: ConsumerPlatform;
+}
+
+export const requestMessage = async <T = any>({
+  subdomain,
+  path,
+  payload,
+  platform,
+}: RequestMessagePayload): Promise<T | null> => {
+  const consumer = getConsumers().find((c) => c.name === platform);
+
+  if (!consumer) {
+    console.error(`No consumer configured for ${platform}`);
+    return null;
+  }
+
+  const endpoint = `${consumer.url}/webhook/${path}`;
+  const body = JSON.stringify({ subdomain, payload });
+  const signature = crypto
+    .createHmac('sha256', consumer.secret)
+    .update(body)
+    .digest('hex');
+
+  const res = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Signature': `sha256=${signature}`,
+    },
+    body,
+    signal: AbortSignal.timeout(10000),
+  });
+
+  if (!res.ok) {
+    throw new Error(`${platform} ${path} HTTP ${res.status}`);
+  }
+
+  return (await res.json()) as T;
+};
+
 const buildPayload = (
   entity: any,
   args: any,

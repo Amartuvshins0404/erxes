@@ -1,8 +1,6 @@
 import { useUnit } from '@/unit/hooks/useUnit';
 import {
-  CurrencyField,
   CurrencyFormatedDisplay,
-  formatAmount,
   InfoCard,
   Label,
   useQueryState,
@@ -11,7 +9,11 @@ import {
 export const ContractUnit = () => {
   const [unitId] = useQueryState<string>('unitId');
   const { unit } = useUnit(unitId || '');
-  console.log('unit', unit);
+
+  if (!unitId || !unit) {
+    return null;
+  }
+
   return (
     <div className="p-5 pb-0">
       <InfoCard title="Unit Details">

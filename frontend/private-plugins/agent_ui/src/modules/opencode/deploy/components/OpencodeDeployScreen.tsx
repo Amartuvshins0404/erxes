@@ -20,7 +20,6 @@ export const OpencodeDeployScreen = () => {
         <Sheet open={open} onOpenChange={setOpen}>
           <Sheet.View className="p-0 md:w-[calc(100vw-theme(spacing.4))] sm:max-w-xl">
             <Sheet.Header>
-              <IconCode />
               <Sheet.Title>Add AI Agent</Sheet.Title>
               <Sheet.Close />
             </Sheet.Header>

@@ -1,15 +1,18 @@
-import { useQuery } from '@apollo/client';
+import { useApolloClient, useQuery } from '@apollo/client';
 import { useState } from 'react';
 import { Button, Dialog, Spinner } from 'erxes-ui';
-import { Link } from 'react-router-dom';
 import { MtoListPageLayout } from '~/components/MtoListPageLayout';
 import { RegistrationFilters } from '@/registration/components/RegistrationFilters';
 import { RegistrationsList } from '@/registration/components/RegistrationsList';
 import { RegistrationFilters as RegistrationFiltersType } from '@/registration/types/registrationFilters';
 import { RegistrationFormSheet } from '@/registration/components/RegistrationFormSheet';
-import { MTO_REGISTRATION_MEMBERSHIP_SUMMARIES } from '@/registration/graphql/registrationQueries';
+import {
+  MTO_REGISTRATION_APPLICATIONS,
+  MTO_REGISTRATION_MEMBERSHIP_SUMMARIES,
+} from '@/registration/graphql/registrationQueries';
 
 export function RegistrationsPage() {
+  const client = useApolloClient();
   const [filters, setFilters] = useState<RegistrationFiltersType>({});
   const { data, loading } = useQuery(MTO_REGISTRATION_MEMBERSHIP_SUMMARIES);
   const [chooserOpen, setChooserOpen] = useState(false);
@@ -49,20 +52,15 @@ export function RegistrationsPage() {
         filtersComponent={RegistrationFilters}
         listComponent={RegistrationsList}
         headerActions={
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              type="button"
-              onClick={() => setChooserOpen(true)}
-              disabled={loading || !fillFormTypes.length}
-            >
-              add
-            </Button>
-            <Button variant="outline" size="sm" asChild>
-              <Link to="/settings/mto">Add instance</Link>
-            </Button>
-          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            type="button"
+            onClick={() => setChooserOpen(true)}
+            disabled={loading || !fillFormTypes.length}
+          >
+            Бүртгэл нэмэх
+          </Button>
         }
       />
 
@@ -115,6 +113,9 @@ export function RegistrationsPage() {
         onOpenChange={handleSheetOpenChange}
         membershipTypeId={selectedTypeId}
         summaryTitle={selectedTitle}
+        onSubmitted={() => {
+          void client.refetchQueries({ include: [MTO_REGISTRATION_APPLICATIONS] });
+        }}
       />
     </>
   );

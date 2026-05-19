@@ -1,10 +1,39 @@
 import { IconContract } from '@tabler/icons-react';
-import { Breadcrumb, Button, PageContainer, PageSubHeader } from 'erxes-ui';
+import {
+  Breadcrumb,
+  Button,
+  PageContainer,
+  PageSubHeader,
+  useQueryState,
+} from 'erxes-ui';
 import { Link, useParams } from 'react-router-dom';
 import { PageHeader } from 'ui-modules';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { AddOpptySheet } from './AddOpptySheet';
-import { OpptyDetailSheet } from './OpptyDetailSheet';
 import { OpptysFilter } from './OpptysFilter';
+
+const OpptyDetailSheet = lazy(() =>
+  import('./OpptyDetailSheet').then((m) => ({
+    default: m.OpptyDetailSheet,
+  })),
+);
+
+const OpptyDetailSheetMount = () => {
+  const [activeOpptyId] = useQueryState<string>('activeOpptyId');
+  const [hasOpened, setHasOpened] = useState(false);
+
+  useEffect(() => {
+    if (activeOpptyId) setHasOpened(true);
+  }, [activeOpptyId]);
+
+  if (!hasOpened) return null;
+
+  return (
+    <Suspense fallback={null}>
+      <OpptyDetailSheet />
+    </Suspense>
+  );
+};
 
 export const OpptysLayout = ({ children }: { children: React.ReactNode }) => {
   //   const path = useLocation().pathname;
@@ -16,7 +45,7 @@ export const OpptysLayout = ({ children }: { children: React.ReactNode }) => {
         <OpptysFilter />
       </PageSubHeader>
       {children}
-      <OpptyDetailSheet />
+      <OpptyDetailSheetMount />
       {/* {!(isContracts && process.env.NODE_ENV === 'development') && (
         <div className="blk:backdrop-blur-lg absolute inset-0 h-full w-full z-10 flex items-center justify-center">
           <Empty>

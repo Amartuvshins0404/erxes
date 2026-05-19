@@ -1,5 +1,5 @@
 import { IContext } from '~/connectionResolvers';
-import { IContract, ContractStatus } from '@/contract/@types/contract';
+import { IContract } from '@/contract/@types/contract';
 
 export const contractMutations = {
   blockCreateContract: async (
@@ -7,6 +7,12 @@ export const contractMutations = {
     { input }: { input: IContract },
     { models }: IContext,
   ) => {
+    if (input.unit) {
+      const unit = await models.Unit.findOne({ _id: input.unit });
+      if (unit?.locked) {
+        throw new Error('Cannot create contract: unit is locked');
+      }
+    }
     return models.Contract.createContract(input);
   },
   blockUpdateContract: async (
@@ -18,7 +24,7 @@ export const contractMutations = {
   },
   blockUpdateContractStatus: async (
     _parent: undefined,
-    { _id, status }: { _id: string; status: ContractStatus },
+    { _id, status }: { _id: string; status: string },
     { models }: IContext,
   ) => {
     return models.Contract.updateContractStatus(_id, status);

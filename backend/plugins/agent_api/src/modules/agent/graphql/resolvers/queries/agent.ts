@@ -22,6 +22,10 @@ export const agentQueries = {
       return null;
     }
 
+    if (agent.token) {
+      return { ...agent, identifierId: agent.identifierId };
+    }
+
     try {
       const token = await getGatewayToken(agent.name);
       return { ...agent, token, identifierId: agent.identifierId };

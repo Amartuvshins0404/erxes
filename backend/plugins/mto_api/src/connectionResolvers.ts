@@ -19,8 +19,7 @@ import {
 } from '@/config/db/models/Config';
 
 // Banner
-import { IBannerDocument } from '@/banner/@types/banner';
-import { IBannerModel, loadBannerClass } from '@/banner/db/models/Banner';
+
 
 // Registration
 import { IRegistrationApplicationDocument } from '@/registration/@types/registrationApplicationDocument';
@@ -37,7 +36,6 @@ import {
 export interface IModels {
   Provider: IProviderModel;
   SystemConfig: ISystemConfigModel;
-  Banner: IBannerModel;
   RegistrationApplication: IRegistrationApplicationModel;
   RegistrationFormSchema: IRegistrationFormSchemaModel;
 }
@@ -62,11 +60,6 @@ export const loadClasses = (db: mongoose.Connection): IModels => {
   models.SystemConfig = db.model<ISystemConfigDocument, ISystemConfigModel>(
     'mto_system_configs',
     loadSystemConfigClass(models),
-  );
-
-  models.Banner = db.model<IBannerDocument, IBannerModel>(
-    'mto_banners',
-    loadBannerClass(models),
   );
 
   models.RegistrationApplication = db.model<

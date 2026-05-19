@@ -9,35 +9,26 @@ router.post('/syncProduct', async (req: Request, res: Response) => {
     const { entityId, entityIds, data } = payload || {};
     const { product, action } = data || {};
 
+    console.log('{subdomain, entityId}', {subdomain, entityId})
+
     if (!subdomain) return res.status(400).json({ error: 'subdomain is required' });
     if (!entityId) return res.status(400).json({ error: 'payload.entityId is required' });
 
     const models = await generateModels(subdomain);
+
+    console.log('action', action)
 
     if (entityIds?.length && action === 'delete') {
       await models.MushopProduct.deleteMany({ subdomain, entityId: { $in: entityIds } });
       return res.status(200).json({ success: true });
     }
 
-    const {
-      vendorId, name, shortName, code, type, description, barcodes, variants,
-      barcodeDescription, unitPrice, category, propertiesData, tagIds,
-      attachment, attachmentMore, scopeBrandIds, uom, subUoms, currency,
-      pdfAttachment, offering,
-    } = product || {};
-
-    const resetToPending = action === 'create' || action === 'update';
+    console.log('product', product)
 
     await models.MushopProduct.syncProduct(
       subdomain,
       entityId,
-      {
-        vendorId, name, shortName, code, type, description, barcodes, variants,
-        barcodeDescription, unitPrice, initialCategory: category, propertiesData,
-        tagIds, attachment, attachmentMore, scopeBrandIds, uom, subUoms, currency,
-        pdfAttachment, offering,
-        ...(resetToPending ? { status: 'pending' } : {}),
-      },
+      product,
       action,
     );
 

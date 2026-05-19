@@ -5,6 +5,14 @@ export const types = `
     brandName: String
   }
 
+  type BlockUnitActiveContract {
+    _id: String
+    status: String
+    statusType: String
+    statusLabel: String
+    statusColor: String
+  }
+
   type BlockUnit {
     _id: String
     building: String
@@ -20,10 +28,12 @@ export const types = `
 
     type: String
     unitType: UnitType
+    activeContract: BlockUnitActiveContract
     blockSubdomain: String
     blockEntityId: String
     agencySubdomain: String
     agencyEntityId: String
+    locked: Boolean
     createdAt: Date
     updatedAt: Date
   }
@@ -65,4 +75,5 @@ export const mutations = `
   blockRemoveUnit(_id: String!): BlockUnit
   blockRemoveUnits(_ids: [String]): JSON
   blockTransferUnit(input: BlockTransferUnitInput!): BlockUnit
+  blockToggleUnitLock(_id: String!, locked: Boolean!): BlockUnit
 `;

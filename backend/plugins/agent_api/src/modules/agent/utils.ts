@@ -1,6 +1,38 @@
 import { getEnv } from 'erxes-api-shared/utils';
 import { IAgentServerDocument } from './@types/agent';
 
+const LOCAL_DEPLOYER_URL = 'http://localhost:4200';
+const PROD_DEPLOYER_URL = 'https://deployer.erxes.io';
+
+const getDeployerUrl = () => {
+  const deployer = getEnv({ name: 'DEPLOYER_URL' }).trim();
+
+  if (deployer) {
+    return deployer.replace(/\/$/, '');
+  }
+
+  if (getEnv({ name: 'NODE_ENV' }).trim() !== 'production') {
+    return LOCAL_DEPLOYER_URL;
+  }
+
+  return PROD_DEPLOYER_URL;
+};
+
+const readDeployerError = async (response: Response) => {
+  const raw = await response.text();
+
+  try {
+    const parsed = JSON.parse(raw) as { error?: string };
+    if (parsed?.error) {
+      return parsed.error;
+    }
+  } catch {
+    // use raw text as message
+  }
+
+  return raw;
+};
+
 interface DeployPaylaod {
   orgId: string;
   agentId: string;
@@ -18,12 +50,8 @@ interface DeployResponse {
 export const deployServer = async (
   payload: DeployPaylaod,
 ): Promise<DeployResponse> => {
-  const DEPLOYER = getEnv({ name: 'DEPLOYER_URL' });
+  const DEPLOYER = getDeployerUrl();
   const BOT_NAME = getEnv({ name: 'BOT_NAME' });
-
-  if (!DEPLOYER) {
-    throw new Error('DEPLOYER_URL environment variable is required');
-  }
 
   if (!payload.discordBotToken?.trim()) {
     throw new Error('discordBotToken is required');
@@ -67,7 +95,7 @@ export const approveServer = async (
   agent: IAgentServerDocument,
   code: string,
 ) => {
-  const DEPLOYER = getEnv({ name: 'DEPLOYER_URL' });
+  const DEPLOYER = getDeployerUrl();
 
   console.log(agent.name);
 
@@ -102,7 +130,7 @@ export const approveServer = async (
 };
 
 export const destroyServer = async (agent: IAgentServerDocument) => {
-  const DEPLOYER = getEnv({ name: 'DEPLOYER_URL' });
+  const DEPLOYER = getDeployerUrl();
 
   const DEPLOYER_URL = `${DEPLOYER}/agents/${agent.name}`;
 
@@ -143,7 +171,7 @@ export interface AgentFile {
 }
 
 export const listAgents = async (serverName: string): Promise<AgentItem[]> => {
-  const DEPLOYER = getEnv({ name: 'DEPLOYER_URL' });
+  const DEPLOYER = getDeployerUrl();
 
   const response = await fetch(`${DEPLOYER}/agents/${serverName}/list`);
 
@@ -162,7 +190,7 @@ export const getAgentDetails = async (
   serverName: string,
   agentId?: string,
 ): Promise<AgentFile[]> => {
-  const DEPLOYER = getEnv({ name: 'DEPLOYER_URL' });
+  const DEPLOYER = getDeployerUrl();
   const url = new URL(`${DEPLOYER}/agents/${serverName}/get-agent-details`);
   if (agentId) url.searchParams.set('agentId', agentId);
 
@@ -181,7 +209,7 @@ export const addAgent = async (
   serverName: string,
   agent: AgentItem,
 ): Promise<void> => {
-  const DEPLOYER = getEnv({ name: 'DEPLOYER_URL' });
+  const DEPLOYER = getDeployerUrl();
   const response = await fetch(`${DEPLOYER}/agents/${serverName}/addagent`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -199,7 +227,7 @@ export const updateDiscordSettings = async (
   botToken: string,
   dmPolicy?: 'pairing' | 'open',
 ): Promise<void> => {
-  const DEPLOYER = getEnv({ name: 'DEPLOYER_URL' });
+  const DEPLOYER = getDeployerUrl();
   const response = await fetch(`${DEPLOYER}/tools/${serverName}/discord`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
@@ -207,7 +235,7 @@ export const updateDiscordSettings = async (
   });
 
   if (!response.ok) {
-    const message = await response.text();
+    const message = await readDeployerError(response);
     throw new Error(`Failed to update Discord settings: ${message}`);
   }
 };
@@ -216,7 +244,7 @@ export const addDiscordGuild = async (
   serverName: string,
   guildId: string,
 ): Promise<void> => {
-  const DEPLOYER = getEnv({ name: 'DEPLOYER_URL' });
+  const DEPLOYER = getDeployerUrl();
   const response = await fetch(
     `${DEPLOYER}/tools/${serverName}/adddiscordguild`,
     {
@@ -235,7 +263,7 @@ export const addDiscordGuild = async (
 export const listDiscordGuilds = async (
   serverName: string,
 ): Promise<{ guildId: string; requireMention: boolean }[]> => {
-  const DEPLOYER = getEnv({ name: 'DEPLOYER_URL' });
+  const DEPLOYER = getDeployerUrl();
   const response = await fetch(`${DEPLOYER}/tools/${serverName}/discordguilds`);
 
   if (!response.ok) {
@@ -254,7 +282,7 @@ export const listDiscordGuilds = async (
 };
 
 export const getGatewayToken = async (serverName: string): Promise<string> => {
-  const DEPLOYER = getEnv({ name: 'DEPLOYER_URL' });
+  const DEPLOYER = getDeployerUrl();
   const response = await fetch(
     `${DEPLOYER}/agents/${serverName}/gateway-token`,
   );
@@ -271,7 +299,7 @@ export const getGatewayToken = async (serverName: string): Promise<string> => {
 export const fixAndRestartServer = async (
   serverName: string,
 ): Promise<void> => {
-  const DEPLOYER = getEnv({ name: 'DEPLOYER_URL' });
+  const DEPLOYER = getDeployerUrl();
   const response = await fetch(`${DEPLOYER}/agents/${serverName}/fix-restart`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
@@ -286,7 +314,7 @@ export const fixAndRestartServer = async (
 export const checkKimiKeySet = async (
   serverName: string,
 ): Promise<boolean> => {
-  const DEPLOYER = getEnv({ name: 'DEPLOYER_URL' });
+  const DEPLOYER = getDeployerUrl();
   const response = await fetch(
     `${DEPLOYER}/agents/${serverName}/check-kimi-key`,
   );
@@ -304,7 +332,7 @@ export const setKimiApiKey = async (
   serverName: string,
   kimiApiKey: string,
 ): Promise<void> => {
-  const DEPLOYER = getEnv({ name: 'DEPLOYER_URL' });
+  const DEPLOYER = getDeployerUrl();
   const response = await fetch(
     `${DEPLOYER}/agents/${serverName}/set-kimi-key`,
     {
@@ -326,7 +354,7 @@ export const updateAgentFile = async (
   content: string,
   agentId?: string,
 ): Promise<void> => {
-  const DEPLOYER = getEnv({ name: 'DEPLOYER_URL' });
+  const DEPLOYER = getDeployerUrl();
   const response = await fetch(
     `${DEPLOYER}/agents/${serverName}/update-agent-file`,
     {

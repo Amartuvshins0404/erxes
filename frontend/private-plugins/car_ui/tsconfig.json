@@ -4,6 +4,7 @@
     "allowJs": false,
     "esModuleInterop": false,
     "allowSyntheticDefaultImports": true,
+    "ignoreDeprecations": "6.0",
     "strict": true,
     "paths": {
       "erxes-ui": ["frontend/libs/erxes-ui/src"],

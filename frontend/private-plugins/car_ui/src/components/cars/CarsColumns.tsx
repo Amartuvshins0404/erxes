@@ -1,23 +1,33 @@
-import type { ComponentType } from 'react';
 import {
   IconArrowsSort,
   IconBarcode,
   IconCalendar,
   IconHash,
+  IconPencil,
   IconNotes,
+  IconTrash,
 } from '@tabler/icons-react';
-import { ColumnDef } from '@tanstack/react-table';
+import { CellContext, ColumnDef } from '@tanstack/react-table';
 import {
   Button,
+  Combobox,
+  Command,
+  Popover,
   RecordTable,
   RecordTableInlineCell,
   TextOverflowTooltip,
+  useConfirm,
 } from 'erxes-ui';
-import { Link } from 'react-router-dom';
+import { Can } from 'ui-modules';
 
+import { getCarDisplayName } from '~/lib/car';
+import { useCarMutations } from '~/hooks/useCarMutations';
 import { ICar } from '~/types/car';
 
-type Translate = (key: string, options: { defaultValue: string }) => string;
+type Translate = (
+  key: string,
+  options: { defaultValue: string } & Record<string, unknown>,
+) => string;
 
 const SortableHead = ({
   label,
@@ -27,7 +37,7 @@ const SortableHead = ({
   onClick,
 }: {
   label: string;
-  icon: ComponentType<{ className?: string }>;
+  icon: typeof IconHash;
   isActive: boolean;
   sortDirection?: number | null;
   onClick: () => void;
@@ -40,8 +50,7 @@ const SortableHead = ({
       className="h-auto px-0 text-xs font-mono uppercase tracking-wide text-accent-foreground hover:bg-transparent hover:text-primary"
       onClick={onClick}
     >
-      <Icon className="size-3.5" />
-      {label}
+      <RecordTable.InlineHead icon={Icon} label={label} />
       <IconArrowsSort
         className={`size-3.5 transition ${
           isActive
@@ -53,17 +62,87 @@ const SortableHead = ({
   );
 };
 
+const CarsMoreCell = ({
+  cell,
+  onEditCar,
+  t,
+}: CellContext<ICar, unknown> & {
+  onEditCar: (car: ICar) => void;
+  t: Translate;
+}) => {
+  const car = cell.row.original;
+  const { carsRemove, loading } = useCarMutations();
+  const { confirm } = useConfirm();
+
+  const handleDelete = async () => {
+    await confirm({
+      message: t('Delete {{name}}?', {
+        name: getCarDisplayName(car, t),
+        defaultValue: 'Delete {{name}}?',
+      }),
+      options: {
+        okLabel: t('Delete', { defaultValue: 'Delete' }),
+        description: t('This permanently removes the car record.', {
+          defaultValue: 'This permanently removes the car record.',
+        }),
+      },
+    });
+
+    await carsRemove({
+      variables: {
+        carIds: [car._id],
+      },
+    });
+  };
+
+  return (
+    <Popover>
+      <Can action="manageCars">
+        <Popover.Trigger asChild>
+          <RecordTable.MoreButton className="h-full w-full" />
+        </Popover.Trigger>
+      </Can>
+      <Combobox.Content>
+        <Command shouldFilter={false}>
+          <Command.List>
+            <Command.Item value="edit" onSelect={() => onEditCar(car)}>
+              <IconPencil className="size-4" />
+              {t('Edit', { defaultValue: 'Edit' })}
+            </Command.Item>
+            <Command.Item
+              value="delete"
+              onSelect={handleDelete}
+              disabled={loading}
+            >
+              <IconTrash className="size-4" />
+              {t('Delete', { defaultValue: 'Delete' })}
+            </Command.Item>
+          </Command.List>
+        </Command>
+      </Combobox.Content>
+    </Popover>
+  );
+};
+
 export const createCarsColumns = ({
   sortField,
   sortDirection,
   onSort,
+  onEditCar,
   t,
 }: {
   sortField: string | null;
   sortDirection: number | null;
   onSort: (field: string) => void;
+  onEditCar: (car: ICar) => void;
   t: Translate;
 }): ColumnDef<ICar>[] => [
+  {
+    id: 'more',
+    header: () => <RecordTable.ColumnSelector />,
+    cell: (props) => <CarsMoreCell {...props} onEditCar={onEditCar} t={t} />,
+    size: 33,
+  },
   RecordTable.checkboxColumn as ColumnDef<ICar>,
   {
     id: 'plateNumber',
@@ -77,17 +156,9 @@ export const createCarsColumns = ({
         onClick={() => onSort('plateNumber')}
       />
     ),
-    cell: ({ row, cell }) => (
+    cell: ({ cell }) => (
       <RecordTableInlineCell>
-        <Button
-          variant="ghost"
-          className="h-auto max-w-full justify-start px-0 text-left"
-          asChild
-        >
-          <Link to={`/car/${row.original._id}`}>
-            <TextOverflowTooltip value={(cell.getValue() as string) || '—'} />
-          </Link>
-        </Button>
+        <TextOverflowTooltip value={(cell.getValue() as string) || '—'} />
       </RecordTableInlineCell>
     ),
     size: 180,
@@ -104,17 +175,9 @@ export const createCarsColumns = ({
         onClick={() => onSort('vinNumber')}
       />
     ),
-    cell: ({ row, cell }) => (
+    cell: ({ cell }) => (
       <RecordTableInlineCell>
-        <Button
-          variant="ghost"
-          className="h-auto max-w-full justify-start px-0 text-left"
-          asChild
-        >
-          <Link to={`/car/${row.original._id}`}>
-            <TextOverflowTooltip value={(cell.getValue() as string) || '—'} />
-          </Link>
-        </Button>
+        <TextOverflowTooltip value={(cell.getValue() as string) || '—'} />
       </RecordTableInlineCell>
     ),
     size: 220,

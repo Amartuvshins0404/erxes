@@ -4,6 +4,7 @@ export interface IOpencodeServer {
   identifierId?: string;
   name: string;
   url: string;
+  token?: string;
   provider: string;
   serverId: string;
   serverPassword?: string;

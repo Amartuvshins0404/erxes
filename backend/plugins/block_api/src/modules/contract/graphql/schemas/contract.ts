@@ -4,13 +4,6 @@ export const types = `
     company
   }
 
-  enum BlockContractStatus {
-    draft
-    signed
-    completed
-    cancelled
-  }
-
   enum BlockContractInterestType {
     SIMPLE
     FLAT
@@ -60,7 +53,7 @@ export const types = `
     date: String
     amount: Int
     amountType: BlockContractAmountType
-    status: BlockContractStatus
+    status: String
     startDate: String
     endDate: String
     isLifeTime: Boolean
@@ -87,19 +80,20 @@ export const types = `
     date: String
     amount: Int
     amountType: BlockContractAmountType
-    status: BlockContractStatus
+    status: String
     startDate: String
     endDate: String
     isLifeTime: Boolean
     party: BlockContractPartyInput
     paymentPlan: BlockContractPaymentPlanInput
+    user: String
   }
 `;
 
 export const mutations = `
   blockCreateContract(input: BlockContractInput!): BlockContract
   blockUpdateContract(_id: String!, input: BlockContractInput!): BlockContract
-  blockUpdateContractStatus(_id: String!, status: BlockContractStatus!): BlockContract
+  blockUpdateContractStatus(_id: String!, status: String!): BlockContract
 `;
 
 export const queries = `

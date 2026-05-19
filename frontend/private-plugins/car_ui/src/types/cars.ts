@@ -106,15 +106,6 @@ export interface ISegment {
   subOf?: string | null;
 }
 
-export interface IDeal {
-  _id: string;
-  name?: string | null;
-  status?: string | null;
-  stage?: {
-    name?: string | null;
-  } | null;
-}
-
 export interface ICarFilters {
   page: number;
   perPage: number;

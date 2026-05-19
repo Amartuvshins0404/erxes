@@ -10,6 +10,7 @@ export const unitSchema = new Schema(
     blockEntityId: { type: String, index: true },
     agencySubdomain: { type: String, index: true },
     agencyEntityId: { type: String, index: true },
+    locked: { type: Boolean, default: false },
   },
   {
     timestamps: true,

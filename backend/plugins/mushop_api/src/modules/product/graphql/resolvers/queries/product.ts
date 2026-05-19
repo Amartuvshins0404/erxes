@@ -32,13 +32,17 @@ export const productQueries = {
 
     const matchStage = Object.keys(filter).length ? [{ $match: filter }] : [];
 
-    const orderBy = params.orderBy && Object.keys(params.orderBy).length
-      ? params.orderBy
-      : ({ _statusOrder: 1, createdAt: -1 } as Record<string, any>);
+    const baseOrderBy =
+      params.orderBy && Object.keys(params.orderBy).length
+        ? params.orderBy
+        : ({ _statusOrder: 1, createdAt: -1 } as Record<string, any>);
+
+    const orderBy = { ...baseOrderBy, _id: 1 } as Record<string, any>;
 
     return cursorPaginateAggregation({
       model: models.MushopProduct,
       params: { ...params, orderBy },
+      formatter: { createdAt: 'date' },
       pipeline: [
         ...matchStage,
         {

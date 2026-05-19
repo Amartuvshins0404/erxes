@@ -16,8 +16,11 @@ const QUERY_KEYS: Array<keyof ICarFilters> = [
   'ids',
 ];
 
+type CarFilterQueryState = ICarFilters & Record<string, unknown>;
+
 export const useCarsQueryState = () => {
-  const [queries, setQueries] = useMultiQueryState<ICarFilters>(QUERY_KEYS);
+  const [queries, setQueries] =
+    useMultiQueryState<CarFilterQueryState>(QUERY_KEYS);
 
   const filters: ICarFilters = {
     page: Number(queries.page || DEFAULT_PAGE),

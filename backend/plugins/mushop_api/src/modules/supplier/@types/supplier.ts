@@ -42,6 +42,8 @@ export interface ISupplier {
   about?: string;
   logo?: string;
   coverImage?: string;
+  attachments?: string[];
+  urls?: string[];
   registrationNumber?: string;
   address?: ISupplierAddress;
   primaryEmail?: string;

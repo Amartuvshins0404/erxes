@@ -5,6 +5,7 @@ import resolvers from './apollo/resolvers';
 import { generateModels } from './connectionResolvers';
 import { payments } from './meta/payments';
 import router from './routes';
+import beforeResolvers from './modules/product/beforeResolvers';
 
 startPlugin({
   name: 'mushop',
@@ -29,5 +30,6 @@ startPlugin({
   },
   meta: {
     payments,
+    beforeResolvers
   },
 });

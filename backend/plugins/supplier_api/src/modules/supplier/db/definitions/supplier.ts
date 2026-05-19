@@ -28,6 +28,8 @@ export const supplierSchema = schemaWrapper(
 
       logo: { type: String, label: 'Logo' },
       coverImage: { type: String, label: 'Cover image' },
+      attachments: { type: [String], default: [] },
+      urls: { type: [String], default: [] },
 
       registrationNumber: { type: String, label: 'Registration number' },
 

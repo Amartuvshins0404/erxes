@@ -22,3 +22,82 @@ export const CONTRACT_STATUS = {
   CANCELLED: 'cancelled',
   EXPIRED: 'expired',
 };
+
+export const DEFAULT_CONTRACT_STATUS_TYPES = {
+  RESERVED: 'reserved',
+  DRAFT: 'draft',
+  SIGNED: 'signed',
+  LOST: 'lost',
+  CANCELLED: 'cancelled',
+};
+
+export const TERMINAL_CONTRACT_STATUS_TYPES = [
+  DEFAULT_CONTRACT_STATUS_TYPES.LOST,
+  DEFAULT_CONTRACT_STATUS_TYPES.CANCELLED,
+];
+
+export const DEFAULT_CONTRACT_STATUSES = {
+  [DEFAULT_CONTRACT_STATUS_TYPES.RESERVED]: {
+    RESERVED: {
+      name: 'Reserved',
+      color: '#FFB347',
+      type: DEFAULT_CONTRACT_STATUS_TYPES.RESERVED,
+    },
+  },
+  [DEFAULT_CONTRACT_STATUS_TYPES.DRAFT]: {
+    DRAFT: {
+      name: 'Draft',
+      color: '#4ECDC4',
+      type: DEFAULT_CONTRACT_STATUS_TYPES.DRAFT,
+    },
+  },
+  [DEFAULT_CONTRACT_STATUS_TYPES.SIGNED]: {
+    SIGNED: {
+      name: 'Signed',
+      color: '#45B7D1',
+      type: DEFAULT_CONTRACT_STATUS_TYPES.SIGNED,
+    },
+  },
+  [DEFAULT_CONTRACT_STATUS_TYPES.LOST]: {
+    LOST: {
+      name: 'Lost',
+      color: '#D9534F',
+      type: DEFAULT_CONTRACT_STATUS_TYPES.LOST,
+    },
+  },
+  [DEFAULT_CONTRACT_STATUS_TYPES.CANCELLED]: {
+    CANCELLED: {
+      name: 'Cancelled',
+      color: '#C0392B',
+      type: DEFAULT_CONTRACT_STATUS_TYPES.CANCELLED,
+    },
+  },
+};
+
+export const DEFAULT_CONTRACT_STATUS_TYPE_VALUES = {
+  [DEFAULT_CONTRACT_STATUS_TYPES.RESERVED]: {
+    color: '#FFB347',
+    type: DEFAULT_CONTRACT_STATUS_TYPES.RESERVED,
+    name: 'Reserved',
+  },
+  [DEFAULT_CONTRACT_STATUS_TYPES.DRAFT]: {
+    color: '#4ECDC4',
+    type: DEFAULT_CONTRACT_STATUS_TYPES.DRAFT,
+    name: 'Draft',
+  },
+  [DEFAULT_CONTRACT_STATUS_TYPES.SIGNED]: {
+    color: '#45B7D1',
+    type: DEFAULT_CONTRACT_STATUS_TYPES.SIGNED,
+    name: 'Signed',
+  },
+  [DEFAULT_CONTRACT_STATUS_TYPES.LOST]: {
+    color: '#D9534F',
+    type: DEFAULT_CONTRACT_STATUS_TYPES.LOST,
+    name: 'Lost',
+  },
+  [DEFAULT_CONTRACT_STATUS_TYPES.CANCELLED]: {
+    color: '#C0392B',
+    type: DEFAULT_CONTRACT_STATUS_TYPES.CANCELLED,
+    name: 'Cancelled',
+  },
+};

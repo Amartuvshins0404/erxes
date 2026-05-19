@@ -1,34 +1,45 @@
-import { IconContract, IconLock, IconSparkles } from '@tabler/icons-react';
-import { Breadcrumb, Button, Empty, PageContainer } from 'erxes-ui';
-import { Link, useLocation } from 'react-router-dom';
+import { IconContract } from '@tabler/icons-react';
+import { Breadcrumb, Button, PageContainer } from 'erxes-ui';
+import { Link } from 'react-router-dom';
 import { PageHeader } from 'ui-modules';
+import { lazy, Suspense, useEffect, useState } from 'react';
+import { useAtomValue } from 'jotai';
+import { ContractAddSheet } from './ContractAdd';
+import { contractDetailSheetState } from '@/contract/states/contractDetailSheetState';
+
+const ContractDetailSheet = lazy(() =>
+  import('./ContractDetailSheet').then((m) => ({
+    default: m.ContractDetailSheet,
+  })),
+);
+
+const ContractDetailSheetMount = () => {
+  const activeContractId = useAtomValue(contractDetailSheetState);
+  const [hasOpened, setHasOpened] = useState(false);
+
+  useEffect(() => {
+    if (activeContractId) setHasOpened(true);
+  }, [activeContractId]);
+
+  if (!hasOpened) return null;
+
+  return (
+    <Suspense fallback={null}>
+      <ContractDetailSheet />
+    </Suspense>
+  );
+};
 
 export const ContractsLayout = ({
   children,
 }: {
   children: React.ReactNode;
 }) => {
-  const path = useLocation().pathname;
-  const isContracts = path.includes('/contracts');
   return (
     <PageContainer>
       <ContractsHeader />
       {children}
-      {!(isContracts && process.env.NODE_ENV === 'development') && (
-        <div className="blk:backdrop-blur-lg absolute inset-0 h-full w-full z-10 flex items-center justify-center">
-          <Empty>
-            <Empty.Header>
-              <Empty.Media variant="icon">
-                <IconSparkles className="text-primary" />
-              </Empty.Media>
-              <Empty.Title>Enterprise</Empty.Title>
-              <Empty.Description>
-                Please upgrade to the Enterprise plan to access this feature.
-              </Empty.Description>
-            </Empty.Header>
-          </Empty>
-        </div>
-      )}
+      <ContractDetailSheetMount />
     </PageContainer>
   );
 };
@@ -50,6 +61,9 @@ export const ContractsHeader = () => {
           </Breadcrumb.List>
         </Breadcrumb>
       </PageHeader.Start>
+      <PageHeader.End>
+        <ContractAddSheet />
+      </PageHeader.End>
     </PageHeader>
   );
 };

@@ -1,9 +1,13 @@
-import { Button, cn, Collapsible, InfoCard, Spinner } from 'erxes-ui';
+import { IconListDetails } from '@tabler/icons-react';
+import { Button, cn, Collapsible, Empty, InfoCard, Spinner } from 'erxes-ui';
 import {
   FieldsInGroup,
   MultipleFieldsInGroup,
   useFieldGroups,
 } from 'ui-modules';
+import { useTranslation } from 'react-i18next';
+
+import { LEGACY_ROOT_CAR_CONTENT_TYPE } from '~/lib/constants';
 
 type MutateHook = () => {
   mutate: (variables: { _id: string } & Record<string, unknown>) => void;
@@ -71,28 +75,67 @@ export const CarPropertiesInDetail = ({
   id: string;
   className?: string;
 }) => {
+  const { t } = useTranslation('car');
   const { fieldGroups, loading: fieldGroupsLoading } = useFieldGroups({
     contentType: fieldContentType,
   });
+  const {
+    fieldGroups: legacyFieldGroups,
+    loading: legacyFieldGroupsLoading,
+  } = useFieldGroups({
+    contentType: LEGACY_ROOT_CAR_CONTENT_TYPE,
+  });
 
-  if (fieldGroupsLoading) {
+  if (fieldGroupsLoading || legacyFieldGroupsLoading) {
     return <Spinner containerClassName="py-6" />;
   }
+
+  const fieldGroupsById = new Map<string, any>();
+
+  [...fieldGroups, ...legacyFieldGroups].forEach((group: any) => {
+    fieldGroupsById.set(group._id, group);
+  });
+
+  const mergedFieldGroups = Array.from(fieldGroupsById.values());
 
   return (
     <div className={cn('flex flex-col gap-4', className)}>
       <InfoCard title={title}>
         <InfoCard.Content>
-          {fieldGroups.map((group: any) => (
-            <CarFieldGroupContent
-              key={group._id}
-              group={group}
-              id={id}
-              contentType={fieldContentType}
-              propertiesData={propertiesData}
-              mutateHook={mutateHook}
-            />
-          ))}
+          {mergedFieldGroups.length ? (
+            mergedFieldGroups.map((group: any) => (
+              <CarFieldGroupContent
+                key={group._id}
+                group={group}
+                id={id}
+                contentType={group.contentType || fieldContentType}
+                propertiesData={propertiesData}
+                mutateHook={mutateHook}
+              />
+            ))
+          ) : (
+            <Empty>
+              <Empty.Header>
+                <Empty.Media variant="icon">
+                  <IconListDetails />
+                </Empty.Media>
+                <Empty.Title>
+                  {t('No car properties found', {
+                    defaultValue: 'No car properties found',
+                  })}
+                </Empty.Title>
+                <Empty.Description>
+                  {t(
+                    'Legacy service and diagnostic fields appear here after their property definitions are migrated.',
+                    {
+                      defaultValue:
+                        'Legacy service and diagnostic fields appear here after their property definitions are migrated.',
+                    },
+                  )}
+                </Empty.Description>
+              </Empty.Header>
+            </Empty>
+          )}
         </InfoCard.Content>
       </InfoCard>
     </div>

@@ -2,7 +2,7 @@ import { IconUser } from '@tabler/icons-react';
 import { Breadcrumb, Button, Separator } from 'erxes-ui';
 import { PageHeader } from 'ui-modules';
 import { Link } from 'react-router-dom';
-import { SupplierProfileForm } from '@/profile/components/SupplierProfileForm';
+import { SupplierProfileForm } from '@/supplier/components/SupplierProfileForm';
 
 export const IndexPage = () => {
   return (

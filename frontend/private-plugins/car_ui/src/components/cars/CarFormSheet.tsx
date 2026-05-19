@@ -70,12 +70,13 @@ const AttachmentField = ({
 
         onChange(fileInfo as IAttachment);
       }}
-      className="relative group"
+      className="group relative block w-full"
     >
       <Upload.Button
         type="button"
         variant="secondary"
-        className="relative min-h-[116px] w-full overflow-hidden rounded-lg border border-dashed bg-background"
+        size={null}
+        className="relative flex h-32 min-h-32 w-full items-center justify-center overflow-hidden rounded-lg border border-dashed bg-background p-0 text-center whitespace-normal"
         style={
           value?.url
             ? {
@@ -87,7 +88,7 @@ const AttachmentField = ({
         }
       >
         {!value?.url ? (
-          <div className="flex flex-col items-center gap-2 text-muted-foreground">
+          <div className="flex flex-col items-center gap-2 px-4 text-muted-foreground">
             {isLoading ? (
               <Spinner size="sm" />
             ) : (
@@ -219,11 +220,11 @@ export const CarFormSheet = ({
         <Form {...form}>
           <form
             onSubmit={form.handleSubmit(onSubmit)}
-            className="flex flex-col overflow-hidden"
+            className="flex min-h-0 flex-auto flex-col overflow-hidden"
           >
-            <Sheet.Content className="flex-auto overflow-hidden">
+            <Sheet.Content className="min-h-0 flex-auto overflow-hidden">
               <ScrollArea className="h-full">
-                <div className="grid gap-6 p-6 md:grid-cols-2">
+                <div className="grid gap-6 p-6 pb-24 md:grid-cols-2">
                   <Form.Field
                     control={form.control}
                     name="categoryId"

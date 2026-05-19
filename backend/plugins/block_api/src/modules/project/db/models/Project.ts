@@ -39,6 +39,7 @@ export const loadProjectClass = (
       // Create default statuses for the project
       if (project) {
         await models.OpptyStatus.generateDefaultOpptyStatus(project._id);
+        await models.ContractStatus.generateDefaultContractStatus(project._id);
       }
 
       return project;
@@ -57,6 +58,12 @@ export const loadProjectClass = (
 
       if (!status) {
         await models.OpptyStatus.generateDefaultOpptyStatus(_id);
+      }
+
+      const contractStatus = await models.ContractStatus.exists({ projectId: _id });
+
+      if (!contractStatus) {
+        await models.ContractStatus.generateDefaultContractStatus(_id);
       }
 
       const updatedProject = await models.Project.findOneAndUpdate(

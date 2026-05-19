@@ -65,6 +65,7 @@ export const opencodeMutations = {
         identifierId,
         name: server.serverName,
         url: server.serverUrl,
+        token: server.gatewayToken,
         provider: normalizedProvider,
         serverId: String(server.serverId),
         serverPassword: server.serverPassword,

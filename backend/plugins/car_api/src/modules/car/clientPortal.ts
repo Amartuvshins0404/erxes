@@ -160,6 +160,52 @@ export const assertCanManageClientPortalCar = async (
   }
 };
 
+const getRelatedCarIdsForEntity = async (
+  subdomain: string,
+  contentType: string,
+  contentId?: string,
+) => {
+  if (!contentId) {
+    return [];
+  }
+
+  return requireArrayResult<string>(
+    await requireCoreTRPC({
+      subdomain,
+      module: 'relation',
+      action: 'getRelationIds',
+      input: {
+        contentType,
+        contentId,
+        relatedContentType: ROOT_CAR_CONTENT_TYPE,
+      },
+    }),
+    'Core relation.getRelationIds',
+  );
+};
+
+export const getClientPortalCarIds = async (
+  subdomain: string,
+  { customerId, companyId }: ClientPortalEntityInput,
+) => {
+  const [customerCarIds, companyCarIds] = await Promise.all([
+    getRelatedCarIdsForEntity(
+      subdomain,
+      CORE_CUSTOMER_CONTENT_TYPE,
+      customerId,
+    ),
+    getRelatedCarIdsForEntity(
+      subdomain,
+      CORE_COMPANY_CONTENT_TYPE,
+      companyId,
+    ),
+  ]);
+
+  return Array.from(
+    new Set([...customerCarIds, ...companyCarIds].filter(Boolean)),
+  );
+};
+
 export const removeCarEntityRelations = async (
   subdomain: string,
   carIds: string[],

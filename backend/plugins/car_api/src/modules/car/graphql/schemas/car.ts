@@ -91,6 +91,8 @@ export const queries = `
   carCategories(parentId: String, searchValue: String): [CarCategory]
   carCategoriesTotalCount: Int
   carCategoryDetail(_id: String): CarCategory
+  cpCarsMain(${queryParams}, customerId: String, companyId: String): CarsListResponse
+  cpCars(${queryParams}, customerId: String, companyId: String): [Car]
   cpCarDetail(_id: String!, customerId: String, companyId: String): Car
   cpCarCategories(parentId: String, searchValue: String): [CarCategory]
   cpCarCategoriesTotalCount: Int

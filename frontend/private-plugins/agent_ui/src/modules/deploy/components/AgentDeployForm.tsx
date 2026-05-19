@@ -64,7 +64,7 @@ export const AgentDeployForm = () => {
         <div className="space-y-2">
           <h3 className="text-sm font-medium">Add AI Assistant</h3>
           <p className="text-muted-foreground text-xs">
-            Enter the provider and API token for this OpenClaw AI assistant.
+            Enter the provider and API token for this AI Assistant.
           </p>
         </div>
         <Form.Field
@@ -118,7 +118,7 @@ export const AgentDeployForm = () => {
                 />
               </Form.Control>
               <p className="text-muted-foreground text-xs">
-                Required. OpenClaw uses this token during bootstrap so the bot
+                Required. Erxes uses this token during bootstrap so the bot
                 can come online and send the pairing code.
               </p>
               <Form.Message />

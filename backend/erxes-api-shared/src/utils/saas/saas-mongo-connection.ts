@@ -3,6 +3,7 @@ import { getEnv } from '../utils';
 import {
   saasAddonSchema,
   saasBundleSchema,
+  saasOrganizationPlanHistorySchema,
   endPointSchema,
   experiencesSchema,
   saasInstallationSchema,
@@ -11,7 +12,7 @@ import {
   saasPromoCodeSchema,
   saasUserSchema,
 } from './definition';
-import { IOrganization } from './types';
+import { IOrganization, ISaasOrganizationPlanHistory } from './types';
 import { redis } from '../redis';
 import { mongooseConnectionOptions } from '../mongo';
 
@@ -24,6 +25,7 @@ export let coreModelEndpoints: any;
 export let coreModelPromoCodes: any;
 export let coreModelPlugins: any;
 export let coreModelExperiences: any;
+export let coreModelOrganizationPlanHistories: mongoose.Model<ISaasOrganizationPlanHistory>;
 
 export const getSaasCoreConnection = async (): Promise<void> => {
   if (coreModelOrganizations) {
@@ -56,6 +58,10 @@ export const getSaasCoreConnection = async (): Promise<void> => {
   coreModelAddons = coreConnection.model('addons', saasAddonSchema);
   coreModelBundles = coreConnection.model('bundles', saasBundleSchema);
   coreModelPlugins = coreConnection.model('plugins', saasPluginSchema);
+  coreModelOrganizationPlanHistories = coreConnection.model(
+    'organization_plan_histories',
+    saasOrganizationPlanHistorySchema,
+  );
 };
 
 export const ORGANIZATION_ID_MAPPING: { [key: string]: string } = {};
@@ -282,6 +288,45 @@ export const getSaasOrganizationDetail = async ({
     charge,
     setupService,
   };
+};
+
+export const getSaasOrganizationPlanHistories = async ({
+  organizationId,
+  statuses = ['active'],
+}: {
+  organizationId: string;
+  statuses?: string[];
+}): Promise<ISaasOrganizationPlanHistory[]> => {
+  await getSaasCoreConnection();
+
+  const histories = await coreModelOrganizationPlanHistories
+    .find({
+      organizationId,
+      ...(statuses.length ? { status: { $in: statuses } } : {}),
+    })
+    .sort({ createdAt: -1 })
+    .lean<ISaasOrganizationPlanHistory[]>();
+
+  const bundleIds = Array.from(
+    new Set(histories.map((history) => history.bundleId).filter(Boolean)),
+  );
+
+  if (!bundleIds.length) {
+    return histories;
+  }
+
+  const bundles = await coreModelBundles
+    .find({ _id: { $in: bundleIds } })
+    .lean();
+
+  const bundleById = new Map(
+    bundles.map((bundle) => [String(bundle._id), bundle]),
+  );
+
+  return histories.map((history) => ({
+    ...history,
+    bundle: history.bundleId ? bundleById.get(history.bundleId) : undefined,
+  }));
 };
 
 export const removeOrgsCache = (source: string) => {

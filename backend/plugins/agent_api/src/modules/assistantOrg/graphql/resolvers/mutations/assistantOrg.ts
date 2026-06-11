@@ -3,6 +3,7 @@ import {
   assertIdentifierManageAccess,
   requireUser,
 } from '~/modules/assistantOrg/permissions';
+import { assertAssistantLimitAvailable } from '~/modules/assistantOrg/assistantLimits';
 import { buildUniqueSlug, ensureLegacyIdentifierLinks } from '../../../utils';
 
 export const identifierMutations = {
@@ -17,7 +18,7 @@ export const identifierMutations = {
         description?: string | null;
       };
     },
-    { models, user }: IContext,
+    { models, subdomain, user }: IContext,
   ) => {
     const currentUser = requireUser(user);
     const name = input?.name?.trim();
@@ -33,6 +34,10 @@ export const identifierMutations = {
     }
 
     await ensureLegacyIdentifierLinks(models);
+
+    if (kind === 'assistant') {
+      await assertAssistantLimitAvailable({ models, subdomain });
+    }
 
     const slug = await buildUniqueSlug(name, (nextSlug) =>
       models.Identifier.findOne({ slug: nextSlug }).lean(),

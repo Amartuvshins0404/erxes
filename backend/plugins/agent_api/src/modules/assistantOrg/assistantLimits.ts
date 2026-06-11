@@ -1,0 +1,525 @@
+import { IContext } from '~/connectionResolvers';
+import { buildIdentifierAccessQuery } from '~/modules/assistantOrg/permissions';
+import {
+  getSaasOrganizationDetail,
+  getSaasOrganizationPlanHistories,
+} from 'erxes-api-shared/utils';
+import type {
+  IOrganization,
+  ISaasOrganizationPlanHistory,
+} from 'erxes-api-shared/utils';
+import type { IIdentifierDocument } from './@types/assistantOrg';
+
+export interface AssistantLimit {
+  limited: boolean;
+  allowed: boolean;
+  limit?: number;
+  used: number;
+  remaining?: number;
+  hasActivePlan: boolean;
+  source: string;
+  upgradeUrl?: string;
+  billingWarning?: AssistantBillingWarning | null;
+  billingOverview?: AssistantBillingOverview | null;
+}
+
+export interface AssistantBillingWarning {
+  active: boolean;
+  deletionDue: boolean;
+  gracePeriodDays: number;
+  daysUntilDeletion: number;
+  unpaidSince?: string;
+  deletionDate?: string;
+  message: string;
+}
+
+export interface AssistantBillingItem {
+  identifierId: string;
+  name: string;
+  slug: string;
+  description?: string | null;
+  memberIds: string[];
+  createdAt?: string;
+  updatedAt?: string;
+  planStartDate?: string | null;
+  planEndDate?: string | null;
+  paymentStatus: 'paid' | 'unpaid';
+  blocked: boolean;
+  overdueDays: number;
+  message: string;
+}
+
+export interface AssistantBillingOverview {
+  active: boolean;
+  blocked: boolean;
+  overdueCount: number;
+  billingUrl?: string;
+  message: string;
+  items: AssistantBillingItem[];
+}
+
+const ACTIVE_HISTORY_STATUSES = ['active'];
+export const ASSISTANT_PAYMENT_GRACE_PERIOD_DAYS = 21;
+const SAAS_HOST_SUFFIX = '.next.erxes.io';
+const ENTERPRISE_HOST_SUFFIX = '.erxes.io';
+
+const ASSISTANT_LIMIT_KEY_MATCHERS = [
+  'ai:assistant',
+  'assistant',
+  'aiassistant',
+  'ai-assistant',
+  'agent-assistant',
+  'openclaw',
+];
+
+const normalizeText = (value?: string) =>
+  (value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+
+const normalizeKey = (value: string) =>
+  normalizeText(value).replace(/[\s_]+/g, '-');
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const readLimitNumber = (value: unknown): number => {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return Math.max(0, Math.floor(value));
+  }
+
+  if (!isRecord(value)) {
+    return 0;
+  }
+
+  const limit = value.limit;
+
+  return typeof limit === 'number' && Number.isFinite(limit)
+    ? Math.max(0, Math.floor(limit))
+    : 0;
+};
+
+const isAssistantLimitKey = (key: string) => {
+  const normalized = normalizeKey(key);
+
+  return ASSISTANT_LIMIT_KEY_MATCHERS.some((matcher) =>
+    normalized.includes(matcher),
+  );
+};
+
+const getSnapshotAssistantLimit = (
+  snapshot?: Record<string, unknown>,
+): number => {
+  if (!snapshot) {
+    return 0;
+  }
+
+  return Object.entries(snapshot).reduce((sum, [key, value]) => {
+    if (!isAssistantLimitKey(key)) {
+      return sum;
+    }
+
+    return sum + readLimitNumber(value);
+  }, 0);
+};
+
+const getFallbackBundleAssistantLimit = (
+  history: ISaasOrganizationPlanHistory,
+) => {
+  const title = normalizeText(history.bundle?.title);
+  const type = normalizeText(history.bundle?.type);
+  const descriptor = `${title} ${type}`;
+
+  if (!descriptor.includes('assistant') && !descriptor.includes('ai')) {
+    return 0;
+  }
+
+  if (descriptor.includes('gold')) {
+    return 3;
+  }
+
+  if (descriptor.includes('silver')) {
+    return 2;
+  }
+
+  if (descriptor.includes('bronze')) {
+    return 1;
+  }
+
+  return 0;
+};
+
+const isHistoryCurrent = (history: ISaasOrganizationPlanHistory) => {
+  const now = Date.now();
+  const startsAt = history.startsAt ? new Date(history.startsAt).getTime() : 0;
+  const endsAt = history.endsAt
+    ? new Date(history.endsAt).getTime()
+    : Number.POSITIVE_INFINITY;
+
+  return startsAt <= now && endsAt >= now;
+};
+
+const getHistoryAssistantLimit = (
+  history: ISaasOrganizationPlanHistory,
+): number => {
+  const snapshotLimit = getSnapshotAssistantLimit(
+    history.pluginsLimitsSnapshot,
+  );
+
+  if (snapshotLimit > 0) {
+    return snapshotLimit;
+  }
+
+  return getFallbackBundleAssistantLimit(history);
+};
+
+const isSaasOrganization = (organization: IOrganization) => {
+  const domain = normalizeText(organization.domain);
+
+  if (organization.isNext || domain.endsWith(SAAS_HOST_SUFFIX)) {
+    return true;
+  }
+
+  if (
+    domain.endsWith(ENTERPRISE_HOST_SUFFIX) &&
+    !domain.endsWith(SAAS_HOST_SUFFIX)
+  ) {
+    return false;
+  }
+
+  return false;
+};
+
+const buildUpgradeUrl = () => 'https://erxes.io/organizations?bundleCode=ai';
+
+const getUsedAssistantCount = async (models: IContext['models']) => {
+  const [identifierCount, serverCount] = await Promise.all([
+    models.Identifier.countDocuments({ kind: 'assistant' }),
+    models.AgentServer.countDocuments({}),
+  ]);
+
+  return Math.max(identifierCount, serverCount);
+};
+
+const getHistoryTime = (
+  history: ISaasOrganizationPlanHistory,
+  field: 'endsAt' | 'updatedAt' | 'createdAt',
+) => {
+  const value = history[field];
+
+  if (!value) {
+    return 0;
+  }
+
+  const time = new Date(value).getTime();
+
+  return Number.isFinite(time) ? time : 0;
+};
+
+const getBillingGraceStart = (
+  history: ISaasOrganizationPlanHistory,
+): Date | null => {
+  const endedAt = getHistoryTime(history, 'endsAt');
+  const updatedAt = getHistoryTime(history, 'updatedAt');
+  const createdAt = getHistoryTime(history, 'createdAt');
+  const now = Date.now();
+  const graceStart =
+    endedAt && endedAt <= now ? endedAt : updatedAt || createdAt;
+
+  return graceStart ? new Date(graceStart) : null;
+};
+
+const getLatestAssistantHistory = (histories: ISaasOrganizationPlanHistory[]) =>
+  histories
+    .filter((history) => getHistoryAssistantLimit(history) > 0)
+    .sort((left, right) => {
+      const rightTime =
+        getHistoryTime(right, 'endsAt') ||
+        getHistoryTime(right, 'updatedAt') ||
+        getHistoryTime(right, 'createdAt');
+      const leftTime =
+        getHistoryTime(left, 'endsAt') ||
+        getHistoryTime(left, 'updatedAt') ||
+        getHistoryTime(left, 'createdAt');
+
+      return rightTime - leftTime;
+    })[0];
+
+const getBillingNoticeMessage = (overdueDays: number) => {
+  if (overdueDays >= 20) {
+    return 'Access is blocked. You have to pay now to restore this assistant.';
+  }
+
+  if (overdueDays >= 18) {
+    return 'Final warning. You have to pay to keep this assistant active.';
+  }
+
+  if (overdueDays >= 12) {
+    return 'Your bill is overdue. You have to pay soon to keep access.';
+  }
+
+  if (overdueDays >= 6) {
+    return 'Your payment is overdue. You have to pay to keep access.';
+  }
+
+  return 'You have to pay to open this assistant.';
+};
+
+const getBillingState = (history?: ISaasOrganizationPlanHistory | null) => {
+  if (!history?.endsAt) {
+    return {
+      blocked: false,
+      overdueDays: 0,
+      paymentStatus: 'paid' as const,
+      message: '',
+    };
+  }
+
+  const endDate = new Date(history.endsAt);
+  const overdueDays = Math.max(
+    0,
+    Math.ceil((Date.now() - endDate.getTime()) / (24 * 60 * 60 * 1000)),
+  );
+  const blocked = overdueDays > 0;
+
+  return {
+    blocked,
+    overdueDays,
+    paymentStatus: blocked ? ('unpaid' as const) : ('paid' as const),
+    message: blocked ? getBillingNoticeMessage(overdueDays) : '',
+  };
+};
+
+export const getAssistantBillingWarning = ({
+  histories,
+  hasActivePlan,
+  used,
+}: {
+  histories: ISaasOrganizationPlanHistory[];
+  hasActivePlan: boolean;
+  used: number;
+}): AssistantBillingWarning | null => {
+  if (hasActivePlan || used === 0) {
+    return null;
+  }
+
+  const latestAssistantHistory = getLatestAssistantHistory(histories);
+
+  if (!latestAssistantHistory) {
+    return null;
+  }
+
+  const unpaidSince = getBillingGraceStart(latestAssistantHistory);
+
+  if (!unpaidSince) {
+    return null;
+  }
+
+  const gracePeriodMs =
+    ASSISTANT_PAYMENT_GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000;
+  const deletionDate = new Date(unpaidSince.getTime() + gracePeriodMs);
+  const remainingMs = deletionDate.getTime() - Date.now();
+  const deletionDue = remainingMs <= 0;
+  const daysUntilDeletion = deletionDue
+    ? 0
+    : Math.max(1, Math.ceil(remainingMs / (24 * 60 * 60 * 1000)));
+
+  return {
+    active: true,
+    deletionDue,
+    gracePeriodDays: ASSISTANT_PAYMENT_GRACE_PERIOD_DAYS,
+    daysUntilDeletion,
+    unpaidSince: unpaidSince.toISOString(),
+    deletionDate: deletionDate.toISOString(),
+    message: deletionDue
+      ? 'Your AI Assistant bundle payment is overdue. The OpenClaw server is scheduled for deletion.'
+      : `Your AI Assistant bundle payment is overdue. The OpenClaw server will be deleted in ${daysUntilDeletion} day${
+          daysUntilDeletion === 1 ? '' : 's'
+        } unless payment is completed.`,
+  };
+};
+
+export const getAssistantLimit = async ({
+  models,
+  subdomain,
+}: {
+  models: IContext['models'];
+  subdomain: string;
+}): Promise<AssistantLimit> => {
+  const used = await getUsedAssistantCount(models);
+
+  let organization: IOrganization;
+
+  try {
+    organization = await getSaasOrganizationDetail({
+      subdomain,
+    });
+  } catch {
+    return {
+      limited: false,
+      allowed: true,
+      used,
+      hasActivePlan: true,
+      source: 'enterprise',
+    };
+  }
+
+  if (!organization?._id || !isSaasOrganization(organization)) {
+    return {
+      limited: false,
+      allowed: true,
+      used,
+      hasActivePlan: true,
+      source: 'enterprise',
+    };
+  }
+
+  const histories = await getSaasOrganizationPlanHistories({
+    organizationId: organization._id,
+    statuses: [],
+  });
+
+  const activeHistories = histories.filter(
+    (history) =>
+      ACTIVE_HISTORY_STATUSES.includes(history.status || '') &&
+      isHistoryCurrent(history),
+  );
+  const limit = activeHistories.reduce(
+    (sum, history) => sum + getHistoryAssistantLimit(history),
+    0,
+  );
+  const remaining = Math.max(0, limit - used);
+  const hasActivePlan = limit > 0;
+
+  return {
+    limited: true,
+    allowed: remaining > 0,
+    limit,
+    used,
+    remaining,
+    hasActivePlan,
+    source: 'payment_history',
+    upgradeUrl: buildUpgradeUrl(),
+    billingWarning: getAssistantBillingWarning({
+      histories,
+      hasActivePlan,
+      used,
+    }),
+  };
+};
+
+export const getAssistantBillingOverview = async ({
+  models,
+  subdomain,
+  user,
+}: {
+  models: IContext['models'];
+  subdomain: string;
+  user?: IContext['user'];
+}): Promise<AssistantBillingOverview> => {
+  let organization: IOrganization;
+
+  try {
+    organization = await getSaasOrganizationDetail({
+      subdomain,
+    });
+  } catch {
+    return {
+      active: false,
+      blocked: false,
+      overdueCount: 0,
+      message: '',
+      items: [],
+    };
+  }
+
+  if (!organization?._id || !isSaasOrganization(organization)) {
+    return {
+      active: false,
+      blocked: false,
+      overdueCount: 0,
+      message: '',
+      items: [],
+    };
+  }
+
+  const histories = await getSaasOrganizationPlanHistories({
+    organizationId: organization._id,
+    statuses: [],
+  });
+  const latestAssistantHistory = getLatestAssistantHistory(histories);
+  const billingState = getBillingState(latestAssistantHistory);
+  const identifiers = (await models.Identifier.find(
+    buildIdentifierAccessQuery(user),
+    {
+      name: 1,
+      slug: 1,
+      description: 1,
+      memberIds: 1,
+      createdAt: 1,
+      updatedAt: 1,
+      kind: 1,
+    },
+  )
+    .sort({ createdAt: 1 })
+    .lean()) as IIdentifierDocument[];
+
+  const items = identifiers
+    .filter((identifier) => identifier.kind === 'assistant')
+    .map((identifier) => ({
+      identifierId: String(identifier._id),
+      name: identifier.name,
+      slug: identifier.slug,
+      description: identifier.description || null,
+      memberIds: identifier.memberIds || [],
+      createdAt: identifier.createdAt?.toISOString?.() || undefined,
+      updatedAt: identifier.updatedAt?.toISOString?.() || undefined,
+      planStartDate: latestAssistantHistory?.startsAt
+        ? new Date(latestAssistantHistory.startsAt).toISOString()
+        : null,
+      planEndDate: latestAssistantHistory?.endsAt
+        ? new Date(latestAssistantHistory.endsAt).toISOString()
+        : null,
+      paymentStatus: billingState.paymentStatus,
+      blocked: billingState.blocked,
+      overdueDays: billingState.overdueDays,
+      message: billingState.blocked
+        ? billingState.message
+        : 'This assistant is active.',
+    }));
+
+  return {
+    active: items.length > 0,
+    blocked: billingState.blocked,
+    overdueCount: billingState.blocked ? items.length : 0,
+    billingUrl: buildUpgradeUrl(),
+    message: billingState.blocked
+      ? billingState.message
+      : 'No outstanding assistant payment was found.',
+    items,
+  };
+};
+
+export const assertAssistantLimitAvailable = async ({
+  models,
+  subdomain,
+}: {
+  models: IContext['models'];
+  subdomain: string;
+}) => {
+  const limit = await getAssistantLimit({ models, subdomain });
+
+  if (!limit.limited || limit.allowed) {
+    return limit;
+  }
+
+  if (!limit.hasActivePlan) {
+    throw new Error(
+      'An active AI Assistant bundle is required before creating an assistant.',
+    );
+  }
+
+  throw new Error(
+    `AI Assistant limit reached. You can create ${
+      limit.limit || 0
+    } assistant(s) on the active plan.`,
+  );
+};

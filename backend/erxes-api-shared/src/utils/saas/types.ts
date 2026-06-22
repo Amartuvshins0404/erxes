@@ -47,6 +47,7 @@ export interface ISaasOrganizationPlanHistory {
   bundleId?: string;
   interval?: string;
   pluginsLimitsSnapshot?: Record<string, unknown>;
+  assistantLimit?: number;
   startsAt?: Date;
   endsAt?: Date;
   createdAt?: Date;

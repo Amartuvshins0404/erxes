@@ -10,7 +10,18 @@ export const OpenClawIndexPage = () => {
   const { identifier } = useIdentifier();
   const { limit, loading } = useAgentAssistantLimit(true);
   const billingOverview = limit?.billingOverview;
-  const billingBlocked = !!billingOverview?.blocked;
+  const billingItem = billingOverview?.items?.find(
+    (item) => item.identifierId === identifier?._id,
+  );
+  // Block this specific assistant when it is unpaid or sits outside the plan's
+  // active slots. Fall back to the global flag while the identifier is loading.
+  const billingBlocked = identifier?._id
+    ? !!billingItem?.blocked
+    : !!billingOverview?.blocked;
+  const billingMessage =
+    billingItem?.message ||
+    billingOverview?.message ||
+    'This AI Assistant is blocked until the bill is paid.';
 
   return (
     <div className="flex flex-col h-full">
@@ -47,10 +58,7 @@ export const OpenClawIndexPage = () => {
         <div className="flex min-h-0 flex-1 flex-col gap-4 p-4">
           <Alert variant="warning">
             <Alert.Title>You have to pay</Alert.Title>
-            <Alert.Description>
-              {billingOverview?.message ||
-                'This AI Assistant is blocked until the bill is paid.'}
-            </Alert.Description>
+            <Alert.Description>{billingMessage}</Alert.Description>
           </Alert>
           <div className="flex flex-wrap items-center gap-2">
             {billingOverview?.billingUrl && (

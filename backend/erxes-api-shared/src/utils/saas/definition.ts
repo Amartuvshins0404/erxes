@@ -289,6 +289,7 @@ export const saasOrganizationPlanHistorySchema = new mongoose.Schema(
     description: { type: String },
 
     pluginsLimitsSnapshot: { type: mongoose.Schema.Types.Mixed },
+    assistantLimit: { type: Number },
 
     stripeCheckoutSessionId: {
       type: String,

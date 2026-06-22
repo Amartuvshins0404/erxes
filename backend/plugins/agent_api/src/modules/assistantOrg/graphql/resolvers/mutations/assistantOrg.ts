@@ -3,7 +3,10 @@ import {
   assertIdentifierManageAccess,
   requireUser,
 } from '~/modules/assistantOrg/permissions';
-import { assertAssistantLimitAvailable } from '~/modules/assistantOrg/assistantLimits';
+import {
+  assertAssistantLimitAvailable,
+  setAssistantPlanSelection,
+} from '~/modules/assistantOrg/assistantLimits';
 import { buildUniqueSlug, ensureLegacyIdentifierLinks } from '../../../utils';
 
 export const identifierMutations = {
@@ -136,5 +139,20 @@ export const identifierMutations = {
     await models.Identifier.deleteOne({ _id: identifierId });
 
     return true;
+  },
+
+  setAssistantPlanSelection: async (
+    _root: undefined,
+    { identifierIds }: { identifierIds: string[] },
+    { models, subdomain, user }: IContext,
+  ) => {
+    requireUser(user);
+
+    return setAssistantPlanSelection({
+      models,
+      subdomain,
+      user,
+      identifierIds,
+    });
   },
 };

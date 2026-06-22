@@ -29,6 +29,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { MembersInline, PageHeader } from 'ui-modules';
 import { z } from 'zod';
 import { AssistantBillingSheet } from '~/modules/company-brain/components/AssistantBillingSheet';
+import { AssistantPaymentAlertDialog } from '~/modules/company-brain/components/AssistantPaymentAlertDialog';
 import { AssistantOrgManageSheet } from '~/modules/assistant-orgs/components/AssistantOrgManageSheet';
 import { useAgentAssistantLimit } from '~/modules/assistant-orgs/hooks/useAgentAssistantLimit';
 import { useCreateIdentifier } from '~/modules/assistant-orgs/hooks/useCreateAssistantOrg';
@@ -705,7 +706,7 @@ const AssistantDiscordManageSheet = ({
             </div>
           )}
         </Sheet.Content>
-        <Sheet.Footer>
+        <Sheet.Footer className="!h-auto min-h-14 py-3 sm:space-x-0">
           <div className="flex w-full flex-wrap items-center justify-end gap-2">
             <Button
               type="button"
@@ -1042,6 +1043,19 @@ export const CompanyBrainWorkspacePage = ({
           assistantLimit.limit || 0
         } assistants remaining`;
   const assistantBillingOverview = assistantLimit?.billingOverview || null;
+
+  const billingItemByIdentifier = useMemo(() => {
+    const map = new Map<
+      string,
+      NonNullable<typeof assistantBillingOverview>['items'][number]
+    >();
+
+    (assistantBillingOverview?.items || []).forEach((item) => {
+      map.set(item.identifierId, item);
+    });
+
+    return map;
+  }, [assistantBillingOverview]);
 
   const resetCreateForm = () => {
     form.reset({
@@ -1827,6 +1841,13 @@ export const CompanyBrainWorkspacePage = ({
 
   return (
     <div className="flex h-full flex-col">
+      {mode === 'assistant' && (
+        <AssistantPaymentAlertDialog
+          warning={assistantLimit?.billingWarning}
+          overview={assistantBillingOverview}
+          payUrl={assistantLimit?.upgradeUrl}
+        />
+      )}
       <PageHeader>
         <PageHeader.Start>
           <Breadcrumb>
@@ -1870,6 +1891,8 @@ export const CompanyBrainWorkspacePage = ({
                   <AssistantBillingSheet
                     overview={assistantBillingOverview}
                     loading={loadingAssistantLimit}
+                    limit={assistantLimit?.limit}
+                    onChanged={refetchAssistantLimit}
                   />
                 )}
                 <Button
@@ -1953,13 +1976,17 @@ export const CompanyBrainWorkspacePage = ({
                 </Alert>
               )}
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-                {identifiers.map((identifier) =>
-                  renderCard(
+                {identifiers.map((identifier) => {
+                  const billingItem = billingItemByIdentifier.get(
+                    identifier._id,
+                  );
+
+                  return renderCard(
                     identifier,
-                    assistantBillingBlocked,
-                    assistantBillingOverview?.message,
-                  ),
-                )}
+                    billingItem?.blocked ?? assistantBillingBlocked,
+                    billingItem?.message ?? assistantBillingOverview?.message,
+                  );
+                })}
               </div>
             </>
           )}

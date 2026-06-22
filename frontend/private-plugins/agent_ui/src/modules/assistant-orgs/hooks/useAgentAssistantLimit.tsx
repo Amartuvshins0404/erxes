@@ -36,6 +36,7 @@ export interface AgentAssistantBillingOverviewItem {
   planEndDate?: string | null;
   paymentStatus: string;
   blocked: boolean;
+  planActive: boolean;
   overdueDays: number;
   message: string;
 }

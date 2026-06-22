@@ -70,6 +70,7 @@ export const AGENT_ASSISTANT_LIMIT = gql`
           planEndDate
           paymentStatus
           blocked
+          planActive
           overdueDays
           message
         }

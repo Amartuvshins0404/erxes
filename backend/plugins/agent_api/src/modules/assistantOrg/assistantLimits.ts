@@ -45,6 +45,7 @@ export interface AssistantBillingItem {
   planEndDate?: string | null;
   paymentStatus: 'paid' | 'unpaid';
   blocked: boolean;
+  planActive: boolean;
   overdueDays: number;
   message: string;
 }
@@ -160,6 +161,15 @@ const isHistoryCurrent = (history: ISaasOrganizationPlanHistory) => {
 const getHistoryAssistantLimit = (
   history: ISaasOrganizationPlanHistory,
 ): number => {
+  // Admin-gifted dynamic assistant count takes precedence over everything else.
+  if (
+    typeof history.assistantLimit === 'number' &&
+    Number.isFinite(history.assistantLimit) &&
+    history.assistantLimit > 0
+  ) {
+    return Math.max(0, Math.floor(history.assistantLimit));
+  }
+
   const snapshotLimit = getSnapshotAssistantLimit(
     history.pluginsLimitsSnapshot,
   );
@@ -169,6 +179,21 @@ const getHistoryAssistantLimit = (
   }
 
   return getFallbackBundleAssistantLimit(history);
+};
+
+const computeActivePlanLimit = (
+  histories: ISaasOrganizationPlanHistory[],
+): number => {
+  const activeHistories = histories.filter(
+    (history) =>
+      ACTIVE_HISTORY_STATUSES.includes(history.status || '') &&
+      isHistoryCurrent(history),
+  );
+
+  return activeHistories.reduce(
+    (sum, history) => sum + getHistoryAssistantLimit(history),
+    0,
+  );
 };
 
 const isSaasOrganization = (organization: IOrganization) => {
@@ -201,7 +226,7 @@ const getUsedAssistantCount = async (models: IContext['models']) => {
 
 const getHistoryTime = (
   history: ISaasOrganizationPlanHistory,
-  field: 'endsAt' | 'updatedAt' | 'createdAt',
+  field: 'startsAt' | 'endsAt' | 'updatedAt' | 'createdAt',
 ) => {
   const value = history[field];
 
@@ -242,6 +267,29 @@ const getLatestAssistantHistory = (histories: ISaasOrganizationPlanHistory[]) =>
 
       return rightTime - leftTime;
     })[0];
+
+// The plan window shown to the customer must reflect when the assistant
+// capacity was actually granted. For admin-gifted limits that is the gift
+// date (history.startsAt), NOT the org/SaaS creation date that a purchased or
+// onboarding history might otherwise contribute. So prefer the most recent
+// gift history; fall back to the generic latest-assistant history only when no
+// gift exists (e.g. capacity purchased via a paid bundle).
+const getAssistantPlanHistory = (
+  histories: ISaasOrganizationPlanHistory[],
+): ISaasOrganizationPlanHistory | undefined => {
+  const giftHistory = histories
+    .filter(
+      (history) =>
+        normalizeText(history.source) === 'gift' &&
+        getHistoryAssistantLimit(history) > 0,
+    )
+    .sort(
+      (left, right) =>
+        getHistoryTime(right, 'startsAt') - getHistoryTime(left, 'startsAt'),
+    )[0];
+
+  return giftHistory || getLatestAssistantHistory(histories);
+};
 
 const getBillingNoticeMessage = (overdueDays: number) => {
   if (overdueDays >= 20) {
@@ -377,15 +425,7 @@ export const getAssistantLimit = async ({
     statuses: [],
   });
 
-  const activeHistories = histories.filter(
-    (history) =>
-      ACTIVE_HISTORY_STATUSES.includes(history.status || '') &&
-      isHistoryCurrent(history),
-  );
-  const limit = activeHistories.reduce(
-    (sum, history) => sum + getHistoryAssistantLimit(history),
-    0,
-  );
+  const limit = computeActivePlanLimit(histories);
   const remaining = Math.max(0, limit - used);
   const hasActivePlan = limit > 0;
 
@@ -446,7 +486,9 @@ export const getAssistantBillingOverview = async ({
     statuses: [],
   });
   const latestAssistantHistory = getLatestAssistantHistory(histories);
+  const planHistory = getAssistantPlanHistory(histories);
   const billingState = getBillingState(latestAssistantHistory);
+  const limit = computeActivePlanLimit(histories);
   const identifiers = (await models.Identifier.find(
     buildIdentifierAccessQuery(user),
     {
@@ -457,45 +499,121 @@ export const getAssistantBillingOverview = async ({
       createdAt: 1,
       updatedAt: 1,
       kind: 1,
+      planActive: 1,
     },
   )
     .sort({ createdAt: 1 })
     .lean()) as IIdentifierDocument[];
 
-  const items = identifiers
-    .filter((identifier) => identifier.kind === 'assistant')
-    .map((identifier) => ({
-      identifierId: String(identifier._id),
+  const assistants = identifiers.filter(
+    (identifier) => identifier.kind === 'assistant',
+  );
+
+  // An assistant occupies a plan slot unless the user explicitly deselected it
+  // (planActive === false). Among the candidates, the oldest `limit` keep their
+  // slot; any extras are "over plan" and blocked until the user picks them or
+  // upgrades.
+  const slotCandidates = assistants.filter(
+    (identifier) => identifier.planActive !== false,
+  );
+  const activeIdSet = new Set(
+    slotCandidates.slice(0, Math.max(0, limit)).map((i) => String(i._id)),
+  );
+
+  const items = assistants.map((identifier) => {
+    const identifierId = String(identifier._id);
+    const planActive = activeIdSet.has(identifierId);
+    const overPlan = !planActive && !billingState.blocked;
+    const blocked = billingState.blocked || overPlan;
+
+    let message = 'This assistant is active.';
+
+    if (billingState.blocked) {
+      message = billingState.message;
+    } else if (overPlan) {
+      message = `Not included in your current plan (${limit} assistant${
+        limit === 1 ? '' : 's'
+      }). Select it in billing or upgrade your plan.`;
+    }
+
+    return {
+      identifierId,
       name: identifier.name,
       slug: identifier.slug,
       description: identifier.description || null,
       memberIds: identifier.memberIds || [],
       createdAt: identifier.createdAt?.toISOString?.() || undefined,
       updatedAt: identifier.updatedAt?.toISOString?.() || undefined,
-      planStartDate: latestAssistantHistory?.startsAt
-        ? new Date(latestAssistantHistory.startsAt).toISOString()
+      planStartDate: planHistory?.startsAt
+        ? new Date(planHistory.startsAt).toISOString()
         : null,
-      planEndDate: latestAssistantHistory?.endsAt
-        ? new Date(latestAssistantHistory.endsAt).toISOString()
+      planEndDate: planHistory?.endsAt
+        ? new Date(planHistory.endsAt).toISOString()
         : null,
       paymentStatus: billingState.paymentStatus,
-      blocked: billingState.blocked,
+      blocked,
+      planActive,
       overdueDays: billingState.overdueDays,
-      message: billingState.blocked
-        ? billingState.message
-        : 'This assistant is active.',
-    }));
+      message,
+    };
+  });
+
+  const blockedCount = items.filter((item) => item.blocked).length;
 
   return {
     active: items.length > 0,
     blocked: billingState.blocked,
-    overdueCount: billingState.blocked ? items.length : 0,
+    overdueCount: blockedCount,
     billingUrl: buildUpgradeUrl(),
     message: billingState.blocked
       ? billingState.message
       : 'No outstanding assistant payment was found.',
     items,
   };
+};
+
+export const setAssistantPlanSelection = async ({
+  models,
+  subdomain,
+  user,
+  identifierIds,
+}: {
+  models: IContext['models'];
+  subdomain: string;
+  user?: IContext['user'];
+  identifierIds: string[];
+}) => {
+  const { limit } = await getAssistantLimit({ models, subdomain });
+  const selected = Array.from(
+    new Set((identifierIds || []).map((id) => id?.trim()).filter(Boolean)),
+  );
+
+  if (typeof limit === 'number' && selected.length > limit) {
+    throw new Error(
+      `You can keep at most ${limit} assistant${
+        limit === 1 ? '' : 's'
+      } active on the current plan.`,
+    );
+  }
+
+  const accessQuery = buildIdentifierAccessQuery(user);
+  const assistants = (await models.Identifier.find(
+    { ...accessQuery, kind: 'assistant' },
+    { _id: 1 },
+  ).lean()) as IIdentifierDocument[];
+
+  const selectedSet = new Set(selected);
+
+  await Promise.all(
+    assistants.map((assistant) =>
+      models.Identifier.updateOne(
+        { _id: assistant._id },
+        { $set: { planActive: selectedSet.has(String(assistant._id)) } },
+      ),
+    ),
+  );
+
+  return true;
 };
 
 export const assertAssistantLimitAvailable = async ({

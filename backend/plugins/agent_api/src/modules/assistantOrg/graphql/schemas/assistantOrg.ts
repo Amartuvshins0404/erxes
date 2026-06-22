@@ -55,6 +55,7 @@ export const types = `
     planEndDate: String
     paymentStatus: String!
     blocked: Boolean!
+    planActive: Boolean!
     overdueDays: Int!
     message: String!
   }
@@ -86,4 +87,5 @@ export const mutations = `
   updateIdentifier(identifierId: String!, input: UpdateIdentifierInput!): Identifier
   inviteIdentifierMembers(identifierId: String!, input: InviteIdentifierMembersInput!): Identifier
   deleteIdentifier(identifierId: String!): Boolean
+  setAssistantPlanSelection(identifierIds: [String!]!): Boolean
 `;

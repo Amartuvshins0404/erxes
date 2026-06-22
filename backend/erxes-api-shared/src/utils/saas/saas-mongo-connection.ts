@@ -12,7 +12,11 @@ import {
   saasPromoCodeSchema,
   saasUserSchema,
 } from './definition';
-import { IOrganization, ISaasOrganizationPlanHistory } from './types';
+import {
+  IOrganization,
+  ISaasBundle,
+  ISaasOrganizationPlanHistory,
+} from './types';
 import { redis } from '../redis';
 import { mongooseConnectionOptions } from '../mongo';
 
@@ -33,6 +37,17 @@ export const getSaasCoreConnection = async (): Promise<void> => {
   }
 
   const CORE_MONGO_URL = getEnv({ name: 'CORE_MONGO_URL' });
+
+  // Guard before handing the URL to mongoose: an empty/invalid CORE_MONGO_URL
+  // makes mongoose.createConnection throw AND emit an unhandled 'error' event
+  // that crashes the whole process, bypassing callers' try/catch. Failing fast
+  // here keeps the rejection catchable (e.g. SaaS limit checks fall back to the
+  // enterprise/unlimited path when SaaS core isn't configured locally).
+  if (!/^mongodb(\+srv)?:\/\//.test(CORE_MONGO_URL)) {
+    throw new Error(
+      'CORE_MONGO_URL is not configured (expected a mongodb:// connection string)',
+    );
+  }
 
   const coreConnection = await mongoose.createConnection(
     CORE_MONGO_URL,
@@ -58,10 +73,11 @@ export const getSaasCoreConnection = async (): Promise<void> => {
   coreModelAddons = coreConnection.model('addons', saasAddonSchema);
   coreModelBundles = coreConnection.model('bundles', saasBundleSchema);
   coreModelPlugins = coreConnection.model('plugins', saasPluginSchema);
-  coreModelOrganizationPlanHistories = coreConnection.model(
-    'organization_plan_histories',
-    saasOrganizationPlanHistorySchema,
-  );
+  coreModelOrganizationPlanHistories =
+    coreConnection.model<ISaasOrganizationPlanHistory>(
+      'organization_plan_histories',
+      saasOrganizationPlanHistorySchema as any,
+    );
 };
 
 export const ORGANIZATION_ID_MAPPING: { [key: string]: string } = {};
@@ -319,8 +335,8 @@ export const getSaasOrganizationPlanHistories = async ({
     .find({ _id: { $in: bundleIds } })
     .lean();
 
-  const bundleById = new Map(
-    bundles.map((bundle) => [String(bundle._id), bundle]),
+  const bundleById = new Map<string, ISaasBundle>(
+    bundles.map((bundle: any) => [String(bundle._id), bundle as ISaasBundle]),
   );
 
   return histories.map((history) => ({

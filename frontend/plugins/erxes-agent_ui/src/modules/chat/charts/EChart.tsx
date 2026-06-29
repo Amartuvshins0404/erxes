@@ -15,6 +15,7 @@ import { IconChevronLeft } from '@tabler/icons-react';
 import { CHART_FONT, useAppChartColors } from './chartColors';
 import { chartSpecToEChartsOption } from './chartSpecToEChartsOption';
 import type { SingleBarRenderHints } from './chartSpecToEChartsOption';
+import { DrilldownTable } from './DrilldownTable';
 import type { ChartSpec, DrilldownSpec } from './types';
 
 export interface EChartHandle {
@@ -223,6 +224,15 @@ export const EChart = forwardRef<EChartHandle, EChartProps>(function EChart(
 
   const inDrilldown = history.length > 0;
   const parentTitle = history[history.length - 1]?.title;
+
+  // A drilldown leaf that lists individual items (one value per row) reads far
+  // better as a table than a one-bar-per-row chart. Swap to the table view for
+  // single-series bar drilldowns; the parent chart still renders as a chart.
+  const showTable =
+    inDrilldown &&
+    activeSpec.series.length === 1 &&
+    (activeSpec.chartType === 'bar' || activeSpec.chartType === 'horizontalBar') &&
+    activeSpec.data.length > 0;
   return (
     <div style={{ width: '100%', height, display: 'flex', flexDirection: 'column' }}>
       {inDrilldown ? (
@@ -270,17 +280,21 @@ export const EChart = forwardRef<EChartHandle, EChartProps>(function EChart(
         style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
       >
         <div style={{ flex: 1, minHeight: 0 }}>
-          <ReactECharts
-            key={specKey}
-            option={option}
-            notMerge={false}
-            lazyUpdate
-            className={className}
-            style={{ width: '100%', height: '100%', borderRadius: 8 }}
-            opts={{ renderer: 'canvas' }}
-            onChartReady={(instance: EChartsType) => { instanceRef.current = instance; }}
-            onEvents={{ click: handleClick, legendselectchanged: handleLegendChange }}
-          />
+          {showTable ? (
+            <DrilldownTable spec={activeSpec} colors={colors} />
+          ) : (
+            <ReactECharts
+              key={specKey}
+              option={option}
+              notMerge={false}
+              lazyUpdate
+              className={className}
+              style={{ width: '100%', height: '100%', borderRadius: 8 }}
+              opts={{ renderer: 'canvas' }}
+              onChartReady={(instance: EChartsType) => { instanceRef.current = instance; }}
+              onEvents={{ click: handleClick, legendselectchanged: handleLegendChange }}
+            />
+          )}
         </div>
       </div>
     </div>

@@ -97,9 +97,14 @@ export const ChatPage = () => {
   );
 
   // The persisted session list lives in the Apollo cache, not the chat store.
-  const { threads, loading: threadsLoading } = useMastraThreads(
-    selectedAgent?.agentId,
-  );
+  // Paginated: older sessions load on demand as the sidebar scrolls.
+  const {
+    threads,
+    loading: threadsLoading,
+    hasMore: hasMoreSessions,
+    loadingMore: loadingMoreSessions,
+    loadMore: loadMoreSessions,
+  } = useMastraThreads(selectedAgent?.agentId);
   const sessionsLoaded = !!selectedAgent && !threadsLoading;
   const { renameThread } = useRenameMastraThread();
   const { removeThread } = useRemoveMastraThread(selectedAgent?.agentId);
@@ -474,6 +479,9 @@ export const ChatPage = () => {
                 sessionsLoaded={sessionsLoaded}
                 isDraft={isDraft}
                 activeThreadId={activeThreadId}
+                hasMore={hasMoreSessions}
+                loadingMore={loadingMoreSessions}
+                onLoadMore={loadMoreSessions}
                 onSelect={handleSelectSession}
                 onNew={handleNewThread}
                 onDelete={handleDeleteSession}

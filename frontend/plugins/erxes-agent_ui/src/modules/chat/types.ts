@@ -210,13 +210,16 @@ export interface IMastraThread {
   _id: string;
   threadId: string;
   title: string;
-  messageCount: number;
   lastMessageAt?: string | null;
   createdAt?: string | null;
 }
 
 export interface IMastraThreadsResponse {
-  mastraThreads: IMastraThread[];
+  mastraThreads: {
+    __typename?: 'MastraThreadListResponse';
+    list: IMastraThread[];
+    totalCount: number;
+  };
 }
 
 // ── Reasoning effort (composer power-user control) ───────────────────────────

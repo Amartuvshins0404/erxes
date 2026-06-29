@@ -20,11 +20,23 @@ function requireUserId(user: IUserDocument | null | undefined): string {
 export const sessionQueries = {
   mastraThreads: async (
     _parent: undefined,
-    { agentId }: { agentId: string },
+    {
+      agentId,
+      page,
+      perPage,
+    }: { agentId: string; page?: number; perPage?: number },
     { user, subdomain, checkPermission }: IContext,
   ) => {
     await checkPermission('agentsChat');
-    return listOwnedThreads(subdomain, requireUserId(user), agentId);
+    // page/perPage are optional — listOwnedThreads applies its own defaults so a
+    // caller omitting them still gets the first (newest) page, not everything.
+    return listOwnedThreads(
+      subdomain,
+      requireUserId(user),
+      agentId,
+      page ?? undefined,
+      perPage ?? undefined,
+    );
   },
 
   mastraThreadMessages: async (

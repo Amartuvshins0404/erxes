@@ -111,14 +111,16 @@ export const MASTRA_AGENT = gql`
 `;
 
 export const MASTRA_THREADS = gql`
-  query MastraThreads($agentId: String!) {
-    mastraThreads(agentId: $agentId) {
-      _id
-      threadId
-      title
-      messageCount
-      lastMessageAt
-      createdAt
+  query MastraThreads($agentId: String!, $page: Int, $perPage: Int) {
+    mastraThreads(agentId: $agentId, page: $page, perPage: $perPage) {
+      list {
+        _id
+        threadId
+        title
+        lastMessageAt
+        createdAt
+      }
+      totalCount
     }
   }
 `;

@@ -58,6 +58,8 @@ interface NativeMemoryFacade {
     filter?: { resourceId?: string; metadata?: Record<string, unknown> };
     orderBy?: { field: string; direction: 'ASC' | 'DESC' };
     perPage?: number | false;
+    // Zero-indexed page for offset pagination (defaults to 0 in the store).
+    page?: number;
   }): Promise<{ threads?: NativeThread[]; total?: number }>;
   createThread(args: {
     threadId: string;
@@ -165,10 +167,15 @@ export interface ErxesThread {
   threadId: string;
   agentId: string | null;
   title: string;
-  messageCount: number;
   lastMessageAt: Date | null;
   createdAt: Date | null;
   updatedAt: Date | null;
+}
+
+/** A page of a user's threads + the total for the filter (drives "load more"). */
+export interface ErxesThreadPage {
+  list: ErxesThread[];
+  totalCount: number;
 }
 export interface ErxesMessage {
   _id: string;
@@ -183,16 +190,16 @@ export interface ErxesMessage {
   createdAt: Date | null;
 }
 
-/** Translate a native thread (+ its derived message count) to the UI's
- *  MastraThread shape, surfacing agentId from metadata. */
-function toErxesThread(t: NativeThread, messageCount: number): ErxesThread {
+/** Translate a native thread to the UI's MastraThread shape, surfacing agentId
+ *  from metadata. The session list shows only the title, so no message count is
+ *  derived here — see listOwnedThreads. */
+function toErxesThread(t: NativeThread): ErxesThread {
   const meta = (t.metadata ?? {}) as { agentId?: string };
   return {
     _id: t.id,
     threadId: t.id,
     agentId: meta.agentId ?? null,
     title: t.title ?? '',
-    messageCount,
     lastMessageAt: t.updatedAt ?? t.createdAt ?? null,
     createdAt: t.createdAt ?? null,
     updatedAt: t.updatedAt ?? null,
@@ -265,26 +272,45 @@ async function withMessageCounts<T, R>(
   return out;
 }
 
-/** A user's own threads for an agent (newest first), in the UI shape. */
+// Default/max page sizes for the session sidebar. The list is loaded a page at a
+// time (newest first) so its cost stays O(perPage) no matter how many sessions a
+// user accumulates — it never fetches the whole history up front.
+const THREADS_DEFAULT_PER_PAGE = 30;
+const THREADS_MAX_PER_PAGE = 100;
+
+/**
+ * One page of a user's own threads for an agent (newest first), in the UI shape.
+ *
+ * This is a single indexed store read — it deliberately does NOT derive a
+ * per-thread message count. The sidebar renders only the title, and counting
+ * messages meant one extra recall per thread (an N+1 that grew linearly with the
+ * session count and dominated the list's load time). Pagination + dropping that
+ * count keep this O(perPage).
+ *
+ * `page` is 1-indexed at this boundary (GraphQL convention) and mapped to the
+ * store's 0-indexed page.
+ */
 export async function listOwnedThreads(
   subdomain: string,
   userId: string,
   agentId: string,
-): Promise<ErxesThread[]> {
+  page = 1,
+  perPage = THREADS_DEFAULT_PER_PAGE,
+): Promise<ErxesThreadPage> {
   const memory = await getNativeMemory(subdomain);
   const resourceId = scopedResource(subdomain, userId);
+  const safePerPage = Math.min(Math.max(1, perPage), THREADS_MAX_PER_PAGE);
+  const safePage = Math.max(1, page);
   const res = await memory.listThreads({
     filter: { resourceId, metadata: { agentId } },
     orderBy: { field: 'updatedAt', direction: 'DESC' },
-    perPage: false,
+    perPage: safePerPage,
+    page: safePage - 1,
   });
-  const threads = res?.threads ?? [];
-  return withMessageCounts(
-    memory,
-    threads,
-    (t) => ({ id: t.id, resourceId }),
-    (t, count) => toErxesThread(t, count),
-  );
+  return {
+    list: (res?.threads ?? []).map(toErxesThread),
+    totalCount: res?.total ?? 0,
+  };
 }
 
 /**
@@ -405,10 +431,7 @@ export async function renameOwnedThread(
     title,
     metadata: { ...(thread.metadata ?? {}), titleSource: 'manual' },
   });
-  return toErxesThread(
-    updated,
-    await countMessages(memory, threadId, resourceId),
-  );
+  return toErxesThread(updated);
 }
 
 /** Delete a thread the caller owns (and its messages + vectors). */

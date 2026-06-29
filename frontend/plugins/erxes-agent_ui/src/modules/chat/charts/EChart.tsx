@@ -233,6 +233,16 @@ export const EChart = forwardRef<EChartHandle, EChartProps>(function EChart(
     activeSpec.series.length === 1 &&
     (activeSpec.chartType === 'bar' || activeSpec.chartType === 'horizontalBar') &&
     activeSpec.data.length > 0;
+  // TEMP debug — remove once table swap is confirmed working.
+  // eslint-disable-next-line no-console
+  console.debug('[EChart drilldown]', {
+    inDrilldown,
+    chartType: activeSpec.chartType,
+    seriesCount: activeSpec.series.length,
+    stacked: activeSpec.stacked,
+    dataLen: activeSpec.data.length,
+    showTable,
+  });
   return (
     <div style={{ width: '100%', height, display: 'flex', flexDirection: 'column' }}>
       {inDrilldown ? (

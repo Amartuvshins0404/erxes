@@ -1,12 +1,13 @@
 import { useEffect, useRef } from 'react';
 import { Sidebar } from 'erxes-ui';
 
-// Collapses the global app sidebar so voice mode owns the whole screen, and
-// restores the prior state on exit. Mounted only while voice is active, so the
-// useSidebar() context lookup never runs on provider-less routes (e.g. preview).
-// Renders nothing.
+// Collapses the global app sidebar while an agent chat is open so the
+// conversation (and voice mode) gets the full width, and restores the user's
+// prior state when they leave the agent view. Mounted only when an agent is
+// selected, so the useSidebar() context lookup never runs on provider-less
+// routes (e.g. preview). Renders nothing.
 
-export const VoiceStageTakeover = () => {
+export const ChatSidebarCollapse = () => {
   const { open, setOpen } = Sidebar.useSidebar();
   const wasOpen = useRef(open);
 

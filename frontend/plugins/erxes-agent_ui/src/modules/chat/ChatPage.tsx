@@ -45,7 +45,7 @@ import { SkillActivePill } from '~/modules/skills/components/SkillActivePill';
 import { SkillDraftPreviewDialog } from '~/modules/skills/components/SkillDraftPreviewDialog';
 import { findDraftSkillFromMessages } from '~/modules/skills/utils';
 import { VoiceOverlay } from '~/modules/chat/voice/components/VoiceOverlay';
-import { VoiceStageTakeover } from '~/modules/chat/voice/components/VoiceStageTakeover';
+import { ChatSidebarCollapse } from '~/modules/chat/components/ChatSidebarCollapse';
 import { useVoiceConversation } from '~/modules/chat/voice/hooks/useVoiceConversation';
 import '~/modules/chat/chat.css';
 
@@ -386,7 +386,7 @@ export const ChatPage = () => {
 
   return (
     <div className="flex flex-col h-full">
-      {voiceActive && <VoiceStageTakeover />}
+      {agentId && <ChatSidebarCollapse />}
       {!voiceActive && (
       <PageHeader>
         <PageHeader.Start>

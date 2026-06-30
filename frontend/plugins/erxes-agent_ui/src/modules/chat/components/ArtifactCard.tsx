@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { memo, useEffect, useRef } from 'react';
 import {
   IconChartBar,
   IconDownload,
@@ -24,7 +24,15 @@ import { MermaidViewer } from '~/modules/chat/preview/MermaidViewer';
 // the first live render. Shared by all artifact card variants.
 function usePresentIfLive(artifact: Artifact, live?: boolean) {
   const presentIfNew = previewStore((s) => s.presentIfNew);
-  useEffect(() => { if (live) presentIfNew(artifact); }, [live, artifact, presentIfNew]);
+  // A streaming turn hands us a fresh `artifact` object on every throttled tick,
+  // so depending on the object itself would re-fire this effect ~20×/s. Key it on
+  // the stable id instead — `presentIfNew` is a one-shot (guarded by `seen`), and
+  // a settled artifact's content never changes for a given id.
+  const artifactRef = useRef(artifact);
+  artifactRef.current = artifact;
+  useEffect(() => {
+    if (live) presentIfNew(artifactRef.current);
+  }, [live, artifact.id, presentIfNew]);
 }
 
 // ── Chart card (inline EChart + open in preview) ──────────────────────────────
@@ -108,9 +116,27 @@ const DocumentCard = ({ artifact, live }: { artifact: DocumentArtifact; live?: b
   );
 };
 
+// Two artifacts are interchangeable for rendering when they describe the same
+// thing. A settled artifact is immutable for a given id — a tool call emits it
+// once (only at state 'output-available') and never mutates it; a streaming turn
+// merely deep-clones it on every throttled tick. So `id` (+ kind, defensively) is
+// a sufficient content key, and this stays O(1): no serializing the spec on every
+// parent re-render in the streaming hot path. A genuinely different artifact (e.g.
+// a regenerated chart) carries a new id and re-renders.
+const artifactsEqual = (a: Artifact, b: Artifact): boolean =>
+  a === b || (a.id === b.id && a.kind === b.kind);
+
 // ── Router ────────────────────────────────────────────────────────────────────
-export const ArtifactCard = ({ artifact, live }: { artifact: Artifact; live?: boolean }) => {
-  if (artifact.kind === 'chart') return <ChartPreview artifact={artifact} live={live} />;
-  if (artifact.kind === 'diagram') return <DiagramPreview artifact={artifact} live={live} />;
-  return <DocumentCard artifact={artifact} live={live} />;
-};
+// memo() so the per-token reference churn of a streaming turn (each tick deep-
+// clones the message, hence the artifact and its chart spec) stops here instead
+// of propagating into EChart/Mermaid and remounting the visualization. EChart is
+// itself reference-churn-resilient; this just spares it the wasted renders.
+export const ArtifactCard = memo(
+  function ArtifactCard({ artifact, live }: { artifact: Artifact; live?: boolean }) {
+    if (artifact.kind === 'chart') return <ChartPreview artifact={artifact} live={live} />;
+    if (artifact.kind === 'diagram') return <DiagramPreview artifact={artifact} live={live} />;
+    return <DocumentCard artifact={artifact} live={live} />;
+  },
+  (prev, next) =>
+    prev.live === next.live && artifactsEqual(prev.artifact, next.artifact),
+);

@@ -36,6 +36,20 @@ function useMounted(): boolean {
 const safeName = (name: string): string =>
   (name || 'chart').replace(/[^\w.-]+/g, '_').slice(0, 80) || 'chart';
 
+// A stable structural signature for a spec. While a turn streams, the chat
+// transport deep-clones the whole assistant message (and the chart artifact it
+// carries) on every throttled tick, so `spec` arrives as a brand-new object that
+// is value-identical to the last one. Comparing content — not reference — lets us
+// ignore that churn and react only when the chart genuinely changes. A spec is
+// plain JSON data, so stringify is a sound, order-stable signature here.
+const specSignature = (spec: ChartSpec): string => {
+  try {
+    return JSON.stringify(spec);
+  } catch {
+    return '';
+  }
+};
+
 // ── Drilldown state machine ───────────────────────────────────────────────────
 
 type DrillState = {
@@ -146,9 +160,21 @@ export const EChart = forwardRef<EChartHandle, EChartProps>(function EChart(
     return () => obs.disconnect();
   }, [mounted]);
 
+  // Reset the drilldown state machine (and remount ECharts via specKey) only when
+  // the chart's *content* changes — not on every new-but-identical `spec` object a
+  // streaming turn hands us. Gating on reference here would replay the entry
+  // animation ~20×/s the whole time the agent keeps writing after the chart lands.
+  const specSig = useMemo(() => specSignature(spec), [spec]);
+  const specRef = useRef(spec);
+  specRef.current = spec;
+  const appliedSigRef = useRef(specSig);
   useEffect(() => {
-    dispatch({ type: 'RESET', spec });
-  }, [spec]);
+    // Skip both the mount run (the reducer already initialized to this spec) and
+    // pure reference churn; act only on a real content change.
+    if (appliedSigRef.current === specSig) return;
+    appliedSigRef.current = specSig;
+    dispatch({ type: 'RESET', spec: specRef.current });
+  }, [specSig]);
 
   const isSingleBarSeries = useMemo(() =>
     activeSpec.series.length === 1 &&

@@ -50,6 +50,7 @@ export const types = `
     dateFounded: String
     website: String
     paymentId: String
+    posToken: String
     verificationStatus: String
     verificationNote: String
     tierLevel: Int
@@ -82,6 +83,7 @@ export const types = `
     dateFounded: String
     website: String
     paymentId: String
+    posToken: String
     socialLinks: JSON
   }
 `;

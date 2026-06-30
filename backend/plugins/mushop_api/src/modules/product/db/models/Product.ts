@@ -1,7 +1,10 @@
 import { Model } from 'mongoose';
 import { EventDispatcherReturn } from 'erxes-api-shared/core-modules';
 import { IModels } from '~/connectionResolvers';
-import { mushopProductSchema } from '@/product/db/definitions/product';
+import {
+  mushopProductSchema,
+  MUSHOP_PRODUCT_STATE,
+} from '@/product/db/definitions/product';
 import {
   IMushopProduct,
   IMushopProductMushopDocument,
@@ -21,6 +24,10 @@ export interface IMushopProductModel
     action?: 'create' | 'update',
   ): Promise<IMushopProductMushopDocument>;
   getProduct(_id: string): Promise<IMushopProductMushopDocument>;
+  softDeleteByEntityIds(
+    subdomain: string,
+    entityIds: string[],
+  ): Promise<IMushopProductMushopDocument[]>;
   assignCategory(
     _id: string,
     categoryId: string | null,
@@ -51,21 +58,20 @@ export const loadMushopProductClass = (
         entityId,
       }).lean();
 
-      console.log('existing', existing)
-
       const synced = await models.Product.findOneAndUpdate(
         { subdomain, entityId },
         {
           $set: {
             ...rest,
             ...(initialCategory ? { initialCategory } : {}),
+            // Resurrect if the supplier re-adds a previously removed product.
+            // Approval `status` is left untouched, so it keeps its prior value.
+            state: MUSHOP_PRODUCT_STATE.ACTIVE,
           },
           $setOnInsert: { subdomain, entityId },
         },
         { upsert: true, new: true, setDefaultsOnInsert: true },
       );
-
-      console.log('synced', synced)
 
       if (synced) {
         if (!existing) {
@@ -79,9 +85,38 @@ export const loadMushopProductClass = (
     }
 
     public static async getProduct(_id: string) {
-      const product = await models.Product.findOne({ _id }).lean();
+      const product = await models.Product.findOne({
+        _id,
+        state: { $ne: MUSHOP_PRODUCT_STATE.DELETED },
+      }).lean();
       if (!product) throw new Error('Product not found');
       return product;
+    }
+
+    public static async softDeleteByEntityIds(
+      subdomain: string,
+      entityIds: string[],
+    ) {
+      if (!entityIds.length) return [];
+
+      const affected = await models.Product.find({
+        subdomain,
+        entityId: { $in: entityIds },
+        state: { $ne: MUSHOP_PRODUCT_STATE.DELETED },
+      }).lean();
+
+      if (!affected.length) return [];
+
+      await models.Product.updateMany(
+        {
+          subdomain,
+          entityId: { $in: entityIds },
+          state: { $ne: MUSHOP_PRODUCT_STATE.DELETED },
+        },
+        { $set: { state: MUSHOP_PRODUCT_STATE.DELETED } },
+      );
+
+      return affected;
     }
 
     public static async removeProduct(_id: string) {

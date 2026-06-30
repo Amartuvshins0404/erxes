@@ -38,6 +38,7 @@ export const types = `
     currency: String
     pdfAttachment: JSON
     status: String
+    state: String
     createdAt: Date
     updatedAt: Date
   }

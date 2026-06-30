@@ -77,6 +77,5 @@ export const queries = `
 export const mutations = `
   mushopUpdateSupplierVerificationStatus(_id: String!, verificationStatus: String!, note: String): MushopSupplier
   mushopUpdateSupplierTier(_id: String!, tierLevel: Int!): MushopSupplier
-  mushopUpdateSupplierPos(_id: String!, posToken: String!): MushopSupplier
   mushopUpdateSupplierMushopPos(_id: String!, mushopPosToken: String!): MushopSupplier
 `;

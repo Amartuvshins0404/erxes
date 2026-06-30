@@ -1,5 +1,6 @@
 import { IContext } from '~/connectionResolvers';
 import { ProductQueryParams } from '@/product/@types/product';
+import { MUSHOP_PRODUCT_STATE } from '@/product/db/definitions/product';
 import { ICursorPaginateParams } from 'erxes-api-shared/core-types';
 import { cursorPaginateAggregation } from 'erxes-api-shared/utils';
 
@@ -11,7 +12,7 @@ export const productQueries = {
   ) => {
     const { supplierId, categoryId, status, searchValue } = params;
 
-    const filter: any = {};
+    const filter: any = { state: { $ne: MUSHOP_PRODUCT_STATE.DELETED } };
 
     if (supplierId) {
       const supplier = await models.Supplier.getSupplier(supplierId);

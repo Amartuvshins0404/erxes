@@ -20,6 +20,7 @@ export const SUPPLIER_FRAGMENT = gql`
     dateFounded
     website
     paymentId
+    posToken
     verificationStatus
     verificationNote
     tierLevel

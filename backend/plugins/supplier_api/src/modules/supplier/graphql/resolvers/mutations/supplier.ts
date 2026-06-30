@@ -1,6 +1,7 @@
 import { IContext } from '~/connectionResolvers';
 import { ISupplier } from '@/supplier/@types/supplier';
 import { requestMessage, sendMessage } from '~/modules/admin/utils';
+import { enqueuePosBackfill } from '~/workers/backfill';
 
 export const supplierMutations = {
   supplierUpdateProfile: async (
@@ -8,7 +9,20 @@ export const supplierMutations = {
     { input }: { input: ISupplier },
     { models, user, subdomain }: IContext,
   ) => {
+    const before = await models.Supplier.findOne().lean();
+    const previousPosToken = before?.posToken;
+
     const supplier = await models.Supplier.updateSupplier(user._id, input);
+
+    // When the supplier (re)selects the POS they expose to mushop, enqueue a
+    // durable job to push that POS's existing catalog so it shows up in mushop
+    // without any manual trigger. Enqueue-and-forget — the profile save
+    // shouldn't block on it, and the job survives restarts / retries.
+    if (supplier?.posToken && supplier.posToken !== previousPosToken) {
+      enqueuePosBackfill(subdomain, supplier.posToken).catch((e) =>
+        console.error('Failed to enqueue POS backfill:', e),
+      );
+    }
 
     if (supplier) {
       const payload = {

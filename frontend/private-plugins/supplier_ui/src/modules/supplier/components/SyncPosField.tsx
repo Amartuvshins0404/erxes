@@ -1,23 +1,26 @@
 import { Form, Select } from 'erxes-ui';
 import { Control, FieldValues, Path } from 'react-hook-form';
-import { usePayments } from '../hooks/usePayments';
+import { usePosConfigs } from '../hooks/usePosConfigs';
 
-interface PaymentMethodFieldProps<T extends FieldValues> {
+interface SyncPosFieldProps<T extends FieldValues> {
   control: Control<T>;
 }
 
-export const PaymentMethodField = <T extends FieldValues>({
+export const SyncPosField = <T extends FieldValues>({
   control,
-}: PaymentMethodFieldProps<T>) => {
-  const { payments, loading } = usePayments();
+}: SyncPosFieldProps<T>) => {
+  const { posConfigs, loading } = usePosConfigs();
 
   return (
     <Form.Field
-      name={'paymentId' as Path<T>}
+      name={'posToken' as Path<T>}
       control={control}
       render={({ field }) => (
         <Form.Item>
-          <Form.Label>Payment method</Form.Label>
+          <Form.Label>POS to sync with mushop</Form.Label>
+          <Form.Description>
+            Products in this POS's categories are shared with mushop.
+          </Form.Description>
           <Select
             value={(field.value as string) || ''}
             onValueChange={field.onChange}
@@ -26,14 +29,14 @@ export const PaymentMethodField = <T extends FieldValues>({
             <Form.Control>
               <Select.Trigger>
                 <Select.Value
-                  placeholder={loading ? 'Loading…' : 'Select payment method'}
+                  placeholder={loading ? 'Loading…' : 'Select POS'}
                 />
               </Select.Trigger>
             </Form.Control>
             <Select.Content>
-              {payments.map((payment) => (
-                <Select.Item key={payment._id} value={payment._id}>
-                  {payment.name} ({payment.kind})
+              {posConfigs.map((pos) => (
+                <Select.Item key={pos._id} value={pos.token}>
+                  {pos.name}
                 </Select.Item>
               ))}
             </Select.Content>

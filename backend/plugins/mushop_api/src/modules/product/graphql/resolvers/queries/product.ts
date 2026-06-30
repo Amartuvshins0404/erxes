@@ -12,7 +12,7 @@ export const productQueries = {
   ) => {
     const { supplierId, categoryId, status, searchValue } = params;
 
-    const filter: any = { state: { $ne: MUSHOP_PRODUCT_STATE.DELETED } };
+    const filter: any = { state: MUSHOP_PRODUCT_STATE.ACTIVE };
 
     if (supplierId) {
       const supplier = await models.Supplier.getSupplier(supplierId);

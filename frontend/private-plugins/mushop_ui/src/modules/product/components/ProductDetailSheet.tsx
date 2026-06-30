@@ -1,6 +1,7 @@
 import {
   Badge,
   Button,
+  Dialog,
   FocusSheet,
   InfoCard,
   ScrollArea,
@@ -9,10 +10,19 @@ import {
   Spinner,
   Table,
   Tabs,
+  readImage,
   useQueryState,
 } from 'erxes-ui';
 import { ActivityLogs } from 'ui-modules';
 import { useTranslation } from 'react-i18next';
+import { useEffect, useState } from 'react';
+import {
+  IconChevronLeft,
+  IconChevronRight,
+  IconDownload,
+  IconX,
+  IconZoomIn,
+} from '@tabler/icons-react';
 import { ProductCategoryAssign } from './ProductCategoryAssign';
 import { format } from 'date-fns';
 import { useMushopProductDetail } from '../hooks/useMushopProductDetail';
@@ -42,6 +52,160 @@ const Row = ({
     </Table.Cell>
   </Table.Row>
 );
+
+type ProductImage = { url: string; name?: string };
+
+const toImage = (att: any): ProductImage | null => {
+  if (!att) return null;
+  if (typeof att === 'string') return { url: att };
+  if (typeof att.url === 'string') return { url: att.url, name: att.name };
+  return null;
+};
+
+const ProductImages = ({ product }: { product: IMushopProduct }) => {
+  const { t } = useTranslation('mushop');
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
+
+  const images: ProductImage[] = [
+    toImage(product.attachment),
+    ...(product.attachmentMore ?? []).map(toImage),
+  ].filter((img): img is ProductImage => !!img?.url);
+
+  const open = activeIndex != null;
+  const active = activeIndex != null ? images[activeIndex] : null;
+  const prev = () =>
+    setActiveIndex((i) =>
+      i == null ? null : (i - 1 + images.length) % images.length,
+    );
+  const next = () =>
+    setActiveIndex((i) => (i == null ? null : (i + 1) % images.length));
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowRight') next();
+      if (e.key === 'ArrowLeft') prev();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [open, images.length]);
+
+  if (images.length === 0) return null;
+
+  return (
+    <InfoCard title={t('Images')}>
+      <InfoCard.Content className="shadow-none p-3">
+        <div className="flex flex-wrap gap-3">
+          {images.map((img, index) => (
+            <div
+              key={`${img.url}-${index}`}
+              role="button"
+              tabIndex={0}
+              onClick={() => setActiveIndex(index)}
+              onKeyDown={(e) =>
+                (e.key === 'Enter' || e.key === ' ') && setActiveIndex(index)
+              }
+              className="group relative w-24 h-24 rounded-lg border border-border shadow-md shrink-0 cursor-zoom-in"
+            >
+              <img
+                src={readImage(img.url, 240)}
+                alt={img.name || product.name || 'product image'}
+                loading="lazy"
+                className="w-full h-full object-cover rounded-lg"
+              />
+              <div className="absolute inset-0 flex items-center justify-center bg-background/30 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg">
+                <IconZoomIn
+                  size={20}
+                  className="text-primary-foreground"
+                  aria-hidden
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      </InfoCard.Content>
+
+      <Dialog
+        open={open}
+        onOpenChange={(o) => !o && setActiveIndex(null)}
+      >
+        <Dialog.Content className="w-[80vw] max-w-[80vw] h-[80vh] max-h-[80vh] p-0 gap-0 bg-transparent shadow-none border-0 flex items-center justify-center">
+          <div className="relative flex items-center justify-center w-full h-full">
+            {active && (
+              <img
+                src={readImage(active.url)}
+                alt={active.name || product.name || 'product image'}
+                className="max-w-full max-h-full object-contain rounded shadow-2xl select-none"
+                draggable={false}
+              />
+            )}
+
+            <div className="absolute top-2 right-2 flex flex-col gap-2 z-60">
+              <Button
+                variant="secondary"
+                size="icon"
+                className="cursor-pointer bg-background/80 hover:bg-background rounded-full transition-colors"
+                onClick={() => setActiveIndex(null)}
+                aria-label={t('Close')}
+              >
+                <IconX size={20} />
+              </Button>
+
+              {active && (
+                <Button
+                  variant="secondary"
+                  size="icon"
+                  aria-label={t('Download')}
+                  asChild
+                  role="link"
+                  className='cursor-pointer'
+                >
+                  <a
+                    target="__blank"
+                    href={readImage(active.url)}
+                    className="bg-background/80 hover:bg-background rounded-full transition-colors"
+                  >
+                    <IconDownload />
+                  </a>
+                </Button>
+              )}
+            </div>
+
+            {images.length > 1 && (
+              <Button
+                variant="secondary"
+                size="icon"
+                className="cursor-pointer absolute left-2 top-1/2 -translate-y-1/2 bg-background/80 hover:bg-background rounded-full z-50 transition-colors"
+                onClick={prev}
+                aria-label={t('Previous image')}
+              >
+                <IconChevronLeft size={24} />
+              </Button>
+            )}
+
+            {images.length > 1 && (
+              <Button
+                variant="secondary"
+                size="icon"
+                className="cursor-pointer absolute right-2 top-1/2 -translate-y-1/2 bg-background/80 hover:bg-background rounded-full z-50 transition-colors"
+                onClick={next}
+                aria-label={t('Next image')}
+              >
+                <IconChevronRight size={24} />
+              </Button>
+            )}
+
+            {images.length > 1 && (
+              <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-background/70 text-foreground text-xs px-3 py-1 rounded-full z-50">
+                {(activeIndex ?? 0) + 1} / {images.length}
+              </div>
+            )}
+          </div>
+        </Dialog.Content>
+      </Dialog>
+    </InfoCard>
+  );
+};
 
 const ProductInfo = ({ product }: { product: IMushopProduct & { _id: string } }) => {
   const { t } = useTranslation('mushop');
@@ -117,6 +281,8 @@ const ProductInfo = ({ product }: { product: IMushopProduct & { _id: string } })
           </Table>
         </InfoCard.Content>
       </InfoCard>
+
+      <ProductImages product={product} />
     </div>
   );
 };

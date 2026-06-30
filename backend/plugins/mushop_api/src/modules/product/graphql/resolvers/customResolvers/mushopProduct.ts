@@ -1,8 +1,18 @@
 import { IContext } from '~/connectionResolvers';
 import { IMushopProductMushopDocument } from '@/product/@types/product';
 import { sendTRPCMessage } from 'erxes-api-shared/utils';
+import { resolveAttachmentUrl } from '~/utils/fileUrl';
 
 export const MushopProduct = {
+  attachment: ({ attachment, subdomain }: IMushopProductMushopDocument) =>
+    resolveAttachmentUrl(attachment, subdomain),
+
+  attachmentMore: ({ attachmentMore, subdomain }: IMushopProductMushopDocument) =>
+    Array.isArray(attachmentMore)
+      ? attachmentMore.map((a) => resolveAttachmentUrl(a, subdomain))
+      : attachmentMore,
+
+
   supplier: async (
     product: IMushopProductMushopDocument,
     _args: any,

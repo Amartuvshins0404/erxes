@@ -31,7 +31,6 @@ const allRules: IAfterProcessRule[] = [
   },
 ];
 
-// Whether a category is part of the POS the supplier exposes to mushop.
 const isInSelectedPos = async (
   subdomain: string,
   categoryId?: string,
@@ -91,8 +90,6 @@ export const afterProcess: AfterProcessConfigs = {
 
       if (!category?._id) return;
 
-      // supplier-valid: only forward categories inside the POS the supplier
-      // exposes to mushop.
       if (!(await isInSelectedPos(ctx.subdomain, category._id))) return;
 
       sendMessage({
@@ -110,13 +107,10 @@ export const afterProcess: AfterProcessConfigs = {
       return;
     }
 
-    // productsAdd | productsEdit
     const product = result;
 
     if (!product?._id) return;
 
-    // supplier-valid: only forward products inside the POS the supplier exposes
-    // to mushop.
     if (!(await isInSelectedPos(ctx.subdomain, product.categoryId))) return;
 
     let category: any = null;
@@ -143,6 +137,7 @@ export const afterProcess: AfterProcessConfigs = {
         product,
         category,
         mutationName === 'productsAdd' ? 'create' : 'update',
+        ctx.subdomain,
       ),
     });
   },

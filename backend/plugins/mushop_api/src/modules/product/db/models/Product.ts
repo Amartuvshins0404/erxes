@@ -14,6 +14,7 @@ import {
   buildProductResubmittedLog,
   buildProductStatusChangedLog,
 } from '~/meta/activity-log/product';
+import { SUPPLIER_VERIFICATION_STATUS } from '~/constants';
 
 export interface IMushopProductModel
   extends Model<IMushopProductMushopDocument> {
@@ -28,6 +29,8 @@ export interface IMushopProductModel
     subdomain: string,
     entityIds: string[],
   ): Promise<IMushopProductMushopDocument[]>;
+  hideBySubdomain(subdomain: string): Promise<IMushopProductMushopDocument[]>;
+  unhideBySubdomain(subdomain: string): Promise<IMushopProductMushopDocument[]>;
   assignCategory(
     _id: string,
     categoryId: string | null,
@@ -58,15 +61,22 @@ export const loadMushopProductClass = (
         entityId,
       }).lean();
 
+      const supplier = await models.Supplier.findOne({ subdomain })
+        .select('verificationStatus')
+        .lean();
+
+      const state =
+        supplier?.verificationStatus === SUPPLIER_VERIFICATION_STATUS.UNVERIFIED
+          ? MUSHOP_PRODUCT_STATE.HIDDEN
+          : MUSHOP_PRODUCT_STATE.ACTIVE;
+
       const synced = await models.Product.findOneAndUpdate(
         { subdomain, entityId },
         {
           $set: {
             ...rest,
             ...(initialCategory ? { initialCategory } : {}),
-            // Resurrect if the supplier re-adds a previously removed product.
-            // Approval `status` is left untouched, so it keeps its prior value.
-            state: MUSHOP_PRODUCT_STATE.ACTIVE,
+            state,
           },
           $setOnInsert: { subdomain, entityId },
         },
@@ -87,7 +97,7 @@ export const loadMushopProductClass = (
     public static async getProduct(_id: string) {
       const product = await models.Product.findOne({
         _id,
-        state: { $ne: MUSHOP_PRODUCT_STATE.DELETED },
+        state: MUSHOP_PRODUCT_STATE.ACTIVE,
       }).lean();
       if (!product) throw new Error('Product not found');
       return product;
@@ -114,6 +124,38 @@ export const loadMushopProductClass = (
           state: { $ne: MUSHOP_PRODUCT_STATE.DELETED },
         },
         { $set: { state: MUSHOP_PRODUCT_STATE.DELETED } },
+      );
+
+      return affected;
+    }
+
+    public static async hideBySubdomain(subdomain: string) {
+      const affected = await models.Product.find({
+        subdomain,
+        state: MUSHOP_PRODUCT_STATE.ACTIVE,
+      }).lean();
+
+      if (!affected.length) return [];
+
+      await models.Product.updateMany(
+        { subdomain, state: MUSHOP_PRODUCT_STATE.ACTIVE },
+        { $set: { state: MUSHOP_PRODUCT_STATE.HIDDEN } },
+      );
+
+      return affected;
+    }
+
+    public static async unhideBySubdomain(subdomain: string) {
+      const affected = await models.Product.find({
+        subdomain,
+        state: MUSHOP_PRODUCT_STATE.HIDDEN,
+      }).lean();
+
+      if (!affected.length) return [];
+
+      await models.Product.updateMany(
+        { subdomain, state: MUSHOP_PRODUCT_STATE.HIDDEN },
+        { $set: { state: MUSHOP_PRODUCT_STATE.ACTIVE } },
       );
 
       return affected;

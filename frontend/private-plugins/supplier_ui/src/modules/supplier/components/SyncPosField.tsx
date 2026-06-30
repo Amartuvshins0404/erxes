@@ -17,10 +17,7 @@ export const SyncPosField = <T extends FieldValues>({
       control={control}
       render={({ field }) => (
         <Form.Item>
-          <Form.Label>POS to sync with mushop</Form.Label>
-          <Form.Description>
-            Products in this POS's categories are shared with mushop.
-          </Form.Description>
+          <Form.Label>POS</Form.Label>
           <Select
             value={(field.value as string) || ''}
             onValueChange={field.onChange}

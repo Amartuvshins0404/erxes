@@ -1,5 +1,6 @@
 import { IContext } from '~/connectionResolvers';
 import { sendSupplierMessage } from '~/utils/sendSupplierMessage';
+import { applySupplierRejectionChange } from '~/utils/supplierRejection';
 
 export const supplierMutations = {
   mushopUpdateSupplierVerificationStatus: async (
@@ -29,11 +30,21 @@ export const supplierMutations = {
       throw new Error(`Failed to send supplier status: ${error.message}`);
     }
 
-    return models.Supplier.updateVerificationStatus(
+    const updated = await models.Supplier.updateVerificationStatus(
       _id,
       verificationStatus,
       note,
     );
+
+    await applySupplierRejectionChange({
+      models,
+      subdomain: existing.subdomain,
+      posToken: updated?.mushopPosToken,
+      prevStatus: existing.verificationStatus,
+      nextStatus: verificationStatus,
+    });
+
+    return updated;
   },
 
   mushopUpdateSupplierTier: async (

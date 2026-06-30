@@ -10,13 +10,11 @@ export const MUSHOP_PRODUCT_STATUS = {
   ALL: ['pending', 'approved', 'rejected'],
 };
 
-// Existence axis, separate from the approval `status` above — mirrors
-// posclient's PRODUCT_STATUSES (active/deleted). Keeps approval state intact
-// across a soft delete.
 export const MUSHOP_PRODUCT_STATE = {
   ACTIVE: 'active',
+  HIDDEN: 'hidden',
   DELETED: 'deleted',
-  ALL: ['active', 'deleted'],
+  ALL: ['active', 'hidden', 'deleted'],
 };
 
 export const mushopProductSchema = schemaWrapper(

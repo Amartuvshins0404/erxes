@@ -1,14 +1,11 @@
-import { sendTRPCMessage } from 'erxes-api-shared/utils';
+import { getEnv, sendTRPCMessage } from 'erxes-api-shared/utils';
 import { generateModels } from '~/connectionResolvers';
 import { sendMessage } from '~/modules/admin/utils';
 
-// How many catalog items the backfill processes at once. Chunks run
-// sequentially so a large catalog doesn't fire thousands of concurrent calls
-// at posclient/core/mushop.
+const NODE_ENV = getEnv({ name: 'NODE_ENV', defaultValue: 'development' });
+
 const BACKFILL_CHUNK_SIZE = 50;
 
-// Run `handler` over `items` in sequential chunks of `size`; within a chunk the
-// work runs in parallel.
 const processInChunks = async <T>(
   items: T[],
   size: number,
@@ -39,13 +36,40 @@ export const buildCategorySnapshot = (category: any): CategorySnapshot =>
       }
     : null;
 
-// The mushop-facing product payload. Single source of truth shared by the
-// per-edit afterProcess hook and the backfill that runs when a supplier
-// (re)selects the POS they expose to mushop.
+const toAttachmentUrl = (attachment: any, subdomain: string) => {
+  if (!attachment || typeof attachment.url !== 'string') {
+    return attachment;
+  }
+
+  if (attachment.url.includes('http')) {
+    return attachment;
+  }
+
+  const domain =
+    NODE_ENV === 'development'
+      ? 'http://localhost:4000'
+      : getEnv({
+          name: 'DOMAIN',
+          subdomain,
+          defaultValue: 'http://localhost:4000',
+        }).replace('<subdomain>', subdomain);
+
+  return { ...attachment, url: `${domain}/read-file?key=${attachment.url}` };
+};
+
+const normalizeAttachments = (product: any, subdomain: string) => ({
+  attachment: toAttachmentUrl(product.attachment, subdomain),
+  attachmentMore: Array.isArray(product.attachmentMore)
+    ? product.attachmentMore.map((a: any) => toAttachmentUrl(a, subdomain))
+    : product.attachmentMore,
+  pdfAttachment: toAttachmentUrl(product.pdfAttachment, subdomain),
+});
+
 export const buildProductSyncPayload = (
   product: any,
   category: any,
   action: 'create' | 'update',
+  subdomain: string,
 ) => ({
   entityId: product._id,
   data: {
@@ -64,19 +88,16 @@ export const buildProductSyncPayload = (
       category: buildCategorySnapshot(category),
       propertiesData: product.propertiesData,
       tagIds: product.tagIds,
-      attachment: product.attachment,
-      attachmentMore: product.attachmentMore,
+      ...normalizeAttachments(product, subdomain),
       scopeBrandIds: product.scopeBrandIds,
       uom: product.uom,
       subUoms: product.subUoms,
       currency: product.currency,
-      pdfAttachment: product.pdfAttachment,
     },
     action,
   },
 });
 
-// All category ids (with children) covered by a POS, resolved in-tenant.
 export const getPosCategoryIds = async (
   subdomain: string,
   posToken: string,
@@ -111,10 +132,6 @@ export const getPosCategoryIds = async (
   }
 };
 
-// Push the current catalog of the supplier's selected POS to mushop. Runs in
-// the background after a supplier (re)selects their POS, so an existing catalog
-// shows up in mushop without any manual trigger. New edits then keep it in
-// sync via afterProcess.
 export const backfillPosToMushop = async (
   subdomain: string,
   posToken: string,
@@ -137,7 +154,6 @@ export const backfillPosToMushop = async (
     const allowedCategoryIds = await getPosCategoryIds(subdomain, posToken);
     const allowed = new Set(allowedCategoryIds);
 
-    // Resolve each category once.
     const categoryIds = Array.from(
       new Set(
         products
@@ -164,7 +180,6 @@ export const backfillPosToMushop = async (
       }
     });
 
-    // Sync categories first so the snapshot exists, then products.
     await processInChunks(
       Array.from(categoryById.values()),
       BACKFILL_CHUNK_SIZE,
@@ -196,6 +211,7 @@ export const backfillPosToMushop = async (
           product,
           categoryById.get(product.categoryId) ?? null,
           'create',
+          subdomain,
         ),
       }),
     );
@@ -204,7 +220,6 @@ export const backfillPosToMushop = async (
   }
 };
 
-// Read the supplier's currently selected POS token (one supplier per tenant).
 export const getSupplierPosToken = async (
   subdomain: string,
 ): Promise<string | undefined> => {

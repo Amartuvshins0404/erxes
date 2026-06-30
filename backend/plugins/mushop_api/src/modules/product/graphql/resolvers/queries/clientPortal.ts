@@ -19,7 +19,7 @@ export const cpProductQueries = {
 
     const { supplierId, categoryId, status, searchValue } = params;
 
-    const filter: any = { state: { $ne: MUSHOP_PRODUCT_STATE.DELETED } };
+    const filter: any = { state: MUSHOP_PRODUCT_STATE.ACTIVE };
 
     if (supplierId) {
       const supplier = await models.Supplier.getSupplier(supplierId);
@@ -60,7 +60,10 @@ export const cpProductQueries = {
     });
 
     if (!isMembership) {
-      return models.Product.findOne({ _id }).select('-unitPrice');
+      return models.Product.findOne({
+        _id,
+        state: MUSHOP_PRODUCT_STATE.ACTIVE,
+      }).select('-unitPrice');
     }
 
     return models.Product.getProduct(_id);

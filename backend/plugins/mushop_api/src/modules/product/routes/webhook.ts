@@ -1,6 +1,9 @@
 import { Router, Request, Response } from 'express';
 import { generateModels } from '~/connectionResolvers';
-import { MUSHOP_PRODUCT_STATUS } from '@/product/db/definitions/product';
+import {
+  MUSHOP_PRODUCT_STATE,
+  MUSHOP_PRODUCT_STATUS,
+} from '@/product/db/definitions/product';
 import {
   removeCategoryFromPosclient,
   removeProductFromPosclient,
@@ -40,12 +43,8 @@ router.post('/syncProduct', async (req: Request, res: Response) => {
           .json({ error: 'entityId or entityIds required for delete' });
       }
 
-      // Soft-delete in mushop_products so history is preserved; the supplier
-      // can resurrect it by re-adding (syncProduct sets state back to active).
       const removed = await models.Product.softDeleteByEntityIds(subdomain, ids);
 
-      // Untag from mushop's POS (posclient drops the product entirely only once
-      // it has no remaining POS tokens).
       await Promise.all(
         removed.map((p) =>
           removeProductFromPosclient({ subdomain, posToken, productId: p._id }),
@@ -67,7 +66,10 @@ router.post('/syncProduct', async (req: Request, res: Response) => {
       action,
     );
 
-    if (synced?.status === MUSHOP_PRODUCT_STATUS.APPROVED) {
+    if (
+      synced?.status === MUSHOP_PRODUCT_STATUS.APPROVED &&
+      synced?.state === MUSHOP_PRODUCT_STATE.ACTIVE
+    ) {
       await syncProductToPosclient({
         subdomain,
         posToken,

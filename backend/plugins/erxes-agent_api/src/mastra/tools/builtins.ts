@@ -15,6 +15,7 @@ import { chartSpecSchema, sanitizeChartSpec } from '~/mastra/charts/chartSpec';
 import { chartArtifactSchema, diagramArtifactSchema, newArtifactId } from './artifacts';
 import { storeArtifact } from '~/mastra/artifactStore';
 import { DOCUMENT_BUILTIN_TOOLS } from './documentTools';
+import { faviconFor, hostnameOf, SEARCH_ENGINE } from './searchEngine';
 
 const FETCH_TIMEOUT_MS = 10_000;
 const UA = 'Mozilla/5.0 (compatible; erxes-agent/1.0)';
@@ -23,6 +24,10 @@ interface SearchResult {
   title: string;
   url: string;
   snippet: string;
+  // Hostname (e.g. "ycombinator.com") + its real favicon, so the UI can render
+  // a Claude-style result row without constructing any URL itself.
+  source: string;
+  favicon: string;
 }
 
 /** Strip HTML tags, decode entities, and collapse whitespace. */
@@ -60,6 +65,8 @@ async function ddgSearch(
       title: stripTags(match[2]),
       url: target,
       snippet: stripTags(match[3]),
+      source: hostnameOf(target),
+      favicon: faviconFor(target),
     });
   }
   return results;
@@ -74,16 +81,21 @@ export const webSearchTool = createTool({
     limit: z.number().int().min(1).max(10).default(5).describe('Max results'),
   }),
   outputSchema: z.object({
+    // The engine identity (name + real favicon) backs the result-card header,
+    // so the UI never hard-codes which search engine produced these.
+    engine: z.object({ name: z.string(), icon: z.string() }),
     results: z.array(
       z.object({
         title: z.string(),
         url: z.string(),
         snippet: z.string(),
+        source: z.string(),
+        favicon: z.string(),
       }),
     ),
   }),
   execute: async ({ query, limit }) => {
-    return { results: await ddgSearch(query, limit ?? 5) };
+    return { engine: SEARCH_ENGINE, results: await ddgSearch(query, limit ?? 5) };
   },
 });
 
@@ -101,6 +113,9 @@ export const fetchUrlTool = createTool({
   outputSchema: z.object({
     url: z.string(),
     title: z.string(),
+    // Hostname + its real favicon so the UI can render a "Reading <site>" chip.
+    siteName: z.string(),
+    favicon: z.string(),
     content: z.string(),
   }),
   execute: async ({ url }) => {
@@ -122,6 +137,8 @@ export const fetchUrlTool = createTool({
     return {
       url: finalUrl,
       title,
+      siteName: hostnameOf(finalUrl),
+      favicon: faviconFor(finalUrl),
       content: content || 'No readable content found.',
     };
   },

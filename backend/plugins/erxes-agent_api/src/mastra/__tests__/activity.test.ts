@@ -2,7 +2,51 @@ import {
   buildActivityContext,
   sanitizeActivity,
   createActivityTracker,
+  parseCombined,
 } from '../activity';
+
+describe('parseCombined', () => {
+  it('extracts the turn headline and each indexed step summary', () => {
+    const raw = [
+      'TURN: Synthesized marketplace data into a PDF report',
+      "[0] The request is ambiguous, so I'll ask which report they mean.",
+      '[2] Found four YC batches for 2026, so I cover all four cohorts.',
+    ].join('\n');
+    const { turn, steps } = parseCombined(raw, true);
+    expect(turn).toBe('Synthesized marketplace data into a PDF report');
+    expect(steps).toEqual([
+      { index: 0, summary: "The request is ambiguous, so I'll ask which report they mean." },
+      { index: 2, summary: 'Found four YC batches for 2026, so I cover all four cohorts.' },
+    ]);
+  });
+
+  it('joins a step summary that wrapped across lines', () => {
+    const raw = ['[1] First part of the thought', 'and its continuation.'].join(
+      '\n',
+    );
+    const { steps } = parseCombined(raw, false);
+    expect(steps).toEqual([
+      { index: 1, summary: 'First part of the thought and its continuation.' },
+    ]);
+  });
+
+  it('drops the turn when not wanted and ignores stray prose', () => {
+    const raw = ['Here are the summaries:', '[3] A concrete step summary.'].join(
+      '\n',
+    );
+    const { turn, steps } = parseCombined(raw, false);
+    expect(turn).toBeNull();
+    expect(steps).toEqual([{ index: 3, summary: 'A concrete step summary.' }]);
+  });
+
+  it('returns empty results for unusable output', () => {
+    expect(parseCombined('', true)).toEqual({ turn: null, steps: [] });
+    expect(parseCombined('no markers here', true)).toEqual({
+      turn: null,
+      steps: [],
+    });
+  });
+});
 
 describe('buildActivityContext', () => {
   it('returns null when nothing is in flight', () => {

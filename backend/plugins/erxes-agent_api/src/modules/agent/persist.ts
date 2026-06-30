@@ -12,12 +12,19 @@ export async function persistTurn(params: {
   models: IModels;
   prepared: PreparedTurn;
   reply: string | null;
+  // Per-reasoning-step short summaries, index-aligned to the assistant turn's
+  // reasoning parts (holes are null). Stamped onto the assistant message's erxes
+  // meta so the chat re-renders the short thoughts on reload.
+  reasoningSummaries?: (string | null)[];
+  // One-line "what this turn accomplished" headline for the collapsed trace.
+  turnSummary?: string;
   assistantMessageId?: string;
 }): Promise<{
   titlePromise: Promise<string | null>;
   assistantMessageId: string | null;
 }> {
-  const { prepared, reply, assistantMessageId } = params;
+  const { prepared, reply, assistantMessageId, reasoningSummaries, turnSummary } =
+    params;
   const { useMemory, memCtx, agentConfig, attachments } = prepared;
 
   const titlePromise: Promise<string | null> =
@@ -38,6 +45,8 @@ export async function persistTurn(params: {
         agentId: agentConfig.agentId,
         reply,
         attachments,
+        reasoningSummaries,
+        turnSummary,
         assistantMessageId,
       });
     } catch (e) {
@@ -99,10 +108,19 @@ export async function patchNativeTurn(params: {
   agentId: string;
   reply: string | null;
   attachments?: IMastraChatAttachment[];
+  reasoningSummaries?: (string | null)[];
+  turnSummary?: string;
   assistantMessageId?: string;
 }): Promise<string | null> {
   const { subdomain, binding, agentId, reply, attachments } = params;
-  const { assistantMessageId } = params;
+  const { reasoningSummaries, turnSummary, assistantMessageId } = params;
+
+  // The erxes-meta fields to stamp onto the assistant message (only the present
+  // ones), so a reload re-renders the short thoughts + turn headline.
+  const assistantMeta: Record<string, unknown> = {};
+  if (reasoningSummaries?.length)
+    assistantMeta.reasoningSummaries = reasoningSummaries;
+  if (turnSummary) assistantMeta.turnSummary = turnSummary;
 
   await ensureThreadRegistered(
     subdomain,
@@ -112,8 +130,9 @@ export async function patchNativeTurn(params: {
   );
 
   const wantUser = Boolean(attachments?.length);
+  const wantAssistant = Object.keys(assistantMeta).length > 0;
 
-  if (!wantUser && (assistantMessageId || !reply)) {
+  if (!wantUser && !wantAssistant && (assistantMessageId || !reply)) {
     return assistantMessageId ?? null;
   }
 
@@ -127,20 +146,34 @@ export async function patchNativeTurn(params: {
   })) as { messages?: NativeChatMessage[] };
   const recent = recalled?.messages ?? [];
 
+  // Patch via the STORAGE domain (patchNativeMessages), not Memory.updateMessages:
+  // the latter re-embeds the message and rewrites its Qdrant vectors whenever
+  // semantic recall is on (always, here). For a metadata-only patch that is pure
+  // waste (content.content is unchanged) and fragile — a single embed/Qdrant
+  // hiccup throws and loses the patch. patchNativeMessages is a plain Mongo
+  // write: no embeddings, no vector I/O, and best-effort.
   if (wantUser) {
     const userMsg = recent.find((m) => m.role === 'user');
     if (userMsg) {
-      // Patch the attachment pointers via the STORAGE domain, not
-      // Memory.updateMessages: the latter re-embeds the message and rewrites its
-      // Qdrant vectors whenever semantic recall is on (always, here). For a
-      // metadata-only patch that is pure waste (content.content is unchanged) and
-      // fragile — a single embed/Qdrant hiccup throws and loses the attachment
-      // pointer. patchNativeMessages is a plain Mongo write: no embeddings, no
-      // vector I/O, and best-effort.
       await patchNativeMessages(subdomain, [
         {
           id: userMsg.id,
           content: mergeErxesMeta(userMsg.content, { attachments }),
+        },
+      ]);
+    }
+  }
+
+  if (wantAssistant) {
+    // The just-saved assistant row (by id when known, else the most recent).
+    const assistantMsg = assistantMessageId
+      ? recent.find((m) => m.id === assistantMessageId)
+      : recent.find((m) => m.role === 'assistant');
+    if (assistantMsg) {
+      await patchNativeMessages(subdomain, [
+        {
+          id: assistantMsg.id,
+          content: mergeErxesMeta(assistantMsg.content, assistantMeta),
         },
       ]);
     }

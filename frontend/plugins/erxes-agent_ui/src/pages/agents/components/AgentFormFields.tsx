@@ -304,6 +304,25 @@ export const AgentFormFields = ({
 
         <Form.Field
           control={form.control}
+          name="debug"
+          render={({ field }) => (
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <Label className="font-medium">Debug View</Label>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Show the full tool-call trace (web searches, fetches,
+                  operations) in chat. Off shows only a turn summary.
+                </p>
+              </div>
+              <Switch checked={field.value} onCheckedChange={field.onChange} />
+            </div>
+          )}
+        />
+
+        <Separator />
+
+        <Form.Field
+          control={form.control}
           name="maxSteps"
           render={({ field }) => (
             <Field

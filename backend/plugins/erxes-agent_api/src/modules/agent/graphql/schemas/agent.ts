@@ -12,6 +12,7 @@ export const types = `
     skills: [String]
     destructiveOps: String
     memoryEnabled: Boolean
+    debug: Boolean
     maxSteps: Int
     temperature: Float
     isEnabled: Boolean
@@ -37,6 +38,7 @@ export const types = `
     skills: [String]
     destructiveOps: String
     memoryEnabled: Boolean
+    debug: Boolean
     maxSteps: Int
     temperature: Float
     isEnabled: Boolean

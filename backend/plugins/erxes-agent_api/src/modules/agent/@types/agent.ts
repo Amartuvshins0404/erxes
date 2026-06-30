@@ -17,6 +17,8 @@ export interface IMastraAgent {
   // 'allow' runs without asking. ('block' is a tolerated legacy value → 'ask'.)
   destructiveOps?: 'allow' | 'ask' | 'block';
   memoryEnabled?: boolean;
+  // Debug view: surface the full tool-call trace in the chat (default off).
+  debug?: boolean;
   maxSteps?: number;
   temperature?: number;
   isEnabled?: boolean;

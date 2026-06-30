@@ -1,6 +1,6 @@
 import { memo, type ReactNode } from 'react';
 import { IconBolt, IconPencil, IconRefresh, IconRepeat } from '@tabler/icons-react';
-import { cn, Tooltip } from 'erxes-ui';
+import { Tooltip } from 'erxes-ui';
 import { AgentUIMessage, ChatAttachment } from '~/modules/chat/types';
 import { asToolPart, messageText } from '~/modules/chat/lib/uiParts';
 import { asArtifactPart, type Artifact } from '~/modules/chat/lib/artifacts';
@@ -67,6 +67,7 @@ export const MessageBubble = memo(function MessageBubble({
   onEditMessage,
   onResendMessage,
   storeArtifacts,
+  debug,
 }: {
   msg: AgentUIMessage;
   isLast: boolean;
@@ -81,6 +82,9 @@ export const MessageBubble = memo(function MessageBubble({
   // Persisted artifacts for this message — used when the live tool parts are
   // gone (after a reload), so the inline cards reappear.
   storeArtifacts?: Artifact[];
+  // The agent's debug setting — when on, the trace shows the full tool-call
+  // timeline; off shows only the turn summary + short thoughts.
+  debug?: boolean;
 }) {
   const text = messageText(msg);
 
@@ -155,14 +159,11 @@ export const MessageBubble = memo(function MessageBubble({
   return (
     <div className="flex justify-start items-start gap-3 group ea-msg-in">
       <AgentAvatar live={streaming} />
-      {/* Hold full width during streaming so the bubble doesn't snap wider
+      {/* A borderless reading column (no bubble) so long answers read like a
+          document. Hold full width during streaming so it doesn't snap wider
           when the first artifact tool call lands mid-turn. */}
-      <div
-        className={cn(
-          'min-w-0 rounded-2xl rounded-bl-md px-4 py-2.5 shadow-sm',
-          streaming || artifacts.length > 0 ? 'w-full' : 'w-auto max-w-full',
-        )}
-      >
+      <div className={`min-w-0 px-1 py-1 ${streaming || artifacts.length > 0 ? 'w-full' : 'w-auto max-w-full'}`}>
+
         {activeSkills && activeSkills.length > 0 && (
           <div className="flex flex-wrap items-center gap-1 mb-1.5">
             {activeSkills.map((name) => (
@@ -177,8 +178,14 @@ export const MessageBubble = memo(function MessageBubble({
             ))}
           </div>
         )}
-        {turnParts.length > 0 && (
-          <AgentTrace parts={turnParts} streaming={streaming} />
+        {(turnParts.length > 0 || msg.metadata?.turnSummary) && (
+          <AgentTrace
+            parts={turnParts}
+            streaming={streaming}
+            summaries={msg.metadata?.reasoningSummaries}
+            turnSummary={msg.metadata?.turnSummary}
+            debug={debug}
+          />
         )}
         {text ? (
           streaming ? (

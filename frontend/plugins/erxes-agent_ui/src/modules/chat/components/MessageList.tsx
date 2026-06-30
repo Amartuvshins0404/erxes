@@ -22,6 +22,7 @@ export const MessageList = ({
   onEditMessage,
   onResendMessage,
   storeArtifactsByMessage,
+  debug,
 }: {
   agent: IChatAgent;
   messages: AgentUIMessage[];
@@ -40,6 +41,8 @@ export const MessageList = ({
   // Persisted artifacts per assistant message id — re-renders inline cards on
   // reload (the live message's own tool parts take priority while streaming).
   storeArtifactsByMessage?: Map<string, Artifact[]>;
+  // The agent's debug setting — controls how much of the trace each turn shows.
+  debug?: boolean;
 }) => {
   // Approve/deny replies are sent hidden — they continue a gated turn without a
   // visible user bubble.
@@ -58,20 +61,22 @@ export const MessageList = ({
             ))}
           </div>
         ) : visible.length === 0 ? (
-          <div className="flex flex-col items-center justify-center min-h-[55vh] text-center gap-2 ea-msg-in">
-            <div className="mb-2">
-              <AgentMark size="lg" />
-            </div>
-            <p className="text-lg font-semibold">{agent.name}</p>
-            {agent.description && (
-              <p className="text-sm text-muted-foreground max-w-sm">
-                {agent.description}
+          <div className="flex flex-col items-center justify-center min-h-[55vh] text-center gap-3 ea-msg-in">
+            <AgentMark size="lg" />
+            <div className="space-y-1">
+              <p className="text-xl font-semibold tracking-tight">
+                {agent.name}
               </p>
-            )}
-            <Badge variant="secondary" className="font-mono text-xs mt-1">
+              {agent.description && (
+                <p className="mx-auto max-w-sm text-sm text-muted-foreground">
+                  {agent.description}
+                </p>
+              )}
+            </div>
+            <Badge variant="secondary" className="font-mono text-[11px]">
               {agent.provider} · {agent.model}
             </Badge>
-            <div className="flex flex-wrap justify-center gap-2 mt-4 max-w-md">
+            <div className="mt-3 flex flex-wrap justify-center gap-2 max-w-md">
               {[
                 'What can you do?',
                 'Summarize my open tickets',
@@ -83,7 +88,7 @@ export const MessageList = ({
                   key={s}
                   type="button"
                   onClick={() => onSuggestion(s)}
-                  className="ea-pop rounded-full border border-border bg-background px-3.5 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:border-primary/40 hover:bg-primary/4 transition-all hover:-translate-y-0.5"
+                  className="ea-pop ea-suggestion"
                 >
                   {s}
                 </button>
@@ -108,6 +113,7 @@ export const MessageList = ({
                     ? storeArtifactsByMessage?.get(msg.metadata.messageId)
                     : undefined
                 }
+                debug={debug}
               />
             ))}
             {chatLoading && lastMsg?.role !== 'assistant' && <WaitingIndicator />}

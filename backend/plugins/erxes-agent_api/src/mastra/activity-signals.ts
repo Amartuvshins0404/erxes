@@ -31,6 +31,13 @@ const clip = (text: string) =>
 const phrase = (verb: string, subject?: string) =>
   clip(subject ? `${verb} ${subject}` : verb);
 
+// Tool names arrive in mixed casing: builtins use camelCase keys (`webSearch`),
+// meta tools use snake_case ids (`execute_erxes_operation`). Normalize to a
+// separator-less lowercase form so a known tool is always recognised (otherwise
+// it falls through to an avoidable LLM summarization for its status line).
+const norm = (toolName: string): string =>
+  toolName.toLowerCase().replace(/[-_\s]/g, '');
+
 /**
  * A present-continuous status line for a tool call, or null when the tool is
  * unknown (let the LLM summarizer narrate it). Mirrors ACTIVITY_INSTRUCTIONS:
@@ -40,36 +47,47 @@ export function toolStatusLine(
   toolName: string,
   args?: unknown,
 ): string | null {
-  switch (toolName) {
-    case 'search_erxes_operations': {
+  switch (norm(toolName)) {
+    case 'searcherxesoperations': {
       const query = pick(args, ['query']);
       return phrase('Searching operations', query ? `for ${query}` : undefined);
     }
-    case 'execute_erxes_operation': {
+    case 'executeerxesoperation': {
       const op = pick(args, ['operation', 'operationName']);
       return op ? phrase('Running', op) : 'Running an operation';
     }
-    case 'company-knowledge': {
+    case 'companyknowledge': {
       const query = pick(args, ['query']);
       return phrase(
         'Searching company data',
         query ? `for ${query}` : undefined,
       );
     }
-    case 'web-search': {
+    case 'agentknowledge': {
+      const query = pick(args, ['query']);
+      return phrase('Recalling learnings', query ? `about ${query}` : undefined);
+    }
+    case 'websearch': {
       const query = pick(args, ['query', 'q', 'search']);
       return phrase('Searching the web', query ? `for ${query}` : undefined);
     }
-    case 'fetch-url': {
+    case 'fetchurl': {
       const url = pick(args, ['url', 'href']);
-      return phrase('Fetching', url);
+      return phrase('Reading', url);
     }
     case 'calculator':
       return 'Calculating';
-    case 'render-chart':
+    case 'renderchart':
       return 'Rendering a chart';
-    case 'file-reader':
-    case 'read-attachment':
+    case 'renderdiagram':
+      return 'Rendering a diagram';
+    case 'generatepdf':
+    case 'generatedocx':
+    case 'generatepptx':
+    case 'generatexlsx':
+      return 'Generating a document';
+    case 'filereader':
+    case 'readattachment':
       return 'Reading a file';
     default:
       return null;

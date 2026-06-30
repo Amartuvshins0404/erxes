@@ -156,6 +156,8 @@ export const metaToUIMessages = (
         messageId: m._id,
         createdAt: m.createdAt,
         interrupted: m.meta?.interrupted || undefined,
+        reasoningSummaries: m.meta?.reasoningSummaries,
+        turnSummary: m.meta?.turnSummary,
       },
     };
   });

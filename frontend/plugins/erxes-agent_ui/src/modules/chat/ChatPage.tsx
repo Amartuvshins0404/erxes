@@ -558,6 +558,7 @@ export const ChatPage = () => {
                 onEditMessage={handleEditMessage}
                 onResendMessage={handleResendMessage}
                 storeArtifactsByMessage={storeArtifactsByMessage}
+                debug={selectedAgent.debug}
               />
 
               {showScrollDown && (

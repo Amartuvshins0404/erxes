@@ -36,6 +36,10 @@ export const agentSchema = new Schema(
       label: 'Destructive Operations',
     },
     memoryEnabled: { type: Boolean, default: true },
+    // Debug view: when on, the chat shows this agent's full tool-call trace
+    // (web searches, fetches, operations, raw I/O). Off (default) → the chat
+    // shows only a one-line turn summary that expands to the short thoughts.
+    debug: { type: Boolean, default: false },
     maxSteps: { type: Number, default: 10 },
     // Sampling temperature sent to the model. Unset → the provider/SDK default
     // (the legacy OpenAI-compatible loop defaults to 0). Some models pin it:

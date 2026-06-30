@@ -123,6 +123,70 @@ export const toolHint = (input: unknown, toolName?: string): string => {
 const cleanHint = (raw: string): string =>
   raw.trim().replace(/^https?:\/\/(www\.)?/i, '').replace(/\s+/g, ' ');
 
+/** The bare hostname of a URL (no leading www.), or '' when unparseable. Used as
+ *  a fallback for the result domain + site-favicon when the tool output predates
+ *  the backend's `source`/`favicon` fields. */
+export const hostnameOf = (url: string): string => {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return '';
+  }
+};
+
+// How a tool call is presented in the run timeline. Each kind maps to a
+// dedicated, Claude-style renderer (web search → result card, fetch → reading
+// chip, …); `artifact` tools are hidden from the trace because they surface as a
+// prominent ArtifactCard instead; everything unrecognised falls back to the
+// quiet generic row.
+export type ToolKind =
+  | 'web-search'
+  | 'fetch-url'
+  | 'operation'
+  | 'calculator'
+  | 'artifact'
+  | 'generic';
+
+// Tool names arrive in whatever casing the backend registers them under: the
+// builtins use camelCase keys (`webSearch`, `fetchUrl`, `renderChart`, …) while
+// the meta tools use snake_case ids (`execute_erxes_operation`). Normalize to a
+// separator-less lowercase form so the registry matches regardless of casing —
+// webSearch / web-search / web_search all collapse to `websearch`.
+export const normToolName = (toolName: string): string =>
+  toolName.toLowerCase().replace(/[-_\s]/g, '');
+
+// Tools whose output becomes an inline ArtifactCard (chart / diagram / document).
+// Listed by normalized name so a still-streaming call is hidden from the trace
+// immediately, with no flicker when its artifact lands.
+const ARTIFACT_TOOL_NAMES = new Set([
+  'renderchart',
+  'renderdiagram',
+  'generatepdf',
+  'generatedocx',
+  'generatepptx',
+  'generatexlsx',
+]);
+
+/** Classify a tool by name for the run-timeline presentation registry. */
+export const toolKind = (toolName: string): ToolKind => {
+  const name = normToolName(toolName);
+  switch (name) {
+    case 'websearch':
+      return 'web-search';
+    case 'fetchurl':
+      return 'fetch-url';
+    case 'executeerxesoperation':
+    case 'searcherxesoperations':
+    case 'companyknowledge':
+    case 'agentknowledge':
+      return 'operation';
+    case 'calculator':
+      return 'calculator';
+    default:
+      return ARTIFACT_TOOL_NAMES.has(name) ? 'artifact' : 'generic';
+  }
+};
+
 /** The concatenated assistant answer text across a message's text parts. */
 export const messageText = (message: AgentUIMessage): string =>
   message.parts

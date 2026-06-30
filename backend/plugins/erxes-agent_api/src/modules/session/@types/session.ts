@@ -37,6 +37,13 @@ export interface IMastraMessageMeta {
   // Slash-skills active for this turn — rendered as a badge on the persisted
   // assistant message so a reload shows which skills shaped the reply.
   activeSkills?: string[];
+  // Per-reasoning-step short summaries ("short thoughts"), index-aligned to the
+  // turn's reasoning parts (holes are null). Re-renders the gist on each step in
+  // the chat run timeline on reload.
+  reasoningSummaries?: (string | null)[];
+  // One-line "what this turn accomplished" headline, shown as the collapsed
+  // run-timeline header on reload.
+  turnSummary?: string;
 }
 
 // A file attached to a user message. `url` is either a storage key (private

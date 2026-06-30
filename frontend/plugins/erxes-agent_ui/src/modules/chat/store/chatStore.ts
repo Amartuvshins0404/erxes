@@ -161,25 +161,32 @@ export const useChatStore = create<ChatStoreState>((set, get) => {
   const setThreadActivity = (key: string, text: string | undefined) =>
     set((s) => ({ threadActivity: { ...s.threadActivity, [key]: text } }));
 
-  // Stamp the reconciled native id onto the most recent assistant message of a
-  // thread (the backend sends it via a transient `data-message-id` part after
-  // `finish`, since persistence now runs off the critical path). Mirrors the
-  // hydrateFeedbacks pattern: reassigning chat.messages re-renders the bubble so
-  // its thumbs feedback becomes ratable without a reload.
-  const reconcileAssistantMessageId = (key: string, messageId: string) => {
+  // Patch the metadata of a thread's most recent assistant message. Reassigning
+  // chat.messages re-renders that bubble (the hydrateFeedbacks pattern), so a
+  // post-`finish` reconcile lands without a reload.
+  const patchLastAssistantMeta = (
+    key: string,
+    metaPatch: Partial<NonNullable<AgentUIMessage['metadata']>>,
+  ) => {
     const chat = get().chats[key];
-    if (!chat || !messageId) return;
+    if (!chat) return;
     const msgs = chat.messages;
     for (let i = msgs.length - 1; i >= 0; i--) {
       if (msgs[i].role === 'assistant') {
         chat.messages = msgs.map((m, idx) =>
-          idx === i
-            ? { ...m, metadata: { ...m.metadata, messageId } }
-            : m,
+          idx === i ? { ...m, metadata: { ...m.metadata, ...metaPatch } } : m,
         );
         return;
       }
     }
+  };
+
+  // Stamp the reconciled native id (sent via a transient `data-message-id` part
+  // after `finish`, since persistence now runs off the critical path) onto the
+  // latest assistant message so its thumbs feedback becomes ratable live.
+  const reconcileAssistantMessageId = (key: string, messageId: string) => {
+    if (!messageId) return;
+    patchLastAssistantMeta(key, { messageId });
   };
 
   // Mark the turn persisted: clear activity, reconcile the cached session list
@@ -229,6 +236,16 @@ export const useChatStore = create<ChatStoreState>((set, get) => {
       onData: (part) => {
         if (part.type === 'data-activity') {
           setThreadActivity(key, part.data.text);
+        } else if (part.type === 'data-reasoning-summaries') {
+          // Arrives once, just after `finish` — stamp the per-step gists onto the
+          // settled assistant message (post-finish, so no streaming clobber).
+          patchLastAssistantMeta(key, {
+            reasoningSummaries: part.data.summaries,
+          });
+        } else if (part.type === 'data-turn-summary') {
+          // Arrives once, just after `finish` — stamp it onto the settled
+          // assistant message (post-finish, so no streaming clobber).
+          patchLastAssistantMeta(key, { turnSummary: part.data.text });
         } else if (part.type === 'data-thread-title') {
           setThreadTitleInCache(
             client,

@@ -68,6 +68,7 @@ export const AgentFormPage = () => {
       allowedTools: agent.allowedTools || [],
       destructiveOps: agent.destructiveOps === 'allow' ? 'allow' : 'ask',
       memoryEnabled: agent.memoryEnabled ?? true,
+      debug: agent.debug ?? false,
       maxSteps: agent.maxSteps ?? 10,
       temperature: agent.temperature ?? null,
       isEnabled: agent.isEnabled ?? true,

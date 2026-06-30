@@ -13,6 +13,7 @@ export const AGENT_FIELDS = gql`
     allowedTools
     destructiveOps
     memoryEnabled
+    debug
     maxSteps
     temperature
     isEnabled

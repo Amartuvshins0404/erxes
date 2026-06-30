@@ -14,6 +14,8 @@ import {
   ActivityTracker,
   createActivityTracker,
   summarizeActivity,
+  summarizeTurnAndSteps,
+  REASONING_STEP_MIN_CHARS,
 } from './mastra/activity';
 import { toolStatusLine } from './mastra/activity-signals';
 import {
@@ -383,6 +385,32 @@ router.post('/chat/stream', llmRouteLimiter, async (req, res) => {
         // reload via the resolver's `parts` field — so no turn-meta stamping is
         // needed here. langfuseTraceId / interrupted / activeSkills still ride the
         // finish chunk for the live client.
+
+        // Per-reasoning-step short summaries ("short thoughts"): substantial
+        // reasoning bursts are COLLECTED here (by reasoning ordinal, matching the
+        // client's per-reasoning-part index) and summarized together in ONE model
+        // call at turn end — no per-burst LLM round-trips during the stream.
+        const reasoningBursts: { index: number; text: string }[] = [];
+        let reasoningBurst = '';
+        let reasoningBurstIndex = 0;
+        // Cap per-turn step summaries: a generous backstop so a pathological,
+        // many-burst turn keeps the single summary call's prompt bounded. Beyond
+        // it, the extra steps fall back to the raw-reasoning lead in the UI.
+        const MAX_STEP_SUMMARIES = 12;
+
+        // A reasoning burst just ended (a non-reasoning chunk arrived). Give it
+        // the next ordinal — kept in lockstep with the client even for bursts too
+        // short to summarize — and queue substantial ones for the batched call.
+        const closeReasoningBurst = () => {
+          const text = reasoningBurst;
+          reasoningBurst = '';
+          if (!text) return;
+          const index = reasoningBurstIndex++;
+          if (text.trim().length < REASONING_STEP_MIN_CHARS) return;
+          if (reasoningBursts.length >= MAX_STEP_SUMMARIES) return;
+          reasoningBursts.push({ index, text });
+        };
+
         try {
           await runWithAuth(authCtx, async () => {
             const modelStream = await agent.stream(convo, {
@@ -419,12 +447,29 @@ router.post('/chat/stream', llmRouteLimiter, async (req, res) => {
 
             for await (const chunk of uiStream) {
               acc.fold(chunk);
-              if (chunk.type === 'reasoning-delta')
-                activity?.onThinking(chunk.delta ?? '');
-              else if (chunk.type === 'tool-input-available')
-                activity?.onToolCall(chunk.toolName, chunk.input);
+              switch (chunk.type) {
+                case 'reasoning-delta':
+                  reasoningBurst += chunk.delta ?? '';
+                  activity?.onThinking(chunk.delta ?? '');
+                  break;
+                // The same chunk types that close a reasoning burst in the
+                // accumulator (a non-reasoning chunk ends the current burst).
+                case 'reasoning-end':
+                case 'text-start':
+                case 'text-delta':
+                case 'tool-input-available':
+                case 'tool-input-error':
+                  closeReasoningBurst();
+                  if (chunk.type === 'tool-input-available')
+                    activity?.onToolCall(chunk.toolName, chunk.input);
+                  break;
+                default:
+                  break;
+              }
               writer.write(chunk);
             }
+            // Flush a burst still open when the model ended on reasoning.
+            closeReasoningBurst();
             // No flush barrier or post-write needed: Mastra persists the turn's
             // parts natively as it saves the row. persistTurn below only
             // reconciles the thread binding, attachments, title, and the native
@@ -480,15 +525,61 @@ router.post('/chat/stream', llmRouteLimiter, async (req, res) => {
           },
         });
 
+        // Run-timeline summaries — the turn headline + each step's gist — are
+        // produced together in ONE model call, OFF the felt path (the reply has
+        // already streamed, so this never slows the response). Only for turns that
+        // did real work (tools or reasoning); a plain answer needs none. Streamed
+        // to the live client + persisted; on failure each item degrades to the
+        // raw-reasoning lead / no header.
+        let turnSummary: string | null = null;
+        let reasoningSummaryList: (string | null)[] | undefined;
+        const wantSummaries =
+          !interrupted &&
+          !!reply &&
+          (acc.toolCalls.length > 0 || reasoningBursts.length > 0);
+        if (wantSummaries) {
+          const { turn, steps } = await summarizeTurnAndSteps({
+            provider: prepared.agentConfig.provider,
+            model: prepared.agentConfig.model,
+            providers: prepared.providers,
+            authCtx,
+            userMessage: message,
+            reply,
+            steps: reasoningBursts,
+          });
+          turnSummary = turn;
+          if (steps.length) {
+            const byIndex: (string | null)[] = [];
+            for (const s of steps) byIndex[s.index] = s.summary;
+            reasoningSummaryList = Array.from(byIndex, (s) => s ?? null);
+          }
+          if (!clientGone) {
+            if (turnSummary)
+              writer.write({
+                type: 'data-turn-summary',
+                data: { text: turnSummary },
+                transient: true,
+              });
+            if (reasoningSummaryList)
+              writer.write({
+                type: 'data-reasoning-summaries',
+                data: { summaries: reasoningSummaryList },
+                transient: true,
+              });
+          }
+        }
+
         // Persistence OFF the critical path. Mastra persists the turn's parts
         // natively as it saves the row; persistTurn now only reconciles the
-        // thread binding, any user-message attachments, the title, and the native
-        // message id. We never block `finish` on it, but we never drop it (errors
-        // are logged, not swallowed).
+        // thread binding, any user-message attachments, the per-step summaries,
+        // the title, and the native message id. We never block `finish` on it,
+        // but we never drop it (errors are logged, not swallowed).
         const persistPromise = persistTurn({
           models,
           prepared,
           reply,
+          reasoningSummaries: reasoningSummaryList,
+          turnSummary: turnSummary ?? undefined,
           // Mastra's assigned id for this turn's assistant row, captured off the
           // stream's `start` chunk — the id the client rates without a reload.
           assistantMessageId: acc.messageId,

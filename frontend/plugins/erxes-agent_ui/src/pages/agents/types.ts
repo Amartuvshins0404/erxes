@@ -10,6 +10,7 @@ export interface IMastraAgent {
   allowedTools?: string[] | null;
   destructiveOps?: 'allow' | 'ask' | null;
   memoryEnabled?: boolean | null;
+  debug?: boolean | null;
   maxSteps?: number | null;
   temperature?: number | null;
   isEnabled?: boolean | null;

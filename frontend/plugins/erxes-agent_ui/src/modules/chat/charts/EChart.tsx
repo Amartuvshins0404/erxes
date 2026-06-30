@@ -15,6 +15,7 @@ import { IconChevronLeft } from '@tabler/icons-react';
 import { CHART_FONT, useAppChartColors } from './chartColors';
 import { chartSpecToEChartsOption } from './chartSpecToEChartsOption';
 import type { SingleBarRenderHints } from './chartSpecToEChartsOption';
+import { DrilldownTable } from './DrilldownTable';
 import type { ChartSpec, DrilldownSpec } from './types';
 
 export interface EChartHandle {
@@ -211,11 +212,20 @@ export const EChart = forwardRef<EChartHandle, EChartProps>(function EChart(
 
   const handleClick = useCallback(
     (params: { name?: string; componentType?: string }) => {
+      // Every data point is drillable — bars, single-bar series, and pie/donut
+      // slices all reach here. We never bail on a missing sub-spec; a point with
+      // no sub-data drills into an empty-state table instead of ignoring the click.
       if (params.componentType !== 'series') return;
       const label = params.name;
       if (!label) return;
-      const sub = activeSpec.drilldowns?.[label];
-      if (!sub) return;
+      const sub: DrilldownSpec = (activeSpec as ChartSpec).drilldowns?.[label] ?? {
+        chartType: 'bar',
+        title: label,
+        series: activeSpec.series.length
+          ? [activeSpec.series[0]]
+          : [{ key: 'value', label: 'Value' }],
+        data: [],
+      };
       animateTransition({ type: 'DRILL_IN', sub }, true);
     },
     [activeSpec, animateTransition],
@@ -249,6 +259,12 @@ export const EChart = forwardRef<EChartHandle, EChartProps>(function EChart(
 
   const inDrilldown = history.length > 0;
   const parentTitle = history[history.length - 1]?.title;
+
+  // Drilling into any data point lists its individual items, which read far
+  // better as a table than a chart. Every drilldown level therefore renders as
+  // a table (empty levels show a "No data available" state); the top-level
+  // parent keeps its chart.
+  const showTable = inDrilldown;
   return (
     <div style={{ width: '100%', height, display: 'flex', flexDirection: 'column' }}>
       {inDrilldown ? (
@@ -296,17 +312,21 @@ export const EChart = forwardRef<EChartHandle, EChartProps>(function EChart(
         style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
       >
         <div style={{ flex: 1, minHeight: 0 }}>
-          <ReactECharts
-            key={specKey}
-            option={option}
-            notMerge={false}
-            lazyUpdate
-            className={className}
-            style={{ width: '100%', height: '100%', borderRadius: 8 }}
-            opts={{ renderer: 'canvas' }}
-            onChartReady={(instance: EChartsType) => { instanceRef.current = instance; }}
-            onEvents={{ click: handleClick, legendselectchanged: handleLegendChange }}
-          />
+          {showTable ? (
+            <DrilldownTable spec={activeSpec} colors={colors} />
+          ) : (
+            <ReactECharts
+              key={specKey}
+              option={option}
+              notMerge={false}
+              lazyUpdate
+              className={className}
+              style={{ width: '100%', height: '100%', borderRadius: 8 }}
+              opts={{ renderer: 'canvas' }}
+              onChartReady={(instance: EChartsType) => { instanceRef.current = instance; }}
+              onEvents={{ click: handleClick, legendselectchanged: handleLegendChange }}
+            />
+          )}
         </div>
       </div>
     </div>

@@ -92,9 +92,6 @@ function wrapLabel(text: string, maxChars: number): string {
   return `${firstLine}\n${truncateLabel(words.slice(i).join(' '), maxChars)}`;
 }
 
-const hasDrilldown = (spec: ChartSpec, label: string) =>
-  !!(spec.drilldowns && label in spec.drilldowns);
-
 const drillEmphasis = (color: string, horizontal: boolean) => ({
   shadowBlur: 22,
   shadowColor: fade(color, 0.65),
@@ -234,10 +231,13 @@ function cartesian(spec: ChartSpec, c: ChartThemeColors, containerWidth = 360, h
         const data = rawLabels.map((_l, di) => {
           if (di !== barIdx) return null;
           const v = rawValues[di];
-          const base = { name: rawLabel, value: v };
-          return hasDrilldown(spec, rawLabel)
-            ? { ...base, cursor: 'pointer', emphasis: { itemStyle: drillEmphasis(color, horizontal) } }
-            : base;
+          // Every bar drills in, so every bar gets the pointer + emphasis affordance.
+          return {
+            name: rawLabel,
+            value: v,
+            cursor: 'pointer',
+            emphasis: { itemStyle: drillEmphasis(color, horizontal) },
+          };
         });
 
         return {
@@ -286,10 +286,9 @@ function cartesian(spec: ChartSpec, c: ChartThemeColors, containerWidth = 360, h
           if (stacked && topSeriesAt[i] === index) {
             item.itemStyle = { borderRadius: horizontal ? [0, 6, 6, 0] : [6, 6, 0, 0] };
           }
-          if (hasDrilldown(spec, lbl)) {
-            item.cursor = 'pointer';
-            item.emphasis = { itemStyle: drillEmphasis(color, horizontal) };
-          }
+          // Every bar drills in.
+          item.cursor = 'pointer';
+          item.emphasis = { itemStyle: drillEmphasis(color, horizontal) };
           return item;
         });
 
@@ -417,17 +416,15 @@ function pie(spec: ChartSpec, c: ChartThemeColors): EChartsOption {
   const pal     = chartPalette(c.isDark);
 
   const data = spec.data.map((row, index) => {
-    const lbl      = String(row['label'] ?? '');
-    const clickable = hasDrilldown(spec, lbl);
-    const color     = pal[index % pal.length];
+    const lbl   = String(row['label'] ?? '');
+    const color = pal[index % pal.length];
+    // Every slice drills in, so every slice gets the pointer + emphasis affordance.
     return {
       name: lbl,
       value: key ? Number((row as Record<string, unknown>)[key]) || 0 : 0,
       itemStyle: { color },
-      emphasis: clickable
-        ? { scaleSize: 10, itemStyle: { shadowBlur: 16, shadowColor: fade(color, 0.55) } }
-        : { scaleSize: 6,  itemStyle: { shadowBlur:  8, shadowColor: fade(color, 0.35) } },
-      ...(clickable ? { cursor: 'pointer' } : {}),
+      cursor: 'pointer',
+      emphasis: { scaleSize: 10, itemStyle: { shadowBlur: 16, shadowColor: fade(color, 0.55) } },
     };
   });
 

@@ -131,36 +131,51 @@ export function isFullUrl(value: string): boolean {
   return /^https?:\/\//i.test(value);
 }
 
-/** Download an attachment through core's /read-file (or directly for URLs). */
+/**
+ * Download an attachment by its storage KEY through core's internal /read-file
+ * endpoint. The target URL is server-built and the key is encoded into the
+ * query string, so this is a trusted internal fetch — it deliberately does NOT
+ * go through safeFetch.
+ *
+ * SECURITY: `key` is treated strictly as a storage key, NEVER as a URL. A
+ * full http(s) URL here would let a model-/attacker-supplied value (e.g.
+ * `http://169.254.169.254/...`) reach a raw, unguarded fetch (SSRF). Any
+ * user-supplied full URL must instead be routed through fetchRemoteFile, which
+ * applies the SSRF guard. We reject full URLs outright as defence in depth.
+ */
 export async function fetchAttachmentBuffer(params: {
   erxesApiUrl: string;
-  keyOrUrl: string;
+  key: string;
   name?: string;
 }): Promise<{ buffer: Buffer; contentType: string }> {
-  const { erxesApiUrl, keyOrUrl, name } = params;
+  const { erxesApiUrl, key, name } = params;
 
-  const target = isFullUrl(keyOrUrl)
-    ? keyOrUrl
-    : `${(erxesApiUrl || 'http://localhost:4000').replace(/\/$/, '')}/read-file?key=${encodeURIComponent(keyOrUrl)}&inline=true`;
+  if (isFullUrl(key)) {
+    throw new ExpectedError(
+      `Refusing to read "${name || key}" by key: a full URL is not a storage key. Use the url parameter (SSRF-guarded) for remote files.`,
+    );
+  }
+
+  const target = `${(erxesApiUrl || 'http://localhost:4000').replace(/\/$/, '')}/read-file?key=${encodeURIComponent(key)}&inline=true`;
 
   const res = await fetch(target, { signal: AbortSignal.timeout(30_000) });
   if (!res.ok) {
     throw new Error(
-      `Could not read file "${name || keyOrUrl}" from storage (HTTP ${res.status})`,
+      `Could not read file "${name || key}" from storage (HTTP ${res.status})`,
     );
   }
 
   const lenHeader = Number(res.headers.get('content-length') || 0);
   if (lenHeader > MAX_ATTACHMENT_BYTES) {
     throw new ExpectedError(
-      `File "${name || keyOrUrl}" is too large to read (max 20MB)`,
+      `File "${name || key}" is too large to read (max 20MB)`,
     );
   }
 
   const buffer = Buffer.from(await res.arrayBuffer());
   if (buffer.length > MAX_ATTACHMENT_BYTES) {
     throw new ExpectedError(
-      `File "${name || keyOrUrl}" is too large to read (max 20MB)`,
+      `File "${name || key}" is too large to read (max 20MB)`,
     );
   }
 

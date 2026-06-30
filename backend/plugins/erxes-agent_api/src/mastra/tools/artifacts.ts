@@ -44,6 +44,11 @@ export const documentArtifactSchema = z.object({
   // True when fileKey is an inline data: URL rather than a storage key.
   inline: z.boolean().optional(),
   size: z.number().optional(),
+  // Ordered slide-image refs (pptx only). Each entry is resolved EXACTLY like
+  // `fileKey`: a storage key (read via core's /read-file) OR an inline data:/http
+  // URL. Drives the Preview + Present panel. Backward compatible (optional).
+  slides: z.array(z.string()).optional(),
+  slideCount: z.number().optional(),
 });
 
 export const diagramArtifactSchema = z.object({

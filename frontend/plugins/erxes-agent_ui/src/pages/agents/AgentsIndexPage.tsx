@@ -1,21 +1,26 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { ApolloCache, useMutation, useQuery } from '@apollo/client';
 import { ColumnDef, Row } from '@tanstack/react-table';
 import {
+  Icon,
   IconPlus,
   IconRobot,
   IconAlignLeft,
+  IconBuilding,
+  IconBuildingCommunity,
   IconCpu,
   IconTool,
   IconCalendar,
+  IconLock,
   IconPencil,
   IconMessageCircle,
   IconEye,
   IconTrash,
+  IconUsersGroup,
+  IconWorld,
 } from '@tabler/icons-react';
 import {
-  Badge,
   Button,
   CommandBar,
   Command,
@@ -33,10 +38,15 @@ import {
   AGENT_FORM_UNITS,
 } from '~/graphql/queries';
 import {
+  IconBadge,
+  IdentityCell,
   RowActionsMenu,
+  SortableHead,
   ToggleDeleteMenuItems,
   enabledStatusColumn,
 } from '~/components/RecordTableShared';
+import { GroupByConfig } from '~/components/GroupedRowList';
+import { SortState, SortValue, useTableSort } from '~/components/useTableSort';
 import { PermissionButton } from '~/components/PermissionButton';
 import { ResourceIndexLayout } from '~/components/ResourceIndexLayout';
 import { SplitBadge } from '~/components/SplitBadge';
@@ -217,34 +227,69 @@ const VISIBILITY_META = {
   private:    { label: 'Private',    variant: 'secondary' },
 } as const;
 
+const VISIBILITY_ICONS: Record<keyof typeof VISIBILITY_META, Icon> = {
+  org: IconWorld,
+  team: IconBuildingCommunity,
+  department: IconBuilding,
+  unit: IconUsersGroup,
+  private: IconLock,
+};
+
+// Groups the list into collapsible sections by organization visibility, in
+// broad→narrow order (Org-wide first, Private last). Reuses VISIBILITY_META so
+// the section labels never drift from the visibility column's labels.
+const VISIBILITY_GROUP: GroupByConfig<IAgent> = {
+  getKey: (agent) => agent.visibility ?? 'private',
+  sections: (
+    Object.keys(VISIBILITY_META) as (keyof typeof VISIBILITY_META)[]
+  ).map((key) => ({
+    key,
+    label: VISIBILITY_META[key].label,
+    icon: VISIBILITY_ICONS[key],
+    variant: VISIBILITY_META[key].variant,
+  })),
+};
+
 // ─── Column builders ──────────────────────────────────────────────────────────
 
 const buildBaseColumns = (
   scopeNames: Record<string, string>,
+  sort: SortState,
+  onSort: (id: string) => void,
 ): ColumnDef<IAgent>[] => [
   {
     id: 'name',
     accessorKey: 'name',
-    header: () => <RecordTable.InlineHead icon={IconAlignLeft} label="Agent" />,
+    header: () => (
+      <SortableHead
+        icon={IconAlignLeft}
+        label="Agent"
+        columnId="name"
+        sort={sort}
+        onSort={onSort}
+      />
+    ),
     cell: ({ row }) => {
       const { _id, name, agentId, description } = row.original;
       return (
-        <RecordTableInlineCell>
-          <Link
-            to={`/settings/erxes-agent/agents/edit/${_id}`}
-            className="font-medium hover:underline cursor-pointer"
-          >
-            {name}
-          </Link>
-          <div className="font-mono text-xs text-muted-foreground">
-            {agentId}
-          </div>
-          {description && (
-            <div className="text-xs text-muted-foreground line-clamp-1">
-              {description}
-            </div>
-          )}
-        </RecordTableInlineCell>
+        <IdentityCell
+          icon={IconRobot}
+          tone="muted"
+          name={
+            <Link
+              to={`/settings/erxes-agent/agents/edit/${_id}`}
+              className="font-medium hover:underline cursor-pointer"
+            >
+              {name}
+            </Link>
+          }
+          sub={
+            <>
+              <span className="font-mono">{agentId}</span>
+              {description ? ` · ${description}` : ''}
+            </>
+          }
+        />
       );
     },
     size: 260,
@@ -252,7 +297,15 @@ const buildBaseColumns = (
   {
     id: 'model',
     accessorKey: 'model',
-    header: () => <RecordTable.InlineHead icon={IconCpu} label="Model" />,
+    header: () => (
+      <SortableHead
+        icon={IconCpu}
+        label="Model"
+        columnId="model"
+        sort={sort}
+        onSort={onSort}
+      />
+    ),
     cell: ({ row }) => {
       const { provider, model } = row.original;
       return (
@@ -277,13 +330,15 @@ const buildBaseColumns = (
       return (
         <RecordTableInlineCell>
           {isRestricted ? (
-            <Badge variant="secondary">
+            <IconBadge icon={IconTool} variant="secondary">
               {count > 0
                 ? `${count} rule${count !== 1 ? 's' : ''}`
                 : 'No tools'}
-            </Badge>
+            </IconBadge>
           ) : (
-            <Badge variant="success">All tools</Badge>
+            <IconBadge icon={IconTool} variant="success">
+              All tools
+            </IconBadge>
           )}
         </RecordTableInlineCell>
       );
@@ -313,12 +368,18 @@ const buildBaseColumns = (
     },
     size: 160,
   },
-  enabledStatusColumn<IAgent>(),
+  enabledStatusColumn<IAgent>({ sort, onSort }),
   {
     id: 'createdAt',
     accessorKey: 'createdAt',
     header: () => (
-      <RecordTable.InlineHead icon={IconCalendar} label="Created" />
+      <SortableHead
+        icon={IconCalendar}
+        label="Created"
+        columnId="createdAt"
+        sort={sort}
+        onSort={onSort}
+      />
     ),
     cell: ({ cell }) => (
       <RelativeDateDisplay value={cell.getValue() as string} asChild>
@@ -333,6 +394,8 @@ const buildBaseColumns = (
 
 const buildColumns = (
   scopeNames: Record<string, string>,
+  sort: SortState,
+  onSort: (id: string) => void,
 ): ColumnDef<IAgent>[] => [
   {
     id: 'more',
@@ -340,7 +403,7 @@ const buildColumns = (
     size: 33,
   },
   RecordTable.checkboxColumn as ColumnDef<IAgent>,
-  ...buildBaseColumns(scopeNames),
+  ...buildBaseColumns(scopeNames, sort, onSort),
 ];
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -368,7 +431,32 @@ export const AgentsIndexPage = () => {
     return map;
   }, [branchData, deptData, unitData]);
 
-  const columns = useMemo(() => buildColumns(scopeNames), [scopeNames]);
+  // Client-side sort over loaded rows. The agent list is offset-paginated, so
+  // this orders what's currently loaded (more pages append on scroll).
+  const getSortValue = useCallback(
+    (a: IAgent, id: string): SortValue => {
+      switch (id) {
+        case 'name':
+          return a.name;
+        case 'model':
+          return `${a.provider} ${a.model}`;
+        case 'status':
+          return a.isEnabled;
+        case 'createdAt':
+          return a.createdAt;
+        default:
+          return undefined;
+      }
+    },
+    [],
+  );
+
+  const { sort, toggle, sorted } = useTableSort(agentsList, getSortValue);
+
+  const columns = useMemo(
+    () => buildColumns(scopeNames, sort, toggle),
+    [scopeNames, sort, toggle],
+  );
 
   return (
     <ResourceIndexLayout<IAgent>
@@ -377,11 +465,12 @@ export const AgentsIndexPage = () => {
       rootPath="/settings/erxes-agent/agents"
       sessionKey="erxes_agent_agents"
       columns={columns}
-      data={agentsList}
+      data={sorted}
       loading={loading}
       skeletonRows={20}
       pageInfo={pageInfo}
       onFetchMore={handleFetchMore}
+      groupBy={VISIBILITY_GROUP}
       commandBar={<AgentBulkDeleteCommandBar />}
       headerExtra={
         <CreateAgentButton>

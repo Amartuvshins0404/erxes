@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@apollo/client';
 import { IconBulb, IconRefresh } from '@tabler/icons-react';
 import { Badge, Button } from 'erxes-ui';
 import { MASTRA_LEARNINGS } from '~/graphql/queries';
 import { ResourceIndexLayout } from '~/components/ResourceIndexLayout';
+import { SortValue, useTableSort } from '~/components/useTableSort';
 import { LearningDetailSheet } from './components/LearningDetailSheet';
 import { useLearningColumns } from './hooks/useLearningColumns';
 import { ILearningRow, StatusFilter, STATUS_FILTERS } from './types';
@@ -22,7 +23,36 @@ export const LearningsIndexPage = () => {
   const items: ILearningRow[] = data?.mastraLearnings?.list ?? [];
   const totalCount: number = data?.mastraLearnings?.totalCount ?? items.length;
 
-  const columns = useLearningColumns({ setSelected, refetch });
+  const getSortValue = useCallback(
+    (l: ILearningRow, id: string): SortValue => {
+      switch (id) {
+        case 'statement':
+          return l.statement;
+        case 'type':
+          return l.type;
+        case 'status':
+          return l.status;
+        case 'confidence':
+          return l.confidence;
+        case 'sourceCount':
+          return l.sourceCount;
+        case 'updatedAt':
+          return l.updatedAt;
+        default:
+          return undefined;
+      }
+    },
+    [],
+  );
+
+  const { sort, toggle, sorted } = useTableSort(items, getSortValue);
+
+  const columns = useLearningColumns({
+    setSelected,
+    refetch,
+    sort,
+    onSort: toggle,
+  });
 
   return (
     <>
@@ -32,7 +62,7 @@ export const LearningsIndexPage = () => {
         rootPath="/erxes-agent/learnings"
         sessionKey="erxes_agent_learnings"
         columns={columns}
-        data={items}
+        data={sorted}
         loading={loading}
         skeletonRows={8}
         stickyColumns={['more', 'statement']}

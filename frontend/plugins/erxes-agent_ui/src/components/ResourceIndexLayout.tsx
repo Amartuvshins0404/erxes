@@ -10,6 +10,7 @@ import {
   Separator,
 } from 'erxes-ui';
 import { PageHeader } from 'ui-modules';
+import { GroupByConfig, GroupedRowList } from './GroupedRowList';
 
 interface PageInfo {
   hasPreviousPage: boolean;
@@ -28,6 +29,8 @@ interface ResourceIndexLayoutProps<T> {
   skeletonRows?: number;
   pageInfo?: PageInfo;
   onFetchMore?: () => void;
+  /** When set, rows render in collapsible sections instead of a flat list. */
+  groupBy?: GroupByConfig<T>;
   newButton?: { to: string; label: string };
   empty: {
     icon?: Icon;
@@ -56,6 +59,7 @@ export const ResourceIndexLayout = <T,>({
   skeletonRows = 10,
   pageInfo,
   onFetchMore,
+  groupBy,
   newButton,
   empty,
   headerExtra,
@@ -134,6 +138,8 @@ export const ResourceIndexLayout = <T,>({
                   )}
                   {loading && data.length === 0 ? (
                     <RecordTable.RowSkeleton rows={skeletonRows} />
+                  ) : groupBy ? (
+                    <GroupedRowList<T> groupBy={groupBy} />
                   ) : (
                     <RecordTable.RowList />
                   )}

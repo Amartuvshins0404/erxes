@@ -1,12 +1,15 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { ColumnDef } from '@tanstack/react-table';
 import {
+  Icon,
   IconPlus,
   IconSitemap,
   IconAlignLeft,
   IconBolt,
   IconCalendar,
+  IconClock,
+  IconHandClick,
   IconListNumbers,
   IconPencil,
   IconPlayerPlay,
@@ -14,7 +17,6 @@ import {
   IconVersions,
 } from '@tabler/icons-react';
 import {
-  Badge,
   Button,
   Command,
   RecordTable,
@@ -24,15 +26,52 @@ import {
   useConfirm,
 } from 'erxes-ui';
 import {
+  IconBadge,
+  IdentityCell,
   RowActionsMenu,
+  SortableHead,
   ToggleDeleteMenuItems,
+  Tone,
   enabledStatusColumn,
 } from '~/components/RecordTableShared';
 import { ResourceIndexLayout } from '~/components/ResourceIndexLayout';
+import { SortState, SortValue, useTableSort } from '~/components/useTableSort';
 import { stepCount, triggerLabel } from './shared';
 import { useWorkflows } from './hooks/useWorkflows';
 import { useWorkflowActions } from './hooks/useWorkflowMutations';
-import { IWorkflow } from './types';
+import { IWorkflow, IWorkflowDefinition } from './types';
+
+type BadgeVariant =
+  | 'default'
+  | 'secondary'
+  | 'success'
+  | 'warning'
+  | 'destructive'
+  | 'info';
+
+// ─── Trigger identity ───────────────────────────────────────────────────────────
+
+// Each trigger kind gets a glyph + tone (for the identity tile) and a badge
+// variant, so the list reads by trigger type at a glance.
+const TRIGGER_META: Record<
+  string,
+  { icon: Icon; tone: Tone; variant: BadgeVariant }
+> = {
+  manual: { icon: IconHandClick, tone: 'muted', variant: 'secondary' },
+  automation: { icon: IconBolt, tone: 'info', variant: 'info' },
+  schedule: { icon: IconClock, tone: 'warning', variant: 'warning' },
+};
+
+const triggerMeta = (definition?: IWorkflowDefinition) => {
+  const type = (definition?.trigger?.type || 'manual').toLowerCase();
+  return (
+    TRIGGER_META[type] ?? {
+      icon: IconBolt,
+      tone: 'primary' as Tone,
+      variant: 'default' as BadgeVariant,
+    }
+  );
+};
 
 // ─── More menu cell ───────────────────────────────────────────────────────────
 
@@ -114,53 +153,83 @@ const WorkflowMoreCell = ({
 
 // ─── Columns ──────────────────────────────────────────────────────────────────
 
-const baseColumns: ColumnDef<IWorkflow>[] = [
+const buildBaseColumns = (
+  sort: SortState,
+  onSort: (id: string) => void,
+): ColumnDef<IWorkflow>[] => [
   {
     id: 'name',
     accessorKey: 'name',
     header: () => (
-      <RecordTable.InlineHead icon={IconAlignLeft} label="Workflow" />
+      <SortableHead
+        icon={IconAlignLeft}
+        label="Workflow"
+        columnId="name"
+        sort={sort}
+        onSort={onSort}
+      />
     ),
     cell: ({ row }) => {
-      const { _id, name, description } = row.original;
+      const { _id, name, description, definition } = row.original;
+      const meta = triggerMeta(definition);
       return (
-        <RecordTableInlineCell>
-          <Link
-            to={`/erxes-agent/workflows/${_id}`}
-            className="font-medium hover:underline cursor-pointer"
-          >
-            {name}
-          </Link>
-          {description && (
-            <div className="text-xs text-muted-foreground line-clamp-1">
-              {description}
-            </div>
-          )}
-        </RecordTableInlineCell>
+        <IdentityCell
+          icon={meta.icon}
+          tone={meta.tone}
+          name={
+            <Link
+              to={`/erxes-agent/workflows/${_id}`}
+              className="font-medium hover:underline cursor-pointer"
+            >
+              {name}
+            </Link>
+          }
+          sub={description}
+        />
       );
     },
     size: 280,
   },
   {
     id: 'trigger',
-    header: () => <RecordTable.InlineHead icon={IconBolt} label="Trigger" />,
-    cell: ({ row }) => (
-      <RecordTableInlineCell>
-        <Badge variant="secondary">
-          {triggerLabel(row.original.definition)}
-        </Badge>
-      </RecordTableInlineCell>
+    header: () => (
+      <SortableHead
+        icon={IconBolt}
+        label="Trigger"
+        columnId="trigger"
+        sort={sort}
+        onSort={onSort}
+      />
     ),
+    cell: ({ row }) => {
+      const meta = triggerMeta(row.original.definition);
+      return (
+        <RecordTableInlineCell>
+          <IconBadge icon={meta.icon} variant={meta.variant}>
+            {triggerLabel(row.original.definition)}
+          </IconBadge>
+        </RecordTableInlineCell>
+      );
+    },
     size: 160,
   },
   {
     id: 'steps',
     header: () => (
-      <RecordTable.InlineHead icon={IconListNumbers} label="Steps" />
+      <SortableHead
+        icon={IconListNumbers}
+        label="Steps"
+        columnId="steps"
+        sort={sort}
+        onSort={onSort}
+      />
     ),
     cell: ({ row }) => (
       <RecordTableInlineCell>
-        <span className="text-sm">{stepCount(row.original.definition)}</span>
+        <span className="flex items-center gap-1 text-sm tabular-nums">
+          <IconListNumbers className="size-3.5 text-muted-foreground" />
+          {stepCount(row.original.definition)}
+        </span>
       </RecordTableInlineCell>
     ),
     size: 80,
@@ -169,21 +238,35 @@ const baseColumns: ColumnDef<IWorkflow>[] = [
     id: 'version',
     accessorKey: 'version',
     header: () => (
-      <RecordTable.InlineHead icon={IconVersions} label="Version" />
+      <SortableHead
+        icon={IconVersions}
+        label="Version"
+        columnId="version"
+        sort={sort}
+        onSort={onSort}
+      />
     ),
     cell: ({ cell }) => (
       <RecordTableInlineCell>
-        <span className="font-mono text-xs">v{cell.getValue() as number}</span>
+        <span className="font-mono text-xs text-muted-foreground">
+          v{cell.getValue() as number}
+        </span>
       </RecordTableInlineCell>
     ),
     size: 80,
   },
-  enabledStatusColumn<IWorkflow>(),
+  enabledStatusColumn<IWorkflow>({ sort, onSort }),
   {
     id: 'updatedAt',
     accessorKey: 'updatedAt',
     header: () => (
-      <RecordTable.InlineHead icon={IconCalendar} label="Updated" />
+      <SortableHead
+        icon={IconCalendar}
+        label="Updated"
+        columnId="updatedAt"
+        sort={sort}
+        onSort={onSort}
+      />
     ),
     cell: ({ cell }) => (
       <RelativeDateDisplay value={cell.getValue() as string} asChild>
@@ -201,6 +284,30 @@ const baseColumns: ColumnDef<IWorkflow>[] = [
 export const WorkflowsIndexPage = () => {
   const { workflows, loading, refetch } = useWorkflows();
 
+  const getSortValue = useCallback(
+    (w: IWorkflow, id: string): SortValue => {
+      switch (id) {
+        case 'name':
+          return w.name;
+        case 'trigger':
+          return triggerLabel(w.definition);
+        case 'steps':
+          return stepCount(w.definition);
+        case 'version':
+          return w.version;
+        case 'status':
+          return w.isEnabled;
+        case 'updatedAt':
+          return w.updatedAt;
+        default:
+          return undefined;
+      }
+    },
+    [],
+  );
+
+  const { sort, toggle, sorted } = useTableSort(workflows, getSortValue);
+
   const columns = useMemo<ColumnDef<IWorkflow>[]>(
     () => [
       {
@@ -211,9 +318,9 @@ export const WorkflowsIndexPage = () => {
         size: 33,
       },
       RecordTable.checkboxColumn as ColumnDef<IWorkflow>,
-      ...baseColumns,
+      ...buildBaseColumns(sort, toggle),
     ],
-    [refetch],
+    [refetch, sort, toggle],
   );
 
   return (
@@ -223,7 +330,7 @@ export const WorkflowsIndexPage = () => {
       rootPath="/erxes-agent/workflows"
       sessionKey="erxes_agent_workflows"
       columns={columns}
-      data={workflows}
+      data={sorted}
       loading={loading}
       newButton={{ to: '/erxes-agent/workflows/new', label: 'New Workflow' }}
       empty={{

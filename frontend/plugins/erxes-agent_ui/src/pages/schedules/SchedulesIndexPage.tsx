@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useMutation } from '@apollo/client';
 import { ColumnDef } from '@tanstack/react-table';
@@ -17,8 +17,8 @@ import {
   Badge,
   Button,
   Command,
-  RecordTable,
   RecordTableInlineCell,
+  RecordTable,
   RelativeDateDisplay,
   Tooltip,
   toast,
@@ -31,11 +31,15 @@ import {
 } from '~/graphql/mutations';
 import { toastError } from '~/lib/mutationToast';
 import {
+  IconBadge,
+  IdentityCell,
   RowActionsMenu,
+  SortableHead,
   ToggleDeleteMenuItems,
   enabledStatusColumn,
 } from '~/components/RecordTableShared';
 import { ResourceIndexLayout } from '~/components/ResourceIndexLayout';
+import { SortState, SortValue, useTableSort } from '~/components/useTableSort';
 import { useSchedules } from './hooks/useSchedules';
 import { ISchedule, IScheduleRunNowResponse } from './types';
 
@@ -202,29 +206,38 @@ const LastRunCell = ({ schedule }: { schedule: ISchedule }) => {
   );
 };
 
-const baseColumns: ColumnDef<ISchedule>[] = [
+const buildBaseColumns = (
+  sort: SortState,
+  onSort: (id: string) => void,
+): ColumnDef<ISchedule>[] => [
   {
     id: 'name',
     accessorKey: 'name',
     header: () => (
-      <RecordTable.InlineHead icon={IconAlignLeft} label="Schedule" />
+      <SortableHead
+        icon={IconAlignLeft}
+        label="Schedule"
+        columnId="name"
+        sort={sort}
+        onSort={onSort}
+      />
     ),
     cell: ({ row }) => {
       const { _id, name, description } = row.original;
       return (
-        <RecordTableInlineCell>
-          <Link
-            to={`/erxes-agent/schedules/edit/${_id}`}
-            className="font-medium hover:underline cursor-pointer"
-          >
-            {name}
-          </Link>
-          {description && (
-            <div className="text-xs text-muted-foreground line-clamp-1">
-              {description}
-            </div>
-          )}
-        </RecordTableInlineCell>
+        <IdentityCell
+          icon={IconClock}
+          tone="info"
+          name={
+            <Link
+              to={`/erxes-agent/schedules/edit/${_id}`}
+              className="font-medium hover:underline cursor-pointer"
+            >
+              {name}
+            </Link>
+          }
+          sub={description}
+        />
       );
     },
     size: 260,
@@ -232,12 +245,20 @@ const baseColumns: ColumnDef<ISchedule>[] = [
   {
     id: 'agent',
     accessorKey: 'agentId',
-    header: () => <RecordTable.InlineHead icon={IconRobot} label="Agent" />,
-    cell: ({ cell }) => (
+    header: () => (
+      <SortableHead
+        icon={IconRobot}
+        label="Agent"
+        columnId="agent"
+        sort={sort}
+        onSort={onSort}
+      />
+    ),
+    cell: ({ row }) => (
       <RecordTableInlineCell>
-        <Badge variant="secondary" className="font-mono">
-          {cell.getValue() as string}
-        </Badge>
+        <IconBadge icon={IconRobot} variant="secondary" className="font-mono">
+          {row.original.agentId}
+        </IconBadge>
       </RecordTableInlineCell>
     ),
     size: 160,
@@ -245,7 +266,15 @@ const baseColumns: ColumnDef<ISchedule>[] = [
   {
     id: 'cron',
     accessorKey: 'cron',
-    header: () => <RecordTable.InlineHead icon={IconClock} label="Cron" />,
+    header: () => (
+      <SortableHead
+        icon={IconClock}
+        label="Cron"
+        columnId="cron"
+        sort={sort}
+        onSort={onSort}
+      />
+    ),
     cell: ({ row }) => (
       <RecordTableInlineCell>
         <span className="font-mono text-xs">{row.original.cron}</span>
@@ -258,11 +287,17 @@ const baseColumns: ColumnDef<ISchedule>[] = [
     ),
     size: 150,
   },
-  enabledStatusColumn<ISchedule>(),
+  enabledStatusColumn<ISchedule>({ sort, onSort }),
   {
     id: 'lastRun',
     header: () => (
-      <RecordTable.InlineHead icon={IconHistory} label="Last run" />
+      <SortableHead
+        icon={IconHistory}
+        label="Last run"
+        columnId="lastRun"
+        sort={sort}
+        onSort={onSort}
+      />
     ),
     cell: ({ row }) => <LastRunCell schedule={row.original} />,
     size: 180,
@@ -270,7 +305,15 @@ const baseColumns: ColumnDef<ISchedule>[] = [
   {
     id: 'runCount',
     accessorKey: 'runCount',
-    header: () => <RecordTable.InlineHead icon={IconPlayerPlay} label="Runs" />,
+    header: () => (
+      <SortableHead
+        icon={IconPlayerPlay}
+        label="Runs"
+        columnId="runCount"
+        sort={sort}
+        onSort={onSort}
+      />
+    ),
     cell: ({ cell }) => (
       <RecordTableInlineCell>
         <span className="text-sm tabular-nums">
@@ -285,7 +328,11 @@ const baseColumns: ColumnDef<ISchedule>[] = [
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 /** The full column set, with the actions column bound to this list's refetch. */
-const buildColumns = (refetch: () => void): ColumnDef<ISchedule>[] => [
+const buildColumns = (
+  refetch: () => void,
+  sort: SortState,
+  onSort: (id: string) => void,
+): ColumnDef<ISchedule>[] => [
   {
     id: 'more',
     cell: ({ row }) => (
@@ -294,14 +341,41 @@ const buildColumns = (refetch: () => void): ColumnDef<ISchedule>[] => [
     size: 33,
   },
   RecordTable.checkboxColumn as ColumnDef<ISchedule>,
-  ...baseColumns,
+  ...buildBaseColumns(sort, onSort),
 ];
 
 /** Record table of all agent schedules with row actions. */
 export const SchedulesIndexPage = () => {
   const { schedules, loading, refetch } = useSchedules();
 
-  const columns = useMemo(() => buildColumns(refetch), [refetch]);
+  const getSortValue = useCallback(
+    (s: ISchedule, id: string): SortValue => {
+      switch (id) {
+        case 'name':
+          return s.name;
+        case 'agent':
+          return s.agentId;
+        case 'cron':
+          return s.cron;
+        case 'status':
+          return s.isEnabled;
+        case 'lastRun':
+          return s.lastRunAt;
+        case 'runCount':
+          return s.runCount;
+        default:
+          return undefined;
+      }
+    },
+    [],
+  );
+
+  const { sort, toggle, sorted } = useTableSort(schedules, getSortValue);
+
+  const columns = useMemo(
+    () => buildColumns(refetch, sort, toggle),
+    [refetch, sort, toggle],
+  );
 
   return (
     <ResourceIndexLayout<ISchedule>
@@ -310,7 +384,7 @@ export const SchedulesIndexPage = () => {
       rootPath="/erxes-agent/schedules"
       sessionKey="erxes_agent_schedules"
       columns={columns}
-      data={schedules}
+      data={sorted}
       loading={loading}
       newButton={{ to: '/erxes-agent/schedules/new', label: 'New Schedule' }}
       empty={{

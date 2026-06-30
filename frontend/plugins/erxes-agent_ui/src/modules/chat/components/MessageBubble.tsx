@@ -1,6 +1,6 @@
 import { memo, type ReactNode } from 'react';
 import { IconBolt, IconPencil, IconRefresh, IconRepeat } from '@tabler/icons-react';
-import { Tooltip } from 'erxes-ui';
+import { cn, Tooltip } from 'erxes-ui';
 import { AgentUIMessage, ChatAttachment } from '~/modules/chat/types';
 import { asToolPart, messageText } from '~/modules/chat/lib/uiParts';
 import { asArtifactPart, type Artifact } from '~/modules/chat/lib/artifacts';
@@ -157,7 +157,12 @@ export const MessageBubble = memo(function MessageBubble({
       <AgentAvatar live={streaming} />
       {/* Hold full width during streaming so the bubble doesn't snap wider
           when the first artifact tool call lands mid-turn. */}
-      <div className={`min-w-0 rounded-2xl rounded-bl-md px-4 py-2.5 shadow-sm ${streaming || artifacts.length > 0 ? 'w-full' : 'w-auto max-w-full'}`}>
+      <div
+        className={cn(
+          'min-w-0 rounded-2xl rounded-bl-md px-4 py-2.5 shadow-sm',
+          streaming || artifacts.length > 0 ? 'w-full' : 'w-auto max-w-full',
+        )}
+      >
         {activeSkills && activeSkills.length > 0 && (
           <div className="flex flex-wrap items-center gap-1 mb-1.5">
             {activeSkills.map((name) => (

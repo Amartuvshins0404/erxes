@@ -1,4 +1,4 @@
-import { ErxesLogoIcon } from 'erxes-ui';
+import { cn, ErxesLogoIcon } from 'erxes-ui';
 
 type MarkSize = 'sm' | 'md' | 'lg';
 
@@ -26,11 +26,14 @@ export const AgentMark = ({
   const s = SIZE[size];
   return (
     <div
-      className={`relative ${s.box} shrink-0 rounded-full border flex items-center justify-center ea-mark ${
-        active ? 'ea-mark-active' : ''
-      } ${className}`}
+      className={cn(
+        'relative shrink-0 rounded-full border flex items-center justify-center ea-mark',
+        s.box,
+        active && 'ea-mark-active',
+        className,
+      )}
     >
-      <ErxesLogoIcon className={`${s.logo} w-auto`} />
+      <ErxesLogoIcon className={cn(s.logo, 'w-auto')} />
       {working && <span className="ea-spin-ring" aria-hidden />}
     </div>
   );

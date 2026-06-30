@@ -1,5 +1,6 @@
 import { memo, useState } from 'react';
 import { IconChevronRight } from '@tabler/icons-react';
+import { cn } from 'erxes-ui';
 
 // A reasoning burst as a timeline-step body — always a single line so the trace
 // only ever grows downward (no auto-expand/auto-collapse, which made the whole
@@ -21,9 +22,10 @@ export const ThinkingSection = memo(function ThinkingSection({
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}
-        className={`ea-trace-row flex w-full items-center gap-2 px-1.5 py-1 text-left text-xs ${
-          live ? '' : 'text-muted-foreground hover:text-foreground'
-        }`}
+        className={cn(
+          'ea-trace-row flex w-full items-center gap-2 px-1.5 py-1 text-left text-xs',
+          !live && 'text-muted-foreground hover:text-foreground',
+        )}
       >
         {live ? (
           <span className="ea-shimmer-text font-medium">Thinking…</span>
@@ -32,9 +34,10 @@ export const ThinkingSection = memo(function ThinkingSection({
         )}
         <span className="flex-1" />
         <IconChevronRight
-          className={`size-3 shrink-0 text-muted-foreground opacity-40 transition-transform duration-200 ${
-            expanded ? 'rotate-90' : ''
-          }`}
+          className={cn(
+            'size-3 shrink-0 text-muted-foreground opacity-40 transition-transform duration-200',
+            expanded && 'rotate-90',
+          )}
         />
       </button>
       {expanded && (

@@ -4,6 +4,7 @@ import {
   IconCheck,
   IconChevronRight,
 } from '@tabler/icons-react';
+import { cn } from 'erxes-ui';
 import { ToolPartView, toolHint } from '~/modules/chat/lib/uiParts';
 import { formatJson } from '~/modules/chat/lib/markdown';
 
@@ -54,9 +55,10 @@ export const ToolCallRow = memo(function ToolCallRow({
           <IconCheck className="size-3.5 shrink-0 text-success" />
         ) : null}
         <IconChevronRight
-          className={`size-3 shrink-0 text-muted-foreground opacity-40 transition-transform duration-200 ${
-            expanded ? 'rotate-90' : ''
-          }`}
+          className={cn(
+            'size-3 shrink-0 text-muted-foreground opacity-40 transition-transform duration-200',
+            expanded && 'rotate-90',
+          )}
         />
       </button>
       {expanded && (

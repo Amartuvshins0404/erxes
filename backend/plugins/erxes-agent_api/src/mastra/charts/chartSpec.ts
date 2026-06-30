@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ExpectedError } from 'erxes-api-shared/utils';
 
 // ---------------------------------------------------------------------------
 // ChartSpec — the single, LLM-friendly chart contract.
@@ -152,7 +153,7 @@ function sanitizeBase(input: DrilldownSpec): DrilldownSpec | null {
  */
 export function sanitizeChartSpec(input: ChartSpec): ChartSpec {
   const base = sanitizeBase(input);
-  if (!base) throw new Error('Chart has no valid series.');
+  if (!base) throw new ExpectedError('Chart has no valid series.');
 
   const drilldowns: ChartSpec['drilldowns'] = {};
   for (const [label, sub] of Object.entries(input.drilldowns ?? {})) {

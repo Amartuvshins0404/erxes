@@ -8,7 +8,8 @@ import { Button } from 'erxes-ui';
 import { EChart, parseChartViz, type ChartSpec } from '~/modules/chat/charts';
 import { CopyButton } from '~/modules/chat/components/CopyButton';
 import { previewStore } from '~/modules/chat/preview/previewStore';
-import { MermaidViewer, sanitizeMermaid } from '~/modules/chat/preview/MermaidViewer';
+import { MermaidViewer } from '~/modules/chat/preview/MermaidViewer';
+import { sanitizeMermaid } from '~/modules/chat/hooks/useMermaidRender';
 import { splitStreamingMarkdown } from '~/modules/chat/lib/markdown';
 
 // Extract the raw text out of a code node's children (string or nested nodes).

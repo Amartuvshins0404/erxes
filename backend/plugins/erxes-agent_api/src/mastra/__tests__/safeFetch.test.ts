@@ -24,16 +24,24 @@ const mockLookup = lookup as unknown as jest.Mock;
 const mockHttps = httpsRequest as unknown as jest.Mock;
 const mockHttp = httpRequest as unknown as jest.Mock;
 
+type FakeRes = EventEmitter & {
+  statusCode?: number;
+  statusMessage?: string;
+  headers: Record<string, string | string[]>;
+};
+type FakeReq = EventEmitter & { end: jest.Mock; destroy: jest.Mock };
+
 /** Queue one fake HTTP(S) response for the next request() call. */
 function queueResponse(
   mock: jest.Mock,
   opts: { status?: number; headers?: Record<string, string>; body?: string },
 ) {
-  mock.mockImplementationOnce((_options: any, cb: (res: any) => void) => {
-    const res: any = new EventEmitter();
-    res.statusCode = opts.status ?? 200;
-    res.statusMessage = 'OK';
-    res.headers = opts.headers ?? {};
+  mock.mockImplementationOnce((_options: unknown, cb: (res: FakeRes) => void) => {
+    const res = Object.assign(new EventEmitter(), {
+      statusCode: opts.status ?? 200,
+      statusMessage: 'OK',
+      headers: opts.headers ?? {},
+    }) as FakeRes;
     process.nextTick(() => {
       cb(res);
       process.nextTick(() => {
@@ -41,9 +49,10 @@ function queueResponse(
         res.emit('end');
       });
     });
-    const req: any = new EventEmitter();
-    req.end = jest.fn();
-    req.destroy = jest.fn();
+    const req = Object.assign(new EventEmitter(), {
+      end: jest.fn(),
+      destroy: jest.fn(),
+    }) as FakeReq;
     return req;
   });
 }

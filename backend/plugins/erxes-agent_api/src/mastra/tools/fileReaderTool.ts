@@ -72,7 +72,7 @@ function stashImage(img: PendingImage): string {
 /** Decode a base64 (or percent-encoded) `data:` URL into bytes + content type. */
 function decodeDataUrl(dataUrl: string): { buffer: Buffer; contentType: string } {
   const m = dataUrl.match(/^data:([^;,]*)(;base64)?,([\s\S]*)$/);
-  if (!m) throw new Error('Malformed data URL');
+  if (!m) throw new ExpectedError('Malformed data URL');
   return {
     contentType: m[1] || 'application/octet-stream',
     buffer: m[2]
@@ -227,7 +227,7 @@ async function readByArtifactId(
   const models = await getModels(subdomain);
   const artifact = await models.MastraArtifact.getByArtifactId(artifactId);
   if (!artifact) {
-    throw new Error(`No artifact found with id "${artifactId}".`);
+    throw new ExpectedError(`No artifact found with id "${artifactId}".`);
   }
 
   // Chart artifacts carry no file — surface their spec as readable JSON.
@@ -298,7 +298,7 @@ export const fileReaderTool = createTool({
     if (url) return readByUrl(url, name);
     if (artifactId) return readByArtifactId(subdomain, artifactId);
     if (key) return readByKey(subdomain, key, name);
-    throw new Error(
+    throw new ExpectedError(
       'Provide a url (public link), an artifactId (a file you generated), or a key (a user attachment).',
     );
   },

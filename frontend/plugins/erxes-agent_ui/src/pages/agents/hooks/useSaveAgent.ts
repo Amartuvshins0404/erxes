@@ -18,13 +18,13 @@ export const useSaveAgent = (id?: string) => {
   const [createAgent, { loading: creating }] = useMutation(MASTRA_AGENT_CREATE, {
     update: cacheUpdate,
     onCompleted,
-    onError: agentMutationError('create'),
+    onError: agentMutationError(),
   });
 
   const [updateAgent, { loading: updating }] = useMutation(MASTRA_AGENT_UPDATE, {
     update: cacheUpdate,
     onCompleted,
-    onError: agentMutationError('edit'),
+    onError: agentMutationError(),
   });
 
   const saveAgent = (doc: AgentFormValues) => {

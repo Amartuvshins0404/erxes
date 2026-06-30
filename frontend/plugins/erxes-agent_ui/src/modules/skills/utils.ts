@@ -1,4 +1,4 @@
-import { Message } from '~/modules/chat/types';
+import type { AgentUIMessage, DbTurnPart } from '~/modules/chat/types';
 import {
   IMastraSkillCreateInput,
   SkillMetadata,
@@ -105,10 +105,12 @@ const isDraftSkillResult = (result: unknown): DraftSkillRef | null => {
 // Scan a thread's messages for the most recent makeSkill tool result that
 // produced a draft skill — the UI surfaces it for review/edit/publish.
 export const findDraftSkillFromMessages = (
-  messages: Message[],
+  messages: AgentUIMessage[],
 ): DraftSkillRef | null => {
   for (let i = messages.length - 1; i >= 0; i -= 1) {
-    const parts = messages[i].parts;
+    // The scan targets the legacy persisted turn-part shape (kind/call); the
+    // live UIMessage parts are read structurally through that lens.
+    const parts = messages[i].parts as unknown as DbTurnPart[] | undefined;
     if (!parts) continue;
     for (let j = parts.length - 1; j >= 0; j -= 1) {
       const part = parts[j];

@@ -16,7 +16,7 @@ export const agentFormSchema = z.object({
   isEnabled: z.boolean(),
   // Visibility is derived automatically by the cascade:
   //   branch only → 'team', branch+dept → 'department', branch+dept+unit → 'unit'
-  visibility: z.enum(['private', 'team', 'department', 'unit', 'org']).default('private'),
+  visibility: z.enum(['private', 'team', 'department', 'unit', 'org']),
   // teamId holds the branch _id for all scoped modes so the edit form can
   // reconstruct which branch was selected without a reverse-lookup.
   teamId: z.string().optional(),

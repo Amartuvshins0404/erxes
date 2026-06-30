@@ -30,6 +30,11 @@ export interface DocumentArtifact {
   fileKey: string;
   inline?: boolean;
   size?: number;
+  // Per-slide image refs for pptx decks (ordered). Each entry follows the SAME
+  // convention as fileKey: a storage key OR an inline data:/http URL — resolve
+  // with resolveStorageRef, exactly like documentUrl resolves fileKey.
+  slides?: string[];
+  slideCount?: number;
 }
 
 export interface DiagramArtifact {
@@ -77,6 +82,9 @@ export const normalizeArtifact = (raw: unknown): Artifact | null => {
   }
 
   if (a.kind === 'document') {
+    const slides = Array.isArray(a.slides)
+      ? a.slides.filter((s): s is string => typeof s === 'string')
+      : undefined;
     return {
       id,
       kind: 'document',
@@ -87,8 +95,26 @@ export const normalizeArtifact = (raw: unknown): Artifact | null => {
       fileKey: String(a.fileKey ?? ''),
       inline: Boolean(a.inline),
       size: typeof a.size === 'number' ? a.size : undefined,
+      slides: slides && slides.length ? slides : undefined,
+      slideCount: typeof a.slideCount === 'number' ? a.slideCount : undefined,
     };
   }
 
   return null;
+};
+
+/**
+ * Resolve a storage ref to a browser URL — the single rule shared by documentUrl
+ * (for fileKey) and the pptx slide deck (for each `slides` entry). A data:/http
+ * ref is returned as-is; anything else is treated as a storage key and read
+ * through core's /read-file. Pure (base passed in) so it is unit-testable.
+ */
+export const resolveStorageRef = (
+  ref: string,
+  apiUrl: string,
+  fileName?: string,
+): string => {
+  if (/^(https?:|data:)/i.test(ref)) return ref;
+  const name = fileName ? `&name=${encodeURIComponent(fileName)}` : '';
+  return `${apiUrl}/read-file?key=${encodeURIComponent(ref)}&inline=true${name}`;
 };

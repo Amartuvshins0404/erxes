@@ -13,6 +13,7 @@ import type { ArtifactGroup } from '~/modules/chat/hooks/useThreadArtifacts';
 import { messageText, type ToolPartView } from '~/modules/chat/lib/uiParts';
 import {
   normalizeArtifact,
+  resolveStorageRef,
   type Artifact,
   type DocumentArtifact,
 } from '~/modules/chat/lib/artifactNormalize';
@@ -114,9 +115,16 @@ export const artifactIcon = (a: Artifact) => {
 
 /** A URL the browser can open/download for a document artifact. */
 export const documentUrl = (artifact: DocumentArtifact): string => {
-  const { fileKey, fileName } = artifact;
-  if (artifact.inline || /^(https?:|data:)/i.test(fileKey)) return fileKey;
-  return `${REACT_APP_API_URL}/read-file?key=${encodeURIComponent(
-    fileKey,
-  )}&inline=true&name=${encodeURIComponent(fileName)}`;
+  if (artifact.inline) return artifact.fileKey;
+  return resolveStorageRef(artifact.fileKey, REACT_APP_API_URL, artifact.fileName);
 };
+
+/**
+ * Browser URLs for a pptx deck's slide images, in order. Each ref resolves the
+ * SAME way as documentUrl resolves fileKey (storage key → /read-file, data:/http
+ * as-is). Empty when the artifact carries no slides.
+ */
+export const slideUrls = (artifact: DocumentArtifact): string[] =>
+  (artifact.slides ?? []).map((ref) =>
+    resolveStorageRef(ref, REACT_APP_API_URL),
+  );

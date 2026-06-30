@@ -2,7 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import { IconDownload, IconLoader2 } from '@tabler/icons-react';
 import { Button } from 'erxes-ui';
 import '@js-preview/excel/lib/index.css';
-import { DocumentArtifact, documentUrl } from '~/modules/chat/lib/artifacts';
+import {
+  DocumentArtifact,
+  documentUrl,
+  slideUrls,
+} from '~/modules/chat/lib/artifacts';
 
 // Inline document rendering in the Preview panel — fully client-side (no
 // external service, no CDN), so private files never leave the instance:
@@ -24,7 +28,37 @@ interface Disposable {
   dispose?: () => void;
 }
 
+// A generated pptx deck arrives as per-slide PNGs (artifact.slides). Render them
+// directly as framed cards — no OOXML parsing, pixel-faithful to the backend's
+// render — and keep @aiden0z as the fallback for older decks with no slides.
+const SlideImageDeck = ({ artifact }: { artifact: DocumentArtifact }) => {
+  const urls = slideUrls(artifact);
+  return (
+    <div className="ea-pptx-stage h-full w-full overflow-auto">
+      <div className="ea-pptx-deck">
+        {urls.map((url, i) => (
+          <img
+            key={i}
+            src={url}
+            alt={`Slide ${i + 1}`}
+            className="ea-slide-img"
+            loading="lazy"
+            draggable={false}
+          />
+        ))}
+      </div>
+    </div>
+  );
+};
+
 export const DocumentViewer = ({ artifact }: { artifact: DocumentArtifact }) => {
+  if (artifact.format === 'pptx' && artifact.slides?.length) {
+    return <SlideImageDeck artifact={artifact} />;
+  }
+  return <DocumentRenderer artifact={artifact} />;
+};
+
+const DocumentRenderer = ({ artifact }: { artifact: DocumentArtifact }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [phase, setPhase] = useState<Phase>('loading');
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);

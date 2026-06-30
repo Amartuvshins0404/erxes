@@ -1,6 +1,6 @@
-import { memo } from 'react';
+import { memo, type ReactNode } from 'react';
 import { IconBolt, IconPencil, IconRefresh, IconRepeat } from '@tabler/icons-react';
-import { Tooltip } from 'erxes-ui';
+import { cn, Tooltip } from 'erxes-ui';
 import { AgentUIMessage, ChatAttachment } from '~/modules/chat/types';
 import { asToolPart, messageText } from '~/modules/chat/lib/uiParts';
 import { asArtifactPart, type Artifact } from '~/modules/chat/lib/artifacts';
@@ -20,6 +20,39 @@ const formatTime = (iso?: string): string =>
     hour: '2-digit',
     minute: '2-digit',
   });
+
+// One icon-only message action (Edit, Resend, Regenerate) — the shared
+// Tooltip+button shape extracted from the three near-identical trees that used
+// to live inline. `aria-label={label}` gives every icon button an accessible
+// name once, here, so screen readers announce the action rather than "button".
+const MessageAction = ({
+  icon,
+  label,
+  onClick,
+  disabled,
+}: {
+  icon: ReactNode;
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+}) => (
+  <Tooltip.Provider>
+    <Tooltip>
+      <Tooltip.Trigger asChild>
+        <button
+          type="button"
+          aria-label={label}
+          onClick={onClick}
+          disabled={disabled}
+          className="size-6 flex items-center justify-center rounded text-muted-foreground transition-colors hover:bg-black/5 hover:text-foreground disabled:opacity-40 dark:hover:bg-white/10"
+        >
+          {icon}
+        </button>
+      </Tooltip.Trigger>
+      <Tooltip.Content>{label}</Tooltip.Content>
+    </Tooltip>
+  </Tooltip.Provider>
+);
 
 // memo() so a streaming turn only re-renders the live bubble, not every prior
 // message — useChat keeps stable refs for settled messages, so shallow prop
@@ -74,35 +107,17 @@ export const MessageBubble = memo(function MessageBubble({
         )}
         {hasText && (
           <div className="flex items-center gap-0.5 pr-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-            <Tooltip.Provider>
-              <Tooltip>
-                <Tooltip.Trigger asChild>
-                  <button
-                    type="button"
-                    onClick={() => onEditMessage(text)}
-                    className="size-6 flex items-center justify-center rounded text-muted-foreground transition-colors hover:bg-black/5 hover:text-foreground dark:hover:bg-white/10"
-                  >
-                    <IconPencil className="size-3.5" />
-                  </button>
-                </Tooltip.Trigger>
-                <Tooltip.Content>Edit</Tooltip.Content>
-              </Tooltip>
-            </Tooltip.Provider>
-            <Tooltip.Provider>
-              <Tooltip>
-                <Tooltip.Trigger asChild>
-                  <button
-                    type="button"
-                    onClick={() => onResendMessage(text, attachments ?? [])}
-                    disabled={chatLoading}
-                    className="size-6 flex items-center justify-center rounded text-muted-foreground transition-colors hover:bg-black/5 hover:text-foreground disabled:opacity-40 dark:hover:bg-white/10"
-                  >
-                    <IconRepeat className="size-3.5" />
-                  </button>
-                </Tooltip.Trigger>
-                <Tooltip.Content>Resend</Tooltip.Content>
-              </Tooltip>
-            </Tooltip.Provider>
+            <MessageAction
+              icon={<IconPencil className="size-3.5" />}
+              label="Edit message"
+              onClick={() => onEditMessage(text)}
+            />
+            <MessageAction
+              icon={<IconRepeat className="size-3.5" />}
+              label="Resend message"
+              onClick={() => onResendMessage(text, attachments ?? [])}
+              disabled={chatLoading}
+            />
             <CopyButton text={text} />
           </div>
         )}
@@ -142,7 +157,12 @@ export const MessageBubble = memo(function MessageBubble({
       <AgentAvatar live={streaming} />
       {/* Hold full width during streaming so the bubble doesn't snap wider
           when the first artifact tool call lands mid-turn. */}
-      <div className={`min-w-0 rounded-2xl rounded-bl-md px-4 py-2.5 shadow-sm ${streaming || artifacts.length > 0 ? 'w-full' : 'w-auto max-w-full'}`}>
+      <div
+        className={cn(
+          'min-w-0 rounded-2xl rounded-bl-md px-4 py-2.5 shadow-sm',
+          streaming || artifacts.length > 0 ? 'w-full' : 'w-auto max-w-full',
+        )}
+      >
         {activeSkills && activeSkills.length > 0 && (
           <div className="flex flex-wrap items-center gap-1 mb-1.5">
             {activeSkills.map((name) => (
@@ -197,20 +217,11 @@ export const MessageBubble = memo(function MessageBubble({
             </p>
             <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
               {canRegenerate && (
-                <Tooltip.Provider>
-                  <Tooltip>
-                    <Tooltip.Trigger asChild>
-                      <button
-                        type="button"
-                        onClick={onRegenerate}
-                        className="size-6 flex items-center justify-center rounded hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-muted-foreground hover:text-foreground"
-                      >
-                        <IconRefresh className="size-3.5" />
-                      </button>
-                    </Tooltip.Trigger>
-                    <Tooltip.Content>Regenerate</Tooltip.Content>
-                  </Tooltip>
-                </Tooltip.Provider>
+                <MessageAction
+                  icon={<IconRefresh className="size-3.5" />}
+                  label="Regenerate"
+                  onClick={onRegenerate}
+                />
               )}
               {handleRate && (
                 <FeedbackButtons rating={msg.metadata?.rating} onRate={handleRate} />

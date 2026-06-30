@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { IconSettings } from '@tabler/icons-react';
-import { Button, ErxesLogoIcon, Skeleton, Tooltip } from 'erxes-ui';
+import { Button, cn, ErxesLogoIcon, Skeleton, Tooltip } from 'erxes-ui';
 import { IChatAgent } from '~/modules/chat/hooks/useChatAgents';
 import {
   useAgentActivity,
@@ -31,9 +31,10 @@ const AgentRailItem = ({
     <div
       role="button"
       tabIndex={0}
-      className={`group relative w-full cursor-pointer rounded-md px-2.5 py-2 text-left transition-colors hover:bg-accent ${
-        isActive || isWorking ? 'bg-accent' : ''
-      }`}
+      className={cn(
+        'group relative w-full cursor-pointer rounded-md px-2.5 py-2 text-left transition-colors hover:bg-accent',
+        (isActive || isWorking) && 'bg-accent',
+      )}
       onClick={() => onSelect(agent._id)}
       onKeyDown={(e) => {
         // Only act on the row's own keys — ignore Enter/Space that bubbled up

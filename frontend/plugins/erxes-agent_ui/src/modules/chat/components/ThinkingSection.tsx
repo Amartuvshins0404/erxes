@@ -1,17 +1,20 @@
-import { useState } from 'react';
+import { memo, useState } from 'react';
 import { IconChevronRight } from '@tabler/icons-react';
+import { cn } from 'erxes-ui';
 
 // A reasoning burst as a timeline-step body — always a single line so the trace
 // only ever grows downward (no auto-expand/auto-collapse, which made the whole
 // section jump up and down as each thought streamed in and finished). Live: a
 // shimmering "Thinking…". Settled: "Reasoning". Click to read the full thought.
-export const ThinkingSection = ({
+// memo()'d so prior reasoning steps don't re-render on every throttled token of
+// the live turn (only the streaming step's text changes).
+export const ThinkingSection = memo(function ThinkingSection({
   text,
   live,
 }: {
   text: string;
   live?: boolean;
-}) => {
+}) {
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -19,9 +22,10 @@ export const ThinkingSection = ({
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}
-        className={`ea-trace-row flex w-full items-center gap-2 px-1.5 py-1 text-left text-xs ${
-          live ? '' : 'text-muted-foreground hover:text-foreground'
-        }`}
+        className={cn(
+          'ea-trace-row flex w-full items-center gap-2 px-1.5 py-1 text-left text-xs',
+          !live && 'text-muted-foreground hover:text-foreground',
+        )}
       >
         {live ? (
           <span className="ea-shimmer-text font-medium">Thinking…</span>
@@ -30,9 +34,10 @@ export const ThinkingSection = ({
         )}
         <span className="flex-1" />
         <IconChevronRight
-          className={`size-3 shrink-0 text-muted-foreground opacity-40 transition-transform duration-200 ${
-            expanded ? 'rotate-90' : ''
-          }`}
+          className={cn(
+            'size-3 shrink-0 text-muted-foreground opacity-40 transition-transform duration-200',
+            expanded && 'rotate-90',
+          )}
         />
       </button>
       {expanded && (
@@ -44,4 +49,4 @@ export const ThinkingSection = ({
       )}
     </div>
   );
-};
+});

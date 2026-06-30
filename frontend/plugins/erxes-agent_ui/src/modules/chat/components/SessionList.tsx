@@ -11,7 +11,7 @@ import {
   IconPlus,
   IconTrash,
 } from '@tabler/icons-react';
-import { Button, Skeleton } from 'erxes-ui';
+import { Button, cn, Skeleton } from 'erxes-ui';
 import { IMastraThread } from '~/modules/chat/types';
 import { useThreadWorking } from '~/modules/chat/hooks/useChatView';
 
@@ -67,9 +67,10 @@ const SessionItem = ({
     <button
       type="button"
       onClick={() => onSelect(session.threadId)}
-      className={`group/sess w-full text-left rounded-md px-2.5 py-2 transition-colors hover:bg-accent ${
-        active || working ? 'bg-accent' : ''
-      }`}
+      className={cn(
+        'group/sess w-full text-left rounded-md px-2.5 py-2 transition-colors hover:bg-accent',
+        (active || working) && 'bg-accent',
+      )}
     >
       <div className="flex items-center gap-1.5">
         {editing ? (
@@ -97,7 +98,7 @@ const SessionItem = ({
           // The title is the session's summary — the whole row. It shimmers
           // while that session is generating a reply.
           <p
-            className={`flex-1 truncate text-sm ${working ? 'ea-shimmer-text' : ''}`}
+            className={cn('flex-1 truncate text-sm', working && 'ea-shimmer-text')}
             onDoubleClick={(e) => {
               e.stopPropagation();
               beginEdit();
@@ -213,12 +214,12 @@ export const SessionList = ({
           <>
             {isDraft && (
               <div
-                className={`rounded-md px-2.5 py-2 ${
+                className={cn(
+                  'rounded-md px-2.5 py-2',
                   activeThreadId &&
-                  !sessions.some((s) => s.threadId === activeThreadId)
-                    ? 'bg-accent'
-                    : ''
-                }`}
+                    !sessions.some((s) => s.threadId === activeThreadId) &&
+                    'bg-accent',
+                )}
               >
                 <p className="truncate text-sm text-muted-foreground">
                   New chat

@@ -63,7 +63,15 @@ export const normalizeArtifact = (raw: unknown): Artifact | null => {
 
   if (a.kind === 'chart') {
     const spec = a.spec as ChartSpec | undefined;
-    if (!spec || typeof spec !== 'object') return null;
+    // A chart is only valid with both arrays present — the invariant <EChart>
+    // trusts. A partial spec is dropped here rather than thrown in the renderer.
+    if (
+      !spec ||
+      typeof spec !== 'object' ||
+      !Array.isArray(spec.series) ||
+      !Array.isArray(spec.data)
+    )
+      return null;
     return {
       id,
       kind: 'chart',

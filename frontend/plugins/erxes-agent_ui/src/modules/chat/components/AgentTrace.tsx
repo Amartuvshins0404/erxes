@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Collapsible } from 'erxes-ui';
+import { cn, Collapsible } from 'erxes-ui';
 import { AgentUIMessage } from '~/modules/chat/types';
 import { asToolPart } from '~/modules/chat/lib/uiParts';
 import { ThinkingSection } from '~/modules/chat/components/ThinkingSection';
@@ -51,9 +51,11 @@ export const AgentTrace = ({
                 <li className="ea-step" key={tool.toolCallId ?? `tool-${i}`}>
                   <span className="ea-step-rail" aria-hidden>
                     <span
-                      className={`ea-node ea-node-tool ${running ? 'is-running' : ''} ${
-                        tool.isError ? 'is-error' : ''
-                      }`}
+                      className={cn(
+                        'ea-node ea-node-tool',
+                        running && 'is-running',
+                        tool.isError && 'is-error',
+                      )}
                     />
                   </span>
                   <div className="ea-step-body">

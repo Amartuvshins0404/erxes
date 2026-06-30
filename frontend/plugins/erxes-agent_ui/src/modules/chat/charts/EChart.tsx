@@ -186,11 +186,20 @@ export const EChart = forwardRef<EChartHandle, EChartProps>(function EChart(
 
   const handleClick = useCallback(
     (params: { name?: string; componentType?: string }) => {
+      // Every data point is drillable — bars, single-bar series, and pie/donut
+      // slices all reach here. We never bail on a missing sub-spec; a point with
+      // no sub-data drills into an empty-state table instead of ignoring the click.
       if (params.componentType !== 'series') return;
       const label = params.name;
       if (!label) return;
-      const sub = activeSpec.drilldowns?.[label];
-      if (!sub) return;
+      const sub: DrilldownSpec = (activeSpec as ChartSpec).drilldowns?.[label] ?? {
+        chartType: 'bar',
+        title: label,
+        series: activeSpec.series.length
+          ? [activeSpec.series[0]]
+          : [{ key: 'value', label: 'Value' }],
+        data: [],
+      };
       animateTransition({ type: 'DRILL_IN', sub }, true);
     },
     [activeSpec, animateTransition],
@@ -225,24 +234,11 @@ export const EChart = forwardRef<EChartHandle, EChartProps>(function EChart(
   const inDrilldown = history.length > 0;
   const parentTitle = history[history.length - 1]?.title;
 
-  // A drilldown leaf that lists individual items (one value per row) reads far
-  // better as a table than a one-bar-per-row chart. Swap to the table view for
-  // single-series bar drilldowns; the parent chart still renders as a chart.
-  const showTable =
-    inDrilldown &&
-    activeSpec.series.length === 1 &&
-    (activeSpec.chartType === 'bar' || activeSpec.chartType === 'horizontalBar') &&
-    activeSpec.data.length > 0;
-  // TEMP debug — remove once table swap is confirmed working.
-  // eslint-disable-next-line no-console
-  console.debug('[EChart drilldown]', {
-    inDrilldown,
-    chartType: activeSpec.chartType,
-    seriesCount: activeSpec.series.length,
-    stacked: activeSpec.stacked,
-    dataLen: activeSpec.data.length,
-    showTable,
-  });
+  // Drilling into any data point lists its individual items, which read far
+  // better as a table than a chart. Every drilldown level therefore renders as
+  // a table (empty levels show a "No data available" state); the top-level
+  // parent keeps its chart.
+  const showTable = inDrilldown;
   return (
     <div style={{ width: '100%', height, display: 'flex', flexDirection: 'column' }}>
       {inDrilldown ? (

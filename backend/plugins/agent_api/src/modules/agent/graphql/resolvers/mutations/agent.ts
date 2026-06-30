@@ -961,4 +961,39 @@ export const agentMutations = {
         }),
     });
   },
+
+  agentRuntimeDisablePlugin: async (
+    _root: undefined,
+    { agentId, pluginId }: { agentId: string; pluginId: string },
+    { models, subdomain, user }: IContext,
+  ) => {
+    const safePluginId = assertSafeRuntimeIdentifier(pluginId, 'pluginId');
+
+    return callManagedRuntimeOperation({
+      models,
+      user,
+      subdomain,
+      agentId,
+      operation: 'agentRuntimeDisablePlugin',
+      identifier: safePluginId,
+      requireAdmin: true,
+      request: {
+        method: 'POST',
+        path: '/openclaw/plugins/disable',
+        body: {
+          plugin: safePluginId,
+        },
+      },
+      message: 'Managed runtime plugin disable completed',
+      setupSync: { action: 'remove', type: 'plugin' },
+      mapResult: (payload) =>
+        mapRuntimePayload('Managed runtime plugin disable completed', payload, {
+          diagnostics:
+            payload.verification && typeof payload.verification === 'object'
+              ? (payload.verification as Record<string, unknown>)
+              : payload,
+          records: payload,
+        }),
+    });
+  },
 };

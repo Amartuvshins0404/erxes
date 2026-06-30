@@ -163,4 +163,5 @@ export const mutations = `
   agentRuntimeInstallSkill(agentId: String!, slug: String!, version: String): AgentRuntimeResult
   agentRuntimeInstallPlugin(agentId: String!, plugin: String!, version: String): AgentRuntimeResult
   agentRuntimeEnablePlugin(agentId: String!, pluginId: String!): AgentRuntimeResult
+  agentRuntimeDisablePlugin(agentId: String!, pluginId: String!): AgentRuntimeResult
 `;

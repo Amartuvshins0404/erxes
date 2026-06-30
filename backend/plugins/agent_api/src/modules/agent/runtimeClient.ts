@@ -25,18 +25,33 @@ async function notifyDeployerSetupSync(
   if (!serverName) return;
   const secret = getManagedDeployerSecret();
   if (!secret) return;
-  try {
-    await fetch(`${getManagedDeployerUrl()}/agents/${encodeURIComponent(serverName)}/setup-sync`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-erxes-managed-deployer-secret': secret,
-      },
-      body: JSON.stringify({ action, type, identifier }),
-      signal: AbortSignal.timeout(10_000),
-    });
-  } catch {
-    // Fire-and-forget: never fail the user's install if deployer is unreachable
+
+  const url = `${getManagedDeployerUrl()}/agents/${encodeURIComponent(serverName)}/setup-sync`;
+  const body = JSON.stringify({ action, type, identifier });
+  const headers = {
+    'Content-Type': 'application/json',
+    'x-erxes-managed-deployer-secret': secret,
+  };
+
+  // Retry up to 3 times with backoff so transient deployer downtime doesn't
+  // silently lose the sync. Never throws — install must always succeed for the user.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers,
+        body,
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (res.ok) return;
+      // 4xx from deployer = bad request, no point retrying
+      if (res.status >= 400 && res.status < 500) return;
+    } catch {
+      // network error, retry
+    }
+    if (attempt < 2) {
+      await new Promise(r => setTimeout(r, 500 * Math.pow(2, attempt))); // 500ms, 1s
+    }
   }
 }
 

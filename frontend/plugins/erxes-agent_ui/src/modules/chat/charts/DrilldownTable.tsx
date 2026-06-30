@@ -23,6 +23,32 @@ const tint = (hex: string, alpha: number): string => {
   return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
 };
 
+// Parse a hex (#rrggbb) or rgb()/rgba() string to an [r,g,b] triple.
+const toRgb = (c: string): [number, number, number] | null => {
+  const hex = /^#?([0-9a-f]{6})$/i.exec(c);
+  if (hex) {
+    const n = parseInt(hex[1], 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  }
+  const rgb = /rgba?\(([^)]+)\)/.exec(c);
+  if (rgb) {
+    const p = rgb[1].split(',').map((s) => parseFloat(s));
+    if (p.length >= 3) return [p[0], p[1], p[2]];
+  }
+  return null;
+};
+
+// Alpha-composite `fg` over opaque `bg` into a solid rgb() string. Used so the
+// sticky header has an OPAQUE accent background — a translucent tint would let
+// rows show through as they scroll underneath it.
+const blend = (fg: string, bg: string, alpha: number): string => {
+  const f = toRgb(fg);
+  const b = toRgb(bg);
+  if (!f || !b) return bg;
+  const mix = f.map((c, i) => Math.round(c * alpha + b[i] * (1 - alpha)));
+  return `rgb(${mix[0]}, ${mix[1]}, ${mix[2]})`;
+};
+
 // Renders a drilldown leaf (individual items — e.g. a list of companies) as a
 // premium, scrollable table instead of a one-bar-per-row chart. The first column
 // is the category label; each series contributes a right-aligned, accent-colored
@@ -42,7 +68,8 @@ export function DrilldownTable({ spec, colors }: DrilldownTableProps) {
     [spec.series, spec.xAxisLabel],
   );
 
-  const headerBg = colors.isDark ? tint(accent, 0.18) : tint(accent, 0.1);
+  // Opaque so rows never bleed through the sticky header while scrolling.
+  const headerBg = blend(accent, colors.surface, colors.isDark ? 0.22 : 0.12);
   const zebraBg = colors.isDark ? 'rgba(255,255,255,0.025)' : 'rgba(0,0,0,0.018)';
   const hoverBg = colors.isDark ? tint(accent, 0.22) : tint(accent, 0.12);
   const rowBorder = colors.isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)';
@@ -121,7 +148,6 @@ export function DrilldownTable({ spec, colors }: DrilldownTableProps) {
                     textTransform: 'uppercase',
                     color: colors.foreground,
                     background: headerBg,
-                    backdropFilter: 'saturate(1.2)',
                     borderBottom: `2px solid ${tint(accent, colors.isDark ? 0.5 : 0.35)}`,
                     whiteSpace: 'nowrap',
                   }}

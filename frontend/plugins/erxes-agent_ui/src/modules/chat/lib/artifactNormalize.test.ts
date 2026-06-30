@@ -85,6 +85,31 @@ describe('normalizeArtifact', () => {
     expect(a).toMatchObject({ id: 'chart_1', kind: 'chart', title: 'Split' });
   });
 
+  // Regression (#205 follow-up): the consolidated normalizer lost the old array
+  // guard, so a partial chart spec reached <EChart> and could throw. Both series
+  // and data must be arrays or the chart is dropped.
+  it('chart with non-array series → null', () => {
+    expect(
+      normalizeArtifact({
+        id: 'chart_bad',
+        kind: 'chart',
+        title: 'Bad',
+        spec: { title: 'Bad', series: 'nope', data: [] },
+      }),
+    ).toBeNull();
+  });
+
+  it('chart with non-array data → null', () => {
+    expect(
+      normalizeArtifact({
+        id: 'chart_bad2',
+        kind: 'chart',
+        title: 'Bad',
+        spec: { title: 'Bad', series: [], data: undefined },
+      }),
+    ).toBeNull();
+  });
+
   it('rejects non-objects, missing ids, and unknown kinds', () => {
     expect(normalizeArtifact(null)).toBeNull();
     expect(normalizeArtifact('nope')).toBeNull();

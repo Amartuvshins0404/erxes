@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { memo, useMemo, useState } from 'react';
 import {
   IconAlertCircle,
   IconCheck,
@@ -11,19 +11,25 @@ import { formatJson } from '~/modules/chat/lib/markdown';
 // name in mono, a dimmed hint of what it acted on, and the settled ✓ / ✕ — that
 // expands to its request and response. The rail node to the left (owned by
 // AgentTrace) carries the running/type state; this row carries completion.
-export const ToolCallRow = ({
+// memo()'d so a streaming turn (which re-renders the live MessageBubble on every
+// throttled token) only re-renders the rows whose call props actually changed.
+export const ToolCallRow = memo(function ToolCallRow({
   call,
   streaming,
 }: {
   call: ToolPartView;
   streaming?: boolean;
-}) => {
+}) {
   const [expanded, setExpanded] = useState(false);
   const pending = call.pending && streaming;
   const settled =
     call.state === 'output-available' || call.state === 'output-error';
   const result = call.isError ? call.errorText : call.output;
-  const hint = toolHint(call.input);
+  // Compute the hint only when the call's input/name change, not on every token.
+  const hint = useMemo(
+    () => toolHint(call.input, call.toolName),
+    [call.input, call.toolName],
+  );
 
   return (
     <div className="ea-pop">
@@ -77,4 +83,4 @@ export const ToolCallRow = ({
       )}
     </div>
   );
-};
+});

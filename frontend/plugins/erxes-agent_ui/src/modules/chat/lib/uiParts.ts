@@ -62,20 +62,60 @@ export const asToolPart = (part: MessagePart): ToolPartView | null => {
   };
 };
 
+// The meaningful summary arg per tool, keyed by tool name (ids mirror the
+// backend mastra/tools registry). This is the explicit contract: each tool names
+// the input field that summarizes the call, so the hint is never a guess about
+// which key happens to surface first. A tool not listed here falls through to the
+// last-resort generic scan below.
+const TOOL_HINT_KEYS: Record<string, readonly string[]> = {
+  'web-search': ['query'],
+  'fetch-url': ['url'],
+  calculator: ['expression'],
+  'render-chart': ['title'],
+  'render-diagram': ['title'],
+  'generate-pdf': ['title'],
+  'generate-docx': ['title'],
+  'generate-pptx': ['title'],
+  'generate-xlsx': ['title'],
+  'company-knowledge': ['query'],
+  'read-attachment': ['fileName', 'name'],
+  readAttachment: ['fileName', 'name'],
+  search_erxes_operations: ['query'],
+  execute_erxes_operation: ['operation'],
+  lookup: ['query'],
+  classify: ['query'],
+};
+
+// Last-resort key order for tools with no explicit entry. Intentionally narrow
+// and ends without `id`, so an internal id is never shown as a summary.
+const FALLBACK_HINT_KEYS = ['url', 'href', 'query', 'q', 'search', 'title', 'name'] as const;
+
+const readHint = (
+  obj: Record<string, unknown>,
+  keys: readonly string[],
+): string => {
+  for (const key of keys) {
+    const v = obj[key];
+    if (typeof v === 'string' && v.trim()) return cleanHint(v);
+  }
+  return '';
+};
+
 /** A short, human hint for a tool call — the URL it fetched, the query it ran —
  *  shown dimmed next to the tool name in the run timeline so a row reads as
- *  "fetchUrl  docs.erxes.io/…" rather than a bare name. Defensive: unknown
- *  shapes return '' so the row simply omits the hint. */
-export const toolHint = (input: unknown): string => {
+ *  "fetchUrl  docs.erxes.io/…" rather than a bare name. Each tool declares its
+ *  summary arg in TOOL_HINT_KEYS; unmapped tools fall back to a narrow generic
+ *  scan. Defensive: unknown shapes return '' so the row simply omits the hint. */
+export const toolHint = (input: unknown, toolName?: string): string => {
   if (typeof input === 'string') return cleanHint(input);
   if (!input || typeof input !== 'object') return '';
   const obj = input as Record<string, unknown>;
-  for (const key of ['url', 'href', 'query', 'q', 'search', 'path', 'name', 'title', 'id']) {
-    const v = obj[key];
-    if (typeof v === 'string' && v.trim()) return cleanHint(v);
-    if (typeof v === 'number') return String(v);
+  const explicit = toolName ? TOOL_HINT_KEYS[toolName] : undefined;
+  if (explicit) {
+    const hit = readHint(obj, explicit);
+    if (hit) return hit;
   }
-  return '';
+  return readHint(obj, FALLBACK_HINT_KEYS);
 };
 
 // Drop the scheme + leading www. from URLs and collapse whitespace so the hint

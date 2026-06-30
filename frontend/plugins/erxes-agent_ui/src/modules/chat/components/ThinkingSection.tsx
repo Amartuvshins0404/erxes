@@ -1,17 +1,19 @@
-import { useState } from 'react';
+import { memo, useState } from 'react';
 import { IconChevronRight } from '@tabler/icons-react';
 
 // A reasoning burst as a timeline-step body — always a single line so the trace
 // only ever grows downward (no auto-expand/auto-collapse, which made the whole
 // section jump up and down as each thought streamed in and finished). Live: a
 // shimmering "Thinking…". Settled: "Reasoning". Click to read the full thought.
-export const ThinkingSection = ({
+// memo()'d so prior reasoning steps don't re-render on every throttled token of
+// the live turn (only the streaming step's text changes).
+export const ThinkingSection = memo(function ThinkingSection({
   text,
   live,
 }: {
   text: string;
   live?: boolean;
-}) => {
+}) {
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -44,4 +46,4 @@ export const ThinkingSection = ({
       )}
     </div>
   );
-};
+});

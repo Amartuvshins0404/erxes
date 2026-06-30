@@ -4,8 +4,10 @@ import { getCurrentAuth } from '~/mastra/requestContext';
 import {
   fetchAttachmentBuffer,
   fetchRemoteFile,
+  isFullUrl,
   MAX_ATTACHMENT_BYTES,
 } from '~/mastra/files/storage';
+import { ExpectedError } from 'erxes-api-shared/utils';
 import {
   extractFileText,
   fileExtension,
@@ -192,18 +194,26 @@ async function readByUrl(url: string, name?: string): Promise<ReaderResult> {
   return buildResult(buffer, fileName, contentType);
 }
 
-/** Read a file the user attached, by its storage key / URL. */
+/** Read a file the user attached, by its storage key.
+ *  SECURITY: a `key` is a storage key, never a URL. Reject full URLs so a
+ *  model-invented `key="http://169.254.169.254/..."` can't reach core's raw
+ *  /read-file fetch (SSRF). Remote URLs must use the SSRF-guarded `url` path. */
 async function readByKey(
   subdomain: string,
   key: string,
   name?: string,
 ): Promise<ReaderResult> {
+  if (isFullUrl(key)) {
+    throw new ExpectedError(
+      'The `key` argument must be a storage key from the Attached files manifest, not a URL. To read a public link, pass it as `url` instead.',
+    );
+  }
   const models = await getModels(subdomain);
   const settings = await models.MastraSettings.getSettings();
   const fileName = name || key.split('/').pop() || key;
   const { buffer, contentType } = await fetchAttachmentBuffer({
     erxesApiUrl: settings?.erxesApiUrl || 'http://localhost:4000',
-    keyOrUrl: key,
+    key,
     name: fileName,
   });
   return buildResult(buffer, fileName, contentType);
@@ -242,7 +252,7 @@ async function readByArtifactId(
     const settings = await models.MastraSettings.getSettings();
     ({ buffer, contentType } = await fetchAttachmentBuffer({
       erxesApiUrl: settings?.erxesApiUrl || 'http://localhost:4000',
-      keyOrUrl: fileKey,
+      key: fileKey,
       name: fileName,
     }));
   }
@@ -273,7 +283,7 @@ export const fileReaderTool = createTool({
       .string()
       .optional()
       .describe(
-        'Storage key (or URL) of a file the USER attached, exactly as given in the Attached files manifest.',
+        'Storage key of a file the USER attached, exactly as given in the Attached files manifest. Must be a storage key, not a URL — pass remote links as `url`.',
       ),
     artifactId: z
       .string()

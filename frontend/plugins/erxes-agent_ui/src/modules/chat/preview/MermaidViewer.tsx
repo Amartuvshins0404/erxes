@@ -136,7 +136,13 @@ export function useMermaidRender(
           startOnLoad: false,
           theme: 'base',
           themeVariables: themeVars(isDark),
-          securityLevel: 'loose',
+          // SECURITY: diagram definitions are LLM-authored (prompt-injection →
+          // stored XSS), and the rendered SVG is injected via
+          // dangerouslySetInnerHTML in PanZoomSvg. 'strict' makes Mermaid
+          // HTML-escape labels and disables click/href/script directives, so no
+          // active content can survive into the DOM. Pan/zoom node interaction
+          // is class-based (PanZoomSvg) and does not need Mermaid's click mode.
+          securityLevel: 'strict',
         });
         const renderPromise = mermaid.render(renderId, cleaned);
         const timeoutPromise = new Promise<never>((_, reject) =>

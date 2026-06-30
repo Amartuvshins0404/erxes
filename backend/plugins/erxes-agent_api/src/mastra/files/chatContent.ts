@@ -1,5 +1,5 @@
 import { IMastraChatAttachment } from '@/session/@types/session';
-import { fetchAttachmentBuffer } from './storage';
+import { fetchAttachmentBuffer, fetchRemoteFile, isFullUrl } from './storage';
 import { isImageType } from './extract';
 import { prepareImageForModel } from './imagePrep';
 
@@ -95,11 +95,15 @@ export async function buildChatUserContent(params: {
 
   for (const img of images) {
     try {
-      const { buffer, contentType } = await fetchAttachmentBuffer({
-        erxesApiUrl,
-        keyOrUrl: img.url,
-        name: img.name,
-      });
+      // A storage key is read through core's internal /read-file; a full URL
+      // (FILE_SYSTEM_PUBLIC, or a user-crafted message) is SSRF-guarded.
+      const { buffer, contentType } = isFullUrl(img.url)
+        ? await fetchRemoteFile({ url: img.url, name: img.name })
+        : await fetchAttachmentBuffer({
+            erxesApiUrl,
+            key: img.url,
+            name: img.name,
+          });
       if (buffer.length > MAX_IMAGE_BYTES) continue;
 
       const sourceMime = img.type?.startsWith('image/')

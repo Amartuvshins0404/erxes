@@ -21,6 +21,14 @@ import {
 export const MAX_EXTRACT_CHARS = 20_000;
 const MAX_SHEET_ROWS = 500;
 
+// Decompression-bomb guard for zip-backed formats (pptx). The download is
+// capped at 20MB COMPRESSED, but a ~1MB zip can inflate to GBs of XML. Cap the
+// total decompressed bytes and the entry count, and reject up front using the
+// zip's declared uncompressed sizes so we never inflate a bomb in the first
+// place.
+export const MAX_PPTX_DECOMPRESSED_BYTES = 50 * 1024 * 1024;
+export const MAX_PPTX_SLIDES = 500;
+
 export interface ExtractedFile {
   content: string;
   format: string;
@@ -115,6 +123,13 @@ function slideNumber(path: string): number {
 
 /** Extract the visible text of a .pptx deck, one labelled block per slide.
  *  A .pptx is a zip; slide text lives in <a:t> runs inside ppt/slides/slideN.xml. */
+/** Declared uncompressed size of a JSZip entry, if the zip header carries it. */
+function declaredSize(entry: unknown): number {
+  const size = (entry as { _data?: { uncompressedSize?: number } })?._data
+    ?.uncompressedSize;
+  return typeof size === 'number' && size > 0 ? size : 0;
+}
+
 async function extractPptx(buffer: Buffer): Promise<string> {
   const { default: JSZip } = await import('jszip');
   const zip = await JSZip.loadAsync(buffer);
@@ -122,9 +137,35 @@ async function extractPptx(buffer: Buffer): Promise<string> {
     .filter((p) => /^ppt\/slides\/slide\d+\.xml$/.test(p))
     .sort((a, b) => slideNumber(a) - slideNumber(b));
 
+  if (slidePaths.length > MAX_PPTX_SLIDES) {
+    throw new ExpectedError(
+      `This presentation has too many slides to read (max ${MAX_PPTX_SLIDES}).`,
+    );
+  }
+
+  // Reject zip bombs BEFORE inflating: the zip header declares each entry's
+  // uncompressed size, so a small archive claiming gigabytes is caught here.
+  let declared = 0;
+  for (const path of slidePaths) {
+    declared += declaredSize(zip.files[path]);
+    if (declared > MAX_PPTX_DECOMPRESSED_BYTES) {
+      throw new ExpectedError(
+        'This presentation is too large to read (decompression limit exceeded).',
+      );
+    }
+  }
+
   const out: string[] = [];
+  let total = 0;
   for (let i = 0; i < slidePaths.length; i++) {
     const xml = await zip.files[slidePaths[i]].async('string');
+    // Second line of defence in case a header under-reports the real size.
+    total += xml.length;
+    if (total > MAX_PPTX_DECOMPRESSED_BYTES) {
+      throw new ExpectedError(
+        'This presentation is too large to read (decompression limit exceeded).',
+      );
+    }
     const runs = [...xml.matchAll(/<a:t>([\s\S]*?)<\/a:t>/g)].map((m) =>
       decodeHtmlEntities(m[1]),
     );

@@ -877,6 +877,7 @@ export const agentMutations = {
         },
       },
       message: 'Managed runtime skill install completed',
+      setupSync: { action: 'install', type: 'skill' },
       mapResult: (payload) =>
         mapRuntimePayload('Managed runtime skill install completed', payload, {
           diagnostics:
@@ -915,6 +916,7 @@ export const agentMutations = {
         },
       },
       message: 'Managed runtime plugin install completed',
+      setupSync: { action: 'install', type: 'plugin' },
       mapResult: (payload) =>
         mapRuntimePayload('Managed runtime plugin install completed', payload, {
           diagnostics:

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { IconLoader2 } from '@tabler/icons-react';
-import { useIsDark } from 'erxes-ui';
+import { useIsDark } from '~/lib/useIsDark';
 
 // Defined locally to avoid MF version-skew: CHART_FONT lives in erxes-ui's
 // charts submodule (added 3.0.45) which may not exist on older host shells.

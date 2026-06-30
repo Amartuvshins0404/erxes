@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useIsDark } from 'erxes-ui';
+import { useIsDark } from '~/lib/useIsDark';
 
 export const CHART_FONT = 'Inter, ui-sans-serif, system-ui, sans-serif';
 

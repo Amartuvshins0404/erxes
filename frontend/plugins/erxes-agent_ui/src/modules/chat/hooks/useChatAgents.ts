@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useQuery } from '@apollo/client';
 import {
   MASTRA_AGENTS,
@@ -46,7 +47,12 @@ interface VoiceStatusResponse {
 // Enabled agents for the chat rail.
 export const useChatAgents = () => {
   const { data, loading } = useQuery<MastraAgentsResponse>(MASTRA_AGENTS);
-  const agents = (data?.mastraAgents ?? []).filter((a) => a.isEnabled);
+  // Memoized so the array keeps a stable identity across streamed-token
+  // re-renders — the memoized AgentRail depends on it not changing per chunk.
+  const agents = useMemo(
+    () => (data?.mastraAgents ?? []).filter((a) => a.isEnabled),
+    [data],
+  );
   return { agents, loading };
 };
 

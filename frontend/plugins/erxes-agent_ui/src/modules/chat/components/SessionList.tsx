@@ -1,4 +1,5 @@
 import {
+  memo,
   useCallback,
   useEffect,
   useRef,
@@ -31,7 +32,7 @@ interface SessionItemProps {
   onRename: RenameHandler;
 }
 
-const SessionItem = ({
+const SessionItem = memo(({
   session,
   agentId,
   active,
@@ -124,7 +125,8 @@ const SessionItem = ({
       </div>
     </button>
   );
-};
+});
+SessionItem.displayName = 'SessionItem';
 
 interface SessionListProps {
   agentId: string;
@@ -142,7 +144,7 @@ interface SessionListProps {
   onBack?: () => void;
 }
 
-export const SessionList = ({
+export const SessionList = memo(({
   agentId,
   sessions,
   sessionsLoaded,
@@ -262,4 +264,5 @@ export const SessionList = ({
       </div>
     </div>
   );
-};
+});
+SessionList.displayName = 'SessionList';

@@ -38,7 +38,7 @@ const SlideImageDeck = ({ artifact }: { artifact: DocumentArtifact }) => {
       <div className="ea-pptx-deck">
         {urls.map((url, i) => (
           <img
-            key={i}
+            key={url}
             src={url}
             alt={`Slide ${i + 1}`}
             className="ea-slide-img"

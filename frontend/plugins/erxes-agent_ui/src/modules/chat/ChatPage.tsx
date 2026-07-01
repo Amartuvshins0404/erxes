@@ -11,7 +11,7 @@ import {
 } from '@tabler/icons-react';
 import { Breadcrumb, Button, Empty } from 'erxes-ui';
 import { PageHeader } from 'ui-modules';
-import { ChatAttachment, ApprovedOp } from '~/modules/chat/types';
+import { ChatAttachment, ApprovedOp, ReasoningEffort } from '~/modules/chat/types';
 import { chatStore } from '~/modules/chat/store/chatStore';
 import {
   useChatAgents,
@@ -232,37 +232,56 @@ export const ChatPage = () => {
     el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
   }, [input]);
 
-  const handleNewThread = () => {
+  // Sidebar handlers are wrapped in useCallback so their identities stay stable
+  // across streamed-token / keystroke re-renders — that's what lets the memoized
+  // SessionList / AgentRail skip re-rendering while a reply streams.
+  const handleNewThread = useCallback(() => {
     if (agentId && selectedAgent)
       chatStore.newDraft(apolloClient, agentId, selectedAgent.agentId);
-  };
+  }, [apolloClient, agentId, selectedAgent]);
 
-  const handleSelectSession = (threadId: string) => {
-    if (!agentId || !selectedAgent || threadId === activeThreadId) return;
-    chatStore.selectSession(
-      apolloClient,
-      agentId,
-      selectedAgent.agentId,
-      threadId,
-    );
-  };
+  const handleSelectSession = useCallback(
+    (threadId: string) => {
+      if (!agentId || !selectedAgent || threadId === activeThreadId) return;
+      chatStore.selectSession(
+        apolloClient,
+        agentId,
+        selectedAgent.agentId,
+        threadId,
+      );
+    },
+    [apolloClient, agentId, selectedAgent, activeThreadId],
+  );
 
-  const handleDeleteSession = (
-    e: React.MouseEvent | React.KeyboardEvent,
-    threadId: string,
-  ) => {
-    e.stopPropagation();
-    if (!agentId || !selectedAgent) return;
-    if (!window.confirm('Delete this session and all its messages?')) return;
-    // The cached list filter (hook) + local state teardown (store); the
-    // bootstrap effect re-selects the next session if this one was active.
-    removeThread(threadId);
-    chatStore.discardThread(agentId, threadId);
-  };
+  const handleDeleteSession = useCallback(
+    (e: React.MouseEvent | React.KeyboardEvent, threadId: string) => {
+      e.stopPropagation();
+      if (!agentId || !selectedAgent) return;
+      if (!window.confirm('Delete this session and all its messages?')) return;
+      // The cached list filter (hook) + local state teardown (store); the
+      // bootstrap effect re-selects the next session if this one was active.
+      removeThread(threadId);
+      chatStore.discardThread(agentId, threadId);
+    },
+    [agentId, selectedAgent, removeThread],
+  );
 
-  const handleRenameSession = (id: string, threadId: string, title: string) => {
-    renameThread(id, threadId, title);
-  };
+  const handleRenameSession = useCallback(
+    (id: string, threadId: string, title: string) => {
+      renameThread(id, threadId, title);
+    },
+    [renameThread],
+  );
+
+  const handleRailOpen = useCallback(() => setRailOpen(true), []);
+
+  const handleAgentSelect = useCallback(
+    (id: string) => {
+      navigate(`/erxes-agent/chat/${id}`);
+      setRailOpen(false);
+    },
+    [navigate],
+  );
 
   const sendMessage = useCallback(
     (
@@ -373,6 +392,23 @@ export const ChatPage = () => {
   const handleStop = () => {
     if (agentId) chatStore.stop(agentId);
   };
+
+  // Composer callback props, stabilized so the memoized Composer /
+  // ReasoningEffortControl don't re-render on every streamed token.
+  const handleReasoningEffortChange = useCallback(
+    (effort?: ReasoningEffort) => chatStore.setReasoningEffort(agentId!, effort),
+    [agentId],
+  );
+
+  const handleVoiceModeToggle = useCallback(
+    () => chatStore.setVoiceMode(agentId!, !voiceMode),
+    [agentId, voiceMode],
+  );
+
+  const handleVoiceSetup = useCallback(
+    () => navigate('/settings/erxes-agent/voice'),
+    [navigate],
+  );
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     // The /slash skill picker claims arrow/Enter/Tab/Esc while it's open.
@@ -486,10 +522,7 @@ export const ChatPage = () => {
               agents={agents}
               loading={agentsLoading}
               activeAgentId={agentId}
-              onSelect={(id) => {
-                navigate(`/erxes-agent/chat/${id}`);
-                setRailOpen(false);
-              }}
+              onSelect={handleAgentSelect}
             />
           </div>
           {selectedAgent && agentId && (
@@ -512,7 +545,7 @@ export const ChatPage = () => {
                 onNew={handleNewThread}
                 onDelete={handleDeleteSession}
                 onRename={handleRenameSession}
-                onBack={() => setRailOpen(true)}
+                onBack={handleRailOpen}
               />
             </div>
           )}
@@ -666,15 +699,11 @@ export const ChatPage = () => {
                 attachments={attachments}
                 agentName={selectedAgent.name}
                 reasoningEffort={reasoningEffort}
-                onReasoningEffortChange={(effort) =>
-                  chatStore.setReasoningEffort(agentId!, effort)
-                }
+                onReasoningEffortChange={handleReasoningEffortChange}
                 voiceEnabled={voiceEnabled}
                 voiceMode={!!voiceMode}
-                onVoiceModeToggle={() =>
-                  chatStore.setVoiceMode(agentId!, !voiceMode)
-                }
-                onVoiceSetup={() => navigate('/settings/erxes-agent/voice')}
+                onVoiceModeToggle={handleVoiceModeToggle}
+                onVoiceSetup={handleVoiceSetup}
                 textareaRef={textareaRef}
                 fileInputRef={fileInputRef}
               />

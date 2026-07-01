@@ -1,4 +1,4 @@
-import { RefObject } from 'react';
+import { memo, RefObject } from 'react';
 import {
   IconLoader2,
   IconPaperclip,
@@ -14,7 +14,7 @@ import { VoiceModeToggle } from '~/modules/chat/voice/components/VoiceModeToggle
 
 type AttachmentsBag = ReturnType<typeof useAttachments>;
 
-export const Composer = ({
+export const Composer = memo(({
   input,
   onInputChange,
   onSend,
@@ -152,6 +152,7 @@ export const Composer = ({
           ) : (
             <Button
               size="icon"
+              aria-label="Send message"
               className="size-9 shrink-0 rounded-full transition-transform duration-150 hover:scale-105 active:scale-95 disabled:scale-100"
               onClick={onSend}
               disabled={!input.trim() || uploadsInFlight}
@@ -172,4 +173,5 @@ export const Composer = ({
     </div>
   </div>
   );
-};
+});
+Composer.displayName = 'Composer';

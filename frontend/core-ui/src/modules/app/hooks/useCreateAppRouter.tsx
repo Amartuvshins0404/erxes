@@ -62,6 +62,7 @@ export const useCreateAppRouter = () => {
         element={<Providers />}
         loader={async () => null}
         errorElement={<RouteErrorBoundary />}
+        hydrateFallbackElement={<div className="h-screen w-screen" />}
       >
         <Route path={AppPath.MainOnboarding} element={<MainOnboardingPage />} />
         <Route path={AppPath.CreateOwner} element={<CreateOwnerPage />} />

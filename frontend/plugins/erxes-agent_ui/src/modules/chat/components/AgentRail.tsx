@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { memo, useState } from 'react';
 import { IconSettings } from '@tabler/icons-react';
 import { Button, cn, ErxesLogoIcon, Skeleton, Tooltip } from 'erxes-ui';
 import { IChatAgent } from '~/modules/chat/hooks/useChatAgents';
@@ -11,7 +11,7 @@ import { EditAgentDialog } from '~/modules/chat/components/EditAgentDialog';
 
 // One agent row — subscribes to its own working/unread/activity slices so a
 // streaming reply only re-renders that row, not the whole rail.
-const AgentRailItem = ({
+const AgentRailItem = memo(({
   agent,
   isActive,
   onSelect,
@@ -93,9 +93,10 @@ const AgentRailItem = ({
       </div>
     </div>
   );
-};
+});
+AgentRailItem.displayName = 'AgentRailItem';
 
-export const AgentRail = ({
+export const AgentRail = memo(({
   agents,
   loading,
   activeAgentId,
@@ -155,4 +156,5 @@ export const AgentRail = ({
       )}
     </div>
   );
-};
+});
+AgentRail.displayName = 'AgentRail';

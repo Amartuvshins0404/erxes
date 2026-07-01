@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { memo, useState } from 'react';
 import { IconBrain, IconCheck } from '@tabler/icons-react';
 import { Button, Command, Popover, Tooltip } from 'erxes-ui';
 import {
@@ -60,7 +60,7 @@ const ReasoningOption = ({
  * agent (localStorage) and is unset by default, leaving the agent's configured
  * behaviour untouched.
  */
-export const ReasoningEffortControl = ({
+export const ReasoningEffortControl = memo(({
   value,
   onChange,
   disabled,
@@ -132,4 +132,5 @@ export const ReasoningEffortControl = ({
       </Popover.Content>
     </Popover>
   );
-};
+});
+ReasoningEffortControl.displayName = 'ReasoningEffortControl';

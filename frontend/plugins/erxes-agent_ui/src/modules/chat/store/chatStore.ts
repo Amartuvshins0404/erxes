@@ -6,7 +6,10 @@ import {
   MASTRA_MESSAGE_FEEDBACKS,
   MASTRA_THREAD_MESSAGES,
 } from '~/graphql/queries';
-import { MASTRA_MESSAGE_FEEDBACK } from '~/graphql/mutations';
+import {
+  MASTRA_MESSAGE_FEEDBACK,
+  MASTRA_CHAT_CANCEL,
+} from '~/graphql/mutations';
 import {
   AgentChatState,
   AgentUIMessage,
@@ -132,7 +135,7 @@ interface ChatStoreState {
   // Drop a removed thread's Chat + signals. The cached session list is filtered
   // by useRemoveMastraThread; this only clears store-side state.
   discardThread: (agentKey: string, threadId: string) => void;
-  stop: (agentKey: string) => void;
+  stop: (client: Client, agentKey: string) => void;
   sendMessage: (
     client: Client,
     agentKey: string,
@@ -208,6 +211,26 @@ export const useChatStore = create<ChatStoreState>((set, get) => {
   const reconcileAssistantMessageId = (key: string, messageId: string) => {
     if (!messageId) return;
     patchLastAssistantMeta(key, { messageId });
+  };
+
+  // Stamp the latest assistant message of a thread as `interrupted` so the
+  // "stopped" badge shows the instant the user clicks Stop — even mid-Thinking,
+  // before any text streamed and before the aborted stream could send `finish`.
+  // Mirrors reconcileAssistantMessageId: reassigning chat.messages re-renders.
+  const markLastAssistantInterrupted = (key: string) => {
+    const chat = get().chats[key];
+    if (!chat) return;
+    const msgs = chat.messages;
+    for (let i = msgs.length - 1; i >= 0; i--) {
+      if (msgs[i].role === 'assistant') {
+        chat.messages = msgs.map((m, idx) =>
+          idx === i
+            ? { ...m, metadata: { ...m.metadata, interrupted: true } }
+            : m,
+        );
+        return;
+      }
+    }
   };
 
   // Mark the turn persisted: clear activity, reconcile the cached session list
@@ -555,10 +578,23 @@ export const useChatStore = create<ChatStoreState>((set, get) => {
       }
     },
 
-    stop: (agentKey) => {
+    stop: (client, agentKey) => {
       const agent = get().agents[agentKey];
       if (!agent?.activeThreadId) return;
-      void get().chats[threadKey(agentKey, agent.activeThreadId)]?.stop();
+      const threadId = agent.activeThreadId;
+      const key = threadKey(agentKey, threadId);
+      // Abort the client reader (stops the incoming stream) and stamp the
+      // partial reply as stopped so the badge shows immediately.
+      void get().chats[key]?.stop();
+      markLastAssistantInterrupted(key);
+      // Explicit server-side cancel — the gateway proxy never forwards the
+      // client disconnect, so aborting the reader alone leaves the backend
+      // generating. Best-effort: the reader is already stopped regardless.
+      void client
+        .mutate({ mutation: MASTRA_CHAT_CANCEL, variables: { threadId } })
+        .catch(() => {
+          // ignore — the client stream is already stopped
+        });
     },
 
     sendMessage: (

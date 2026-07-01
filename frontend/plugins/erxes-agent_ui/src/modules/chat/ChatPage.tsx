@@ -371,7 +371,7 @@ export const ChatPage = () => {
   );
 
   const handleStop = () => {
-    if (agentId) chatStore.stop(agentId);
+    if (agentId) chatStore.stop(apolloClient, agentId);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {

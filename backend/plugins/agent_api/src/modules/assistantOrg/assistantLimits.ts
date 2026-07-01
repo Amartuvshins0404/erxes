@@ -312,7 +312,7 @@ const getBillingNoticeMessage = (overdueDays: number) => {
 };
 
 const getBillingState = (history?: ISaasOrganizationPlanHistory | null) => {
-  if (!history?.endsAt) {
+  if (!history) {
     return {
       blocked: false,
       overdueDays: 0,
@@ -321,18 +321,42 @@ const getBillingState = (history?: ISaasOrganizationPlanHistory | null) => {
     };
   }
 
-  const endDate = new Date(history.endsAt);
-  const overdueDays = Math.max(
-    0,
-    Math.ceil((Date.now() - endDate.getTime()) / (24 * 60 * 60 * 1000)),
-  );
-  const blocked = overdueDays > 0;
+  // A plan only counts as "paid/covered" while it is active AND within its
+  // window — the exact same test computeActivePlanLimit uses to grant the
+  // limit. Anything else (expired, canceled, or a past_due->failed sub whose
+  // endsAt has not passed yet) is unpaid, so the overview must not report
+  // "no outstanding payment" while getAssistantLimit already flags a warning.
+  const isCovered =
+    ACTIVE_HISTORY_STATUSES.includes(history.status || '') &&
+    isHistoryCurrent(history);
+
+  if (isCovered) {
+    return {
+      blocked: false,
+      overdueDays: 0,
+      paymentStatus: 'paid' as const,
+      message: '',
+    };
+  }
+
+  // Overdue is measured from when coverage actually lapsed (endsAt if it has
+  // passed, otherwise the moment the plan went unpaid) rather than from endsAt
+  // alone, so a failed sub with a still-future endsAt is treated as overdue.
+  const graceStart = getBillingGraceStart(history);
+  const overdueDays = graceStart
+    ? Math.max(
+        0,
+        Math.ceil(
+          (Date.now() - graceStart.getTime()) / (24 * 60 * 60 * 1000),
+        ),
+      )
+    : 0;
 
   return {
-    blocked,
+    blocked: true,
     overdueDays,
-    paymentStatus: blocked ? ('unpaid' as const) : ('paid' as const),
-    message: blocked ? getBillingNoticeMessage(overdueDays) : '',
+    paymentStatus: 'unpaid' as const,
+    message: getBillingNoticeMessage(overdueDays),
   };
 };
 

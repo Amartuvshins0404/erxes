@@ -22,7 +22,6 @@ export const TypeExtensions = `
   extend type cpPoscProduct @key(fields: "_id") {
     _id: String @external
     supplier: MushopSupplier
-    moq: Float
-    prePaymentAmount: Float
+    terms: JSON
   }
 `;

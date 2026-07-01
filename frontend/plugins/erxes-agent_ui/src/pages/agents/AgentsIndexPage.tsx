@@ -57,6 +57,7 @@ import {
   showAgentQuotaError,
   useAgentAccess,
 } from './hooks/useAgentAccess';
+import { useAgentsBasePath } from './hooks/useAgentsBasePath';
 import type { IMastraAgentQuotaStatus } from './types';
 
 type IAgent = IMastraAgentRow;
@@ -74,6 +75,7 @@ const agentListCacheUpdate = (cache: ApolloCache<unknown>) => {
 
 const CreateAgentButton = ({ children }: { children: React.ReactNode }) => {
   const navigate = useNavigate();
+  const basePath = useAgentsBasePath();
   const { canCreate, isAdmin } = useAgentAccess();
 
   const { data: quotaData } = useQuery<{
@@ -87,7 +89,7 @@ const CreateAgentButton = ({ children }: { children: React.ReactNode }) => {
     <PermissionButton
       allowed={allowed}
       onDenied={atQuota ? showAgentQuotaError : showAgentPermissionError}
-      onClick={() => navigate('/settings/erxes-agent/agents/new')}
+      onClick={() => navigate(`${basePath}/new`)}
     >
       {children}
     </PermissionButton>
@@ -98,6 +100,7 @@ const CreateAgentButton = ({ children }: { children: React.ReactNode }) => {
 
 const AgentMoreCell = ({ agent }: { agent: IAgent }) => {
   const navigate = useNavigate();
+  const basePath = useAgentsBasePath();
   const { confirm } = useConfirm();
   const { canEditAgent, canRemoveAgent } = useAgentAccess();
 
@@ -146,9 +149,7 @@ const AgentMoreCell = ({ agent }: { agent: IAgent }) => {
           className="justify-start w-full h-8"
           allowed={canEdit}
           onDenied={showAgentPermissionError}
-          onClick={() =>
-            navigate(`/settings/erxes-agent/agents/edit/${agent._id}`)
-          }
+          onClick={() => navigate(`${basePath}/edit/${agent._id}`)}
         >
           <IconPencil className="size-4" /> Edit
         </PermissionButton>
@@ -256,6 +257,7 @@ const buildBaseColumns = (
   scopeNames: Record<string, string>,
   sort: SortState,
   onSort: (id: string) => void,
+  basePath: string,
 ): ColumnDef<IAgent>[] => [
   {
     id: 'name',
@@ -277,7 +279,7 @@ const buildBaseColumns = (
           tone="muted"
           name={
             <Link
-              to={`/settings/erxes-agent/agents/edit/${_id}`}
+              to={`${basePath}/edit/${_id}`}
               className="font-medium hover:underline cursor-pointer"
             >
               {name}
@@ -396,6 +398,7 @@ const buildColumns = (
   scopeNames: Record<string, string>,
   sort: SortState,
   onSort: (id: string) => void,
+  basePath: string,
 ): ColumnDef<IAgent>[] => [
   {
     id: 'more',
@@ -403,12 +406,13 @@ const buildColumns = (
     size: 33,
   },
   RecordTable.checkboxColumn as ColumnDef<IAgent>,
-  ...buildBaseColumns(scopeNames, sort, onSort),
+  ...buildBaseColumns(scopeNames, sort, onSort, basePath),
 ];
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export const AgentsIndexPage = () => {
+  const basePath = useAgentsBasePath();
   const { agentsList, loading, pageInfo, handleFetchMore } =
     useMastraAgentList();
 
@@ -454,15 +458,15 @@ export const AgentsIndexPage = () => {
   const { sort, toggle, sorted } = useTableSort(agentsList, getSortValue);
 
   const columns = useMemo(
-    () => buildColumns(scopeNames, sort, toggle),
-    [scopeNames, sort, toggle],
+    () => buildColumns(scopeNames, sort, toggle, basePath),
+    [scopeNames, sort, toggle, basePath],
   );
 
   return (
     <ResourceIndexLayout<IAgent>
       icon={IconRobot}
       title="Agents"
-      rootPath="/settings/erxes-agent/agents"
+      rootPath={basePath}
       sessionKey="erxes_agent_agents"
       columns={columns}
       data={sorted}

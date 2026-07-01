@@ -1,18 +1,18 @@
 import { deriveVoiceStatus, partialTail, toolStatusLabel } from './voiceStatus';
 
 describe('toolStatusLabel', () => {
-  it('maps known tools to friendly Mongolian labels', () => {
-    expect(toolStatusLabel('web-search')).toBe('Вэбээс хайж байна…');
-    expect(toolStatusLabel('read-attachment')).toBe('Файл уншиж байна…');
+  it('maps known tools to friendly labels', () => {
+    expect(toolStatusLabel('web-search')).toBe('Searching the web…');
+    expect(toolStatusLabel('read-attachment')).toBe('Reading the file…');
   });
 
   it('groups every workflow tool under one umbrella line', () => {
-    expect(toolStatusLabel('workflow-run-now')).toBe('Урсгал боловсруулж байна…');
-    expect(toolStatusLabel('workflow-validate')).toBe('Урсгал боловсруулж байна…');
+    expect(toolStatusLabel('workflow-run-now')).toBe('Processing the workflow…');
+    expect(toolStatusLabel('workflow-validate')).toBe('Processing the workflow…');
   });
 
   it('falls back to a generic label for unknown tools', () => {
-    expect(toolStatusLabel('some-future-tool')).toBe('Багаж ашиглаж байна…');
+    expect(toolStatusLabel('some-future-tool')).toBe('Using a tool…');
   });
 });
 
@@ -31,9 +31,9 @@ describe('partialTail', () => {
 
 describe('deriveVoiceStatus', () => {
   it('shows the phase label for the simple phases', () => {
-    expect(deriveVoiceStatus({ phase: 'listening' }).label).toBe('Сонсож байна…');
+    expect(deriveVoiceStatus({ phase: 'listening' }).label).toBe('Listening…');
     expect(deriveVoiceStatus({ phase: 'transcribing' }).label).toBe(
-      'Бичиж байна…',
+      'Transcribing…',
     );
   });
 
@@ -49,32 +49,32 @@ describe('deriveVoiceStatus', () => {
       activeToolName: 'web-search',
       serverActivity: 'Searching the web for invoices',
     });
-    expect(view.label).toBe('Вэбээс хайж байна…');
+    expect(view.label).toBe('Searching the web…');
     expect(view.detail).toBe('Searching the web for invoices');
   });
 
   it('falls back to the thinking label when no tool is active', () => {
     const view = deriveVoiceStatus({ phase: 'thinking', serverActivity: '  ' });
-    expect(view.label).toBe('Бодож байна…');
+    expect(view.label).toBe('Thinking…');
     expect(view.detail).toBeUndefined();
   });
 
   it('reads back the streaming reply while thinking with no tool', () => {
     const view = deriveVoiceStatus({
       phase: 'thinking',
-      partialText: 'Захиалгыг шалгаж байна.',
+      partialText: 'Checking the order.',
       serverActivity: 'Thinking',
     });
-    expect(view.label).toBe('Бодож байна…');
-    expect(view.detail).toBe('Захиалгыг шалгаж байна.');
+    expect(view.label).toBe('Thinking…');
+    expect(view.detail).toBe('Checking the order.');
   });
 
   it('reads back the streamed reply tail while speaking', () => {
     const view = deriveVoiceStatus({
       phase: 'speaking',
-      partialText: 'Сайн байна уу.',
+      partialText: 'Hello there.',
     });
-    expect(view.label).toBe('Хариулж байна…');
-    expect(view.detail).toBe('Сайн байна уу.');
+    expect(view.label).toBe('Responding…');
+    expect(view.detail).toBe('Hello there.');
   });
 });

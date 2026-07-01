@@ -23,6 +23,7 @@ export const CopyButton = ({ text }: { text: string }) => {
         <Tooltip.Trigger asChild>
           <button
             type="button"
+            aria-label={copied ? 'Copied!' : 'Copy'}
             onClick={handleCopy}
             className="size-6 flex items-center justify-center rounded hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-muted-foreground hover:text-foreground"
           >

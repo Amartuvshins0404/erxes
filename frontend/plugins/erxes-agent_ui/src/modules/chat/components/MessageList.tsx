@@ -77,8 +77,10 @@ export const MessageList = ({
                 </p>
               )}
             </div>
-            <Badge variant="secondary" className="font-mono text-[11px]">
-              {agent.provider} · {agent.model}
+            <Badge variant="secondary" className="font-mono text-xs mt-1">
+              {agent.provider === agent.model
+                ? agent.model
+                : `${agent.provider} · ${agent.model}`}
             </Badge>
             <div className="mt-3 flex flex-wrap justify-center gap-2 max-w-md">
               {[

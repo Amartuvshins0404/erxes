@@ -23,6 +23,7 @@ import { metaToUIMessages } from '~/modules/chat/lib/messageMapping';
 import { createChatTransport } from '~/modules/chat/lib/chatTransport';
 import {
   prependThreadToCache,
+  refetchThreadArtifactsIntoCache,
   refetchThreadsIntoCache,
   setThreadTitleInCache,
 } from '~/modules/chat/threadsCache';
@@ -233,6 +234,8 @@ export const useChatStore = create<ChatStoreState>((set, get) => {
       patchAgent(agentKey, { isDraft: false });
     }
     void refetchThreadsIntoCache(client, mastraAgentId);
+    // Surface any file the turn produced in the Files panel without a reload.
+    void refetchThreadArtifactsIntoCache(client, threadId);
   };
 
   // Create + register a Chat for one agent+thread, wiring the transport and the

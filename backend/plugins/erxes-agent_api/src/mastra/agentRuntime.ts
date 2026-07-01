@@ -18,7 +18,7 @@ import { resolveDestructiveOpsPolicy } from './tools/destructiveGuard';
 import { writeAgentAction, AgentActionInput } from './auditLog';
 import { isAdvancedMemoryEnabled } from './memory/config';
 import { getMastraMemory } from './memory/mastraMemory';
-import { ToolCallFilter } from '@mastra/core/processors';
+import { ToolCallSignalFilter } from './memory/toolCallSignalFilter';
 import { isEvaluationEnabled } from './scoring/config';
 import { buildAgentScorers } from './scoring/scorers';
 import { getObservabilityHost } from './scoring/observability';
@@ -223,9 +223,11 @@ export async function getOrCreateAgent(
   const temperature = agentConfig.temperature;
   const hasTemperature = typeof temperature === 'number';
 
-  // Per-tenant Mastra Memory (recall + working memory). ToolCallFilter strips
-  // tool-call frames from any replayed/recalled history so reasoning models
-  // (Kimi) don't reject the request. Both are opt-in via advanced memory.
+  // Per-tenant Mastra Memory (recall + working memory). ToolCallSignalFilter
+  // strips raw tool-call frames from any replayed/recalled history so reasoning
+  // models (Kimi) don't reject the request, but leaves a text breadcrumb so the
+  // model keeps calling render tools on later turns. Both are opt-in via
+  // advanced memory.
   const memory = useMemory ? await getMastraMemory(subdomain) : undefined;
 
   // Quality scorers (heuristic + LLM-judge using this agent's own model) — only
@@ -248,7 +250,9 @@ export async function getOrCreateAgent(
     instructions: systemPrompt,
     model,
     tools: toolNames.length ? tools : undefined,
-    ...(memory ? { memory, inputProcessors: [new ToolCallFilter()] } : {}),
+    ...(memory
+      ? { memory, inputProcessors: [new ToolCallSignalFilter()] }
+      : {}),
     ...(scorers ? { scorers } : {}),
     ...(skillsWorkspace ? { workspace: skillsWorkspace } : {}),
     // generate()/stream() read defaultOptions. Temperature is only set when the

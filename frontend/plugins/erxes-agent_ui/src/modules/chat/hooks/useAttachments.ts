@@ -55,6 +55,21 @@ export const useAttachments = (enabled: boolean) => {
 
       const id = `att-${Date.now()}-${randomIdSuffix(6)}`;
 
+      // Reject empty files up front — a 0-byte upload only trips a raw parser
+      // error server-side and would block the whole send. Mirror the oversize
+      // path: mark it errored without staging the file or a preview URL.
+      if (file.size === 0) {
+        staged.push({
+          id,
+          name: file.name,
+          type: file.type || 'application/octet-stream',
+          size: 0,
+          status: 'error',
+          error: 'This file is empty',
+        });
+        continue;
+      }
+
       // Reject oversize files up front — mark them errored without staging the
       // file (nothing to upload) or a preview URL that would need cleanup.
       if (file.size > MAX_ATTACHMENT_BYTES) {

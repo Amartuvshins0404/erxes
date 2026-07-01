@@ -47,6 +47,9 @@ export const agentSchema = new Schema(
     temperature: { type: Number, min: 0, max: 2, label: 'Temperature' },
     isEnabled: { type: Boolean, default: true },
     createdBy: { type: String, label: 'Created By' },
+    // Background-run principal (Phase 3): bounded user whose gateway permissions
+    // background runs (bot/schedule) act under. Unset → defaults to createdBy.
+    ownerUserId: { type: String, label: 'Owner User' },
     visibility: {
       type: String,
       enum: ['private', 'team', 'department', 'unit', 'org'],

@@ -3,6 +3,27 @@ import { IContext } from '~/connectionResolvers';
 import { IMastraAgent } from '@/agent/@types/agent';
 import { isAgentAdmin, getAgentQuotaStatus } from '@/agent/utils';
 
+/**
+ * Authorize a requested `ownerUserId` value. The owner is the identity
+ * background runs mint a real gateway token for, so naming someone else as
+ * owner is equivalent to acting as that user. Because an `isOwner` target
+ * short-circuits every permission check, the bar is true ORGANIZATION
+ * OWNERSHIP — not the agent-admin group, which would otherwise be a path to
+ * isOwner. So only an org owner (already top privilege, can't be escalated by
+ * assignment) may name an owner other than themselves; everyone else may omit
+ * it (createdBy default) or name only their own _id. No-op when not supplied.
+ */
+const assertOwnerAssignable = (
+  ownerUserId: string | undefined,
+  callerId: string,
+  callerIsOwner: boolean,
+) => {
+  if (!ownerUserId || callerIsOwner || ownerUserId === callerId) return;
+  throw new ExpectedError(
+    'Only an organization owner may assign another user as the agent owner',
+  );
+};
+
 export const agentMutations = {
   mastraAgentCreate: async (
     _parent: undefined,
@@ -17,6 +38,14 @@ export const agentMutations = {
     if (!admin && doc.visibility && doc.visibility !== 'private') {
       throw new ExpectedError('Users may only create private agents');
     }
+
+    // The owner is the principal background runs (bot/schedule) mint a gateway
+    // token for (Phase 3). Assigning it to another user = acting as that user,
+    // and an isOwner target bypasses every permission check, so only an org
+    // owner may name an owner other than themselves; otherwise an agent-admin
+    // (or any user) could bind the agent to an org owner and escalate to
+    // isOwner. Everyone else gets the createdBy default below.
+    assertOwnerAssignable(doc.ownerUserId, user._id, Boolean(user.isOwner));
 
     if (!admin) {
       const status = await getAgentQuotaStatus(models, user._id);
@@ -36,6 +65,11 @@ export const agentMutations = {
     await checkPermission('agentsEdit');
     if (!user?._id) throw new ExpectedError('Login required');
     const admin = isAgentAdmin(user);
+    // Same owner-assignment guard as create: reassigning the owner = acting as
+    // that user when background runs mint its token, so only an org owner may
+    // name someone other than themselves (the createdBy filter scopes non-owners
+    // to their own agents, but the owner VALUE is otherwise unconstrained).
+    assertOwnerAssignable(doc.ownerUserId, user._id, Boolean(user.isOwner));
     return models.MastraAgent.updateAgent(_id, doc, admin ? undefined : user._id);
   },
 

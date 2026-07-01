@@ -4,8 +4,10 @@ export const appQueries = {
   async apps(
     _parent: undefined,
     { searchValue, page = 1, perPage = 20 }: any,
-    { models }: IContext,
+    { models, checkPermission }: IContext,
   ) {
+    await checkPermission('appsManage');
+
     const qry: any = {};
 
     if (searchValue) {
@@ -35,8 +37,10 @@ export const appQueries = {
   async appDetail(
     _parent: undefined,
     { _id }: { _id: string },
-    { models }: IContext,
+    { models, checkPermission }: IContext,
   ) {
+    await checkPermission('appsManage');
+
     return models.Apps.findOne({ _id });
   },
 };

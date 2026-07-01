@@ -1,5 +1,6 @@
 import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
+import { sendTRPCMessage } from 'erxes-api-shared/utils';
 import {
   executeErxesOperation,
   graphqlTypeToString,
@@ -21,6 +22,7 @@ import {
   isSecurityBlockedOperation,
   securityBlockedResult,
 } from './securityGuard';
+import { redactSecrets } from './secretRedaction';
 import { getCurrentAuth } from '../requestContext';
 import { makeAgentProcessId, type AgentActionInput } from '../auditLog';
 
@@ -317,7 +319,9 @@ export function buildErxesMetaTools(params: {
           operation,
           operationType: 'query',
           destructive: false,
-          args: coerceArgs(args),
+          // Redact secret-valued args (a blocked `login`/`resetPassword` attempt
+          // otherwise writes a plaintext password into the audit store).
+          args: redactSecrets(coerceArgs(args)),
           status: 'blocked',
           error: 'security-blocked',
         });
@@ -354,7 +358,7 @@ export function buildErxesMetaTools(params: {
             operation,
             operationType: op.operationType,
             destructive: true,
-            args: callArgs,
+            args: redactSecrets(callArgs),
             status: 'blocked',
             error: 'awaiting user approval',
           });
@@ -387,7 +391,8 @@ export function buildErxesMetaTools(params: {
           operation,
           operationType: op.operationType,
           destructive: isDestructiveOperation(op),
-          args: callArgs,
+          // Audit records the secret-redacted args (never plaintext credentials).
+          args: redactSecrets(callArgs),
           status: failed ? 'failed' : 'success',
           error: failed
             ? String((result as { error?: unknown }).error ?? '')
@@ -434,9 +439,73 @@ export function buildErxesMetaTools(params: {
     }),
   });
 
+  // Names-only config discovery. Lets the model see WHICH configuration codes are
+  // set (so it can answer "is Cloudflare/SES configured?" and avoid re-wiring
+  // something already present) while never exposing a value — core returns only
+  // the codes (`configs.getCodes` → `.distinct('code')`). This is why the bulk
+  // `configs` read can stay hard-blocked in securityGuard: discovery is a
+  // separate, structurally value-free channel, not a redacted config dump.
+  const listConfigKeys = createTool({
+    id: 'list_config_keys',
+    description:
+      'List which erxes configuration codes are currently SET (names only — the ' +
+      'values are never returned and cannot be read). Use this to check whether an ' +
+      'integration or credential is already configured before wiring it, e.g. ' +
+      '"is Cloudflare or SES set up?".',
+    inputSchema: z.object({}),
+    outputSchema: z.any(),
+    execute: async () => {
+      const subdomain = getCurrentAuth()?.subdomain || '';
+      try {
+        // defaultValue null (not []) so a failed/absent core call is
+        // distinguishable from a genuinely empty config set — otherwise the tool
+        // would falsely report "nothing is configured" when it simply couldn't
+        // reach core.
+        const codes = await sendTRPCMessage({
+          subdomain,
+          pluginName: 'core',
+          module: 'configs',
+          action: 'getCodes',
+          method: 'query',
+          input: {},
+          defaultValue: null,
+        });
+        if (codes == null) {
+          return {
+            success: false,
+            error: 'Could not reach the configuration service.',
+            instruction:
+              'Tell the user the configuration list is temporarily unavailable; do not guess what is configured.',
+          };
+        }
+        const list = Array.isArray(codes) ? codes.map(String) : [];
+        return {
+          total: list.length,
+          codes: list,
+          note: list.length
+            ? 'These configuration codes are set. Values are hidden and cannot be read. ' +
+              'To change a config that holds a secret, send ONLY the fields you are ' +
+              'changing — omitted keys keep their stored values.'
+            : 'No configuration codes are set on this instance.',
+        };
+      } catch {
+        return {
+          success: false,
+          error: 'Could not reach the configuration service.',
+          instruction:
+            'Tell the user the configuration list is temporarily unavailable; do not guess what is configured.',
+        };
+      }
+    },
+  });
+
   return {
     search_erxes_operations: search,
     execute_erxes_operation: execute,
+    // Config discovery is bound ONLY for unrestricted (mode:'all') agents — a
+    // narrowly-scoped agent (e.g. a customer-facing bot) has no business
+    // enumerating the instance's configuration topology, even names-only.
+    ...(policy.mode === 'all' ? { list_config_keys: listConfigKeys } : {}),
     // Only offered when approval is needed — with 'allow', ops run directly.
     ...(destructiveOps !== 'allow' ? { request_approval: requestApproval } : {}),
   };

@@ -18,6 +18,10 @@ import {
 } from '@/agent/turn';
 import { getOrCreateAgent } from '~/mastra/agentRuntime';
 import { runWithAuth } from '~/mastra/requestContext';
+import {
+  resolveBackgroundToken,
+  isSecureBackgroundRunRequired,
+} from '~/mastra/auth/runToken';
 import { isAdvancedMemoryEnabled } from '~/mastra/memory/config';
 import { scopedResource } from '~/mastra/memory/mastraMemory';
 
@@ -94,7 +98,26 @@ export async function runSchedule(args: {
         }
       : undefined;
 
-    const authCtx = { token: settings?.erxesApiToken, subdomain };
+    // Scheduled runs have no user session — run as the agent's bound owner
+    // (Phase 3). Falls back to the static app token ONLY in the degraded mode
+    // where the secure path isn't active (secret unset or no owner). When the
+    // secure path IS active (secret set + owner present) but the mint failed
+    // (owner deactivated, secret skew, core unreachable) we fail closed rather
+    // than fall back to the privileged app token — falling back would silently
+    // escalate the run to admin instead of stopping the schedule.
+    const ownerToken = await resolveBackgroundToken(agentConfig, subdomain);
+    if (!ownerToken && isSecureBackgroundRunRequired(agentConfig)) {
+      return finish({
+        status: 'failed',
+        error:
+          'Owner token mint failed (owner deactivated or secret skew); run refused — not falling back to app token',
+      });
+    }
+    if (!ownerToken)
+      console.warn(
+        '[agent] scheduled run falling back to app token — set ERXES_AGENT_RUN_TOKEN_SECRET and an agent owner',
+      );
+    const authCtx = { token: ownerToken ?? settings?.erxesApiToken, subdomain };
 
     const convo: TurnMessage[] = [{ role: 'user', content: schedule.prompt }];
     const reply = await runWithAuth(authCtx, () =>

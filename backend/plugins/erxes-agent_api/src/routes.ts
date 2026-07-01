@@ -24,6 +24,10 @@ import {
   ReasoningEffort,
 } from './mastra/providers';
 import { runWithAuth, ApprovedOp } from './mastra/requestContext';
+import {
+  resolveBackgroundToken,
+  isSecureBackgroundRunRequired,
+} from './mastra/auth/runToken';
 import { isAdvancedMemoryEnabled } from './mastra/memory/config';
 import { scopedResource } from './mastra/memory/mastraMemory';
 import { augmentConvo } from './mastra/memory';
@@ -709,8 +713,32 @@ router.post('/bot/:conversationId', llmRouteLimiter, async (req, res) => {
       learnedDigestBlock: digest?.block,
     });
 
-    // Bot requests use the static app token from settings (no user session).
-    const authCtx = { token: settings?.erxesApiToken, subdomain };
+    // Bot requests have no user session — run as the agent's bound owner
+    // (Phase 3). Falls back to the static app token ONLY in the degraded mode
+    // where the secure path isn't active (secret unset or no owner). When the
+    // secure path IS active (secret set + owner present) but the mint failed
+    // (owner deactivated, secret skew, core unreachable) we fail closed rather
+    // than fall back to the privileged app token — falling back would silently
+    // escalate the run to admin instead of stopping the bot.
+    const ownerToken = await resolveBackgroundToken(agentConfig, subdomain);
+    if (!ownerToken && isSecureBackgroundRunRequired(agentConfig)) {
+      console.error(
+        '[agent] bot run refused — owner token mint failed (owner deactivated or secret skew); not falling back to app token',
+      );
+      return res.json({
+        responses: [
+          {
+            type: 'text',
+            text: 'This bot is temporarily unavailable. Please try again later.',
+          },
+        ],
+      });
+    }
+    if (!ownerToken)
+      console.warn(
+        '[agent] bot run falling back to app token — set ERXES_AGENT_RUN_TOKEN_SECRET and an agent owner',
+      );
+    const authCtx = { token: ownerToken ?? settings?.erxesApiToken, subdomain };
     const reply =
       (await runWithAuth(authCtx, () =>
         runAgentTurn({

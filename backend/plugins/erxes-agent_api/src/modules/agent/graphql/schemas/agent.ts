@@ -17,6 +17,7 @@ export const types = `
     temperature: Float
     isEnabled: Boolean
     createdBy: String
+    ownerUserId: String
     isOwnAgent: Boolean
     visibility: String
     teamId: String
@@ -42,6 +43,7 @@ export const types = `
     maxSteps: Int
     temperature: Float
     isEnabled: Boolean
+    ownerUserId: String
     visibility: String
     teamId: String
     departmentId: String

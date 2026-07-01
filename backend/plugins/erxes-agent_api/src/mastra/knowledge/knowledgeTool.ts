@@ -117,8 +117,8 @@ export const companyKnowledgeTool = createTool({
       const gql = makeGqlExec(
         settings.erxesApiUrl || 'http://localhost:4000',
         buildAuthHeaders({
-          userHeader: auth?.userHeader,
-          apiToken: auth?.token || settings.erxesApiToken,
+          token: auth?.token,
+          apiToken: settings.erxesApiToken,
         }),
       );
 

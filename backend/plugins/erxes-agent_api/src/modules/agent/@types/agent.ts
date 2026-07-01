@@ -23,6 +23,10 @@ export interface IMastraAgent {
   temperature?: number;
   isEnabled?: boolean;
   createdBy?: string;
+  // Background-run principal (Phase 3): the bounded user whose gateway
+  // permissions frontline-bot and scheduled runs act under. Defaults to the
+  // creator (`createdBy`) when unset; reassignable to scope an exposed agent.
+  ownerUserId?: string;
   // Access control: who can see and chat with this agent.
   visibility?: 'private' | 'team' | 'department' | 'unit' | 'org';
   // teamId stores the branch _id for all scoped modes (team/department/unit) so

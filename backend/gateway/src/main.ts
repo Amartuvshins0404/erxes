@@ -31,6 +31,7 @@ import {
   getSubdomain,
   isDev,
   redis,
+  sanitizeHeaders,
   setActivePlugins,
 } from 'erxes-api-shared/utils';
 import { generateModels } from '~/connectionResolver';
@@ -148,6 +149,13 @@ app.use(async (req, res, next) => {
   // }
 
   return cors(corsOptions)(req, res, next);
+});
+
+// Trust boundary: strip client-supplied identity headers (user/userid/erxes-subdomain)
+// so userMiddleware can only derive identity from a verified JWT, never a forged header.
+app.use((req, _res, next) => {
+  sanitizeHeaders(req.headers);
+  next();
 });
 
 app.use(userMiddleware);

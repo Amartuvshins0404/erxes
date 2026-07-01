@@ -22,7 +22,8 @@ import {
   looksLikeStackFrame,
   sanitizeServerError,
 } from './serverErrorClassifier';
-import { redactSecrets } from './secretRedaction';
+import { redactSecrets, REDACTED } from './secretRedaction';
+import { scrubArgs } from './argScrub';
 
 // Re-export the introspection + humanisation surface so existing importers
 // (metaTools, operationRegistry, tests) keep their `from './erxesTools'` paths.
@@ -217,19 +218,23 @@ const isValidObjectId = (value?: string): boolean =>
   /^[a-f0-9]{24}$/i.test(value ?? '');
 
 /**
- * Auth headers for gateway calls: the calling user's request header when
- * present, otherwise the configured app token (bot/no-session calls).
+ * Auth headers for gateway calls: the calling user's login token as a Bearer,
+ * otherwise the configured app token (bot/no-session calls). The decoded
+ * `userHeader` is NEVER sent outbound — it stays in requestContext for INTERNAL
+ * gating only (requireTeamMember, currentUserId, resource scoping). Exported so
+ * the header contract can be unit-tested in isolation.
  */
-function buildAuthHeaders(
+export function buildAuthHeaders(
   appToken: string,
   processId?: string,
 ): Record<string, string> {
   const reqAuth = getCurrentAuth();
   const authHeaders: Record<string, string> = {};
-  if (reqAuth?.userHeader) {
-    authHeaders['user'] = reqAuth.userHeader;
-  } else if (reqAuth?.token || appToken) {
-    authHeaders['Authorization'] = asBearer(reqAuth?.token || appToken);
+  // Forward identity as `Authorization: Bearer <token>` only (the gateway's
+  // userMiddleware resolves the request as that user); never a `user` header.
+  const bearer = reqAuth?.token || appToken;
+  if (bearer) {
+    authHeaders['Authorization'] = asBearer(bearer);
   }
   if (reqAuth?.subdomain) {
     // The gateway resolves the tenant via getSubdomain(), which reads the
@@ -320,6 +325,52 @@ async function resolveDealsAddStageArg(
 const joinErrors = (errs: Array<{ message: string }>): string =>
   errs.map((err) => err.message).join('; ');
 
+// The agent has no way to read or inject secret VALUES — that path is
+// deliberately closed (see secretRedaction). Blocked secret material in ANY
+// operation's args (queries included; the guard runs op-wide as a uniform net,
+// though writes are where corruption bites) is refused. Two shapes:
+//   1. invented reference syntax — `{{secret:CODE}}` / `{{keep}}` — which, with
+//      no server-side resolver, would land as a literal placeholder in a
+//      credential field and silently break the integration;
+//   2. the redactor's own REDACTED sentinel — echoed back in a read-modify-write
+//      it would overwrite the real stored secret with the placeholder string.
+// Both mean the same fix: OMIT that field. configsUpdate is a partial upsert, so
+// an omitted key keeps its stored value untouched. Refusing the whole op (rather
+// than silently stripping the field) is deliberate — stripping would WIPE the
+// secret on replace-on-edit sinks; the instruction tells the model to retry.
+const SECRET_REF_RE = /\{\{\s*(?:secret\s*:|keep\s*\}\})/i;
+
+/** True when any string leaf in the args carries blocked secret material. */
+function hasBlockedSecretMaterial(value: unknown, depth = 0): boolean {
+  // Fail SAFE past the defensive depth cap (mirrors secretRedaction): if the
+  // tree can't be fully scanned, REFUSE rather than let unvetted material
+  // through. Real argument trees never approach this depth.
+  if (depth > 16) return true;
+  if (typeof value === 'string')
+    return SECRET_REF_RE.test(value) || value.includes(REDACTED);
+  if (Array.isArray(value))
+    return value.some((v) => hasBlockedSecretMaterial(v, depth + 1));
+  if (value && typeof value === 'object') {
+    return Object.values(value as Record<string, unknown>).some((v) =>
+      hasBlockedSecretMaterial(v, depth + 1),
+    );
+  }
+  return false;
+}
+
+/** Structured refusal returned when the model uses secret-reference syntax. */
+function secretRefRefusedResult() {
+  return {
+    success: false,
+    error: 'Secret references are not supported.',
+    instruction:
+      'You cannot read or set secret values (API tokens, passwords and keys are ' +
+      'hidden). To update a configuration that already contains a secret while ' +
+      'changing other fields, send ONLY the fields you are changing — omitted keys ' +
+      'keep their stored values. Never invent a secret value or paste one the user gave you.',
+  };
+}
+
 /**
  * Runs a single erxes GraphQL operation by name on the user's behalf and returns
  * its result (or a structured { success:false, … } payload the model can act on).
@@ -363,6 +414,22 @@ export async function executeErxesOperation(
     let resolvedArgs: Record<string, unknown> = parsed.success
       ? { ...(parsed.data as Record<string, unknown>) }
       : { ...(rawArgs || {}) };
+
+    // Strip high-risk keys the agent must never set (e.g. usersEdit password /
+    // email / groupIds, usersInvite permissionGroupIds) before the args become a
+    // GraphQL call — the arg-scoped complement to the full-operation denylist.
+    resolvedArgs = scrubArgs(erxesOperation, resolvedArgs);
+
+    // Refuse blocked secret material — invented reference syntax
+    // ({{secret:CODE}} / {{keep}}) or an echoed REDACTED sentinel. There is NO
+    // server-side secret resolver by design; letting either through would
+    // silently corrupt a credential field. The guard sits at this shared
+    // chokepoint so both the chat meta-tool and the workflow runtime are covered;
+    // the chat path audits the refusal via recordAction (the args it logs hold
+    // only placeholders, never a real secret).
+    if (hasBlockedSecretMaterial(resolvedArgs)) {
+      return secretRefRefusedResult();
+    }
 
     // Auth must be resolved first — needed for any pre-flight stage lookups.
     const authHeaders = buildAuthHeaders(token, processId);

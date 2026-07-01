@@ -43,7 +43,12 @@ function resolveIdentity(
   agentId: string,
   advanced: boolean,
   message: string,
-): { resourceId: string; useMemory: boolean; userHeader?: string } {
+): {
+  resourceId: string;
+  useMemory: boolean;
+  userHeader?: string;
+  token?: string;
+} {
   switch (identity.kind) {
     case 'user':
       return {
@@ -53,6 +58,11 @@ function resolveIdentity(
         userHeader: identity.user
           ? Buffer.from(JSON.stringify(identity.user)).toString('base64')
           : undefined,
+        // Forward the logged-in user's login token outbound (as a Bearer) so
+        // gateway calls run under THEIR permissions — not the app token. The
+        // decoded user carries loginToken even though IUserDocument omits it.
+        token: (identity.user as { loginToken?: string } | undefined)
+          ?.loginToken,
       };
     case 'bot':
       return {
@@ -147,7 +157,7 @@ export async function prepareTurn(
   // Advanced memory rides on the agent's own memory toggle.
   const advanced = isAdvancedMemoryEnabled() && useHistory;
 
-  const { resourceId, useMemory, userHeader } = resolveIdentity(
+  const { resourceId, useMemory, userHeader, token } = resolveIdentity(
     identity,
     agentId,
     advanced,
@@ -322,7 +332,9 @@ export async function prepareTurn(
 
   const authCtx = {
     userHeader,
-    token: settings?.erxesApiToken,
+    // Interactive turns forward the user's own login token; bot/schedule turns
+    // (no login token) fall back to the configured app token.
+    token: token ?? settings?.erxesApiToken,
     userId,
     threadId: sessionId,
     agentId,

@@ -107,8 +107,8 @@ export async function runKnowledgeSweep(
       // Index AS the requesting user (erxes enforces their permissions); fall
       // back to the configured app token only when no user auth is present.
       buildAuthHeaders({
-        userHeader: auth?.userHeader,
-        apiToken: auth?.token || settings.erxesApiToken,
+        token: auth?.token,
+        apiToken: settings.erxesApiToken,
       }),
     );
 

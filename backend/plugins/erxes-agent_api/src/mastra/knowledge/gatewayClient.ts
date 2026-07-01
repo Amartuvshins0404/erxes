@@ -5,22 +5,23 @@
 // needs no coupling to other plugins' internals and (b) query-time fetches
 // run under erxes's own permission layer — the authoritative post-filter.
 //
-// Auth: a `user` header (the asking user) when present — erxes resolves the
-// request as that user — otherwise a Bearer token. The reconciliation sweep
+// Auth: the asking user's login token as a Bearer when present — erxes resolves
+// the request as that user — otherwise the app token. The reconciliation sweep
 // now runs AS the requesting user too (Agent = Person), so the app token is a
 // last-resort fallback (e.g. the customer bot bridge, which has no team user).
+// A `user` header is never sent outbound (it stays internal to the agent).
 // ---------------------------------------------------------------------------
 
 import { asBearer } from '../tools/erxesTools';
 import { GqlExec } from './contentTypes';
 
-/** Pick the auth header for gateway calls: user session first, else app token. */
+/** Pick the auth header for gateway calls: user login token first, else app token. */
 export function buildAuthHeaders(opts: {
-  userHeader?: string;
+  token?: string;
   apiToken?: string;
 }): Record<string, string> {
-  if (opts.userHeader) return { user: opts.userHeader };
-  if (opts.apiToken) return { Authorization: asBearer(opts.apiToken) };
+  const bearer = opts.token || opts.apiToken;
+  if (bearer) return { Authorization: asBearer(bearer) };
   return {};
 }
 

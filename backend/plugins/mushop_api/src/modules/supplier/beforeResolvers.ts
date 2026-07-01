@@ -9,13 +9,6 @@ import { IModels, generateModels } from '~/connectionResolvers';
 import { getSupplierId } from '~/utils/getSupplierId';
 import { sendSupplierMessage } from '~/utils/sendSupplierMessage';
 
-// The storefront calls mushop's own resolvers (cpOrdersAdd, invoiceCreate,
-// invoicesCheck, cpFullOrders, cpOrdersEdit, ...) against a single endpoint.
-// When a request carries an erxes-supplier-id header it belongs to a supplier
-// SaaS, so mushop proxies the call into that supplier's server and returns the
-// supplier's result verbatim (via the 'resolved' short-circuit) — the storefront
-// never knows it was routed. Requests without a supplier id fall through to
-// mushop's own handling.
 const SUPPLIER_RESOLVERS = [
   'cpOrdersAdd',
   'invoiceCreate',
@@ -34,8 +27,6 @@ type ForwardSupplier = {
   paymentId?: string;
 };
 
-// The shopper's contact info forwarded to a supplier tenant so it can create its
-// own customer record (linked back to the global shopper via sourceUserId).
 type CustomerInfo = {
   sourceUserId?: string;
   phone?: string;
@@ -59,9 +50,6 @@ const resolveSupplier = async (
   return supplier;
 };
 
-// cpOrdersAdd → supplier /order. Remaps product ids (mushop → supplier
-// entityId), logs the forward, and returns the supplier's created order so the
-// storefront receives { _id, number } to invoice against.
 const proxyOrder = async (
   models: IModels,
   supplier: ForwardSupplier,
@@ -100,8 +88,6 @@ const proxyOrder = async (
   });
 
   try {
-    // customerInfo lets the supplier create its own customer; it returns that
-    // local customerId so mushop can index global shopper → tenant customer.
     const res = await sendSupplierMessage<{
       order?: Record<string, any>;
       customerId?: string;
@@ -129,9 +115,6 @@ const proxyOrder = async (
   }
 };
 
-// invoiceCreate → supplier /invoice. Injects the supplier's posToken/paymentId
-// (never exposed to the storefront) and returns the supplier-tenant invoice +
-// transaction shaped as the storefront's Invoice type.
 const proxyInvoiceCreate = async (
   supplier: ForwardSupplier,
   args: Record<string, any>,
@@ -181,7 +164,6 @@ const proxyInvoiceCreate = async (
     };
   }
 
-  // Shaped to match the payment plugin's Invoice type the storefront expects.
   return {
     status: 'resolved',
     data: {
@@ -212,7 +194,6 @@ const proxyInvoiceCreate = async (
   };
 };
 
-// invoicesCheck → supplier /invoice-check. Returns the paid status string.
 const proxyInvoiceCheck = async (
   supplier: ForwardSupplier,
   args: Record<string, any>,
@@ -226,9 +207,6 @@ const proxyInvoiceCheck = async (
   return { status: 'resolved', data: res?.status ?? null };
 };
 
-// Runs a posclient order query/mutation in the supplier tenant via the supplier
-// webhook (posToken-scoped, no client-portal token needed) and returns the
-// result via the short-circuit.
 const proxyOrderAction = async (
   supplier: ForwardSupplier,
   action: string,
@@ -256,19 +234,12 @@ const proxyCurrentOrder = (
   args: Record<string, any>,
 ) => proxyOrderAction(supplier, 'orders-list', { params: args });
 
-// Returns the createdAt timestamp of an order for cross-tenant sorting; orders
-// from different posclient tenants only share their stored field shape.
 const orderTime = (order: any): number => {
   const t = order?.createdAt ?? order?.modifiedAt;
   const ms = t ? new Date(t).getTime() : 0;
   return Number.isNaN(ms) ? 0 : ms;
 };
 
-// cpFullOrders aggregates ONE shopper's orders across every supplier tenant AND
-// mushop's own POS into a single list. The shopper's customerId (the client-
-// portal user id stored on each posclient order) is the same across tenants, so
-// it's passed through to every leg unchanged. Each leg is isolated (allSettled)
-// so one slow/broken tenant can't break the whole history.
 const aggregateFullOrders = async (
   subdomain: string,
   models: IModels,
@@ -285,7 +256,6 @@ const aggregateFullOrders = async (
   type Leg = () => Promise<any[]>;
   const legs: Leg[] = [];
 
-  // mushop's own POS — the storefront passes its token in erxes-pos-token.
   if (mushopPosToken) {
     legs.push(async () => {
       const result = await callOwnPosclient(subdomain, mushopPosToken, params);
@@ -293,7 +263,6 @@ const aggregateFullOrders = async (
     });
   }
 
-  // Every supplier tenant, via its /orders-list webhook.
   for (const supplier of suppliers) {
     if (!supplier.posToken) continue;
     legs.push(async () => {
@@ -330,7 +299,6 @@ const aggregateFullOrders = async (
 
   merged.sort((a, b) => orderTime(b) - orderTime(a));
 
-  // Apply pagination once, after the merge, since each tenant paginated its own.
   const _perPage = Number(perPage) || 20;
   const _page = Number(page) || 1;
   const paged = merged.slice((_page - 1) * _perPage, _page * _perPage);
@@ -338,8 +306,6 @@ const aggregateFullOrders = async (
   return { status: 'resolved', data: paged };
 };
 
-// Calls mushop's OWN posclient fullOrders in-tenant (no webhook) using the
-// marketplace's own POS token.
 const callOwnPosclient = (
   subdomain: string,
   posToken: string,
@@ -355,8 +321,6 @@ const callOwnPosclient = (
     defaultValue: [],
   });
 
-// mushop's own POS token, sent by the storefront so its own orders join the
-// aggregate. Without it the aggregate covers supplier tenants only.
 const getMushopPosToken = (
   headers?: Record<string, unknown>,
 ): string | undefined => {
@@ -373,9 +337,6 @@ const proxyOrderDetail = (
     customerId: args.customerId,
   });
 
-// cpOrdersEdit remaps each item's productId (mushop → supplier entityId) so the
-// edited order references the supplier's products, then runs the edit in the
-// supplier tenant.
 const proxyOrdersEdit = async (
   models: IModels,
   supplier: ForwardSupplier,
@@ -429,21 +390,14 @@ export const supplierBeforeResolvers: BeforeResolversConfig = {
     const { resolver, args = {}, headers } = params;
 
     if (!SUPPLIER_RESOLVERS.includes(resolver)) {
-      return args;
+      return { status: 'ok', args };
     }
 
-    // The shopper's customerId (the client-portal user id stored on each
-    // posclient order) is the same across every tenant, so it scopes orders in
-    // all of them. Trust the authenticated cpUser, never the client's arg —
-    // otherwise a customer could read/edit another's orders.
     const cpUser = extractCPUserFromHeader((headers || {}) as any);
     const customerId = cpUser?.erxesCustomerId || cpUser?._id;
     const scopedArgs =
       customerId !== undefined ? { ...args, customerId } : args;
 
-    // The shopper's contact info, forwarded so a supplier tenant can create its
-    // OWN customer (keyed by phone/email, linked back via sourceUserId) — the
-    // order still carries the global customerId for cross-tenant aggregation.
     const customerInfo = cpUser
       ? {
           sourceUserId: customerId,
@@ -456,11 +410,9 @@ export const supplierBeforeResolvers: BeforeResolversConfig = {
 
     const models = await generateModels(subdomain);
 
-    // cpFullOrders is special: it aggregates the shopper's orders across ALL
-    // supplier tenants + mushop's own POS, regardless of which (if any) supplier
-    // the request came in under. So it runs before the single-supplier routing.
     if (resolver === 'cpFullOrders') {
       const mushopPosToken = getMushopPosToken(headers);
+      
       return aggregateFullOrders(
         subdomain,
         models,
@@ -471,15 +423,14 @@ export const supplierBeforeResolvers: BeforeResolversConfig = {
 
     const supplierId = getSupplierId(headers);
 
-    // No supplier context → not a supplier request; mushop handles it itself.
     if (!supplierId) {
-      return args;
+      return { status: 'ok', args };
     }
 
     const supplier = await resolveSupplier(models, supplierId);
 
     if (!supplier) {
-      return args;
+      return { status: 'ok', args };
     }
 
     switch (resolver) {

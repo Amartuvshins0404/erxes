@@ -206,6 +206,9 @@ export const UNIT_DOCUMENT_TABS = {
   opportunities: {
     en: 'Opportunities',
   },
+  offers: {
+    en: 'Offers',
+  },
   contracts: {
     en: 'Contracts',
   },

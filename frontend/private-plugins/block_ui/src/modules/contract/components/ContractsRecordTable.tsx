@@ -10,7 +10,7 @@ import { useParams } from 'react-router-dom';
 import { useEffect } from 'react';
 import { contractTotalCountAtom } from '@/contract/states/contractsTotalCountState';
 
-export const ContractsRecordTable = () => {
+export const ContractsRecordTable = ({ unitId }: { unitId?: string } = {}) => {
   const { projectId: projectIdParam, id } = useParams<{
     projectId?: string;
     id?: string;
@@ -19,7 +19,7 @@ export const ContractsRecordTable = () => {
   const setContractTotalCount = useSetAtom(contractTotalCountAtom);
 
   const { contracts, handleFetchMore, pageInfo, loading, totalCount } =
-    useContractsList();
+    useContractsList(unitId ? { variables: { unit: unitId } } : undefined);
 
   const { hasPreviousPage, hasNextPage } = pageInfo || {};
 

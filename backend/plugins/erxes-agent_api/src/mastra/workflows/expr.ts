@@ -1,4 +1,5 @@
-import { RefScope, resolveValue } from './refs';
+import { ExpectedError } from 'erxes-api-shared/utils';
+import { RefScope, lookup } from './refs';
 
 /**
  * The restricted condition language for branch steps (docs/WORKFLOW-SPEC.md
@@ -57,7 +58,7 @@ function tokenize(src: string): Token[] {
       const quote = rest[0];
       const end = rest.indexOf(quote, 1);
       if (end === -1)
-        throw new Error(`unterminated string in condition: ${src}`);
+        throw new ExpectedError(`unterminated string in condition: ${src}`);
       tokens.push({ kind: 'string', value: rest.slice(1, end) });
       rest = rest.slice(end + 1);
       continue;
@@ -98,12 +99,17 @@ function tokenize(src: string): Token[] {
       else if (word[0] === 'false') tokens.push({ kind: 'bool', value: false });
       else if (word[0] === 'null') tokens.push({ kind: 'null' });
       else if (word[0] === 'in') tokens.push({ kind: 'op', op: 'in' });
-      else throw new Error(`unknown word "${word[0]}" in condition: ${src}`);
+      else
+        throw new ExpectedError(
+          `unknown word "${word[0]}" in condition: ${src}`,
+        );
       rest = rest.slice(word[0].length);
       continue;
     }
 
-    throw new Error(`unexpected character "${rest[0]}" in condition: ${src}`);
+    throw new ExpectedError(
+      `unexpected character "${rest[0]}" in condition: ${src}`,
+    );
   }
 
   return tokens;
@@ -130,7 +136,7 @@ export function parseExpr(src: string): ExprNode {
   /** Literal, ref, or parenthesized sub-expression. */
   function primary(): ExprNode {
     const token = next();
-    if (!token) throw new Error(`condition ended unexpectedly: ${src}`);
+    if (!token) throw new ExpectedError(`condition ended unexpectedly: ${src}`);
     if (token.kind === 'ref') return { kind: 'ref', path: token.path };
     if (
       token.kind === 'string' ||
@@ -144,10 +150,10 @@ export function parseExpr(src: string): ExprNode {
       const inner = orExpr();
       const close = next();
       if (!close || close.kind !== 'rparen')
-        throw new Error(`missing ")" in condition: ${src}`);
+        throw new ExpectedError(`missing ")" in condition: ${src}`);
       return inner;
     }
-    throw new Error(`unexpected token in condition: ${src}`);
+    throw new ExpectedError(`unexpected token in condition: ${src}`);
   }
 
   /** Unary `!` chains. */
@@ -195,7 +201,7 @@ export function parseExpr(src: string): ExprNode {
 
   const ast = orExpr();
   if (pos < tokens.length)
-    throw new Error(`trailing tokens in condition: ${src}`);
+    throw new ExpectedError(`trailing tokens in condition: ${src}`);
   return ast;
 }
 
@@ -224,13 +230,27 @@ function looseEquals(a: unknown, b: unknown): boolean {
   return a === b;
 }
 
+// Forgiving-but-explicit ordering: LLM-origin operands may be strings, so
+// coerce via Number() and treat a NaN on either side as a non-comparison
+// (false) instead of the silent always-false a bare `as number` cast yields.
+function compareNumeric(
+  a: unknown,
+  b: unknown,
+  cmp: (x: number, y: number) => boolean,
+): boolean {
+  const x = Number(a);
+  const y = Number(b);
+  if (Number.isNaN(x) || Number.isNaN(y)) return false;
+  return cmp(x, y);
+}
+
 /** Evaluates a parsed condition AST against the runtime ref scope. */
 export function evalExpr(node: ExprNode, scope: RefScope): unknown {
   switch (node.kind) {
     case 'lit':
       return node.value;
     case 'ref':
-      return resolveValue(`{{${node.path}}}`, scope);
+      return lookup(node.path, scope);
     case 'not':
       return !evalExpr(node.operand, scope);
     case 'binary': {
@@ -253,13 +273,13 @@ export function evalExpr(node: ExprNode, scope: RefScope): unknown {
         case '!=':
           return !looseEquals(leftVal, rightVal);
         case '>':
-          return (leftVal as number) > (rightVal as number);
+          return compareNumeric(leftVal, rightVal, (x, y) => x > y);
         case '<':
-          return (leftVal as number) < (rightVal as number);
+          return compareNumeric(leftVal, rightVal, (x, y) => x < y);
         case '>=':
-          return (leftVal as number) >= (rightVal as number);
+          return compareNumeric(leftVal, rightVal, (x, y) => x >= y);
         case '<=':
-          return (leftVal as number) <= (rightVal as number);
+          return compareNumeric(leftVal, rightVal, (x, y) => x <= y);
         case 'in':
           if (Array.isArray(rightVal))
             return rightVal.some((member) => looseEquals(member, leftVal));

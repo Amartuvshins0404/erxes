@@ -5,6 +5,7 @@ import resolvers from './apollo/resolvers';
 import { generateModels } from './connectionResolvers';
 import { router } from './routes';
 import { afterProcess } from './meta/afterProcess';
+import { initBackfillWorker } from './workers/backfill';
 
 startPlugin({
   name: 'supplier',
@@ -14,6 +15,9 @@ startPlugin({
     resolvers,
   }),
   expressRouter: router,
+  onServerInit: async () => {
+    initBackfillWorker();
+  },
   apolloServerContext: async (subdomain, context) => {
     const models = await generateModels(subdomain);
     context.models = models;

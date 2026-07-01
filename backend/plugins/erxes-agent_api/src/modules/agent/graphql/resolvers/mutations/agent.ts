@@ -1,28 +1,52 @@
+import { ExpectedError } from 'erxes-api-shared/utils';
 import { IContext } from '~/connectionResolvers';
 import { IMastraAgent } from '@/agent/@types/agent';
+import { isAgentAdmin, getAgentQuotaStatus } from '@/agent/utils';
 
 export const agentMutations = {
-  mastraAgentCreate: (
+  mastraAgentCreate: async (
     _parent: undefined,
     { doc }: { doc: IMastraAgent },
-    { models }: IContext,
+    { models, user, checkPermission }: IContext,
   ) => {
-    return models.MastraAgent.createAgent(doc);
+    await checkPermission('agentsCreate');
+    if (!user?._id) throw new ExpectedError('Login required');
+
+    const admin = isAgentAdmin(user);
+
+    if (!admin && doc.visibility && doc.visibility !== 'private') {
+      throw new ExpectedError('Users may only create private agents');
+    }
+
+    if (!admin) {
+      const status = await getAgentQuotaStatus(models, user._id);
+      if (status.atQuota) {
+        throw new ExpectedError(`Agent quota reached (${status.quota})`);
+      }
+    }
+
+    return models.MastraAgent.createAgent({ ...doc, createdBy: user._id });
   },
 
-  mastraAgentUpdate: (
+  mastraAgentUpdate: async (
     _parent: undefined,
     { _id, doc }: { _id: string; doc: Partial<IMastraAgent> },
-    { models }: IContext,
+    { models, user, checkPermission }: IContext,
   ) => {
-    return models.MastraAgent.updateAgent(_id, doc);
+    await checkPermission('agentsEdit');
+    if (!user?._id) throw new ExpectedError('Login required');
+    const admin = isAgentAdmin(user);
+    return models.MastraAgent.updateAgent(_id, doc, admin ? undefined : user._id);
   },
 
-  mastraAgentRemove: (
+  mastraAgentRemove: async (
     _parent: undefined,
     { _id }: { _id: string },
-    { models }: IContext,
+    { models, user, checkPermission }: IContext,
   ) => {
-    return models.MastraAgent.removeAgent(_id);
+    await checkPermission('agentsRemove');
+    if (!user?._id) throw new ExpectedError('Login required');
+    const admin = isAgentAdmin(user);
+    return models.MastraAgent.removeAgent(_id, admin ? undefined : user._id);
   },
 };

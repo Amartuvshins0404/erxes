@@ -18,6 +18,7 @@ export const COLLECTIVE_FRAGMENT = gql`
     phones
     dateFounded
     website
+    paymentId
     verificationStatus
     verificationNote
     tierLevel

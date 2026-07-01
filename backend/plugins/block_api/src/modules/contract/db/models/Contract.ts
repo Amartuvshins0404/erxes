@@ -122,6 +122,13 @@ export const loadContractClass = (
         );
       }
 
+      if (updated && newStage.type === 'cancelled') {
+        await models.ContractPayment.updateMany(
+          { contractId: _id },
+          { $set: { status: 'cancelled' } },
+        );
+      }
+
       if (updated && newStage.type === 'signed') {
         await models.ContractPayment.regenerateForContract(_id, true);
 

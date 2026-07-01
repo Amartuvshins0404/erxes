@@ -112,6 +112,14 @@ export const queries = `
   blockGetOppty(_id: String!): BlockOppty
   blockGetOpptys(projectId: String!, filter: IOpptyFilter): BlockOpptyListResponse
   blockGetOpptyUnitRows(_id: String!): [BlockOpptyUnitRow]
+  blockGetUnitOpptyOverview(unitId: String!, projectId: String!): BlockUnitOpptyOverview
+`;
+
+export const opptyOverviewType = `
+  type BlockUnitOpptyOverview {
+    total: Int
+    stages: [BlockOverviewStageCount]
+  }
 `;
 
 export const mutations = `

@@ -1,8 +1,9 @@
 import { GET_CONTRACTS_LIST } from '../graphql/contractQueries';
 import { IContract } from '../types/contractTypes';
-import { useQuery } from '@apollo/client';
+import { QueryHookOptions, useQuery } from '@apollo/client';
 import {
   EnumCursorDirection,
+  ICursorListResponse,
   mergeCursorData,
   useNonNullMultiQueryState,
   validateFetchMore,
@@ -25,7 +26,10 @@ interface IContractsListResponse {
   };
 }
 
-export const useContractsFilterVariables = () => {
+export const useContractsFilterVariables = (variables?: {
+  unit?: string;
+  [key: string]: any;
+}) => {
   const { projectId: projectIdParam, id } = useParams<{
     projectId?: string;
     id?: string;
@@ -50,6 +54,7 @@ export const useContractsFilterVariables = () => {
       partyType: partyType || undefined,
       currency: currency || undefined,
       user: user || undefined,
+      ...variables,
     },
     cursor: '',
     limit: CONTRACTS_PER_PAGE,
@@ -57,11 +62,14 @@ export const useContractsFilterVariables = () => {
   };
 };
 
-export const useContractsList = () => {
-  const variables = useContractsFilterVariables();
+export const useContractsList = (
+  options?: QueryHookOptions<IContractsListResponse>,
+) => {
+  const variables = useContractsFilterVariables(options?.variables);
 
   const { data, loading, fetchMore } =
     useQuery<IContractsListResponse>(GET_CONTRACTS_LIST, {
+      ...options,
       variables,
       fetchPolicy: 'cache-and-network',
     });

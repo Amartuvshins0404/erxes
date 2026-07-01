@@ -1,6 +1,7 @@
 import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
-import { lookup } from 'node:dns/promises';
+import { ExpectedError } from 'erxes-api-shared/utils';
+import { safeFetch } from '~/mastra/safeFetch';
 import {
   decodeHtmlEntities as decodeEntities,
   stripAllTags,
@@ -8,8 +9,13 @@ import {
 } from '~/mastra/html';
 import { companyKnowledgeTool } from '~/mastra/knowledge/knowledgeTool';
 import { agentKnowledgeTool } from '~/mastra/learning/learningTool';
-import { readAttachmentTool } from './attachmentTool';
+import { fileReaderTool } from './fileReaderTool';
 import { WORKFLOW_BUILTIN_TOOLS } from './workflowTools';
+import { chartSpecSchema, sanitizeChartSpec } from '~/mastra/charts/chartSpec';
+import { chartArtifactSchema, diagramArtifactSchema, newArtifactId } from './artifacts';
+import { storeArtifact } from '~/mastra/artifactStore';
+import { DOCUMENT_BUILTIN_TOOLS } from './documentTools';
+import { faviconFor, hostnameOf, SEARCH_ENGINE } from './searchEngine';
 
 const FETCH_TIMEOUT_MS = 10_000;
 const UA = 'Mozilla/5.0 (compatible; erxes-agent/1.0)';
@@ -18,6 +24,10 @@ interface SearchResult {
   title: string;
   url: string;
   snippet: string;
+  // Hostname (e.g. "ycombinator.com") + its real favicon, so the UI can render
+  // a Claude-style result row without constructing any URL itself.
+  source: string;
+  favicon: string;
 }
 
 /** Strip HTML tags, decode entities, and collapse whitespace. */
@@ -55,6 +65,8 @@ async function ddgSearch(
       title: stripTags(match[2]),
       url: target,
       snippet: stripTags(match[3]),
+      source: hostnameOf(target),
+      favicon: faviconFor(target),
     });
   }
   return results;
@@ -69,77 +81,23 @@ export const webSearchTool = createTool({
     limit: z.number().int().min(1).max(10).default(5).describe('Max results'),
   }),
   outputSchema: z.object({
+    // The engine identity (name + real favicon) backs the result-card header,
+    // so the UI never hard-codes which search engine produced these.
+    engine: z.object({ name: z.string(), icon: z.string() }),
     results: z.array(
       z.object({
         title: z.string(),
         url: z.string(),
         snippet: z.string(),
+        source: z.string(),
+        favicon: z.string(),
       }),
     ),
   }),
   execute: async ({ query, limit }) => {
-    return { results: await ddgSearch(query, limit ?? 5) };
+    return { engine: SEARCH_ENGINE, results: await ddgSearch(query, limit ?? 5) };
   },
 });
-
-/** True for loopback, RFC1918, link-local, and IPv6 private ranges. */
-function isPrivateIp(ip: string): boolean {
-  if (ip.includes(':')) {
-    const v6 = ip.toLowerCase();
-    if (v6.startsWith('::ffff:')) return isPrivateIp(v6.slice(7));
-    return (
-      v6 === '::1' ||
-      v6 === '::' ||
-      v6.startsWith('fc') ||
-      v6.startsWith('fd') ||
-      v6.startsWith('fe80')
-    );
-  }
-  const [a, b] = ip.split('.').map(Number);
-  return (
-    a === 0 ||
-    a === 10 ||
-    a === 127 ||
-    (a === 169 && b === 254) ||
-    (a === 172 && b >= 16 && b <= 31) ||
-    (a === 192 && b === 168)
-  );
-}
-
-// The model controls the URL, so fetch-url is an SSRF surface: http(s) only,
-// no private/link-local targets, and every redirect hop is re-validated.
-async function assertPublicHttpUrl(raw: string): Promise<URL> {
-  const url = new URL(raw);
-  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-    throw new Error('Only http(s) URLs are allowed');
-  }
-  const addrs = await lookup(url.hostname, { all: true });
-  if (!addrs.length || addrs.some((a) => isPrivateIp(a.address))) {
-    throw new Error('URL resolves to a private or unknown address');
-  }
-  return url;
-}
-
-/** Fetch with manual redirects, re-validating every hop against SSRF. */
-async function safeFetch(
-  raw: string,
-): Promise<{ res: Response; finalUrl: string }> {
-  let url = await assertPublicHttpUrl(raw);
-  for (let hop = 0; hop < 4; hop++) {
-    const res = await fetch(url, {
-      redirect: 'manual',
-      headers: { 'User-Agent': UA },
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-    });
-    const loc = res.headers.get('location');
-    if (res.status >= 300 && res.status < 400 && loc) {
-      url = await assertPublicHttpUrl(new URL(loc, url).toString());
-      continue;
-    }
-    return { res, finalUrl: url.toString() };
-  }
-  throw new Error('Too many redirects');
-}
 
 const MAX_CONTENT_CHARS = 8_000;
 
@@ -155,6 +113,9 @@ export const fetchUrlTool = createTool({
   outputSchema: z.object({
     url: z.string(),
     title: z.string(),
+    // Hostname + its real favicon so the UI can render a "Reading <site>" chip.
+    siteName: z.string(),
+    favicon: z.string(),
     content: z.string(),
   }),
   execute: async ({ url }) => {
@@ -176,6 +137,8 @@ export const fetchUrlTool = createTool({
     return {
       url: finalUrl,
       title,
+      siteName: hostnameOf(finalUrl),
+      favicon: faviconFor(finalUrl),
       content: content || 'No readable content found.',
     };
   },
@@ -227,12 +190,13 @@ function evalMathExpression(expr: string): number {
       pos++;
     }
     if (start === pos) {
-      throw new Error(
+      throw new ExpectedError(
         `Unexpected character "${source[pos] ?? 'end of input'}" in expression`,
       );
     }
     const num = Number(source.slice(start, pos));
-    if (Number.isNaN(num)) throw new Error('Invalid number in expression');
+    if (Number.isNaN(num))
+      throw new ExpectedError('Invalid number in expression');
     return num;
   }
 
@@ -252,7 +216,8 @@ function evalMathExpression(expr: string): number {
       pos++;
       const inner = parseAddSub();
       skipWs();
-      if (source[pos] !== ')') throw new Error('Unbalanced parentheses');
+      if (source[pos] !== ')')
+        throw new ExpectedError('Unbalanced parentheses');
       pos++;
       return inner;
     }
@@ -294,97 +259,75 @@ function evalMathExpression(expr: string): number {
   const value = parseAddSub();
   skipWs();
   if (pos < source.length) {
-    throw new Error(`Unexpected character "${source[pos]}" in expression`);
+    throw new ExpectedError(
+      `Unexpected character "${source[pos]}" in expression`,
+    );
   }
   return value;
 }
 
 // ─── Chart visualization tool ─────────────────────────────────────────────────
 //
-// Returns a serialized chart-viz JSON payload. The agent is instructed (via
-// routing.ts) to embed the returned string verbatim in a ```chart-viz``` fenced
-// code block so the chat UI renders it as an interactive chart.
-
-const SAFE_CSS_VAR_KEY = /^[a-zA-Z][a-zA-Z0-9_-]{0,49}$/;
-const SAFE_CSS_COLOR =
-  /^(#[0-9a-fA-F]{3,8}|rgb\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*\)|hsl\(\s*\d{1,3}\s*,\s*\d{1,3}%\s*,\s*\d{1,3}%\s*\))$/;
-
-const seriesItemSchema = z.object({
-  key: z.string().refine((key) => SAFE_CSS_VAR_KEY.test(key), {
-    message:
-      'key must start with a letter and contain only alphanumeric, dash, or underscore chars',
-  }),
-  label: z.string().max(200),
-  color: z.string().optional(),
-});
-
-const dataPointSchema = z.record(z.string(), z.union([z.string(), z.number()]));
+// Returns a structured chart ARTIFACT. The chat UI detects it on the tool
+// result and renders an interactive ECharts chart in the Preview panel — the
+// agent no longer pastes any JSON. The same ChartSpec is reused by the document
+// tools to embed an identical chart image into a PDF/DOCX/XLSX.
 
 export const renderChartTool = createTool({
   id: 'render-chart',
   description:
-    'Build a data visualization chart (bar, line, area, or pie) and return the serialized payload. ' +
-    'The UI will render it as an interactive chart in the chat. ' +
-    'Use this whenever the user asks to see data as a chart or graph.',
+    'Visualize data as an interactive chart (bar, horizontalBar, line, area, ' +
+    'stackedBar, pie, donut, radar, combo, or scatter). The chart opens in the ' +
+    'Preview panel beside the chat. Use this whenever the user asks to see data ' +
+    'as a chart, graph, or plot. The returned chart id can be reused to embed ' +
+    'the same chart inside a generated PDF/DOCX/XLSX document. ' +
+    'Use the optional `drilldowns` field to add a clickable detail view: provide ' +
+    'a map of data-row label → sub-ChartSpec. For example, a pie chart of employees ' +
+    'per department can include a drilldown for each department showing the team ' +
+    'breakdown — clicking the slice opens the detail chart automatically.',
+  inputSchema: chartSpecSchema,
+  outputSchema: z.object({ artifact: chartArtifactSchema }),
+  execute: async (input) => {
+    const spec = sanitizeChartSpec(input);
+    const artifact = {
+      id: newArtifactId('chart'),
+      kind: 'chart' as const,
+      title: spec.title,
+      spec,
+    };
+    await storeArtifact(artifact);
+    return { artifact };
+  },
+});
+
+export const renderDiagramTool = createTool({
+  id: 'render-diagram',
+  description:
+    'Render a Mermaid diagram (flowchart, sequence, pie, xychart-beta, ' +
+    'quadrantChart, gantt, classDiagram, stateDiagram, erDiagram, etc.) in ' +
+    'the Preview panel. Pass valid Mermaid syntax in `definition`. Use this ' +
+    'for process maps, architecture diagrams, flowcharts, ER diagrams, ' +
+    'market-research visualizations (pie/xychart-beta/quadrantChart), or any ' +
+    'data that is better expressed as a diagram than a chart.',
   inputSchema: z.object({
-    chartType: z.enum(['bar', 'line', 'area', 'pie']).describe('Chart type'),
-    title: z.string().max(200).describe('Chart title shown above the chart'),
-    description: z.string().max(200).optional().describe('Optional subtitle'),
-    series: z
-      .array(seriesItemSchema)
-      .min(1)
-      .max(10)
+    title: z.string().describe('Short descriptive title for the diagram'),
+    definition: z
+      .string()
       .describe(
-        'Data series. Each entry maps a key (used as dataKey in data rows) to a label and optional color.',
-      ),
-    data: z
-      .array(dataPointSchema)
-      .min(1)
-      .max(100)
-      .describe(
-        'Data rows. Each row must have a "label" string field and numeric values for every series key.',
+        'Complete Mermaid diagram definition starting with the type keyword ' +
+          '(e.g. "pie title ...", "flowchart LR", "xychart-beta")',
       ),
   }),
-  outputSchema: z.object({ chartJson: z.string() }),
-  execute: ({ chartType, title, description, series, data }) => {
-    const cleanSeries = series
-      .filter((item) => SAFE_CSS_VAR_KEY.test(item.key))
-      .map((item) => ({
-        key: item.key,
-        label: item.label.slice(0, 200),
-        color:
-          item.color && SAFE_CSS_COLOR.test(item.color.trim())
-            ? item.color.trim()
-            : undefined,
-      }));
-
-    const validKeys = new Set(cleanSeries.map((item) => item.key));
-
-    const cleanData = data.map((row) => {
-      const point: Record<string, string | number> = {
-        label:
-          typeof row['label'] === 'string' ? row['label'].slice(0, 200) : '',
-      };
-      for (const key of validKeys) {
-        const k = key as string;
-        const raw = (row as Record<string, unknown>)[k];
-        const num = Number(raw);
-        point[k] = Number.isFinite(num) ? num : 0;
-      }
-      return point;
-    });
-
-    const payload = {
-      type: 'chart-viz',
-      chartType,
-      title: title.slice(0, 200),
-      description: description?.slice(0, 200),
-      series: cleanSeries,
-      data: cleanData,
-      sentAt: new Date().toISOString(),
+  outputSchema: z.object({ artifact: diagramArtifactSchema }),
+  execute: async ({ title, definition }) => {
+    const artifact = {
+      id: newArtifactId('diagram'),
+      kind: 'diagram' as const,
+      title,
+      definition,
     };
-
-    return Promise.resolve({ chartJson: JSON.stringify(payload) });
+    await storeArtifact(artifact);
+    return { artifact };
   },
 });
 
@@ -394,17 +337,22 @@ export const BUILTIN_TOOLS: Record<string, ReturnType<typeof createTool>> = {
   fetchUrl: fetchUrlTool,
   calculator: calculatorTool,
   renderChart: renderChartTool,
+  renderDiagram: renderDiagramTool,
   // No-ops with a clear message unless ERXES_AGENT_KNOWLEDGE=enable.
   companyKnowledge: companyKnowledgeTool,
   // Distilled lessons from past conversations. No-op unless
   // ERXES_AGENT_LEARNING=enable.
   agentKnowledge: agentKnowledgeTool,
-  // Reads chat attachments (pdf/docx/xlsx/csv/…). Also force-bound outside
-  // the policy filter — see agentRuntime — so attached files are always readable.
-  readAttachment: readAttachmentTool,
+  // Reads a file as text — a user attachment by key, or a file the agent
+  // generated by artifactId (pdf/docx/xlsx/pptx/csv/…). Also force-bound outside
+  // the policy filter — see agentRuntime — so files are always readable.
+  fileReader: fileReaderTool,
   // Builder tools — the master-agent loop: guide → validate → simulate →
   // save → run/observe. Deny per agent via builtin:<key> when needed.
   ...WORKFLOW_BUILTIN_TOOLS,
+  // Document generators (PDF/DOCX/XLSX). Each returns a downloadable artifact
+  // shown in the Preview panel; charts embed via the render-chart spec.
+  ...DOCUMENT_BUILTIN_TOOLS,
 };
 
 /** Look up a builtin tool by its registry key, or null when unknown. */

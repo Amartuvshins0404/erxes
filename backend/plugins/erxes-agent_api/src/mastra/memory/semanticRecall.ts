@@ -9,7 +9,8 @@
 // Pure helpers (filter / point / format / score) are exported for unit testing.
 // ---------------------------------------------------------------------------
 
-import { createHash } from 'crypto';
+import { ExpectedError } from 'erxes-api-shared/utils';
+import { uuidFromHash } from '~/mastra/qdrantIds';
 import {
   collectionName,
   resolveEmbedderConfig,
@@ -46,7 +47,7 @@ export function buildRecallFilter(args: {
   threadId?: string;
 }): { must: Array<Record<string, unknown>> } {
   if (!args.subdomain) {
-    throw new Error(
+    throw new ExpectedError(
       '[mastra:memory] refusing to query Qdrant without a subdomain (tenant isolation).',
     );
   }
@@ -124,13 +125,7 @@ export function formatRecallBlock(
 
 /** Deterministic UUID-shaped point id from the source message id (idempotent upserts). */
 export function pointIdFor(subdomain: string, messageId: string): string {
-  const hex = createHash('sha256')
-    .update(`${subdomain}:${messageId}`)
-    .digest('hex');
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(
-    12,
-    16,
-  )}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
+  return uuidFromHash(`${subdomain}:${messageId}`);
 }
 
 // ── Orchestration (best-effort; never throws) ────────────────────────────────

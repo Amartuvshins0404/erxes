@@ -1,6 +1,13 @@
 import { useQuery } from '@apollo/client';
 import { GET_IDENTIFIERS } from '../graphql/queries';
 
+export interface IdentifierServer {
+  exists: boolean;
+  hasNamespace: boolean;
+  name?: string | null;
+  status?: string | null;
+}
+
 export interface Identifier {
   _id: string;
   name: string;
@@ -11,6 +18,7 @@ export interface Identifier {
   memberIds?: string[] | null;
   createdAt: string;
   updatedAt: string;
+  server?: IdentifierServer | null;
 }
 
 export type AssistantOrg = Identifier;

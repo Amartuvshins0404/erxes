@@ -1,6 +1,6 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { useQuery, useMutation } from '@apollo/client';
+import { useMutation } from '@apollo/client';
 import { ColumnDef } from '@tanstack/react-table';
 import {
   IconPlus,
@@ -15,50 +15,33 @@ import {
 } from '@tabler/icons-react';
 import {
   Badge,
-  Breadcrumb,
   Button,
-  Combobox,
   Command,
-  Empty,
-  Popover,
-  RecordTable,
   RecordTableInlineCell,
+  RecordTable,
   RelativeDateDisplay,
-  Separator,
   Tooltip,
   toast,
   useConfirm,
 } from 'erxes-ui';
-import { PageHeader } from 'ui-modules';
-import { MASTRA_SCHEDULES } from '~/graphql/queries';
 import {
   MASTRA_SCHEDULE_REMOVE,
   MASTRA_SCHEDULE_RUN_NOW,
   MASTRA_SCHEDULE_SET_ENABLED,
 } from '~/graphql/mutations';
+import { toastError } from '~/lib/mutationToast';
 import {
+  IconBadge,
+  IdentityCell,
+  RowActionsMenu,
+  SortableHead,
   ToggleDeleteMenuItems,
   enabledStatusColumn,
 } from '~/components/RecordTableShared';
-
-export interface IScheduleRow {
-  _id: string;
-  name: string;
-  description?: string;
-  agentId: string;
-  cron: string;
-  timezone?: string;
-  prompt: string;
-  isEnabled: boolean;
-  threadId: string;
-  lastRunAt?: string;
-  lastStatus?: 'success' | 'failed' | 'skipped';
-  lastError?: string;
-  lastDurationMs?: number;
-  runCount: number;
-  createdAt: string;
-  updatedAt: string;
-}
+import { ResourceIndexLayout } from '~/components/ResourceIndexLayout';
+import { SortState, SortValue, useTableSort } from '~/components/useTableSort';
+import { useSchedules } from './hooks/useSchedules';
+import { ISchedule, IScheduleRunNowResponse } from './types';
 
 // ─── More menu cell ───────────────────────────────────────────────────────────
 
@@ -67,7 +50,7 @@ const ScheduleMoreCell = ({
   schedule,
   refetch,
 }: {
-  schedule: IScheduleRow;
+  schedule: ISchedule;
   refetch: () => void;
 }) => {
   const navigate = useNavigate();
@@ -75,33 +58,33 @@ const ScheduleMoreCell = ({
 
   const [removeSchedule] = useMutation(MASTRA_SCHEDULE_REMOVE, {
     onCompleted: () => refetch(),
-    onError: (e) =>
-      toast({ title: 'Error', description: e.message, variant: 'destructive' }),
+    onError: toastError(),
   });
 
   const [setEnabled] = useMutation(MASTRA_SCHEDULE_SET_ENABLED, {
     onCompleted: () => refetch(),
-    onError: (e) =>
-      toast({ title: 'Error', description: e.message, variant: 'destructive' }),
+    onError: toastError(),
   });
 
-  const [runNow, { loading: running }] = useMutation(MASTRA_SCHEDULE_RUN_NOW, {
-    onCompleted: (data) => {
-      const outcome = data?.mastraScheduleRunNow;
-      if (outcome?.lastStatus === 'failed') {
-        toast({
-          title: 'Run failed',
-          description: outcome.lastError || schedule.name,
-          variant: 'destructive',
-        });
-      } else {
-        toast({ title: 'Run finished', description: schedule.name });
-      }
-      refetch();
+  const [runNow, { loading: running }] = useMutation<IScheduleRunNowResponse>(
+    MASTRA_SCHEDULE_RUN_NOW,
+    {
+      onCompleted: (data) => {
+        const outcome = data?.mastraScheduleRunNow;
+        if (outcome?.lastStatus === 'failed') {
+          toast({
+            title: 'Run failed',
+            description: outcome.lastError || schedule.name,
+            variant: 'destructive',
+          });
+        } else {
+          toast({ title: 'Run finished', description: schedule.name });
+        }
+        refetch();
+      },
+      onError: toastError(),
     },
-    onError: (e) =>
-      toast({ title: 'Error', description: e.message, variant: 'destructive' }),
-  });
+  );
 
   /** Confirm, then remove the schedule together with its output thread. */
   const handleDelete = () =>
@@ -111,82 +94,66 @@ const ScheduleMoreCell = ({
     }).then(() => removeSchedule({ variables: { _id: schedule._id } }));
 
   return (
-    // skipcq: JS-0415 — action menu scaffolding nests past the lint cap
-    <Popover>
-      <Popover.Trigger asChild>
-        <RecordTable.MoreButton className="w-full h-full" />
-      </Popover.Trigger>
-      <Combobox.Content
-        side="right"
-        align="start"
-        avoidCollisions={false}
-        className="w-44 min-w-0 [&>button]:cursor-pointer"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <Command>
-          <Command.List>
-            <Command.Item asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="justify-start w-full h-8"
-                disabled={running}
-                onClick={() => {
-                  toast({ title: 'Running…', description: schedule.name });
-                  runNow({ variables: { _id: schedule._id } });
-                }}
-              >
-                <IconPlayerPlay className="size-4" /> Run now
-              </Button>
-            </Command.Item>
-            <Command.Item asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="justify-start w-full h-8"
-                disabled={!schedule.lastRunAt}
-                title={
-                  schedule.lastRunAt
-                    ? undefined
-                    : 'No output yet — the thread is created on the first run'
-                }
-                onClick={() =>
-                  navigate(
-                    `/erxes-agent/chat/${schedule.agentId}?thread=${schedule.threadId}`,
-                  )
-                }
-              >
-                <IconMessageCircle className="size-4" /> View output
-              </Button>
-            </Command.Item>
-            <Command.Item asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="justify-start w-full h-8"
-                onClick={() =>
-                  navigate(`/erxes-agent/schedules/edit/${schedule._id}`)
-                }
-              >
-                <IconPencil className="size-4" /> Edit
-              </Button>
-            </Command.Item>
-            <ToggleDeleteMenuItems
-              isEnabled={schedule.isEnabled}
-              onToggle={() =>
-                setEnabled({
-                  variables: {
-                    _id: schedule._id,
-                    isEnabled: !schedule.isEnabled,
-                  },
-                })
-              }
-              onDelete={handleDelete}
-            />
-          </Command.List>
-        </Command>
-      </Combobox.Content>
-    </Popover>
+    <RowActionsMenu>
+      <Command.Item asChild>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="justify-start w-full h-8"
+          disabled={running}
+          onClick={() => {
+            toast({ title: 'Running…', description: schedule.name });
+            runNow({ variables: { _id: schedule._id } });
+          }}
+        >
+          <IconPlayerPlay className="size-4" /> Run now
+        </Button>
+      </Command.Item>
+      <Command.Item asChild>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="justify-start w-full h-8"
+          disabled={!schedule.lastRunAt}
+          title={
+            schedule.lastRunAt
+              ? undefined
+              : 'No output yet — the thread is created on the first run'
+          }
+          onClick={() =>
+            navigate(
+              `/erxes-agent/chat/${schedule.agentId}?thread=${schedule.threadId}`,
+            )
+          }
+        >
+          <IconMessageCircle className="size-4" /> View output
+        </Button>
+      </Command.Item>
+      <Command.Item asChild>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="justify-start w-full h-8"
+          onClick={() =>
+            navigate(`/erxes-agent/schedules/edit/${schedule._id}`)
+          }
+        >
+          <IconPencil className="size-4" /> Edit
+        </Button>
+      </Command.Item>
+      <ToggleDeleteMenuItems
+        isEnabled={schedule.isEnabled}
+        onToggle={() =>
+          setEnabled({
+            variables: {
+              _id: schedule._id,
+              isEnabled: !schedule.isEnabled,
+            },
+          })
+        }
+        onDelete={handleDelete}
+      />
+    </RowActionsMenu>
   );
 };
 
@@ -200,7 +167,7 @@ const STATUS_VARIANTS = {
 } as const;
 
 /** Status badge (with error tooltip on failure) plus relative run time. */
-const LastRunCell = ({ schedule }: { schedule: IScheduleRow }) => {
+const LastRunCell = ({ schedule }: { schedule: ISchedule }) => {
   if (!schedule.lastRunAt) {
     return (
       <RecordTableInlineCell>
@@ -239,29 +206,38 @@ const LastRunCell = ({ schedule }: { schedule: IScheduleRow }) => {
   );
 };
 
-const baseColumns: ColumnDef<IScheduleRow>[] = [
+const buildBaseColumns = (
+  sort: SortState,
+  onSort: (id: string) => void,
+): ColumnDef<ISchedule>[] => [
   {
     id: 'name',
     accessorKey: 'name',
     header: () => (
-      <RecordTable.InlineHead icon={IconAlignLeft} label="Schedule" />
+      <SortableHead
+        icon={IconAlignLeft}
+        label="Schedule"
+        columnId="name"
+        sort={sort}
+        onSort={onSort}
+      />
     ),
     cell: ({ row }) => {
       const { _id, name, description } = row.original;
       return (
-        <RecordTableInlineCell>
-          <Link
-            to={`/erxes-agent/schedules/edit/${_id}`}
-            className="font-medium hover:underline cursor-pointer"
-          >
-            {name}
-          </Link>
-          {description && (
-            <div className="text-xs text-muted-foreground line-clamp-1">
-              {description}
-            </div>
-          )}
-        </RecordTableInlineCell>
+        <IdentityCell
+          icon={IconClock}
+          tone="info"
+          name={
+            <Link
+              to={`/erxes-agent/schedules/edit/${_id}`}
+              className="font-medium hover:underline cursor-pointer"
+            >
+              {name}
+            </Link>
+          }
+          sub={description}
+        />
       );
     },
     size: 260,
@@ -269,12 +245,20 @@ const baseColumns: ColumnDef<IScheduleRow>[] = [
   {
     id: 'agent',
     accessorKey: 'agentId',
-    header: () => <RecordTable.InlineHead icon={IconRobot} label="Agent" />,
-    cell: ({ cell }) => (
+    header: () => (
+      <SortableHead
+        icon={IconRobot}
+        label="Agent"
+        columnId="agent"
+        sort={sort}
+        onSort={onSort}
+      />
+    ),
+    cell: ({ row }) => (
       <RecordTableInlineCell>
-        <Badge variant="secondary" className="font-mono">
-          {cell.getValue() as string}
-        </Badge>
+        <IconBadge icon={IconRobot} variant="secondary" className="font-mono">
+          {row.original.agentId}
+        </IconBadge>
       </RecordTableInlineCell>
     ),
     size: 160,
@@ -282,7 +266,15 @@ const baseColumns: ColumnDef<IScheduleRow>[] = [
   {
     id: 'cron',
     accessorKey: 'cron',
-    header: () => <RecordTable.InlineHead icon={IconClock} label="Cron" />,
+    header: () => (
+      <SortableHead
+        icon={IconClock}
+        label="Cron"
+        columnId="cron"
+        sort={sort}
+        onSort={onSort}
+      />
+    ),
     cell: ({ row }) => (
       <RecordTableInlineCell>
         <span className="font-mono text-xs">{row.original.cron}</span>
@@ -295,11 +287,17 @@ const baseColumns: ColumnDef<IScheduleRow>[] = [
     ),
     size: 150,
   },
-  enabledStatusColumn<IScheduleRow>(),
+  enabledStatusColumn<ISchedule>({ sort, onSort }),
   {
     id: 'lastRun',
     header: () => (
-      <RecordTable.InlineHead icon={IconHistory} label="Last run" />
+      <SortableHead
+        icon={IconHistory}
+        label="Last run"
+        columnId="lastRun"
+        sort={sort}
+        onSort={onSort}
+      />
     ),
     cell: ({ row }) => <LastRunCell schedule={row.original} />,
     size: 180,
@@ -307,7 +305,15 @@ const baseColumns: ColumnDef<IScheduleRow>[] = [
   {
     id: 'runCount',
     accessorKey: 'runCount',
-    header: () => <RecordTable.InlineHead icon={IconPlayerPlay} label="Runs" />,
+    header: () => (
+      <SortableHead
+        icon={IconPlayerPlay}
+        label="Runs"
+        columnId="runCount"
+        sort={sort}
+        onSort={onSort}
+      />
+    ),
     cell: ({ cell }) => (
       <RecordTableInlineCell>
         <span className="text-sm tabular-nums">
@@ -322,7 +328,11 @@ const baseColumns: ColumnDef<IScheduleRow>[] = [
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 /** The full column set, with the actions column bound to this list's refetch. */
-const buildColumns = (refetch: () => void): ColumnDef<IScheduleRow>[] => [
+const buildColumns = (
+  refetch: () => void,
+  sort: SortState,
+  onSort: (id: string) => void,
+): ColumnDef<ISchedule>[] => [
   {
     id: 'more',
     cell: ({ row }) => (
@@ -330,103 +340,65 @@ const buildColumns = (refetch: () => void): ColumnDef<IScheduleRow>[] => [
     ),
     size: 33,
   },
-  RecordTable.checkboxColumn as ColumnDef<IScheduleRow>,
-  ...baseColumns,
+  RecordTable.checkboxColumn as ColumnDef<ISchedule>,
+  ...buildBaseColumns(sort, onSort),
 ];
 
 /** Record table of all agent schedules with row actions. */
 export const SchedulesIndexPage = () => {
-  const { data, loading, refetch } = useQuery(MASTRA_SCHEDULES, {
-    fetchPolicy: 'network-only',
-    notifyOnNetworkStatusChange: true,
-  });
+  const { schedules, loading, refetch } = useSchedules();
 
-  const schedules: IScheduleRow[] = data?.mastraSchedules || [];
+  const getSortValue = useCallback(
+    (s: ISchedule, id: string): SortValue => {
+      switch (id) {
+        case 'name':
+          return s.name;
+        case 'agent':
+          return s.agentId;
+        case 'cron':
+          return s.cron;
+        case 'status':
+          return s.isEnabled;
+        case 'lastRun':
+          return s.lastRunAt;
+        case 'runCount':
+          return s.runCount;
+        default:
+          return undefined;
+      }
+    },
+    [],
+  );
 
-  const columns = useMemo(() => buildColumns(refetch), [refetch]);
+  const { sort, toggle, sorted } = useTableSort(schedules, getSortValue);
+
+  const columns = useMemo(
+    () => buildColumns(refetch, sort, toggle),
+    [refetch, sort, toggle],
+  );
 
   return (
-    // skipcq: JS-0415 — page scaffolding (header/empty state/table) nests past the cap
-    <div className="flex flex-col h-full">
-      <PageHeader>
-        <PageHeader.Start>
-          <Breadcrumb>
-            <Breadcrumb.List className="gap-1">
-              <Breadcrumb.Item>
-                <Button variant="ghost" asChild>
-                  <Link to="/erxes-agent/schedules">
-                    <IconCalendarTime />
-                    Schedules
-                  </Link>
-                </Button>
-              </Breadcrumb.Item>
-            </Breadcrumb.List>
-          </Breadcrumb>
-          <Separator.Inline />
-          <PageHeader.FavoriteToggleButton />
-        </PageHeader.Start>
-        <PageHeader.End>
+    <ResourceIndexLayout<ISchedule>
+      icon={IconCalendarTime}
+      title="Schedules"
+      rootPath="/erxes-agent/schedules"
+      sessionKey="erxes_agent_schedules"
+      columns={columns}
+      data={sorted}
+      loading={loading}
+      newButton={{ to: '/erxes-agent/schedules/new', label: 'New Schedule' }}
+      empty={{
+        title: 'No schedules yet',
+        description:
+          'Run an agent on a recurring cron — daily reports, periodic checks, reminders.',
+        action: (
           <Button asChild>
             <Link to="/erxes-agent/schedules/new">
-              <IconPlus /> New Schedule
+              <IconPlus /> Create Schedule
             </Link>
           </Button>
-        </PageHeader.End>
-      </PageHeader>
-
-      {!loading && schedules.length === 0 ? (
-        // skipcq: JS-0415 — empty-state scaffolding nests past the lint cap
-        <div className="flex-1 flex items-center justify-center p-4">
-          <Empty className="border border-dashed max-w-sm w-full">
-            <Empty.Header>
-              <Empty.Media variant="icon">
-                <IconCalendarTime />
-              </Empty.Media>
-              <Empty.Title>No schedules yet</Empty.Title>
-              <Empty.Description>
-                Run an agent on a recurring cron — daily reports, periodic
-                checks, reminders.
-              </Empty.Description>
-            </Empty.Header>
-            <Empty.Content>
-              <Button asChild>
-                <Link to="/erxes-agent/schedules/new">
-                  <IconPlus /> Create Schedule
-                </Link>
-              </Button>
-            </Empty.Content>
-          </Empty>
-        </div>
-      ) : (
-        // skipcq: JS-0415 — record-table scaffolding nests past the lint cap
-        <div className="flex-1 min-h-0">
-          <RecordTable.Provider
-            columns={columns}
-            data={schedules}
-            className="m-3"
-            stickyColumns={['more', 'checkbox', 'name']}
-          >
-            <RecordTable.CursorProvider
-              hasPreviousPage={false}
-              hasNextPage={false}
-              loading={loading}
-              dataLength={schedules.length}
-              sessionKey="erxes_agent_schedules"
-            >
-              <RecordTable>
-                <RecordTable.Header />
-                <RecordTable.Body>
-                  {loading && schedules.length === 0 ? (
-                    <RecordTable.RowSkeleton rows={10} />
-                  ) : (
-                    <RecordTable.RowList />
-                  )}
-                </RecordTable.Body>
-              </RecordTable>
-            </RecordTable.CursorProvider>
-          </RecordTable.Provider>
-        </div>
-      )}
-    </div>
+        ),
+      }}
+    />
   );
 };

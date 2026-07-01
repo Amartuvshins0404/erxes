@@ -1,25 +1,13 @@
 import { z } from 'zod';
 
 export const paymentPlanSchema = z.object({
-  completionPaymentPercentage: z
-    .number()
-    .min(0)
-    .max(100, { message: 'Completion payment must be less than 100%' }),
-  description: z.string().min(1, { message: 'Description is required' }),
-  discountPercentage: z
-    .number()
-    .min(0, { message: 'Discount percentage is required' })
-    .max(100, { message: 'Discount percentage must be less than 100%' }),
-  downPaymentPercentage: z
-    .number()
-    .min(0, { message: 'Down payment percentage is required' })
-    .max(100, { message: 'Down payment percentage must be less than 100%' }),
-  interestPercentage: z
-    .number()
-    .min(0, { message: 'Interest percentage is required' })
-    .max(100, { message: 'Interest percentage must be less than 100%' }),
-  name: z.string().min(1, { message: 'Name is required' }),
-  type: z.string().min(1, { message: 'Type is required' }),
-  frequency: z.string().min(1, { message: 'Frequency is required' }),
-  installment: z.number().min(1, { message: 'Installment is required' }),
+  completionPaymentPercentage: z.number().min(0).max(100).optional(),
+  description: z.string().optional(),
+  discountPercentage: z.number().min(0).max(100).optional(),
+  downPaymentPercentage: z.number().min(0).max(100).optional(),
+  interestPercentage: z.number().min(0).max(100).optional(),
+  name: z.string().optional(),
+  type: z.string().optional(),
+  frequency: z.string().optional(),
+  installment: z.number().min(0).optional(),
 });

@@ -215,7 +215,7 @@ export const GenerateByFloorRangeForm = ({
       size: 0,
       areaType: '',
       tenureTypes: [],
-      usageTypes: building.types?.map((type) => type.toLowerCase()),
+      usageTypes: building.types,
     },
   });
 

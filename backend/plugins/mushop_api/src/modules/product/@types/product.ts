@@ -26,6 +26,7 @@ export interface IMushopProduct {
   offering?: any;
   status?: string;
   note?: string;
+  state?: string;
 }
 
 export interface IMushopProductDocument extends IMushopProduct, Document {

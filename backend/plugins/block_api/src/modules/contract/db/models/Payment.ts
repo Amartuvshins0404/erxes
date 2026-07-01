@@ -127,6 +127,7 @@ export const loadContractPaymentClass = (models: IModels) => {
       const stage = contract.status
         ? await models.ContractStatus.findOne({ _id: contract.status })
         : null;
+      if (stage?.type === 'cancelled') return [];
       if (!force && stage?.type !== 'signed') return [];
 
       const contractNumber = contract.number;
@@ -274,8 +275,21 @@ export const loadContractPaymentClass = (models: IModels) => {
           });
         }
 
-        const principalPerInstallment =
+        const defaultPerInstallment =
           installmentCount > 0 ? principal / installmentCount : 0;
+        const savedAmounts: number[] = paymentPlan.installmentAmounts || [];
+
+        // Compute per-installment principals: use saved overrides, auto-fill last as remainder
+        const installmentPrincipals = Array.from({ length: installmentCount }, (_, i) => {
+          if (i < installmentCount - 1) {
+            return savedAmounts[i] || defaultPerInstallment;
+          }
+          // last row = remainder so totals always match
+          const sumOfOthers = Array.from({ length: installmentCount - 1 }, (__, j) =>
+            savedAmounts[j] || defaultPerInstallment,
+          ).reduce((a, b) => a + b, 0);
+          return savedAmounts[i] || (principal - sumOfOthers);
+        });
 
         // SIMPLE: total interest = principal × rate × (installments / ppy), spread evenly
         const simpleInterestPerInstallment =
@@ -284,18 +298,16 @@ export const loadContractPaymentClass = (models: IModels) => {
             : 0;
 
         for (let i = 0; i < installmentCount; i++) {
+          const installPrincipal = installmentPrincipals[i];
           let interest = 0;
 
           if (interestPct > 0 && installmentCount > 0) {
             if (interestType === 'FLAT') {
-              // Fixed interest on original principal, divided equally
               interest = (principal * interestPct) / 100 / installmentCount;
             } else if (interestType === 'REDUCING') {
-              // Interest on remaining balance for the current period
-              const remainingPrincipal = principal - principalPerInstallment * i;
-              interest = (remainingPrincipal * interestPct) / 100 / ppy;
+              const paidSoFar = installmentPrincipals.slice(0, i).reduce((a, b) => a + b, 0);
+              interest = ((principal - paidSoFar) * interestPct) / 100 / ppy;
             } else {
-              // SIMPLE: annualized total interest divided equally
               interest = simpleInterestPerInstallment;
             }
           }
@@ -305,7 +317,7 @@ export const loadContractPaymentClass = (models: IModels) => {
             index: rowIndex++,
             label: `Installment ${i + 1}`,
             dueDate: dates[i] || firstInstallmentStart,
-            amount: principalPerInstallment + interest,
+            amount: installPrincipal + interest,
           });
         }
 
@@ -349,6 +361,7 @@ export const loadContractPaymentClass = (models: IModels) => {
     public static async recomputeStatus(paymentId: string) {
       const payment = await models.ContractPayment.findOne({ _id: paymentId });
       if (!payment) return null;
+      if (payment.status === 'cancelled') return payment;
 
       const transactions = await models.ContractPaymentTransaction.find({
         paymentId,

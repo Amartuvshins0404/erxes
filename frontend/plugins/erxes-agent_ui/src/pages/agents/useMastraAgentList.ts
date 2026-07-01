@@ -14,7 +14,20 @@ export interface IMastraAgentRow {
   toolPolicy?: 'all' | 'custom';
   allowedTools?: string[];
   isEnabled: boolean;
+  visibility?: 'private' | 'team' | 'department' | 'unit' | 'org';
+  teamId?: string;
+  departmentId?: string;
+  unitId?: string;
+  createdBy?: string;
+  isOwnAgent?: boolean;
   createdAt: string;
+}
+
+interface IMastraAgentsMainResponse {
+  mastraAgentsMain: {
+    list: IMastraAgentRow[];
+    totalCount: number;
+  } | null;
 }
 
 /**
@@ -33,11 +46,12 @@ export const useMastraAgentList = (searchValue?: string) => {
     searchValue: searchValue || undefined,
   };
 
-  const { data, loading, fetchMore, refetch } = useQuery(MASTRA_AGENTS_MAIN, {
-    variables,
-    notifyOnNetworkStatusChange: true,
-    fetchPolicy: 'network-only',
-  });
+  const { data, loading, fetchMore, refetch } =
+    useQuery<IMastraAgentsMainResponse>(MASTRA_AGENTS_MAIN, {
+      variables,
+      notifyOnNetworkStatusChange: true,
+      fetchPolicy: 'network-only',
+    });
 
   const agentsList = useMemo<IMastraAgentRow[]>(
     () => data?.mastraAgentsMain?.list || [],
@@ -61,8 +75,9 @@ export const useMastraAgentList = (searchValue?: string) => {
 
     fetchMore({
       variables: {
-        ...variables,
         page: Math.ceil(agentsList.length / AGENTS_PER_PAGE) + 1,
+        perPage: AGENTS_PER_PAGE,
+        searchValue: searchValue || undefined,
       },
       updateQuery: (prev, { fetchMoreResult }) => {
         if (!fetchMoreResult?.mastraAgentsMain) return prev;
@@ -77,8 +92,7 @@ export const useMastraAgentList = (searchValue?: string) => {
         };
       },
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, agentsList.length, totalCount, fetchMore]);
+  }, [loading, agentsList.length, totalCount, fetchMore, searchValue]);
 
   return {
     agentsList,

@@ -28,7 +28,7 @@ import { ContractUnit } from './ContractUnit';
 import { ContractUnitSelector } from './ContractUnitSelector';
 import { useBlockContractStatusesByType } from '@/contract-status/hooks/useGetBlockContractStatuses';
 import { IUnit } from '@/unit/types/unitType';
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useUnit } from '@/unit/hooks/useUnit';
 
 const TYPE_ORDER = ['reserved', 'draft', 'signed', 'lost', 'cancelled'];
@@ -82,7 +82,6 @@ export const ContractFormSheet = ({
     resolver: zodResolver(contractSchema),
     defaultValues: {
       unit: unitIdFromUrl || '',
-      status: '',
       party: { type: 'customer', id: '' },
       currency: CurrencyCode.MNT,
       ...defaultValues,
@@ -94,19 +93,20 @@ export const ContractFormSheet = ({
   const { unit: fetchedUnit } = useUnit(!unit ? watchedUnitId : null);
   const activeUnit = unit || fetchedUnit;
   const unitSize = activeUnit?.unitType?.size || 0;
-
-  const [ratePerSize, setRatePerSize] = useState<number>(0);
+  const watchedAmount = form.watch('amount') || 0;
+  const ratePerSize = unitSize > 0 ? watchedAmount / unitSize : watchedAmount;
 
   useEffect(() => {
-    if (!activeUnit) return;
+    if (!activeUnit || isEdit) return;
+    if (form.getValues('amount')) return;
+
     const currency = form.getValues('currency');
     const prices = activeUnit.unitType?.prices || [];
-    const match = prices.find(
-      (p) => p.priceType === 'priceBySize' && p.currency === currency,
-    ) || prices.find((p) => p.priceType === 'priceBySize');
+    const match =
+      prices.find((p) => p.priceType === 'priceBySize' && p.currency === currency) ||
+      prices.find((p) => p.priceType === 'priceBySize');
     const rate = match?.price ?? activeUnit.unitType?.price ?? 0;
     if (rate) {
-      setRatePerSize(rate);
       const size = activeUnit.unitType?.size || 0;
       form.setValue('amount', size > 0 ? rate * size : rate);
     }
@@ -153,6 +153,7 @@ export const ContractFormSheet = ({
     <Form {...form}>
       <form
         onSubmit={form.handleSubmit(onSubmit, onValidationError)}
+        onKeyDown={(e) => { if (e.key === 'Enter' && (e.target as HTMLElement).tagName === 'INPUT') e.preventDefault(); }}
         className="flex flex-col flex-auto overflow-hidden"
       >
         <Sheet.Content className="flex-auto overflow-hidden flex">
@@ -242,7 +243,6 @@ export const ContractFormSheet = ({
                             value={ratePerSize}
                             onChange={(v) => {
                               const rate = v || 0;
-                              setRatePerSize(rate);
                               field.onChange(unitSize > 0 ? rate * unitSize : rate);
                             }}
                           />
@@ -365,7 +365,7 @@ export const ContractFormSheet = ({
                           <Form.Label>Status</Form.Label>
                           <Select
                             onValueChange={field.onChange}
-                            value={field.value || ''}
+                            value={field.value ?? ''}
                           >
                             <Form.Control>
                               <Select.Trigger className="h-8">

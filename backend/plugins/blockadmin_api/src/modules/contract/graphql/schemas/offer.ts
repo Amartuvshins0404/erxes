@@ -13,17 +13,27 @@ export const types = `
   type BlockAdminOfferPaymentPlan {
     type: BlockAdminProjectPaymentPlanType!
     downPaymentPercentage: Float
+    downPaymentAmount: Float
+    barterPercentage: Float
+    barterAmount: Float
     interestPercentage: Float
+    interestType: BlockAdminOfferInterestType
     completionPaymentPercentage: Float
+    completionPaymentAmount: Float
     discountPercentage: Float
     description: String
     installment: Int
     frequency: BlockAdminProjectPaymentPlanFrequency
     penaltyPercentage: Float
     vatIncluded: Boolean
+    roundedInstallmentAmount: Float
+    installmentAmounts: [Float]
     paymentDates: [Int]
+    paymentDueDates: [Date]
     firstPaymentDate: Date
+    downPaymentDate: Date
     completionPaymentDate: Date
+    completionPaymentDateLabel: String
   }
 
   enum BlockAdminOfferAmountType {

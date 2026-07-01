@@ -10,4 +10,6 @@ export const settingsSchema = new Schema({
   attachmentsEnabled: { type: Boolean, default: true },
   // Written by the company-knowledge reconciliation sweep; read-only in the UI.
   knowledgeSyncStatus: { type: Schema.Types.Mixed },
+  // 0 = unlimited. Admins exempt. Per-user override (MastraUserSettings) takes precedence.
+  defaultAgentQuota: { type: Number, default: 0 },
 });

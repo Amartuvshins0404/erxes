@@ -182,7 +182,7 @@ export const GenerateByFloorRangeForm = ({
       maxFloor: 0,
       size: 0,
       tenureTypes: [],
-      usageTypes: building.types?.map((type) => type.toLowerCase()),
+      usageTypes: building.types,
     },
   });
   const { createBuildingZone, loading } = useBuildingsCreateZone();

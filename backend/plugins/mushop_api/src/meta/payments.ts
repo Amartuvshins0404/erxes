@@ -75,13 +75,13 @@ const handleTicketPayment = async (
   });
 };
 
-const handleSubscriptionPayment = async (
+const handleMembershipPayment = async (
   subdomain: string,
   data: IPaymentCallbackData,
 ) => {
   const models = await generateModels(subdomain);
 
-  const exists = await models.MushopSubscription.findOne({
+  const exists = await models.Membership.findOne({
     invoiceId: data._id,
   }).lean();
 
@@ -95,21 +95,21 @@ const handleSubscriptionPayment = async (
     return;
   }
 
-  const planId = process.env.MUSHOP_SUBSCRIPTION_PLAN_ID;
+  const planId = process.env.MUSHOP_MEMBERSHIP_PLAN_ID;
 
   if (!planId) {
     console.error(
-      `[mushop:payments] Invoice ${data._id} missing planId — cannot determine subscription duration`,
+      `[mushop:payments] Invoice ${data._id} missing planId — cannot determine membership duration`,
     );
 
     return;
   }
 
-  const existSubscription =
-    await models.MushopSubscription.getActiveSubscription(customerId);
+  const existMembership =
+    await models.Membership.getActiveMembership(customerId);
 
-  if (existSubscription) {
-    await models.MushopSubscription.renewSubscription(existSubscription._id, {
+  if (existMembership) {
+    await models.Membership.renewMembership(existMembership._id, {
       planId,
       invoiceId: data._id,
       amount: data.amount,
@@ -119,7 +119,7 @@ const handleSubscriptionPayment = async (
     return;
   }
 
-  const subscription = await models.MushopSubscription.createSubscription({
+  const membership = await models.Membership.createMembership({
     customerId,
     planId,
     invoiceId: data._id,
@@ -129,7 +129,7 @@ const handleSubscriptionPayment = async (
 
   await linkRelation({
     subdomain,
-    main: { contentType: 'mushop:subscription', contentId: subscription._id },
+    main: { contentType: 'mushop:membership', contentId: membership._id },
     related: [
       { contentType: 'core:customer', contentId: customerId },
       { contentType: 'payment:invoice', contentId: data._id },
@@ -145,8 +145,8 @@ export const payments = {
 
     try {
       switch (data.contentType) {
-        case 'mushop:subscription':
-          await handleSubscriptionPayment(subdomain, data);
+        case 'mushop:membership':
+          await handleMembershipPayment(subdomain, data);
           break;
         case 'frontline:ticket':
           await handleTicketPayment(subdomain, data);

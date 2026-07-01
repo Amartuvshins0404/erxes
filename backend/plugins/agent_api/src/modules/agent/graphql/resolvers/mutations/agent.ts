@@ -564,11 +564,16 @@ export const agentMutations = {
       throw new Error('Agent server not found');
     }
 
-    // Fire-and-forget — agent registration happens in the background
-    addAgent(server.name, input).catch((error) => {
+    // Await registration so the mutation reflects the real outcome — a
+    // fire-and-forget here reported success even when the deployer failed,
+    // which is why creation looked flaky ("created" but no agent).
+    try {
+      await addAgent(server.name, input);
+    } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.error('addAgent failed:', message);
-    });
+      throw new Error(`Failed to create agent: ${message}`);
+    }
 
     return true;
   },

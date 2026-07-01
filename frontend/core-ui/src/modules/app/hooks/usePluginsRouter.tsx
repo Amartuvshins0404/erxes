@@ -14,7 +14,7 @@ export const getPluginsRoutes = () => {
       key={module.name}
       path={`/${module.path}/*`}
       element={
-        <PermissionRouteGuard plugin={module.name}>
+        <PermissionRouteGuard plugin={module.permissionName ?? module.name}>
           <RenderPluginsComponent
             pluginName={`${module.name}_ui`}
             remoteModuleName={module.name}
@@ -34,7 +34,7 @@ export const getPluginsSettingsRoutes = () => {
       key={plugin.name}
       path={`/${plugin.path}/*`}
       element={
-        <PermissionRouteGuard plugin={plugin.name}>
+        <PermissionRouteGuard plugin={plugin.permissionName ?? plugin.name}>
           <RenderPluginsComponent
             pluginName={`${plugin.name}_ui`}
             remoteModuleName={`${plugin.name}Settings`}

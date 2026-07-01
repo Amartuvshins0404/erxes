@@ -65,6 +65,10 @@ export const MTO_REGISTRATION_APPLICATION_UPDATE = gql`
       answers
       modifiedAt
       cpUserId
+      invoiceId
+      paymentStatus
+      membershipFeeAmount
+      invoice
     }
   }
 `;
@@ -132,5 +136,22 @@ export const MTO_REGISTRATION_FORM_SCHEMA_UPDATE = gql`
 export const MTO_REGISTRATION_FORM_SCHEMA_REMOVE = gql`
   mutation MtoRegistrationFormSchemaRemove($_id: String!) {
     mtoRegistrationFormSchemaRemove(_id: $_id)
+  }
+`;
+
+export const MTO_REGISTRATION_APPLICATION_VERIFY_MANUAL_PAYMENT = gql`
+  mutation MtoRegistrationApplicationVerifyManualPayment($_id: String!) {
+    mtoRegistrationApplicationVerifyManualPayment(_id: $_id) {
+      _id
+      paymentStatus
+      invoiceId
+      membershipFeeAmount
+    }
+  }
+`;
+
+export const MTO_REGISTRATION_APPLICATION_PAYMENT_URL = gql`
+  mutation MtoRegistrationApplicationPaymentUrl($_id: String!) {
+    mtoRegistrationApplicationPaymentUrl(_id: $_id)
   }
 `;

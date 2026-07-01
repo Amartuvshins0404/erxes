@@ -17,10 +17,13 @@ import {
 } from 'erxes-api-shared/utils';
 import { SortOrder } from 'mongoose';
 import { IContext } from '~/connectionResolvers';
+import { checkApprovalLock } from '@/approval/utils/checkApprovalLock';
+import { AUTOMATION_APPROVAL_CONTENT_TYPES } from '../../constants';
 import { sanitizeAiAgent, sanitizeAiAgents } from './utils/aiAgent';
 import {
   generateAutomationHistoriesFilter,
   generateAutomationsFilter,
+  addReferenceExtensionsToAutomationOutput,
   getAutomationReferenceFields,
   getAutomationConstants,
   getAutomationSetPropertyTargets,
@@ -98,9 +101,20 @@ export const automationQueries = {
   async automationDetail(
     _root,
     { _id }: { _id: string },
-    { models }: IContext,
+    { models, user }: IContext,
   ) {
-    return models.Automations.getAutomation(_id);
+    const automation = await models.Automations.getAutomation(_id);
+
+    await checkApprovalLock.assert({
+      models,
+      user,
+      contentType: AUTOMATION_APPROVAL_CONTENT_TYPES.AUTOMATION,
+      contentId: _id,
+      ownerId: automation.createdBy,
+      action: 'view',
+    });
+
+    return automation;
   },
 
   async cpAutomationDetail(
@@ -181,13 +195,13 @@ export const automationQueries = {
 
     const matchedTrigger = triggersConst.find(({ type }) => type === nodeType);
 
-    if (matchedTrigger?.output) {
-      return matchedTrigger.output;
-    }
-
     const matchedAction = actionsConst.find(({ type }) => type === nodeType);
+    const output = matchedTrigger?.output || matchedAction?.output || null;
 
-    return matchedAction?.output || null;
+    return await addReferenceExtensionsToAutomationOutput({
+      nodeType,
+      output,
+    });
   },
 
   async automationReferenceFields(
@@ -230,8 +244,9 @@ export const automationQueries = {
     { executionId },
     { models }: IContext,
   ) {
-    const execution =
-      await models.AutomationExecutions.findById(executionId).lean();
+    const execution = await models.AutomationExecutions.findById(
+      executionId,
+    ).lean();
     if (!execution) {
       throw new Error('Execution not found');
     }
@@ -285,16 +300,36 @@ export const automationQueries = {
   async automationsAiAgentDetail(
     _root,
     { _id }: { _id?: string },
-    { models }: IContext,
+    { models, user }: IContext,
   ) {
-    return sanitizeAiAgent(await models.AiAgents.findOne(_id ? { _id } : {}));
+    const agent = await models.AiAgents.findOne(_id ? { _id } : {});
+
+    if (_id && agent) {
+      await checkApprovalLock.assert({
+        models,
+        user,
+        contentType: AUTOMATION_APPROVAL_CONTENT_TYPES.AUTOMATION_AI_AGENT,
+        contentId: _id,
+        action: 'view',
+      });
+    }
+
+    return sanitizeAiAgent(agent);
   },
 
   async automationsAiAgentHealth(
     _root,
     { agentId }: { agentId: string },
-    { subdomain }: IContext,
+    { models, subdomain, user }: IContext,
   ) {
+    await checkApprovalLock.assert({
+      models,
+      user,
+      contentType: AUTOMATION_APPROVAL_CONTENT_TYPES.AUTOMATION_AI_AGENT,
+      contentId: agentId,
+      action: 'view',
+    });
+
     return await sendWorkerMessage({
       pluginName: 'automations',
       queueName: 'aiAgent',
@@ -303,6 +338,34 @@ export const automationQueries = {
       data: { agentId },
       timeout: 10000,
     });
+  },
+
+  async automationsAiAgentKnowledgeSourceStatuses(
+    _root,
+    { agentId }: { agentId: string },
+    { models, subdomain, user }: IContext,
+  ) {
+    await checkApprovalLock.assert({
+      models,
+      user,
+      contentType: AUTOMATION_APPROVAL_CONTENT_TYPES.AUTOMATION_AI_AGENT,
+      contentId: agentId,
+      action: 'view',
+    });
+
+    try {
+      return await sendWorkerMessage({
+        pluginName: 'automations',
+        queueName: 'aiAgent',
+        jobName: 'getAiAgentKnowledgeSourceStatuses',
+        subdomain,
+        data: { agentId },
+        defaultValue: [],
+        timeout: 10000,
+      });
+    } catch {
+      return [];
+    }
   },
 
   /**

@@ -8,9 +8,16 @@
 // See docs/ADVANCED_MEMORY.md (§6) and docs/ADVANCED_MEMORY_TESTS.md (§1–3, §9).
 // ---------------------------------------------------------------------------
 
-import { trimEdgeChars } from '~/mastra/text';
+import {
+  Env,
+  val,
+  parsePositiveInt,
+  parseScore,
+  collectionName as buildCollectionName,
+  buildVectorStatus,
+} from '~/mastra/configEnv';
 
-export type Env = Record<string, string | undefined>;
+export type { Env };
 
 export type EmbedderKind = 'fastembed' | 'openai';
 
@@ -55,18 +62,14 @@ const EMBED_DIMENSIONS: Record<string, number> = {
 const FASTEMBED_FALLBACK_DIM = 384;
 const OPENAI_FALLBACK_DIM = 1536;
 
-/** Read one env var as trimmed text (absent → empty string). */
-function val(env: Env, key: string): string {
-  return (env[key] ?? '').trim();
-}
-
 /**
- * The master switch. Advanced memory is enabled ONLY when ERXES_AGENT_MEMORY is
- * exactly "enable" (whitespace-trimmed). Every other value — true/1/on/ENABLE —
- * is treated as off, so the flag is unambiguous and hard to enable by accident.
+ * The master switch. Advanced memory is ON by default — chat persistence and the
+ * session sidebar ride on it, so it must not depend on an env opt-in. Set
+ * ERXES_AGENT_MEMORY to exactly "disable" (whitespace-trimmed) to turn it off;
+ * every other value (including absent) leaves it enabled.
  */
 export function isAdvancedMemoryEnabled(env: Env = process.env): boolean {
-  return val(env, 'ERXES_AGENT_MEMORY') === 'enable';
+  return val(env, 'ERXES_AGENT_MEMORY') !== 'disable';
 }
 
 /** Resolve the embedder kind, model, dimension, and (for openai) endpoint/key. */
@@ -110,21 +113,7 @@ export function resolveEmbedderConfig(env: Env = process.env): EmbedderConfig {
  * crashing on a vector-size mismatch against an old one.
  */
 export function collectionName(model: string, dimension: number): string {
-  const slug = model.toLowerCase().replace(/[^a-z0-9]+/g, '_');
-  const trimmed = trimEdgeChars(slug, '_', '_');
-  return `mastra_memory_${trimmed}_${dimension}`;
-}
-
-/** Parse a positive integer from env text, falling back to the default. */
-function parsePositiveInt(raw: string, def: number): number {
-  const n = parseInt(raw, 10);
-  return Number.isFinite(n) && n > 0 ? n : def;
-}
-
-/** Parse a 0..1 score from env text, falling back to the default. */
-function parseScore(raw: string, def: number): number {
-  const n = parseFloat(raw);
-  return Number.isFinite(n) && n >= 0 && n <= 1 ? n : def;
+  return buildCollectionName('mastra_memory', model, dimension);
 }
 
 /** Semantic-recall tuning knobs (topK / minScore / scope) with safe defaults. */
@@ -171,11 +160,9 @@ export function computeAdvancedMemoryStatus(
 
   const emb = resolveEmbedderConfig(env);
   return {
+    ...buildVectorStatus('mastra_memory', emb, qdrantUrl(env)),
     enabled: true,
     embedder: emb.kind,
-    embedderModel: emb.model,
-    qdrantUrl: qdrantUrl(env),
     qdrantReachable: health?.reachable ?? null,
-    collection: collectionName(emb.model, emb.dimension),
   };
 }

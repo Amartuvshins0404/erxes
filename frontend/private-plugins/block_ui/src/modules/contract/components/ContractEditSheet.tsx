@@ -70,7 +70,6 @@ const ContractEditBody = ({
       : { type: 'customer', id: '' },
     paymentPlan: contract.paymentPlan
       ? {
-          type: orUndef(contract.paymentPlan.type),
           downPaymentPercentage: orUndef(
             contract.paymentPlan.downPaymentPercentage,
           ),
@@ -91,6 +90,8 @@ const ContractEditBody = ({
           frequency: orUndef(contract.paymentPlan.frequency),
           penaltyPercentage: orUndef(contract.paymentPlan.penaltyPercentage),
           vatIncluded: contract.paymentPlan.vatIncluded || false,
+          roundedInstallmentAmount: orUndef(contract.paymentPlan.roundedInstallmentAmount),
+          installmentAmounts: orUndef(contract.paymentPlan.installmentAmounts),
           paymentDates: orUndef(contract.paymentPlan.paymentDates),
           paymentDueDates: orUndef(contract.paymentPlan.paymentDueDates),
           firstPaymentDate: orUndef(contract.paymentPlan.firstPaymentDate),
@@ -101,7 +102,7 @@ const ContractEditBody = ({
   };
 
   const handleSubmit = async (data: ContractFormData) => {
-    const paymentPlan = data.paymentPlan?.type ? data.paymentPlan : undefined;
+    const paymentPlan = data.paymentPlan?.frequency ? data.paymentPlan : undefined;
     const party =
       data.party && data.party.id
         ? { type: data.party.type, id: data.party.id }

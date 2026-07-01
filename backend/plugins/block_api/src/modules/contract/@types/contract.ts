@@ -1,7 +1,6 @@
 import { Document } from 'mongoose';
 import {
   BlockProjectPaymentPlanInterestType,
-  BlockProjectPaymentPlanType,
 } from '@/project/@types/payment';
 
 export enum ContractPartyType {
@@ -18,7 +17,6 @@ export interface IContractParty {
 // Stage semantics (reserved/draft/signed/cancelled/lost) live on ContractStatus.type.
 
 export interface IContractPaymentPlan {
-  type: BlockProjectPaymentPlanType;
   downPaymentPercentage: number;
   downPaymentAmount?: number;
   barterPercentage?: number;

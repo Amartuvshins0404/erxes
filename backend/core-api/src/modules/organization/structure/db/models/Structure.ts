@@ -146,6 +146,13 @@ export const loadDepartmentClass = (
 
       doc.order = parent ? `${parent.order}${doc.code}/` : `${doc.code}/`;
 
+      if (doc.supervisorId) {
+        const userIds = doc.userIds || [];
+        if (!userIds.includes(doc.supervisorId)) {
+          doc.userIds = [...userIds, doc.supervisorId];
+        }
+      }
+
       const department = await models.Departments.create({
         ...doc,
         createdAt: new Date(),
@@ -186,6 +193,14 @@ export const loadDepartmentClass = (
       }
 
       doc.order = parent ? `${parent.order}${doc.code}/` : `${doc.code}/`;
+
+      if (doc.supervisorId) {
+        const userIds = doc.userIds || [];
+        if (!userIds.includes(doc.supervisorId)) {
+          doc.userIds = [...userIds, doc.supervisorId];
+        }
+      }
+
       const children = await models.Departments.find({
         order: { $regex: new RegExp(`^${escapeRegExp(department.order)}`) },
       });
@@ -293,6 +308,13 @@ export const loadUnitClass = (models: IModels) => {
      * Create an unit
      */
     public static async createUnit(doc: any, user: IUserDocument) {
+      if (doc.supervisorId) {
+        const userIds = doc.userIds || [];
+        if (!userIds.includes(doc.supervisorId)) {
+          doc.userIds = [...userIds, doc.supervisorId];
+        }
+      }
+
       const unit = await models.Units.create({
         ...doc,
         createdAt: new Date(),
@@ -306,6 +328,13 @@ export const loadUnitClass = (models: IModels) => {
      * Update an unit
      */
     public static async updateUnit(_id: string, doc: any, user: IUserDocument) {
+      if (doc.supervisorId) {
+        const userIds = doc.userIds || [];
+        if (!userIds.includes(doc.supervisorId)) {
+          doc.userIds = [...userIds, doc.supervisorId];
+        }
+      }
+
       await models.Units.updateOne(
         { _id },
         {
@@ -376,6 +405,13 @@ export const loadBranchClass = (
 
       doc.order = parent ? `${parent.order}${doc.code}/` : `${doc.code}/`;
 
+      if (doc.supervisorId) {
+        const userIds = doc.userIds || [];
+        if (!userIds.includes(doc.supervisorId)) {
+          doc.userIds = [...userIds, doc.supervisorId];
+        }
+      }
+
       const branch = await models.Branches.create({
         ...doc,
         createdAt: new Date(),
@@ -405,6 +441,13 @@ export const loadBranchClass = (
 
       if (branch?.code !== doc.code) {
         await checkCollectionCodeDuplication(models.Branches, doc.code);
+      }
+
+      if (doc.supervisorId) {
+        const userIds = doc.userIds || [];
+        if (!userIds.includes(doc.supervisorId)) {
+          doc.userIds = [...userIds, doc.supervisorId];
+        }
       }
 
       const parent = await models.Branches.findOne({ _id: doc.parentId });

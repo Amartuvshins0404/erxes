@@ -9,19 +9,29 @@ import {
   types as ProductTypes,
 } from '@/product/graphql/schemas/product';
 import {
-  mutations as SubscriptionMutations,
-  queries as SubscriptionQueries,
-  types as SubscriptionTypes,
-} from '@/subscription/graphql/schemas/mushopSubscription';
+  mutations as ProductSpecificationMutations,
+  queries as ProductSpecificationQueries,
+  types as ProductSpecificationTypes,
+} from '@/product-specification/graphql/schemas/productSpecification';
 import {
-  mutations as SubscriptionPlanMutations,
-  queries as SubscriptionPlanQueries,
-  types as SubscriptionPlanTypes,
-} from '@/subscription/graphql/schemas/mushopSubscriptionPlan';
+  mutations as ConfigMutations,
+  queries as ConfigQueries,
+  types as ConfigTypes,
+} from '@/config/graphql/schemas/config';
+import {
+  mutations as MembershipMutations,
+  queries as MembershipQueries,
+  types as MembershipTypes,
+} from '@/membership/graphql/schemas/mushopMembership';
+import {
+  mutations as MembershipPlanMutations,
+  queries as MembershipPlanQueries,
+  types as MembershipPlanTypes,
+} from '@/membership/graphql/schemas/mushopMembershipPlan';
 import {
   queries as CustomerInvoiceQueries,
   types as CustomerInvoiceTypes,
-} from '@/subscription/graphql/schemas/invoices';
+} from '@/membership/graphql/schemas/invoices';
 import {
   mutations as CollectiveMutations,
   queries as CollectiveQueries,
@@ -39,8 +49,10 @@ export const types = `
 
   ${SupplierTypes}
   ${ProductTypes}
-  ${SubscriptionTypes}
-  ${SubscriptionPlanTypes}
+  ${ProductSpecificationTypes}
+  ${ConfigTypes}
+  ${MembershipTypes}
+  ${MembershipPlanTypes}
   ${CustomerInvoiceTypes}
   ${CollectiveTypes}
   ${CollectivePackageTypes}
@@ -49,8 +61,10 @@ export const types = `
 export const queries = `
   ${SupplierQueries}
   ${ProductQueries}
-  ${SubscriptionQueries}
-  ${SubscriptionPlanQueries}
+  ${ProductSpecificationQueries}
+  ${ConfigQueries}
+  ${MembershipQueries}
+  ${MembershipPlanQueries}
   ${CustomerInvoiceQueries}
   ${CollectiveQueries}
   ${CollectivePackageQueries}
@@ -59,8 +73,10 @@ export const queries = `
 export const mutations = `
   ${SupplierMutations}
   ${ProductMutations}
-  ${SubscriptionMutations}
-  ${SubscriptionPlanMutations}
+  ${ProductSpecificationMutations}
+  ${ConfigMutations}
+  ${MembershipMutations}
+  ${MembershipPlanMutations}
   ${CollectiveMutations}
   ${CollectivePackageMutations}
 `;

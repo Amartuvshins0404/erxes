@@ -1,32 +1,7 @@
-import { Document } from 'mongoose';
-
-// A persisted chat session (thread) between a user and an agent. Survives page
-// reloads — replaces the previous browser-only / LibSQL-file memory.
-export interface IMastraThread {
-  threadId: string;
-  agentId: string;
-  // Owner: in-app user _id or "bot:<id>" for messenger sessions. Optional only
-  // for legacy docs created before ownership existed.
-  userId?: string;
-  title?: string;
-  // Who set the title: 'derived' (first-message snippet), 'generated' (LLM
-  // summary of the conversation), 'manual' (user rename — never overwritten).
-  titleSource?: 'derived' | 'generated' | 'manual';
-  // messageCount at the last LLM title generation — drives periodic refresh.
-  titleMessageCount?: number;
-  messageCount?: number;
-  lastMessageAt?: Date;
-  // messageCount at the last learning-distillation sweep over this thread.
-  distilledMessageCount?: number;
-}
-
-export interface IMastraThreadDocument extends IMastraThread, Document {
-  _id: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export type MastraMessageRole = 'user' | 'assistant';
+// Chat-turn artifact types. The chat store itself is Mastra-native (see
+// session/nativeStore.ts); these shapes describe the erxes-only per-turn
+// artifacts the pipeline builds and mirrors onto the native message's
+// content.metadata.erxes blob, and the attachment pointers on a user message.
 
 // One tool invocation made during an assistant turn, kept for the expandable
 // tool-call detail in the chat UI.
@@ -56,6 +31,19 @@ export interface IMastraMessageMeta {
   // Learnings injected into this turn's context (digest entries) — lets a
   // thumbs rating reinforce/penalize the lessons that shaped the reply.
   learningIdsInContext?: string[];
+  // Langfuse trace id for this turn — lets a later thumbs rating attach a human
+  // score to the right trace in Langfuse (Plan B / langfuseClient.pushUserScore).
+  langfuseTraceId?: string;
+  // Slash-skills active for this turn — rendered as a badge on the persisted
+  // assistant message so a reload shows which skills shaped the reply.
+  activeSkills?: string[];
+  // Per-reasoning-step short summaries ("short thoughts"), index-aligned to the
+  // turn's reasoning parts (holes are null). Re-renders the gist on each step in
+  // the chat run timeline on reload.
+  reasoningSummaries?: (string | null)[];
+  // One-line "what this turn accomplished" headline, shown as the collapsed
+  // run-timeline header on reload.
+  turnSummary?: string;
 }
 
 // A file attached to a user message. `url` is either a storage key (private
@@ -65,17 +53,4 @@ export interface IMastraChatAttachment {
   name: string;
   type?: string;
   size?: number;
-}
-
-export interface IMastraMessage {
-  threadId: string;
-  role: MastraMessageRole;
-  content: string;
-  meta?: IMastraMessageMeta;
-  attachments?: IMastraChatAttachment[];
-}
-
-export interface IMastraMessageDocument extends IMastraMessage, Document {
-  _id: string;
-  createdAt: Date;
 }

@@ -17,7 +17,6 @@ export interface IContractParty {
 }
 
 export interface IContractPaymentPlan {
-  type: string;
   downPaymentPercentage?: number;
   downPaymentAmount?: number;
   barterPercentage?: number;
@@ -32,6 +31,8 @@ export interface IContractPaymentPlan {
   frequency?: string;
   penaltyPercentage?: number;
   vatIncluded?: boolean;
+  roundedInstallmentAmount?: number;
+  installmentAmounts?: number[];
   paymentDates?: number[];
   paymentDueDates?: string[];
   firstPaymentDate?: string;

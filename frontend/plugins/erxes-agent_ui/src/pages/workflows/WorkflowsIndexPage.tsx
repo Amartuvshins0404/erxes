@@ -1,13 +1,15 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { useQuery, useMutation } from '@apollo/client';
 import { ColumnDef } from '@tanstack/react-table';
 import {
+  Icon,
   IconPlus,
   IconSitemap,
   IconAlignLeft,
   IconBolt,
   IconCalendar,
+  IconClock,
+  IconHandClick,
   IconListNumbers,
   IconPencil,
   IconPlayerPlay,
@@ -15,43 +17,61 @@ import {
   IconVersions,
 } from '@tabler/icons-react';
 import {
-  Badge,
-  Breadcrumb,
   Button,
-  Combobox,
   Command,
-  Empty,
-  Popover,
   RecordTable,
   RecordTableInlineCell,
   RelativeDateDisplay,
-  Separator,
   toast,
   useConfirm,
 } from 'erxes-ui';
-import { PageHeader } from 'ui-modules';
-import { MASTRA_WORKFLOWS } from '~/graphql/queries';
 import {
-  MASTRA_WORKFLOW_REMOVE,
-  MASTRA_WORKFLOW_RUN_START,
-  MASTRA_WORKFLOW_SET_ENABLED,
-} from '~/graphql/mutations';
-import {
+  IconBadge,
+  IdentityCell,
+  RowActionsMenu,
+  SortableHead,
   ToggleDeleteMenuItems,
+  Tone,
   enabledStatusColumn,
 } from '~/components/RecordTableShared';
+import { ResourceIndexLayout } from '~/components/ResourceIndexLayout';
+import { SortState, SortValue, useTableSort } from '~/components/useTableSort';
 import { stepCount, triggerLabel } from './shared';
+import { useWorkflows } from './hooks/useWorkflows';
+import { useWorkflowActions } from './hooks/useWorkflowMutations';
+import { IWorkflow, IWorkflowDefinition } from './types';
 
-export interface IWorkflowRow {
-  _id: string;
-  name: string;
-  description?: string;
-  definition: any;
-  version: number;
-  isEnabled: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
+type BadgeVariant =
+  | 'default'
+  | 'secondary'
+  | 'success'
+  | 'warning'
+  | 'destructive'
+  | 'info';
+
+// ─── Trigger identity ───────────────────────────────────────────────────────────
+
+// Each trigger kind gets a glyph + tone (for the identity tile) and a badge
+// variant, so the list reads by trigger type at a glance.
+const TRIGGER_META: Record<
+  string,
+  { icon: Icon; tone: Tone; variant: BadgeVariant }
+> = {
+  manual: { icon: IconHandClick, tone: 'muted', variant: 'secondary' },
+  automation: { icon: IconBolt, tone: 'info', variant: 'info' },
+  schedule: { icon: IconClock, tone: 'warning', variant: 'warning' },
+};
+
+const triggerMeta = (definition?: IWorkflowDefinition) => {
+  const type = (definition?.trigger?.type || 'manual').toLowerCase();
+  return (
+    TRIGGER_META[type] ?? {
+      icon: IconBolt,
+      tone: 'primary' as Tone,
+      variant: 'default' as BadgeVariant,
+    }
+  );
+};
 
 // ─── More menu cell ───────────────────────────────────────────────────────────
 
@@ -59,32 +79,21 @@ const WorkflowMoreCell = ({
   workflow,
   refetch,
 }: {
-  workflow: IWorkflowRow;
+  workflow: IWorkflow;
   refetch: () => void;
 }) => {
   const navigate = useNavigate();
   const { confirm } = useConfirm();
-
-  const [removeWorkflow] = useMutation(MASTRA_WORKFLOW_REMOVE, {
-    onCompleted: () => refetch(),
-    onError: (e) =>
-      toast({ title: 'Error', description: e.message, variant: 'destructive' }),
-  });
-
-  const [setEnabled] = useMutation(MASTRA_WORKFLOW_SET_ENABLED, {
-    onCompleted: () => refetch(),
-    onError: (e) =>
-      toast({ title: 'Error', description: e.message, variant: 'destructive' }),
-  });
-
-  const [runStart] = useMutation(MASTRA_WORKFLOW_RUN_START, {
-    onCompleted: () => {
+  const { removeWorkflow, setEnabled, runStart } = useWorkflowActions(
+    refetch,
+    () => {
       toast({ title: 'Run started', description: workflow.name });
       navigate(`/erxes-agent/workflows/${workflow._id}`);
     },
-    onError: (e) =>
-      toast({ title: 'Error', description: e.message, variant: 'destructive' }),
-  });
+  );
+
+  const handleRun = () =>
+    runStart({ variables: { _id: workflow._id, input: {} } });
 
   const handleDelete = () =>
     confirm({
@@ -93,123 +102,134 @@ const WorkflowMoreCell = ({
     }).then(() => removeWorkflow({ variables: { _id: workflow._id } }));
 
   return (
-    <Popover>
-      <Popover.Trigger asChild>
-        <RecordTable.MoreButton className="w-full h-full" />
-      </Popover.Trigger>
-      <Combobox.Content
-        side="right"
-        align="start"
-        avoidCollisions={false}
-        className="w-44 min-w-0 [&>button]:cursor-pointer"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <Command>
-          <Command.List>
-            <Command.Item asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="justify-start w-full h-8"
-                onClick={() =>
-                  navigate(`/erxes-agent/workflows/${workflow._id}`)
-                }
-              >
-                <IconEye className="size-4" /> View runs
-              </Button>
-            </Command.Item>
-            <Command.Item asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="justify-start w-full h-8"
-                onClick={() =>
-                  runStart({ variables: { _id: workflow._id, input: {} } })
-                }
-              >
-                <IconPlayerPlay className="size-4" /> Run now
-              </Button>
-            </Command.Item>
-            <Command.Item asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="justify-start w-full h-8"
-                onClick={() =>
-                  navigate(`/erxes-agent/workflows/edit/${workflow._id}`)
-                }
-              >
-                <IconPencil className="size-4" /> Edit
-              </Button>
-            </Command.Item>
-            <ToggleDeleteMenuItems
-              isEnabled={workflow.isEnabled}
-              onToggle={() =>
-                setEnabled({
-                  variables: {
-                    _id: workflow._id,
-                    isEnabled: !workflow.isEnabled,
-                  },
-                })
-              }
-              onDelete={handleDelete}
-            />
-          </Command.List>
-        </Command>
-      </Combobox.Content>
-    </Popover>
+    <RowActionsMenu>
+      <Command.Item asChild>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="justify-start w-full h-8"
+          onClick={() => navigate(`/erxes-agent/workflows/${workflow._id}`)}
+        >
+          <IconEye className="size-4" /> View runs
+        </Button>
+      </Command.Item>
+      <Command.Item asChild>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="justify-start w-full h-8"
+          onClick={handleRun}
+        >
+          <IconPlayerPlay className="size-4" /> Run now
+        </Button>
+      </Command.Item>
+      <Command.Item asChild>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="justify-start w-full h-8"
+          onClick={() =>
+            navigate(`/erxes-agent/workflows/edit/${workflow._id}`)
+          }
+        >
+          <IconPencil className="size-4" /> Edit
+        </Button>
+      </Command.Item>
+      <ToggleDeleteMenuItems
+        isEnabled={workflow.isEnabled}
+        onToggle={() =>
+          setEnabled({
+            variables: {
+              _id: workflow._id,
+              isEnabled: !workflow.isEnabled,
+            },
+          })
+        }
+        onDelete={handleDelete}
+      />
+    </RowActionsMenu>
   );
 };
 
 // ─── Columns ──────────────────────────────────────────────────────────────────
 
-const baseColumns: ColumnDef<IWorkflowRow>[] = [
+const buildBaseColumns = (
+  sort: SortState,
+  onSort: (id: string) => void,
+): ColumnDef<IWorkflow>[] => [
   {
     id: 'name',
     accessorKey: 'name',
     header: () => (
-      <RecordTable.InlineHead icon={IconAlignLeft} label="Workflow" />
+      <SortableHead
+        icon={IconAlignLeft}
+        label="Workflow"
+        columnId="name"
+        sort={sort}
+        onSort={onSort}
+      />
     ),
     cell: ({ row }) => {
-      const { _id, name, description } = row.original;
+      const { _id, name, description, definition } = row.original;
+      const meta = triggerMeta(definition);
       return (
-        <RecordTableInlineCell>
-          <Link
-            to={`/erxes-agent/workflows/${_id}`}
-            className="font-medium hover:underline cursor-pointer"
-          >
-            {name}
-          </Link>
-          {description && (
-            <div className="text-xs text-muted-foreground line-clamp-1">
-              {description}
-            </div>
-          )}
-        </RecordTableInlineCell>
+        <IdentityCell
+          icon={meta.icon}
+          tone={meta.tone}
+          name={
+            <Link
+              to={`/erxes-agent/workflows/${_id}`}
+              className="font-medium hover:underline cursor-pointer"
+            >
+              {name}
+            </Link>
+          }
+          sub={description}
+        />
       );
     },
     size: 280,
   },
   {
     id: 'trigger',
-    header: () => <RecordTable.InlineHead icon={IconBolt} label="Trigger" />,
-    cell: ({ row }) => (
-      <RecordTableInlineCell>
-        <Badge variant="secondary">
-          {triggerLabel(row.original.definition)}
-        </Badge>
-      </RecordTableInlineCell>
+    header: () => (
+      <SortableHead
+        icon={IconBolt}
+        label="Trigger"
+        columnId="trigger"
+        sort={sort}
+        onSort={onSort}
+      />
     ),
+    cell: ({ row }) => {
+      const meta = triggerMeta(row.original.definition);
+      return (
+        <RecordTableInlineCell>
+          <IconBadge icon={meta.icon} variant={meta.variant}>
+            {triggerLabel(row.original.definition)}
+          </IconBadge>
+        </RecordTableInlineCell>
+      );
+    },
     size: 160,
   },
   {
     id: 'steps',
     header: () => (
-      <RecordTable.InlineHead icon={IconListNumbers} label="Steps" />
+      <SortableHead
+        icon={IconListNumbers}
+        label="Steps"
+        columnId="steps"
+        sort={sort}
+        onSort={onSort}
+      />
     ),
     cell: ({ row }) => (
       <RecordTableInlineCell>
-        <span className="text-sm">{stepCount(row.original.definition)}</span>
+        <span className="flex items-center gap-1 text-sm tabular-nums">
+          <IconListNumbers className="size-3.5 text-muted-foreground" />
+          {stepCount(row.original.definition)}
+        </span>
       </RecordTableInlineCell>
     ),
     size: 80,
@@ -218,21 +238,35 @@ const baseColumns: ColumnDef<IWorkflowRow>[] = [
     id: 'version',
     accessorKey: 'version',
     header: () => (
-      <RecordTable.InlineHead icon={IconVersions} label="Version" />
+      <SortableHead
+        icon={IconVersions}
+        label="Version"
+        columnId="version"
+        sort={sort}
+        onSort={onSort}
+      />
     ),
     cell: ({ cell }) => (
       <RecordTableInlineCell>
-        <span className="font-mono text-xs">v{cell.getValue() as number}</span>
+        <span className="font-mono text-xs text-muted-foreground">
+          v{cell.getValue() as number}
+        </span>
       </RecordTableInlineCell>
     ),
     size: 80,
   },
-  enabledStatusColumn<IWorkflowRow>(),
+  enabledStatusColumn<IWorkflow>({ sort, onSort }),
   {
     id: 'updatedAt',
     accessorKey: 'updatedAt',
     header: () => (
-      <RecordTable.InlineHead icon={IconCalendar} label="Updated" />
+      <SortableHead
+        icon={IconCalendar}
+        label="Updated"
+        columnId="updatedAt"
+        sort={sort}
+        onSort={onSort}
+      />
     ),
     cell: ({ cell }) => (
       <RelativeDateDisplay value={cell.getValue() as string} asChild>
@@ -248,14 +282,33 @@ const baseColumns: ColumnDef<IWorkflowRow>[] = [
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export const WorkflowsIndexPage = () => {
-  const { data, loading, refetch } = useQuery(MASTRA_WORKFLOWS, {
-    fetchPolicy: 'network-only',
-    notifyOnNetworkStatusChange: true,
-  });
+  const { workflows, loading, refetch } = useWorkflows();
 
-  const workflows: IWorkflowRow[] = data?.mastraWorkflows || [];
+  const getSortValue = useCallback(
+    (w: IWorkflow, id: string): SortValue => {
+      switch (id) {
+        case 'name':
+          return w.name;
+        case 'trigger':
+          return triggerLabel(w.definition);
+        case 'steps':
+          return stepCount(w.definition);
+        case 'version':
+          return w.version;
+        case 'status':
+          return w.isEnabled;
+        case 'updatedAt':
+          return w.updatedAt;
+        default:
+          return undefined;
+      }
+    },
+    [],
+  );
 
-  const columns = useMemo<ColumnDef<IWorkflowRow>[]>(
+  const { sort, toggle, sorted } = useTableSort(workflows, getSortValue);
+
+  const columns = useMemo<ColumnDef<IWorkflow>[]>(
     () => [
       {
         id: 'more',
@@ -264,90 +317,33 @@ export const WorkflowsIndexPage = () => {
         ),
         size: 33,
       },
-      RecordTable.checkboxColumn as ColumnDef<IWorkflowRow>,
-      ...baseColumns,
+      RecordTable.checkboxColumn as ColumnDef<IWorkflow>,
+      ...buildBaseColumns(sort, toggle),
     ],
-    [refetch],
+    [refetch, sort, toggle],
   );
 
   return (
-    <div className="flex flex-col h-full">
-      <PageHeader>
-        <PageHeader.Start>
-          <Breadcrumb>
-            <Breadcrumb.List className="gap-1">
-              <Breadcrumb.Item>
-                <Button variant="ghost" asChild>
-                  <Link to="/erxes-agent/workflows">
-                    <IconSitemap />
-                    Workflows
-                  </Link>
-                </Button>
-              </Breadcrumb.Item>
-            </Breadcrumb.List>
-          </Breadcrumb>
-          <Separator.Inline />
-          <PageHeader.FavoriteToggleButton />
-        </PageHeader.Start>
-        <PageHeader.End>
+    <ResourceIndexLayout<IWorkflow>
+      icon={IconSitemap}
+      title="Workflows"
+      rootPath="/erxes-agent/workflows"
+      sessionKey="erxes_agent_workflows"
+      columns={columns}
+      data={sorted}
+      loading={loading}
+      newButton={{ to: '/erxes-agent/workflows/new', label: 'New Workflow' }}
+      empty={{
+        title: 'No workflows yet',
+        description: 'Ask an agent to build one in Chat, or create one by hand.',
+        action: (
           <Button asChild>
             <Link to="/erxes-agent/workflows/new">
-              <IconPlus /> New Workflow
+              <IconPlus /> Create Workflow
             </Link>
           </Button>
-        </PageHeader.End>
-      </PageHeader>
-
-      {!loading && workflows.length === 0 ? (
-        <div className="flex-1 flex items-center justify-center p-4">
-          <Empty className="border border-dashed max-w-sm w-full">
-            <Empty.Header>
-              <Empty.Media variant="icon">
-                <IconSitemap />
-              </Empty.Media>
-              <Empty.Title>No workflows yet</Empty.Title>
-              <Empty.Description>
-                Ask an agent to build one in Chat, or create one by hand.
-              </Empty.Description>
-            </Empty.Header>
-            <Empty.Content>
-              <Button asChild>
-                <Link to="/erxes-agent/workflows/new">
-                  <IconPlus /> Create Workflow
-                </Link>
-              </Button>
-            </Empty.Content>
-          </Empty>
-        </div>
-      ) : (
-        <div className="flex-1 min-h-0">
-          <RecordTable.Provider
-            columns={columns}
-            data={workflows}
-            className="m-3"
-            stickyColumns={['more', 'checkbox', 'name']}
-          >
-            <RecordTable.CursorProvider
-              hasPreviousPage={false}
-              hasNextPage={false}
-              loading={loading}
-              dataLength={workflows.length}
-              sessionKey="erxes_agent_workflows"
-            >
-              <RecordTable>
-                <RecordTable.Header />
-                <RecordTable.Body>
-                  {loading && workflows.length === 0 ? (
-                    <RecordTable.RowSkeleton rows={10} />
-                  ) : (
-                    <RecordTable.RowList />
-                  )}
-                </RecordTable.Body>
-              </RecordTable>
-            </RecordTable.CursorProvider>
-          </RecordTable.Provider>
-        </div>
-      )}
-    </div>
+        ),
+      }}
+    />
   );
 };

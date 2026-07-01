@@ -1,4 +1,6 @@
-import { sendTRPCMessage } from 'erxes-api-shared/utils';
+import { ExpectedError, sendTRPCMessage } from 'erxes-api-shared/utils';
+import { createTTLCache } from '~/utils/ttlCache';
+import { safeFetch } from '~/mastra/safeFetch';
 
 // ---------------------------------------------------------------------------
 // Attachment storage — detection + retrieval.
@@ -87,15 +89,15 @@ export function evaluateStorageConfigs(
 
 // Storage config rarely changes — cache per subdomain briefly so every chat
 // page load / stream request doesn't round-trip to core.
-const statusCache = new Map<string, { status: StorageStatus; at: number }>();
 const STATUS_TTL_MS = 60_000;
+const statusCache = createTTLCache<StorageStatus>(STATUS_TTL_MS);
 
 /** Fetch (and briefly cache) the instance's upload-storage status. */
 export async function getStorageStatus(
   subdomain: string,
 ): Promise<StorageStatus> {
   const cached = statusCache.get(subdomain);
-  if (cached && Date.now() - cached.at < STATUS_TTL_MS) return cached.status;
+  if (cached) return cached;
 
   let configs: Record<string, string> = {};
   try {
@@ -115,7 +117,7 @@ export async function getStorageStatus(
   }
 
   const status = evaluateStorageConfigs(configs);
-  statusCache.set(subdomain, { status, at: Date.now() });
+  statusCache.set(subdomain, status);
   return status;
 }
 
@@ -129,38 +131,94 @@ export function isFullUrl(value: string): boolean {
   return /^https?:\/\//i.test(value);
 }
 
-/** Download an attachment through core's /read-file (or directly for URLs). */
+/**
+ * Download an attachment by its storage KEY through core's internal /read-file
+ * endpoint. The target URL is server-built and the key is encoded into the
+ * query string, so this is a trusted internal fetch — it deliberately does NOT
+ * go through safeFetch.
+ *
+ * SECURITY: `key` is treated strictly as a storage key, NEVER as a URL. A
+ * full http(s) URL here would let a model-/attacker-supplied value (e.g.
+ * `http://169.254.169.254/...`) reach a raw, unguarded fetch (SSRF). Any
+ * user-supplied full URL must instead be routed through fetchRemoteFile, which
+ * applies the SSRF guard. We reject full URLs outright as defence in depth.
+ */
 export async function fetchAttachmentBuffer(params: {
   erxesApiUrl: string;
-  keyOrUrl: string;
+  key: string;
   name?: string;
 }): Promise<{ buffer: Buffer; contentType: string }> {
-  const { erxesApiUrl, keyOrUrl, name } = params;
+  const { erxesApiUrl, key, name } = params;
 
-  const target = isFullUrl(keyOrUrl)
-    ? keyOrUrl
-    : `${(erxesApiUrl || 'http://localhost:4000').replace(/\/$/, '')}/read-file?key=${encodeURIComponent(keyOrUrl)}&inline=true`;
+  if (isFullUrl(key)) {
+    throw new ExpectedError(
+      `Refusing to read "${name || key}" by key: a full URL is not a storage key. Use the url parameter (SSRF-guarded) for remote files.`,
+    );
+  }
+
+  const target = `${(erxesApiUrl || 'http://localhost:4000').replace(/\/$/, '')}/read-file?key=${encodeURIComponent(key)}&inline=true`;
 
   const res = await fetch(target, { signal: AbortSignal.timeout(30_000) });
   if (!res.ok) {
     throw new Error(
-      `Could not read file "${name || keyOrUrl}" from storage (HTTP ${res.status})`,
+      `Could not read file "${name || key}" from storage (HTTP ${res.status})`,
     );
   }
 
   const lenHeader = Number(res.headers.get('content-length') || 0);
   if (lenHeader > MAX_ATTACHMENT_BYTES) {
-    throw new Error(
-      `File "${name || keyOrUrl}" is too large to read (max 20MB)`,
+    throw new ExpectedError(
+      `File "${name || key}" is too large to read (max 20MB)`,
     );
   }
 
   const buffer = Buffer.from(await res.arrayBuffer());
   if (buffer.length > MAX_ATTACHMENT_BYTES) {
-    throw new Error(
-      `File "${name || keyOrUrl}" is too large to read (max 20MB)`,
+    throw new ExpectedError(
+      `File "${name || key}" is too large to read (max 20MB)`,
     );
   }
 
   return { buffer, contentType: res.headers.get('content-type') || '' };
+}
+
+/**
+ * Download a file from a public http(s) URL the agent (or user) supplied —
+ * the file_reader URL path. Unlike fetchAttachmentBuffer (trusted internal
+ * keys), this URL is model/user-controlled, so it goes through safeFetch's
+ * SSRF guard: http(s) only, no private/link-local hosts, every redirect hop
+ * re-validated. Size is capped both by the declared content-length and the
+ * actual bytes.
+ */
+export async function fetchRemoteFile(params: {
+  url: string;
+  name?: string;
+  maxBytes?: number;
+}): Promise<{ buffer: Buffer; contentType: string; finalUrl: string }> {
+  const { url, name } = params;
+  const maxBytes = params.maxBytes ?? MAX_ATTACHMENT_BYTES;
+  const maxMb = Math.round(maxBytes / (1024 * 1024));
+
+  const { res, finalUrl } = await safeFetch(url);
+  if (!res.ok) {
+    throw new ExpectedError(
+      `Could not fetch "${name || url}" (HTTP ${res.status})`,
+    );
+  }
+
+  const lenHeader = Number(res.headers.get('content-length') || 0);
+  if (lenHeader > maxBytes) {
+    throw new ExpectedError(`File "${name || url}" is too large (max ${maxMb}MB)`);
+  }
+
+  const buffer = Buffer.from(await res.arrayBuffer());
+  if (buffer.length > maxBytes) {
+    throw new ExpectedError(`File "${name || url}" is too large (max ${maxMb}MB)`);
+  }
+
+  return {
+    buffer,
+    contentType: res.headers.get('content-type') || '',
+    finalUrl,
+  };
 }

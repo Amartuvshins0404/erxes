@@ -10,6 +10,13 @@ export const MUSHOP_PRODUCT_STATUS = {
   ALL: ['pending', 'approved', 'rejected'],
 };
 
+export const MUSHOP_PRODUCT_STATE = {
+  ACTIVE: 'active',
+  HIDDEN: 'hidden',
+  DELETED: 'deleted',
+  ALL: ['active', 'hidden', 'deleted'],
+};
+
 export const mushopProductSchema = schemaWrapper(
   new Schema<IMushopProductMushopDocument>(
     {
@@ -40,6 +47,12 @@ export const mushopProductSchema = schemaWrapper(
         default: MUSHOP_PRODUCT_STATUS.PENDING,
       },
       note: { type: String },
+      state: {
+        type: String,
+        enum: MUSHOP_PRODUCT_STATE.ALL,
+        default: MUSHOP_PRODUCT_STATE.ACTIVE,
+        index: true,
+      },
     },
     {
       timestamps: true,

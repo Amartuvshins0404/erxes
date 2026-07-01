@@ -16,6 +16,16 @@ import {
 } from './tools/scope';
 import { resolveDestructiveOpsPolicy } from './tools/destructiveGuard';
 import { writeAgentAction, AgentActionInput } from './auditLog';
+import { isAdvancedMemoryEnabled } from './memory/config';
+import { getMastraMemory } from './memory/mastraMemory';
+import { ToolCallFilter } from '@mastra/core/processors';
+import { isEvaluationEnabled } from './scoring/config';
+import { buildAgentScorers } from './scoring/scorers';
+import { getObservabilityHost } from './scoring/observability';
+import { getSkillsWorkspace } from '@/skills/store/skillsWorkspace';
+import { createMakeSkillTool } from '@/skills/tools/makeSkill';
+import type { IMastraProviderDocument } from '@/provider/@types/provider';
+import type { IMastraSettingsDocument } from '@/settings/@types/settings';
 
 // Cache agents by config ID + updatedAt + routing version.
 const agentCache = new Map<string, Agent>();
@@ -25,22 +35,44 @@ const agentCache = new Map<string, Agent>();
 const toolsCache = new Map<string, ToolsInput>();
 
 // Increment this whenever routing.ts, the meta-tools, or provider logic changes.
-const ROUTING_VERSION = 25;
+const ROUTING_VERSION = 30;
 
 export interface AgentWithTools {
   agent: Agent;
   tools: ToolsInput;
 }
 
+export interface GetOrCreateAgentOptions {
+  // Already-loaded config the caller fetched for its own use. When BOTH are
+  // supplied the duplicate Mongo reads here are skipped (prepareTurn loads them
+  // alongside the agent config in one Promise.all). Standalone callers omit them
+  // and the values are fetched here — getSettings() is process-cached anyway.
+  providers?: IMastraProviderDocument[];
+  settings?: IMastraSettingsDocument;
+}
+
 /** Build (or return the cached) Mastra agent for a stored agent config. */
 export async function getOrCreateAgent(
   agentConfig: IMastraAgentDocument,
   models: IModels,
+  subdomain?: string,
+  options: GetOrCreateAgentOptions = {},
 ): Promise<AgentWithTools> {
-  const [providers, settings] = await Promise.all([
-    models.MastraProvider.find({ isEnabled: true }),
-    models.MastraSettings.getSettings(),
-  ]);
+  // Mastra Memory (persistence + semantic recall + working memory) is attached
+  // whenever advanced memory is on and the agent hasn't opted out. An unknown
+  // tenant must NOT detach memory — that would stop the turn from being
+  // persisted (and lose the session); scopedResource defaults an empty subdomain
+  // to the "os" scope.
+  const useMemory =
+    isAdvancedMemoryEnabled() && agentConfig.memoryEnabled !== false;
+  // Reuse the caller's already-fetched config when present; otherwise load it.
+  const [providers, settings] =
+    options.providers && options.settings
+      ? [options.providers, options.settings]
+      : await Promise.all([
+          models.MastraProvider.find({ isEnabled: true }),
+          models.MastraSettings.getSettings(),
+        ]);
 
   // The agent's reach: 'all' (every erxes operation + builtin) by default, or a
   // restricted allowlist. The two meta-tools enforce this at execution time.
@@ -60,7 +92,21 @@ export async function getOrCreateAgent(
   // agent (and its prompt) is rebuilt as soon as the registry refreshes.
   const inventory = capabilityInventory(registry.list, policy);
 
-  const cacheKey = `${agentConfig._id}:${agentConfig.updatedAt?.getTime?.() ?? 0}:v${ROUTING_VERSION}:${inventory.fingerprint}`;
+  // Evaluation is process-wide (env), but the observability host is per-tenant
+  // — so when it's on, the subdomain joins the cache key to keep each tenant's
+  // agent bound to its own Langfuse project (serviceName).
+  const evaluationEnabled = isEvaluationEnabled();
+  const evalTag = evaluationEnabled ? subdomain || 'os' : 'off';
+
+  // When skills are enabled the agent carries a per-subdomain Workspace, so the
+  // subdomain + allowlist MUST key the cache (otherwise a cached agent could be
+  // reused for another tenant with the wrong skills source). Per-user scoping
+  // still happens at request time inside the skills resolver.
+  const skillsTag = agentConfig.skills?.length
+    ? `${subdomain || 'os'}:${agentConfig.skills.join('|')}`
+    : 'off';
+
+  const cacheKey = `${agentConfig._id}:${agentConfig.updatedAt?.getTime?.() ?? 0}:v${ROUTING_VERSION}:${inventory.fingerprint}:mem${useMemory ? subdomain : 'off'}:eval${evalTag}:skills${skillsTag}`;
 
   const cached = agentCache.get(cacheKey);
   if (cached) {
@@ -119,22 +165,39 @@ export async function getOrCreateAgent(
     });
   }
 
-  // read-attachment is bound regardless of policy: when the chat transport
-  // accepts a file, the agent must always be able to open it. (It only reads
-  // files from this instance's own storage — no external reach.)
-  if (!tools.readAttachment) {
-    const tool = BUILTIN_TOOLS.readAttachment;
-    tools.readAttachment = tool;
+  // file_reader is bound regardless of policy: the agent must always be able to
+  // open a file the user attached or one it generated. (It only reads files from
+  // this instance's own storage / artifacts — no external reach.)
+  if (!tools.fileReader) {
+    const tool = BUILTIN_TOOLS.fileReader;
+    tools.fileReader = tool;
     builtinInfos.push({
-      id: 'readAttachment',
-      name: 'readAttachment',
+      id: 'fileReader',
+      name: 'fileReader',
       description: tool.description,
     });
   }
 
-  // Conversation memory is persisted in MongoDB (MastraThread / MastraMessage)
-  // and replayed into each request as message history — see mastraAgentChat.
-  // The agent itself is therefore stateless (no Mastra/LibSQL memory store).
+  // Skills-enabled agents can distill the current conversation into a SKILL.md
+  // draft via the makeSkill tool (the only creation path). Bound with the
+  // agent's own provider/model; the thread/user come from the request context.
+  if (agentConfig.skills?.length) {
+    const makeSkillTool = createMakeSkillTool({
+      provider: agentConfig.provider,
+      model: agentConfig.model,
+      providers,
+    });
+    tools.make_skill = makeSkillTool;
+    builtinInfos.push({
+      id: 'make_skill',
+      name: 'make_skill',
+      description: makeSkillTool.description,
+    });
+  }
+
+  // Conversation persistence + recent-history replay + recall are owned by the
+  // attached Mastra Memory (the chat store IS the native memory store; see
+  // memory below + session/nativeStore.ts). No custom message store.
   const toolNames = Object.keys(tools);
   const systemPrompt = buildSystemPrompt(agentConfig.instructions || '', {
     hasErxesTools: hasErxes,
@@ -160,31 +223,71 @@ export async function getOrCreateAgent(
   const temperature = agentConfig.temperature;
   const hasTemperature = typeof temperature === 'number';
 
+  // Per-tenant Mastra Memory (recall + working memory). ToolCallFilter strips
+  // tool-call frames from any replayed/recalled history so reasoning models
+  // (Kimi) don't reject the request. Both are opt-in via advanced memory.
+  const memory = useMemory ? await getMastraMemory(subdomain) : undefined;
+
+  // Quality scorers (heuristic + LLM-judge using this agent's own model) — only
+  // when ERXES_AGENT_EVALUATION=enable. Results export to Langfuse via the host
+  // registered below.
+  const scorers = evaluationEnabled ? buildAgentScorers(model) : undefined;
+
+  // Native Mastra skills: a per-subdomain Workspace (Mongo-backed SkillSource +
+  // dynamic per-user resolver). Passing `workspace` makes the Agent auto-wire the
+  // SkillsProcessor (name+description into the prompt) and the skill /
+  // skill_search / skill_read tools (progressive disclosure). Additive: only
+  // attached when the agent declares a skills allowlist.
+  const skillsWorkspace = agentConfig.skills?.length
+    ? getSkillsWorkspace(subdomain || 'os', agentConfig.skills)
+    : undefined;
+
   const agent = new Agent({
     id: agentConfig.agentId,
     name: agentConfig.name,
     instructions: systemPrompt,
     model,
     tools: toolNames.length ? tools : undefined,
-    // The modern loop (generate/stream) reads defaultOptions; the legacy
-    // OpenAI-compatible loop (generateLegacy/streamLegacy) reads its own two
-    // keys and otherwise falls back to Mastra's internal default — all three
-    // must be set or legacy turns get silently truncated mid-task.
+    ...(memory ? { memory, inputProcessors: [new ToolCallFilter()] } : {}),
+    ...(scorers ? { scorers } : {}),
+    ...(skillsWorkspace ? { workspace: skillsWorkspace } : {}),
+    // generate()/stream() read defaultOptions. Temperature is only set when the
+    // agent configures it — otherwise the provider default applies (sending an
+    // explicit 0 is what reasoning models like Kimi reject).
     defaultOptions: {
       maxSteps,
       ...(hasTemperature ? { modelSettings: { temperature } } : {}),
     },
-    defaultGenerateOptionsLegacy: {
-      maxSteps,
-      ...(hasTemperature ? { temperature } : {}),
-    },
-    defaultStreamOptionsLegacy: {
-      maxSteps,
-      ...(hasTemperature ? { temperature } : {}),
-    },
-    // The two legacy keys are read at runtime but missing from Mastra's
-    // published AgentConfig type, hence the cast.
-  } as unknown as ConstructorParameters<typeof Agent>[0]) as unknown as Agent;
+  } as never);
+
+  // Wire the agent to the per-tenant observability host so traces + scores reach
+  // the central Langfuse. Two distinct hooks, both guarded (internal Mastra APIs):
+  //   • __registerMastra(host)  → the agent emits TRACES to host.observability.
+  //   • host.addScorer(scorer)  → registers each scorer so Mastra's onScorerRun
+  //     hook can resolve it (findScorer → getScorerById) AND sets scorer.#mastra
+  //     = host, so the scorer's run() emits its SCORE to Langfuse. (The host's
+  //     storage, set above, is what stops the hook from bailing.)
+  // Null host = evaluation off or Langfuse unconfigured → no-op.
+  if (evaluationEnabled) {
+    const host = await getObservabilityHost(subdomain);
+    if (host) {
+      const register = (
+        agent as unknown as { __registerMastra?: (m: unknown) => void }
+      ).__registerMastra;
+      if (typeof register === 'function') register.call(agent, host);
+
+      const addScorer = (
+        host as unknown as {
+          addScorer?: (s: unknown, key?: string, o?: { source: string }) => void;
+        }
+      ).addScorer;
+      if (scorers && typeof addScorer === 'function') {
+        for (const [id, entry] of Object.entries(scorers)) {
+          addScorer.call(host, entry.scorer, id, { source: 'code' });
+        }
+      }
+    }
+  }
 
   agentCache.set(cacheKey, agent);
   toolsCache.set(cacheKey, tools);

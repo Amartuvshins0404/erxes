@@ -103,13 +103,13 @@ export function buildActivityContext(snap: ActivitySnapshot): string | null {
 /** Normalize raw model output into a usable status line, or null. */
 export function sanitizeActivity(
   raw: string | null | undefined,
+  maxChars = ACTIVITY_MAX_CHARS,
 ): string | null {
   let line = (raw || '').split('\n')[0].replace(/\s+/g, ' ').trim();
   line = line.replace(/^(status|activity)\s*:\s*/i, '');
   line = trimEdgeChars(line, '"\'`“”‘’', '"\'`“”‘’.…').trim();
   if (!line) return null;
-  if (line.length > ACTIVITY_MAX_CHARS)
-    line = `${line.slice(0, ACTIVITY_MAX_CHARS).trimEnd()}…`;
+  if (line.length > maxChars) line = `${line.slice(0, maxChars).trimEnd()}…`;
   return line;
 }
 
@@ -150,10 +150,9 @@ export async function summarizeActivity(params: {
   model: string;
   providers: ProviderDocLike[];
   authCtx: AuthCtx;
-  isLegacy: boolean;
   snapshot: ActivitySnapshot;
 }): Promise<string | null> {
-  const { provider, model, providers, authCtx, isLegacy, snapshot } = params;
+  const { provider, model, providers, authCtx, snapshot } = params;
   try {
     const context = buildActivityContext(snapshot);
     if (!context) return null;
@@ -164,9 +163,7 @@ export async function summarizeActivity(params: {
     const result = await runWithAuth(
       authCtx,
       (): Promise<{ text?: string }> =>
-        isLegacy
-          ? summarizer.generateLegacy(prompt)
-          : summarizer.generate(prompt, { maxSteps: 1 }),
+        summarizer.generate(prompt, { maxSteps: 1 }),
     );
 
     return sanitizeActivity(result?.text);
@@ -177,6 +174,209 @@ export async function summarizeActivity(params: {
       `[mastra:activity] activity summarization skipped: ${message}`,
     );
     return null;
+  }
+}
+
+// ── Turn + step summaries (single batched call) ──────────────────────────────
+//
+// Where ACTIVITY narrates "what is the agent doing right now" (one rolling line
+// for the sidebar), this produces the chat run-timeline summaries: ONE past-tense
+// turn headline plus a ≤50-word gist for each substantial reasoning step. Both
+// come from a SINGLE model call at turn end — off the felt path (the reply has
+// already streamed), so a long turn costs one summarization call, not N.
+
+// Bursts shorter than this aren't worth summarizing — the UI shows their raw
+// lead instead. Exported so the stream loop gates which bursts to include.
+export const REASONING_STEP_MIN_CHARS = 80;
+// Output budget for a step summary — ~50 words, kept as one or two sentences.
+const REASONING_STEP_MAX_CHARS = 320;
+
+/** Sanitize a fuller (sentence-level) summary: collapse whitespace, strip a
+ *  leading label + wrapping quotes, cap to the budget. Keeps sentence
+ *  punctuation (unlike sanitizeActivity, which is for terse status lines). */
+function sanitizeSummary(
+  raw: string | null | undefined,
+  maxChars: number,
+): string | null {
+  let text = (raw || '').replace(/\s+/g, ' ').trim();
+  text = text.replace(/^(summary|note|step)\s*:\s*/i, '');
+  text = trimEdgeChars(text, '"\'`“”‘’', '"\'`“”‘’').trim();
+  if (!text) return null;
+  if (text.length > maxChars) text = `${text.slice(0, maxChars).trimEnd()}…`;
+  return text;
+}
+
+const COMBINED_SUMMARY_INSTRUCTIONS = `You summarize an AI assistant's turn for a human-readable activity log.
+You are given the user's request, the assistant's reply, and a numbered list of the assistant's reasoning steps (each prefixed with an index like [2]).
+Produce two things:
+1. A TURN headline: ONE short past-tense line (4-10 words) naming what the assistant ultimately accomplished — the outcome, not the process ("Synthesized marketplace data into a PDF report", "Compared the three pricing plans").
+2. For EACH reasoning step you are given, a 1-2 sentence summary (UNDER 50 words) of what it is figuring out, deciding, or about to do, in the agent's own natural voice (first person like "I'll…" is fine), concrete and specific to that step.
+Rules:
+- Use the same language as the content.
+- Output the headline on its own line prefixed "TURN:". Output each step summary on its own line prefixed with its exact index in square brackets, e.g. "[2] …".
+- Only summarize the steps you are given; never invent indices. No markdown, lists, quotes, or emoji.
+- Output ONLY the "TURN:" line and the "[index]" lines, nothing else.`;
+
+// Output budgets.
+const TURN_SUMMARY_MAX_CHARS = 120;
+const TURN_SUMMARY_REPLY_CHARS = 1200;
+// How much of each burst the batched summarizer sees — substance is up front.
+const STEP_INPUT_CHARS = 800;
+
+/** Optional cheaper/faster model for the (off-path) summarization, via env. Both
+ *  vars are optional; with neither set, summaries run on the agent's own model so
+ *  nothing breaks out of the box (set AGENT_SUMMARIZER_MODEL, and optionally
+ *  AGENT_SUMMARIZER_PROVIDER, to point them at a small fast model). */
+function summarizerTarget(
+  agentProvider: string,
+  agentModel: string,
+): { provider: string; model: string } {
+  const model = process.env.AGENT_SUMMARIZER_MODEL?.trim();
+  if (!model) return { provider: agentProvider, model: agentModel };
+  return {
+    provider: process.env.AGENT_SUMMARIZER_PROVIDER?.trim() || agentProvider,
+    model,
+  };
+}
+
+// One combined summarizer agent, cached per provider+model.
+const _summaryAgents = new Map<string, Agent>();
+
+async function summaryAgentFor(
+  provider: string,
+  model: string,
+  providers: ProviderDocLike[],
+): Promise<Agent> {
+  const key = `${provider}:${model}`;
+  let agent = _summaryAgents.get(key);
+  if (!agent) {
+    const { Agent: AgentCtor } = await import('@mastra/core/agent');
+    const { buildModel } = await import('~/mastra/providers');
+    agent = new AgentCtor({
+      id: 'mastra-turn-summarizer',
+      name: 'Turn Summarizer',
+      instructions: COMBINED_SUMMARY_INSTRUCTIONS,
+      model: buildModel(provider, model, providers),
+    });
+    _summaryAgents.set(key, agent);
+  }
+  return agent;
+}
+
+export interface ReasoningStepInput {
+  index: number;
+  text: string;
+}
+
+export interface TurnAndStepsResult {
+  turn: string | null;
+  steps: { index: number; summary: string }[];
+}
+
+/** Build the single prompt asking for the turn headline + each step summary. */
+function buildCombinedPrompt(params: {
+  userMessage: string;
+  reply: string;
+  steps: ReasoningStepInput[];
+  wantTurn: boolean;
+}): string {
+  const { userMessage, reply, steps, wantTurn } = params;
+  const sections: string[] = [];
+  const user = clip(
+    (userMessage || '').replace(/\s+/g, ' ').trim(),
+    USER_MESSAGE_CHARS,
+  );
+  if (user) sections.push(`User request: ${user}`);
+  if (wantTurn)
+    sections.push(`Assistant reply: ${clip(reply, TURN_SUMMARY_REPLY_CHARS)}`);
+  if (steps.length) {
+    const lines = steps.map(
+      (s) =>
+        `[${s.index}] ${clip(s.text.replace(/\s+/g, ' ').trim(), STEP_INPUT_CHARS)}`,
+    );
+    sections.push(`Reasoning steps:\n${lines.join('\n')}`);
+  }
+  const spec: string[] = ['Now output:'];
+  if (wantTurn) spec.push('TURN: <past-tense headline, 4-10 words>');
+  for (const s of steps)
+    spec.push(`[${s.index}] <1-2 sentence summary, under 50 words>`);
+  sections.push(spec.join('\n'));
+  return sections.join('\n\n');
+}
+
+/** Parse the "TURN:" + "[index]" lines back out, tolerating wrapped lines and
+ *  stray prose. Each item degrades independently. Exported for unit tests. */
+export function parseCombined(raw: string, wantTurn: boolean): TurnAndStepsResult {
+  const turnLines: string[] = [];
+  const stepLines = new Map<number, string[]>();
+  let cur: { kind: 'turn' } | { kind: 'step'; index: number } | null = null;
+  for (const line of (raw || '').split('\n')) {
+    const trimmed = line.trim();
+    const turnM = trimmed.match(/^TURN\s*:\s*(.*)$/i);
+    const stepM = trimmed.match(/^\[(\d+)\]\s*(.*)$/);
+    if (turnM) {
+      cur = { kind: 'turn' };
+      if (turnM[1]) turnLines.push(turnM[1]);
+    } else if (stepM) {
+      const index = Number(stepM[1]);
+      cur = { kind: 'step', index };
+      const acc = stepLines.get(index) ?? [];
+      if (stepM[2]) acc.push(stepM[2]);
+      stepLines.set(index, acc);
+    } else if (cur && trimmed) {
+      if (cur.kind === 'turn') turnLines.push(trimmed);
+      else stepLines.get(cur.index)?.push(trimmed);
+    }
+  }
+  const turn = wantTurn
+    ? sanitizeActivity(turnLines.join(' '), TURN_SUMMARY_MAX_CHARS)
+    : null;
+  const steps: { index: number; summary: string }[] = [];
+  for (const [index, lines] of stepLines) {
+    const summary = sanitizeSummary(lines.join(' '), REASONING_STEP_MAX_CHARS);
+    if (summary) steps.push({ index, summary });
+  }
+  return { turn, steps };
+}
+
+/**
+ * Produce the turn headline + each substantial reasoning step's summary in ONE
+ * model call (off the felt path — the reply already streamed). Returns whatever
+ * parsed cleanly; a failure yields empty results and the UI falls back to the
+ * raw-reasoning lead / no header. Never throws.
+ */
+export async function summarizeTurnAndSteps(params: {
+  provider: string;
+  model: string;
+  providers: ProviderDocLike[];
+  authCtx: AuthCtx;
+  userMessage: string;
+  reply: string | null;
+  steps: ReasoningStepInput[];
+}): Promise<TurnAndStepsResult> {
+  const { provider, model, providers, authCtx, userMessage, steps } = params;
+  const reply = (params.reply || '').replace(/\s+/g, ' ').trim();
+  const wantTurn = !!reply;
+  if (!wantTurn && steps.length === 0) return { turn: null, steps: [] };
+  try {
+    const { runWithAuth } = await import('~/mastra/requestContext');
+    const target = summarizerTarget(provider, model);
+    const agent = await summaryAgentFor(
+      target.provider,
+      target.model,
+      providers,
+    );
+    const prompt = buildCombinedPrompt({ userMessage, reply, steps, wantTurn });
+    const result = await runWithAuth(
+      authCtx,
+      (): Promise<{ text?: string }> => agent.generate(prompt, { maxSteps: 1 }),
+    );
+    return parseCombined(result?.text ?? '', wantTurn);
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    // eslint-disable-next-line no-console
+    console.warn(`[mastra:activity] turn+steps summary skipped: ${message}`);
+    return { turn: null, steps: [] };
   }
 }
 
@@ -200,6 +400,10 @@ export interface ActivityTracker {
 export function createActivityTracker(opts: {
   summarize: (snapshot: ActivitySnapshot) => Promise<string | null>;
   emit: (text: string) => void;
+  // Optional instant, LLM-free status line for a tool call (see
+  // activity-signals.toolStatusLine). When it returns a line, that line is
+  // emitted immediately and the LLM summarizer is skipped for that step.
+  toolSignal?: (toolName: string, args?: unknown) => string | null;
   userMessage?: string;
   minIntervalMs?: number;
   minNewThinkingChars?: number;
@@ -272,6 +476,17 @@ export function createActivityTracker(opts: {
       // The tool is now the current step; earlier reasoning led up to it.
       thinking = '';
       newThinkingChars = 0;
+      // A tool's name + args already describe the step — emit a precise line
+      // instantly with no LLM round-trip. Only fall back to the summarizer when
+      // the tool is unrecognized.
+      const signal = opts.toolSignal?.(toolName, args);
+      if (signal) {
+        if (signal !== lastEmitted) {
+          lastEmitted = signal;
+          opts.emit(signal);
+        }
+        return;
+      }
       dirty = true;
       schedule();
     },

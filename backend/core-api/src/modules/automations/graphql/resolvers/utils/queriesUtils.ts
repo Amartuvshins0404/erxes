@@ -6,6 +6,8 @@ import {
   TAutomationOutputDefinition,
   TAutomationOutputVariable,
   TAutomationFindObjectTargetDefinition,
+  TAiKnowledgeSourceConfig,
+  TAiToolConfig,
   TAutomationSetPropertyTarget,
   TRecordReferencesConfig,
   normalizeAutomationConstantsForTransport,
@@ -36,10 +38,19 @@ type TAutomationConstantsResponse = {
   actionsConst: TWithPluginName<IAutomationsActionConfig>[];
   findObjectTargetsConst: TAutomationFindObjectTargetDefinition[];
   setPropertyTargetsConst: TWithPluginName<TAutomationSetPropertyTarget>[];
+  aiKnowledgeSourcesConst: TWithPluginName<TAiKnowledgeSourceConfig>[];
+  aiToolsConst: TWithPluginName<TAiToolConfig>[];
 };
 
 type TRecordReferenceType = TRecordReferencesConfig['types'][number];
 type TRecordReferenceField = TRecordReferenceType['fields'][number];
+type TRecordReferenceExtension = NonNullable<
+  TRecordReferencesConfig['extensions']
+>[number];
+type TReferenceMetadata = {
+  types: TRecordReferenceType[];
+  extensions: TRecordReferenceExtension[];
+};
 
 export const generateAutomationsFilter = (params: IListArgs) => {
   const {
@@ -172,6 +183,16 @@ export const getAutomationConstants =
       setPropertyTargetsConst: [
         ...(normalizedCoreConstants.setPropertyTargets || []),
       ],
+      aiKnowledgeSourcesConst: (
+        normalizedCoreConstants.ai?.knowledgeSources || []
+      ).map((source) => ({
+        ...source,
+        pluginName: 'core',
+      })),
+      aiToolsConst: (normalizedCoreConstants.ai?.tools || []).map((tool) => ({
+        ...tool,
+        pluginName: 'core',
+      })),
     };
 
     for (const pluginName of plugins) {
@@ -195,10 +216,23 @@ export const getAutomationConstants =
         actions = [],
         findObjectTargets = [],
         setPropertyTargets = [],
+        ai,
       } = pluginConstants as AutomationConstants;
       constants.findObjectTargetsConst.push(...findObjectTargets);
       constants.setPropertyTargetsConst.push(
         ...setPropertyTargets.map((target) => ({ ...target, pluginName })),
+      );
+      constants.aiKnowledgeSourcesConst.push(
+        ...(ai?.knowledgeSources || []).map((source) => ({
+          ...source,
+          pluginName,
+        })),
+      );
+      constants.aiToolsConst.push(
+        ...(ai?.tools || []).map((tool) => ({
+          ...tool,
+          pluginName,
+        })),
       );
 
       for (const trigger of triggers) {
@@ -369,6 +403,22 @@ const getReferenceLocalType = (type: string) => {
     : contentType;
 };
 
+const normalizeReferenceField = (
+  pluginName: string,
+  field: TRecordReferenceField,
+): TRecordReferenceField => ({
+  ...field,
+  fields: (field.fields || []).map((nestedField) =>
+    normalizeReferenceField(pluginName, nestedField),
+  ),
+  reference: field.reference
+    ? {
+        ...field.reference,
+        type: normalizeReferenceType(pluginName, field.reference.type),
+      }
+    : undefined,
+});
+
 const normalizeReferenceTypes = (
   pluginName: string,
   types: TRecordReferenceType[] = [],
@@ -376,15 +426,21 @@ const normalizeReferenceTypes = (
   types.map((referenceType) => ({
     ...referenceType,
     type: normalizeReferenceType(pluginName, referenceType.type),
-    fields: (referenceType.fields || []).map((field) => ({
-      ...field,
-      reference: field.reference
-        ? {
-            ...field.reference,
-            type: normalizeReferenceType(pluginName, field.reference.type),
-          }
-        : undefined,
-    })),
+    fields: (referenceType.fields || []).map((field) =>
+      normalizeReferenceField(pluginName, field),
+    ),
+  }));
+
+const normalizeReferenceExtensions = (
+  pluginName: string,
+  extensions: TRecordReferenceExtension[] = [],
+): TRecordReferenceExtension[] =>
+  extensions.map((extension) => ({
+    ...extension,
+    type: normalizeReferenceType(pluginName, extension.type),
+    fields: (extension.fields || []).map((field) =>
+      normalizeReferenceField(pluginName, field),
+    ),
   }));
 
 const isSameReferenceType = (candidate: string, target: string) =>
@@ -428,8 +484,33 @@ const findOutputVariable = (
     (variable) => variable.key === field || variable.field === field,
   );
 
-const getReferenceTypes = async () => {
+const applyReferenceExtensions = ({
+  types,
+  extensions,
+}: TReferenceMetadata): TRecordReferenceType[] => {
+  const referenceTypes = types.map((referenceType) => ({
+    ...referenceType,
+    fields: [...(referenceType.fields || [])],
+  }));
+
+  for (const extension of extensions) {
+    const referenceType = referenceTypes.find((item) =>
+      isSameReferenceType(item.type, extension.type),
+    );
+
+    if (!referenceType) {
+      continue;
+    }
+
+    referenceType.fields.push(...(extension.fields || []));
+  }
+
+  return referenceTypes;
+};
+
+const getReferenceMetadata = async (): Promise<TReferenceMetadata> => {
   const referenceTypes = normalizeReferenceTypes('core', CORE_REFERENCE_TYPES);
+  const referenceExtensions: TRecordReferenceExtension[] = [];
   const plugins = await getPlugins();
 
   for (const pluginName of plugins) {
@@ -439,14 +520,25 @@ const getReferenceTypes = async () => {
 
     const plugin = await getPlugin(pluginName);
     const pluginReferenceTypes = plugin.config?.meta?.references?.types || [];
+    const pluginReferenceExtensions =
+      plugin.config?.meta?.references?.extensions || [];
 
     referenceTypes.push(
       ...normalizeReferenceTypes(pluginName, pluginReferenceTypes),
     );
+    referenceExtensions.push(
+      ...normalizeReferenceExtensions(pluginName, pluginReferenceExtensions),
+    );
   }
 
-  return referenceTypes;
+  return {
+    types: referenceTypes,
+    extensions: referenceExtensions,
+  };
 };
+
+const getReferenceTypes = async () =>
+  applyReferenceExtensions(await getReferenceMetadata());
 
 const resolveSourceReferenceType = (
   nodeType: string,
@@ -515,6 +607,7 @@ const resolveAutomationReferenceType = ({
 const toAutomationReferenceField = (
   field: TRecordReferenceField,
   referenceTypes: TRecordReferenceType[],
+  sourceType?: string,
 ): TAutomationOutputVariable => {
   const referenceType = field.reference?.type
     ? findReferenceType(referenceTypes, field.reference.type)?.type ||
@@ -524,9 +617,13 @@ const toAutomationReferenceField = (
   return {
     key: field.key,
     label: field.label,
-    exposure: field.reference ? 'reference' : undefined,
+    exposure: field.reference || field.fields?.length ? 'reference' : undefined,
     field: field.reference?.path || field.path || field.key,
+    referenceFields: field.fields?.map((nestedField) =>
+      toAutomationReferenceField(nestedField, referenceTypes),
+    ),
     referenceType,
+    sourceType,
   };
 };
 
@@ -552,6 +649,57 @@ const uniqOutputVariables = (variables: TAutomationOutputVariable[]) =>
     (item, index, array) =>
       array.findIndex((candidate) => candidate.key === item.key) === index,
   );
+
+const getReferenceExtensionFields = (
+  extensions: TRecordReferenceExtension[],
+  type: string,
+) =>
+  extensions
+    .filter((extension) => isSameReferenceType(extension.type, type))
+    .flatMap((extension) => extension.fields || []);
+
+export const addReferenceExtensionsToAutomationOutput = async ({
+  nodeType,
+  output,
+}: {
+  nodeType: string;
+  output: TAutomationOutputDefinition | null;
+}) => {
+  if (!output) {
+    return null;
+  }
+
+  const referenceMetadata = await getReferenceMetadata();
+  const referenceTypes = applyReferenceExtensions(referenceMetadata);
+  const sourceReferenceType = resolveSourceReferenceType(
+    nodeType,
+    output,
+    referenceTypes,
+  );
+
+  if (!sourceReferenceType) {
+    return output;
+  }
+
+  const extensionFields = getReferenceExtensionFields(
+    referenceMetadata.extensions,
+    sourceReferenceType,
+  );
+
+  if (!extensionFields.length) {
+    return output;
+  }
+
+  return {
+    ...output,
+    variables: uniqOutputVariables([
+      ...(output.variables || []),
+      ...extensionFields.map((field) =>
+        toAutomationReferenceField(field, referenceTypes, sourceReferenceType),
+      ),
+    ]),
+  };
+};
 
 export const getAutomationReferenceFields = async ({
   field,

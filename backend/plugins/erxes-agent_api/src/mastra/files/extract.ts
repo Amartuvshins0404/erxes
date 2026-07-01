@@ -1,4 +1,5 @@
 import { extname } from 'path';
+import { ExpectedError } from 'erxes-api-shared/utils';
 import {
   decodeHtmlEntities,
   stripAllTags,
@@ -7,10 +8,11 @@ import {
 
 // ---------------------------------------------------------------------------
 // Text extraction from chat attachments. Pure buffer → text; storage access
-// lives in storage.ts, the agent-facing tool in tools/attachmentTool.ts.
+// lives in storage.ts, the agent-facing tool in tools/fileReaderTool.ts.
 //
-// Supported: pdf (pdf-parse), docx (mammoth), xlsx/xls (exceljs), and any
-// plain-text family (txt/csv/md/json/html/...). Images are handled upstream —
+// Supported: pdf (pdf-parse), docx (mammoth), xlsx/xls (exceljs), pptx (jszip +
+// slide-xml text), and any plain-text family (txt/csv/md/json/html/...). Images
+// are handled upstream —
 // they are inlined into the model message as multimodal parts, not extracted.
 // ---------------------------------------------------------------------------
 
@@ -18,6 +20,14 @@ import {
 // window — the agent gets the head of the document plus a truncation notice.
 export const MAX_EXTRACT_CHARS = 20_000;
 const MAX_SHEET_ROWS = 500;
+
+// Decompression-bomb guard for zip-backed formats (pptx). The download is
+// capped at 20MB COMPRESSED, but a ~1MB zip can inflate to GBs of XML. Cap the
+// total decompressed bytes and the entry count, and reject up front using the
+// zip's declared uncompressed sizes so we never inflate a bomb in the first
+// place.
+export const MAX_PPTX_DECOMPRESSED_BYTES = 50 * 1024 * 1024;
+export const MAX_PPTX_SLIDES = 500;
 
 export interface ExtractedFile {
   content: string;
@@ -106,6 +116,65 @@ async function extractDocx(buffer: Buffer): Promise<string> {
   return (result.value || '').trim();
 }
 
+/** Numeric index of a `ppt/slides/slideN.xml` path (for ordering). */
+function slideNumber(path: string): number {
+  return Number(path.match(/slide(\d+)\.xml$/)?.[1] ?? 0);
+}
+
+/** Extract the visible text of a .pptx deck, one labelled block per slide.
+ *  A .pptx is a zip; slide text lives in <a:t> runs inside ppt/slides/slideN.xml. */
+/** Declared uncompressed size of a JSZip entry, if the zip header carries it. */
+function declaredSize(entry: unknown): number {
+  const size = (entry as { _data?: { uncompressedSize?: number } })?._data
+    ?.uncompressedSize;
+  return typeof size === 'number' && size > 0 ? size : 0;
+}
+
+async function extractPptx(buffer: Buffer): Promise<string> {
+  const { default: JSZip } = await import('jszip');
+  const zip = await JSZip.loadAsync(buffer);
+  const slidePaths = Object.keys(zip.files)
+    .filter((p) => /^ppt\/slides\/slide\d+\.xml$/.test(p))
+    .sort((a, b) => slideNumber(a) - slideNumber(b));
+
+  if (slidePaths.length > MAX_PPTX_SLIDES) {
+    throw new ExpectedError(
+      `This presentation has too many slides to read (max ${MAX_PPTX_SLIDES}).`,
+    );
+  }
+
+  // Reject zip bombs BEFORE inflating: the zip header declares each entry's
+  // uncompressed size, so a small archive claiming gigabytes is caught here.
+  let declared = 0;
+  for (const path of slidePaths) {
+    declared += declaredSize(zip.files[path]);
+    if (declared > MAX_PPTX_DECOMPRESSED_BYTES) {
+      throw new ExpectedError(
+        'This presentation is too large to read (decompression limit exceeded).',
+      );
+    }
+  }
+
+  const out: string[] = [];
+  let total = 0;
+  for (let i = 0; i < slidePaths.length; i++) {
+    const xml = await zip.files[slidePaths[i]].async('string');
+    // Second line of defence in case a header under-reports the real size.
+    total += xml.length;
+    if (total > MAX_PPTX_DECOMPRESSED_BYTES) {
+      throw new ExpectedError(
+        'This presentation is too large to read (decompression limit exceeded).',
+      );
+    }
+    const runs = [...xml.matchAll(/<a:t>([\s\S]*?)<\/a:t>/g)].map((m) =>
+      decodeHtmlEntities(m[1]),
+    );
+    const text = runs.join(' ').replace(/\s+/g, ' ').trim();
+    out.push(`--- Slide ${i + 1} ---\n${text}`);
+  }
+  return out.join('\n\n').trim();
+}
+
 // Cells that carry their value behind a property (formula results, rich text,
 // hyperlinks) — structural type, narrowed from exceljs's CellValue union.
 interface LooseCell {
@@ -181,6 +250,11 @@ export async function extractFileText(params: {
     return { content, truncated, format: 'docx' };
   }
 
+  if (ext === 'pptx' || mime.includes('presentationml')) {
+    const { content, truncated } = clamp(await extractPptx(buffer));
+    return { content, truncated, format: 'pptx' };
+  }
+
   if (
     ext === 'xlsx' ||
     ext === 'xls' ||
@@ -206,20 +280,20 @@ export async function extractFileText(params: {
   }
 
   if (isImageType(name, mimeType)) {
-    throw new Error(
+    throw new ExpectedError(
       'This is an image — it is shown to the model directly with the message; there is no text to extract.',
     );
   }
 
   if (ext === 'doc') {
-    throw new Error(
+    throw new ExpectedError(
       'Legacy .doc files are not supported. Ask the user to re-save the document as .docx or .pdf.',
     );
   }
 
-  throw new Error(
+  throw new ExpectedError(
     `Unsupported file format "${
       ext || mimeType || 'unknown'
-    }". Supported: pdf, docx, xlsx, csv, txt, md, json, html.`,
+    }". Supported: pdf, docx, xlsx, pptx, csv, txt, md, json, html.`,
   );
 }

@@ -3,7 +3,6 @@ import { format } from 'date-fns';
 import {
   IconCalendarEventFilled,
   IconHome,
-  IconCreditCard,
 } from '@tabler/icons-react';
 import { useAtomValue, useSetAtom, atom } from 'jotai';
 import {
@@ -74,10 +73,6 @@ export const ContractsBoardCard = ({ id }: BoardCardProps) => {
 
   const dateLabel = parseDate(date);
 
-  const planTypeLabel = paymentPlan?.type
-    ? String(paymentPlan.type).replace(/_/g, ' ').toLowerCase()
-    : null;
-
   return (
     <div
       onClick={() => setActiveContract(id)}
@@ -110,12 +105,6 @@ export const ContractsBoardCard = ({ id }: BoardCardProps) => {
             <Badge variant="secondary">
               <IconHome className="size-3 mr-1" />
               Unit {unitDoc.number}
-            </Badge>
-          )}
-          {planTypeLabel && (
-            <Badge variant="secondary" className="capitalize">
-              <IconCreditCard className="size-3 mr-1" />
-              {planTypeLabel}
             </Badge>
           )}
           {amount ? <Badge>{formatAmount(amount)}</Badge> : null}

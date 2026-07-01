@@ -1,6 +1,12 @@
 import { IContext } from '~/connectionResolvers';
-import { MUSHOP_PRODUCT_STATUS } from '@/product/db/definitions/product';
-import { syncProductToPosclient } from '~/utils/syncProductToPosclient';
+import {
+  MUSHOP_PRODUCT_STATUS,
+  MUSHOP_PRODUCT_STATE,
+} from '@/product/db/definitions/product';
+import {
+  removeProductFromPosclient,
+  syncProductToPosclient,
+} from '~/utils/syncProductToPosclient';
 
 const getSupplierMushopPosToken = async (
   models: IContext['models'],
@@ -18,22 +24,30 @@ export const productMutations = {
     { models, subdomain, checkPermission }: IContext,
   ) => {
     await checkPermission('mushopAssignProductCategory');
-    const product = await models.MushopProduct.assignCategory(
+    const product = await models.Product.assignCategory(
       _id,
       categoryId || null,
     );
 
-    if (categoryId && product?.status === 'approved') {
+    if (product?.status === 'approved') {
       const posToken = await getSupplierMushopPosToken(
         models,
         product.subdomain,
       );
 
-      await syncProductToPosclient({
-        subdomain,
-        posToken,
-        product,
-      });
+      if (categoryId) {
+        await syncProductToPosclient({
+          subdomain,
+          posToken,
+          product,
+        });
+      } else {
+        await removeProductFromPosclient({
+          subdomain,
+          posToken,
+          productId: _id,
+        });
+      }
     }
 
     return product;
@@ -51,12 +65,10 @@ export const productMutations = {
 
     try {
       if (status === 'approved') {
-        const products = await models.MushopProduct.find({
+        const products = await models.Product.find({
           _id: { $in: ids },
           categoryId: { $exists: true, $ne: null },
         }).lean();
-
-        console.log('products', products.length);
 
         await Promise.all(
           products.map(async (p) => {
@@ -74,7 +86,28 @@ export const productMutations = {
         );
       }
 
-      await models.MushopProduct.updateMany(
+      if (status === MUSHOP_PRODUCT_STATUS.REJECTED) {
+        const products = await models.Product.find({
+          _id: { $in: ids },
+        }).lean();
+
+        await Promise.all(
+          products.map(async (p) => {
+            const posToken = await getSupplierMushopPosToken(
+              models,
+              p.subdomain,
+            );
+
+            return removeProductFromPosclient({
+              subdomain,
+              posToken,
+              productId: p._id,
+            });
+          }),
+        );
+      }
+
+      await models.Product.updateMany(
         { _id: { $in: ids } },
         { $set: { status } },
       );
@@ -95,7 +128,7 @@ export const productMutations = {
     { models, checkPermission }: IContext,
   ) => {
     await checkPermission('mushopRemoveProduct');
-    await models.MushopProduct.removeProduct(_id);
+    await models.Product.removeProduct(_id);
     return { success: true };
   },
 
@@ -105,7 +138,7 @@ export const productMutations = {
     { models, checkPermission }: IContext,
   ) => {
     await checkPermission('mushopBulkRemoveProducts');
-    await models.MushopProduct.deleteMany({ _id: { $in: ids } });
+    await models.Product.deleteMany({ _id: { $in: ids } });
     return { success: true, count: ids.length };
   },
 
@@ -119,9 +152,9 @@ export const productMutations = {
       throw new Error('Invalid product status');
     }
 
-    const existing = await models.MushopProduct.getProduct(_id);
+    const existing = await models.Product.getProduct(_id);
 
-    const updated = await models.MushopProduct.updateStatus(_id, status, note);
+    const updated = await models.Product.updateStatus(_id, status, note);
 
     if (status === 'approved' && existing.categoryId) {
       const posToken = await getSupplierMushopPosToken(
@@ -133,6 +166,18 @@ export const productMutations = {
         posToken,
         product: updated ?? existing,
         action: 'create',
+      });
+    }
+
+    if (status === MUSHOP_PRODUCT_STATUS.REJECTED) {
+      const posToken = await getSupplierMushopPosToken(
+        models,
+        existing.subdomain,
+      );
+      await removeProductFromPosclient({
+        subdomain,
+        posToken,
+        productId: _id,
       });
     }
 
@@ -148,8 +193,6 @@ export const productMutations = {
       throw new Error('Invalid product status');
     }
 
-    // Only approved products with a category are eligible to sync to posclient,
-    // mirroring the per-product sync paths above.
     if (status && status !== MUSHOP_PRODUCT_STATUS.APPROVED) {
       throw new Error('Only approved products can be synced to POS client');
     }
@@ -157,6 +200,7 @@ export const productMutations = {
     const filter: Record<string, any> = {
       status: MUSHOP_PRODUCT_STATUS.APPROVED,
       categoryId: { $exists: true, $ne: null },
+      state: { $ne: MUSHOP_PRODUCT_STATE.DELETED },
     };
 
     if (supplierId) {
@@ -164,9 +208,8 @@ export const productMutations = {
       filter.subdomain = supplier.subdomain;
     }
 
-    const products = await models.MushopProduct.find(filter).lean();
+    const products = await models.Product.find(filter).lean();
 
-    // Cache posToken per supplier subdomain so we don't refetch for every product.
     const posTokenCache = new Map<string, string | undefined>();
     const getPosToken = async (sub: string) => {
       if (!posTokenCache.has(sub)) {

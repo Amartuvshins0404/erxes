@@ -66,17 +66,33 @@ export const AssistantOrgManageSheet = ({
       : org.kind === 'agent'
         ? 'Delete AI agent?'
         : 'Delete identifier?';
-  const deleteDescription =
+  const namespaceLabel = org.kind === 'agent' ? 'Opencode' : 'OpenClaw';
+  const server = org.server;
+  const hasNamespace = !!server?.hasNamespace;
+  const namespaceName = server?.name?.trim();
+  const entityNoun =
     org.kind === 'assistant'
-      ? 'This will permanently remove this AI assistant identifier from the workspace. This action cannot be undone.'
+      ? 'AI assistant'
       : org.kind === 'agent'
-        ? 'This will permanently remove this AI agent identifier from the workspace. This action cannot be undone.'
-        : 'This will permanently remove this identifier from the workspace. This action cannot be undone.';
+        ? 'AI agent'
+        : 'identifier';
+  const baseDeleteDescription = `This will permanently remove this ${entityNoun} identifier from the workspace. This action cannot be undone.`;
+  const deleteDescription = hasNamespace
+    ? `This will permanently remove this ${entityNoun} identifier and its ${namespaceLabel} namespace${
+        namespaceName ? ` (${namespaceName})` : ''
+      } from the workspace. Do you want to delete both? This action cannot be undone.`
+    : server?.exists
+      ? `No ${namespaceLabel} namespace was found — the deployment never finished, so only this ${entityNoun} identifier will be removed from the workspace. This action cannot be undone.`
+      : baseDeleteDescription;
   const deleteLabel =
     org.kind === 'assistant'
-      ? 'Delete AI Assistant'
+      ? hasNamespace
+        ? 'Delete assistant & namespace'
+        : 'Delete AI Assistant'
       : org.kind === 'agent'
-        ? 'Delete AI Agent'
+        ? hasNamespace
+          ? 'Delete agent & namespace'
+          : 'Delete AI Agent'
         : 'Delete Identifier';
   const deletingLabel =
     org.kind === 'assistant'

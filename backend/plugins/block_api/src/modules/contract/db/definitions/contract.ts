@@ -3,7 +3,6 @@ import { ContractPartyType } from '@/contract/@types/contract';
 
 import {
   BlockProjectPaymentPlanFrequency,
-  BlockProjectPaymentPlanType,
   BlockProjectPaymentPlanInterestType,
 } from '@/project/@types/payment';
 
@@ -41,7 +40,8 @@ const contractPaymentPlanSchema = new Schema(
     },
     penaltyPercentage: { type: Number },
     vatIncluded: { type: Boolean },
-    type: { type: String, enum: Object.values(BlockProjectPaymentPlanType) },
+    roundedInstallmentAmount: { type: Number },
+    installmentAmounts: { type: [Number] },
     paymentDates: { type: [Number] },
     paymentDueDates: { type: [Date] },
     firstPaymentDate: { type: Date },

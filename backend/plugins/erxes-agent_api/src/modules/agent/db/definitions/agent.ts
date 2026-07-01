@@ -20,22 +20,45 @@ export const agentSchema = new Schema(
       label: 'Tool Policy',
     },
     allowedTools: [{ type: String }],
+    // Skill allowlist. Glob patterns matched against global skills' name (or
+    // "category/name"); the requesting user's own published skills are always
+    // added on top. Empty/unset → the agent has no skills attached.
+    skills: [{ type: String }],
     // Consent for irreversible deletes/merges (remove/delete/merge mutations).
-    // Defaults to 'block' so the agent cannot destroy data by mistake; set to
-    // 'allow' to opt a specific agent into destructive operations.
+    //   'ask' (default) → the agent asks the user to approve each one in chat.
+    //   'allow'         → they run without asking.
+    // 'block' is the legacy value (treated as 'ask'); kept in the enum so old
+    // documents validate. The agent never hard-refuses a destructive op.
     destructiveOps: {
       type: String,
-      enum: ['allow', 'block'],
-      default: 'block',
+      enum: ['allow', 'ask', 'block'],
+      default: 'ask',
       label: 'Destructive Operations',
     },
     memoryEnabled: { type: Boolean, default: true },
+    // Debug view: when on, the chat shows this agent's full tool-call trace
+    // (web searches, fetches, operations, raw I/O). Off (default) → the chat
+    // shows only a one-line turn summary that expands to the short thoughts.
+    debug: { type: Boolean, default: false },
     maxSteps: { type: Number, default: 10 },
     // Sampling temperature sent to the model. Unset → the provider/SDK default
     // (the legacy OpenAI-compatible loop defaults to 0). Some models pin it:
     // e.g. Kimi thinking models reject anything but 1.
     temperature: { type: Number, min: 0, max: 2, label: 'Temperature' },
     isEnabled: { type: Boolean, default: true },
+    createdBy: { type: String, label: 'Created By' },
+    visibility: {
+      type: String,
+      enum: ['private', 'team', 'department', 'unit', 'org'],
+      default: 'private',
+      label: 'Visibility',
+    },
+    // teamId   — branch _id for 'team' scope; also stored as cascade context for
+    //            'department' and 'unit' scopes so the edit form can reconstruct
+    //            the branch selection without a reverse-lookup.
+    teamId: { type: String },
+    departmentId: { type: String },
+    unitId: { type: String },
   },
   { timestamps: true },
 );

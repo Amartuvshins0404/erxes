@@ -3,6 +3,7 @@ import { IPageInfo } from 'ui-modules';
 export interface ISupplier {
   _id: string;
   name?: string;
+  code?: string;
   description?: string;
   about?: string;
   logo?: string;

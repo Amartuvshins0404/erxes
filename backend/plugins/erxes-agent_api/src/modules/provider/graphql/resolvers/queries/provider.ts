@@ -1,5 +1,6 @@
 import { IContext } from '~/connectionResolvers';
 import { PROVIDER_PRESETS } from '~/mastra/providers';
+import { toPublicProvider } from '@/provider/utils/mask';
 
 // One entry of a provider's live model-listing response. Field names cover
 // the OpenAI/Anthropic/Mistral (`id`, `display_name`), Google (`name`,
@@ -14,24 +15,30 @@ interface ProviderModelEntry {
 
 /** Queries over configured providers, presets, and live model catalogs. */
 export const providerQueries = {
-  mastraProviders: (
+  mastraProviders: async (
     _parent: undefined,
     _args: undefined,
-    { models }: IContext,
+    { models, checkPermission }: IContext,
   ) => {
-    return models.MastraProvider.getProviders();
+    await checkPermission('providersView');
+    // Mask before the secret crosses the GraphQL boundary: callers get
+    // hasApiKey + a masked hint, never the raw apiKey.
+    const providers = await models.MastraProvider.getProviders();
+    return providers.map(toPublicProvider);
   },
 
-  mastraProvider: (
+  mastraProvider: async (
     _parent: undefined,
     { _id }: { _id: string },
-    { models }: IContext,
+    { models, checkPermission }: IContext,
   ) => {
-    return models.MastraProvider.getProvider(_id);
+    await checkPermission('providersView');
+    return toPublicProvider(await models.MastraProvider.getProvider(_id));
   },
 
   // Returns static presets — used only by the "Add Provider" form in the UI
-  // to pre-fill fields when a user picks a known provider.
+  // to pre-fill fields when a user picks a known provider. No stored secrets are
+  // involved, so this stays open to any logged-in user.
   mastraProviderPresets: () => {
     return PROVIDER_PRESETS;
   },
@@ -40,8 +47,9 @@ export const providerQueries = {
   mastraProviderCatalog: async (
     _parent: undefined,
     _args: undefined,
-    { models }: IContext,
+    { models, checkPermission }: IContext,
   ) => {
+    await checkPermission('providersView');
     const storedProviders = await models.MastraProvider.find({
       isEnabled: true,
     });
@@ -65,8 +73,9 @@ export const providerQueries = {
   mastraProviderModels: async (
     _parent: undefined,
     { provider }: { provider: string },
-    { models }: IContext,
+    { models, checkPermission }: IContext,
   ) => {
+    await checkPermission('providersView');
     // Prefer the stored DB doc (supports custom/unknown providers too)
     const stored = await models.MastraProvider.findOne({ provider });
 

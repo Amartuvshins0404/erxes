@@ -11,51 +11,64 @@ export const types = `
   }
 
   type BlockOfferPaymentPlan {
-    type: BlockProjectPaymentPlanType!  
     downPaymentPercentage: Float
+    downPaymentAmount: Float
+    barterPercentage: Float
+    barterAmount: Float
     interestPercentage: Float
+    interestType: BlockOfferInterestType
     completionPaymentPercentage: Float
+    completionPaymentAmount: Float
     discountPercentage: Float
     description: String
     installment: Int
     frequency: BlockProjectPaymentPlanFrequency
     penaltyPercentage: Float
     vatIncluded: Boolean
+    roundedInstallmentAmount: Float
+    installmentAmounts: [Float]
     paymentDates: [Int]
+    paymentDueDates: [Date]
     firstPaymentDate: Date
+    downPaymentDate: Date
     completionPaymentDate: Date
+    completionPaymentDateLabel: String
   }
 
   input BlockOfferPaymentPlanInput {
-    type: BlockProjectPaymentPlanType!
     downPaymentPercentage: Float
+    downPaymentAmount: Float
+    barterPercentage: Float
+    barterAmount: Float
     interestPercentage: Float
-    interestType: BlockContractInterestType
+    interestType: BlockOfferInterestType
     completionPaymentPercentage: Float
+    completionPaymentAmount: Float
     discountPercentage: Float
     description: String
     installment: Int
     frequency: BlockProjectPaymentPlanFrequency
     penaltyPercentage: Float
-    firstPaymentDate: Date
     vatIncluded: Boolean
+    roundedInstallmentAmount: Float
+    installmentAmounts: [Float]
     paymentDates: [Int]
+    paymentDueDates: [Date]
+    firstPaymentDate: Date
+    downPaymentDate: Date
     completionPaymentDate: Date
-  }
-
-  enum BlockOfferAmountType {
-    priceBySize
-    priceBySize
+    completionPaymentDateLabel: String
   }
 
   type BlockOffer {
     _id: String
     unit: String!
+    project: String
     number: String
     currency: String
     date: String
     amount: Float
-    amountType: BlockOfferAmountType
+    status: BlockOfferStatus
     endDate: String
     party: BlockOfferParty
     paymentPlan: BlockOfferPaymentPlan
@@ -91,11 +104,11 @@ export const types = `
 
   input BlockOfferInput {
     unit: String!
+    project: String
     number: String
     currency: String
     date: String
     amount: Float
-    amountType: BlockOfferAmountType
     status: BlockOfferStatus
     endDate: String
     party: BlockOfferPartyInput
@@ -115,5 +128,44 @@ export const mutations = `
 
 export const queries = `
   blockGetOffer(_id: String!): BlockOffer
-  blockGetOffers(unit: String): [BlockOffer]
+  blockGetOffers(unit: String, project: String): [BlockOffer]
+  blockGetOffersList(
+    filter: BlockOfferFilterInput
+    limit: Int
+    cursor: String
+    direction: String
+  ): BlockOfferListResponse
+  blockGetUnitOfferStats(unitId: String!): BlockUnitOfferStats
+`;
+
+export const offerStatsType = `
+  type BlockUnitOfferStats {
+    totalCount: Int
+    sentCount: Int
+    draftCount: Int
+    averageAmount: Float
+    highestAmount: Float
+    lowestAmount: Float
+    currency: String
+  }
+`;
+
+export const filterInputTypes = `
+  input BlockOfferFilterInput {
+    projectId: String
+    unit: String
+    search: String
+    status: String
+    partyType: String
+    currency: String
+    dateFrom: String
+    dateTo: String
+    user: String
+  }
+
+  type BlockOfferListResponse {
+    list: [BlockOffer]
+    pageInfo: PageInfo
+    totalCount: Int
+  }
 `;

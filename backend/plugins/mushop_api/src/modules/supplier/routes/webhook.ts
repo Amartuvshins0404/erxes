@@ -16,9 +16,14 @@ const syncSupplierRecord = async (req: Request, res: Response) => {
 
     const models = await generateModels(subdomain);
 
-    await models.Supplier.syncFromSupplier(entityId, subdomain, input, userId);
+    const supplier = await models.Supplier.syncFromSupplier(
+      entityId,
+      subdomain,
+      input,
+      userId,
+    );
 
-    return res.status(200).json({ success: true });
+    return res.status(200).json({ success: true, code: supplier?.code });
   } catch (e: any) {
     return res.status(400).json({ error: e.message });
   }

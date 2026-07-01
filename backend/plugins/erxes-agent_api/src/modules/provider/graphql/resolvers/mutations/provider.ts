@@ -1,21 +1,25 @@
 import { IContext } from '~/connectionResolvers';
 import { IMastraProvider } from '@/provider/@types/provider';
+import { toPublicProvider } from '@/provider/utils/mask';
 
 /** Mutations for stored LLM provider credentials/configs. */
 export const providerMutations = {
-  mastraProviderSave: (
+  mastraProviderSave: async (
     _parent: undefined,
     { doc }: { doc: IMastraProvider },
-    { models }: IContext,
+    { models, checkPermission }: IContext,
   ) => {
-    return models.MastraProvider.saveProvider(doc);
+    await checkPermission('providersManage');
+    // Echo back the secret-free view so the key never returns to the browser.
+    return toPublicProvider(await models.MastraProvider.saveProvider(doc));
   },
 
-  mastraProviderRemove: (
+  mastraProviderRemove: async (
     _parent: undefined,
     { _id }: { _id: string },
-    { models }: IContext,
+    { models, checkPermission }: IContext,
   ) => {
+    await checkPermission('providersRemove');
     return models.MastraProvider.removeProvider(_id);
   },
 };

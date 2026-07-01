@@ -1,8 +1,7 @@
 import { RecordTable } from 'erxes-ui';
+import { SUPPLIERS_CURSOR_SESSION_KEY } from '../constants/cursorSessionKey';
 import { useSuppliers } from '../hooks/useSuppliers';
 import { suppliersColumns } from './SuppliersColumns';
-
-const SUPPLIERS_CURSOR_SESSION_KEY = 'mushop-suppliers-cursor';
 
 export const SuppliersTable = () => {
   const { suppliers, loading, pageInfo, handleFetchMore } = useSuppliers();

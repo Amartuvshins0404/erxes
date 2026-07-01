@@ -1,3 +1,4 @@
+import { createTTLCache } from '~/utils/ttlCache';
 import {
   fetchAvailableErxesTools,
   fetchInputTypesMap,
@@ -7,6 +8,7 @@ import {
   type GqlFieldDef,
   type GqlTypeRef,
 } from './erxesTools';
+import { isSecurityBlockedOperation } from './securityGuard';
 
 // One discovered erxes GraphQL operation (query or mutation) the agent can run.
 export interface OperationMeta {
@@ -30,18 +32,18 @@ export interface OperationRegistry {
   objectFieldsMap: Record<string, GqlFieldDef[]>;
 }
 
-interface CacheEntry {
-  reg: OperationRegistry;
-  at: number;
-}
-
 // Schema introspection is identical for every user (it's the gateway's shape,
 // not tenant data), so the registry is cached per API URL + app token with a
 // short TTL. This replaces the old per-operation MastraTool collection: the
 // agent's capabilities are now always derived from the live schema, no manual
 // "sync" step required.
-const cache = new Map<string, CacheEntry>();
 const TTL_MS = 15 * 60 * 1000;
+const cache = createTTLCache<OperationRegistry>(TTL_MS);
+
+// Resilience tier: the last successfully built registry per key, never expired.
+// When a live introspection transiently returns zero operations (or throws) we
+// serve this rather than wiping an agent's capabilities mid-conversation.
+const lastGood = new Map<string, OperationRegistry>();
 
 /** Cache key for a registry: one entry per API URL + app token pair. */
 function cacheKey(settings: ErxesToolSettings | null | undefined): string {
@@ -56,9 +58,17 @@ function buildRegistry(
   inputTypesMap: Record<string, GqlArgDef[]>,
   objectFieldsMap: Record<string, GqlFieldDef[]>,
 ): OperationRegistry {
+  // Strip security-blocked operations (e.g. `configs`, which dumps the whole
+  // secret store) before they ever enter the registry, so NO discovery surface
+  // built on it — search, capability inventory, workflow step resolution, the
+  // tool-listing UI — can reveal or resolve them. The execute tool independently
+  // refuses them by name as a backstop.
+  const visible = operations.filter(
+    (op) => !isSecurityBlockedOperation(op.operation),
+  );
   const map = new Map<string, OperationMeta>();
-  for (const op of operations) map.set(op.operation, op);
-  return { operations: map, list: operations, inputTypesMap, objectFieldsMap };
+  for (const op of visible) map.set(op.operation, op);
+  return { operations: map, list: visible, inputTypesMap, objectFieldsMap };
 }
 
 /**
@@ -74,9 +84,10 @@ export async function getOperationRegistry(
   opts: { force?: boolean } = {},
 ): Promise<OperationRegistry> {
   const key = cacheKey(settings);
-  const hit = cache.get(key);
-  const fresh = hit && Date.now() - hit.at < TTL_MS;
-  if (hit && fresh && !opts.force) return hit.reg;
+  const fresh = cache.get(key);
+  if (fresh && !opts.force) return fresh;
+
+  const previous = lastGood.get(key);
 
   try {
     const [operations, inputTypesMap, objectFieldsMap] = await Promise.all([
@@ -85,16 +96,17 @@ export async function getOperationRegistry(
       fetchObjectFieldsMap(settings),
     ]);
 
-    if (!operations.length && hit) {
+    if (!operations.length && previous) {
       // Introspection failed/empty — serve the last good registry.
-      return hit.reg;
+      return previous;
     }
 
     const reg = buildRegistry(operations, inputTypesMap, objectFieldsMap);
-    cache.set(key, { reg, at: Date.now() });
+    cache.set(key, reg);
+    lastGood.set(key, reg);
     return reg;
   } catch {
-    if (hit) return hit.reg;
+    if (previous) return previous;
     return buildRegistry([], {}, {});
   }
 }
@@ -103,6 +115,12 @@ export async function getOperationRegistry(
 export function invalidateOperationRegistry(
   settings?: ErxesToolSettings | null,
 ) {
-  if (settings) cache.delete(cacheKey(settings));
-  else cache.clear();
+  if (settings) {
+    const key = cacheKey(settings);
+    cache.delete(key);
+    lastGood.delete(key);
+  } else {
+    cache.clear();
+    lastGood.clear();
+  }
 }

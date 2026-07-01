@@ -22,6 +22,7 @@ const SETTINGS_PERMISSION_MAP: Record<string, string> = {
   [SettingsWorkspacePath.ClientPortals]: 'clientPortal',
   [SettingsWorkspacePath.OAuthClients]: 'apps',
   [SettingsWorkspacePath.Permissions]: 'permissions',
+  [SettingsWorkspacePath.ApprovalRequests]: 'approval',
 };
 
 export function SettingsSidebar() {
@@ -48,7 +49,7 @@ export function SettingsSidebar() {
     .filter((plugin) => {
       if (!plugin.settingsNavigation) return false;
       if (!isLoaded || isWildcard) return true;
-      return hasPluginPermission(plugin.name);
+      return hasPluginPermission(plugin.permissionName ?? plugin.name);
     })
     .map((plugin) => ({
       Navigation: plugin.settingsNavigation,

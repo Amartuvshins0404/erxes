@@ -110,6 +110,111 @@ export const contractPaymentQueries = {
     });
   },
 
+  blockGetProjectPaymentPlanData: async (
+    _parent: undefined,
+    { projectId }: { projectId: string },
+    { models }: IContext,
+  ) => {
+    const buildings = await models.Building.find(
+      { project: projectId },
+      { _id: 1 },
+    ).lean();
+    const buildingIds = buildings.map((b: any) => b._id);
+
+    const zonings = await models.Zoning.find(
+      { building: { $in: buildingIds } },
+      { _id: 1 },
+    ).lean();
+    const zoningIds = zonings.map((z: any) => z._id);
+
+    const units = await models.Unit.find(
+      { zoning: { $in: zoningIds } },
+      { _id: 1 },
+    ).lean();
+    const unitIds = units.map((u: any) => u._id);
+
+    const signedStages = await models.ContractStatus.find(
+      { type: 'signed' },
+      { _id: 1 },
+    ).lean();
+    if (!signedStages.length) return [];
+    const signedStageIds = signedStages.map((s: any) => s._id);
+
+    const contracts = await models.Contract.find(
+      { unit: { $in: unitIds }, status: { $in: signedStageIds } },
+      { _id: 1 },
+    ).lean();
+    if (!contracts.length) return [];
+
+    const contractIds = contracts.map((c: any) => c._id);
+    return models.ContractPayment.find({ contractId: { $in: contractIds } })
+      .sort({ dueDate: 1 })
+      .lean();
+  },
+
+  blockGetUnitPaymentPlanData: async (
+    _parent: undefined,
+    { unitId }: { unitId: string },
+    { models }: IContext,
+  ) => {
+    const signedStages = await models.ContractStatus.find({ type: 'signed' }, { _id: 1 }).lean();
+    if (!signedStages.length) return [];
+    const signedStageIds = signedStages.map((s: any) => s._id);
+    const contracts = await models.Contract.find(
+      { unit: new Types.ObjectId(unitId), status: { $in: signedStageIds } },
+      { _id: 1 },
+    ).lean();
+    if (!contracts.length) return [];
+    const contractIds = contracts.map((c: any) => c._id);
+    return models.ContractPayment.find({ contractId: { $in: contractIds } })
+      .sort({ dueDate: 1 })
+      .lean();
+  },
+
+  blockGetUnitPaymentTransactions: async (
+    _parent: undefined,
+    { unitId }: { unitId: string },
+    { models }: IContext,
+  ) => {
+    const signedStages = await models.ContractStatus.find({ type: 'signed' }, { _id: 1 }).lean();
+    if (!signedStages.length) return [];
+    const signedStageIds = signedStages.map((s: any) => s._id);
+    const contracts = await models.Contract.find(
+      { unit: new Types.ObjectId(unitId), status: { $in: signedStageIds } },
+      { _id: 1 },
+    ).lean();
+    if (!contracts.length) return [];
+    const contractIds = contracts.map((c: any) => c._id.toString());
+    return models.ContractPaymentTransaction.find({ contractId: { $in: contractIds } })
+      .sort({ date: -1 })
+      .lean();
+  },
+
+  blockGetProjectPaymentTransactions: async (
+    _parent: undefined,
+    { projectId }: { projectId: string },
+    { models }: IContext,
+  ) => {
+    const buildings = await models.Building.find({ project: projectId }, { _id: 1 }).lean();
+    const buildingIds = buildings.map((b: any) => b._id);
+    const zonings = await models.Zoning.find({ building: { $in: buildingIds } }, { _id: 1 }).lean();
+    const zoningIds = zonings.map((z: any) => z._id);
+    const units = await models.Unit.find({ zoning: { $in: zoningIds } }, { _id: 1 }).lean();
+    const unitIds = units.map((u: any) => u._id);
+    const signedStages = await models.ContractStatus.find({ type: 'signed' }, { _id: 1 }).lean();
+    if (!signedStages.length) return [];
+    const signedStageIds = signedStages.map((s: any) => s._id);
+    const contracts = await models.Contract.find(
+      { unit: { $in: unitIds }, status: { $in: signedStageIds } },
+      { _id: 1 },
+    ).lean();
+    if (!contracts.length) return [];
+    const contractIds = contracts.map((c: any) => c._id.toString());
+    return models.ContractPaymentTransaction.find({ contractId: { $in: contractIds } })
+      .sort({ date: -1 })
+      .lean();
+  },
+
   blockGetPaymentTransactions: async (
     _parent: undefined,
     { paymentId }: { paymentId: string },

@@ -86,7 +86,7 @@ const AgentManagedRetry = () => {
         />
       </div>
 
-      <div className="flex gap-2">
+      <div className="grid grid-cols-1 gap-2 sm:flex">
         <Button
           type="button"
           variant="outline"
@@ -143,7 +143,7 @@ export const AgentDeployScreen = () => {
               <Sheet.Title>Add AI Assistant</Sheet.Title>
               <Sheet.Close />
             </Sheet.Header>
-            <Sheet.Content className="px-5 py-5">
+            <Sheet.Content className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
               <AgentDeployForm />
             </Sheet.Content>
           </Sheet.View>

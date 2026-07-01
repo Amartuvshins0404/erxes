@@ -1,11 +1,15 @@
 import { useMutation, useQuery } from '@apollo/client';
-import { Button, Label, Select, Sheet, Spinner } from 'erxes-ui';
+import { Badge, Button, Label, Select, Sheet, Spinner, toast } from 'erxes-ui';
 import { useEffect, useMemo, useState } from 'react';
 import {
   MTO_REGISTRATION_APPLICATION,
   MTO_REGISTRATION_FORM_DEFINITION,
 } from '@/registration/graphql/registrationQueries';
-import { MTO_REGISTRATION_APPLICATION_UPDATE } from '@/registration/graphql/registrationMutations';
+import {
+  MTO_REGISTRATION_APPLICATION_PAYMENT_URL,
+  MTO_REGISTRATION_APPLICATION_UPDATE,
+  MTO_REGISTRATION_APPLICATION_VERIFY_MANUAL_PAYMENT,
+} from '@/registration/graphql/registrationMutations';
 import { DynamicRegistrationForm } from '@/registration/components/DynamicRegistrationForm';
 import { isFormDefinition } from '@/registration/utils/isFormDefinition';
 import {
@@ -21,6 +25,42 @@ const STATUS_OPTIONS = [
   { value: 'approved', label: 'approved' },
   { value: 'rejected', label: 'rejected' },
 ];
+
+function paymentStatusBadgeVariant(
+  paymentStatus?: string | null,
+): 'success' | 'warning' | 'secondary' {
+  if (paymentStatus === 'paid' || paymentStatus === 'manual_verified') {
+    return 'success';
+  }
+
+  if (paymentStatus === 'unpaid') {
+    return 'warning';
+  }
+
+  return 'secondary';
+}
+
+function hasManualPaymentProof(answers: Record<string, unknown>): boolean {
+  const proof = answers.doc_membership_fee;
+
+  if (proof === null || proof === undefined) {
+    return false;
+  }
+
+  if (typeof proof === 'string') {
+    return proof.trim().length > 0;
+  }
+
+  if (Array.isArray(proof)) {
+    return proof.length > 0;
+  }
+
+  if (typeof proof === 'object') {
+    return Object.keys(proof as object).length > 0;
+  }
+
+  return true;
+}
 
 interface RegistrationDetailSheetProps {
   applicationId: string | null;
@@ -45,6 +85,12 @@ export function RegistrationDetailSheet({
 
   const [updateCpLink, { loading: cpLinkSaving }] = useMutation(
     MTO_REGISTRATION_APPLICATION_UPDATE,
+  );
+  const [verifyManualPayment, { loading: verifyManualLoading }] = useMutation(
+    MTO_REGISTRATION_APPLICATION_VERIFY_MANUAL_PAYMENT,
+  );
+  const [getPaymentUrl, { loading: paymentUrlLoading }] = useMutation(
+    MTO_REGISTRATION_APPLICATION_PAYMENT_URL,
   );
 
   const row = data?.mtoRegistrationApplication;
@@ -97,6 +143,75 @@ export function RegistrationDetailSheet({
     await refetch();
     onSaved?.();
   }
+
+  async function handleVerifyManualPayment() {
+    if (!applicationId) return;
+
+    try {
+      await verifyManualPayment({ variables: { _id: applicationId } });
+      await refetch();
+      onSaved?.();
+      toast({
+        title: 'Амжилттай',
+        description: 'Гараар төлсөн төлбөр баталгаажлаа',
+      });
+    } catch (e: unknown) {
+      const message =
+        e instanceof Error ? e.message : 'Баталгаажуулахад алдаа гарлаа';
+      toast({
+        title: 'Алдаа',
+        description: message,
+        variant: 'destructive',
+      });
+    }
+  }
+
+  async function handleCopyPaymentLink() {
+    if (!applicationId) return;
+
+    try {
+      const result = await getPaymentUrl({ variables: { _id: applicationId } });
+      const url = result.data?.mtoRegistrationApplicationPaymentUrl as
+        | string
+        | undefined;
+
+      if (!url) {
+        throw new Error('Төлбөрийн холбоос олдсонгүй');
+      }
+
+      await navigator.clipboard.writeText(url);
+      toast({
+        title: 'Хуулсан',
+        description: 'Төлбөрийн холбоос хуулбарлагдлаа',
+      });
+    } catch (e: unknown) {
+      const message =
+        e instanceof Error ? e.message : 'Холбоос авахад алдаа гарлаа';
+      toast({
+        title: 'Алдаа',
+        description: message,
+        variant: 'destructive',
+      });
+    }
+  }
+
+  const paymentStatus = row?.paymentStatus as string | undefined;
+  const invoiceStatus = (row?.invoice as { status?: string } | null | undefined)
+    ?.status;
+  const showManualVerify =
+    row &&
+    paymentStatus !== 'paid' &&
+    paymentStatus !== 'manual_verified' &&
+    hasManualPaymentProof(initialAnswers);
+  const showPaymentLink =
+    row &&
+    Boolean(row.invoiceId) &&
+    paymentStatus !== 'paid' &&
+    paymentStatus !== 'manual_verified';
+  const showApprovePaymentNote =
+    status === 'approved' &&
+    paymentStatus !== 'paid' &&
+    paymentStatus !== 'manual_verified';
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -191,6 +306,64 @@ export function RegistrationDetailSheet({
                       ))}
                     </Select.Content>
                   </Select>
+                </div>
+
+                <div className="space-y-3 rounded-md border p-4">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Label className="mb-0">Төлбөрийн төлөв</Label>
+                    <Badge
+                      variant={paymentStatusBadgeVariant(paymentStatus)}
+                      className="capitalize"
+                    >
+                      {paymentStatus ?? 'unpaid'}
+                    </Badge>
+                    {row.membershipFeeAmount ? (
+                      <span className="text-sm text-muted-foreground">
+                        {row.membershipFeeAmount.toLocaleString()} ₮
+                      </span>
+                    ) : null}
+                  </div>
+
+                  {invoiceStatus ? (
+                    <p className="text-sm text-muted-foreground">
+                      Нэхэмжлэх:{' '}
+                      <span className="capitalize font-medium text-foreground">
+                        {invoiceStatus}
+                      </span>
+                    </p>
+                  ) : null}
+
+                  {showApprovePaymentNote ? (
+                    <p className="text-sm text-muted-foreground">
+                      Баталгаажуулахад онлайн нэхэмжлэх үүснэ (гараар
+                      баталгаажуулаагүй бол).
+                    </p>
+                  ) : null}
+
+                  <div className="flex flex-wrap gap-2">
+                    {showManualVerify ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={verifyManualLoading}
+                        onClick={() => void handleVerifyManualPayment()}
+                      >
+                        Гараар төлсөн баталгаажуулах
+                      </Button>
+                    ) : null}
+                    {showPaymentLink ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={paymentUrlLoading}
+                        onClick={() => void handleCopyPaymentLink()}
+                      >
+                        Төлбөрийн холбоос хуулах
+                      </Button>
+                    ) : null}
+                  </div>
                 </div>
 
                 <DynamicRegistrationForm

@@ -1,4 +1,4 @@
-import { IconBuildingStore, IconFileDescription } from '@tabler/icons-react';
+import { IconBuildingStore, IconCreditCard, IconCurrencyYuan, IconFileDescription, IconPackage, IconUsers } from '@tabler/icons-react';
 import { lazy, Suspense } from 'react';
 import { IUIConfig } from 'erxes-ui';
 
@@ -13,7 +13,7 @@ export const CONFIG: IUIConfig = {
   path: 'mushop',
   i18n: true,
   navigationGroup: {
-    name: 'MuShop',
+    name: 'mushop',
     icon: IconBuildingStore,
     content: () => (
       <Suspense fallback={<div />}>
@@ -24,17 +24,39 @@ export const CONFIG: IUIConfig = {
 
   modules: [
     {
-      name: 'MuShop',
+      name: 'Supplier',
+      icon: IconUsers,
+      path: 'suppliers',
+    },
+    {
+      name: 'Products',
+      icon: IconPackage,
+      path: 'products',
+    },
+    {
+      name: 'Members',
+      icon: IconCreditCard,
+      path: 'members',
+    },
+    {
+      name: 'Collectives',
       icon: IconBuildingStore,
-      path: 'mushop',
+      path: 'collectives',
     },
   ],
 
   widgets: {
     relationWidgets: [
       {
-        name: 'subscription_plan',
+        name: 'membership_plan',
         icon: IconFileDescription,
+      },
+    ],
+    formWidgets: [
+      {
+        name: 'mushop',
+        contentType: 'core:product',
+        icon: IconCurrencyYuan,
       },
     ],
   },

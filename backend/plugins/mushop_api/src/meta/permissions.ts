@@ -5,69 +5,69 @@ export const permissions: IPermissionConfig = {
 
   modules: [
     {
-      name: 'subscription',
-      description: 'Mushop subscriptions',
+      name: 'membership',
+      description: 'Mushop memberships',
       scopeField: null,
       ownerFields: [],
-      scopes: [{ name: 'all', description: 'All subscriptions' }],
+      scopes: [{ name: 'all', description: 'All memberships' }],
       actions: [
         {
-          title: 'View subscriptions',
-          name: 'showMushopSubscriptions',
-          description: 'List and view subscriber records',
+          title: 'View memberships',
+          name: 'showMushopMemberships',
+          description: 'List and view membership records',
           always: true,
         },
         {
-          title: 'Cancel subscription',
-          name: 'mushopCancelSubscription',
-          description: 'Cancel any customer subscription',
+          title: 'Cancel membership',
+          name: 'mushopCancelMembership',
+          description: 'Cancel any customer membership',
         },
         {
-          title: 'Grant subscription',
-          name: 'mushopGrantSubscription',
-          description: 'Manually grant or extend a subscription for a customer',
+          title: 'Grant membership',
+          name: 'mushopGrantMembership',
+          description: 'Manually grant or extend a membership for a customer',
         },
         {
-          title: 'Adjust subscription end date',
-          name: 'mushopUpdateSubscriptionEndDate',
+          title: 'Adjust membership end date',
+          name: 'mushopUpdateMembershipEndDate',
           description:
-            "Manually change a subscription's end date (e.g. to revert an accidental grant)",
+            "Manually change a membership's end date (e.g. to revert an accidental grant)",
         },
         {
-          title: 'Change subscription status',
-          name: 'mushopUpdateSubscriptionStatus',
+          title: 'Change membership status',
+          name: 'mushopUpdateMembershipStatus',
           description:
-            'Manually change a subscription status (active / expired / cancelled)',
+            'Manually change a membership status (active / expired / cancelled)',
         },
       ],
     },
     {
-      name: 'subscriptionPlan',
-      description: 'Mushop subscription plans',
+      name: 'membershipPlan',
+      description: 'Mushop membership plans',
       scopeField: null,
       ownerFields: [],
       scopes: [{ name: 'all', description: 'All plans' }],
       actions: [
         {
           title: 'View plans',
-          name: 'showMushopSubscriptionPlans',
-          description: 'List and view subscription plans',
+          name: 'showMushopMembershipPlans',
+          description: 'List and view membership plans',
           always: true,
         },
         {
           title: 'Add plans',
-          name: 'mushopSubscriptionPlanCreate',
-          description: 'Create subscription plans',
+          name: 'mushopMembershipPlanCreate',
+          description: 'Create membership plans',
         },
         {
           title: 'Edit plans',
-          name: 'mushopSubscriptionPlanUpdate',
-          description: 'Edit subscription plans',
+          name: 'mushopMembershipPlanUpdate',
+          description: 'Edit membership plans',
         },
         {
           title: 'Deactivate plans',
-          name: 'mushopSubscriptionPlanDeactivate',
-          description: 'Deactivate subscription plans',
+          name: 'mushopMembershipPlanDeactivate',
+          description: 'Deactivate membership plans',
         },
       ],
     },
@@ -93,11 +93,6 @@ export const permissions: IPermissionConfig = {
           title: 'Update supplier tier',
           name: 'mushopUpdateSupplierTier',
           description: 'Change supplier tier level',
-        },
-        {
-          title: 'Update supplier POS',
-          name: 'mushopUpdateSupplierPos',
-          description: 'Assign or change the POS configuration for a supplier',
         },
         {
           title: 'Update supplier Mushop POS',
@@ -144,6 +139,11 @@ export const permissions: IPermissionConfig = {
           name: 'mushopBulkRemoveProducts',
           description: 'Delete many products at once',
         },
+        {
+          title: 'Save product specification',
+          name: 'mushopProductSpecificationSave',
+          description: 'Set product specification fields (e.g. MOQ)',
+        },
       ],
     },
     {
@@ -181,6 +181,26 @@ export const permissions: IPermissionConfig = {
         },
       ],
     },
+    {
+      name: 'config',
+      description: 'Mushop settings',
+      scopeField: null,
+      ownerFields: [],
+      scopes: [{ name: 'all', description: 'All settings' }],
+      actions: [
+        {
+          title: 'View settings',
+          name: 'showMushopConfig',
+          description: 'View Mushop settings',
+          always: true,
+        },
+        {
+          title: 'Save settings',
+          name: 'mushopConfigSave',
+          description: 'Change Mushop settings (e.g. YEN to MNT rate)',
+        },
+      ],
+    },
   ],
 
   defaultGroups: [
@@ -191,24 +211,24 @@ export const permissions: IPermissionConfig = {
       permissions: [
         {
           plugin: 'mushop',
-          module: 'subscription',
+          module: 'membership',
           actions: [
-            'showMushopSubscriptions',
-            'mushopCancelSubscription',
-            'mushopGrantSubscription',
-            'mushopUpdateSubscriptionEndDate',
-            'mushopUpdateSubscriptionStatus',
+            'showMushopMemberships',
+            'mushopCancelMembership',
+            'mushopGrantMembership',
+            'mushopUpdateMembershipEndDate',
+            'mushopUpdateMembershipStatus',
           ],
           scope: 'all',
         },
         {
           plugin: 'mushop',
-          module: 'subscriptionPlan',
+          module: 'membershipPlan',
           actions: [
-            'showMushopSubscriptionPlans',
-            'mushopSubscriptionPlanCreate',
-            'mushopSubscriptionPlanUpdate',
-            'mushopSubscriptionPlanDeactivate',
+            'showMushopMembershipPlans',
+            'mushopMembershipPlanCreate',
+            'mushopMembershipPlanUpdate',
+            'mushopMembershipPlanDeactivate',
           ],
           scope: 'all',
         },
@@ -219,7 +239,6 @@ export const permissions: IPermissionConfig = {
             'showMushopSuppliers',
             'mushopUpdateSupplierVerificationStatus',
             'mushopUpdateSupplierTier',
-            'mushopUpdateSupplierPos',
             'mushopUpdateSupplierMushopPos',
           ],
           scope: 'all',
@@ -234,6 +253,7 @@ export const permissions: IPermissionConfig = {
             'mushopAssignProductCategory',
             'mushopRemoveProduct',
             'mushopBulkRemoveProducts',
+            'mushopProductSpecificationSave',
           ],
           scope: 'all',
         },
@@ -242,11 +262,16 @@ export const permissions: IPermissionConfig = {
           module: 'collective',
           actions: [
             'showMushopCollectives',
-            'mushopCreateCollective',
             'mushopUpdateCollectiveSuppliers',
             'mushopResyncCollective',
             'mushopRemoveCollective',
           ],
+          scope: 'all',
+        },
+        {
+          plugin: 'mushop',
+          module: 'config',
+          actions: ['showMushopConfig', 'mushopConfigSave'],
           scope: 'all',
         },
       ],
@@ -255,18 +280,18 @@ export const permissions: IPermissionConfig = {
       id: 'mushop:operator',
       name: 'Mushop Operator',
       description:
-        'Day-to-day moderation: approve products, verify suppliers, grant subscriptions',
+        'Day-to-day moderation: approve products, verify suppliers, grant memberships',
       permissions: [
         {
           plugin: 'mushop',
-          module: 'subscription',
-          actions: ['showMushopSubscriptions', 'mushopGrantSubscription'],
+          module: 'membership',
+          actions: ['showMushopMemberships', 'mushopGrantMembership'],
           scope: 'all',
         },
         {
           plugin: 'mushop',
-          module: 'subscriptionPlan',
-          actions: ['showMushopSubscriptionPlans'],
+          module: 'membershipPlan',
+          actions: ['showMushopMembershipPlans'],
           scope: 'all',
         },
         {
@@ -299,14 +324,14 @@ export const permissions: IPermissionConfig = {
       permissions: [
         {
           plugin: 'mushop',
-          module: 'subscription',
-          actions: ['showMushopSubscriptions'],
+          module: 'membership',
+          actions: ['showMushopMemberships'],
           scope: 'all',
         },
         {
           plugin: 'mushop',
-          module: 'subscriptionPlan',
-          actions: ['showMushopSubscriptionPlans'],
+          module: 'membershipPlan',
+          actions: ['showMushopMembershipPlans'],
           scope: 'all',
         },
         {

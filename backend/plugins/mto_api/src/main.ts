@@ -13,6 +13,7 @@ import {
 import { getMasterClient } from '~/utils/masterClient';
 import { graphqlProxyMiddleware } from '~/middlewares/graphqlProxyMiddleware';
 import { initMQWorkers } from '~/worker';
+import { handleRegistrationPaymentCallback } from '@/registration/utils/registrationPayment';
 
 const DOMAIN = getEnv({ name: 'DOMAIN' });
 const ALLOWED_ORIGINS = getEnv({ name: 'ALLOWED_ORIGINS' });
@@ -107,10 +108,10 @@ startPlugin({
   meta: {
     payments: {
       transactionCallback: async () => {
-        // Membership payment handling requires the full onefit membership module.
+        // Registration payments are handled on invoice paid callback.
       },
-      callback: async () => {
-        // Membership payment handling requires the full onefit membership module.
+      callback: async (subdomain, data) => {
+        await handleRegistrationPaymentCallback(subdomain, data);
       },
     },
   },

@@ -8,7 +8,7 @@ import {
 import { MushopCollectivePackage } from '@/collective-package/graphql/resolvers/customResolvers/collectivePackage';
 import { mutations } from './mutations';
 import { queries } from './queries';
-import { subscriptionTypeResolvers } from '@/subscription/graphql/resolvers/queries/mushopSubscription';
+import { membershipTypeResolvers } from '@/membership/graphql/resolvers/queries/mushopMembership';
 import { extensionResolvers } from './extensions';
 
 const resolvers: any = {
@@ -23,7 +23,7 @@ const resolvers: any = {
   MushopCollective,
   MushopCollectiveSyncResult,
   MushopCollectivePackage,
-  ...subscriptionTypeResolvers,
+  ...membershipTypeResolvers,
   ...apolloCustomScalars,
   ...extensionResolvers,
 };

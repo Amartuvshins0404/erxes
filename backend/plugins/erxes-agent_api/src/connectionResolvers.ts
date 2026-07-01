@@ -5,10 +5,7 @@ import mongoose from 'mongoose';
 import { IMastraAgentDocument } from '@/agent/@types/agent';
 import { IMastraProviderDocument } from '@/provider/@types/provider';
 import { IMastraSettingsDocument } from '@/settings/@types/settings';
-import {
-  IMastraThreadDocument,
-  IMastraMessageDocument,
-} from '@/session/@types/session';
+import { IMastraUserSettingsDocument } from '@/settings/@types/userSettings';
 import { IMastraWorkingMemoryDocument } from '@/memory/@types/workingMemory';
 import {
   IMastraWorkflowDocument,
@@ -29,13 +26,9 @@ import {
   IMastraSettingsModel,
 } from '@/settings/db/models/Settings';
 import {
-  loadThreadClass,
-  IMastraThreadModel,
-} from '@/session/db/models/Thread';
-import {
-  loadMessageClass,
-  IMastraMessageModel,
-} from '@/session/db/models/Message';
+  loadUserSettingsClass,
+  IMastraUserSettingsModel,
+} from '@/settings/db/models/UserSettings';
 import {
   loadWorkingMemoryClass,
   IMastraWorkingMemoryModel,
@@ -65,20 +58,31 @@ import {
   IMastraScheduleModel,
 } from '@/schedule/db/models/Schedule';
 import { IMastraScheduleDocument } from '@/schedule/@types/schedule';
+import {
+  loadArtifactClass,
+  IMastraArtifactModel,
+} from '@/artifact/db/models/Artifact';
+import { IMastraArtifactDocument } from '@/artifact/@types/artifact';
+import {
+  loadVoiceConfigClass,
+  IMastraVoiceConfigModel,
+} from '@/voice/db/models/VoiceConfig';
+import { IMastraVoiceConfigDocument } from '@/voice/@types/voice';
 
 export interface IModels {
   MastraAgent: IMastraAgentModel;
   MastraAgentActionLog: IMastraAgentActionLogModel;
   MastraProvider: IMastraProviderModel;
   MastraSettings: IMastraSettingsModel;
-  MastraThread: IMastraThreadModel;
-  MastraMessage: IMastraMessageModel;
+  MastraUserSettings: IMastraUserSettingsModel;
   MastraWorkingMemory: IMastraWorkingMemoryModel;
   MastraWorkflow: IMastraWorkflowModel;
   MastraWorkflowRun: IMastraWorkflowRunModel;
   MastraLearning: IMastraLearningModel;
   MastraFeedback: IMastraFeedbackModel;
   MastraSchedule: IMastraScheduleModel;
+  MastraArtifact: IMastraArtifactModel;
+  MastraVoiceConfig: IMastraVoiceConfigModel;
 }
 
 export interface IContext extends IMainContext {
@@ -111,15 +115,10 @@ export const loadClasses = (db: mongoose.Connection): IModels => {
     IMastraSettingsModel
   >('mastra_settings', loadSettingsClass(models));
 
-  models.MastraThread = db.model<IMastraThreadDocument, IMastraThreadModel>(
-    'mastra_threads',
-    loadThreadClass(models),
-  );
-
-  models.MastraMessage = db.model<IMastraMessageDocument, IMastraMessageModel>(
-    'mastra_messages',
-    loadMessageClass(models),
-  );
+  models.MastraUserSettings = db.model<
+    IMastraUserSettingsDocument,
+    IMastraUserSettingsModel
+  >('mastra_user_settings', loadUserSettingsClass(models));
 
   models.MastraWorkingMemory = db.model<
     IMastraWorkingMemoryDocument,
@@ -150,6 +149,15 @@ export const loadClasses = (db: mongoose.Connection): IModels => {
     IMastraScheduleDocument,
     IMastraScheduleModel
   >('mastra_schedules', loadScheduleClass(models));
+
+  models.MastraArtifact = db.model<
+    IMastraArtifactDocument,
+    IMastraArtifactModel
+  >('mastra_artifacts', loadArtifactClass(models));
+  models.MastraVoiceConfig = db.model<
+    IMastraVoiceConfigDocument,
+    IMastraVoiceConfigModel
+  >('mastra_voice_config', loadVoiceConfigClass(models));
 
   return models;
 };

@@ -1,27 +1,6 @@
-import { getEnv } from 'erxes-api-shared/utils';
 import { IContext } from '~/connectionResolvers';
 import { ICollectiveDocument } from '@/collective/@types/collective';
-
-const toFileUrl = (
-  key: string | undefined,
-  subdomain: string,
-): string | null => {
-  if (!key) return null;
-
-  if (key.startsWith('http://') || key.startsWith('https://')) return key;
-
-  const COLLECTIVE_DOMAIN = getEnv({
-    name: 'SUPPLIER_API_URL',
-    subdomain,
-    defaultValue: 'http://localhost:4000',
-  });
-
-  if (!COLLECTIVE_DOMAIN) return null;
-
-  const domain = COLLECTIVE_DOMAIN.replace('<subdomain>', subdomain);
-
-  return `${domain}/read-file?key=${key}`;
-};
+import { toFileUrl } from '~/utils/fileUrl';
 
 export const MushopCollective = {
   suppliers: async (

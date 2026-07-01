@@ -9,6 +9,14 @@ export const types = `
     memberIds: [String]
     createdAt: Date
     updatedAt: Date
+    server: IdentifierServer
+  }
+
+  type IdentifierServer {
+    exists: Boolean!
+    hasNamespace: Boolean!
+    name: String
+    status: String
   }
 
   input CreateIdentifierInput {

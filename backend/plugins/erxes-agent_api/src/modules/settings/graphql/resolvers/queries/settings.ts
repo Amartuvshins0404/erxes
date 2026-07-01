@@ -9,6 +9,7 @@ import {
 import { ALL_KNOWLEDGE_TYPE_NAMES } from '~/mastra/knowledge/contentTypes';
 import { health as qdrantHealth } from '~/mastra/memory/vectorStore';
 import { getStorageStatus } from '~/mastra/files/storage';
+import { resolveVoiceStatusForTenant } from '~/mastra/voice/resolveConfig';
 import { IModels } from '~/connectionResolvers';
 import { IMastraSettings } from '@/settings/@types/settings';
 
@@ -30,6 +31,14 @@ export async function attachmentStorageStatus(
 
 /** Queries for plugin settings plus their derived feature-status blocks. */
 export const settingsQueries = {
+  mastraUserAgentQuota: async (
+    _parent: undefined,
+    { userId }: { userId: string },
+    { models, checkPermission }: IContext,
+  ) => {
+    await checkPermission('settingsManage');
+    return models.MastraUserSettings.getUserSettings(userId);
+  },
   // Lightweight status for the chat UI: decides whether the attach button shows.
   mastraAttachmentStorageStatus: (
     _parent: undefined,
@@ -39,11 +48,24 @@ export const settingsQueries = {
     return attachmentStorageStatus(models, subdomain);
   },
 
+  // Lightweight status for the chat UI: decides whether the voice mode entry
+  // point shows. Per-tenant (the tenant's stored Chimege tokens win over env),
+  // no secrets exposed — just the round-trip `enabled` boolean.
+  mastraVoiceStatus: (
+    _parent: undefined,
+    _args: undefined,
+    { subdomain }: IContext,
+  ) => resolveVoiceStatusForTenant(subdomain),
+
   mastraSettings: async (
     _parent: undefined,
     _args: undefined,
-    { models, subdomain }: IContext,
+    { models, subdomain, checkPermission }: IContext,
   ) => {
+    // Settings spread includes secrets (e.g. erxesApiToken) — gate the read.
+    // The lightweight, secret-free mastraAttachmentStorageStatus stays open for
+    // the chat UI.
+    await checkPermission('settingsView');
     const doc = await models.MastraSettings.getSettings();
     const obj: IMastraSettings = doc?.toObject ? doc.toObject() : doc;
 

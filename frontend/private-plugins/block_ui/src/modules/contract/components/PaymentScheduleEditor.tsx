@@ -1,5 +1,8 @@
 import { DatePicker, InfoCard } from 'erxes-ui';
+import { useState, useEffect, useRef, memo, useCallback } from 'react';
 import { format } from 'date-fns';
+import { UseFormReturn } from 'react-hook-form';
+import { generateInstallmentDates } from './contract-detail/shared';
 
 const periodsPerYear = (frequency: string | undefined): number => {
   switch (frequency) {
@@ -12,9 +15,6 @@ const periodsPerYear = (frequency: string | undefined): number => {
     default: return 12;
   }
 };
-import { UseFormReturn } from 'react-hook-form';
-import { ContractFormData } from '@/contract/constants/contractSchema';
-import { generateInstallmentDates } from './contract-detail/shared';
 
 const parseDateLike = (value: any): Date | null => {
   if (!value) return null;
@@ -23,16 +23,82 @@ const parseDateLike = (value: any): Date | null => {
   return isNaN(d.getTime()) ? null : d;
 };
 
+const PrincipalInput = memo(({
+  index,
+  value,
+  onCommit,
+}: {
+  index: number;
+  value: number;
+  onCommit: (index: number, val: number) => void;
+}) => {
+  const [text, setText] = useState(String(value));
+  const focusedRef = useRef(false);
+
+  useEffect(() => {
+    if (!focusedRef.current) {
+      setText(String(value));
+    }
+  }, [value]);
+
+  return (
+    <input
+      type="number"
+      step="any"
+      value={text}
+      onChange={(e) => setText(e.target.value)}
+      onFocus={() => { focusedRef.current = true; }}
+      onBlur={(e) => {
+        focusedRef.current = false;
+        const n = parseFloat(e.target.value);
+        if (!isNaN(n)) onCommit(index, n);
+      }}
+      className="h-7 text-sm w-full border rounded px-2 bg-background"
+    />
+  );
+});
+
 export const PaymentScheduleEditor = ({
   form,
+  amount: amountProp,
+  currency: currencyProp,
+  date: dateProp,
 }: {
-  form: UseFormReturn<ContractFormData>;
+  form: UseFormReturn<any>;
+  amount?: number;
+  currency?: string;
+  date?: string;
 }) => {
-  const amount = form.watch('amount') || 0;
-  const currency = form.watch('currency') || 'MNT';
-  const contractDate = form.watch('date');
+  const amount = amountProp ?? (form.watch('amount') || 0);
+  const currency = currencyProp ?? (form.watch('currency') || 'MNT');
+  const contractDate = dateProp ?? form.watch('date');
   const paymentPlan = form.watch('paymentPlan');
   const dueDates = form.watch('paymentPlan.paymentDueDates') || [];
+  const savedAmounts = form.getValues('paymentPlan.installmentAmounts');
+  const [principalOverrides, setPrincipalOverrides] = useState<Record<number, number>>(() => {
+    if (!savedAmounts?.length) return {};
+    // 0 means "not set, use computed" — skip zeros
+    return Object.fromEntries(
+      (savedAmounts as number[])
+        .map((v, i) => [i, v] as [number, number])
+        .filter(([, v]) => v > 0),
+    );
+  });
+
+  const handlePrincipalCommit = useCallback((index: number, val: number) => {
+    setPrincipalOverrides((prev) => {
+      const installments = form.getValues('paymentPlan.installment') || 0;
+      const lastIndex = installments - 1;
+      // last row is always auto-computed — never store its override
+      if (index === lastIndex) return prev;
+      const next = { ...prev, [index]: val };
+      const amounts = Array.from({ length: installments }, (_, i) =>
+        i === lastIndex ? 0 : (next[i] ?? 0),
+      );
+      form.setValue('paymentPlan.installmentAmounts', amounts, { shouldDirty: true });
+      return next;
+    });
+  }, [form]);
 
   if (!paymentPlan) return null;
 
@@ -63,8 +129,25 @@ export const PaymentScheduleEditor = ({
     ? paymentPlan.completionPaymentAmount!
     : (priceAfterDiscount * completionPct) / 100;
   const principal = priceAfterDiscount - downAmount - barterValue - completionAmount;
+  const roundedAmount = paymentPlan.roundedInstallmentAmount || 0;
   const principalPerInstallment =
-    installmentCount > 0 ? principal / installmentCount : 0;
+    installmentCount > 0
+      ? roundedAmount > 0
+        ? roundedAmount
+        : principal / installmentCount
+      : 0;
+
+  // Pre-compute all effective principals so last row auto-adjusts
+  const effectivePrincipals = Array.from({ length: installmentCount }, (_, i) => {
+    const base = roundedAmount > 0 ? roundedAmount : principalPerInstallment;
+    return principalOverrides[i] ?? base;
+  });
+  if (installmentCount > 0) {
+    const sumOfOthers = effectivePrincipals.slice(0, -1).reduce((a, b) => a + b, 0);
+    const lastFallback = principal - sumOfOthers;
+    effectivePrincipals[installmentCount - 1] =
+      principalOverrides[installmentCount - 1] ?? lastFallback;
+  }
 
   const baseStart =
     parseDateLike(paymentPlan.firstPaymentDate) ||
@@ -87,11 +170,11 @@ export const PaymentScheduleEditor = ({
   };
 
   const setDueDate = (index: number, date: Date | undefined) => {
-    const next = Array.from(
-      { length: installmentCount },
-      (_, i) => dueDates[i] || '',
-    );
-    next[index] = date ? date.toISOString() : '';
+    const next = Array.from({ length: installmentCount }, (_, i) => {
+      if (i === index) return date?.toISOString() ?? autoDates[i]?.toISOString() ?? '';
+      const d = parseDateLike(dueDates[i]) || autoDates[i];
+      return d?.toISOString() ?? '';
+    });
     form.setValue('paymentPlan.paymentDueDates', next, { shouldDirty: true });
   };
 
@@ -101,10 +184,10 @@ export const PaymentScheduleEditor = ({
       return (principal * interestPct) / 100 / installmentCount;
     }
     if (interestType === 'REDUCING') {
-      const remaining = principal - principalPerInstallment * index;
+      const paidSoFar = effectivePrincipals.slice(0, index).reduce((a, b) => a + b, 0);
+      const remaining = principal - paidSoFar;
       return (remaining * interestPct) / 100 / ppy;
     }
-    // SIMPLE: annualized total interest spread equally
     return ((principal * interestPct) / 100) * (installmentCount / ppy) / installmentCount;
   };
 
@@ -215,7 +298,10 @@ export const PaymentScheduleEditor = ({
             {Array.from({ length: installmentCount }).map((_, index) => {
               const dueDate = getDueDate(index);
               const interest = getInterest(index);
-              const rowTotal = principalPerInstallment + interest;
+              const isLast = index === installmentCount - 1;
+              const installPrincipal = effectivePrincipals[index];
+              const rowTotal = installPrincipal + interest;
+              const isNegative = isLast && installPrincipal < 0;
               grandTotal += rowTotal;
               return (
                 <div
@@ -236,7 +322,20 @@ export const PaymentScheduleEditor = ({
                     />
                   </Cell>
                   <Cell>Progress payment</Cell>
-                  <Cell>{fmt(principalPerInstallment)}</Cell>
+                  {isLast ? (
+                    <Cell className={isNegative ? 'text-destructive font-medium' : ''}>
+                      {fmt(installPrincipal)}
+                      {isNegative && <span className="ml-1 text-xs">(over)</span>}
+                    </Cell>
+                  ) : (
+                    <Cell className="p-1">
+                      <PrincipalInput
+                        index={index}
+                        value={installPrincipal}
+                        onCommit={handlePrincipalCommit}
+                      />
+                    </Cell>
+                  )}
                   {hasInterest && <Cell>{fmt(interest)}</Cell>}
                   <Cell>{fmt(rowTotal)}</Cell>
                 </div>

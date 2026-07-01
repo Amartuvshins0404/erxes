@@ -103,22 +103,8 @@ export const permissionQueries = {
       };
     }
 
-    let groupIds = user.permissionGroupIds || [];
+    const groupIds = user.permissionGroupIds || [];
     const customPermissions = user.customPermissions || [];
-
-    if (groupIds.length === 0 && customPermissions.length === 0) {
-      const viewerGroupIds = allDefaultGroups
-        .filter((g) => g.id.endsWith(':viewer'))
-        .map((g) => g.id);
-
-      if (viewerGroupIds.length > 0) {
-        await models.Users.updateOne(
-          { _id: user._id },
-          { $set: { permissionGroupIds: viewerGroupIds } },
-        );
-        groupIds = viewerGroupIds;
-      }
-    }
 
     const permMap = new Map();
 

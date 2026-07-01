@@ -44,6 +44,8 @@ export default {
       statusType: best.stage.type || null,
       statusLabel: best.stage.name || null,
       statusColor: best.stage.color || null,
+      partyId: best.contract.party?.id || null,
+      partyType: best.contract.party?.type || null,
     };
   },
 

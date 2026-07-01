@@ -1,6 +1,7 @@
 import { IMastraChatAttachment } from '@/session/@types/session';
-import { fetchAttachmentBuffer } from './storage';
+import { fetchAttachmentBuffer, fetchRemoteFile, isFullUrl } from './storage';
 import { isImageType } from './extract';
+import { prepareImageForModel } from './imagePrep';
 
 // ---------------------------------------------------------------------------
 // Turns a user message + its attachments into what the model actually sees:
@@ -70,6 +71,10 @@ type ContentPart =
  * are no usable images, or an AI-SDK content-part array with the images
  * inlined as data URLs. Image fetch failures are non-fatal — the file stays
  * listed in the manifest, the turn proceeds.
+ *
+ * Each image is downscaled (prepareImageForModel) before inlining so its base64
+ * fits the provider's request-size budget — a full-resolution photo otherwise
+ * overflows small limits (e.g. Kimi's 2MB) and fails the whole turn.
  */
 export async function buildChatUserContent(params: {
   message: string;
@@ -90,22 +95,31 @@ export async function buildChatUserContent(params: {
 
   for (const img of images) {
     try {
-      const { buffer, contentType } = await fetchAttachmentBuffer({
-        erxesApiUrl,
-        keyOrUrl: img.url,
-        name: img.name,
-      });
+      // A storage key is read through core's internal /read-file; a full URL
+      // (FILE_SYSTEM_PUBLIC, or a user-crafted message) is SSRF-guarded.
+      const { buffer, contentType } = isFullUrl(img.url)
+        ? await fetchRemoteFile({ url: img.url, name: img.name })
+        : await fetchAttachmentBuffer({
+            erxesApiUrl,
+            key: img.url,
+            name: img.name,
+          });
       if (buffer.length > MAX_IMAGE_BYTES) continue;
 
-      const mime = img.type?.startsWith('image/')
+      const sourceMime = img.type?.startsWith('image/')
         ? img.type
         : contentType.startsWith('image/')
           ? contentType
           : 'image/png';
 
+      // Downscale large images so the inlined base64 fits the request budget.
+      const prepared = await prepareImageForModel(buffer, sourceMime);
+      if (!prepared) continue; // too large to shrink (rare format) — skip
+      const mime = prepared.mediaType;
+
       parts.push({
         type: 'image',
-        image: `data:${mime};base64,${buffer.toString('base64')}`,
+        image: `data:${mime};base64,${prepared.data}`,
         // AI SDK v4 reads mimeType, v5 reads mediaType — set both.
         mimeType: mime,
         mediaType: mime,

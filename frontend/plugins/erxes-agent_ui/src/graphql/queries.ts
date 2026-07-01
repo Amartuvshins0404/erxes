@@ -1,25 +1,75 @@
 import { gql } from '@apollo/client';
 
+export const AGENT_FIELDS = gql`
+  fragment AgentFields on MastraAgent {
+    _id
+    name
+    agentId
+    description
+    instructions
+    provider
+    model
+    toolPolicy
+    allowedTools
+    destructiveOps
+    memoryEnabled
+    debug
+    maxSteps
+    temperature
+    isEnabled
+    visibility
+    teamId
+    departmentId
+    unitId
+    createdBy
+    isOwnAgent
+    createdAt
+    updatedAt
+  }
+`;
+
+export const WORKFLOW_FIELDS = gql`
+  fragment WorkflowFields on MastraWorkflow {
+    _id
+    name
+    description
+    definition
+    version
+    isEnabled
+    createdAt
+    updatedAt
+  }
+`;
+
+export const SCHEDULE_FIELDS = gql`
+  fragment ScheduleFields on MastraSchedule {
+    _id
+    name
+    description
+    agentId
+    cron
+    timezone
+    prompt
+    isEnabled
+    threadId
+    lastRunAt
+    lastStatus
+    lastError
+    lastReply
+    lastDurationMs
+    runCount
+    createdAt
+    updatedAt
+  }
+`;
+
 export const MASTRA_AGENTS = gql`
   query MastraAgents {
     mastraAgents {
-      _id
-      name
-      agentId
-      description
-      instructions
-      provider
-      model
-      toolPolicy
-      allowedTools
-      memoryEnabled
-      maxSteps
-      temperature
-      isEnabled
-      createdAt
-      updatedAt
+      ...AgentFields
     }
   }
+  ${AGENT_FIELDS}
 `;
 
 export const MASTRA_AGENTS_MAIN = gql`
@@ -39,6 +89,12 @@ export const MASTRA_AGENTS_MAIN = gql`
         toolPolicy
         allowedTools
         isEnabled
+        visibility
+        teamId
+        departmentId
+        unitId
+        createdBy
+        isOwnAgent
         createdAt
       }
       totalCount
@@ -49,44 +105,23 @@ export const MASTRA_AGENTS_MAIN = gql`
 export const MASTRA_AGENT = gql`
   query MastraAgent($_id: String!) {
     mastraAgent(_id: $_id) {
-      _id
-      name
-      agentId
-      description
-      instructions
-      provider
-      model
-      toolPolicy
-      allowedTools
-      memoryEnabled
-      maxSteps
-      temperature
-      isEnabled
-      createdAt
-      updatedAt
+      ...AgentFields
     }
   }
-`;
-
-export const MASTRA_AGENT_CHAT = gql`
-  query MastraAgentChat(
-    $agentId: String!
-    $message: String!
-    $threadId: String
-  ) {
-    mastraAgentChat(agentId: $agentId, message: $message, threadId: $threadId)
-  }
+  ${AGENT_FIELDS}
 `;
 
 export const MASTRA_THREADS = gql`
-  query MastraThreads($agentId: String!) {
-    mastraThreads(agentId: $agentId) {
-      _id
-      threadId
-      title
-      messageCount
-      lastMessageAt
-      createdAt
+  query MastraThreads($agentId: String!, $page: Int, $perPage: Int) {
+    mastraThreads(agentId: $agentId, page: $page, perPage: $perPage) {
+      list {
+        _id
+        threadId
+        title
+        lastMessageAt
+        createdAt
+      }
+      totalCount
     }
   }
 `;
@@ -97,10 +132,17 @@ export const MASTRA_THREAD_MESSAGES = gql`
       _id
       role
       content
+      parts
       meta
       attachments
       createdAt
     }
+  }
+`;
+
+export const MASTRA_THREAD_ARTIFACTS = gql`
+  query MastraThreadArtifacts($threadId: String!) {
+    mastraThreadArtifacts(threadId: $threadId)
   }
 `;
 
@@ -110,6 +152,41 @@ export const MASTRA_ATTACHMENT_STORAGE_STATUS = gql`
       configured
       serviceType
       enabled
+    }
+  }
+`;
+
+export const MASTRA_VOICE_STATUS = gql`
+  query MastraVoiceStatus {
+    mastraVoiceStatus {
+      enabled
+    }
+  }
+`;
+
+export const MASTRA_VOICE_CONFIG = gql`
+  query MastraVoiceConfig {
+    mastraVoiceConfig {
+      enabled
+      sttEnabled
+      ttsEnabled
+      sttConfigured
+      ttsConfigured
+      sttSource
+      ttsSource
+      ttsVoice
+      ttsSampleRate
+      isEnabled
+    }
+  }
+`;
+
+export const MASTRA_VOICE_CATALOG = gql`
+  query MastraVoiceCatalog {
+    mastraVoiceCatalog {
+      id
+      label
+      gender
     }
   }
 `;
@@ -134,14 +211,15 @@ export const MASTRA_PROVIDERS = gql`
       _id
       provider
       label
-      apiKey
+      hasApiKey
+      apiKeyHint
       baseUrl
       isDefault
       isEnabled
       isOpenAICompatible
       modelsEndpoint
       envKey
-      headers
+      headerKeys
       createdAt
     }
   }
@@ -189,6 +267,7 @@ export const MASTRA_SETTINGS = gql`
       erxesApiToken
       defaultAgentId
       attachmentsEnabled
+      defaultAgentQuota
       attachmentStorage {
         configured
         serviceType
@@ -217,6 +296,43 @@ export const MASTRA_SETTINGS = gql`
         lastError
       }
     }
+  }
+`;
+
+export const MASTRA_MY_AGENT_QUOTA_STATUS = gql`
+  query MastraMyAgentQuotaStatus {
+    mastraMyAgentQuotaStatus {
+      count
+      quota
+      atQuota
+    }
+  }
+`;
+
+export const MASTRA_USER_AGENT_QUOTA = gql`
+  query MastraUserAgentQuota($userId: String!) {
+    mastraUserAgentQuota(userId: $userId) {
+      userId
+      agentQuota
+    }
+  }
+`;
+
+export const AGENT_FORM_BRANCHES = gql`
+  query AgentFormBranches {
+    branches { _id title }
+  }
+`;
+
+export const AGENT_FORM_DEPARTMENTS = gql`
+  query AgentFormDepartments {
+    departments { _id title }
+  }
+`;
+
+export const AGENT_FORM_UNITS = gql`
+  query AgentFormUnits {
+    units { _id title departmentId }
   }
 `;
 
@@ -285,80 +401,38 @@ export const MASTRA_MESSAGE_FEEDBACKS = gql`
 export const MASTRA_WORKFLOWS = gql`
   query MastraWorkflows {
     mastraWorkflows {
-      _id
-      name
-      description
-      definition
-      version
-      isEnabled
-      createdAt
-      updatedAt
+      ...WorkflowFields
     }
   }
+  ${WORKFLOW_FIELDS}
 `;
 
 export const MASTRA_WORKFLOW = gql`
   query MastraWorkflow($_id: String!) {
     mastraWorkflow(_id: $_id) {
-      _id
-      name
-      description
-      definition
-      version
-      isEnabled
+      ...WorkflowFields
       createdByUserId
-      createdAt
-      updatedAt
     }
   }
+  ${WORKFLOW_FIELDS}
 `;
 
 export const MASTRA_SCHEDULES = gql`
   query MastraSchedules {
     mastraSchedules {
-      _id
-      name
-      description
-      agentId
-      cron
-      timezone
-      prompt
-      isEnabled
-      threadId
-      lastRunAt
-      lastStatus
-      lastError
-      lastReply
-      lastDurationMs
-      runCount
-      createdAt
-      updatedAt
+      ...ScheduleFields
     }
   }
+  ${SCHEDULE_FIELDS}
 `;
 
 export const MASTRA_SCHEDULE = gql`
   query MastraSchedule($_id: String!) {
     mastraSchedule(_id: $_id) {
-      _id
-      name
-      description
-      agentId
-      cron
-      timezone
-      prompt
-      isEnabled
-      threadId
-      lastRunAt
-      lastStatus
-      lastError
-      lastReply
-      lastDurationMs
-      runCount
-      createdAt
-      updatedAt
+      ...ScheduleFields
     }
   }
+  ${SCHEDULE_FIELDS}
 `;
 
 export const MASTRA_WORKFLOW_RUNS = gql`

@@ -1,4 +1,5 @@
 import { opptysColumns } from '@/oppty/components/OpptysColumn';
+import { IOppty } from '@/oppty/types/opptyTypes';
 import { isUndefinedOrNull, RecordTable } from 'erxes-ui';
 import { useOpptys } from '@/oppty/hooks/useGetOpptys';
 import { OPPTYS_CURSOR_SESSION_KEY } from '@/oppty/constants/constants';
@@ -9,12 +10,18 @@ import { useParams } from 'react-router-dom';
 import { useEffect } from 'react';
 import { opptyTotalCountAtom } from '@/oppty/states/opptysTotalCountState';
 
-export const OpptysRecordTable = () => {
-  const { projectId } = useParams<{ projectId?: string }>();
+export const OpptysRecordTable = ({
+  projectId: projectIdProp,
+  unitId,
+}: { projectId?: string; unitId?: string } = {}) => {
+  const { projectId: projectIdParam } = useParams<{ projectId?: string }>();
+  const projectId = projectIdProp || projectIdParam || '';
   const setOpptyTotalCount = useSetAtom(opptyTotalCountAtom);
 
-  const { opptys, handleFetchMore, pageInfo, loading, totalCount } =
-    useOpptys(projectId || '');
+  const { opptys, loading, pageInfo, totalCount, handleFetchMore } = useOpptys(
+    projectId,
+    unitId ? { variables: { unit: unitId } } : undefined,
+  );
 
   const { hasPreviousPage, hasNextPage } = pageInfo || {};
 

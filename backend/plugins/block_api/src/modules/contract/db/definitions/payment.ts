@@ -19,7 +19,7 @@ export const contractPaymentSchema = new Schema(
     currency: { type: String, default: 'MNT' },
     status: {
       type: String,
-      enum: ['unpaid', 'partial', 'paid'],
+      enum: ['unpaid', 'partial', 'paid', 'cancelled'],
       default: 'unpaid',
       index: true,
     },

@@ -23,6 +23,9 @@ const offerPartySchema = new Schema(
 const offerPaymentPlanSchema = new Schema(
   {
     downPaymentPercentage: { type: Number },
+    downPaymentAmount: { type: Number },
+    barterPercentage: { type: Number },
+    barterAmount: { type: Number },
     description: { type: String },
     interestPercentage: { type: Number },
     interestType: {
@@ -30,6 +33,7 @@ const offerPaymentPlanSchema = new Schema(
       enum: Object.values(BlockProjectPaymentPlanInterestType),
     },
     completionPaymentPercentage: { type: Number },
+    completionPaymentAmount: { type: Number },
     discountPercentage: { type: Number },
     installment: { type: Number },
     frequency: {
@@ -38,10 +42,15 @@ const offerPaymentPlanSchema = new Schema(
     },
     penaltyPercentage: { type: Number },
     vatIncluded: { type: Boolean },
+    roundedInstallmentAmount: { type: Number },
+    installmentAmounts: { type: [Number] },
     type: { type: String, enum: Object.values(BlockProjectPaymentPlanType) },
     paymentDates: { type: [Number] },
+    paymentDueDates: { type: [Date] },
     firstPaymentDate: { type: Date },
+    downPaymentDate: { type: Date },
     completionPaymentDate: { type: Date },
+    completionPaymentDateLabel: { type: String },
   },
   { _id: false },
 );

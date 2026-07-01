@@ -17,6 +17,8 @@ export interface IMastraSettings {
   // effective when that storage is actually configured.
   attachmentsEnabled?: boolean;
   knowledgeSyncStatus?: IKnowledgeSyncStatus;
+  // Per-user agent creation cap. 0 = unlimited. Admins are always exempt.
+  defaultAgentQuota?: number;
 }
 
 export interface IMastraSettingsDocument extends IMastraSettings, Document {

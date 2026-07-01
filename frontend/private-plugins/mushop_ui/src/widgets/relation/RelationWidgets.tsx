@@ -1,6 +1,6 @@
 import { Suspense } from 'react';
 import type { IRelationWidgetProps } from 'ui-modules';
-import { SubscriptionPlanWidget } from './SubscriptionPlanWidget';
+import { MembershipPlanWidget } from './MembershipPlanWidget';
 
 export const RelationWidgets = ({
   module,
@@ -8,8 +8,8 @@ export const RelationWidgets = ({
 }: IRelationWidgetProps) => {
   return (
     <Suspense>
-      {module === 'subscription_plan' && (
-        <SubscriptionPlanWidget contentId={contentId} />
+      {module === 'membership_plan' && (
+        <MembershipPlanWidget contentId={contentId} />
       )}
     </Suspense>
   );

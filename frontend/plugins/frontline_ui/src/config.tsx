@@ -4,7 +4,7 @@ import {
   IconTicket,
   IconBook,
 } from '@tabler/icons-react';
-import { IUIConfig } from 'erxes-ui';
+import { IUIConfig, TPropertyInputProps } from 'erxes-ui';
 import { lazy, Suspense } from 'react';
 
 const FrontlineNavigation = lazy(() =>
@@ -22,6 +22,14 @@ const FrontlineSubGroups = lazy(() =>
 const FrontlineSettingsNavigation = lazy(() =>
   import('./modules/FrontlineSettingsNavigation').then((module) => ({
     default: module.FrontlineSettingsNavigation,
+  })),
+);
+
+const TicketStatusPropertyInput = lazy(() =>
+  import(
+    './modules/ticket/components/ticket-selects/TicketStatusPropertyInput'
+  ).then((module) => ({
+    default: module.TicketStatusPropertyInput,
   })),
 );
 
@@ -59,6 +67,13 @@ export const CONFIG: IUIConfig = {
         icon: IconTicket,
       },
     ],
+    propertyInputs: {
+      ticketStatus: (props: TPropertyInputProps) => (
+        <Suspense fallback={<div />}>
+          <TicketStatusPropertyInput {...props} />
+        </Suspense>
+      ),
+    },
   },
   modules: [
     {

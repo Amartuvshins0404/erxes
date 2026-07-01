@@ -148,7 +148,7 @@ export const loadAgentClass = (_models: IModels) => {
       const updated = await _models.MastraAgent.findOneAndUpdate(
         filter,
         { $set: doc },
-        { new: true },
+        { new: true, runValidators: true },
       );
       if (!updated) throw new ExpectedError('Agent not found');
       invalidateAgentCache(_id);

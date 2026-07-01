@@ -2,6 +2,7 @@ import { ExpectedError } from 'erxes-api-shared/utils';
 import { IContext } from '~/connectionResolvers';
 import { IMastraAgent } from '@/agent/@types/agent';
 import { isAgentAdmin, getAgentQuotaStatus } from '@/agent/utils';
+import { toUserFacingAgentError } from './agentErrors';
 
 /**
  * Authorize a requested `ownerUserId` value. The owner is the identity
@@ -54,7 +55,11 @@ export const agentMutations = {
       }
     }
 
-    return models.MastraAgent.createAgent({ ...doc, createdBy: user._id });
+    try {
+      return await models.MastraAgent.createAgent({ ...doc, createdBy: user._id });
+    } catch (error) {
+      throw toUserFacingAgentError(error);
+    }
   },
 
   mastraAgentUpdate: async (
@@ -70,7 +75,11 @@ export const agentMutations = {
     // name someone other than themselves (the createdBy filter scopes non-owners
     // to their own agents, but the owner VALUE is otherwise unconstrained).
     assertOwnerAssignable(doc.ownerUserId, user._id, Boolean(user.isOwner));
-    return models.MastraAgent.updateAgent(_id, doc, admin ? undefined : user._id);
+    try {
+      return await models.MastraAgent.updateAgent(_id, doc, admin ? undefined : user._id);
+    } catch (error) {
+      throw toUserFacingAgentError(error);
+    }
   },
 
   mastraAgentRemove: async (

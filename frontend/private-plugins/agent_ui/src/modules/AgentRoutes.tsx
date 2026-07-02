@@ -1,5 +1,12 @@
 import { lazy, Suspense } from 'react';
 import { Navigate, Route, Routes } from 'react-router';
+import { LOCKED_MODULES } from '~/modules/locked/lockedModules';
+
+const LockedModulePage = lazy(() =>
+  import('~/modules/locked/LockedModulePage').then((module) => ({
+    default: module.LockedModulePage,
+  })),
+);
 
 const AssistantIndexPage = lazy(() =>
   import('~/pages/assistant/IndexPage').then((module) => ({
@@ -52,6 +59,13 @@ const AgentMain = () => {
         <Route path="agents/:id" element={<OpencodeIndexPage />} />
         <Route path="templates" element={<AgentTemplatesIndexPage />} />
         <Route path="templates/:id" element={<AgentTemplateDetailPage />} />
+        {LOCKED_MODULES.map((module) => (
+          <Route
+            key={module.path}
+            path={module.path}
+            element={<LockedModulePage module={module} />}
+          />
+        ))}
       </Routes>
     </Suspense>
   );

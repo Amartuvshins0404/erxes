@@ -154,6 +154,7 @@ const proxyOrder = async (
 const proxyInvoiceCreate = async (
   supplier: ForwardSupplier,
   args: Record<string, any>,
+  customerInfo?: CustomerInfo,
 ): Promise<BeforeResolverResult> => {
   if (!supplier.posToken || !supplier.paymentId) {
     return {
@@ -178,9 +179,10 @@ const proxyInvoiceCreate = async (
       customer: {
         id: input.customerId,
         type: input.customerType,
-        phone: input.phone,
-        email: input.email,
+        phone: input.phone || customerInfo?.phone,
+        email: input.email || customerInfo?.email,
       },
+      customerInfo,
     },
   });
 
@@ -202,10 +204,10 @@ const proxyInvoiceCreate = async (
       phone: input.phone,
       email: input.email,
       description: input.description,
-      status: res.transaction?.status || 'pending',
+      status: res.invoice.status || 'pending',
       customerType: input.customerType,
-      customerId: input.customerId,
-      contentType: 'pos:orders',
+      customerId: res.customerId ?? res.invoice.customerId ?? input.customerId,
+      contentType: res.invoice.contentType ?? 'sales:pos:orders',
       contentTypeId: input.contentTypeId,
       createdAt: res.invoice.createdAt,
       data: input.data ?? null,
@@ -299,7 +301,8 @@ const proxyOrderAction = async (
 const proxyCurrentOrder = (
   supplier: ForwardSupplier,
   args: Record<string, any>,
-) => proxyOrderAction(supplier, 'orders-list', { params: args });
+  customerInfo?: CustomerInfo,
+) => proxyOrderAction(supplier, 'orders-list', { params: args, customerInfo });
 
 const orderTime = (order: any): number => {
   const t = order?.createdAt ?? order?.modifiedAt;
@@ -311,6 +314,7 @@ const aggregateFullOrders = async (
   subdomain: string,
   models: IModels,
   args: Record<string, any>,
+  customerInfo?: CustomerInfo,
   mushopPosToken?: string,
 ): Promise<BeforeResolverResult> => {
   const { page, perPage, ...params } = args;
@@ -336,7 +340,7 @@ const aggregateFullOrders = async (
       const res = await sendSupplierMessage<{ result?: unknown }>({
         subdomain: supplier.subdomain,
         action: 'orders-list',
-        payload: { posToken: supplier.posToken, params },
+        payload: { posToken: supplier.posToken, params, customerInfo },
       });
       return Array.isArray(res?.result) ? (res?.result as any[]) : [];
     });
@@ -398,10 +402,12 @@ const getMushopPosToken = (
 const proxyOrderDetail = (
   supplier: ForwardSupplier,
   args: Record<string, any>,
+  customerInfo?: CustomerInfo,
 ) =>
   proxyOrderAction(supplier, 'order-detail', {
     _id: args._id,
     customerId: args.customerId,
+    customerInfo,
   });
 
 const proxyOrdersEdit = async (
@@ -467,8 +473,19 @@ export const supplierBeforeResolvers: BeforeResolversConfig = {
 
     if (resolver === 'cpFullOrders') {
       const mushopPosToken = getMushopPosToken(headers);
+      const customerInfo = await buildCustomerInfo(
+        subdomain,
+        customerId,
+        cpUser,
+      );
 
-      return aggregateFullOrders(subdomain, models, args, mushopPosToken);
+      return aggregateFullOrders(
+        subdomain,
+        models,
+        args,
+        customerInfo,
+        mushopPosToken,
+      );
     }
 
     const supplierId = getSupplierId(headers);
@@ -495,8 +512,16 @@ export const supplierBeforeResolvers: BeforeResolversConfig = {
 
         return proxyOrder(models, supplier, args, customerInfo);
       }
-      case 'invoiceCreate':
-        return proxyInvoiceCreate(supplier, args);
+      case 'invoiceCreate': {
+        const input = (args.input || {}) as Record<string, any>;
+        const customerInfo = await buildCustomerInfo(
+          subdomain,
+          input.customerId || customerId,
+          cpUser,
+        );
+
+        return proxyInvoiceCreate(supplier, args, customerInfo);
+      }
       case 'paymentTransactionsAdd':
         return proxyTransactionAdd(supplier, args);
       case 'invoicesCheck':
@@ -505,10 +530,24 @@ export const supplierBeforeResolvers: BeforeResolversConfig = {
         return proxyOrdersEdit(models, supplier, args);
       case 'cpOrdersCancel':
         return proxyOrdersCancel(supplier, args);
-      case 'cpCurrentOrder':
-        return proxyCurrentOrder(supplier, args);
-      case 'cpOrderDetail':
-        return proxyOrderDetail(supplier, args);
+      case 'cpCurrentOrder': {
+        const customerInfo = await buildCustomerInfo(
+          subdomain,
+          customerId,
+          cpUser,
+        );
+
+        return proxyCurrentOrder(supplier, args, customerInfo);
+      }
+      case 'cpOrderDetail': {
+        const customerInfo = await buildCustomerInfo(
+          subdomain,
+          args.customerId || customerId,
+          cpUser,
+        );
+
+        return proxyOrderDetail(supplier, args, customerInfo);
+      }
       default:
         return args;
     }

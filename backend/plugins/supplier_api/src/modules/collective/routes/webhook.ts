@@ -1,6 +1,11 @@
 import crypto from 'crypto';
 import { Router, Request, Response } from 'express';
-import { isDev, sendTRPCMessage } from 'erxes-api-shared/utils';
+import {
+  isDev,
+  sendTRPCMessage,
+  sendWorkerQueue,
+} from 'erxes-api-shared/utils';
+import { splitType } from 'erxes-api-shared/core-modules';
 import { isValid } from '@/collective/utils/isCollective';
 import { generateModels } from '~/connectionResolvers';
 
@@ -760,7 +765,7 @@ interface CustomerInfo {
   lastName?: string;
 }
 
-const upsertLocalCustomer = async (
+const findLocalCustomerId = async (
   subdomain: string,
   info?: CustomerInfo,
 ): Promise<string | undefined> => {
@@ -768,10 +773,6 @@ const upsertLocalCustomer = async (
     return undefined;
   }
 
-  // Find the tenant-local customer the way frontline does: core's canonical
-  // getWidgetCustomer finder, matched by the global shopper id (stored in
-  // `code`), then email, then phone. The global id is the stable key; phone/
-  // email are fallbacks so a returning shopper reuses the same customer.
   const existing = (await sendTRPCMessage({
     subdomain,
     pluginName: 'core',
@@ -786,8 +787,19 @@ const upsertLocalCustomer = async (
     defaultValue: null,
   })) as { _id?: string } | null;
 
-  // Only send fields we actually have, so an update never clobbers existing
-  // contact info with blanks.
+  return existing?._id;
+};
+
+const upsertLocalCustomer = async (
+  subdomain: string,
+  info?: CustomerInfo,
+): Promise<string | undefined> => {
+  if (!info || (!info.sourceUserId && !info.phone && !info.email)) {
+    return undefined;
+  }
+
+  const existingId = await findLocalCustomerId(subdomain, info);
+
   const doc: Record<string, any> = { state: 'customer' };
   if (info.sourceUserId) doc.code = info.sourceUserId;
   if (info.phone) doc.primaryPhone = info.phone;
@@ -795,16 +807,14 @@ const upsertLocalCustomer = async (
   if (info.firstName) doc.firstName = info.firstName;
   if (info.lastName) doc.lastName = info.lastName;
 
-  // Update-or-create, mirroring frontline's getWidgetCustomer → update/create
-  // shape, but with the plain customer mutations (no messenger session baggage).
-  const saved = existing?._id
+  const saved = existingId
     ? ((await sendTRPCMessage({
         subdomain,
         pluginName: 'core',
         method: 'mutation',
         module: 'customers',
         action: 'updateCustomer',
-        input: { _id: existing._id, doc },
+        input: { _id: existingId, doc },
         defaultValue: null,
       })) as { _id?: string } | null)
     : ((await sendTRPCMessage({
@@ -817,7 +827,7 @@ const upsertLocalCustomer = async (
         defaultValue: null,
       })) as { _id?: string } | null);
 
-  return saved?._id ?? existing?._id;
+  return saved?._id ?? existingId;
 };
 
 router.post('/order', async (req: Request, res: Response) => {
@@ -883,6 +893,7 @@ router.post('/invoice', async (req: Request, res: Response) => {
       amount,
       currency,
       customer,
+      customerInfo,
       description,
     } = payload || {};
 
@@ -904,6 +915,14 @@ router.post('/invoice', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'payload.amount is required' });
     }
 
+    let customerId: string | undefined;
+    
+    try {
+      customerId = await upsertLocalCustomer(subdomain, customerInfo);
+    } catch (e: any) {
+      console.error('mushop/invoice: customer upsert failed:', e.message);
+    }
+
     const invoice = (await sendTRPCMessage({
       subdomain,
       pluginName: 'payment',
@@ -916,8 +935,8 @@ router.post('/invoice', async (req: Request, res: Response) => {
         phone: customer?.phone || '',
         email: customer?.email || '',
         description: description || '',
-        customerId: customer?.id,
-        customerType: customer?.type || 'customer',
+        customerId: customerId,
+        customerType: 'customer',
         contentType: 'pos:orders',
         contentTypeId,
         paymentIds: [paymentId],
@@ -947,7 +966,8 @@ router.post('/invoice', async (req: Request, res: Response) => {
     return res.status(200).json({
       success: true,
       invoice,
-      transactions
+      transactions,
+      customerId: customerId,
     });
   } catch (e: any) {
     console.error('mushop/invoice webhook failed:', e);

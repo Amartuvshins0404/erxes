@@ -42,21 +42,38 @@ export const AutomationBuilder = ({ detail }: AutomationBuilderProps) => {
 
   const form = useForm<TAutomationBuilderForm>({
     resolver: zodResolver(automationBuilderFormSchema),
-    defaultValues: deepCleanNulls(detail),
+    defaultValues: {
+      edgeType: 'default',
+      flowDirection: 'horizontal',
+      triggers: [],
+      actions: [],
+      workflows: [],
+      ...deepCleanNulls(detail),
+    },
   });
 
   useEffect(() => {
-    if (activeTab !== queryParams.activeTab) {
-      setActiveTab(queryParams.activeTab || AutomationBuilderTabsType.Builder);
+    const nextActiveTab =
+      queryParams.activeTab || AutomationBuilderTabsType.Builder;
+
+    if (activeTab !== nextActiveTab) {
+      setActiveTab(nextActiveTab);
     }
 
     if (queryParams.activeNodeId && !isOpenSideBar) {
       setOpenSidebar(true);
     }
-  }, [queryParams?.activeTab, queryParams?.activeNodeId]);
+  }, [
+    activeTab,
+    isOpenSideBar,
+    queryParams.activeNodeId,
+    queryParams.activeTab,
+    setActiveTab,
+    setOpenSidebar,
+  ]);
 
   return (
-    <AutomationProvider>
+    <AutomationProvider detail={detail}>
       <ReactFlowProvider>
         <AutomationBuilderDnDProvider>
           <FormProvider {...form}>

@@ -17,6 +17,13 @@ import {
   verifyManagedRuntime,
 } from '~/modules/agent/utils';
 import {
+  buildPluginInstallIdentifier,
+  assertSafeRuntimeIdentifier,
+  assertSafeRuntimeVersion,
+  callManagedRuntimeOperation,
+  mapRuntimePayload,
+} from '~/modules/agent/runtimeClient';
+import {
   createOrUpdateDiscordBinding,
   deleteDiscordBinding,
   getDiscordBinding,
@@ -108,12 +115,20 @@ const runManagedDeployment = async ({
   const description = input.description?.trim() || identifier.description || '';
   const systemPrompt = input.systemPrompt?.trim() || description || undefined;
 
+  // Pre-compute the K8s namespace name so frontend polls during deployment
+  // hit the right endpoint. Format mirrors the deployer's sanitizeId logic.
+  const sanitizeId = (v: string) =>
+    v.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/^-+|-+$/g, '').slice(0, 20);
+  const expectedServerName = `assistant-${sanitizeId(subdomain)}-${sanitizeId(identifier.slug)}`;
+
   try {
     await models.AgentServer.findOneAndUpdate(
       { _id: serverMongoId },
       {
         $set: {
           status: SERVER_STATUSES.PENDING,
+          name: expectedServerName,
+          url: `https://${expectedServerName}.assistant.erxes.io`,
           ...provisioningSet('server_lookup'),
           updatedAt: new Date(),
         },
@@ -123,7 +138,7 @@ const runManagedDeployment = async ({
     const server = await deployManagedServer({
       orgId: subdomain,
       assistantId: identifier.slug,
-      serverName: identifier.slug,
+      serverName: expectedServerName,
       provider: input.provider?.trim() || 'kimi',
       kimiApiKey: input.kimiApiKey.trim(),
       description,
@@ -240,7 +255,9 @@ export const agentMutations = {
         url: server.serverUrl,
         token: server.gatewayToken,
         serverId: server.serverId,
-        status: SERVER_STATUSES.DEPLOYING,
+        status: server.status === 'approved'
+          ? SERVER_STATUSES.APPROVED
+          : SERVER_STATUSES.DEPLOYING,
       });
     } catch (error) {
       await models.AgentServer.deleteOne({ identifierId });
@@ -547,11 +564,16 @@ export const agentMutations = {
       throw new Error('Agent server not found');
     }
 
-    // Fire-and-forget — agent registration happens in the background
-    addAgent(server.name, input).catch((error) => {
+    // Await registration so the mutation reflects the real outcome — a
+    // fire-and-forget here reported success even when the deployer failed,
+    // which is why creation looked flaky ("created" but no agent).
+    try {
+      await addAgent(server.name, input);
+    } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.error('addAgent failed:', message);
-    });
+      throw new Error(`Failed to create agent: ${message}`);
+    }
 
     return true;
   },
@@ -721,6 +743,9 @@ export const agentMutations = {
       discordGuildId: installation.discordGuildId,
       discordChannelId,
       openclawUrl: getRuntimeUrl(server),
+      // Default new channel bindings to respond on every message, not just
+      // slash commands.
+      responseMode: 'all_messages',
     });
 
     return binding;
@@ -826,5 +851,154 @@ export const agentMutations = {
       const message = error instanceof Error ? error.message : String(error);
       throw new Error(message);
     }
+  },
+
+  agentRuntimeInstallSkill: async (
+    _root: undefined,
+    {
+      agentId,
+      slug,
+      version,
+    }: { agentId: string; slug: string; version?: string },
+    { models, subdomain, user }: IContext,
+  ) => {
+    const safeSlug = assertSafeRuntimeIdentifier(slug, 'slug');
+    const safeVersion = assertSafeRuntimeVersion(version);
+
+    return callManagedRuntimeOperation({
+      models,
+      user,
+      subdomain,
+      agentId,
+      operation: 'agentRuntimeInstallSkill',
+      identifier: safeSlug,
+      requireAdmin: true,
+      request: {
+        method: 'POST',
+        path: '/openclaw/skills/install',
+        body: {
+          slug: safeSlug,
+          ...(safeVersion ? { version: safeVersion } : {}),
+        },
+      },
+      message: 'Managed runtime skill install completed',
+      setupSync: { action: 'install', type: 'skill' },
+      mapResult: (payload) =>
+        mapRuntimePayload('Managed runtime skill install completed', payload, {
+          diagnostics:
+            payload.verification && typeof payload.verification === 'object'
+              ? (payload.verification as Record<string, unknown>)
+              : payload,
+          records: payload,
+        }),
+    });
+  },
+
+  agentRuntimeInstallPlugin: async (
+    _root: undefined,
+    {
+      agentId,
+      plugin,
+      version,
+    }: { agentId: string; plugin: string; version?: string },
+    { models, subdomain, user }: IContext,
+  ) => {
+    const installPlugin = buildPluginInstallIdentifier(plugin, version);
+
+    return callManagedRuntimeOperation({
+      models,
+      user,
+      subdomain,
+      agentId,
+      operation: 'agentRuntimeInstallPlugin',
+      identifier: installPlugin,
+      requireAdmin: true,
+      request: {
+        method: 'POST',
+        path: '/openclaw/plugins/install',
+        body: {
+          plugin: installPlugin,
+        },
+      },
+      message: 'Managed runtime plugin install completed',
+      setupSync: { action: 'install', type: 'plugin' },
+      mapResult: (payload) =>
+        mapRuntimePayload('Managed runtime plugin install completed', payload, {
+          diagnostics:
+            payload.verification && typeof payload.verification === 'object'
+              ? (payload.verification as Record<string, unknown>)
+              : payload,
+          records: payload,
+        }),
+    });
+  },
+
+  agentRuntimeEnablePlugin: async (
+    _root: undefined,
+    { agentId, pluginId }: { agentId: string; pluginId: string },
+    { models, subdomain, user }: IContext,
+  ) => {
+    const safePluginId = assertSafeRuntimeIdentifier(pluginId, 'pluginId');
+
+    return callManagedRuntimeOperation({
+      models,
+      user,
+      subdomain,
+      agentId,
+      operation: 'agentRuntimeEnablePlugin',
+      identifier: safePluginId,
+      requireAdmin: true,
+      request: {
+        method: 'POST',
+        path: '/openclaw/plugins/enable',
+        body: {
+          plugin: safePluginId,
+        },
+      },
+      message: 'Managed runtime plugin enable completed',
+      mapResult: (payload) =>
+        mapRuntimePayload('Managed runtime plugin enable completed', payload, {
+          diagnostics:
+            payload.verification && typeof payload.verification === 'object'
+              ? (payload.verification as Record<string, unknown>)
+              : payload,
+          records: payload,
+        }),
+    });
+  },
+
+  agentRuntimeDisablePlugin: async (
+    _root: undefined,
+    { agentId, pluginId }: { agentId: string; pluginId: string },
+    { models, subdomain, user }: IContext,
+  ) => {
+    const safePluginId = assertSafeRuntimeIdentifier(pluginId, 'pluginId');
+
+    return callManagedRuntimeOperation({
+      models,
+      user,
+      subdomain,
+      agentId,
+      operation: 'agentRuntimeDisablePlugin',
+      identifier: safePluginId,
+      requireAdmin: true,
+      request: {
+        method: 'POST',
+        path: '/openclaw/plugins/disable',
+        body: {
+          plugin: safePluginId,
+        },
+      },
+      message: 'Managed runtime plugin disable completed',
+      setupSync: { action: 'remove', type: 'plugin' },
+      mapResult: (payload) =>
+        mapRuntimePayload('Managed runtime plugin disable completed', payload, {
+          diagnostics:
+            payload.verification && typeof payload.verification === 'object'
+              ? (payload.verification as Record<string, unknown>)
+              : payload,
+          records: payload,
+        }),
+    });
   },
 };

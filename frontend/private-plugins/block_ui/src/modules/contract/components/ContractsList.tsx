@@ -74,7 +74,6 @@ export const ContractItem = ({
   currency,
   status,
   date,
-  endDate,
   onSelect,
 }: IContract & { onSelect?: (contract: IContract) => void }) => {
   return (
@@ -83,7 +82,7 @@ export const ContractItem = ({
         <Badge
           variant="secondary"
           className="ml-2 cursor-pointer truncate font-medium"
-          onClick={() => onSelect?.({ _id, number, party, amount, currency, status, date, endDate } as IContract)}
+          onClick={() => onSelect?.({ _id, number, party, amount, currency, status, date } as IContract)}
         >
           #{number || _id}
         </Badge>

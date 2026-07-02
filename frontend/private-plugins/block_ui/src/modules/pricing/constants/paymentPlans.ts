@@ -12,7 +12,6 @@ export const PAYMENT_PLAN_TYPE = {
 };
 
 export const PAYMENT_PLAN_FREQUENCY = {
-  CUSTOM: 'Custom',
   ONE_TIME: 'One time',
   ONE_TIME_PER_MONTH: 'One time per month',
   TWO_TIME_PER_MONTH: 'Two time per month',

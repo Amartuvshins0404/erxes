@@ -45,6 +45,7 @@ interface DeployResponse {
   serverUrl: string;
   gatewayToken: string;
   serverId: number;
+  status?: string;
 }
 
 interface ManagedDeployPayload {
@@ -201,8 +202,9 @@ export const deployManagedServer = async (
     throw new Error('Managed deployer did not return an approved runtime URL');
   }
 
-  await verifyManagedRuntime(result.url);
-
+  // The deployer already verifies the runtime health before returning
+  // "approved" — a second verification from the platform would hit the same
+  // Cloudflare proxy that blocks same-DC requests, causing a false failure.
   return {
     ...result,
     url: normalizeRuntimeUrl(result.url),
@@ -214,8 +216,6 @@ export const approveServer = async (
   code: string,
 ) => {
   const DEPLOYER = getDeployerUrl();
-
-  console.log(agent.name);
 
   const DEPLOYER_URL = `${DEPLOYER}/tools/${agent.name}/discordapprove`;
 
@@ -329,7 +329,6 @@ export const listAgents = async (serverName: string): Promise<AgentItem[]> => {
 
   const data = (await response.json()) as { agents: AgentItem[] };
 
-  console.log('data', data);
   return data.agents;
 };
 

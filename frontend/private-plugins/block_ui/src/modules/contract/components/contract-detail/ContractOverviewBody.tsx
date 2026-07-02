@@ -102,11 +102,6 @@ export const ContractOverviewBody = ({
               )}
               {renderRow('Currency', contract.currency)}
               {renderRow('Contract Date', formatDate(contract.date))}
-              {renderRow('Start Date', formatDate(contract.startDate))}
-              {renderRow(
-                'End Date',
-                formatDate(contract.endDate),
-              )}
               {renderRow('Party', partyLabel)}
               {renderRow(
                 'Assigned User',

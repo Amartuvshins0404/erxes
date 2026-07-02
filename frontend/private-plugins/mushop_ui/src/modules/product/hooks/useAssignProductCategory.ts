@@ -3,8 +3,10 @@ import { MUSHOP_ASSIGN_PRODUCT_CATEGORY } from '../graphql/mutations';
 import { PRODUCT_CATEGORIES } from '../graphql/queries';
 import { IMushopProductCategory } from '../types';
 
-export const useCoreProductCategories = (_searchValue?: string) => {
-  const { data, loading } = useQuery(PRODUCT_CATEGORIES);
+export const useCoreProductCategories = (searchValue?: string) => {
+  const { data, loading } = useQuery(PRODUCT_CATEGORIES, {
+    variables: { searchValue },
+  });
 
   const categories: IMushopProductCategory[] =
     data?.productCategories || [];

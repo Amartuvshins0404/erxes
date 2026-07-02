@@ -25,6 +25,10 @@ import {
   loadAssociationClass,
 } from '@/association/db/models/Association';
 
+// Event
+import { IEventDocument } from '@/event/@types/event';
+import { IEventModel, loadEventClass } from '@/event/db/models/Event';
+
 // Registration
 import { IRegistrationApplicationDocument } from '@/registration/@types/registrationApplicationDocument';
 import {
@@ -41,6 +45,7 @@ export interface IModels {
   Provider: IProviderModel;
   SystemConfig: ISystemConfigModel;
   Association: IAssociationModel;
+  Event: IEventModel;
   RegistrationApplication: IRegistrationApplicationModel;
   RegistrationFormSchema: IRegistrationFormSchemaModel;
 }
@@ -70,6 +75,11 @@ export const loadClasses = (db: mongoose.Connection): IModels => {
   models.Association = db.model<IAssociationDocument, IAssociationModel>(
     'mto_categories',
     loadAssociationClass(models),
+  );
+
+  models.Event = db.model<IEventDocument, IEventModel>(
+    'mto_events',
+    loadEventClass(models),
   );
 
   models.RegistrationApplication = db.model<

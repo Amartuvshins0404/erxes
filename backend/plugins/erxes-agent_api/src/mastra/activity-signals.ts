@@ -1,0 +1,95 @@
+// ---------------------------------------------------------------------------
+// Cheap activity signals — instant, LLM-free status lines for tool calls.
+//
+// activity.ts narrates the agent's *reasoning* with a model round-trip, but a
+// TOOL invocation already says what the step is: its name + args. So for tool
+// events we derive the status line directly here — no LLM, emitted the moment
+// the call starts. Known tools get a concrete line; anything unrecognized
+// returns null so the caller falls back to the LLM summarizer.
+// ---------------------------------------------------------------------------
+
+const MAX_CHARS = 80;
+
+/** First non-empty string value among the given arg keys. */
+function pick(args: unknown, keys: string[]): string | undefined {
+  if (!args || typeof args !== 'object') return undefined;
+  const record = args as Record<string, unknown>;
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === 'string' && value.trim()) {
+      return value.trim().replace(/\s+/g, ' ');
+    }
+  }
+  return undefined;
+}
+
+/** Truncate a status line to the display budget, with an ellipsis. */
+const clip = (text: string) =>
+  text.length > MAX_CHARS ? `${text.slice(0, MAX_CHARS).trimEnd()}…` : text;
+
+/** Compose a "<verb> <subject>" status line (subject optional), clipped. */
+const phrase = (verb: string, subject?: string) =>
+  clip(subject ? `${verb} ${subject}` : verb);
+
+// Tool names arrive in mixed casing: builtins use camelCase keys (`webSearch`),
+// meta tools use snake_case ids (`execute_erxes_operation`). Normalize to a
+// separator-less lowercase form so a known tool is always recognised (otherwise
+// it falls through to an avoidable LLM summarization for its status line).
+const norm = (toolName: string): string =>
+  toolName.toLowerCase().replace(/[-_\s]/g, '');
+
+/**
+ * A present-continuous status line for a tool call, or null when the tool is
+ * unknown (let the LLM summarizer narrate it). Mirrors ACTIVITY_INSTRUCTIONS:
+ * 3-8 words, concrete subject, no punctuation/emoji.
+ */
+export function toolStatusLine(
+  toolName: string,
+  args?: unknown,
+): string | null {
+  switch (norm(toolName)) {
+    case 'searcherxesoperations': {
+      const query = pick(args, ['query']);
+      return phrase('Searching operations', query ? `for ${query}` : undefined);
+    }
+    case 'executeerxesoperation': {
+      const op = pick(args, ['operation', 'operationName']);
+      return op ? phrase('Running', op) : 'Running an operation';
+    }
+    case 'companyknowledge': {
+      const query = pick(args, ['query']);
+      return phrase(
+        'Searching company data',
+        query ? `for ${query}` : undefined,
+      );
+    }
+    case 'agentknowledge': {
+      const query = pick(args, ['query']);
+      return phrase('Recalling learnings', query ? `about ${query}` : undefined);
+    }
+    case 'websearch': {
+      const query = pick(args, ['query', 'q', 'search']);
+      return phrase('Searching the web', query ? `for ${query}` : undefined);
+    }
+    case 'fetchurl': {
+      const url = pick(args, ['url', 'href']);
+      return phrase('Reading', url);
+    }
+    case 'calculator':
+      return 'Calculating';
+    case 'renderchart':
+      return 'Rendering a chart';
+    case 'renderdiagram':
+      return 'Rendering a diagram';
+    case 'generatepdf':
+    case 'generatedocx':
+    case 'generatepptx':
+    case 'generatexlsx':
+      return 'Generating a document';
+    case 'filereader':
+    case 'readattachment':
+      return 'Reading a file';
+    default:
+      return null;
+  }
+}

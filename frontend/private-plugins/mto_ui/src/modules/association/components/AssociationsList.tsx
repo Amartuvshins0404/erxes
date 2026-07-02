@@ -6,6 +6,7 @@ import {
   RecordTable,
   RecordTableInlineCell,
   RelativeDateDisplay,
+  useConfirm,
 } from 'erxes-ui';
 import { useMutation, useQuery } from '@apollo/client';
 import { useState } from 'react';
@@ -27,6 +28,7 @@ interface AssociationsListProps {
 }
 
 export function AssociationsList({ filters }: AssociationsListProps) {
+  const { confirm } = useConfirm();
   const { data, loading, refetch } = useQuery(MTO_ASSOCIATIONS, {
     variables: {
       isActive: filters?.isActive,
@@ -40,10 +42,13 @@ export function AssociationsList({ filters }: AssociationsListProps) {
 
   const associations: AssociationRow[] = data?.mtoAssociations ?? [];
 
-  const handleRemove = async (id: string) => {
-    if (!confirm('Remove this association?')) return;
-    await removeAssociations({ variables: { ids: [id] } });
-    void refetch();
+  const handleRemove = (id: string) => {
+    void confirm({
+      message: 'Are you sure you want to remove this association?',
+      options: { confirmationValue: 'delete' },
+    }).then(() => {
+      void removeAssociations({ variables: { ids: [id] } }).then(() => refetch());
+    });
   };
 
   const columns: ColumnDef<Record<string, unknown>>[] = [

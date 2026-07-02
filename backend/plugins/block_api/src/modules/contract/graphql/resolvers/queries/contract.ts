@@ -1,11 +1,13 @@
 import { cursorPaginateAggregation } from 'erxes-api-shared/utils';
 import { IContractDocument } from '@/contract/@types/contract';
 import { IContext } from '~/connectionResolvers';
+import { Types } from 'mongoose';
 
 const STATUS_TYPE_ORDER = ['reserved', 'draft', 'lost', 'cancelled', 'signed'];
 
 export interface IContractFilter {
   projectId?: string;
+  unit?: string;
   search?: string;
   status?: string;
   partyType?: string;
@@ -30,6 +32,35 @@ export const contractQueries = {
     { models }: IContext,
   ) => {
     return models.Contract.find(unit ? { unit } : {});
+  },
+
+  blockGetUnitContractOverview: async (
+    _parent: undefined,
+    { unitId }: { unitId: string },
+    { models }: IContext,
+  ) => {
+    const contracts = await models.Contract.find({ unit: new Types.ObjectId(unitId) }, { status: 1 }).lean();
+    if (!contracts.length) return { total: 0, stages: [] };
+    const stageIdStrs = contracts.map((c: any) => c.status?.toString()).filter(Boolean);
+    const uniqueStageIds = [...new Set(stageIdStrs)];
+    const statuses = await models.ContractStatus.find(
+      { _id: { $in: uniqueStageIds } },
+      { _id: 1, name: 1, order: 1 },
+    ).lean();
+    const nameById = new Map(statuses.map((s: any) => [s._id.toString(), s.name || 'Unknown']));
+    const countByStage = new Map<string, number>();
+    for (const c of contracts) {
+      const name = c.status ? (nameById.get(c.status.toString()) ?? 'Unknown') : 'Unknown';
+      countByStage.set(name, (countByStage.get(name) ?? 0) + 1);
+    }
+    const stageOrder = new Map<string, number>();
+    for (const s of statuses) {
+      stageOrder.set(s.name || 'Unknown', s.order ?? 9999);
+    }
+    const stages = [...countByStage.entries()]
+      .sort((a, b) => (stageOrder.get(a[0]) ?? 9999) - (stageOrder.get(b[0]) ?? 9999))
+      .map(([name, count]) => ({ name, count }));
+    return { total: contracts.length, stages };
   },
 
   blockGetContractsList: async (
@@ -70,6 +101,9 @@ export const contractQueries = {
         const unitIds = units.map((u: any) => u._id);
 
         query.unit = { $in: unitIds };
+      }
+      if (filter.unit) {
+        query.unit = new Types.ObjectId(filter.unit);
       }
       if (filter.search) {
         query.number = { $regex: filter.search, $options: 'i' };

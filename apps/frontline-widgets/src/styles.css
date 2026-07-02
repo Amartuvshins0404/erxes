@@ -228,6 +228,8 @@
     --chart-5: oklch(0.432 0.232 292.759);
 
     --form-label: oklch(0.3156 0.0121 258.37);
+
+    --color-hero: oklch(var(--primary));
   }
 
   .dark {
@@ -274,7 +276,9 @@
     @apply border-border;
   }
   body {
-    font-feature-settings: 'rlig' 1, 'calt' 1;
+    font-feature-settings:
+      'rlig' 1,
+      'calt' 1;
   }
   h1 {
     @apply text-2xl font-bold;

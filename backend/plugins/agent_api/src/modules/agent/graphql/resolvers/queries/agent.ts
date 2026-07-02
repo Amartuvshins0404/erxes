@@ -18,6 +18,12 @@ import {
   listDiscordChannels,
   listDiscordInstallations,
 } from '~/modules/agent/discordGatewayClient';
+import {
+  assertSafeRuntimeIdentifier,
+  assertSafeRuntimeQuery,
+  callManagedRuntimeOperation,
+  mapRuntimePayload,
+} from '~/modules/agent/runtimeClient';
 
 const assertAssistantManageAccess = async (
   models: IContext['models'],
@@ -206,4 +212,175 @@ export const agentQueries = {
 
     return bindings;
   },
+
+  agentRuntimeDiagnostics: async (
+    _root: undefined,
+    { agentId }: { agentId: string },
+    { models, subdomain, user }: IContext,
+  ) =>
+    callManagedRuntimeOperation({
+      models,
+      user,
+      subdomain,
+      agentId,
+      operation: 'agentRuntimeDiagnostics',
+      request: {
+        method: 'GET',
+        path: '/runtime-diagnostics',
+      },
+      message: 'Managed runtime diagnostics fetched',
+      mapResult: (payload) =>
+        mapRuntimePayload('Managed runtime diagnostics fetched', payload, {
+          diagnostics: payload,
+        }),
+    }),
+
+  agentRuntimeSkills: async (
+    _root: undefined,
+    { agentId }: { agentId: string },
+    { models, subdomain, user }: IContext,
+  ) =>
+    callManagedRuntimeOperation({
+      models,
+      user,
+      subdomain,
+      agentId,
+      operation: 'agentRuntimeSkills',
+      request: {
+        method: 'GET',
+        path: '/openclaw/skills',
+      },
+      message: 'Managed runtime skills fetched',
+      mapResult: (payload) =>
+        mapRuntimePayload('Managed runtime skills fetched', payload, {
+          items: Array.isArray(payload.data) ? payload.data : null,
+          records: payload,
+        }),
+    }),
+
+  agentRuntimeSkillSearch: async (
+    _root: undefined,
+    { agentId, query }: { agentId: string; query: string },
+    { models, subdomain, user }: IContext,
+  ) =>
+    callManagedRuntimeOperation({
+      models,
+      user,
+      subdomain,
+      agentId,
+      operation: 'agentRuntimeSkillSearch',
+      identifier: assertSafeRuntimeQuery(query),
+      request: {
+        method: 'POST',
+        path: '/openclaw/skills/search',
+        body: { query: assertSafeRuntimeQuery(query) },
+      },
+      message: 'Managed runtime skill search completed',
+      mapResult: (payload) =>
+        mapRuntimePayload('Managed runtime skill search completed', payload, {
+          items: Array.isArray(payload.data) ? payload.data : null,
+          records: payload,
+        }),
+    }),
+
+  agentRuntimePlugins: async (
+    _root: undefined,
+    { agentId }: { agentId: string },
+    { models, subdomain, user }: IContext,
+  ) =>
+    callManagedRuntimeOperation({
+      models,
+      user,
+      subdomain,
+      agentId,
+      operation: 'agentRuntimePlugins',
+      request: {
+        method: 'GET',
+        path: '/openclaw/plugins',
+      },
+      message: 'Managed runtime plugins fetched',
+      mapResult: (payload) =>
+        mapRuntimePayload('Managed runtime plugins fetched', payload, {
+          items: Array.isArray(payload.data) ? payload.data : null,
+          records: payload,
+        }),
+    }),
+
+  agentRuntimePluginSearch: async (
+    _root: undefined,
+    { agentId, query }: { agentId: string; query: string },
+    { models, subdomain, user }: IContext,
+  ) =>
+    callManagedRuntimeOperation({
+      models,
+      user,
+      subdomain,
+      agentId,
+      operation: 'agentRuntimePluginSearch',
+      identifier: assertSafeRuntimeQuery(query),
+      request: {
+        method: 'POST',
+        path: '/openclaw/plugins/search',
+        body: { query: assertSafeRuntimeQuery(query) },
+      },
+      message: 'Managed runtime plugin search completed',
+      mapResult: (payload) =>
+        mapRuntimePayload('Managed runtime plugin search completed', payload, {
+          items: Array.isArray(payload.data) ? payload.data : null,
+          records: payload,
+        }),
+    }),
+
+  agentRuntimePluginInspect: async (
+    _root: undefined,
+    { agentId, pluginId }: { agentId: string; pluginId: string },
+    { models, subdomain, user }: IContext,
+  ) =>
+    callManagedRuntimeOperation({
+      models,
+      user,
+      subdomain,
+      agentId,
+      operation: 'agentRuntimePluginInspect',
+      identifier: assertSafeRuntimeIdentifier(pluginId, 'pluginId'),
+      request: {
+        method: 'POST',
+        path: '/openclaw/plugins/inspect',
+        body: { plugin: assertSafeRuntimeIdentifier(pluginId, 'pluginId') },
+      },
+      message: 'Managed runtime plugin inspection completed',
+      mapResult: (payload) =>
+        mapRuntimePayload('Managed runtime plugin inspection completed', payload, {
+          records:
+            payload.data && typeof payload.data === 'object'
+              ? (payload.data as Record<string, unknown>)
+              : payload,
+        }),
+    }),
+
+  agentRuntimePluginDoctor: async (
+    _root: undefined,
+    { agentId }: { agentId: string },
+    { models, subdomain, user }: IContext,
+  ) =>
+    callManagedRuntimeOperation({
+      models,
+      user,
+      subdomain,
+      agentId,
+      operation: 'agentRuntimePluginDoctor',
+      request: {
+        method: 'POST',
+        path: '/openclaw/plugins/doctor',
+        body: {},
+      },
+      message: 'Managed runtime plugin doctor completed',
+      mapResult: (payload) =>
+        mapRuntimePayload('Managed runtime plugin doctor completed', payload, {
+          diagnostics:
+            payload.pluginDoctor && typeof payload.pluginDoctor === 'object'
+              ? (payload.pluginDoctor as Record<string, unknown>)
+              : payload,
+        }),
+    }),
 };

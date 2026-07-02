@@ -69,12 +69,15 @@ import {
   queries as ContractQueries,
   types as ContractTypes,
   filterInputTypes as ContractFilterTypes,
+  contractOverviewType as ContractOverviewType,
 } from '@/contract/graphql/schemas/contract';
 
 import {
   mutations as OfferMutations,
   queries as OfferQueries,
   types as OfferTypes,
+  filterInputTypes as OfferFilterTypes,
+  offerStatsType as OfferStatsType,
 } from '@/contract/graphql/schemas/offer';
 
 import {
@@ -87,6 +90,7 @@ import {
   mutations as OpptyMutations,
   queries as OpptyQueries,
   types as OpptyTypes,
+  opptyOverviewType as OpptyOverviewType,
 } from '@/oppty/graphql/schemas/oppty';
 
 import {
@@ -177,9 +181,13 @@ export const types = `
   ${InvoiceTypes}
   ${ContractTypes}
   ${ContractFilterTypes}
+  ${OfferFilterTypes}
   ${OfferTypes}
+  ${OfferStatsType}
+  ${ContractOverviewType}
   ${UnitTypeTypes}
   ${OpptyTypes}
+  ${OpptyOverviewType}
   ${NoteTypes}
   ${StatusTypes}
   ${ContractStatusTypes}

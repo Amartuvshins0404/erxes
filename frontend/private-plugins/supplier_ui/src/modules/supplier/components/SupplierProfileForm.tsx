@@ -9,6 +9,7 @@ import {
   Textarea,
   toast,
 } from 'erxes-ui';
+import { IconHash } from '@tabler/icons-react';
 import { useCallback, useEffect } from 'react';
 import { Path, useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -18,6 +19,8 @@ import { supplierProfileSchema } from '../constants/supplierProfileSchema';
 import { useGetSupplier } from '../hooks/useSupplier';
 import { useUpdateSupplier } from '../hooks/useUpdateSupplier';
 import { SupplierEditorField } from './SupplierEditorField';
+import { PaymentMethodField } from './PaymentMethodField';
+import { SyncPosField } from './SyncPosField';
 import { SupplierPhones } from './SupplierPhones';
 import { UploadImage } from './upload';
 import { MultiUploadImage } from './MultiUploadImage';
@@ -63,6 +66,8 @@ export const SupplierProfileForm = () => {
       primaryPhone: supplier?.primaryPhone || '',
       phones: supplier?.phones || [],
       dateFounded: supplier?.dateFounded || '',
+      paymentId: supplier?.paymentId || '',
+      posToken: supplier?.posToken || '',
       address: {
         details: {
           countryCode: addressDetails?.countryCode || undefined,
@@ -128,9 +133,17 @@ export const SupplierProfileForm = () => {
     <div className="flex flex-col gap-6 mx-auto p-6 w-full max-w-6xl">
       <div className="flex justify-between items-center">
         <h1 className="font-bold text-lg">Supplier profile</h1>
-        <Badge variant={statusVariant(supplier?.verificationStatus)}>
-          {supplier?.verificationStatus || 'pending'}
-        </Badge>
+        <div className="flex items-center gap-2">
+          {supplier?.code && (
+            <Badge variant="secondary" className="font-mono tracking-wide">
+              <IconHash className="size-3.5 shrink-0 text-muted-foreground" />
+              {supplier.code}
+            </Badge>
+          )}
+          <Badge variant={statusVariant(supplier?.verificationStatus)}>
+            {supplier?.verificationStatus || 'pending'}
+          </Badge>
+        </div>
       </div>
       {supplier?.verificationStatus === 'unverified' &&
         supplier?.verificationNote && (
@@ -313,37 +326,6 @@ export const SupplierProfileForm = () => {
             </InfoCard.Content>
           </InfoCard>
 
-          <InfoCard title="Contact">
-            <InfoCard.Content>
-              <div className="gap-4 grid grid-cols-2">
-                <Form.Field
-                  name="primaryEmail"
-                  control={form.control}
-                  render={({ field }) => (
-                    <Form.Item>
-                      <Form.Label>Email</Form.Label>
-                      <Form.Control>
-                        <Input type="email" {...field} />
-                      </Form.Control>
-                      <Form.Message />
-                    </Form.Item>
-                  )}
-                />
-                <Form.Field
-                  name="primaryPhone"
-                  control={form.control}
-                  render={() => (
-                    <Form.Item>
-                      <Form.Label>Phone</Form.Label>
-                      <SupplierPhones form={form} />
-                      <Form.Message />
-                    </Form.Item>
-                  )}
-                />
-              </div>
-            </InfoCard.Content>
-          </InfoCard>
-
           <InfoCard title="Address">
             <InfoCard.Content>
               <div className="gap-4 grid grid-cols-2">
@@ -425,6 +407,48 @@ export const SupplierProfileForm = () => {
               </div>
             </InfoCard.Content>
           </InfoCard>
+
+          <div className="flex flex-col gap-4">
+            <InfoCard title="Contact">
+              <InfoCard.Content>
+                <div className="gap-4 grid grid-cols-2">
+                  <Form.Field
+                    name="primaryEmail"
+                    control={form.control}
+                    render={({ field }) => (
+                      <Form.Item>
+                        <Form.Label>Email</Form.Label>
+                        <Form.Control>
+                          <Input type="email" {...field} />
+                        </Form.Control>
+                        <Form.Message />
+                      </Form.Item>
+                    )}
+                  />
+                  <Form.Field
+                    name="primaryPhone"
+                    control={form.control}
+                    render={() => (
+                      <Form.Item>
+                        <Form.Label>Phone</Form.Label>
+                        <SupplierPhones form={form} />
+                        <Form.Message />
+                      </Form.Item>
+                    )}
+                  />
+                </div>
+              </InfoCard.Content>
+            </InfoCard>
+
+            <InfoCard title="Integrations">
+              <InfoCard.Content>
+                <div className="gap-4 grid grid-cols-2">
+                  <PaymentMethodField control={form.control} />
+                  <SyncPosField control={form.control} />
+                </div>
+              </InfoCard.Content>
+            </InfoCard>
+          </div>
 
           <InfoCard title="Attachments" className="lg:col-span-2">
             <InfoCard.Content>

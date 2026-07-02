@@ -38,6 +38,7 @@ export const types = `
     currency: String
     pdfAttachment: JSON
     status: String
+    state: String
     createdAt: Date
     updatedAt: Date
   }
@@ -71,4 +72,5 @@ export const mutations = `
   mushopRemoveProduct(_id: String!): JSON
   mushopBulkRemoveProducts(ids: [String!]!): JSON
   mushopApproveProduct(_id: String!): MushopProduct
+  mushopSyncProductsToPosclient(supplierId: String, status: String): JSON
 `;

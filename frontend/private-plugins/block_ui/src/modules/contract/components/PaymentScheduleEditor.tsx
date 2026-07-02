@@ -1,5 +1,8 @@
 import { DatePicker, InfoCard } from 'erxes-ui';
+import { useState, useEffect, useRef, memo, useCallback } from 'react';
 import { format } from 'date-fns';
+import { UseFormReturn } from 'react-hook-form';
+import { generateInstallmentDates } from './contract-detail/shared';
 
 const periodsPerYear = (frequency: string | undefined): number => {
   switch (frequency) {
@@ -12,9 +15,6 @@ const periodsPerYear = (frequency: string | undefined): number => {
     default: return 12;
   }
 };
-import { UseFormReturn } from 'react-hook-form';
-import { ContractFormData } from '@/contract/constants/contractSchema';
-import { generateInstallmentDates } from './contract-detail/shared';
 
 const parseDateLike = (value: any): Date | null => {
   if (!value) return null;
@@ -23,22 +23,88 @@ const parseDateLike = (value: any): Date | null => {
   return isNaN(d.getTime()) ? null : d;
 };
 
+const PrincipalInput = memo(({
+  index,
+  value,
+  onCommit,
+}: {
+  index: number;
+  value: number;
+  onCommit: (index: number, val: number) => void;
+}) => {
+  const [text, setText] = useState(String(value));
+  const focusedRef = useRef(false);
+
+  useEffect(() => {
+    if (!focusedRef.current) {
+      setText(String(value));
+    }
+  }, [value]);
+
+  return (
+    <input
+      type="number"
+      step="any"
+      value={text}
+      onChange={(e) => setText(e.target.value)}
+      onFocus={() => { focusedRef.current = true; }}
+      onBlur={(e) => {
+        focusedRef.current = false;
+        const n = parseFloat(e.target.value);
+        if (!isNaN(n)) onCommit(index, n);
+      }}
+      className="h-7 text-sm w-full border rounded px-2 bg-background"
+    />
+  );
+});
+
 export const PaymentScheduleEditor = ({
   form,
+  amount: amountProp,
+  currency: currencyProp,
+  date: dateProp,
 }: {
-  form: UseFormReturn<ContractFormData>;
+  form: UseFormReturn<any>;
+  amount?: number;
+  currency?: string;
+  date?: string;
 }) => {
-  const amount = form.watch('amount') || 0;
-  const currency = form.watch('currency') || 'MNT';
-  const contractDate = form.watch('date');
-  const startDate = form.watch('startDate');
+  const amount = amountProp ?? (form.watch('amount') || 0);
+  const currency = currencyProp ?? (form.watch('currency') || 'MNT');
+  const contractDate = dateProp ?? form.watch('date');
   const paymentPlan = form.watch('paymentPlan');
   const dueDates = form.watch('paymentPlan.paymentDueDates') || [];
+  const savedAmounts = form.getValues('paymentPlan.installmentAmounts');
+  const [principalOverrides, setPrincipalOverrides] = useState<Record<number, number>>(() => {
+    if (!savedAmounts?.length) return {};
+    // 0 means "not set, use computed" — skip zeros
+    return Object.fromEntries(
+      (savedAmounts as number[])
+        .map((v, i) => [i, v] as [number, number])
+        .filter(([, v]) => v > 0),
+    );
+  });
+
+  const handlePrincipalCommit = useCallback((index: number, val: number) => {
+    setPrincipalOverrides((prev) => {
+      const installments = form.getValues('paymentPlan.installment') || 0;
+      const lastIndex = installments - 1;
+      // last row is always auto-computed — never store its override
+      if (index === lastIndex) return prev;
+      const next = { ...prev, [index]: val };
+      const amounts = Array.from({ length: installments }, (_, i) =>
+        i === lastIndex ? 0 : (next[i] ?? 0),
+      );
+      form.setValue('paymentPlan.installmentAmounts', amounts, { shouldDirty: true });
+      return next;
+    });
+  }, [form]);
 
   if (!paymentPlan) return null;
 
   const downPct = paymentPlan.downPaymentPercentage || 0;
-  const advancePct = paymentPlan.advancePaymentPercentage || 0;
+  const barterPct = paymentPlan.barterPercentage || 0;
+  const completionPct = paymentPlan.completionPaymentPercentage || 0;
   const discountPct = paymentPlan.discountPercentage || 0;
   const interestPct = paymentPlan.interestPercentage || 0;
   const interestType = paymentPlan.interestType || 'FLAT';
@@ -53,15 +119,38 @@ export const PaymentScheduleEditor = ({
 
   const discountAmount = (amount * discountPct) / 100;
   const priceAfterDiscount = amount - discountAmount;
-  const downAmount = (priceAfterDiscount * downPct) / 100;
-  const advanceAmount = (priceAfterDiscount * advancePct) / 100;
-  const principal = priceAfterDiscount - downAmount - advanceAmount;
+  const downAmount = (paymentPlan.downPaymentAmount || 0) > 0
+    ? paymentPlan.downPaymentAmount!
+    : (priceAfterDiscount * downPct) / 100;
+  const barterValue = (paymentPlan.barterAmount || 0) > 0
+    ? paymentPlan.barterAmount!
+    : (priceAfterDiscount * barterPct) / 100;
+  const completionAmount = (paymentPlan.completionPaymentAmount || 0) > 0
+    ? paymentPlan.completionPaymentAmount!
+    : (priceAfterDiscount * completionPct) / 100;
+  const principal = priceAfterDiscount - downAmount - barterValue - completionAmount;
+  const roundedAmount = paymentPlan.roundedInstallmentAmount || 0;
   const principalPerInstallment =
-    installmentCount > 0 ? principal / installmentCount : 0;
+    installmentCount > 0
+      ? roundedAmount > 0
+        ? roundedAmount
+        : principal / installmentCount
+      : 0;
+
+  // Pre-compute all effective principals so last row auto-adjusts
+  const effectivePrincipals = Array.from({ length: installmentCount }, (_, i) => {
+    const base = roundedAmount > 0 ? roundedAmount : principalPerInstallment;
+    return principalOverrides[i] ?? base;
+  });
+  if (installmentCount > 0) {
+    const sumOfOthers = effectivePrincipals.slice(0, -1).reduce((a, b) => a + b, 0);
+    const lastFallback = principal - sumOfOthers;
+    effectivePrincipals[installmentCount - 1] =
+      principalOverrides[installmentCount - 1] ?? lastFallback;
+  }
 
   const baseStart =
     parseDateLike(paymentPlan.firstPaymentDate) ||
-    parseDateLike(startDate) ||
     parseDateLike(contractDate) ||
     new Date();
   const autoDates = generateInstallmentDates(
@@ -81,14 +170,12 @@ export const PaymentScheduleEditor = ({
   };
 
   const setDueDate = (index: number, date: Date | undefined) => {
-    const next = Array.from(
-      { length: installmentCount },
-      (_, i) => dueDates[i] || '',
-    );
-    next[index] = date ? date.toISOString() : '';
-    form.setValue('paymentPlan.paymentDueDates', next, {
-      shouldDirty: true,
+    const next = Array.from({ length: installmentCount }, (_, i) => {
+      if (i === index) return date?.toISOString() ?? autoDates[i]?.toISOString() ?? '';
+      const d = parseDateLike(dueDates[i]) || autoDates[i];
+      return d?.toISOString() ?? '';
     });
+    form.setValue('paymentPlan.paymentDueDates', next, { shouldDirty: true });
   };
 
   const getInterest = (index: number) => {
@@ -97,10 +184,10 @@ export const PaymentScheduleEditor = ({
       return (principal * interestPct) / 100 / installmentCount;
     }
     if (interestType === 'REDUCING') {
-      const remaining = principal - principalPerInstallment * index;
+      const paidSoFar = effectivePrincipals.slice(0, index).reduce((a, b) => a + b, 0);
+      const remaining = principal - paidSoFar;
       return (remaining * interestPct) / 100 / ppy;
     }
-    // SIMPLE: annualized total interest spread equally
     return ((principal * interestPct) / 100) * (installmentCount / ppy) / installmentCount;
   };
 
@@ -113,6 +200,7 @@ export const PaymentScheduleEditor = ({
 
   const hasInterest = interestPct > 0;
   const contractDateLabel = parseDateLike(contractDate);
+  const downPaymentDateLabel = parseDateLike(paymentPlan.downPaymentDate) || contractDateLabel;
   let grandTotal = 0;
 
   const Header = ({ children }: { children: React.ReactNode }) => (
@@ -120,8 +208,8 @@ export const PaymentScheduleEditor = ({
       {children}
     </div>
   );
-  const Cell = ({ children }: { children: React.ReactNode }) => (
-    <div className="px-2 py-2 border-t text-sm flex items-center">
+  const Cell = ({ children, className }: { children: React.ReactNode; className?: string }) => (
+    <div className={`px-2 py-2 border-t text-sm flex items-center ${className || ''}`}>
       {children}
     </div>
   );
@@ -165,6 +253,27 @@ export const PaymentScheduleEditor = ({
           );
         })() : (
           <>
+            {barterValue > 0 && (() => {
+              grandTotal += barterValue;
+              return (
+                <div
+                  className={`grid ${
+                    hasInterest ? 'grid-cols-6' : 'grid-cols-5'
+                  }`}
+                >
+                  <Cell>Barter</Cell>
+                  <Cell>
+                    {contractDateLabel
+                      ? format(contractDateLabel, 'dd.MM.yyyy')
+                      : '-'}
+                  </Cell>
+                  <Cell>Barter</Cell>
+                  <Cell>{fmt(barterValue)}</Cell>
+                  {hasInterest && <Cell>-</Cell>}
+                  <Cell>{fmt(barterValue)}</Cell>
+                </div>
+              );
+            })()}
             {downAmount > 0 && (() => {
               grandTotal += downAmount;
               return (
@@ -175,8 +284,8 @@ export const PaymentScheduleEditor = ({
                 >
                   <Cell>Reservation</Cell>
                   <Cell>
-                    {contractDateLabel
-                      ? format(contractDateLabel, 'dd.MM.yyyy')
+                    {downPaymentDateLabel
+                      ? format(downPaymentDateLabel, 'dd.MM.yyyy')
                       : '-'}
                   </Cell>
                   <Cell>Down payment</Cell>
@@ -186,33 +295,13 @@ export const PaymentScheduleEditor = ({
                 </div>
               );
             })()}
-            {advanceAmount > 0 && (() => {
-              grandTotal += advanceAmount;
-              const advanceDateLabel = parseDateLike(paymentPlan.advancePaymentDate) || contractDateLabel;
-              return (
-                <div
-                  className={`grid ${
-                    hasInterest ? 'grid-cols-6' : 'grid-cols-5'
-                  }`}
-                >
-                  <Cell>Advance</Cell>
-                  <Cell>
-                    {advanceDateLabel
-                      ? format(advanceDateLabel, 'dd.MM.yyyy')
-                      : '-'}
-                  </Cell>
-                  <Cell>Advance payment</Cell>
-                  <Cell>{fmt(advanceAmount)}</Cell>
-                  {hasInterest && <Cell>-</Cell>}
-                  <Cell>{fmt(advanceAmount)}</Cell>
-                </div>
-              );
-            })()}
             {Array.from({ length: installmentCount }).map((_, index) => {
-              const isLast = index === installmentCount - 1;
               const dueDate = getDueDate(index);
               const interest = getInterest(index);
-              const rowTotal = principalPerInstallment + interest;
+              const isLast = index === installmentCount - 1;
+              const installPrincipal = effectivePrincipals[index];
+              const rowTotal = installPrincipal + interest;
+              const isNegative = isLast && installPrincipal < 0;
               grandTotal += rowTotal;
               return (
                 <div
@@ -232,15 +321,43 @@ export const PaymentScheduleEditor = ({
                       placeholder="Pick date"
                     />
                   </Cell>
-                  <Cell>
-                    {isLast ? 'Final payment' : 'Progress payment'}
-                  </Cell>
-                  <Cell>{fmt(principalPerInstallment)}</Cell>
+                  <Cell>Progress payment</Cell>
+                  {isLast ? (
+                    <Cell className={isNegative ? 'text-destructive font-medium' : ''}>
+                      {fmt(installPrincipal)}
+                      {isNegative && <span className="ml-1 text-xs">(over)</span>}
+                    </Cell>
+                  ) : (
+                    <Cell className="p-1">
+                      <PrincipalInput
+                        index={index}
+                        value={installPrincipal}
+                        onCommit={handlePrincipalCommit}
+                      />
+                    </Cell>
+                  )}
                   {hasInterest && <Cell>{fmt(interest)}</Cell>}
                   <Cell>{fmt(rowTotal)}</Cell>
                 </div>
               );
             })}
+            {completionAmount > 0 && (() => {
+              grandTotal += completionAmount;
+              return (
+                <div
+                  className={`grid ${
+                    hasInterest ? 'grid-cols-6' : 'grid-cols-5'
+                  }`}
+                >
+                  <Cell>Completion</Cell>
+                  <Cell className="text-muted-foreground text-xs">After building completed</Cell>
+                  <Cell>Completion payment</Cell>
+                  <Cell>{fmt(completionAmount)}</Cell>
+                  {hasInterest && <Cell>-</Cell>}
+                  <Cell>{fmt(completionAmount)}</Cell>
+                </div>
+              );
+            })()}
           </>
         )}
         <div
@@ -251,9 +368,9 @@ export const PaymentScheduleEditor = ({
           <Cell>Total</Cell>
           <Cell>{discountPct > 0 ? `Discount: ${fmt(discountAmount)}` : ' '}</Cell>
           <Cell> </Cell>
-          <Cell>{fmt(principal + downAmount)}</Cell>
+          <Cell>{fmt(principal + downAmount + barterValue)}</Cell>
           {hasInterest && (
-            <Cell>{fmt(grandTotal - (principal + downAmount))}</Cell>
+            <Cell>{fmt(grandTotal - (principal + downAmount + barterValue))}</Cell>
           )}
           <Cell>{fmt(grandTotal)}</Cell>
         </div>

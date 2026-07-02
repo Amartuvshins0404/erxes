@@ -15,11 +15,12 @@ import {
   Tooltip,
   useQueryState,
 } from 'erxes-ui';
-import { IconPlus, IconX } from '@tabler/icons-react';
+import { IconPlus, IconRefresh, IconX } from '@tabler/icons-react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { usePermissionCheck } from 'ui-modules';
 import { useCollectiveDetail } from '../hooks/useCollectiveDetail';
+import { useResyncCollective } from '../hooks/useResyncCollective';
 import { useUpdateCollectiveSuppliers } from '../hooks/useUpdateCollectiveSuppliers';
 import { useSuppliers } from '../../supplier/hooks/useSuppliers';
 import { humanizeSyncError } from '../utils/humanizeSyncError';
@@ -352,7 +353,15 @@ const ErrorList = ({ errors }: { errors: string[] }) => {
   );
 };
 
-const SyncResultCard = ({ result }: { result: ICollectiveSyncResult }) => {
+const SyncResultCard = ({
+  result,
+  collectiveId,
+  canResync,
+}: {
+  result: ICollectiveSyncResult;
+  collectiveId: string;
+  canResync: boolean;
+}) => {
   const {
     supplierId,
     supplier,
@@ -364,9 +373,55 @@ const SyncResultCard = ({ result }: { result: ICollectiveSyncResult }) => {
   } = result;
   const { t } = useTranslation('mushop');
   const title = supplier?.name || subdomain || supplierId;
+  const { resyncCollective, loading } = useResyncCollective(collectiveId);
+
+  const handleResync = async () => {
+    try {
+      await resyncCollective({
+        variables: { _id: collectiveId, supplierIds: [supplierId] },
+      });
+      toast({
+        variant: 'success',
+        title: t('Resync started for {{name}}', { name: title }),
+      });
+    } catch (e: any) {
+      toast({
+        variant: 'destructive',
+        title: t('Failed to resync supplier'),
+        description: e?.message,
+      });
+    }
+  };
 
   return (
-    <InfoCard title={title}>
+    <div className="flex flex-col bg-foreground/5 rounded-xl p-1 pt-0">
+      <div className="flex justify-between items-center pr-1 pl-2 h-7 shrink-0">
+        <h3 className="font-medium font-mono text-xs uppercase truncate">
+          {title}
+        </h3>
+        {canResync && (
+          <Tooltip.Provider>
+            <Tooltip>
+              <Tooltip.Trigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-6"
+                  disabled={loading}
+                  onClick={handleResync}
+                >
+                  {loading ? (
+                    <Spinner size="sm" />
+                  ) : (
+                    <IconRefresh className="size-4" />
+                  )}
+                </Button>
+              </Tooltip.Trigger>
+              <Tooltip.Content>{t('Resync this supplier')}</Tooltip.Content>
+            </Tooltip>
+          </Tooltip.Provider>
+        )}
+      </div>
       <InfoCard.Content className="shadow-none p-0 overflow-hidden">
         <Table>
           <Table.Body className="bt:[&_td]:px-2 bt:[&_tr:first-child_td]:border-t bt:[&_td]:h-10">
@@ -413,25 +468,47 @@ const SyncResultCard = ({ result }: { result: ICollectiveSyncResult }) => {
           </Table.Body>
         </Table>
       </InfoCard.Content>
-    </InfoCard>
+    </div>
   );
 };
 
 const CollectiveSyncResults = ({ collective }: { collective: ICollective }) => {
   const { t } = useTranslation('mushop');
   const results = collective.syncResults || [];
+  const { hasActionPermission } = usePermissionCheck();
+  const canResync = hasActionPermission('mushopResyncCollective');
+  const { resyncCollective, loading: resyncingAll } = useResyncCollective(
+    collective._id,
+  );
+  const isSyncing = collective.status === 'syncing';
 
-  if (results.length === 0) {
-    return (
-      <div className="p-4 text-muted-foreground">{t('No sync results yet.')}</div>
-    );
-  }
+  const handleResyncAll = async () => {
+    try {
+      await resyncCollective({ variables: { _id: collective._id } });
+      toast({ variant: 'success', title: t('Resync started') });
+    } catch (e: any) {
+      toast({
+        variant: 'destructive',
+        title: t('Failed to resync'),
+        description: e?.message,
+      });
+    }
+  };
 
   return (
     <div className="flex flex-col gap-4 p-4">
-      {results.map((r) => (
-        <SyncResultCard key={r.supplierId} result={r} />
-      ))}
+      {results.length === 0 ? (
+        <div className="text-muted-foreground">{t('No sync results yet.')}</div>
+      ) : (
+        results.map((r) => (
+          <SyncResultCard
+            key={r.supplierId}
+            result={r}
+            collectiveId={collective._id}
+            canResync={canResync && !isSyncing}
+          />
+        ))
+      )}
     </div>
   );
 };

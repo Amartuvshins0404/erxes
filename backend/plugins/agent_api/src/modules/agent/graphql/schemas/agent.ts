@@ -112,6 +112,17 @@ export const types = `
     guildId: String
     requireMention: Boolean
   }
+
+  type AgentRuntimeResult {
+    ok: Boolean!
+    status: String
+    stage: String
+    message: String
+    warnings: [String]
+    diagnostics: JSON
+    items: JSON
+    records: JSON
+  }
 `;
 
 export const queries = `
@@ -124,6 +135,13 @@ export const queries = `
   agentDiscordInstallations(assistantId: String!): JSON
   agentDiscordChannels(assistantId: String!, installationId: String!): JSON
   agentDiscordBindings(assistantId: String!): JSON
+  agentRuntimeDiagnostics(agentId: String!): AgentRuntimeResult
+  agentRuntimeSkills(agentId: String!): AgentRuntimeResult
+  agentRuntimeSkillSearch(agentId: String!, query: String!): AgentRuntimeResult
+  agentRuntimePlugins(agentId: String!): AgentRuntimeResult
+  agentRuntimePluginSearch(agentId: String!, query: String!): AgentRuntimeResult
+  agentRuntimePluginInspect(agentId: String!, pluginId: String!): AgentRuntimeResult
+  agentRuntimePluginDoctor(agentId: String!): AgentRuntimeResult
 `;
 
 export const mutations = `
@@ -142,4 +160,8 @@ export const mutations = `
   agentDiscordCreateBinding(assistantId: String!, installationId: String!, discordChannelId: String!): JSON
   agentDiscordUpdateBinding(assistantId: String!, bindingId: String!, input: UpdateDiscordBindingInput!): JSON
   agentDiscordDeleteBinding(assistantId: String!, bindingId: String!): JSON
+  agentRuntimeInstallSkill(agentId: String!, slug: String!, version: String): AgentRuntimeResult
+  agentRuntimeInstallPlugin(agentId: String!, plugin: String!, version: String): AgentRuntimeResult
+  agentRuntimeEnablePlugin(agentId: String!, pluginId: String!): AgentRuntimeResult
+  agentRuntimeDisablePlugin(agentId: String!, pluginId: String!): AgentRuntimeResult
 `;

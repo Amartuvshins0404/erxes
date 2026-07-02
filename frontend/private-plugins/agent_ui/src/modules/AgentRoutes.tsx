@@ -31,12 +31,6 @@ const AgentTemplateDetailPage = lazy(() =>
   })),
 );
 
-const LockedCompanyBrainModulePage = lazy(() =>
-  import('~/pages/locked-module/IndexPage').then((module) => ({
-    default: module.LockedCompanyBrainModulePage,
-  })),
-);
-
 const OpencodeIndexPage = lazy(() =>
   import('~/pages/opencode/IndexPage').then((module) => ({
     default: module.OpencodeIndexPage,
@@ -58,10 +52,6 @@ const AgentMain = () => {
         <Route path="agents/:id" element={<OpencodeIndexPage />} />
         <Route path="templates" element={<AgentTemplatesIndexPage />} />
         <Route path="templates/:id" element={<AgentTemplateDetailPage />} />
-        <Route
-          path=":lockedModuleSlug"
-          element={<LockedCompanyBrainModulePage />}
-        />
       </Routes>
     </Suspense>
   );

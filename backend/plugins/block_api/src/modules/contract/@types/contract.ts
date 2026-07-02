@@ -1,7 +1,6 @@
 import { Document } from 'mongoose';
 import {
   BlockProjectPaymentPlanInterestType,
-  BlockProjectPaymentPlanType,
 } from '@/project/@types/payment';
 
 export enum ContractPartyType {
@@ -18,10 +17,13 @@ export interface IContractParty {
 // Stage semantics (reserved/draft/signed/cancelled/lost) live on ContractStatus.type.
 
 export interface IContractPaymentPlan {
-  type: BlockProjectPaymentPlanType;
   downPaymentPercentage: number;
+  downPaymentAmount?: number;
+  barterPercentage?: number;
+  barterAmount?: number;
   interestPercentage: number;
-  advancePaymentPercentage: number;
+  completionPaymentPercentage: number;
+  completionPaymentAmount?: number;
   discountPercentage: number;
   description: string;
   installment: number;
@@ -31,7 +33,9 @@ export interface IContractPaymentPlan {
   paymentDates: number[];
   paymentDueDates?: Date[];
   firstPaymentDate?: Date;
-  advancePaymentDate?: Date;
+  downPaymentDate?: Date;
+  completionPaymentDate?: Date;
+  completionPaymentDateLabel?: string;
   interestType: BlockProjectPaymentPlanInterestType;
 }
 
@@ -43,8 +47,6 @@ export interface IContract {
   amount: number;
   currency: string;
   status: string;
-  startDate: Date;
-  endDate: Date;
   party: IContractParty;
   paymentPlan: IContractPaymentPlan;
   user: string;

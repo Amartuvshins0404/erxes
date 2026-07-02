@@ -3,6 +3,7 @@ import { gql } from '@apollo/client';
 export const SUPPLIER_FRAGMENT = gql`
   fragment SupplierFields on Supplier {
     _id
+    code
     name
     description
     about
@@ -18,6 +19,8 @@ export const SUPPLIER_FRAGMENT = gql`
     phones
     dateFounded
     website
+    paymentId
+    posToken
     verificationStatus
     verificationNote
     tierLevel

@@ -2,109 +2,37 @@ import { useOffers } from '../hooks/useOffers';
 import { IOffer } from '../types/offerTypes';
 import { InfoCard, InfoCardContent } from '@/block/components/card';
 import { OfferAddSheet } from '@/offer/components/OfferAdd';
+import { offerDetailSheetState } from '@/offer/states/offerDetailSheetState';
 import { IconDots, IconMail, IconPencil } from '@tabler/icons-react';
 import { format } from 'date-fns';
 import {
+  Badge,
   Button,
   CurrencyDisplay,
   DropdownMenu,
   Empty,
-  Label,
   Spinner,
   useQueryState,
 } from 'erxes-ui';
 import { CustomersInline, CompaniesInline, MembersInline } from 'ui-modules';
+import { useSetAtom } from 'jotai';
 
-interface OffersListProps {
-  unitId?: string;
-  onSelectOffer?: (offer: IOffer) => void;
-}
-
-export function OffersList({ unitId, onSelectOffer }: OffersListProps) {
-  const { offers, loading, error } = useOffers(unitId);
-
-  if (loading) {
-    return <Spinner containerClassName="blk:py-32" />;
-  }
-
-  if (error) {
-    return (
-      <div className="flex items-center justify-center p-8">
-        <div className="text-sm text-red-500">Error loading offers</div>
-      </div>
-    );
-  }
-
-  if (!offers || offers.length === 0) {
-    return (
-      <Empty>
-        <Empty.Header>
-          <Empty.Title>No offers found</Empty.Title>
-          <Empty.Description>There seems to be no offers.</Empty.Description>
-        </Empty.Header>
-      </Empty>
-    );
-  }
-
-  return (
-    <div className="space-y-4">
-      {offers.map((offer) => (
-        <OfferItem key={offer._id} {...offer} />
-      ))}
-    </div>
-  );
-}
-
-export const OfferItem = ({
-  number,
-  party,
-  amount,
-  currency,
-  user,
-  endDate,
-}: IOffer) => {
-  return (
-    <div className="flex gap-2">
-      <div className="grid grid-cols-5 gap-2 items-center flex-auto">
-        <div className="font-medium flex items-center gap-1 truncate">
-          #{number}
-        </div>
-        <div className="truncate">{<DisplayParty party={party} />}</div>
-        <div className="flex items-center truncate">
-          <CurrencyDisplay variant="icon" code={currency} />
-          {amount.toLocaleString()}
-        </div>
-        <div className="flex items-center gap-1 truncate">
-          <MembersInline memberIds={user ? [user] : []} />
-        </div>
-        <div className="truncate">
-          {format(new Date(Number(endDate)), 'MMM dd, yyyy')}
-        </div>
-      </div>
-      <div className="w-10 text-right">
-        <DropdownMenu>
-          <DropdownMenu.Trigger asChild>
-            <Button variant="secondary" size="icon">
-              <IconDots />
-            </Button>
-          </DropdownMenu.Trigger>
-          <DropdownMenu.Content className="blk:min-w-36" align="end">
-            <DropdownMenu.Item className="cursor-pointer">
-              <IconMail className="size-4" />
-              <span>Send via Email</span>
-            </DropdownMenu.Item>
-            <DropdownMenu.Item className="cursor-pointer">
-              <IconPencil className="size-4" />
-              <span>Edit</span>
-            </DropdownMenu.Item>
-          </DropdownMenu.Content>
-        </DropdownMenu>
-      </div>
-    </div>
-  );
+const parseDate = (val: string | number | undefined) => {
+  if (!val) return null;
+  const num = Number(val);
+  const d = new Date(isNaN(num) ? val : num);
+  return isNaN(d.getTime()) ? null : d;
 };
 
-export const DisplayParty = ({ party }: { party: IOffer['party'] }) => {
+const StatusBadge = ({ status }: { status: IOffer['status'] }) => {
+  if (status === 'sent') {
+    return <Badge variant="default">Sent</Badge>;
+  }
+  return <Badge variant="secondary">Draft</Badge>;
+};
+
+const DisplayParty = ({ party }: { party: IOffer['party'] }) => {
+  if (!party?.id) return <span className="text-muted-foreground">—</span>;
   const PartyInline =
     party.type === 'customer' ? CustomersInline : CompaniesInline;
   return (
@@ -116,41 +44,132 @@ export const DisplayParty = ({ party }: { party: IOffer['party'] }) => {
   );
 };
 
-export const OffersListCard = () => {
-  const [unitId] = useQueryState<string>('unitId');
+const COLS = 'grid-cols-[1fr_2fr_1.5fr_1fr_1fr_1fr_1fr_40px]';
+
+const OfferRow = ({ offer }: { offer: IOffer }) => {
+  const offerDate = parseDate(offer.date);
+  const expiryDate = parseDate(offer.endDate);
+  const isExpired = expiryDate ? expiryDate < new Date() : false;
+  const setActiveOffer = useSetAtom(offerDetailSheetState);
+
   return (
-    <InfoCard title="Offers">
-      <InfoCardContent>
-        <div className="flex gap-2 pr-12">
-          <div className="grid grid-cols-5 gap-2 flex-auto">
-            <Label asChild>
-              <span>Number</span>
-            </Label>
-            <Label asChild>
-              <span>Customer</span>
-            </Label>
-            <Label asChild>
-              <span>Amount</span>
-            </Label>
-            <Label asChild>
-              <span>Assigned To</span>
-            </Label>
-            <Label asChild>
-              <span>Validity</span>
-            </Label>
-          </div>
-        </div>
-        <OffersList unitId={unitId || ''} />
-        <OfferAddSheet />
-      </InfoCardContent>
-    </InfoCard>
+    <div className={`grid ${COLS} gap-2 items-center px-3 py-2 border-t hover:bg-muted/40 transition-colors`}>
+      <button
+        className="font-mono text-xs text-muted-foreground text-left hover:underline"
+        onClick={() => offer._id && setActiveOffer(offer._id)}
+      >
+        #{offer.number || offer._id?.slice(-6)}
+      </button>
+      <div className="truncate text-sm">
+        <DisplayParty party={offer.party} />
+      </div>
+      <div className="flex items-center gap-1 text-sm">
+        <CurrencyDisplay variant="icon" code={offer.currency} />
+        {offer.amount?.toLocaleString() ?? '—'}
+      </div>
+      <div>
+        <StatusBadge status={offer.status ?? 'draft'} />
+      </div>
+      <div className="text-sm text-muted-foreground">
+        {offerDate ? format(offerDate, 'MMM dd, yyyy') : '—'}
+      </div>
+      <div className="text-sm text-muted-foreground">
+        {expiryDate ? (
+          <span className={isExpired ? 'text-destructive' : ''}>
+            {format(expiryDate, 'MMM dd, yyyy')}
+          </span>
+        ) : (
+          '—'
+        )}
+      </div>
+      <div className="text-sm text-muted-foreground">
+        <MembersInline memberIds={offer.user ? [offer.user] : []} />
+      </div>
+      <div>
+        <DropdownMenu>
+          <DropdownMenu.Trigger asChild>
+            <Button variant="ghost" size="icon" className="h-7 w-7">
+              <IconDots className="size-4" />
+            </Button>
+          </DropdownMenu.Trigger>
+          <DropdownMenu.Content className="blk:min-w-36" align="end">
+            <DropdownMenu.Item
+              className="cursor-pointer"
+              onClick={() => offer._id && setActiveOffer(offer._id)}
+            >
+              <IconPencil className="size-4" />
+              <span>Edit</span>
+            </DropdownMenu.Item>
+            <DropdownMenu.Item className="cursor-pointer">
+              <IconMail className="size-4" />
+              <span>Send via Email</span>
+            </DropdownMenu.Item>
+          </DropdownMenu.Content>
+        </DropdownMenu>
+      </div>
+    </div>
   );
 };
 
-export const OfferSend = ({ offer }: { offer: IOffer }) => {
+const TableHeader = () => (
+  <div className={`grid ${COLS} gap-2 px-3 py-2 text-xs font-medium text-muted-foreground uppercase bg-muted/30`}>
+    <span>#</span>
+    <span>Customer</span>
+    <span>Amount</span>
+    <span>Status</span>
+    <span>Date</span>
+    <span>Expiry</span>
+    <span>Assigned to</span>
+    <span />
+  </div>
+);
+
+export function OffersList({ unitId }: { unitId?: string }) {
+  const { offers, loading, error } = useOffers(unitId);
+
+  if (loading) return <Spinner containerClassName="blk:py-16" />;
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center p-8 text-sm text-destructive">
+        Error loading offers
+      </div>
+    );
+  }
+
+  if (!offers?.length) {
+    return (
+      <Empty>
+        <Empty.Header>
+          <Empty.Title>No offers yet</Empty.Title>
+          <Empty.Description>
+            Create the first offer for this unit.
+          </Empty.Description>
+        </Empty.Header>
+      </Empty>
+    );
+  }
+
   return (
-    <div className="flex items-center gap-1">
-      <Button variant="secondary">View</Button>
+    <div className="rounded-md border overflow-hidden">
+      <TableHeader />
+      {offers.map((offer) => (
+        <OfferRow key={offer._id} offer={offer} />
+      ))}
     </div>
+  );
+}
+
+export const OffersListCard = () => {
+  const [unitId] = useQueryState<string>('unitId');
+  return (
+    <InfoCard title={`Offers`}>
+      <InfoCardContent>
+        <OffersList unitId={unitId || ''} />
+        <div className="flex justify-end pt-2">
+          <OfferAddSheet />
+        </div>
+      </InfoCardContent>
+    </InfoCard>
   );
 };

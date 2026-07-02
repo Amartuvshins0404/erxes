@@ -22,7 +22,7 @@ export const types = `
     downPaymentPercentage: Float
     interestPercentage: Float
     interestType: BlockAdminContractInterestType
-    advancePaymentPercentage: Float
+    completionPaymentPercentage: Float
     discountPercentage: Float
     description: String
     installment: Int
@@ -46,8 +46,6 @@ export const types = `
     amount: Int
     amountType: BlockAdminContractAmountType
     status: BlockAdminContractStatus
-    startDate: String
-    endDate: String
     isLifeTime: Boolean
     party: BlockAdminContractParty
     paymentPlan: BlockAdminContractPaymentPlan

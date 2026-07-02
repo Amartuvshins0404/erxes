@@ -1,7 +1,6 @@
 import { IUIConfig } from 'erxes-ui';
 import { IconCode, IconSparkles } from '@tabler/icons-react';
 import { lazy, Suspense } from 'react';
-import { LOCKED_COMPANY_BRAIN_MODULES } from '~/modules/company-brain/constants/lockedCompanyBrainModules';
 
 const AgentNavigation = lazy(() =>
   import('./modules/AgentNavigation').then((module) => ({
@@ -32,10 +31,5 @@ export const CONFIG: IUIConfig = {
       icon: IconCode,
       path: 'agent/agents',
     },
-    ...LOCKED_COMPANY_BRAIN_MODULES.map((module) => ({
-      name: module.name,
-      icon: module.icon,
-      path: `agent/${module.slug}`,
-    })),
   ],
 };

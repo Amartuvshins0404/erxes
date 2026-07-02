@@ -10,6 +10,10 @@ export const PROPERTY_OPERATOR = {
       label: 'Set',
     },
     {
+      value: 'clear',
+      label: 'Clear',
+    },
+    {
       value: 'concat',
       label: 'Concat',
     },
@@ -18,6 +22,10 @@ export const PROPERTY_OPERATOR = {
     {
       value: 'set',
       label: 'Set',
+    },
+    {
+      value: 'clear',
+      label: 'Clear',
     },
     {
       value: 'addDay',
@@ -49,11 +57,45 @@ export const PROPERTY_OPERATOR = {
       value: 'set',
       label: 'Set',
     },
+    {
+      value: 'clear',
+      label: 'Clear',
+    },
+  ],
+  Array: [
+    {
+      value: 'set',
+      label: 'Set',
+    },
+    {
+      value: 'clear',
+      label: 'Clear',
+    },
+    {
+      value: 'split',
+      label: 'Split',
+    },
+    {
+      value: 'push',
+      label: 'Push',
+    },
+    {
+      value: 'addToSet',
+      label: 'Add unique',
+    },
+    {
+      value: 'pull',
+      label: 'Pull',
+    },
   ],
   Default: [
     {
       value: 'set',
       label: 'Set',
+    },
+    {
+      value: 'clear',
+      label: 'Clear',
     },
   ],
 };
@@ -70,6 +112,11 @@ export const AUTOMATION_HISTORIES_CURSOR_SESSION_KEY =
   'automation-histories-cursor';
 export const AUTOMATION_RECORD_TABLE_FILTERS_SESSION_KEY =
   'automation-record-table-filters-cursor';
+
+export const AUTOMATION_APPROVAL_CONTENT_TYPES = {
+  AUTOMATION: 'core:automation',
+  AUTOMATION_AI_AGENT: 'core:automation_ai_agent',
+} as const;
 
 export const AUTOMATION_LIBRARY_TABS = [
   {

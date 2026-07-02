@@ -2,6 +2,7 @@ import { initTRPC } from '@trpc/server';
 import { escapeRegExp } from 'erxes-api-shared/utils';
 import { z } from 'zod';
 import { CoreTRPCContext } from '~/init-trpc';
+import { similaritiesTrpcRouter } from '@/products/trpc/similarity';
 
 const t = initTRPC.context<CoreTRPCContext>().create();
 
@@ -9,6 +10,7 @@ const inventoryKey = (id?: string) => id || '_';
 
 export const productsTrpcRouter = t.router({
   products: t.router({
+    similarities: similaritiesTrpcRouter,
     find: t.procedure.input(z.any()).query(async ({ ctx, input }) => {
       const {
         query: rawQuery,
@@ -98,16 +100,25 @@ export const productsTrpcRouter = t.router({
       .input(z.any())
       .mutation(async ({ ctx, input }) => {
         const { query, doc } = input;
-        const { models } = ctx;
+        const { models, subdomain } = ctx;
 
-        return models.Products.updateMany(query, doc);
+        console.log(
+          `[${subdomain}][trpc:updateProducts] called`,
+          JSON.stringify({ query, doc }),
+        );
+
+        return models.Products.updateProducts(query, doc);
       }),
 
     removeProducts: t.procedure
       .input(z.any())
       .mutation(async ({ ctx, input }) => {
         const { _ids } = input;
-        const { models } = ctx;
+        const { models, subdomain } = ctx;
+
+        console.log(
+          `[${subdomain}][trpc:removeProducts] called with ${_ids?.length ?? 0} id(s)`,
+        );
 
         return models.Products.removeProducts(_ids);
       }),
@@ -146,7 +157,6 @@ export const productsTrpcRouter = t.router({
         return models.ProductRules.find({ _id: { $in: _ids } }).lean();
       }),
     }),
-
 
     setInventories: t.procedure
       .input(

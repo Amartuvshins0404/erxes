@@ -5,17 +5,41 @@ import { IContext } from '~/connectionResolvers';
 export const associationQueries: Record<string, Resolver> = {
   async mtoAssociations(
     _root: undefined,
-    { isActive, parentId }: { isActive?: boolean; parentId?: string },
+    {
+      isActive,
+      parentId,
+      onlyTopLevel,
+      level,
+    }: {
+      isActive?: boolean;
+      parentId?: string;
+      onlyTopLevel?: boolean;
+      level?: string;
+    },
     { models }: IContext,
   ) {
-    const filter: any = {};
+    const filter: Record<string, unknown> = {};
 
     if (isActive !== undefined) {
       filter.isActive = isActive;
     }
 
-    if (parentId !== undefined) {
+    if (level) {
+      filter.level = level;
+    } else if (parentId !== undefined) {
       filter.parentId = parentId;
+    } else if (onlyTopLevel) {
+      filter.$or = [
+        { level: 'main' },
+        {
+          level: { $exists: false },
+          $or: [
+            { parentId: { $exists: false } },
+            { parentId: null },
+            { parentId: '' },
+          ],
+        },
+      ];
     }
 
     return models.Association.find(filter).sort({ createdAt: 1 });

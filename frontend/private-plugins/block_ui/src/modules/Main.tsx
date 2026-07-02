@@ -37,9 +37,21 @@ const OpptysPage = lazy(() =>
   })),
 );
 
+const OffersPage = lazy(() =>
+  import('~/pages/OffersPage').then((module) => ({
+    default: module.OffersPage,
+  })),
+);
+
 const PaymentsPage = lazy(() =>
   import('~/pages/PaymentsPage').then((module) => ({
     default: module.PaymentsPage,
+  })),
+);
+
+const OverviewPage = lazy(() =>
+  import('~/pages/OverviewPage').then((module) => ({
+    default: module.OverviewPage,
   })),
 );
 
@@ -51,8 +63,10 @@ const Main = () => {
         <Route path="/projects/:id" element={<ProjectDetail />} />
 
         <Route path="project/:projectId">
+          <Route path="overview" element={<OverviewPage />} />
           <Route path="stacking-plan" element={<StackingPlanPage />} />
           <Route path="opportunities" element={<OpptysPage />} />
+          <Route path="offers" element={<OffersPage />} />
           <Route path="contracts" element={<ContractsPage />} />
           <Route path="payments" element={<PaymentsPage />} />
         </Route>

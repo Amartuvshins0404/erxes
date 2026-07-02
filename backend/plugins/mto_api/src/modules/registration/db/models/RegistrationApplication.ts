@@ -1,6 +1,7 @@
 import {
   IRegistrationApplication,
   RegistrationApplicationStatus,
+  RegistrationPaymentStatus,
 } from '@/registration/@types/registrationApplication';
 import { IRegistrationApplicationDocument } from '@/registration/@types/registrationApplicationDocument';
 import { Model } from 'mongoose';
@@ -18,6 +19,9 @@ export interface IRegistrationApplicationModel extends Model<IRegistrationApplic
       answers?: Record<string, unknown>;
       status?: RegistrationApplicationStatus;
       cpUserId?: string | null;
+      invoiceId?: string;
+      paymentStatus?: RegistrationPaymentStatus;
+      membershipFeeAmount?: number;
     },
   ): Promise<IRegistrationApplicationDocument | null>;
   markAsRead(
@@ -43,12 +47,25 @@ export const loadRegistrationApplicationClass = (models: IModels) => {
         answers?: Record<string, unknown>;
         status?: RegistrationApplicationStatus;
         cpUserId?: string | null;
+        invoiceId?: string;
+        paymentStatus?: RegistrationPaymentStatus;
+        membershipFeeAmount?: number;
       },
     ) {
       const hasAnswers = patch.answers !== undefined;
       const hasStatus = patch.status !== undefined;
       const hasCpUserId = patch.cpUserId !== undefined;
-      if (!hasAnswers && !hasStatus && !hasCpUserId) {
+      const hasInvoiceId = patch.invoiceId !== undefined;
+      const hasPaymentStatus = patch.paymentStatus !== undefined;
+      const hasMembershipFeeAmount = patch.membershipFeeAmount !== undefined;
+      if (
+        !hasAnswers &&
+        !hasStatus &&
+        !hasCpUserId &&
+        !hasInvoiceId &&
+        !hasPaymentStatus &&
+        !hasMembershipFeeAmount
+      ) {
         throw new Error('Nothing to update');
       }
 
@@ -66,6 +83,15 @@ export const loadRegistrationApplicationClass = (models: IModels) => {
         } else {
           $set.cpUserId = patch.cpUserId;
         }
+      }
+      if (hasInvoiceId) {
+        $set.invoiceId = patch.invoiceId;
+      }
+      if (hasPaymentStatus) {
+        $set.paymentStatus = patch.paymentStatus;
+      }
+      if (hasMembershipFeeAmount) {
+        $set.membershipFeeAmount = patch.membershipFeeAmount;
       }
 
       const update: Record<string, unknown> = { $set };

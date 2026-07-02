@@ -9,8 +9,6 @@ const CONTRACT_ACTIVITY_FIELDS = [
   { field: 'amount', label: 'Amount' },
   { field: 'currency', label: 'Currency' },
   { field: 'date', label: 'Contract Date' },
-  { field: 'startDate', label: 'Start Date' },
-  { field: 'endDate', label: 'End Date' },
   { field: 'description', label: 'Description' },
   { field: 'party', label: 'Party' },
   { field: 'unit', label: 'Unit' },

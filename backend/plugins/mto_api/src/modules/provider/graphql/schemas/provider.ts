@@ -25,8 +25,12 @@ export const types = `
     _id: String
     name: MtoMultilingualString
     logo: String
+    level: String
     parentId: String
+    parent: MtoActivityAssociation
     isActive: Boolean
+    createdAt: Date
+    modifiedAt: Date
   }
 
   type MtoContactInfo {

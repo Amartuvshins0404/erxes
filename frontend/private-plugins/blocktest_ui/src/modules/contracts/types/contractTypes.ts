@@ -40,7 +40,7 @@ export interface IContractPaymentPlan {
   downPaymentPercentage?: number;
   interestPercentage?: number;
   interestType?: ContractInterestType;
-  advancePaymentPercentage?: number;
+  completionPaymentPercentage?: number;
   discountPercentage?: number;
   description?: string;
   installment?: number;

@@ -36,6 +36,7 @@ export interface ISupplierAddress {
 }
 
 export interface ISupplier {
+  code?: string;
   name?: string;
   description?: string;
   about?: string;
@@ -51,6 +52,8 @@ export interface ISupplier {
   phones?: string[];
   dateFounded?: string;
   website?: string;
+  paymentId?: string;
+  posToken?: string;
   verificationStatus?: string;
   verificationNote?: string;
   tierLevel?: number;

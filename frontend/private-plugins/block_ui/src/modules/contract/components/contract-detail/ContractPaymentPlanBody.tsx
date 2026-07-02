@@ -1,6 +1,7 @@
-import { InfoCard, Table } from 'erxes-ui';
+import { InfoCard, Spinner, Table } from 'erxes-ui';
 import { format } from 'date-fns';
 import { IContract } from '@/contract/types/contractTypes';
+import { useContractPayments } from '@/contract-payment/hooks/usePayments';
 import {
   formatDate,
   generateInstallmentDates,
@@ -41,11 +42,20 @@ export const ContractPaymentPlanBody = ({
         <InfoCard.Content className="shadow-none p-0 overflow-hidden">
           <Table>
             <Table.Body className="bt:[&_td]:px-2 bt:[&_tr:first-child_td]:border-t bt:[&_td]:h-10">
-              {renderRow('Type', paymentPlan.type, true)}
               {renderRow(
                 'Down Payment',
-                paymentPlan.downPaymentPercentage != null
+                (paymentPlan.downPaymentAmount || 0) > 0
+                  ? paymentPlan.downPaymentAmount!.toLocaleString()
+                  : paymentPlan.downPaymentPercentage != null
                   ? `${paymentPlan.downPaymentPercentage}%`
+                  : null,
+              )}
+              {renderRow(
+                'Barter',
+                (paymentPlan.barterAmount || 0) > 0
+                  ? paymentPlan.barterAmount!.toLocaleString()
+                  : (paymentPlan.barterPercentage || 0) > 0
+                  ? `${paymentPlan.barterPercentage}%`
                   : null,
               )}
               {renderRow(
@@ -56,9 +66,9 @@ export const ContractPaymentPlanBody = ({
               )}
               {renderRow('Interest Type', paymentPlan.interestType)}
               {renderRow(
-                'Advance Payment',
-                paymentPlan.advancePaymentPercentage != null
-                  ? `${paymentPlan.advancePaymentPercentage}%`
+                'Completion Payment',
+                paymentPlan.completionPaymentPercentage != null
+                  ? `${paymentPlan.completionPaymentPercentage}%`
                   : null,
               )}
               {renderRow(
@@ -83,15 +93,21 @@ export const ContractPaymentPlanBody = ({
               )}
               {renderRow('Description', paymentPlan.description)}
               {renderRow(
+                'Down Payment Due',
+                paymentPlan.downPaymentDate
+                  ? formatDate(paymentPlan.downPaymentDate)
+                  : null,
+              )}
+              {renderRow(
                 'First Installment Date',
                 paymentPlan.firstPaymentDate
                   ? formatDate(paymentPlan.firstPaymentDate)
                   : null,
               )}
               {renderRow(
-                'Advance Payment Date',
-                paymentPlan.advancePaymentDate
-                  ? formatDate(paymentPlan.advancePaymentDate)
+                'Completion Payment Date',
+                paymentPlan.completionPaymentDate
+                  ? formatDate(paymentPlan.completionPaymentDate)
                   : null,
               )}
               {renderRow(
@@ -110,46 +126,134 @@ export const ContractPaymentPlanBody = ({
   );
 };
 
-const PaymentSchedule = ({ contract }: { contract: IContract }) => {
-  const { paymentPlan, amount, currency } = contract;
-  if (!paymentPlan) return null;
+type ScheduleRow = {
+  key: string;
+  label: string;
+  date: string;
+  type: string;
+  amount: number;
+};
+
+const computeRowsFromPlan = (contract: IContract): ScheduleRow[] => {
+  const { paymentPlan, amount, date: contractDateRaw } = contract;
+  if (!paymentPlan) return [];
 
   const totalPrice = amount || 0;
-  const downPct = paymentPlan.downPaymentPercentage || 0;
-  const advancePct = paymentPlan.advancePaymentPercentage || 0;
   const discountPct = paymentPlan.discountPercentage || 0;
+  const downPct = paymentPlan.downPaymentPercentage || 0;
+  const barterPct = paymentPlan.barterPercentage || 0;
+  const completionPct = paymentPlan.completionPaymentPercentage || 0;
   const interestPct = paymentPlan.interestPercentage || 0;
   const interestType = paymentPlan.interestType || 'FLAT';
   const frequency = paymentPlan.frequency;
   const isOneTime = frequency === 'ONE_TIME';
-  const installmentCount = isOneTime
-    ? 0
-    : Math.max(0, paymentPlan.installment || 0);
+  const installmentCount = isOneTime ? 0 : Math.max(0, paymentPlan.installment || 0);
   const ppy = periodsPerYear(frequency);
-
-  if (!totalPrice && installmentCount === 0 && !isOneTime) return null;
 
   const discountAmount = (totalPrice * discountPct) / 100;
   const priceAfterDiscount = totalPrice - discountAmount;
-  const downAmount = (priceAfterDiscount * downPct) / 100;
-  const advanceAmount = (priceAfterDiscount * advancePct) / 100;
-  const principal = priceAfterDiscount - downAmount - advanceAmount;
-  const principalPerInstallment =
-    installmentCount > 0 ? principal / installmentCount : 0;
+  const downAmount = (paymentPlan.downPaymentAmount || 0) > 0
+    ? paymentPlan.downPaymentAmount!
+    : (priceAfterDiscount * downPct) / 100;
+  const barterValue = (paymentPlan.barterAmount || 0) > 0
+    ? paymentPlan.barterAmount!
+    : (priceAfterDiscount * barterPct) / 100;
+  const completionAmount = (paymentPlan.completionPaymentAmount || 0) > 0
+    ? paymentPlan.completionPaymentAmount!
+    : (priceAfterDiscount * completionPct) / 100;
+  const principal = priceAfterDiscount - downAmount - barterValue - completionAmount;
 
-  const contractDate = parseDateLike(contract.date) || new Date();
-  const firstInstallmentStart =
-    parseDateLike(paymentPlan.firstPaymentDate) ||
-    parseDateLike(contract.startDate) ||
-    contractDate;
-  const installmentDates = generateInstallmentDates(
+  const roundedAmount = paymentPlan.roundedInstallmentAmount || 0;
+  const basePerInstallment = installmentCount > 0
+    ? (roundedAmount > 0 ? roundedAmount : principal / installmentCount)
+    : 0;
+
+  const savedAmounts: number[] = paymentPlan.installmentAmounts || [];
+  const effectivePrincipals = Array.from({ length: installmentCount }, (_, i) => {
+    return savedAmounts[i] > 0 ? savedAmounts[i] : basePerInstallment;
+  });
+  if (installmentCount > 0) {
+    const sumOfOthers = effectivePrincipals.slice(0, -1).reduce((a, b) => a + b, 0);
+    const lastSaved = savedAmounts[installmentCount - 1];
+    effectivePrincipals[installmentCount - 1] = lastSaved > 0 ? lastSaved : principal - sumOfOthers;
+  }
+
+  const contractDate = parseDateLike(contractDateRaw) || new Date();
+  const firstInstallmentStart = parseDateLike(paymentPlan.firstPaymentDate) || contractDate;
+  const autoDates = generateInstallmentDates(
     firstInstallmentStart,
     installmentCount,
     frequency,
     paymentPlan.paymentDates || [],
   );
+  const customDueDates = paymentPlan.paymentDueDates || [];
+  const getDate = (i: number): Date | null => {
+    const override = customDueDates[i] ? parseDateLike(customDueDates[i]) : null;
+    return override || autoDates[i] || null;
+  };
 
-  const contractDateStr = formatDate(contract.date) || '-';
+  const getInterest = (i: number): number => {
+    if (interestPct <= 0 || installmentCount <= 0) return 0;
+    if (interestType === 'FLAT') return (principal * interestPct) / 100 / installmentCount;
+    if (interestType === 'REDUCING') {
+      const paidSoFar = effectivePrincipals.slice(0, i).reduce((a, b) => a + b, 0);
+      return ((principal - paidSoFar) * interestPct) / 100 / ppy;
+    }
+    return ((principal * interestPct) / 100) * (installmentCount / ppy) / installmentCount;
+  };
+
+  const fmtDate = (d: Date | null) => (d ? format(d, 'dd.MM.yyyy') : '-');
+  const contractDateStr = fmtDate(contractDate);
+  const downDateStr = fmtDate(parseDateLike(paymentPlan.downPaymentDate)) || contractDateStr;
+
+  const rows: ScheduleRow[] = [];
+
+  if (isOneTime) {
+    const totalInterest = (priceAfterDiscount * interestPct) / 100;
+    rows.push({
+      key: 'one-time',
+      label: 'Full payment',
+      date: contractDateStr,
+      type: 'One-time',
+      amount: priceAfterDiscount + totalInterest,
+    });
+    return rows;
+  }
+
+  if (barterValue > 0) {
+    rows.push({ key: 'barter', label: 'Barter', date: contractDateStr, type: 'Barter', amount: barterValue });
+  }
+  if (downAmount > 0) {
+    rows.push({ key: 'down', label: 'Reservation', date: downDateStr, type: 'Down payment', amount: downAmount });
+  }
+  for (let i = 0; i < installmentCount; i++) {
+    const p = effectivePrincipals[i];
+    const interest = getInterest(i);
+    rows.push({
+      key: `inst-${i}`,
+      label: String(i + 1),
+      date: fmtDate(getDate(i)),
+      type: 'Progress payment',
+      amount: p + interest,
+    });
+  }
+  if (completionAmount > 0) {
+    const completionDateStr = fmtDate(parseDateLike(paymentPlan.completionPaymentDate));
+    rows.push({
+      key: 'completion',
+      label: 'Completion',
+      date: completionDateStr || contractDateStr,
+      type: 'Completion payment',
+      amount: completionAmount,
+    });
+  }
+
+  return rows;
+};
+
+const PaymentSchedule = ({ contract }: { contract: IContract }) => {
+  const { payments, loading } = useContractPayments(contract._id);
+  const { currency } = contract;
 
   const fmt = (val: number) =>
     new Intl.NumberFormat('mn-MN', {
@@ -157,21 +261,6 @@ const PaymentSchedule = ({ contract }: { contract: IContract }) => {
       currency: currency || 'MNT',
       minimumFractionDigits: 0,
     }).format(val);
-
-  const getInterest = (index: number) => {
-    if (interestPct <= 0 || installmentCount <= 0) return 0;
-    if (interestType === 'FLAT') {
-      return (principal * interestPct) / 100 / installmentCount;
-    }
-    if (interestType === 'REDUCING') {
-      const remaining = principal - principalPerInstallment * index;
-      return (remaining * interestPct) / 100 / ppy;
-    }
-    // SIMPLE: annualized total interest spread equally
-    return ((principal * interestPct) / 100) * (installmentCount / ppy) / installmentCount;
-  };
-
-  let grandTotal = 0;
 
   const Header = ({ children }: { children: React.ReactNode }) => (
     <div className="px-2 py-2 text-xs font-medium text-muted-foreground uppercase">
@@ -182,144 +271,53 @@ const PaymentSchedule = ({ contract }: { contract: IContract }) => {
     <div className="px-2 py-2 border-t text-sm">{children}</div>
   );
 
-  const hasInterest = interestPct > 0;
-  const hasDiscount = discountPct > 0;
+  if (loading) {
+    return (
+      <InfoCard title="Payment Schedule">
+        <InfoCard.Content className="shadow-none p-4">
+          <Spinner />
+        </InfoCard.Content>
+      </InfoCard>
+    );
+  }
+
+  // Use stored payment records if they exist (signed contract),
+  // otherwise compute from saved paymentPlan fields (matches editor preview)
+  const rows: ScheduleRow[] = payments.length > 0
+    ? payments.map((p, i) => ({
+        key: p._id,
+        label: String(i + 1),
+        date: p.dueDate ? format(new Date(p.dueDate), 'dd.MM.yyyy') : '-',
+        type: p.label || '-',
+        amount: p.amount || 0,
+      }))
+    : computeRowsFromPlan(contract);
+
+  if (!rows.length) return null;
+
+  const grandTotal = rows.reduce((s, r) => s + r.amount, 0);
 
   return (
     <InfoCard title="Payment Schedule">
       <InfoCard.Content className="shadow-none p-0 overflow-hidden">
-        <div
-          className={`grid ${
-            hasInterest ? 'grid-cols-7' : 'grid-cols-5'
-          } bg-sidebar`}
-        >
-          <Header>Payment</Header>
+        <div className="grid grid-cols-4 bg-sidebar">
+          <Header>#</Header>
           <Header>Date</Header>
           <Header>Type</Header>
-          <Header>Principal</Header>
-          {hasInterest && <Header>Interest</Header>}
-          {hasInterest && <Header>Interest %</Header>}
-          <Header>Total</Header>
+          <Header>Amount</Header>
         </div>
-        {isOneTime ? (
-          (() => {
-            const totalInterest = (priceAfterDiscount * interestPct) / 100;
-            const rowTotal = priceAfterDiscount + totalInterest;
-            grandTotal = rowTotal;
-            return (
-              <div
-                className={`grid ${
-                  hasInterest ? 'grid-cols-7' : 'grid-cols-5'
-                }`}
-              >
-                <Cell>Full payment</Cell>
-                <Cell>{contractDateStr}</Cell>
-                <Cell>One-time</Cell>
-                <Cell>{fmt(priceAfterDiscount)}</Cell>
-                {hasInterest && <Cell>{fmt(totalInterest)}</Cell>}
-                {hasInterest && <Cell>{interestPct}%</Cell>}
-                <Cell>{fmt(rowTotal)}</Cell>
-              </div>
-            );
-          })()
-        ) : (
-          <>
-            {downAmount > 0 &&
-              (() => {
-                grandTotal += downAmount;
-                return (
-                  <div
-                    className={`grid ${
-                      hasInterest ? 'grid-cols-7' : 'grid-cols-5'
-                    }`}
-                  >
-                    <Cell>Reservation</Cell>
-                    <Cell>{contractDateStr}</Cell>
-                    <Cell>Down payment</Cell>
-                    <Cell>{fmt(downAmount)}</Cell>
-                    {hasInterest && <Cell>-</Cell>}
-                    {hasInterest && <Cell>-</Cell>}
-                    <Cell>{fmt(downAmount)}</Cell>
-                  </div>
-                );
-              })()}
-            {advanceAmount > 0 &&
-              (() => {
-                grandTotal += advanceAmount;
-                const advanceDateStr = paymentPlan.advancePaymentDate
-                  ? formatDate(paymentPlan.advancePaymentDate) || contractDateStr
-                  : contractDateStr;
-                return (
-                  <div
-                    className={`grid ${
-                      hasInterest ? 'grid-cols-7' : 'grid-cols-5'
-                    }`}
-                  >
-                    <Cell>Advance</Cell>
-                    <Cell>{advanceDateStr}</Cell>
-                    <Cell>Advance payment</Cell>
-                    <Cell>{fmt(advanceAmount)}</Cell>
-                    {hasInterest && <Cell>-</Cell>}
-                    {hasInterest && <Cell>-</Cell>}
-                    <Cell>{fmt(advanceAmount)}</Cell>
-                  </div>
-                );
-              })()}
-            {Array.from({ length: installmentCount }).map((_, index) => {
-              const isLast = index === installmentCount - 1;
-              const date = installmentDates[index];
-              const interest = getInterest(index);
-              const rowTotal = principalPerInstallment + interest;
-              grandTotal += rowTotal;
-              return (
-                <div
-                  key={index}
-                  className={`grid ${
-                    hasInterest ? 'grid-cols-7' : 'grid-cols-5'
-                  }`}
-                >
-                  <Cell>{index + 1}</Cell>
-                  <Cell>
-                    {date
-                      ? format(date, 'dd.MM.yyyy')
-                      : isLast
-                      ? 'Key handover'
-                      : '-'}
-                  </Cell>
-                  <Cell>{isLast ? 'Final payment' : 'Progress payment'}</Cell>
-                  <Cell>{fmt(principalPerInstallment)}</Cell>
-                  {hasInterest && <Cell>{fmt(interest)}</Cell>}
-                  {hasInterest && (
-                    <Cell>
-                      {interestType === 'REDUCING'
-                        ? `${(
-                            (interest /
-                              (principal - principalPerInstallment * index)) *
-                            100 *
-                            ppy
-                          ).toFixed(1)}%`
-                        : `${interestPct}%`}
-                    </Cell>
-                  )}
-                  <Cell>{fmt(rowTotal)}</Cell>
-                </div>
-              );
-            })}
-          </>
-        )}
-        <div
-          className={`grid ${
-            hasInterest ? 'grid-cols-7' : 'grid-cols-5'
-          } bg-sidebar border-t font-medium`}
-        >
+        {rows.map((row) => (
+          <div key={row.key} className="grid grid-cols-4">
+            <Cell>{row.label}</Cell>
+            <Cell>{row.date}</Cell>
+            <Cell>{row.type}</Cell>
+            <Cell>{fmt(row.amount)}</Cell>
+          </div>
+        ))}
+        <div className="grid grid-cols-4 bg-sidebar border-t font-medium">
           <Cell>Total</Cell>
-          <Cell>{hasDiscount ? `Discount: ${fmt(discountAmount)}` : ' '}</Cell>
           <Cell> </Cell>
-          <Cell>{fmt(principal + downAmount)}</Cell>
-          {hasInterest && (
-            <Cell>{fmt(grandTotal - (principal + downAmount))}</Cell>
-          )}
-          {hasInterest && <Cell> </Cell>}
+          <Cell> </Cell>
           <Cell>{fmt(grandTotal)}</Cell>
         </div>
       </InfoCard.Content>

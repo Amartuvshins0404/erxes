@@ -2,6 +2,8 @@ import {
   IconTags,
   IconClipboardList,
   IconForms,
+  IconCalendarEvent,
+  IconCategory,
 } from '@tabler/icons-react';
 import { Button } from 'erxes-ui';
 import { Link } from 'react-router-dom';
@@ -37,6 +39,22 @@ export function IndexPage() {
                   <Link to="/mto/associations">
                     <IconTags />
                     Associations
+                  </Link>
+                </Button>
+              )}
+              {!isSlaveMode && (
+                <Button asChild>
+                  <Link to="/mto/categories">
+                    <IconCategory />
+                    Categories
+                  </Link>
+                </Button>
+              )}
+              {!isSlaveMode && (
+                <Button asChild>
+                  <Link to="/mto/events">
+                    <IconCalendarEvent />
+                    Events
                   </Link>
                 </Button>
               )}

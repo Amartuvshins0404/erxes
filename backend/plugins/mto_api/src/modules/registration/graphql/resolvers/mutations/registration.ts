@@ -16,6 +16,11 @@ import {
   validateAnswersOrThrow,
 } from '@/registration/graphql/utils/registrationApplicationMutations';
 import { mapRegistrationApplicationGql } from '@/registration/utils/mapRegistrationApplicationGql';
+import {
+  getRegistrationPaymentUrl,
+  maybeCreateRegistrationInvoiceOnApproval,
+} from '@/registration/utils/registrationPayment';
+import { getRegistrationFormDefinition } from '@/registration/schemas/registry';
 
 interface SubmitArgs {
   membershipTypeId: string;
@@ -34,6 +39,52 @@ interface UpdateApplicationArgs {
 interface MarkReadArgs {
   _id: string;
   isRead?: boolean | null;
+}
+
+interface ApplicationIdArgs {
+  _id: string;
+}
+
+async function resolveMembershipTypeTitle(
+  models: IContext['models'],
+  membershipTypeId: string,
+  schemaVersion: string,
+): Promise<string> {
+  const def = await getRegistrationFormDefinition(
+    models,
+    membershipTypeId,
+    schemaVersion,
+  );
+  return def?.title ?? membershipTypeId;
+}
+
+async function finalizeStaffApplicationUpdate(
+  existing: { status?: string; membershipTypeId: string; schemaVersion: string },
+  updated: NonNullable<
+    Awaited<
+      ReturnType<IContext['models']['RegistrationApplication']['updateApplicationById']>
+    >
+  >,
+  context: IContext,
+) {
+  const { models } = context;
+  const membershipTypeTitle = await resolveMembershipTypeTitle(
+    models,
+    updated.membershipTypeId,
+    updated.schemaVersion,
+  );
+
+  const withInvoice = await maybeCreateRegistrationInvoiceOnApproval(
+    existing.status,
+    updated,
+    context,
+    membershipTypeTitle,
+  );
+
+  return mapRegistrationApplicationGql(
+    models,
+    toPlainRegistrationDoc(withInvoice),
+  );
 }
 
 function resolveSubmitCpUserId(
@@ -193,10 +244,7 @@ export const registrationMutations: Record<string, Resolver> = {
       throw new Error('Application not found');
     }
 
-    return mapRegistrationApplicationGql(
-      models,
-      toPlainRegistrationDoc(updated),
-    );
+    return finalizeStaffApplicationUpdate(existing, updated, context);
   },
 
   async cpMtoRegistrationApplicationUpdate(
@@ -275,6 +323,69 @@ export const registrationMutations: Record<string, Resolver> = {
     }
 
     return mapRegistrationApplicationGql(models, toPlainRegistrationDoc(updated));
+  },
+
+  async mtoRegistrationApplicationVerifyManualPayment(
+    _root: undefined,
+    { _id }: ApplicationIdArgs,
+    context: IContext,
+  ) {
+    if (context.cpUser) {
+      throw new Error('Forbidden');
+    }
+
+    const { models, subdomain } = context;
+
+    const existing = await models.RegistrationApplication.findOne({
+      _id,
+      subdomain,
+    }).lean();
+
+    if (!existing) {
+      throw new Error('Application not found');
+    }
+
+    const updated = await models.RegistrationApplication.updateApplicationById(
+      _id,
+      subdomain,
+      { paymentStatus: 'manual_verified' },
+    );
+
+    if (!updated) {
+      throw new Error('Application not found');
+    }
+
+    return mapRegistrationApplicationGql(
+      models,
+      toPlainRegistrationDoc(updated),
+    );
+  },
+
+  async mtoRegistrationApplicationPaymentUrl(
+    _root: undefined,
+    { _id }: ApplicationIdArgs,
+    context: IContext,
+  ) {
+    if (context.cpUser) {
+      throw new Error('Forbidden');
+    }
+
+    const { models, subdomain } = context;
+
+    const existing = await models.RegistrationApplication.findOne({
+      _id,
+      subdomain,
+    }).lean();
+
+    if (!existing) {
+      throw new Error('Application not found');
+    }
+
+    if (!existing.invoiceId) {
+      throw new Error('No payment invoice exists for this application.');
+    }
+
+    return getRegistrationPaymentUrl(existing.invoiceId, subdomain);
   },
 };
 

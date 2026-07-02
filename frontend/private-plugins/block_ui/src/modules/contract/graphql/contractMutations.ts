@@ -10,8 +10,7 @@ export const CREATE_CONTRACT = gql`
       date
       amount
       status
-      startDate
-      endDate
+
 
       party {
         type
@@ -20,19 +19,27 @@ export const CREATE_CONTRACT = gql`
       paymentPlan {
         type
         downPaymentPercentage
+        downPaymentAmount
+        barterPercentage
+        barterAmount
         interestPercentage
         interestType
-        advancePaymentPercentage
+        completionPaymentPercentage
+        completionPaymentAmount
         discountPercentage
         description
         installment
         frequency
         penaltyPercentage
         vatIncluded
+        roundedInstallmentAmount
+        installmentAmounts
         paymentDates
         paymentDueDates
         firstPaymentDate
-        advancePaymentDate
+        downPaymentDate
+        completionPaymentDate
+        completionPaymentDateLabel
       }
       user
     }
@@ -58,8 +65,7 @@ export const UPDATE_CONTRACT = gql`
       date
       amount
       status
-      startDate
-      endDate
+
 
       party {
         type
@@ -68,19 +74,27 @@ export const UPDATE_CONTRACT = gql`
       paymentPlan {
         type
         downPaymentPercentage
+        downPaymentAmount
+        barterPercentage
+        barterAmount
         interestPercentage
         interestType
-        advancePaymentPercentage
+        completionPaymentPercentage
+        completionPaymentAmount
         discountPercentage
         description
         installment
         frequency
         penaltyPercentage
         vatIncluded
+        roundedInstallmentAmount
+        installmentAmounts
         paymentDates
         paymentDueDates
         firstPaymentDate
-        advancePaymentDate
+        downPaymentDate
+        completionPaymentDate
+        completionPaymentDateLabel
       }
       user
     }

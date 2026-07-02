@@ -4,7 +4,7 @@ export const GET_PAYMENT_PLANS_BY_PROJECT = gql`
   query BlockGetProjectPaymentPlans($project: String!) {
     blockGetProjectPaymentPlans(project: $project) {
       _id
-      advancePaymentPercentage
+      completionPaymentPercentage
       description
       discountPercentage
       downPaymentPercentage

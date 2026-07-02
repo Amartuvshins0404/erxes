@@ -8,8 +8,6 @@ import {
   IconUser,
   IconCoin,
   IconCalendar,
-  IconCalendarEvent,
-  IconCalendarCheck,
   IconUserCircle,
 } from '@tabler/icons-react';
 import { ColumnDef } from '@tanstack/table-core';
@@ -145,46 +143,6 @@ export const contractsColumns = (
       id: 'date',
       accessorKey: 'date',
       header: () => <RecordTable.InlineHead label="Date" icon={IconCalendar} />,
-      cell: ({ cell }) => {
-        const d = parseDate(cell.getValue());
-        return (
-          <RecordTableInlineCell>
-            {d ? (
-              <span>{format(d, 'MMM dd, yyyy')}</span>
-            ) : (
-              <span className="text-muted-foreground">-</span>
-            )}
-          </RecordTableInlineCell>
-        );
-      },
-      size: 170,
-    },
-    {
-      id: 'startDate',
-      accessorKey: 'startDate',
-      header: () => (
-        <RecordTable.InlineHead label="Start Date" icon={IconCalendarEvent} />
-      ),
-      cell: ({ cell }) => {
-        const d = parseDate(cell.getValue());
-        return (
-          <RecordTableInlineCell>
-            {d ? (
-              <span>{format(d, 'MMM dd, yyyy')}</span>
-            ) : (
-              <span className="text-muted-foreground">-</span>
-            )}
-          </RecordTableInlineCell>
-        );
-      },
-      size: 170,
-    },
-    {
-      id: 'endDate',
-      accessorKey: 'endDate',
-      header: () => (
-        <RecordTable.InlineHead label="End Date" icon={IconCalendarCheck} />
-      ),
       cell: ({ cell }) => {
         const d = parseDate(cell.getValue());
         return (

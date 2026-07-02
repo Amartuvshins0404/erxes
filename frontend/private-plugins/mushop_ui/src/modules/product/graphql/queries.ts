@@ -42,8 +42,8 @@ const MUSHOP_PRODUCT_FRAGMENT = gql`
 `;
 
 export const PRODUCT_CATEGORIES = gql`
-  query ProductCategories {
-    productCategories {
+  query ProductCategories($searchValue: String) {
+    productCategories(searchValue: $searchValue) {
       _id
       name
       code

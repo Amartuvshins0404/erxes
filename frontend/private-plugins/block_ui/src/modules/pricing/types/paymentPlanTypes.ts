@@ -1,7 +1,7 @@
 import { PAYMENT_PLAN_FREQUENCY } from '@/pricing/constants/paymentPlans';
 
 export interface IPaymentPlanInput {
-  advancePaymentPercentage: number;
+  completionPaymentPercentage: number;
   description: string;
   discountPercentage: number;
   downPaymentPercentage: number;

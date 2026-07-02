@@ -1,11 +1,51 @@
 import { gql } from '@apollo/client';
 
+export const GET_OFFERS_LIST = gql`
+  query BlockGetOffersList(
+    $filter: BlockOfferFilterInput
+    $limit: Int
+    $cursor: String
+    $direction: String
+  ) {
+    blockGetOffersList(
+      filter: $filter
+      limit: $limit
+      cursor: $cursor
+      direction: $direction
+    ) {
+      list {
+        _id
+        amount
+
+        currency
+        date
+        endDate
+        number
+        party {
+          id
+          type
+        }
+        status
+        unit
+        user
+      }
+      pageInfo {
+        hasNextPage
+        hasPreviousPage
+        startCursor
+        endCursor
+      }
+      totalCount
+    }
+  }
+`;
+
 export const GET_OFFERS = gql`
   query BlockGetOffers($unit: String) {
     blockGetOffers(unit: $unit) {
       _id
       amount
-      amountType
+
       currency
       date
       endDate
@@ -15,60 +55,40 @@ export const GET_OFFERS = gql`
         type
       }
       paymentPlan {
-        type
         downPaymentPercentage
+        downPaymentAmount
+        barterPercentage
+        barterAmount
         interestPercentage
-        advancePaymentPercentage
+        interestType
+        completionPaymentPercentage
+        completionPaymentAmount
         discountPercentage
         description
         installment
         frequency
         penaltyPercentage
         vatIncluded
+        roundedInstallmentAmount
+        installmentAmounts
         paymentDates
+        paymentDueDates
         firstPaymentDate
-        advancePaymentDate
+        downPaymentDate
+        completionPaymentDate
+        completionPaymentDateLabel
       }
+      status
       user
     }
   }
 `;
 
 export const GET_OFFER = gql`
-  query BlockGetOffers($unit: String, $id: String!) {
-    blockGetOffers(unit: $unit) {
-      _id
-      amount
-      amountType
-      currency
-      date
-      endDate
-      number
-      party {
-        id
-        type
-      }
-      paymentPlan {
-        type
-        downPaymentPercentage
-        interestPercentage
-        advancePaymentPercentage
-        discountPercentage
-        description
-        installment
-        frequency
-        penaltyPercentage
-        vatIncluded
-        paymentDates
-        firstPaymentDate
-        advancePaymentDate
-      }
-      user
-    }
+  query BlockGetOffer($id: String!) {
     blockGetOffer(_id: $id) {
       _id
       amount
-      amountType
       currency
       date
       endDate
@@ -78,20 +98,30 @@ export const GET_OFFER = gql`
         type
       }
       paymentPlan {
-        type
         downPaymentPercentage
+        downPaymentAmount
+        barterPercentage
+        barterAmount
         interestPercentage
-        advancePaymentPercentage
+        interestType
+        completionPaymentPercentage
+        completionPaymentAmount
         discountPercentage
         description
         installment
         frequency
         penaltyPercentage
         vatIncluded
+        roundedInstallmentAmount
+        installmentAmounts
         paymentDates
+        paymentDueDates
         firstPaymentDate
-        advancePaymentDate
+        downPaymentDate
+        completionPaymentDate
+        completionPaymentDateLabel
       }
+      status
       unit
       user
     }

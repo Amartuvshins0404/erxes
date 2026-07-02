@@ -76,10 +76,7 @@ import {
   loadProductsConfigClass,
 } from '@/products/db/models/Configs';
 import { IProductModel, loadProductClass } from '@/products/db/models/Products';
-import {
-  IPackageModel,
-  loadPackageClass,
-} from '@/products/db/models/Packages';
+import { IPackageModel, loadPackageClass } from '@/products/db/models/Packages';
 import {
   IProductRuleModel,
   loadProductRuleClass,
@@ -245,13 +242,27 @@ import {
   ISegmentModel,
   loadSegmentClass,
 } from './modules/segments/db/models/Segments';
-
+import { IProductSimilarityDocument } from '@/products/@types/similarity';
+import {
+  IProductSimilarityModel,
+  loadProductSimilarityClass,
+} from '@/products/db/models/Similarities';
 import { ICPNotificationDocument } from './modules/clientportal/types/cpNotification';
 
 import {
   IPermissionGroupModel,
   loadPermissionGroupClass,
 } from '@/permissions/db/models/Permissions';
+import {
+  IApprovalLockModel,
+  loadApprovalLockClass,
+} from '@/approval/db/models/ApprovalLocks';
+import {
+  IApprovalRequestModel,
+  loadApprovalRequestClass,
+} from '@/approval/db/models/ApprovalRequests';
+import { IApprovalLockDocument } from '@/approval/db/definitions/approvalLocks';
+import { IApprovalRequestDocument } from '@/approval/db/definitions/approvalRequests';
 import {
   ITemplateCategoryModal,
   loadTemplateCategoryClass,
@@ -282,6 +293,7 @@ export interface IModels {
   Packages: IPackageModel;
   ProductCategories: IProductCategoryModel;
   ProductsConfigs: IProductsConfigModel;
+  ProductSimilarities: IProductSimilarityModel;
   Uoms: IUomModel;
   Structures: IStructureModel;
   Departments: IDepartmentModel;
@@ -325,6 +337,8 @@ export interface IModels {
   BundleRule: IBundleRuleModel;
   ProductRules: IProductRuleModel;
   PermissionGroups: IPermissionGroupModel;
+  ApprovalLocks: IApprovalLockModel;
+  ApprovalRequests: IApprovalRequestModel;
 
   NotificationSettings: Model<NotificationSettings>;
 
@@ -459,6 +473,18 @@ export const loadClasses = (
     ),
   );
 
+  models.ProductSimilarities = db.model<
+    IProductSimilarityDocument,
+    IProductSimilarityModel
+  >(
+    'product_similarities',
+    loadProductSimilarityClass(
+      models,
+      subdomain,
+      coreEventHandlers('products', 'product_similarities'),
+    ),
+  );
+
   models.Structures = db.model<IStructureDocument, IStructureModel>(
     'structures',
     loadStructureClass(models),
@@ -525,7 +551,7 @@ export const loadClasses = (
 
   models.Relations = db.model<IRelationDocument, IRelationModel>(
     'relations',
-    loadRelationClass(models),
+    loadRelationClass(models, coreEventHandlers('relations', 'relations')),
   );
 
   models.Favorites = db.model<IFavoritesDocument, IFavoritesModel>(
@@ -657,6 +683,16 @@ export const loadClasses = (
     IPermissionGroupDocument,
     IPermissionGroupModel
   >('permission_groups', loadPermissionGroupClass(models));
+
+  models.ApprovalLocks = db.model<IApprovalLockDocument, IApprovalLockModel>(
+    'approval_locks',
+    loadApprovalLockClass(models),
+  );
+
+  models.ApprovalRequests = db.model<
+    IApprovalRequestDocument,
+    IApprovalRequestModel
+  >('approval_requests', loadApprovalRequestClass(models));
 
   models.Template = db.model<ITemplateDocument, ITemplateModal>(
     'templates',

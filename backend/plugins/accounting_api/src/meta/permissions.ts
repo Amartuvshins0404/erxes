@@ -26,6 +26,7 @@ const VAT_ROW_ACTIONS = {
   read: 'readVatRows',
   manage: 'manageVatRows',
   remove: 'removeVatRows',
+  import: 'vatRowsImportManage',
 } as const;
 
 const CTAX_ROW_ACTIONS = {
@@ -102,6 +103,11 @@ export const permissions: IPermissionConfig = {
           name: ACTIONS.merge,
           description: 'Merge accounts',
         },
+        {
+          title: 'Import accounts',
+          name: 'accountsImportManage',
+          description: 'Import accounts',
+        },
       ],
     },
 
@@ -129,6 +135,11 @@ export const permissions: IPermissionConfig = {
           title: 'Remove categories',
           name: CATEGORY_ACTIONS.remove,
           description: 'Remove account categories',
+        },
+        {
+          title: 'Import account categories',
+          name: 'accountCategoriesImportManage',
+          description: 'Import account categories',
         },
       ],
     },
@@ -161,6 +172,11 @@ export const permissions: IPermissionConfig = {
           name: TRANSACTION_ACTIONS.link,
           description: 'Link transactions',
         },
+        {
+          title: 'Import transactions',
+          name: 'transactionsImportManage',
+          description: 'Import transactions',
+        },
       ],
     },
     {
@@ -186,6 +202,11 @@ export const permissions: IPermissionConfig = {
           title: 'Remove VAT rows',
           name: VAT_ROW_ACTIONS.remove,
           description: 'Delete VAT rows',
+        },
+        {
+          title: 'Import VAT rows',
+          name: VAT_ROW_ACTIONS.import,
+          description: 'Import VAT rows',
         },
       ],
     },
@@ -313,13 +334,13 @@ export const permissions: IPermissionConfig = {
         {
           plugin: 'accounting',
           module: 'account',
-          actions: [...allActions],
+          actions: [...allActions, 'accountsImportManage'],
           scope: 'all',
         },
         {
           plugin: 'accounting',
           module: 'accountCategory',
-          actions: [...allCategoryActions],
+          actions: [...allCategoryActions, 'accountCategoriesImportManage'],
           scope: 'all',
         },
         {
@@ -356,7 +377,7 @@ export const permissions: IPermissionConfig = {
         {
           plugin: 'accounting',
           module: 'transaction',
-          actions: [...allTransactionActions],
+          actions: [...allTransactionActions, 'transactionsImportManage'],
           scope: 'all',
         },
         {

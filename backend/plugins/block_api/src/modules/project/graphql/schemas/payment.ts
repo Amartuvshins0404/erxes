@@ -13,7 +13,6 @@ export const types = `
   }
 
   enum BlockProjectPaymentPlanFrequency {
-    CUSTOM
     ONE_TIME
     ONE_TIME_PER_MONTH
     TOW_TIME_PER_MONTH
@@ -36,7 +35,7 @@ export const types = `
     downPaymentPercentage: Float
     interestPercentage: Float
     interestType: BlockProjectPaymentPlanInterestType
-    advancePaymentPercentage: Float
+    completionPaymentPercentage: Float
     discountPercentage: Float
     project: ID!
     description: String
@@ -51,7 +50,7 @@ export const types = `
     type: BlockProjectPaymentPlanType!
     downPaymentPercentage: Float
     interestPercentage: Float
-    advancePaymentPercentage: Float
+    completionPaymentPercentage: Float
     discountPercentage: Float
     project: ID!
     description: String

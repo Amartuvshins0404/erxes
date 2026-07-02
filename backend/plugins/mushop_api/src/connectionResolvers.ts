@@ -7,21 +7,26 @@ import {
   loadSupplierClass,
   ISupplierModel,
 } from '@/supplier/db/models/Supplier';
+import {
+  loadCounterClass,
+  ICounterModel,
+  ICounterDocument,
+} from '@/supplier/db/models/Counter';
 import { IMushopProductMushopDocument } from '@/product/@types/product';
 import {
   loadMushopProductClass,
   IMushopProductModel,
 } from '@/product/db/models/Product';
-import { IMushopSubscriptionDocument } from '@/subscription/@types/mushopSubscription';
+import { IMushopMembershipDocument } from '@/membership/@types/mushopMembership';
 import {
-  loadMushopSubscriptionClass,
-  IMushopSubscriptionModel,
-} from '@/subscription/db/models/MushopSubscription';
-import { IMushopSubscriptionPlanDocument } from '@/subscription/@types/mushopSubscriptionPlan';
+  loadMushopMembershipClass,
+  IMushopMembershipModel,
+} from '@/membership/db/models/MushopMembership';
+import { IMushopMembershipPlanDocument } from '@/membership/@types/mushopMembershipPlan';
 import {
-  loadMushopSubscriptionPlanClass,
-  IMushopSubscriptionPlanModel,
-} from '@/subscription/db/models/MushopSubscriptionPlan';
+  loadMushopMembershipPlanClass,
+  IMushopMembershipPlanModel,
+} from '@/membership/db/models/MushopMembershipPlan';
 import { ICollectiveDocument } from '@/collective/@types/collective';
 import {
   loadCollectiveClass,
@@ -32,14 +37,30 @@ import {
   loadCollectivePackageClass,
   ICollectivePackageModel,
 } from '@/collective-package/db/models/CollectivePackage';
+import { IOrderDocument } from '@/supplier/@types/order';
+import { loadOrderClass, IOrderModel } from '@/supplier/db/models/Order';
+import { IMushopProductSpecificationDocument } from '@/product-specification/@types/productSpecification';
+import {
+  loadMushopProductSpecificationClass,
+  IMushopProductSpecificationModel,
+} from '@/product-specification/db/models/ProductSpecification';
+import { IMushopConfigDocument } from '@/config/@types/config';
+import {
+  loadMushopConfigClass,
+  IMushopConfigModel,
+} from '@/config/db/models/Config';
 
 export interface IModels {
   Supplier: ISupplierModel;
-  MushopProduct: IMushopProductModel;
-  MushopSubscription: IMushopSubscriptionModel;
-  MushopSubscriptionPlan: IMushopSubscriptionPlanModel;
+  Counter: ICounterModel;
+  Product: IMushopProductModel;
+  ProductSpecification: IMushopProductSpecificationModel;
+  Membership: IMushopMembershipModel;
+  MembershipPlan: IMushopMembershipPlanModel;
   Collective: ICollectiveModel;
   CollectivePackage: ICollectivePackageModel;
+  Order: IOrderModel;
+  Config: IMushopConfigModel;
 }
 
 export interface IContext extends IMainContext {
@@ -63,7 +84,12 @@ export const loadClasses = (
     ),
   );
 
-  models.MushopProduct = db.model<
+  models.Counter = db.model<ICounterDocument, ICounterModel>(
+    'mushop_counters',
+    loadCounterClass(models),
+  );
+
+  models.Product = db.model<
     IMushopProductMushopDocument,
     IMushopProductModel
   >(
@@ -74,25 +100,33 @@ export const loadClasses = (
     ),
   );
 
-  models.MushopSubscription = db.model<
-    IMushopSubscriptionDocument,
-    IMushopSubscriptionModel
+  models.ProductSpecification = db.model<
+    IMushopProductSpecificationDocument,
+    IMushopProductSpecificationModel
   >(
-    'mushop_subscriptions',
-    loadMushopSubscriptionClass(
+    'mushop_product_specifications',
+    loadMushopProductSpecificationClass(models),
+  );
+
+  models.Membership = db.model<
+    IMushopMembershipDocument,
+    IMushopMembershipModel
+  >(
+    'mushop_memberships',
+    loadMushopMembershipClass(
       models,
-      mushopEventHandlers('subscriptions', 'mushop_subscriptions'),
+      mushopEventHandlers('memberships', 'mushop_memberships'),
     ),
   );
 
-  models.MushopSubscriptionPlan = db.model<
-    IMushopSubscriptionPlanDocument,
-    IMushopSubscriptionPlanModel
+  models.MembershipPlan = db.model<
+    IMushopMembershipPlanDocument,
+    IMushopMembershipPlanModel
   >(
-    'mushop_subscription_plans',
-    loadMushopSubscriptionPlanClass(
+    'mushop_membership_plans',
+    loadMushopMembershipPlanClass(
       models,
-      mushopEventHandlers('subscription_plans', 'mushop_subscription_plans'),
+      mushopEventHandlers('membership_plans', 'mushop_membership_plans'),
     ),
   );
 
@@ -107,6 +141,16 @@ export const loadClasses = (
   >(
     'mushop_collective_packages',
     loadCollectivePackageClass(models),
+  );
+
+  models.Order = db.model<IOrderDocument, IOrderModel>(
+    'mushop_orders',
+    loadOrderClass(models),
+  );
+
+  models.Config = db.model<IMushopConfigDocument, IMushopConfigModel>(
+    'mushop_configs',
+    loadMushopConfigClass(models),
   );
 
   return models;

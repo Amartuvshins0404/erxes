@@ -9,6 +9,12 @@ const REGISTRATION_APPLICATION_STATUSES = [
   'rejected',
 ] as const;
 
+const REGISTRATION_PAYMENT_STATUSES = [
+  'unpaid',
+  'paid',
+  'manual_verified',
+] as const;
+
 export const registrationApplicationSchema = new Schema(
   {
     _id: mongooseStringRandomId,
@@ -57,6 +63,23 @@ export const registrationApplicationSchema = new Schema(
       label: 'Is read',
       default: false,
       index: true,
+    },
+    invoiceId: {
+      type: String,
+      label: 'Invoice ID',
+      sparse: true,
+      index: true,
+    },
+    paymentStatus: {
+      type: String,
+      enum: [...REGISTRATION_PAYMENT_STATUSES],
+      default: 'unpaid',
+      label: 'Payment status',
+      index: true,
+    },
+    membershipFeeAmount: {
+      type: Number,
+      label: 'Membership fee amount',
     },
   },
   {

@@ -10,29 +10,35 @@ export const GET_CONTRACTS = gql`
       date
       amount
       status
-      startDate
-      endDate
+
 
       party {
         type
         id
       }
       paymentPlan {
-        type
         downPaymentPercentage
+        downPaymentAmount
+        barterPercentage
+        barterAmount
         interestPercentage
         interestType
-        advancePaymentPercentage
+        completionPaymentPercentage
+        completionPaymentAmount
         discountPercentage
         description
         installment
         frequency
         penaltyPercentage
         vatIncluded
+        roundedInstallmentAmount
+        installmentAmounts
         paymentDates
         paymentDueDates
         firstPaymentDate
-        advancePaymentDate
+        downPaymentDate
+        completionPaymentDate
+        completionPaymentDateLabel
       }
       user
     }
@@ -60,15 +66,11 @@ export const GET_CONTRACTS_LIST = gql`
         date
         amount
           status
-        startDate
-        endDate
   
+
         party {
           type
           id
-        }
-        paymentPlan {
-          type
         }
         user
       }
@@ -93,29 +95,35 @@ export const GET_CONTRACT = gql`
       date
       amount
       status
-      startDate
-      endDate
+
 
       party {
         type
         id
       }
       paymentPlan {
-        type
         downPaymentPercentage
+        downPaymentAmount
+        barterPercentage
+        barterAmount
         interestPercentage
         interestType
-        advancePaymentPercentage
+        completionPaymentPercentage
+        completionPaymentAmount
         discountPercentage
         description
         installment
         frequency
         penaltyPercentage
         vatIncluded
+        roundedInstallmentAmount
+        installmentAmounts
         paymentDates
         paymentDueDates
         firstPaymentDate
-        advancePaymentDate
+        downPaymentDate
+        completionPaymentDate
+        completionPaymentDateLabel
       }
       user
     }

@@ -19,6 +19,7 @@ const config: ModuleFederationConfig = {
     './mushop': './src/modules/MushopMain.tsx',
     './widgets': './src/widgets/Widgets.tsx',
     './relationWidget': './src/widgets/relation/RelationWidgets.tsx',
+    './formWidget': './src/widgets/ProductFormWidget.tsx',
   },
 
   shared: (libraryName, defaultConfig) => {

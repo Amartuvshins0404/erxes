@@ -1,4 +1,6 @@
 export * from './blocks';
+export * from './charts';
+export * from './chat-viz';
 export * from './hotkey';
 export * from './select-tree';
 export * from './record-table';

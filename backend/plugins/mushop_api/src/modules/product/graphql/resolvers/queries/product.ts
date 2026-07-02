@@ -1,5 +1,6 @@
 import { IContext } from '~/connectionResolvers';
 import { ProductQueryParams } from '@/product/@types/product';
+import { MUSHOP_PRODUCT_STATE } from '@/product/db/definitions/product';
 import { ICursorPaginateParams } from 'erxes-api-shared/core-types';
 import { cursorPaginateAggregation } from 'erxes-api-shared/utils';
 
@@ -11,7 +12,7 @@ export const productQueries = {
   ) => {
     const { supplierId, categoryId, status, searchValue } = params;
 
-    const filter: any = {};
+    const filter: any = { state: MUSHOP_PRODUCT_STATE.ACTIVE };
 
     if (supplierId) {
       const supplier = await models.Supplier.getSupplier(supplierId);
@@ -40,7 +41,7 @@ export const productQueries = {
     const orderBy = { ...baseOrderBy, _id: 1 } as Record<string, any>;
 
     return cursorPaginateAggregation({
-      model: models.MushopProduct,
+      model: models.Product,
       params: { ...params, orderBy },
       formatter: { createdAt: 'date' },
       pipeline: [
@@ -68,6 +69,6 @@ export const productQueries = {
     { _id }: { _id: string },
     { models }: IContext,
   ) => {
-    return models.MushopProduct.getProduct(_id);
+    return models.Product.getProduct(_id);
   },
 };

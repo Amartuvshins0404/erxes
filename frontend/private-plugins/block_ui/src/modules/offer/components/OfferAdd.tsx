@@ -5,8 +5,6 @@ import {
   Form,
   ScrollArea,
   Select,
-  Input,
-  Label,
   Separator,
   useQueryState,
   CurrencyField,
@@ -15,12 +13,10 @@ import {
   toast,
 } from 'erxes-ui';
 import { IconPlus } from '@tabler/icons-react';
-import { useState } from 'react';
 import { useCreateOffer } from '@/offer/hooks/useManageOffer';
 import { useForm, UseFormReturn } from 'react-hook-form';
 import { OfferFormData, offerSchema } from '@/offer/constants/offerSchema';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
 import {
   SelectCustomer,
   SelectCompany,
@@ -28,24 +24,23 @@ import {
   currentUserState,
 } from 'ui-modules';
 import { useAtomValue } from 'jotai';
-import { SelectPaymentPlan } from '@/pricing/components/SelectPaymentPlan';
-import { SelectPaymentPlanType } from '@/pricing/components/SelectPaymentPlanType';
-import { SelectPaymentPlanFrequency } from '@/pricing/components/SelectPaymentPlanFrequency';
 import { useUnit } from '@/unit/hooks/useUnit';
 import { IUnit } from '@/unit/types/unitType';
-import { InfoCard, InfoCardContent } from '@/block/components/card';
-import { SelectPrice } from '@/pricing/components/SelectPrice';
-import { IProjectPrice } from '@/project/types/projectTypes';
-import { SelectPriceType } from '@/pricing/components/SelectPriceType';
 import { addDays } from 'date-fns';
 import { PaymentPlanForm } from '@/pricing/components/PaymentPlanForm';
+import { PaymentScheduleEditor } from '@/contract/components/PaymentScheduleEditor';
+import { ContractUnit } from '@/contract/components/ContractUnit';
+import { useParams } from 'react-router-dom';
+import { useBuildings, useBuildingZonings } from '@/building/hooks/useBuildings';
+import { useUnits } from '@/unit/hooks/useUnits';
+import { useState, useEffect } from 'react';
 
 export const OfferAddSheet = () => {
   const [open, setOpen] = useState(false);
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <Sheet.Trigger asChild>
-        <Button variant="secondary">
+        <Button>
           <IconPlus />
           Add offer
         </Button>
@@ -61,48 +56,66 @@ export const OfferAddSheet = () => {
   );
 };
 
-export const OfferAddForm = ({ onClose }: { onClose: () => void }) => {
+
+export const OfferAddForm = ({
+  onClose,
+  defaultValues,
+  onSubmit: externalOnSubmit,
+  submitLabel = 'Add offer',
+  externalLoading = false,
+  unit: unitProp,
+}: {
+  onClose: () => void;
+  defaultValues?: Partial<OfferFormData>;
+  onSubmit?: (data: OfferFormData) => void;
+  submitLabel?: string;
+  externalLoading?: boolean;
+  unit?: IUnit;
+}) => {
   const [unitId] = useQueryState<string>('unitId');
-  const { unit } = useUnit(unitId);
+  const { projectId } = useParams<{ projectId?: string }>();
   const currentUser = useAtomValue(currentUserState);
-  const mainPrice = {
-    _id: 'mainPrice',
-    currency: CurrencyCode.MNT,
-    price: unit?.mainPrice,
-    priceType: 'priceBySize' as any,
-  };
 
   const form = useForm<OfferFormData>({
     resolver: zodResolver(offerSchema),
-    defaultValues: {
+    defaultValues: defaultValues ?? {
       paymentPlanId: '',
+      date: new Date().toISOString(),
       endDate: addDays(new Date(), 7),
       partyType: 'customer',
       partyId: '',
       user: currentUser?._id,
-      priceId: mainPrice._id,
-      price: mainPrice,
+      priceId: 'mainPrice',
+      price: { currency: CurrencyCode.MNT, price: 0 },
     },
   });
 
-  const { createOffer, loading } = useCreateOffer();
+  const selectedUnit = form.watch('unit' as any) as string | undefined;
+  const activeUnitId = unitProp?._id || unitId || selectedUnit;
+  const { unit: fetchedUnit } = useUnit(!unitProp ? activeUnitId : undefined);
+  const unit = unitProp || fetchedUnit;
+
+  const { createOffer, loading: createLoading } = useCreateOffer();
+  const loading = externalLoading || createLoading;
 
   const handleSubmit = (data: OfferFormData) => {
+    if (externalOnSubmit) {
+      externalOnSubmit(data);
+      return;
+    }
+    const resolvedUnitId = unitId || (data as any).unit;
     createOffer({
       variables: {
         input: {
-          amount: data.price.price,
-          amountType: data.price.priceType,
-          currency: data.price.currency,
-          date: new Date(),
-          endDate: data.endDate,
-          party: {
-            type: data.partyType,
-            id: data.partyId,
-          },
+          amount: data.price?.price,
+          currency: data.price?.currency,
+          date: data.date || new Date().toISOString(),
+          endDate: data.endDate?.toISOString(),
+          party: data.partyType ? { type: data.partyType, id: data.partyId } : undefined,
           paymentPlan: data.paymentPlan,
           user: data.user,
-          unit: unitId,
+          unit: resolvedUnitId,
+          project: projectId || undefined,
         },
       },
       onCompleted: () => {
@@ -128,9 +141,22 @@ export const OfferAddForm = ({ onClose }: { onClose: () => void }) => {
       <form
         className="flex-auto flex flex-col overflow-hidden"
         onSubmit={form.handleSubmit(handleSubmit)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && (e.target as HTMLElement).tagName === 'INPUT')
+            e.preventDefault();
+        }}
       >
         <Sheet.Content className="flex-auto overflow-hidden">
           <ScrollArea className="h-full">
+            {(unitProp || unitId || projectId) && (
+              <div className="p-5">
+                {unitProp || unitId ? (
+                  <ContractUnit unitId={unitProp?._id || unitId} />
+                ) : (
+                  <OfferUnitSelector form={form} projectId={projectId} />
+                )}
+              </div>
+            )}
             <div className="grid grid-cols-4 gap-5 p-5">
               <Form.Field
                 name="user"
@@ -146,10 +172,27 @@ export const OfferAddForm = ({ onClose }: { onClose: () => void }) => {
                 )}
               />
               <Form.Field
+                name="date"
+                render={({ field }) => (
+                  <Form.Item>
+                    <Form.Label>Offer Date</Form.Label>
+                    <DatePicker
+                      placeholder="Select date"
+                      value={field.value ? new Date(Number(field.value) || field.value) : undefined}
+                      onChange={(date) => {
+                        const d = Array.isArray(date) ? date[0] : date;
+                        field.onChange(d ? d.toISOString() : undefined);
+                      }}
+                    />
+                    <Form.Message />
+                  </Form.Item>
+                )}
+              />
+              <Form.Field
                 name="endDate"
                 render={({ field }) => (
                   <Form.Item>
-                    <Form.Label>Offer expires on</Form.Label>
+                    <Form.Label>Offer Expires On</Form.Label>
                     <DatePicker
                       placeholder="end date"
                       value={field.value}
@@ -164,7 +207,6 @@ export const OfferAddForm = ({ onClose }: { onClose: () => void }) => {
                 render={({ field }) => (
                   <Form.Item>
                     <Form.Label>Lead Type</Form.Label>
-
                     <Select
                       onValueChange={(value) => {
                         field.onChange(value);
@@ -187,34 +229,11 @@ export const OfferAddForm = ({ onClose }: { onClose: () => void }) => {
                 )}
               />
               <SelectLead form={form} />
-              <Separator className="col-span-4" />
-              <PaymentPlanForm form={form} />
-              <Separator className="col-span-4" />
-              <Form.Field
-                name="priceId"
-                render={({ field }) => (
-                  <Form.Item className="col-start-1">
-                    <Form.Label>Price</Form.Label>
-                    <SelectPrice
-                      prices={[
-                        mainPrice,
-                        ...(unit?.prices || []).map((price: IProjectPrice) => ({
-                          ...price,
-                          _id: price.currency + price.price + price.priceType,
-                        })),
-                      ]}
-                      form={form}
-                      value={field.value}
-                      onValueChange={field.onChange}
-                    />
-                  </Form.Item>
-                )}
-              />
               <Form.Field
                 name="price.currency"
                 render={({ field }) => (
-                  <Form.Item className="col-start-1">
-                    <Form.Label>Price Currency</Form.Label>
+                  <Form.Item>
+                    <Form.Label>Currency</Form.Label>
                     <CurrencyField.SelectCurrency
                       value={field.value as CurrencyCode}
                       onChange={(value) =>
@@ -229,7 +248,7 @@ export const OfferAddForm = ({ onClose }: { onClose: () => void }) => {
                 name="price.price"
                 render={({ field }) => (
                   <Form.Item>
-                    <Form.Label>Price</Form.Label>
+                    <Form.Label>Price per m²</Form.Label>
                     <CurrencyField.ValueInput
                       value={field.value as number}
                       onChange={(value) => field.onChange(value as number)}
@@ -237,24 +256,13 @@ export const OfferAddForm = ({ onClose }: { onClose: () => void }) => {
                   </Form.Item>
                 )}
               />
-              <Form.Field
-                name="price.priceType"
-                render={({ field }) => (
-                  <Form.Item>
-                    <Form.Label>Price Type</Form.Label>
-                    <SelectPriceType
-                      value={field.value as IProjectPrice['priceType']}
-                      onValueChange={(value) =>
-                        field.onChange(value as IProjectPrice['priceType'])
-                      }
-                    />
-                  </Form.Item>
-                )}
-              />
+              <Separator className="col-span-4" />
+              <PaymentPlanForm form={form} />
             </div>
-            <Separator className="col-span-4 mt-2" />
-
-            <OfferPrice form={form} unit={unit} />
+            <Separator />
+            <div className="px-5 py-5">
+              <OfferPaymentSchedule form={form} unit={unit} />
+            </div>
           </ScrollArea>
         </Sheet.Content>
         <Sheet.Footer className="flex-none">
@@ -266,7 +274,7 @@ export const OfferAddForm = ({ onClose }: { onClose: () => void }) => {
           </Sheet.Close>
           <Button type="submit" disabled={loading}>
             <Spinner show={loading} />
-            Add offer
+            {submitLabel}
           </Button>
         </Sheet.Footer>
       </form>
@@ -274,135 +282,30 @@ export const OfferAddForm = ({ onClose }: { onClose: () => void }) => {
   );
 };
 
-export const OfferPrice = ({
+const OfferPaymentSchedule = ({
   form,
   unit,
 }: {
-  form: UseFormReturn<z.infer<typeof offerSchema>>;
+  form: UseFormReturn<OfferFormData>;
   unit: IUnit;
 }) => {
-  const formData = form.watch();
-
-  if (!formData.paymentPlanId) {
-    return null;
-  }
-  const { downPaymentPercentage, discountPercentage, installment } =
-    formData.paymentPlan;
-
-  const { price, priceType } = formData.price;
-
-  const discountAmount = ((discountPercentage || 0) * price) / 100;
-  const offerPrice = price - discountAmount;
-  const offerTotalPrice =
-    offerPrice * (priceType === 'priceBySize' ? unit?.size : 1);
-
-  const installmentPercentage = (100 - downPaymentPercentage) / installment;
-
-  const installmentAmount = (offerTotalPrice * installmentPercentage) / 100;
+  const pricePerUnit = form.watch('price.price') || 0;
+  const currency = form.watch('price.currency') || 'MNT';
+  const unitSize = unit?.unitType?.size || 0;
+  const totalAmount = unitSize > 0 ? pricePerUnit * unitSize : pricePerUnit;
 
   return (
-    <div className="grid grid-cols-4 gap-5 p-5 bg-accent">
-      <div className="col-span-4">
-        <InfoCard title="Төлөлтийн график">
-          <InfoCardContent>
-            <div className="grid grid-cols-5 gap-2">
-              <Label asChild>
-                <div>Төлөлт</div>
-              </Label>
-              <Label asChild>
-                <div>Огноо</div>
-              </Label>
-              <Label asChild>
-                <div>Төлбөрийн хэлбэр</div>
-              </Label>
-              <Label asChild>
-                <div>100%</div>
-              </Label>
-              <Label asChild>
-                <div>ҮНДСЭН ДҮН</div>
-              </Label>
-            </div>
-            <div className="grid grid-cols-5 gap-2">
-              <Input
-                value={'Захиалга'}
-                disabled
-                className="disabled:opacity-100"
-              />
-              <Input
-                value={'Гэрээ хийгдсэн өдөр'}
-                disabled
-                className="disabled:opacity-100"
-              />
-              <Input
-                value={'Урьдчилгаа'}
-                disabled
-                className="disabled:opacity-100"
-              />
-              <Input
-                value={downPaymentPercentage + '%'}
-                disabled
-                className="disabled:opacity-100"
-              />
-              <CurrencyField.ValueInput
-                value={
-                  (offerPrice *
-                    (priceType === 'priceBySize' ? unit?.size : 1) *
-                    downPaymentPercentage) /
-                  100
-                }
-                disabled
-                className="disabled:opacity-100"
-              />
-            </div>
-            {Array.from({ length: installment }).map((_, index) => (
-              <div className="grid grid-cols-5 gap-2">
-                <Input
-                  value={'Төлөлт ' + (index + 1)}
-                  disabled
-                  className="disabled:opacity-100"
-                />
-                <Input
-                  value={installment === index + 1 ? 'Түлхүүр хүлээлгэхэд' : ''}
-                  disabled
-                  className="disabled:opacity-100"
-                />
-                <Input
-                  value={
-                    installment !== index + 1
-                      ? 'ажлын гүйцэтгэлийн төлөлт '
-                      : ''
-                  }
-                  disabled
-                  className="disabled:opacity-100"
-                />
-                <Input
-                  value={
-                    installmentPercentage.toFixed(2).replace('.00', '') + '%'
-                  }
-                  disabled
-                  className="disabled:opacity-100"
-                />
-                <CurrencyField.ValueInput
-                  value={installmentAmount}
-                  disabled
-                  className="disabled:opacity-100"
-                />
-              </div>
-            ))}
-          </InfoCardContent>
-        </InfoCard>
-      </div>
-    </div>
+    <PaymentScheduleEditor form={form} amount={totalAmount} currency={currency} />
   );
 };
 
 export const SelectLead = ({
   form,
 }: {
-  form: UseFormReturn<z.infer<typeof offerSchema>>;
+  form: UseFormReturn<OfferFormData>;
 }) => {
   const leadType = form.watch('partyType');
-  const SelectLead =
+  const SelectLeadComponent =
     leadType === 'customer' ? SelectCustomer.FormItem : SelectCompany;
   return (
     <Form.Field
@@ -411,7 +314,7 @@ export const SelectLead = ({
       render={({ field }) => (
         <Form.Item>
           <Form.Label>Lead</Form.Label>
-          <SelectLead
+          <SelectLeadComponent
             value={field.value}
             onValueChange={field.onChange}
             mode="single"
@@ -423,56 +326,118 @@ export const SelectLead = ({
   );
 };
 
+const OfferUnitSelector = ({
+  form,
+  projectId,
+}: {
+  form: UseFormReturn<OfferFormData>;
+  projectId?: string;
+}) => {
+  const [buildingId, setBuildingId] = useState('');
+  const [zoningId, setZoningId] = useState('');
+  const { buildings = [] } = useBuildings({ projectId: projectId || '' });
+  const { buildingZonings = [] } = useBuildingZonings({ buildingId, skip: !buildingId });
+  const { units = [] } = useUnits({ variables: { zoning: zoningId }, skip: !zoningId });
+
+  useEffect(() => { setZoningId(''); (form as any).setValue('unit', ''); }, [buildingId]);
+  useEffect(() => { (form as any).setValue('unit', ''); }, [zoningId]);
+
+  if (!projectId) return null;
+
+  return (
+    <div className="grid grid-cols-3 gap-4">
+      <div className="space-y-2">
+        <Form.Label>Building</Form.Label>
+        <Select value={buildingId} onValueChange={setBuildingId}>
+          <Select.Trigger className="h-8"><Select.Value placeholder="Select building" /></Select.Trigger>
+          <Select.Content>
+            {buildings.map((b) => <Select.Item key={b._id} value={b._id}>{b.name}</Select.Item>)}
+          </Select.Content>
+        </Select>
+      </div>
+      <div className="space-y-2">
+        <Form.Label>Zone</Form.Label>
+        <Select value={zoningId} onValueChange={setZoningId} disabled={!buildingId}>
+          <Select.Trigger className="h-8"><Select.Value placeholder="Select zone" /></Select.Trigger>
+          <Select.Content>
+            {buildingZonings.map((z) => <Select.Item key={z._id} value={z._id}>Floor {z.floor}</Select.Item>)}
+          </Select.Content>
+        </Select>
+      </div>
+      <Form.Field
+        name={'unit' as any}
+        render={({ field }) => (
+          <Form.Item>
+            <Form.Label>Unit</Form.Label>
+            <Select
+              value={field.value || ''}
+              onValueChange={(uid) => {
+                field.onChange(uid);
+                const selected = units.find((u) => u._id === uid);
+                if (selected?.unitType?.price != null)
+                  form.setValue('price.price', Number(selected.unitType.price));
+              }}
+              disabled={!zoningId}
+            >
+              <Form.Control>
+                <Select.Trigger className="h-8"><Select.Value placeholder="Select unit" /></Select.Trigger>
+              </Form.Control>
+              <Select.Content>
+                {units.map((u) => (
+                  <Select.Item key={u._id} value={u._id}>Unit {u.number}</Select.Item>
+                ))}
+              </Select.Content>
+            </Select>
+            <Form.Message />
+          </Form.Item>
+        )}
+      />
+    </div>
+  );
+};
+
 export const OfferSummary = ({
   form,
   unit,
 }: {
-  form: UseFormReturn<z.infer<typeof offerSchema>>;
+  form: UseFormReturn<OfferFormData>;
   unit: IUnit;
 }) => {
-  const formData = form.watch();
-
-  if (!formData.paymentPlanId) {
-    return null;
-  }
-
-  const { discountPercentage } = formData.paymentPlan;
-
-  const { price, priceType } = formData.price;
-
-  const discountAmount = ((discountPercentage || 0) * price) / 100;
-  const offerPrice = price - discountAmount;
-  const offerTotalPrice =
-    offerPrice * (priceType === 'priceBySize' ? unit?.size : 1);
-  const totalDiscount =
-    discountAmount * (priceType === 'priceBySize' ? unit?.size : 1);
-
-  const initialPrice =
-    (priceType === 'priceBySize' ? unit?.size : 1) * (price || 0);
+  const price = form.watch('price.price') || 0;
+  const currency = form.watch('price.currency');
+  const discountPct = form.watch('paymentPlan.discountPercentage') || 0;
+  const unitSize = unit?.unitType?.size || 0;
+  const totalAmount = unitSize > 0 ? price * unitSize : price;
+  const discountAmount = (totalAmount * discountPct) / 100;
+  const offerPrice = totalAmount - discountAmount;
 
   return (
     <div className="flex-auto flex gap-4 items-center text-sm">
       <span className="text-muted-foreground flex items-center gap-1 font-medium">
-        Initial price:
+        Total:
         <span className="text-primary font-bold">
-          {initialPrice.toLocaleString()}
+          {totalAmount.toLocaleString()}
         </span>
-        {formData.price.currency}
+        {currency}
       </span>
-      <span className="text-muted-foreground flex items-center gap-1 font-medium">
-        Discount:
-        <span className="text-destructive font-bold">
-          -{totalDiscount.toLocaleString()}
+      {discountPct > 0 && (
+        <span className="text-muted-foreground flex items-center gap-1 font-medium">
+          Discount:
+          <span className="text-destructive font-bold">
+            -{discountAmount.toLocaleString()}
+          </span>
+          {currency}
         </span>
-        {formData.price.currency}
-      </span>
-      <span className="text-muted-foreground flex items-center gap-1 font-medium">
-        Offer price:
-        <span className="text-primary font-bold">
-          {offerTotalPrice.toLocaleString()}
+      )}
+      {discountPct > 0 && (
+        <span className="text-muted-foreground flex items-center gap-1 font-medium">
+          Offer price:
+          <span className="text-primary font-bold">
+            {offerPrice.toLocaleString()}
+          </span>
+          {currency}
         </span>
-        {formData.price.currency}
-      </span>
+      )}
     </div>
   );
 };

@@ -221,6 +221,7 @@ export const createOrUpdateDiscordBinding = (body: {
   discordGuildId: string;
   discordChannelId: string;
   openclawUrl: string;
+  responseMode?: 'slash_only' | 'all_messages';
 }) =>
   gatewayRequest<{ binding: TDiscordAssistantBinding }>('/api/bindings', {
     method: 'POST',

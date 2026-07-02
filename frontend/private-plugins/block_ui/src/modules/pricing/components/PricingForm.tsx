@@ -1,6 +1,6 @@
 import { addUnitSchema } from '@/unit/constants/addUnitSchema';
 import { IconPlus, IconTrash } from '@tabler/icons-react';
-import { Form, Checkbox, CurrencyField, Button, Select, Label } from 'erxes-ui';
+import { Form, Checkbox, CurrencyField, Button, Label } from 'erxes-ui';
 import { useFieldArray, UseFormReturn } from 'react-hook-form';
 import { z } from 'zod';
 
@@ -59,7 +59,7 @@ const PricesForm = ({
       </Label>
       {fields.map((field, index) => (
         <div key={field.id} className="flex items-center gap-2">
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-3 gap-2">
             <Form.Field
               name={`prices.${index}.currency`}
               render={({ field }) => (
@@ -77,30 +77,6 @@ const PricesForm = ({
               render={({ field }) => (
                 <Form.Item className="col-span-2">
                   <CurrencyField.ValueInput {...field} disabled={disabled} />
-                </Form.Item>
-              )}
-            />
-            <Form.Field
-              name={`prices.${index}.priceType`}
-              render={({ field }) => (
-                <Form.Item>
-                  <Select
-                    value={field.value}
-                    onValueChange={(value) => {
-                      field.onChange(value);
-                    }}
-                    disabled={disabled}
-                  >
-                    <Form.Control>
-                      <Select.Trigger className="h-8">
-                        <Select.Value placeholder="Price type" />
-                      </Select.Trigger>
-                    </Form.Control>
-                    <Select.Content>
-                      <Select.Item value="priceBySize">per m²</Select.Item>
-                      <Select.Item value="priceByUnit">per unit</Select.Item>
-                    </Select.Content>
-                  </Select>
                 </Form.Item>
               )}
             />

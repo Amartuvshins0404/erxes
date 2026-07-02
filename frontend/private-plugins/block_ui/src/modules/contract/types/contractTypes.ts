@@ -17,21 +17,28 @@ export interface IContractParty {
 }
 
 export interface IContractPaymentPlan {
-  type: string;
   downPaymentPercentage?: number;
+  downPaymentAmount?: number;
+  barterPercentage?: number;
+  barterAmount?: number;
   interestPercentage?: number;
   interestType?: ContractInterestType;
-  advancePaymentPercentage?: number;
+  completionPaymentPercentage?: number;
+  completionPaymentAmount?: number;
   discountPercentage?: number;
   description?: string;
   installment?: number;
   frequency?: string;
   penaltyPercentage?: number;
   vatIncluded?: boolean;
+  roundedInstallmentAmount?: number;
+  installmentAmounts?: number[];
   paymentDates?: number[];
   paymentDueDates?: string[];
   firstPaymentDate?: string;
-  advancePaymentDate?: string;
+  downPaymentDate?: string;
+  completionPaymentDate?: string;
+  completionPaymentDateLabel?: string;
 }
 
 export interface IContractInput {
@@ -41,8 +48,6 @@ export interface IContractInput {
   date?: string;
   amount?: number;
   status?: string;
-  startDate?: string;
-  endDate?: string;
   party?: IContractParty;
   paymentPlan?: IContractPaymentPlan;
   user?: string;

@@ -12,6 +12,12 @@ export const GET_IDENTIFIERS = gql`
       memberIds
       createdAt
       updatedAt
+      server {
+        exists
+        hasNamespace
+        name
+        status
+      }
     }
   }
 `;
@@ -28,6 +34,12 @@ export const GET_IDENTIFIER = gql`
       memberIds
       createdAt
       updatedAt
+      server {
+        exists
+        hasNamespace
+        name
+        status
+      }
     }
   }
 `;

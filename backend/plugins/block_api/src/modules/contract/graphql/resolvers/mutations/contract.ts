@@ -1,6 +1,12 @@
 import { IContext } from '~/connectionResolvers';
 import { IContract } from '@/contract/@types/contract';
 
+function stripNulls<T extends Record<string, any>>(obj: T): Partial<T> {
+  return Object.fromEntries(
+    Object.entries(obj).filter(([, v]) => v !== null && v !== undefined),
+  ) as Partial<T>;
+}
+
 export const contractMutations = {
   blockCreateContract: async (
     _parent: undefined,
@@ -13,6 +19,9 @@ export const contractMutations = {
         throw new Error('Cannot create contract: unit is locked');
       }
     }
+    if (input.paymentPlan) {
+      input.paymentPlan = stripNulls(input.paymentPlan) as typeof input.paymentPlan;
+    }
     return models.Contract.createContract(input);
   },
   blockUpdateContract: async (
@@ -20,6 +29,9 @@ export const contractMutations = {
     { _id, input }: { _id: string; input: IContract },
     { models }: IContext,
   ) => {
+    if (input.paymentPlan) {
+      input.paymentPlan = stripNulls(input.paymentPlan) as typeof input.paymentPlan;
+    }
     return models.Contract.updateContract(_id, input);
   },
   blockUpdateContractStatus: async (

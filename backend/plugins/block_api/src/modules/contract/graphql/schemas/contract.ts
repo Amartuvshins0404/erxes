@@ -11,39 +11,53 @@ export const types = `
   }
 
   type BlockContractPaymentPlan {
-    type: BlockProjectPaymentPlanType!
     downPaymentPercentage: Float
+    downPaymentAmount: Float
+    barterPercentage: Float
+    barterAmount: Float
     interestPercentage: Float
     interestType: BlockContractInterestType
-    advancePaymentPercentage: Float
+    completionPaymentPercentage: Float
+    completionPaymentAmount: Float
     discountPercentage: Float
     description: String
     installment: Int
     frequency: BlockProjectPaymentPlanFrequency
     penaltyPercentage: Float
     vatIncluded: Boolean
+    roundedInstallmentAmount: Float
+    installmentAmounts: [Float]
     paymentDates: [Int]
     paymentDueDates: [Date]
     firstPaymentDate: Date
-    advancePaymentDate: Date
+    downPaymentDate: Date
+    completionPaymentDate: Date
+    completionPaymentDateLabel: String
   }
 
   input BlockContractPaymentPlanInput {
-    type: BlockProjectPaymentPlanType!
     downPaymentPercentage: Float
+    downPaymentAmount: Float
+    barterPercentage: Float
+    barterAmount: Float
     interestPercentage: Float
     interestType: BlockContractInterestType
-    advancePaymentPercentage: Float
+    completionPaymentPercentage: Float
+    completionPaymentAmount: Float
     discountPercentage: Float
     description: String
     installment: Int
     frequency: BlockProjectPaymentPlanFrequency
     penaltyPercentage: Float
     vatIncluded: Boolean
+    roundedInstallmentAmount: Float
+    installmentAmounts: [Float]
     paymentDates: [Int]
     paymentDueDates: [Date]
     firstPaymentDate: Date
-    advancePaymentDate: Date
+    downPaymentDate: Date
+    completionPaymentDate: Date
+    completionPaymentDateLabel: String
   }
 
   type BlockContract {
@@ -54,8 +68,6 @@ export const types = `
     date: String
     amount: Float
     status: String
-    startDate: String
-    endDate: String
     party: BlockContractParty
     paymentPlan: BlockContractPaymentPlan
     user: String
@@ -79,8 +91,6 @@ export const types = `
     date: String
     amount: Float
     status: String
-    startDate: String
-    endDate: String
     party: BlockContractPartyInput
     paymentPlan: BlockContractPaymentPlanInput
     user: String
@@ -102,11 +112,25 @@ export const queries = `
     cursor: String
     direction: String
   ): BlockContractListResponse
+  blockGetUnitContractOverview(unitId: String!): BlockUnitContractOverview
+`;
+
+export const contractOverviewType = `
+  type BlockOverviewStageCount {
+    name: String
+    count: Int
+  }
+
+  type BlockUnitContractOverview {
+    total: Int
+    stages: [BlockOverviewStageCount]
+  }
 `;
 
 export const filterInputTypes = `
   input BlockContractFilterInput {
     projectId: String
+    unit: String
     search: String
     status: String
     partyType: String

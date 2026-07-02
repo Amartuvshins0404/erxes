@@ -4,6 +4,7 @@ import {
   AutomationConstants,
   AutomationNodeType,
   ConstantsQueryResponse,
+  IAutomation,
   NodeData,
 } from '@/automations/types';
 import { useQuery } from '@apollo/client';
@@ -23,6 +24,7 @@ import {
   useEffect,
   useState,
 } from 'react';
+import { useLocation } from 'react-router-dom';
 import {
   IAutomationsActionConfigConstants,
   IAutomationsActionFolkConfig,
@@ -74,14 +76,18 @@ interface AutomationContextType {
   setReactFlowInstance: OnInit<Node<NodeData>, Edge<EdgeProps>>;
   actionConstMap: Map<string, IAutomationsActionConfigConstants>;
   triggerConstMap: Map<string, IAutomationsTriggerConfigConstants>;
+  isCreatePage: boolean;
+  detail?: IAutomation;
 }
 
 const AutomationContext = createContext<AutomationContextType | null>(null);
 
 export const AutomationProvider = ({
   children,
+  detail,
 }: {
   children: React.ReactNode;
+  detail?: IAutomation;
 }) => {
   const [awaitingToConnectNodeId, setAwaitingToConnectNodeId] = useState('');
   const [selectedNode, setSelectedNode] = useState<{
@@ -101,7 +107,8 @@ export const AutomationProvider = ({
       'activeNodeTab',
       'activeNodeId',
     ]);
-
+  const { pathname } = useLocation();
+  const isCreatePage = pathname === '/automations/create';
   const [cached, setCached] = useState<TConstantCached>(null);
 
   const { data, loading, error, refetch } = useQuery<ConstantsQueryResponse>(
@@ -196,6 +203,8 @@ export const AutomationProvider = ({
         setReactFlowInstance,
         actionConstMap,
         triggerConstMap,
+        isCreatePage,
+        detail,
       }}
     >
       {children}

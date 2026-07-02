@@ -71,6 +71,7 @@ const queryParams = `
 export const queries = `
   mushopCollectiveDetail(_id: String!): MushopCollective
   mushopCollectives(${queryParams}${GQL_CURSOR_PARAM_DEFS}): MushopCollectiveListResponse
+  mushopCheckSubdomain(subdomain: String): JSON
 `;
 
 export const mutations = `
@@ -84,7 +85,7 @@ export const mutations = `
     supplierIds: [String!]!
   ): MushopCollective
 
-  mushopResyncCollective(_id: String!): MushopCollective
+  mushopResyncCollective(_id: String!, supplierIds: [String!]): MushopCollective
 
   mushopRemoveCollective(_id: String!): JSON
 `;

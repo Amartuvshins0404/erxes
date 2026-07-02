@@ -10,6 +10,7 @@ import { contractPaymentSchema } from '@/contract/db/definitions/payment';
 export interface IContractPaymentModel extends Model<IContractPaymentDocument> {
   regenerateForContract(
     contractId: string,
+    force?: boolean,
   ): Promise<IContractPaymentDocument[]>;
   recomputeStatus(
     paymentId: string,
@@ -71,62 +72,63 @@ function generateInstallmentDates(
   const dates: Date[] = [];
   const days = paymentDates.length ? paymentDates : [15];
 
+  const push = (computed: Date) => {
+    dates.push(dates.length === 0 ? startDate : computed);
+  };
+
   switch (frequency) {
     case 'ONE_TIME_PER_MONTH':
       for (let i = 0; i < count; i++)
-        dates.push(setSafeDay(addMonths(startDate, i + 1), days[0]));
+        push(setSafeDay(addMonths(startDate, i), days[0]));
       break;
     case 'TWO_TIME_PER_MONTH': {
       const dd = days.length >= 2 ? days.slice(0, 2) : [15, 30];
       const monthsNeeded = Math.ceil(count / 2);
-      for (let m = 0; m < monthsNeeded; m++) {
+      for (let m = 0; m < monthsNeeded; m++)
         for (let i = 0; i < dd.length && dates.length < count; i++)
-          dates.push(setSafeDay(addMonths(startDate, m + 1), dd[i]));
-      }
+          push(setSafeDay(addMonths(startDate, m), dd[i]));
       break;
     }
     case 'THREE_TIME_PER_MONTH': {
       const dd = days.length >= 3 ? days.slice(0, 3) : [10, 20, 30];
       const monthsNeeded = Math.ceil(count / 3);
-      for (let m = 0; m < monthsNeeded; m++) {
+      for (let m = 0; m < monthsNeeded; m++)
         for (let i = 0; i < dd.length && dates.length < count; i++)
-          dates.push(setSafeDay(addMonths(startDate, m + 1), dd[i]));
-      }
+          push(setSafeDay(addMonths(startDate, m), dd[i]));
       break;
     }
     case 'QUARTERLY':
       for (let i = 0; i < count; i++)
-        dates.push(setSafeDay(addMonths(startDate, (i + 1) * 3), days[0]));
+        push(setSafeDay(addMonths(startDate, i * 3), days[0]));
       break;
     case 'HALF_YEARLY':
       for (let i = 0; i < count; i++)
-        dates.push(setSafeDay(addMonths(startDate, (i + 1) * 6), days[0]));
+        push(setSafeDay(addMonths(startDate, i * 6), days[0]));
       break;
     case 'YEARLY':
       for (let i = 0; i < count; i++)
-        dates.push(setSafeDay(addYears(startDate, i + 1), days[0]));
+        push(setSafeDay(addYears(startDate, i), days[0]));
       break;
     case 'ONE_TIME':
       break;
     default:
       for (let i = 0; i < count; i++)
-        dates.push(setSafeDay(addMonths(startDate, i + 1), days[0]));
+        push(setSafeDay(addMonths(startDate, i), days[0]));
   }
   return dates;
 }
 
 export const loadContractPaymentClass = (models: IModels) => {
   class ContractPayment {
-    public static async regenerateForContract(contractId: string) {
+    public static async regenerateForContract(contractId: string, force = false) {
       const contract = await models.Contract.findOne({ _id: contractId });
       if (!contract) return [];
 
-      if (contract.status) {
-        const stage = await models.ContractStatus.findOne({
-          _id: contract.status,
-        });
-        if (stage?.type === 'signed') return [];
-      }
+      const stage = contract.status
+        ? await models.ContractStatus.findOne({ _id: contract.status })
+        : null;
+      if (stage?.type === 'cancelled') return [];
+      if (!force && stage?.type !== 'signed') return [];
 
       const contractNumber = contract.number;
       const partyId = contract.party?.id;
@@ -173,7 +175,8 @@ export const loadContractPaymentClass = (models: IModels) => {
 
       const totalPrice = contract.amount || 0;
       const downPct = paymentPlan.downPaymentPercentage || 0;
-      const advancePct = paymentPlan.advancePaymentPercentage || 0;
+      const finalPct = paymentPlan.completionPaymentPercentage || 0;
+      const barterPct = paymentPlan.barterPercentage || 0;
       const discountPct = paymentPlan.discountPercentage || 0;
       const interestPct = paymentPlan.interestPercentage || 0;
       const interestType = paymentPlan.interestType || 'FLAT';
@@ -183,12 +186,21 @@ export const loadContractPaymentClass = (models: IModels) => {
 
       const discountAmount = (totalPrice * discountPct) / 100;
       const priceAfterDiscount = totalPrice - discountAmount;
-      const downAmount = (priceAfterDiscount * downPct) / 100;
-      const advanceAmount = (priceAfterDiscount * advancePct) / 100;
-      const principal = priceAfterDiscount - downAmount - advanceAmount;
+      const downAmount = paymentPlan.downPaymentAmount > 0
+        ? paymentPlan.downPaymentAmount
+        : (priceAfterDiscount * downPct) / 100;
+      const barterValue = paymentPlan.barterAmount > 0
+        ? paymentPlan.barterAmount
+        : (priceAfterDiscount * barterPct) / 100;
+      const advanceAmount = paymentPlan.completionPaymentAmount > 0
+        ? paymentPlan.completionPaymentAmount
+        : (priceAfterDiscount * finalPct) / 100;
+      const principal = priceAfterDiscount - downAmount - barterValue - advanceAmount;
 
       const contractDate = contract.date || new Date();
-      const startDate = contract.startDate || contractDate;
+      const downPaymentDate = paymentPlan.downPaymentDate
+        ? new Date(paymentPlan.downPaymentDate)
+        : contractDate;
       // paymentDueDates are stored as Date objects
       const customDueDates = (paymentPlan.paymentDueDates || [])
         .map((d: Date | string) => (d instanceof Date ? d : new Date(d)))
@@ -197,7 +209,7 @@ export const loadContractPaymentClass = (models: IModels) => {
       const firstInstallmentStart =
         paymentPlan.firstPaymentDate
           ? new Date(paymentPlan.firstPaymentDate)
-          : startDate;
+          : contractDate;
 
       const autoDates = isOneTime
         ? []
@@ -243,31 +255,41 @@ export const loadContractPaymentClass = (models: IModels) => {
       } else {
         let rowIndex = 0;
 
+        if (barterValue > 0) {
+          rows.push({
+            ...commonFields,
+            index: rowIndex++,
+            label: 'Barter',
+            dueDate: contractDate,
+            amount: barterValue,
+          });
+        }
+
         if (downAmount > 0) {
           rows.push({
             ...commonFields,
             index: rowIndex++,
             label: 'Down payment',
-            dueDate: contractDate,
+            dueDate: downPaymentDate,
             amount: downAmount,
           });
         }
 
-        if (advanceAmount > 0) {
-          const advanceDue = paymentPlan.advancePaymentDate
-            ? new Date(paymentPlan.advancePaymentDate)
-            : contractDate;
-          rows.push({
-            ...commonFields,
-            index: rowIndex++,
-            label: 'Advance payment',
-            dueDate: advanceDue,
-            amount: advanceAmount,
-          });
-        }
-
-        const principalPerInstallment =
+        const defaultPerInstallment =
           installmentCount > 0 ? principal / installmentCount : 0;
+        const savedAmounts: number[] = paymentPlan.installmentAmounts || [];
+
+        // Compute per-installment principals: use saved overrides, auto-fill last as remainder
+        const installmentPrincipals = Array.from({ length: installmentCount }, (_, i) => {
+          if (i < installmentCount - 1) {
+            return savedAmounts[i] || defaultPerInstallment;
+          }
+          // last row = remainder so totals always match
+          const sumOfOthers = Array.from({ length: installmentCount - 1 }, (__, j) =>
+            savedAmounts[j] || defaultPerInstallment,
+          ).reduce((a, b) => a + b, 0);
+          return savedAmounts[i] || (principal - sumOfOthers);
+        });
 
         // SIMPLE: total interest = principal × rate × (installments / ppy), spread evenly
         const simpleInterestPerInstallment =
@@ -276,18 +298,16 @@ export const loadContractPaymentClass = (models: IModels) => {
             : 0;
 
         for (let i = 0; i < installmentCount; i++) {
+          const installPrincipal = installmentPrincipals[i];
           let interest = 0;
 
           if (interestPct > 0 && installmentCount > 0) {
             if (interestType === 'FLAT') {
-              // Fixed interest on original principal, divided equally
               interest = (principal * interestPct) / 100 / installmentCount;
             } else if (interestType === 'REDUCING') {
-              // Interest on remaining balance for the current period
-              const remainingPrincipal = principal - principalPerInstallment * i;
-              interest = (remainingPrincipal * interestPct) / 100 / ppy;
+              const paidSoFar = installmentPrincipals.slice(0, i).reduce((a, b) => a + b, 0);
+              interest = ((principal - paidSoFar) * interestPct) / 100 / ppy;
             } else {
-              // SIMPLE: annualized total interest divided equally
               interest = simpleInterestPerInstallment;
             }
           }
@@ -296,8 +316,18 @@ export const loadContractPaymentClass = (models: IModels) => {
             ...commonFields,
             index: rowIndex++,
             label: `Installment ${i + 1}`,
-            dueDate: dates[i] || startDate,
-            amount: principalPerInstallment + interest,
+            dueDate: dates[i] || firstInstallmentStart,
+            amount: installPrincipal + interest,
+          });
+        }
+
+        if (advanceAmount > 0) {
+          rows.push({
+            ...commonFields,
+            index: rowIndex++,
+            label: 'Completion payment',
+            dueDate: new Date('2099-12-31'),
+            amount: advanceAmount,
           });
         }
       }
@@ -331,6 +361,7 @@ export const loadContractPaymentClass = (models: IModels) => {
     public static async recomputeStatus(paymentId: string) {
       const payment = await models.ContractPayment.findOne({ _id: paymentId });
       if (!payment) return null;
+      if (payment.status === 'cancelled') return payment;
 
       const transactions = await models.ContractPaymentTransaction.find({
         paymentId,

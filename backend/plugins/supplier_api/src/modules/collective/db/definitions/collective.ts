@@ -44,6 +44,8 @@ export const collectiveSchema = schemaWrapper(
       dateFounded: { type: String },
       website: { type: String },
 
+      paymentId: { type: String, label: 'Payment method' },
+
       verificationStatus: {
         type: String,
         label: 'Verification status',

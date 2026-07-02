@@ -42,6 +42,7 @@ export interface ICollective {
   phones?: string[];
   dateFounded?: string;
   website?: string;
+  paymentId?: string;
   socialLinks?: ICollectiveSocialLink;
   ownerUserId?: string;
 
@@ -84,5 +85,6 @@ export interface ICollectiveProfileInput {
   phones?: string[];
   dateFounded?: string;
   website?: string;
+  paymentId?: string;
   socialLinks?: ICollectiveSocialLink;
 }

@@ -1,5 +1,17 @@
+export type TPropertyInputMeta = Record<string, unknown>;
+
+export type TPropertyInputProps = {
+  value: string;
+  onValueChange: (value: string) => void;
+  meta?: TPropertyInputMeta;
+  onMetaChange: (meta: TPropertyInputMeta) => void;
+  disabled?: boolean;
+};
+
 export type IUIConfig = {
   name: string;
+  /** Backend plugin name used for permission checks — only needed when it differs from `name` (e.g. dashes vs underscores). */
+  permissionName?: string;
   path: string;
   icon?: React.ElementType;
   i18n?: boolean;
@@ -20,6 +32,12 @@ export type IUIConfig = {
     customerDetailWidgets?: {
       name: string;
     }[];
+    formWidgets?: {
+      name: string;
+      contentType: string;
+      icon?: React.ElementType;
+    }[];
+    propertyInputs?: Record<string, React.ComponentType<TPropertyInputProps>>;
   };
   modules?: {
     name: string;

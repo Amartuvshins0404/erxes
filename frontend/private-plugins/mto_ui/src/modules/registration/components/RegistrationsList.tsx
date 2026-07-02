@@ -62,6 +62,33 @@ function CpUserPhoneCell({ cpUserId }: { cpUserId?: string | null }) {
   );
 }
 
+function paymentStatusBadgeVariant(
+  paymentStatus?: string | null,
+): 'success' | 'warning' | 'secondary' {
+  if (paymentStatus === 'paid' || paymentStatus === 'manual_verified') {
+    return 'success';
+  }
+
+  if (paymentStatus === 'unpaid') {
+    return 'warning';
+  }
+
+  return 'secondary';
+}
+
+function PaymentStatusCell({ paymentStatus }: { paymentStatus?: string | null }) {
+  return (
+    <RecordTableInlineCell>
+      <Badge
+        variant={paymentStatusBadgeVariant(paymentStatus)}
+        className="capitalize text-xs"
+      >
+        {paymentStatus ?? 'unpaid'}
+      </Badge>
+    </RecordTableInlineCell>
+  );
+}
+
 const ALL_STATUSES = ['draft', 'submitted', 'under_review', 'approved', 'rejected'] as const;
 
 function StatusChangeCell({
@@ -168,6 +195,13 @@ function GroupSection({
         <RecordTableInlineCell className="text-sm font-medium max-w-[240px]">
           {(cell.getValue() as string) || '—'}
         </RecordTableInlineCell>
+      ),
+    },
+    {
+      accessorKey: 'paymentStatus',
+      header: 'Төлбөр',
+      cell: ({ cell }) => (
+        <PaymentStatusCell paymentStatus={cell.getValue() as string | null} />
       ),
     },
 
@@ -340,6 +374,13 @@ export function RegistrationsList({ filters }: RegistrationsListProps) {
         <RecordTableInlineCell className="text-sm font-medium max-w-[240px]">
           {(cell.getValue() as string) || '—'}
         </RecordTableInlineCell>
+      ),
+    },
+    {
+      accessorKey: 'paymentStatus',
+      header: 'Төлбөр',
+      cell: ({ cell }) => (
+        <PaymentStatusCell paymentStatus={cell.getValue() as string | null} />
       ),
     },
     {

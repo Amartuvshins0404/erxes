@@ -1,8 +1,9 @@
 import { IContext } from '~/connectionResolvers';
 import { ProductQueryParams } from '@/product/@types/product';
+import { MUSHOP_PRODUCT_STATE } from '@/product/db/definitions/product';
 import { IOffsetPaginateParams } from 'erxes-api-shared/core-types';
 import { markResolvers, paginate } from 'erxes-api-shared/utils';
-import { checkSubscription } from '~/utils';
+import { checkMembership } from '~/utils';
 
 export const cpProductQueries = {
   cpMushopProducts: async (
@@ -10,7 +11,7 @@ export const cpProductQueries = {
     params: ProductQueryParams & IOffsetPaginateParams,
     { models, subdomain, cpUser }: IContext,
   ) => {
-    const isSubscriber = await checkSubscription({
+    const isMembership = await checkMembership({
       models,
       subdomain,
       cpUserId: cpUser?._id,
@@ -18,7 +19,7 @@ export const cpProductQueries = {
 
     const { supplierId, categoryId, status, searchValue } = params;
 
-    const filter: any = {};
+    const filter: any = { state: MUSHOP_PRODUCT_STATE.ACTIVE };
 
     if (supplierId) {
       const supplier = await models.Supplier.getSupplier(supplierId);
@@ -37,14 +38,14 @@ export const cpProductQueries = {
       ];
     }
 
-    if (!isSubscriber) {
+    if (!isMembership) {
       return paginate(
-        models.MushopProduct.find(filter).select('-unitPrice'),
+        models.Product.find(filter).select('-unitPrice'),
         params,
       );
     }
 
-    return paginate(models.MushopProduct.find(filter), params);
+    return paginate(models.Product.find(filter), params);
   },
 
   cpMushopProductDetail: async (
@@ -52,17 +53,20 @@ export const cpProductQueries = {
     { _id }: { _id: string },
     { models, subdomain, cpUser }: IContext,
   ) => {
-    const isSubscriber = await checkSubscription({
+    const isMembership = await checkMembership({
       models,
       subdomain,
       cpUserId: cpUser?._id,
     });
 
-    if (!isSubscriber) {
-      return models.MushopProduct.findOne({ _id }).select('-unitPrice');
+    if (!isMembership) {
+      return models.Product.findOne({
+        _id,
+        state: MUSHOP_PRODUCT_STATE.ACTIVE,
+      }).select('-unitPrice');
     }
 
-    return models.MushopProduct.getProduct(_id);
+    return models.Product.getProduct(_id);
   },
 };
 

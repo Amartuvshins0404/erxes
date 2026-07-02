@@ -57,8 +57,6 @@ export const ContractAddForm = ({ onClose }: { onClose: () => void }) => {
           date: data.date || new Date().toISOString(),
           amount,
           status: data.status || undefined,
-          startDate: data.startDate || undefined,
-          endDate: data.endDate || undefined,
           party,
           paymentPlan,
           user: data.user || undefined,

@@ -61,8 +61,6 @@ const ContractEditBody = ({
     date: orUndef(contract.date),
     amount: orUndef(contract.amount),
     status: orUndef(contract.status),
-    startDate: orUndef(contract.startDate),
-    endDate: orUndef(contract.endDate),
     user: orUndef(contract.user),
     party: contract.party
       ? {
@@ -72,15 +70,18 @@ const ContractEditBody = ({
       : { type: 'customer', id: '' },
     paymentPlan: contract.paymentPlan
       ? {
-          type: orUndef(contract.paymentPlan.type),
           downPaymentPercentage: orUndef(
             contract.paymentPlan.downPaymentPercentage,
           ),
+          downPaymentAmount: orUndef(contract.paymentPlan.downPaymentAmount),
+          barterPercentage: orUndef(contract.paymentPlan.barterPercentage),
+          barterAmount: orUndef(contract.paymentPlan.barterAmount),
           interestPercentage: orUndef(contract.paymentPlan.interestPercentage),
           interestType: orUndef(contract.paymentPlan.interestType),
-          advancePaymentPercentage: orUndef(
-            contract.paymentPlan.advancePaymentPercentage,
+          completionPaymentPercentage: orUndef(
+            contract.paymentPlan.completionPaymentPercentage,
           ),
+          completionPaymentAmount: orUndef(contract.paymentPlan.completionPaymentAmount),
           discountPercentage: orUndef(
             contract.paymentPlan.discountPercentage,
           ),
@@ -89,16 +90,19 @@ const ContractEditBody = ({
           frequency: orUndef(contract.paymentPlan.frequency),
           penaltyPercentage: orUndef(contract.paymentPlan.penaltyPercentage),
           vatIncluded: contract.paymentPlan.vatIncluded || false,
+          roundedInstallmentAmount: orUndef(contract.paymentPlan.roundedInstallmentAmount),
+          installmentAmounts: orUndef(contract.paymentPlan.installmentAmounts),
           paymentDates: orUndef(contract.paymentPlan.paymentDates),
           paymentDueDates: orUndef(contract.paymentPlan.paymentDueDates),
           firstPaymentDate: orUndef(contract.paymentPlan.firstPaymentDate),
-          advancePaymentDate: orUndef(contract.paymentPlan.advancePaymentDate),
+          downPaymentDate: orUndef(contract.paymentPlan.downPaymentDate),
+          completionPaymentDate: orUndef(contract.paymentPlan.completionPaymentDate),
         }
       : undefined,
   };
 
   const handleSubmit = async (data: ContractFormData) => {
-    const paymentPlan = data.paymentPlan?.type ? data.paymentPlan : undefined;
+    const paymentPlan = data.paymentPlan?.frequency ? data.paymentPlan : undefined;
     const party =
       data.party && data.party.id
         ? { type: data.party.type, id: data.party.id }
@@ -116,8 +120,6 @@ const ContractEditBody = ({
         date: data.date,
         amount,
         status: data.status || undefined,
-        startDate: data.startDate || undefined,
-        endDate: data.endDate || undefined,
         party,
         paymentPlan,
         user: data.user || undefined,

@@ -1,6 +1,6 @@
 import { Document } from 'mongoose';
 
-export type ContractPaymentStatus = 'unpaid' | 'partial' | 'paid';
+export type ContractPaymentStatus = 'unpaid' | 'partial' | 'paid' | 'cancelled';
 
 export interface IContractPayment {
   contractId: string;
@@ -11,7 +11,7 @@ export interface IContractPayment {
   unit?: string;
   index: number;
   label?: string;
-  dueDate: Date;
+  dueDate?: Date;
   amount: number;
   currency?: string;
   status: ContractPaymentStatus;

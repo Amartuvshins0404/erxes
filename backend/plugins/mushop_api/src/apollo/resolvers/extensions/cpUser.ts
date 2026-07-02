@@ -22,7 +22,7 @@ const getCustomerId = async (cpUserId: string, subdomain: string) => {
 };
 
 export const CPUser = {
-  isSubscribed: async (
+  isMembership: async (
     cpUser: ICPUser,
     _args: undefined,
     context: IContext,
@@ -31,13 +31,13 @@ export const CPUser = {
 
     const customerId = await getCustomerId(cpUser._id, context.subdomain);
 
-    const subscription = await models.MushopSubscription.getActiveSubscription(
+    const membership = await models.Membership.getActiveMembership(
       customerId,
     );
 
-    return !!subscription;
+    return !!membership;
   },
-  subscription: async (
+  membership: async (
     cpUser: ICPUser,
     _args: undefined,
     context: IContext,
@@ -46,6 +46,6 @@ export const CPUser = {
 
     const customerId = await getCustomerId(cpUser._id, context.subdomain);
 
-    return models.MushopSubscription.getActiveSubscription(customerId);
+    return models.Membership.getActiveMembership(customerId);
   },
 };

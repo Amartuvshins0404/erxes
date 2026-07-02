@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useApolloClient } from '@apollo/client';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   IconAlertTriangle,
   IconArrowDown,
@@ -28,6 +28,7 @@ import { useRemoveMastraThread } from '~/modules/chat/hooks/useRemoveMastraThrea
 import { useAttachments } from '~/modules/chat/hooks/useAttachments';
 import { useThreadArtifacts } from '~/modules/chat/hooks/useThreadArtifacts';
 import { useSessionBootstrap } from '~/modules/chat/hooks/useSessionBootstrap';
+import { withThreadParam } from '~/modules/chat/lib/threadParam';
 import { useIsNarrow } from '~/modules/chat/hooks/useIsNarrow';
 import { AgentRail } from '~/modules/chat/components/AgentRail';
 import { SessionList } from '~/modules/chat/components/SessionList';
@@ -61,6 +62,16 @@ const SCROLL_BUTTON_THRESHOLD = 280;
 export const ChatPage = () => {
   const { agentId } = useParams<{ agentId: string }>();
   const navigate = useNavigate();
+  // The active conversation is addressable via ?thread=<id>. Selecting a session
+  // writes it (push, so browser Back walks between conversations); reload/deep-
+  // link restores it (useSessionBootstrap). An agent-only URL keeps the old
+  // behavior — bootstrap opens the most-recent thread or a fresh draft.
+  const [, setSearchParams] = useSearchParams();
+  const setThreadParam = useCallback(
+    (threadId: string | undefined, replace = false) =>
+      setSearchParams((prev) => withThreadParam(prev, threadId), { replace }),
+    [setSearchParams],
+  );
   const [railOpen, setRailOpen] = useState(!agentId);
   // Below `md` the sessions side panel becomes an off-canvas drawer; closed by
   // default so the message column keeps full width. Desktop ignores this.
@@ -249,9 +260,12 @@ export const ChatPage = () => {
   // across streamed-token / keystroke re-renders — that's what lets the memoized
   // SessionList / AgentRail skip re-rendering while a reply streams.
   const handleNewThread = useCallback(() => {
-    if (agentId && selectedAgent)
-      chatStore.newDraft(apolloClient, agentId, selectedAgent.agentId);
-  }, [apolloClient, agentId, selectedAgent]);
+    if (!agentId || !selectedAgent) return;
+    chatStore.newDraft(apolloClient, agentId, selectedAgent.agentId);
+    // A draft isn't persisted yet, so it has nothing to address — drop ?thread=
+    // and let reload/back fall back to the agent's default (most-recent/draft).
+    setThreadParam(undefined);
+  }, [apolloClient, agentId, selectedAgent, setThreadParam]);
 
   const handleSelectSession = useCallback(
     (threadId: string) => {
@@ -264,8 +278,11 @@ export const ChatPage = () => {
         selectedAgent.agentId,
         threadId,
       );
+      // Make the conversation addressable: push ?thread= so reload restores it
+      // and browser Back returns to the previously viewed conversation.
+      setThreadParam(threadId);
     },
-    [apolloClient, agentId, selectedAgent, activeThreadId],
+    [apolloClient, agentId, selectedAgent, activeThreadId, setThreadParam],
   );
 
   // Open the confirmation dialog; the teardown itself runs in confirmDelete once
@@ -283,10 +300,14 @@ export const ChatPage = () => {
     if (!agentId || !pendingDelete) return;
     // The cached list filter (hook) + local state teardown (store); the
     // bootstrap effect re-selects the next session if this one was active.
+    const wasActive = pendingDelete === activeThreadId;
     removeThread(pendingDelete);
     chatStore.discardThread(agentId, pendingDelete);
     setPendingDelete(null);
-  }, [agentId, pendingDelete, removeThread]);
+    // Drop the deleted thread from the URL so it doesn't point at a dead session
+    // and the bootstrap effect is free to re-home to the next one.
+    if (wasActive) setThreadParam(undefined, true);
+  }, [agentId, pendingDelete, activeThreadId, removeThread, setThreadParam]);
 
   const handleRenameSession = useCallback(
     (id: string, threadId: string, title: string) => {

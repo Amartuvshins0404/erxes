@@ -37,9 +37,11 @@ export const useSessionBootstrap = (
     }
   }, [selectedId, agentId, searchParams, navigate]);
 
-  // Deep link: ?thread=<id> opens that session once sessions have loaded. Fires
-  // once per ?thread value — it does not depend on activeThreadId, so switching
-  // sessions afterwards never snaps the user back to the linked thread.
+  // ?thread=<id> is the addressable active conversation: this opens it once
+  // sessions have loaded, and re-fires whenever the value changes — a deep-link,
+  // a reload, a sidebar selection (ChatPage pushes the new id), or browser Back
+  // walking between conversations. selectSession is idempotent for an already-
+  // loaded thread, so re-runs are cheap and never reload over live state.
   useEffect(() => {
     if (!agentId || !mastraAgentId || !threadParam || !sessionsLoaded) return;
     chatStore.selectSession(apolloClient, agentId, mastraAgentId, threadParam);
@@ -53,9 +55,12 @@ export const useSessionBootstrap = (
 
   // Bootstrap / re-home the active session: once the cached list has loaded and
   // nothing is selected (first open of this agent, or after deleting the active
-  // session), open the most recent session or a fresh draft.
+  // session), open the most recent session or a fresh draft. A ?thread= deep-link
+  // owns the initial selection, so skip auto-homing while one is present —
+  // otherwise it would race the deep-link effect and override the linked thread.
   useEffect(() => {
     if (!agentId || !mastraAgentId || !sessionsLoaded || activeThreadId) return;
+    if (threadParam) return;
     if (threads.length > 0) {
       chatStore.selectSession(
         apolloClient,
@@ -71,6 +76,7 @@ export const useSessionBootstrap = (
     mastraAgentId,
     sessionsLoaded,
     activeThreadId,
+    threadParam,
     threads,
     apolloClient,
   ]);

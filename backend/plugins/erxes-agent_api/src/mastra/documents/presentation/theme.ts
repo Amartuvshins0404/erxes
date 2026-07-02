@@ -14,9 +14,10 @@ import * as path from 'node:path';
 // and still get on-brand, flexbox-only layout that actually renders.
 //
 // Brand palette mirrors the chat chart colors: indigo #6366f1 primary, dark
-// neutrals #1f2937 / #374151 / #6b7280, light canvas. Fonts are the already
-// bundled Noto Sans TTFs (full Cyrillic + Mongolian Cyrillic coverage), loaded
-// as Buffers for Satori.
+// neutrals #1f2937 / #374151 / #6b7280, light canvas. Fonts are the bundled Noto
+// TTFs — Noto Sans (Latin + full Cyrillic/Mongolian Cyrillic) plus Noto Sans SC,
+// Noto Sans Arabic and monochrome Noto Emoji for per-glyph fallback — loaded as
+// Buffers for Satori (see getFonts).
 // ---------------------------------------------------------------------------
 
 // 16:9 canvas. Satori renders at this logical size; renderSlide rasterises @2x.
@@ -50,7 +51,13 @@ export interface SatoriFont {
 
 let cachedFonts: SatoriFont[] | null = null;
 
-/** Load the bundled Noto Sans TTFs as Satori font descriptors (cached). */
+/** Load the bundled Noto fonts as Satori font descriptors (cached).
+ *
+ * Noto Sans leads (Latin/Cyrillic); Satori falls back per glyph to the trailing
+ * families for CJK (世界), Arabic (مرحبا) and monochrome emoji, so those scripts
+ * no longer render as tofu. The Arabic TTFs have their Satori-unsupported GSUB
+ * contextual lookups pruned (Satori throws on lookupType 5), and the emoji is a
+ * static monochrome instance (Satori cannot parse the variable NotoEmoji). */
 export function getFonts(): SatoriFont[] {
   if (cachedFonts) return cachedFonts;
   const read = (file: string) => fs.readFileSync(path.join(FONT_DIR, file));
@@ -59,6 +66,10 @@ export function getFonts(): SatoriFont[] {
     { name: 'Noto Sans', data: read('NotoSans-Bold.ttf'), weight: 700, style: 'normal' },
     { name: 'Noto Sans', data: read('NotoSans-Italic.ttf'), weight: 400, style: 'italic' },
     { name: 'Noto Sans', data: read('NotoSans-BoldItalic.ttf'), weight: 700, style: 'italic' },
+    { name: 'Noto Sans SC', data: read('NotoSansSC-Regular.otf'), weight: 400, style: 'normal' },
+    { name: 'Noto Sans Arabic', data: read('NotoSansArabic-Regular.ttf'), weight: 400, style: 'normal' },
+    { name: 'Noto Sans Arabic', data: read('NotoSansArabic-Bold.ttf'), weight: 700, style: 'normal' },
+    { name: 'Noto Emoji', data: read('NotoEmoji-Regular.ttf'), weight: 400, style: 'normal' },
   ];
   return cachedFonts;
 }

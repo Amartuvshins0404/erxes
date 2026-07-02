@@ -5,7 +5,7 @@ import {
   renderSlideSvg,
 } from '../renderSlide';
 import { renderPptxDocument } from '~/mastra/documents/pptx';
-import { RENDER_SCALE, SLIDE_H, SLIDE_W } from '../theme';
+import { getFonts, RENDER_SCALE, SLIDE_H, SLIDE_W } from '../theme';
 import type { DocumentChartRef } from '~/mastra/documents/markdown';
 
 // Each slide is a real Satori + resvg (+ echarts) render, so allow generous
@@ -65,6 +65,22 @@ describe('renderSlidePng', () => {
     expect(png.length).toBeGreaterThan(1000);
     expect(info.width).toBe(SLIDE_W * RENDER_SCALE);
     expect(info.height).toBe(SLIDE_H * RENDER_SCALE);
+  });
+
+  // Regression: Noto Sans covers only Latin/Cyrillic, so CJK/Arabic/emoji used to
+  // render as tofu, and satori throws outright on the variable emoji / the Arabic
+  // GSUB lookupType 5. The multiscript slide must render and draw real glyphs.
+  const MULTISCRIPT_SLIDE = `
+  <div class="slide"><div class="h1">Hello 世界 مرحبا Привет 😀🐱</div></div>`;
+  const BLANK_SLIDE = '<div class="slide"><div class="h1">Hello</div></div>';
+
+  it('renders CJK/Arabic/Cyrillic/emoji without throwing and draws glyphs', async () => {
+    const multi = await renderSlidePng(MULTISCRIPT_SLIDE);
+    const blank = await renderSlidePng(BLANK_SLIDE);
+    expect(pngInfo(multi).ok).toBe(true);
+    // The extra scripts add real pixels beyond the Latin-only slide — no tofu
+    // would leave the raster no larger than the plain "Hello".
+    expect(multi.length).toBeGreaterThan(blank.length);
   });
 
   it('substitutes a chart:ID reference with the rendered chart image', async () => {
@@ -198,6 +214,17 @@ describe('autofit', () => {
     expect(info.ok).toBe(true);
     expect(info.width).toBe(SLIDE_W * RENDER_SCALE);
     expect(info.height).toBe(SLIDE_H * RENDER_SCALE);
+describe('getFonts', () => {
+  it('exposes the full per-glyph fallback set with Noto Sans leading', () => {
+    const fonts = getFonts();
+    // Noto Sans must stay first so Latin/Cyrillic keeps rendering identically.
+    expect(fonts[0]).toMatchObject({ name: 'Noto Sans', weight: 400, style: 'normal' });
+    const families = new Set(fonts.map((f) => f.name));
+    for (const family of ['Noto Sans', 'Noto Sans SC', 'Noto Sans Arabic', 'Noto Emoji']) {
+      expect(families.has(family)).toBe(true);
+    }
+    // Every descriptor must carry real font bytes (no empty/missing file).
+    for (const f of fonts) expect(f.data.length).toBeGreaterThan(0);
   });
 });
 

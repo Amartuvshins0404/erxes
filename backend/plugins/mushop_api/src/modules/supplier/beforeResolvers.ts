@@ -53,10 +53,9 @@ const resolveSupplier = async (
 
 const buildCustomerInfo = async (
   subdomain: string,
+  customerId: string | undefined,
   cpUser: any,
 ): Promise<CustomerInfo | undefined> => {
-  const customerId = cpUser?.erxesCustomerId || cpUser?._id;
-
   if (!customerId && !cpUser) {
     return undefined;
   }
@@ -462,22 +461,14 @@ export const supplierBeforeResolvers: BeforeResolversConfig = {
     }
 
     const cpUser = extractCPUserFromHeader((headers || {}) as any);
-    const customerId = cpUser?.erxesCustomerId || cpUser?._id;
-    const scopedArgs =
-      customerId !== undefined ? { ...args, customerId } : args;
-
-    // Enrich from mushop's own core customer so the supplier gets real contact
-    // info to match/create against, not just the header's (often sparse) fields.
-    const customerInfo = cpUser
-      ? await buildCustomerInfo(subdomain, cpUser)
-      : undefined;
+    const customerId = args.customerId || cpUser?.erxesCustomerId || cpUser?._id;
 
     const models = await generateModels(subdomain);
 
     if (resolver === 'cpFullOrders') {
       const mushopPosToken = getMushopPosToken(headers);
 
-      return aggregateFullOrders(subdomain, models, scopedArgs, mushopPosToken);
+      return aggregateFullOrders(subdomain, models, args, mushopPosToken);
     }
 
     const supplierId = getSupplierId(headers);
@@ -493,8 +484,17 @@ export const supplierBeforeResolvers: BeforeResolversConfig = {
     }
 
     switch (resolver) {
-      case 'cpOrdersAdd':
-        return proxyOrder(models, supplier, scopedArgs, customerInfo);
+      case 'cpOrdersAdd': {
+        const orderCustomerId = args.customerId || customerId;
+      
+        const customerInfo = await buildCustomerInfo(
+          subdomain,
+          orderCustomerId,
+          cpUser,
+        );
+
+        return proxyOrder(models, supplier, args, customerInfo);
+      }
       case 'invoiceCreate':
         return proxyInvoiceCreate(supplier, args);
       case 'paymentTransactionsAdd':
@@ -502,13 +502,13 @@ export const supplierBeforeResolvers: BeforeResolversConfig = {
       case 'invoicesCheck':
         return proxyInvoiceCheck(supplier, args);
       case 'cpOrdersEdit':
-        return proxyOrdersEdit(models, supplier, scopedArgs);
+        return proxyOrdersEdit(models, supplier, args);
       case 'cpOrdersCancel':
-        return proxyOrdersCancel(supplier, scopedArgs);
+        return proxyOrdersCancel(supplier, args);
       case 'cpCurrentOrder':
-        return proxyCurrentOrder(supplier, scopedArgs);
+        return proxyCurrentOrder(supplier, args);
       case 'cpOrderDetail':
-        return proxyOrderDetail(supplier, scopedArgs);
+        return proxyOrderDetail(supplier, args);
       default:
         return args;
     }

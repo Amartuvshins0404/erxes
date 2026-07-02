@@ -33,6 +33,14 @@ export interface ToolPartView {
 const isToolType = (type: string): boolean =>
   type === 'dynamic-tool' || type.startsWith('tool-');
 
+// A tool that caught its own failure returns a soft-error result (`{error:true}`)
+// with `state: 'output-available'` rather than throwing to `output-error`. Treat
+// it as a failed call so the row shows the error styling, not a success check.
+const isSoftErrorOutput = (output: unknown): boolean =>
+  !!output &&
+  typeof output === 'object' &&
+  (output as { error?: unknown }).error === true;
+
 /** Narrow a UIMessage part to a normalized tool view, or null when it is not a
  *  tool part. The field reads are defensive (every field optional, state
  *  defaulted) so a contract drift renders blank rather than crashing. */
@@ -57,7 +65,7 @@ export const asToolPart = (part: MessagePart): ToolPartView | null => {
     input: p.input,
     output: p.output,
     errorText: p.errorText,
-    isError: state === 'output-error',
+    isError: state === 'output-error' || isSoftErrorOutput(p.output),
     pending: state === 'input-streaming' || state === 'input-available',
   };
 };

@@ -1,5 +1,5 @@
 import { ApolloCache, ApolloClient } from '@apollo/client';
-import { MASTRA_THREADS } from '~/graphql/queries';
+import { MASTRA_THREADS, MASTRA_THREAD_ARTIFACTS } from '~/graphql/queries';
 import { IMastraThread, IMastraThreadsResponse } from '~/modules/chat/types';
 
 type Client = ApolloClient<object>;
@@ -128,5 +128,26 @@ export const refetchThreadsIntoCache = async (
     );
   } catch {
     // best-effort — the optimistic list stays until the next successful read
+  }
+};
+
+// Refresh a thread's persisted artifacts after a turn finishes so a file created
+// during the turn shows in the Files panel without a reload. The panel's query
+// (useThreadArtifacts) watches this same cache entry with cache-and-network, so a
+// network read writes through and re-renders it in place. Best-effort — the panel
+// self-heals on the next reload if this read fails.
+export const refetchThreadArtifactsIntoCache = async (
+  client: Client,
+  threadId: string,
+): Promise<void> => {
+  if (!threadId) return;
+  try {
+    await client.query({
+      query: MASTRA_THREAD_ARTIFACTS,
+      variables: { threadId },
+      fetchPolicy: 'network-only',
+    });
+  } catch {
+    // best-effort — the Files panel refreshes on the next successful read
   }
 };

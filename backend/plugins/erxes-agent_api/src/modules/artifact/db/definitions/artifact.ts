@@ -27,6 +27,8 @@ export const artifactSchema = new Schema({
   size: { type: Number, label: 'Bytes' },
   width: { type: Number, label: 'Image width (px)' },
   height: { type: Number, label: 'Image height (px)' },
+  slides: { type: [String], label: 'Ordered pptx slide-image refs' },
+  slideCount: { type: Number, label: 'Slide count' },
   spec: { type: Schema.Types.Mixed, label: 'Chart spec' },
   createdAt: { type: Date, default: Date.now, label: 'Created at' },
 });

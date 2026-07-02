@@ -42,6 +42,8 @@ export async function storeArtifact(artifact: Artifact): Promise<void> {
                 fileKey: artifact.fileKey,
                 inline: artifact.inline,
                 size: artifact.size,
+                slides: artifact.slides,
+                slideCount: artifact.slideCount,
               }),
     });
   } catch (e) {

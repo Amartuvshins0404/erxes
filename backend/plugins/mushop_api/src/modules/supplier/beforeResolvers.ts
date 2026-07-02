@@ -12,6 +12,7 @@ import { sendSupplierMessage } from '~/utils/sendSupplierMessage';
 const SUPPLIER_RESOLVERS = [
   'cpOrdersAdd',
   'invoiceCreate',
+  'paymentTransactionsAdd',
   'invoicesCheck',
   'cpOrdersEdit',
   'cpOrdersCancel',
@@ -48,6 +49,42 @@ const resolveSupplier = async (
   }
 
   return supplier;
+};
+
+const buildCustomerInfo = async (
+  subdomain: string,
+  cpUser: any,
+): Promise<CustomerInfo | undefined> => {
+  const customerId = cpUser?.erxesCustomerId || cpUser?._id;
+
+  if (!customerId && !cpUser) {
+    return undefined;
+  }
+
+  const coreCustomer = customerId
+    ? ((await sendTRPCMessage({
+        subdomain,
+        pluginName: 'core',
+        method: 'query',
+        module: 'customers',
+        action: 'findOne',
+        input: { query: { _id: customerId } },
+        defaultValue: null,
+      })) as {
+        primaryPhone?: string;
+        primaryEmail?: string;
+        firstName?: string;
+        lastName?: string;
+      } | null)
+    : null;
+
+  return {
+    sourceUserId: customerId,
+    phone: coreCustomer?.primaryPhone || cpUser?.phone,
+    email: coreCustomer?.primaryEmail || cpUser?.email,
+    firstName: coreCustomer?.firstName || cpUser?.firstName,
+    lastName: coreCustomer?.lastName || cpUser?.lastName,
+  };
 };
 
 const proxyOrder = async (
@@ -129,15 +166,7 @@ const proxyInvoiceCreate = async (
 
   const input = (args.input || {}) as Record<string, any>;
 
-  const res = await sendSupplierMessage<{
-    invoice?: {
-      _id?: string;
-      invoiceNumber?: string;
-      amount?: number;
-      createdAt?: string;
-    };
-    transaction?: { _id?: string; status?: string; response?: any } | null;
-  }>({
+  const res = await sendSupplierMessage({
     subdomain: supplier.subdomain,
     action: 'invoice',
     payload: {
@@ -181,15 +210,54 @@ const proxyInvoiceCreate = async (
       contentTypeId: input.contentTypeId,
       createdAt: res.invoice.createdAt,
       data: input.data ?? null,
-      transactions: res.transaction
-        ? [
-            {
-              _id: res.transaction._id,
-              status: res.transaction.status,
-              response: res.transaction.response,
-            },
-          ]
-        : [],
+      transactions: res.transactions,
+    },
+  };
+};
+
+const proxyTransactionAdd = async (
+  supplier: ForwardSupplier,
+  args: Record<string, any>,
+): Promise<BeforeResolverResult> => {
+  if (!supplier.paymentId) {
+    return {
+      status: 'blocked',
+      code: 'SUPPLIER_NO_PAYMENT_CONFIG',
+      message: `Supplier ${supplier._id} has no paymentId configured`,
+    };
+  }
+
+  const input = (args.input || {}) as Record<string, any>;
+
+  const res = await sendSupplierMessage<{
+    transaction?: { _id?: string; status?: string; response?: any } | null;
+  }>({
+    subdomain: supplier.subdomain,
+    action: 'transaction',
+    payload: {
+      paymentId: supplier.paymentId,
+      invoiceId: input.invoiceId,
+      amount: input.amount,
+      details: input.details,
+    },
+  });
+
+  if (!res?.transaction?._id) {
+    return {
+      status: 'blocked',
+      code: 'SUPPLIER_TRANSACTION_FAILED',
+      message: `Supplier ${supplier._id} did not create a transaction`,
+    };
+  }
+
+  return {
+    status: 'resolved',
+    data: {
+      _id: res.transaction._id,
+      status: res.transaction.status,
+      response: res.transaction.response,
+      paymentId: supplier.paymentId,
+      amount: input.amount,
     },
   };
 };
@@ -381,7 +449,7 @@ export const supplierBeforeResolvers: BeforeResolversConfig = {
       'cpCurrentOrder',
       'cpOrderDetail',
     ],
-    payment: ['invoiceCreate', 'invoicesCheck'],
+    payment: ['invoiceCreate', 'paymentTransactionsAdd', 'invoicesCheck'],
   },
   handler: async (
     subdomain: string,
@@ -398,27 +466,18 @@ export const supplierBeforeResolvers: BeforeResolversConfig = {
     const scopedArgs =
       customerId !== undefined ? { ...args, customerId } : args;
 
+    // Enrich from mushop's own core customer so the supplier gets real contact
+    // info to match/create against, not just the header's (often sparse) fields.
     const customerInfo = cpUser
-      ? {
-          sourceUserId: customerId,
-          phone: cpUser.phone,
-          email: cpUser.email,
-          firstName: cpUser.firstName,
-          lastName: cpUser.lastName,
-        }
+      ? await buildCustomerInfo(subdomain, cpUser)
       : undefined;
 
     const models = await generateModels(subdomain);
 
     if (resolver === 'cpFullOrders') {
       const mushopPosToken = getMushopPosToken(headers);
-      
-      return aggregateFullOrders(
-        subdomain,
-        models,
-        scopedArgs,
-        mushopPosToken,
-      );
+
+      return aggregateFullOrders(subdomain, models, scopedArgs, mushopPosToken);
     }
 
     const supplierId = getSupplierId(headers);
@@ -438,6 +497,8 @@ export const supplierBeforeResolvers: BeforeResolversConfig = {
         return proxyOrder(models, supplier, scopedArgs, customerInfo);
       case 'invoiceCreate':
         return proxyInvoiceCreate(supplier, args);
+      case 'paymentTransactionsAdd':
+        return proxyTransactionAdd(supplier, args);
       case 'invoicesCheck':
         return proxyInvoiceCheck(supplier, args);
       case 'cpOrdersEdit':

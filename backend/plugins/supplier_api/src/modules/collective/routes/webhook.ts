@@ -169,8 +169,6 @@ router.post('/collective', async (req: Request, res: Response) => {
     const targetCatId = (sourceId: string) =>
       deterministicObjectId('collective-cat', collectiveId, supplierId, sourceId);
 
-    // Create a source category and its ancestors first (depth order), so every
-    // node's cloned parent already exists. Returns the cloned category id.
     const targetCategoryBySource = new Map<string, string>();
     const ensureCategory = async (
       sourceId: string,
@@ -180,11 +178,9 @@ router.post('/collective', async (req: Request, res: Response) => {
       if (cached) return cached;
 
       const cat = sourceById.get(sourceId);
-      // Parent not in the payload, or a cycle: hang it off the supplier root.
       if (!cat || seen.has(sourceId)) return supplierCategoryId;
       seen.add(sourceId);
 
-      // Resolve the cloned parent first; top-level → supplier root.
       const parentTargetId =
         cat.parentId && sourceById.has(cat.parentId)
           ? await ensureCategory(cat.parentId, seen)
@@ -198,7 +194,6 @@ router.post('/collective', async (req: Request, res: Response) => {
         cloneId,
         {
           name: cat.name || cat.code || sourceId,
-          // Flat code per category regardless of depth; nesting is in parentId.
           code: `${supplierKey}-${cat.code || sourceId}`,
           parentId: parentTargetId,
         },
@@ -223,17 +218,17 @@ router.post('/collective', async (req: Request, res: Response) => {
     for await (const doc of products) {
       const { _id: sourceProductId, prices, categoryId, ...rest } = doc || {};
 
-      delete (rest as any).__v;
-      delete (rest as any).createdAt;
-      delete (rest as any).updatedAt;
-      delete (rest as any).vendorId;
-      delete (rest as any).tokens;
-      delete (rest as any).isCheckRems;
-      delete (rest as any).taxRules;
-      delete (rest as any).scopeBrandIds;
-      delete (rest as any).mergedIds;
-      delete (rest as any).sameDefault;
-      delete (rest as any).sameMasks;
+      delete rest.__v;
+      delete rest.createdAt;
+      delete rest.updatedAt;
+      delete rest.vendorId;
+      delete rest.tokens;
+      delete rest.isCheckRems;
+      delete rest.taxRules;
+      delete rest.scopeBrandIds;
+      delete rest.mergedIds;
+      delete rest.sameDefault;
+      delete rest.sameMasks;
 
       if (!doc?.code) {
         results.push({
@@ -258,8 +253,6 @@ router.post('/collective', async (req: Request, res: Response) => {
         (categoryId && targetCategoryBySource.get(categoryId)) ||
         supplierCategoryId;
 
-      // Code: <supplierCode>-<srcProductCode>, e.g. UB-BZD-001-PHONEX1. The
-      // category isn't repeated here — it's already linked via categoryId.
       const targetCode = `${supplierKey}-${doc.code}`;
 
       const doc_ = {
@@ -353,9 +346,6 @@ router.post('/collective-push', async (req: Request, res: Response) => {
       });
     }
 
-    // The supplier's authoritative profile lives in this (the supplier's) own
-    // tenant — exactly one per tenant — so we read its contact info here rather
-    // than relying on mushop to pass it down.
     const models = await generateModels(subdomain);
     const supplier = await models.Supplier.findOne({}).lean();
 
@@ -367,7 +357,7 @@ router.post('/collective-push', async (req: Request, res: Response) => {
       action: 'findByToken',
       input: { token: posToken },
       defaultValue: [],
-    })) as Record<string, any>[];
+    }))
 
     if (!products.length) {
       return res.status(200).json({
@@ -390,8 +380,6 @@ router.post('/collective-push', async (req: Request, res: Response) => {
       }
     }
 
-    // Resolve the categories the products sit in AND all their ancestors, so
-    // the target can rebuild the full tree. Walk up parentId until no new ids.
     const categoryById = new Map<string, Record<string, any>>();
     let pending = Array.from(leafCategoryIds);
 
@@ -407,7 +395,7 @@ router.post('/collective-push', async (req: Request, res: Response) => {
           fields: { _id: 1, name: 1, code: 1, parentId: 1 },
         },
         defaultValue: [],
-      })) as Record<string, any>[];
+      }))
 
       const nextParents: string[] = [];
       for (const cat of fetched) {
@@ -642,7 +630,7 @@ router.post('/collective-purge-push', async (req: Request, res: Response) => {
       action: 'findByToken',
       input: { token: posToken },
       defaultValue: [],
-    })) as Record<string, any>[];
+    }))
 
     const productIds = products
       .map((p) => p?._id)
@@ -725,7 +713,7 @@ router.post('/create-pos', async (req: Request, res: Response) => {
       action: 'findOne',
       input: { query: { isOwner: true } },
       defaultValue: null,
-    })) as { _id: string } | null;
+    }))
 
     if (!owner?._id) {
       return res.status(400).json({
@@ -748,7 +736,7 @@ router.post('/create-pos', async (req: Request, res: Response) => {
           cashierIds: [owner._id],
         },
       },
-    })) as { _id: string; token: string } | null;
+    }))
 
     if (!pos?.token) {
       return res
@@ -772,10 +760,6 @@ interface CustomerInfo {
   lastName?: string;
 }
 
-// Creates/finds THIS tenant's own customer for a mushop shopper, matched by the
-// global shopper id (stored in `code`) or phone/email. Returns the tenant-local
-// customer id so mushop can index the global→local mapping. The tenant owns the
-// id — no foreign id is injected; the global id only lives in `code`.
 const upsertLocalCustomer = async (
   subdomain: string,
   info?: CustomerInfo,
@@ -784,47 +768,56 @@ const upsertLocalCustomer = async (
     return undefined;
   }
 
-  const findOne = (query: Record<string, any>) =>
-    sendTRPCMessage({
-      subdomain,
-      pluginName: 'core',
-      method: 'query',
-      module: 'customers',
-      action: 'findOne',
-      input: { query },
-      defaultValue: null,
-    }) as Promise<{ _id?: string } | null>;
-
-  // Match by the global shopper id first (stable), then phone, then email.
-  let existing: { _id?: string } | null = null;
-  if (info.sourceUserId) existing = await findOne({ code: info.sourceUserId });
-  if (!existing?._id && info.phone)
-    existing = await findOne({ customerPrimaryPhone: info.phone });
-  if (!existing?._id && info.email)
-    existing = await findOne({ customerPrimaryEmail: info.email });
-
-  if (existing?._id) return existing._id;
-
-  const created = (await sendTRPCMessage({
+  // Find the tenant-local customer the way frontline does: core's canonical
+  // getWidgetCustomer finder, matched by the global shopper id (stored in
+  // `code`), then email, then phone. The global id is the stable key; phone/
+  // email are fallbacks so a returning shopper reuses the same customer.
+  const existing = (await sendTRPCMessage({
     subdomain,
     pluginName: 'core',
-    method: 'mutation',
+    method: 'query',
     module: 'customers',
-    action: 'createCustomer',
+    action: 'getWidgetCustomer',
     input: {
-      doc: {
-        code: info.sourceUserId,
-        primaryPhone: info.phone,
-        primaryEmail: info.email,
-        firstName: info.firstName,
-        lastName: info.lastName,
-        state: 'customer',
-      },
+      code: info.sourceUserId,
+      email: info.email,
+      phone: info.phone,
     },
     defaultValue: null,
   })) as { _id?: string } | null;
 
-  return created?._id;
+  // Only send fields we actually have, so an update never clobbers existing
+  // contact info with blanks.
+  const doc: Record<string, any> = { state: 'customer' };
+  if (info.sourceUserId) doc.code = info.sourceUserId;
+  if (info.phone) doc.primaryPhone = info.phone;
+  if (info.email) doc.primaryEmail = info.email;
+  if (info.firstName) doc.firstName = info.firstName;
+  if (info.lastName) doc.lastName = info.lastName;
+
+  // Update-or-create, mirroring frontline's getWidgetCustomer → update/create
+  // shape, but with the plain customer mutations (no messenger session baggage).
+  const saved = existing?._id
+    ? ((await sendTRPCMessage({
+        subdomain,
+        pluginName: 'core',
+        method: 'mutation',
+        module: 'customers',
+        action: 'updateCustomer',
+        input: { _id: existing._id, doc },
+        defaultValue: null,
+      })) as { _id?: string } | null)
+    : ((await sendTRPCMessage({
+        subdomain,
+        pluginName: 'core',
+        method: 'mutation',
+        module: 'customers',
+        action: 'createCustomer',
+        input: { doc },
+        defaultValue: null,
+      })) as { _id?: string } | null);
+
+  return saved?._id ?? existing?._id;
 };
 
 router.post('/order', async (req: Request, res: Response) => {
@@ -844,8 +837,6 @@ router.post('/order', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'payload.order is required' });
     }
 
-    // Create this tenant's own customer for the shopper (best-effort: a contact
-    // failure must not block the order). The order keeps the global customerId.
     let localCustomerId: string | undefined;
     try {
       localCustomerId = await upsertLocalCustomer(subdomain, customerInfo);
@@ -853,13 +844,17 @@ router.post('/order', async (req: Request, res: Response) => {
       console.error('mushop/order: customer upsert failed:', e.message);
     }
 
+    const orderInput = localCustomerId
+      ? { ...order, posToken, customerId: localCustomerId, customerType: 'customer' }
+      : { ...order, posToken };
+
     const created = (await sendTRPCMessage({
       subdomain,
       pluginName: 'posclient',
       method: 'mutation',
       module: 'posclient',
       action: 'createOrder',
-      input: { order: { ...order, posToken } },
+      input: { order: orderInput },
       defaultValue: null,
     }))
 
@@ -869,9 +864,6 @@ router.post('/order', async (req: Request, res: Response) => {
         .json({ error: 'posclient did not create the order' });
     }
 
-    // Return the full created order so the storefront (via mushop's proxy) gets
-    // _id/number/totalAmount/paidAmounts to invoice against, plus the tenant's
-    // own customerId so mushop can index the global→local customer mapping.
     return res
       .status(200)
       .json({ success: true, order: created, customerId: localCustomerId });
@@ -881,10 +873,6 @@ router.post('/order', async (req: Request, res: Response) => {
   }
 });
 
-// Creates a gateway invoice (+ transaction/QR) in the SUPPLIER tenant for a
-// posclient order, using the supplier's own payment method. mushop proxies the
-// storefront's invoiceCreate here so the invoice + money live in the supplier
-// tenant; the returned QR is handed back to the storefront unchanged.
 router.post('/invoice', async (req: Request, res: Response) => {
   try {
     const { subdomain, payload } = req.body || {};
@@ -936,12 +924,53 @@ router.post('/invoice', async (req: Request, res: Response) => {
         data: { posToken },
       },
       defaultValue: null,
-    })) as { _id?: string; invoiceNumber?: string; createdAt?: string } | null;
+    }))
 
     if (!invoice?._id) {
       return res
         .status(502)
         .json({ error: 'payment plugin did not create the invoice' });
+    }
+
+    const invoiceWithTransactions = (await sendTRPCMessage({
+      subdomain,
+      pluginName: 'payment',
+      method: 'query',
+      module: 'payment',
+      action: 'getInvoiceWithTransactions',
+      input: { _id: invoice._id },
+      defaultValue: null,
+    }))
+
+    const transactions = invoiceWithTransactions?.transactions || [];
+
+    return res.status(200).json({
+      success: true,
+      invoice,
+      transactions
+    });
+  } catch (e: any) {
+    console.error('mushop/invoice webhook failed:', e);
+    return res.status(400).json({ error: e.message });
+  }
+});
+
+router.post('/transaction', async (req: Request, res: Response) => {
+  try {
+    const { subdomain, payload } = req.body || {};
+    const { paymentId, invoiceId, amount, details } = payload || {};
+
+    if (!subdomain) {
+      return res.status(400).json({ error: 'subdomain is required' });
+    }
+    if (!paymentId) {
+      return res.status(400).json({ error: 'payload.paymentId is required' });
+    }
+    if (!invoiceId) {
+      return res.status(400).json({ error: 'payload.invoiceId is required' });
+    }
+    if (!amount) {
+      return res.status(400).json({ error: 'payload.amount is required' });
     }
 
     const transaction = (await sendTRPCMessage({
@@ -950,34 +979,26 @@ router.post('/invoice', async (req: Request, res: Response) => {
       method: 'mutation',
       module: 'payment',
       action: 'addTransaction',
-      input: { invoiceId: invoice._id, paymentId, amount },
+      input: { invoiceId, paymentId, amount, details },
       defaultValue: null,
-    })) as { _id?: string; status?: string; response?: any } | null;
+    }))
+
+    if (!transaction?._id) {
+      return res
+        .status(502)
+        .json({ error: 'payment plugin did not create the transaction' });
+    }
 
     return res.status(200).json({
       success: true,
-      invoice: {
-        _id: invoice._id,
-        invoiceNumber: invoice.invoiceNumber,
-        amount,
-        createdAt: invoice.createdAt,
-      },
-      transaction: transaction
-        ? {
-            _id: transaction._id,
-            status: transaction.status,
-            response: transaction.response,
-          }
-        : null,
+      transaction,
     });
   } catch (e: any) {
-    console.error('mushop/invoice webhook failed:', e);
+    console.error('mushop/transaction webhook failed:', e);
     return res.status(400).json({ error: e.message });
   }
 });
 
-// Customer order operations proxied from mushop, run in the SUPPLIER tenant
-// against its posclient (posToken-scoped via new posclient tRPC procedures).
 const callPosclientOrder = async (
   subdomain: string,
   action: string,
@@ -1006,9 +1027,6 @@ router.post('/orders-list', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'payload.posToken is required' });
     }
 
-    // params carries the shopper's customerId (the client-portal user id, the
-    // same across tenants); posclient fullOrders filters this tenant's orders by
-    // it.
     const result = await callPosclientOrder(
       subdomain,
       'fullOrders',
@@ -1110,8 +1128,6 @@ router.post('/order-cancel', async (req: Request, res: Response) => {
   }
 });
 
-// Polls the SUPPLIER tenant for an invoice's paid status. On 'paid', the
-// supplier tenant's own payment callback settles the posclient order.
 router.post('/invoice-check', async (req: Request, res: Response) => {
   try {
     const { subdomain, payload } = req.body || {};
@@ -1132,7 +1148,7 @@ router.post('/invoice-check', async (req: Request, res: Response) => {
       action: 'checkInvoice',
       input: { _id: invoiceId },
       defaultValue: null,
-    })) as string | null;
+    }))
 
     return res.status(200).json({ success: true, status });
   } catch (e: any) {

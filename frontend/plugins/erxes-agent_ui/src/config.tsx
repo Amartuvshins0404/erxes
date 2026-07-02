@@ -56,6 +56,11 @@ export const CONFIG: IUIConfig = {
       name: 'workflows',
       icon: IconSitemap,
       path: 'erxes-agent/workflows',
+      // Advertises that this plugin contributes to the automations builder, so
+      // core's RenderPluginsComponentWrapper loads our `automationsWidget`
+      // (the "Run agent workflow" action config UI) instead of showing the
+      // "Plugin disabled" fallback.
+      hasAutomation: true,
     },
     {
       name: 'schedules',

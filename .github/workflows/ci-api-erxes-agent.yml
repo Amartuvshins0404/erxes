@@ -16,6 +16,9 @@ on:
 
 env:
   NX_DAEMON: false
+  # onnxruntime-node (under @imgly/background-removal-node) postinstalls the
+  # full CUDA GPU tarball on linux/x64 unless skipped — CPU-only everywhere.
+  npm_config_onnxruntime_node_install_cuda: skip
 
 jobs:
   erxes-agent_api-ci:
@@ -55,7 +58,7 @@ jobs:
       - name: Run security regression tests
         run: |
           pnpm nx test erxes-api-shared
-          pnpm nx test erxes-agent_api -- --testPathPattern="securityGuard|argScrub|authHeaders|secretRedaction|secretRefGuard|secretHandlingContract|runToken|securityExploit" --runInBand
+          pnpm nx test erxes-agent_api -- --testPathPattern="securityGuard|argScrub|authHeaders|secretRedaction|secretRefGuard|secretHandlingContract|runToken|securityExploit|imageTools" --runInBand
           pnpm nx test core-api -- --testPathPattern="issueRunToken|configsGetCodes|getCodesContract" --runInBand
 
       - name: Set up QEMU

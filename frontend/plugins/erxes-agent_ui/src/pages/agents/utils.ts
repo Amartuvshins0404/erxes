@@ -40,6 +40,11 @@ export const BUILTIN_TOOLS: { key: string; description: string }[] = [
     description: 'Read a file as text (PDF, Word, Excel, PowerPoint, …)',
   },
   {
+    key: 'removeImageBackground',
+    description:
+      'Remove the background from a photo (transparent PNG, e.g. product images)',
+  },
+  {
     key: 'companyKnowledge',
     description: 'Search indexed company knowledge',
   },

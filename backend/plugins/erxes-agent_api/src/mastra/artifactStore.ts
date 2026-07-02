@@ -25,14 +25,24 @@ export async function storeArtifact(artifact: Artifact): Promise<void> {
         ? { spec: artifact.spec as unknown as Record<string, unknown> }
         : artifact.kind === 'diagram'
           ? { definition: artifact.definition }
-          : {
-              format: artifact.format,
-              fileName: artifact.fileName,
-              mimeType: artifact.mimeType,
-              fileKey: artifact.fileKey,
-              inline: artifact.inline,
-              size: artifact.size,
-            }),
+          : artifact.kind === 'image'
+            ? {
+                fileName: artifact.fileName,
+                mimeType: artifact.mimeType,
+                fileKey: artifact.fileKey,
+                inline: artifact.inline,
+                size: artifact.size,
+                width: artifact.width,
+                height: artifact.height,
+              }
+            : {
+                format: artifact.format,
+                fileName: artifact.fileName,
+                mimeType: artifact.mimeType,
+                fileKey: artifact.fileKey,
+                inline: artifact.inline,
+                size: artifact.size,
+              }),
     });
   } catch (e) {
     // eslint-disable-next-line no-console

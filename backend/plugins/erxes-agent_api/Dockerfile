@@ -1,7 +1,14 @@
 # Stage 1: install production deps as flat real directories (no pnpm virtual store)
-FROM node:22-alpine3.22 AS installer
+# bookworm-slim, NOT alpine: onnxruntime-node (under @imgly/background-removal-node)
+# ships glibc-only binaries that fail to dlopen on musl. Both stages must match —
+# @resvg/resvg-js and sharp pick their platform binary (-gnu vs -musl) at install.
+FROM node:22-bookworm-slim AS installer
 WORKDIR /app
 RUN npm install -g pnpm@9
+
+# onnxruntime-node's postinstall downloads the full CUDA GPU tarball on
+# linux/x64 unless told not to — this is a CPU-only image.
+ENV npm_config_onnxruntime_node_install_cuda=skip
 
 COPY pnpm-lock.yaml ./
 COPY backend/plugins/erxes-agent_api/package.json backend/plugins/erxes-agent_api/
@@ -37,8 +44,12 @@ fs.writeFileSync( \
          -o -name "docs" -o -name "doc" -o -name "examples" -o -name "example" \
          -o -name ".github" -o -name "coverage" \
        \) -prune -exec rm -rf {} \; 2>/dev/null || true
+# onnxruntime-node ships binaries for every platform in one tarball — drop the
+# darwin/win32 ones (~150MB) from this linux image.
+RUN rm -rf node_modules/onnxruntime-node/bin/napi-v3/darwin \
+           node_modules/onnxruntime-node/bin/napi-v3/win32
 # Stage 2: minimal runtime
-FROM node:22-alpine3.22
+FROM node:22-bookworm-slim
 WORKDIR /app
 
 COPY --from=installer /app/node_modules ./node_modules

@@ -378,8 +378,15 @@ export const useChatStore = create<ChatStoreState>((set, get) => {
       ? activeSkillNames.slice(0, 10).map((n) => n.slice(0, 64))
       : undefined;
 
+    // Attachments ride in the message metadata too (not only the request
+    // body): the user bubble renders sent images from metadata immediately,
+    // exactly as messageMapping restores them on reload.
+    const metadata = {
+      ...(hidden ? { hidden: true } : {}),
+      ...(attachments?.length ? { attachments } : {}),
+    };
     void chat.sendMessage(
-      { text: message, ...(hidden ? { metadata: { hidden: true } } : {}) },
+      { text: message, ...(Object.keys(metadata).length ? { metadata } : {}) },
       {
         body: {
           ...(agent.reasoningEffort

@@ -35,7 +35,7 @@ const agentCache = new Map<string, Agent>();
 const toolsCache = new Map<string, ToolsInput>();
 
 // Increment this whenever routing.ts, the meta-tools, or provider logic changes.
-const ROUTING_VERSION = 30;
+const ROUTING_VERSION = 31;
 
 export interface AgentWithTools {
   agent: Agent;

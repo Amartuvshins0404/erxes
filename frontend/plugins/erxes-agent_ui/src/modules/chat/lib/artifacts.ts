@@ -7,6 +7,7 @@ import {
   IconFileTypePpt,
   IconFileTypeXls,
   IconHierarchy,
+  IconPhoto,
 } from '@tabler/icons-react';
 import type { AgentUIMessage } from '~/modules/chat/types';
 import type { ArtifactGroup } from '~/modules/chat/hooks/useThreadArtifacts';
@@ -16,6 +17,7 @@ import {
   resolveStorageRef,
   type Artifact,
   type DocumentArtifact,
+  type ImageArtifact,
 } from '~/modules/chat/lib/artifactNormalize';
 
 // The artifact contract + normalizer live in ./artifactNormalize (pure and
@@ -29,6 +31,7 @@ export type {
   DiagramArtifact,
   DocumentArtifact,
   DocumentFormat,
+  ImageArtifact,
 } from '~/modules/chat/lib/artifactNormalize';
 
 /** Pull a valid artifact off a tool result, or null when there isn't one. */
@@ -106,6 +109,7 @@ export const associateArtifacts = (
 export const artifactIcon = (a: Artifact) => {
   if (a.kind === 'chart')   return IconChartBar;
   if (a.kind === 'diagram') return IconHierarchy;
+  if (a.kind === 'image')   return IconPhoto;
   if (a.format === 'pdf')   return IconFileTypePdf;
   if (a.format === 'docx')  return IconFileTypeDocx;
   if (a.format === 'pptx')  return IconFileTypePpt;
@@ -113,8 +117,10 @@ export const artifactIcon = (a: Artifact) => {
   return IconFile;
 };
 
-/** A URL the browser can open/download for a document artifact. */
-export const documentUrl = (artifact: DocumentArtifact): string => {
+/** A URL the browser can open/download for a file-backed artifact. */
+export const documentUrl = (
+  artifact: DocumentArtifact | ImageArtifact,
+): string => {
   if (artifact.inline) return artifact.fileKey;
   return resolveStorageRef(artifact.fileKey, REACT_APP_API_URL, artifact.fileName);
 };

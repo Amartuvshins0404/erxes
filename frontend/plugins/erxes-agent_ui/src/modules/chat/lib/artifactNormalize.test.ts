@@ -110,6 +110,43 @@ describe('normalizeArtifact', () => {
     ).toBeNull();
   });
 
+  // Image artifacts (remove-image-background). Both shapes must normalize: a
+  // live tool result (`id`) and a persisted store row (`artifactId`).
+  it('normalizes an image from a tool result', () => {
+    const a = normalizeArtifact({
+      id: 'img_1',
+      kind: 'image',
+      title: 'Red mug',
+      fileName: 'red-mug-nobg.png',
+      mimeType: 'image/png',
+      fileKey: 'private/agent/red-mug-nobg.png',
+      size: 51234,
+      width: 1600,
+      height: 1200,
+    });
+    expect(a).toMatchObject({
+      id: 'img_1',
+      kind: 'image',
+      title: 'Red mug',
+      fileName: 'red-mug-nobg.png',
+      fileKey: 'private/agent/red-mug-nobg.png',
+      width: 1600,
+      height: 1200,
+    });
+  });
+
+  it('reads a persisted image store row (artifactId, sparse fields)', () => {
+    const a = normalizeArtifact({
+      artifactId: 'img_2',
+      kind: 'image',
+      fileKey: 'private/agent/x.png',
+    });
+    expect(a?.id).toBe('img_2');
+    expect(a?.kind).toBe('image');
+    expect(a && a.kind === 'image' && a.fileName).toBe('image.png');
+    expect(a && a.kind === 'image' && a.width).toBeUndefined();
+  });
+
   it('rejects non-objects, missing ids, and unknown kinds', () => {
     expect(normalizeArtifact(null)).toBeNull();
     expect(normalizeArtifact('nope')).toBeNull();

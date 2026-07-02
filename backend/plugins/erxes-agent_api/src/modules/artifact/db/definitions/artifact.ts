@@ -12,7 +12,11 @@ export const artifactSchema = new Schema({
   messageId: { type: String, label: 'Linked assistant message id' },
   agentId: { type: String, label: 'Agent id' },
   resourceId: { type: String, label: 'Owner resource id' },
-  kind: { type: String, required: true, label: 'chart | document | diagram' },
+  kind: {
+    type: String,
+    required: true,
+    label: 'chart | document | diagram | image',
+  },
   definition: { type: String, label: 'Mermaid diagram definition' },
   format: { type: String, label: 'pdf | docx | xlsx | pptx' },
   title: { type: String, default: '', label: 'Title' },
@@ -21,6 +25,8 @@ export const artifactSchema = new Schema({
   fileKey: { type: String, label: 'Storage key or inline URL' },
   inline: { type: Boolean, label: 'fileKey is an inline URL' },
   size: { type: Number, label: 'Bytes' },
+  width: { type: Number, label: 'Image width (px)' },
+  height: { type: Number, label: 'Image height (px)' },
   spec: { type: Schema.Types.Mixed, label: 'Chart spec' },
   createdAt: { type: Date, default: Date.now, label: 'Created at' },
 });

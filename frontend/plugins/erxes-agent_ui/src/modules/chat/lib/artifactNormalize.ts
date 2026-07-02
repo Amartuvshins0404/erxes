@@ -44,7 +44,25 @@ export interface DiagramArtifact {
   definition: string;
 }
 
-export type Artifact = ChartArtifact | DocumentArtifact | DiagramArtifact;
+export interface ImageArtifact {
+  id: string;
+  kind: 'image';
+  title: string;
+  fileName: string;
+  mimeType: string;
+  // Storage key (read via core's /read-file) OR an inline data:/http URL.
+  fileKey: string;
+  inline?: boolean;
+  size?: number;
+  width?: number;
+  height?: number;
+}
+
+export type Artifact =
+  | ChartArtifact
+  | DocumentArtifact
+  | DiagramArtifact
+  | ImageArtifact;
 
 /**
  * Normalize ANY raw artifact shape into the one UI Artifact type — the single
@@ -86,6 +104,21 @@ export const normalizeArtifact = (raw: unknown): Artifact | null => {
       kind: 'diagram',
       title: String(a.title ?? 'Diagram'),
       definition: String(a.definition ?? ''),
+    };
+  }
+
+  if (a.kind === 'image') {
+    return {
+      id,
+      kind: 'image',
+      title: String(a.title ?? 'Image'),
+      fileName: String(a.fileName ?? 'image.png'),
+      mimeType: String(a.mimeType ?? 'image/png'),
+      fileKey: String(a.fileKey ?? ''),
+      inline: Boolean(a.inline),
+      size: typeof a.size === 'number' ? a.size : undefined,
+      width: typeof a.width === 'number' ? a.width : undefined,
+      height: typeof a.height === 'number' ? a.height : undefined,
     };
   }
 

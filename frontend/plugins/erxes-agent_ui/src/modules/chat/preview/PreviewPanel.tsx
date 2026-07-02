@@ -14,12 +14,14 @@ import {
   artifactIcon,
   Artifact,
   DocumentArtifact,
+  ImageArtifact,
   documentUrl,
 } from '~/modules/chat/lib/artifacts';
 import { MermaidViewer } from '~/modules/chat/preview/MermaidViewer';
 import { formatFileSize } from '~/modules/chat/lib/attachments';
 import { previewStore } from '~/modules/chat/preview/previewStore';
 import { DocumentViewer } from '~/modules/chat/preview/DocumentViewer';
+import { ImageViewer } from '~/modules/chat/preview/ImageViewer';
 import { PresentMode } from '~/modules/chat/preview/PresentMode';
 import { useThreadArtifacts } from '~/modules/chat/hooks/useThreadArtifacts';
 
@@ -34,6 +36,15 @@ const slideLabel = (a: DocumentArtifact): string => {
 const artifactSubtitle = (a: Artifact): string => {
   if (a.kind === 'chart') return 'Interactive chart';
   if (a.kind === 'diagram') return 'Mermaid diagram';
+  if (a.kind === 'image') {
+    return [
+      'Transparent PNG',
+      a.width && a.height ? `${a.width}×${a.height}` : '',
+      formatFileSize(a.size),
+    ]
+      .filter(Boolean)
+      .join(' · ');
+  }
   return [a.format.toUpperCase(), slideLabel(a), formatFileSize(a.size)]
     .filter(Boolean)
     .join(' · ');
@@ -211,7 +222,7 @@ const FileListView = ({
           <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-muted-foreground">
             <IconFile className="size-8 opacity-40" />
             <p className="text-sm">
-              {loading ? 'Loading…' : 'No charts or documents yet.'}
+              {loading ? 'Loading…' : 'No charts, documents or images yet.'}
             </p>
             <p className="text-xs">
               Ask the agent to chart data or generate a report.
@@ -243,7 +254,9 @@ const ItemView = ({
       ? 'Chart'
       : artifact.kind === 'diagram'
         ? 'Diagram'
-        : artifact.format.toUpperCase();
+        : artifact.kind === 'image'
+          ? 'Image'
+          : artifact.format.toUpperCase();
 
   return (
     <>
@@ -290,7 +303,9 @@ const ItemView = ({
             Present
           </Button>
         )}
-        {artifact.kind === 'document' && <DocumentActions artifact={artifact} />}
+        {(artifact.kind === 'document' || artifact.kind === 'image') && (
+          <DocumentActions artifact={artifact} />
+        )}
         <Button
           variant="ghost"
           size="icon"
@@ -315,6 +330,8 @@ const ItemView = ({
           </div>
         ) : artifact.kind === 'diagram' ? (
           <MermaidViewer definition={artifact.definition} />
+        ) : artifact.kind === 'image' ? (
+          <ImageViewer artifact={artifact} />
         ) : (
           <DocumentViewer artifact={artifact} />
         )}
@@ -330,7 +347,11 @@ const ItemView = ({
   );
 };
 
-const DocumentActions = ({ artifact }: { artifact: DocumentArtifact }) => (
+const DocumentActions = ({
+  artifact,
+}: {
+  artifact: DocumentArtifact | ImageArtifact;
+}) => (
   <Button asChild variant="secondary" size="sm">
     <a
       href={documentUrl(artifact)}

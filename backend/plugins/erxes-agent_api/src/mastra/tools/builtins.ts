@@ -15,6 +15,7 @@ import { chartSpecSchema, sanitizeChartSpec } from '~/mastra/charts/chartSpec';
 import { chartArtifactSchema, diagramArtifactSchema, newArtifactId } from './artifacts';
 import { storeArtifact } from '~/mastra/artifactStore';
 import { DOCUMENT_BUILTIN_TOOLS } from './documentTools';
+import { IMAGE_BUILTIN_TOOLS } from './imageTools';
 import { faviconFor, hostnameOf, SEARCH_ENGINE } from './searchEngine';
 
 const FETCH_TIMEOUT_MS = 10_000;
@@ -353,6 +354,9 @@ export const BUILTIN_TOOLS: Record<string, ReturnType<typeof createTool>> = {
   // Document generators (PDF/DOCX/XLSX). Each returns a downloadable artifact
   // shown in the Preview panel; charts embed via the render-chart spec.
   ...DOCUMENT_BUILTIN_TOOLS,
+  // Image tools (background removal). In-process inference — see imageTools.ts
+  // for the memory guards. Deny per agent via builtin:removeImageBackground.
+  ...IMAGE_BUILTIN_TOOLS,
 };
 
 /** Look up a builtin tool by its registry key, or null when unknown. */

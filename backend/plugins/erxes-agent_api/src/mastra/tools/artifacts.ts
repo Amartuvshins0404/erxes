@@ -58,18 +58,37 @@ export const diagramArtifactSchema = z.object({
   definition: z.string(),
 });
 
+export const imageArtifactSchema = z.object({
+  id: z.string(),
+  kind: z.literal('image'),
+  title: z.string(),
+  fileName: z.string(),
+  mimeType: z.string(),
+  // Storage key (read back through core's /read-file) OR a full/data URL when
+  // the instance can't persist (e.g. local-disk storage) — same as documents.
+  fileKey: z.string(),
+  inline: z.boolean().optional(),
+  size: z.number().optional(),
+  width: z.number().optional(),
+  height: z.number().optional(),
+});
+
 export const artifactSchema = z.discriminatedUnion('kind', [
   chartArtifactSchema,
   documentArtifactSchema,
   diagramArtifactSchema,
+  imageArtifactSchema,
 ]);
 
 export type ChartArtifact = z.infer<typeof chartArtifactSchema>;
 export type DocumentArtifact = z.infer<typeof documentArtifactSchema>;
 export type DiagramArtifact = z.infer<typeof diagramArtifactSchema>;
+export type ImageArtifact = z.infer<typeof imageArtifactSchema>;
 export type Artifact = z.infer<typeof artifactSchema>;
 
 /** Short, collision-free artifact id (e.g. "chart_ab12cd"). */
-export function newArtifactId(prefix: 'chart' | 'doc' | 'diagram'): string {
+export function newArtifactId(
+  prefix: 'chart' | 'doc' | 'diagram' | 'img',
+): string {
   return `${prefix}_${randomUUID().slice(0, 8)}`;
 }

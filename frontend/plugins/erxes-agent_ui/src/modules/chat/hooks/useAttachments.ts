@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useToast } from 'erxes-ui';
 import { ChatAttachment, PendingAttachment } from '~/modules/chat/types';
 import { randomIdSuffix } from '~/modules/chat/lib/ids';
 import { uploadToStorage } from '~/modules/chat/lib/attachments';
@@ -12,6 +13,7 @@ const MAX_ATTACHMENT_BYTES = MAX_ATTACHMENT_MB * 1024 * 1024;
 // and the chat-area drop overlay.
 export const useAttachments = (enabled: boolean) => {
   const [pendingAtts, setPendingAtts] = useState<PendingAttachment[]>([]);
+  const { toast } = useToast();
 
   // Revoke every outstanding preview object URL when the composer unmounts
   // (navigate away mid-compose) — removeAttachment/clear only cover explicit
@@ -147,17 +149,22 @@ export const useAttachments = (enabled: boolean) => {
           );
         } catch (err: unknown) {
           ok = false;
+          const reason = (err as Error)?.message || 'Upload failed';
           setPendingAtts((prev) =>
             prev.map((a) =>
               a.id === t.id
-                ? {
-                    ...a,
-                    status: 'error' as const,
-                    error: (err as Error)?.message || 'Upload failed',
-                  }
+                ? { ...a, status: 'error' as const, error: reason }
                 : a,
             ),
           );
+          // The chip's error icon alone is easy to miss and the send aborts
+          // silently — tell the user what failed and why (the server's reason,
+          // e.g. storage not configured / file type not allowed).
+          toast({
+            title: `Couldn't upload ${t.name}`,
+            description: reason,
+            variant: 'destructive',
+          });
         }
       }),
     );

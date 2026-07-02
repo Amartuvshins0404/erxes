@@ -2,11 +2,11 @@ import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
 import { getCurrentAuth } from '~/mastra/requestContext';
 import {
-  fetchAttachmentBuffer,
-  fetchRemoteFile,
-  isFullUrl,
-  MAX_ATTACHMENT_BYTES,
-} from '~/mastra/files/storage';
+  nameFromUrl,
+  resolveArtifactFile,
+  resolveByKey,
+  resolveByUrl,
+} from '~/mastra/files/resolveSource';
 import { ExpectedError } from 'erxes-api-shared/utils';
 import {
   extractFileText,
@@ -69,28 +69,10 @@ function stashImage(img: PendingImage): string {
   return token;
 }
 
-/** Decode a base64 (or percent-encoded) `data:` URL into bytes + content type. */
-function decodeDataUrl(dataUrl: string): { buffer: Buffer; contentType: string } {
-  const m = dataUrl.match(/^data:([^;,]*)(;base64)?,([\s\S]*)$/);
-  if (!m) throw new ExpectedError('Malformed data URL');
-  return {
-    contentType: m[1] || 'application/octet-stream',
-    buffer: m[2]
-      ? Buffer.from(m[3], 'base64')
-      : Buffer.from(decodeURIComponent(m[3]), 'utf8'),
-  };
-}
-
-/** Best-effort file name from a URL's last path segment. */
-export function nameFromUrl(url: string): string {
-  try {
-    const u = new URL(url);
-    const last = u.pathname.split('/').filter(Boolean).pop();
-    return last ? decodeURIComponent(last) : u.hostname;
-  } catch {
-    return url.split('/').pop() || url;
-  }
-}
+// Source addressing (url / key / artifact fileKey) lives in files/resolveSource
+// so other file-consuming tools (e.g. remove-image-background) resolve sources
+// with the exact same security behavior. Re-exported for existing consumers.
+export { nameFromUrl };
 
 /** Normalize an image's media type from its content-type, falling back to ext. */
 export function resolveImageMime(name: string, contentType?: string): string {
@@ -185,38 +167,19 @@ async function getModels(subdomain: string) {
 
 /** Read a file from a public http(s) URL (SSRF-guarded inside fetchRemoteFile). */
 async function readByUrl(url: string, name?: string): Promise<ReaderResult> {
-  const fileName = name || nameFromUrl(url);
-  const { buffer, contentType } = await fetchRemoteFile({
-    url,
-    name: fileName,
-    maxBytes: MAX_ATTACHMENT_BYTES,
-  });
-  return buildResult(buffer, fileName, contentType);
+  const resolved = await resolveByUrl(url, name);
+  return buildResult(resolved.buffer, resolved.name, resolved.contentType);
 }
 
-/** Read a file the user attached, by its storage key.
- *  SECURITY: a `key` is a storage key, never a URL. Reject full URLs so a
- *  model-invented `key="http://169.254.169.254/..."` can't reach core's raw
- *  /read-file fetch (SSRF). Remote URLs must use the SSRF-guarded `url` path. */
+/** Read a file the user attached, by its storage key. Full URLs are rejected
+ *  inside resolveByKey (SSRF) — remote links must use the `url` path. */
 async function readByKey(
   subdomain: string,
   key: string,
   name?: string,
 ): Promise<ReaderResult> {
-  if (isFullUrl(key)) {
-    throw new ExpectedError(
-      'The `key` argument must be a storage key from the Attached files manifest, not a URL. To read a public link, pass it as `url` instead.',
-    );
-  }
-  const models = await getModels(subdomain);
-  const settings = await models.MastraSettings.getSettings();
-  const fileName = name || key.split('/').pop() || key;
-  const { buffer, contentType } = await fetchAttachmentBuffer({
-    erxesApiUrl: settings?.erxesApiUrl || 'http://localhost:4000',
-    key,
-    name: fileName,
-  });
-  return buildResult(buffer, fileName, contentType);
+  const resolved = await resolveByKey(subdomain, key, name);
+  return buildResult(resolved.buffer, resolved.name, resolved.contentType);
 }
 
 /** Read back an artifact the agent generated earlier this run, by its id. */
@@ -242,21 +205,12 @@ async function readByArtifactId(
     };
   }
 
-  const fileKey = artifact.fileKey || '';
-  const fileName = artifact.fileName || artifact.title || artifactId;
-  let buffer: Buffer;
-  let contentType: string;
-  if (fileKey.startsWith('data:')) {
-    ({ buffer, contentType } = decodeDataUrl(fileKey));
-  } else {
-    const settings = await models.MastraSettings.getSettings();
-    ({ buffer, contentType } = await fetchAttachmentBuffer({
-      erxesApiUrl: settings?.erxesApiUrl || 'http://localhost:4000',
-      key: fileKey,
-      name: fileName,
-    }));
-  }
-  return buildResult(buffer, fileName, artifact.mimeType || contentType);
+  const resolved = await resolveArtifactFile(subdomain, artifact, artifactId);
+  return buildResult(
+    resolved.buffer,
+    resolved.name,
+    artifact.mimeType || resolved.contentType,
+  );
 }
 
 export const fileReaderTool = createTool({

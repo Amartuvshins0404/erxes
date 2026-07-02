@@ -5,6 +5,7 @@ import {
   IconHierarchy,
   IconLayoutSidebarRightExpand,
   IconMaximize,
+  IconPhoto,
 } from '@tabler/icons-react';
 import { Button } from 'erxes-ui';
 import { EChart } from '~/modules/chat/charts';
@@ -14,11 +15,13 @@ import {
   type ChartArtifact,
   type DiagramArtifact,
   type DocumentArtifact,
+  type ImageArtifact,
   documentUrl,
 } from '~/modules/chat/lib/artifacts';
 import { formatFileSize } from '~/modules/chat/lib/attachments';
 import { previewStore } from '~/modules/chat/preview/previewStore';
 import { MermaidViewer } from '~/modules/chat/preview/MermaidViewer';
+import { CHECKERBOARD_STYLE } from '~/modules/chat/preview/ImageViewer';
 
 // Registers the artifact in the Files list (without auto-opening the panel) on
 // the first live render. Shared by all artifact card variants.
@@ -116,6 +119,41 @@ const DocumentCard = ({ artifact, live }: { artifact: DocumentArtifact; live?: b
   );
 };
 
+// ── Image card (inline transparent-PNG preview + open in preview) ─────────────
+const ImageCard = ({ artifact, live }: { artifact: ImageArtifact; live?: boolean }) => {
+  const openArtifact = previewStore((s) => s.openArtifact);
+  usePresentIfLive(artifact, live);
+
+  return (
+    <div className="ea-pop my-2 overflow-hidden rounded-xl border border-border/70 bg-background">
+      {/* Card header */}
+      <div className="flex items-center gap-2 px-3 py-2 bg-muted/30 border-b border-border/50">
+        <IconPhoto className="size-4 text-primary shrink-0" />
+        <p className="flex-1 min-w-0 truncate text-sm font-medium">{artifact.title}</p>
+        <Button variant="ghost" size="sm" onClick={() => openArtifact(artifact)}>
+          <IconLayoutSidebarRightExpand className="size-3.5" />
+          Open
+        </Button>
+        <Button asChild variant="ghost" size="sm">
+          <a href={documentUrl(artifact)} download={artifact.fileName} target="_blank" rel="noreferrer">
+            <IconDownload className="size-3.5" />
+          </a>
+        </Button>
+      </div>
+      <div className="flex items-center justify-center p-2" style={CHECKERBOARD_STYLE}>
+        {/* Height cap as an inline style, not max-h-64 — that utility is used
+            by no host/core code, so the prod CSS purge could drop it. */}
+        <img
+          src={documentUrl(artifact)}
+          alt={artifact.title}
+          className="max-w-full object-contain"
+          style={{ maxHeight: '16rem' }}
+        />
+      </div>
+    </div>
+  );
+};
+
 // Two artifacts are interchangeable for rendering when they describe the same
 // thing. A settled artifact is immutable for a given id — a tool call emits it
 // once (only at state 'output-available') and never mutates it; a streaming turn
@@ -135,6 +173,7 @@ export const ArtifactCard = memo(
   function ArtifactCard({ artifact, live }: { artifact: Artifact; live?: boolean }) {
     if (artifact.kind === 'chart') return <ChartPreview artifact={artifact} live={live} />;
     if (artifact.kind === 'diagram') return <DiagramPreview artifact={artifact} live={live} />;
+    if (artifact.kind === 'image') return <ImageCard artifact={artifact} live={live} />;
     return <DocumentCard artifact={artifact} live={live} />;
   },
   (prev, next) =>

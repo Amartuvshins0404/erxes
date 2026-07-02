@@ -53,8 +53,16 @@ server-side — author with the FIXED house class vocabulary below (Satori appli
 inline styles + these classes only; flexbox layout, NO grid/float/<style>).
 
 Rules:
-- ONE idea per slide. Short headlines, few bullets. Text does NOT auto-shrink —
-  it wraps but can overflow, so keep copy tight and within bounds.
+- ONE idea per slide. The canvas is a FIXED 16:9 — a slide that holds more than
+  the budget below is scaled down whole to fit, so its text renders smaller
+  than designed. Stay inside the budget; slides are free, so SPLIT instead:
+  - max 5 bullets per slide, one line (≤ 12 words) each;
+  - a bullet with a bold name + description line counts as TWO lines — max 4
+    of those per slide (or 8 in a two-column row of two \`bullets\` columns);
+  - headline ≤ 6 words; \`lead\` ≤ 2 lines; with a chart on the slide, halve
+    the text budget.
+  A list longer than the budget becomes several slides ("Standouts 1/2",
+  "Standouts 2/2") or a two-column slide — never one overstuffed slide.
 - Every slide's root element is \`<div class="slide ...">\`. Make TITLE and SECTION
   slides distinct (indigo field, white headline) — do NOT repeat one bland
   white-title-plus-bullets layout on every slide.
@@ -93,6 +101,9 @@ Two-column with chart —
 Big-stat / section slide —
 \`<div class="slide slide-dark slide-center"><div class="eyebrow">Outcome</div><div class="row items-center gap-lg mt-md"><div class="stat text-white">3.2x</div><div class="col"><div class="h2 text-white">Pipeline created</div><div class="small text-soft">vs. same period last year</div></div></div></div>\`
 
+Two-column list (6–8 name+description items) —
+\`<div class="slide"><div class="accent-bar mb-md"></div><div class="h1">Winter standouts</div><div class="row gap-lg mt-lg"><div class="bullets grow"><div class="bullet"><span class="dot"></span><span><span class="bold">Ndea</span> — $43M AGI lab</span></div><div class="bullet"><span class="dot"></span><span><span class="bold">Beacon</span> — AI primary care</span></div></div><div class="bullets grow"><div class="bullet"><span class="dot"></span><span><span class="bold">Byteport</span> — 10x faster than TCP</span></div><div class="bullet"><span class="dot"></span><span><span class="bold">Silmaril</span> — prompt-injection defense</span></div></div></div></div>\`
+
 ## Embedding a chart in any document or slide
 1. Call **renderChart** first to create the chart; keep its returned chart id + spec.
 2. Pass that chart in the tool's \`charts\` array (each entry is \`{ id, spec }\`).
@@ -122,7 +133,43 @@ The same chart then appears identically in chat and in the file.
 `.trim(),
 };
 
-export const STATIC_SKILLS: StaticSkill[] = [DOCUMENT_CREATION_SKILL];
+const PRODUCT_IMAGE_SKILL: StaticSkill = {
+  name: 'product-image-cleanup',
+  description:
+    'Remove photo backgrounds and set the cut-out as a product image.',
+  triggerTools: ['removeImageBackground'],
+  instructions: `
+When the user wants an image's background removed (typically a product photo),
+call **removeImageBackground**:
+- For an image the user ATTACHED to the message, pass \`key\` — the exact key
+  from the message's "Attached files" manifest.
+- For an image given as a public link, pass \`url\`.
+- \`title\`: a short human name for the result (e.g. the product name).
+
+The transparent PNG opens in the Preview panel automatically. Tell the user in
+ONE plain sentence that it is ready there — never expose file keys, URLs,
+artifact ids, or tool names.
+
+## Setting it as a product image
+Only when the user asks for the cut-out to be put on a product:
+1. Find the product (search by name if you only have a name).
+2. Call the erxes operation \`productsEdit\` with the product's \`_id\` and pass
+   the tool result's \`attachment\` object VERBATIM as the \`attachment\`
+   argument. Do not invent or rewrite its fields.
+If the tool result has NO \`attachment\` field, this instance has no cloud file
+storage — the image can still be downloaded from the Preview panel, but cannot
+be attached to a product; say so plainly.
+
+## Batches
+For several photos, process them one at a time (each call returns its own
+preview + attachment) and keep the user posted on progress.
+`.trim(),
+};
+
+export const STATIC_SKILLS: StaticSkill[] = [
+  DOCUMENT_CREATION_SKILL,
+  PRODUCT_IMAGE_SKILL,
+];
 
 /** Static skills whose trigger tools are present in the bound tool set. */
 export function staticSkillsFor(toolKeys: Iterable<string>): StaticSkill[] {

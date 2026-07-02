@@ -9,7 +9,6 @@ export interface IIdentifier {
   description?: string;
   createdUserId?: string;
   memberIds?: string[];
-  planActive?: boolean;
 }
 
 export interface IIdentifierDocument extends IIdentifier, Document {

@@ -3,10 +3,6 @@ import {
   assertIdentifierAccess,
   buildIdentifierAccessQuery,
 } from '~/modules/assistantOrg/permissions';
-import {
-  getAssistantBillingOverview,
-  getAssistantLimit,
-} from '~/modules/assistantOrg/assistantLimits';
 import { ensureLegacyIdentifierLinks } from '../../../utils';
 
 const getIdentifiers = async (
@@ -39,14 +35,14 @@ const getIdentifiers = async (
 
     if (kind === 'assistant') {
       return (
-        identifier.kind === 'assistant' ||
-        agentIdentifierIdSet.has(identifierId)
+        identifier.kind === 'assistant' || agentIdentifierIdSet.has(identifierId)
       );
     }
 
     if (kind === 'agent') {
       return (
-        identifier.kind === 'agent' || opencodeIdentifierIdSet.has(identifierId)
+        identifier.kind === 'agent' ||
+        opencodeIdentifierIdSet.has(identifierId)
       );
     }
 
@@ -67,19 +63,4 @@ const getIdentifier = async (
 export const identifierQueries = {
   getIdentifiers,
   getIdentifier,
-  agentAssistantLimit: async (
-    _root: undefined,
-    _args: Record<string, never>,
-    { models, subdomain, user }: IContext,
-  ) => {
-    const [limit, billingOverview] = await Promise.all([
-      getAssistantLimit({ models, subdomain }),
-      getAssistantBillingOverview({ models, subdomain, user }),
-    ]);
-
-    return {
-      ...limit,
-      billingOverview,
-    };
-  },
 };

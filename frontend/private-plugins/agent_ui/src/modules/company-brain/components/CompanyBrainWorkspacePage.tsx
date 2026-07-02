@@ -28,7 +28,10 @@ import { useForm } from 'react-hook-form';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { MembersInline, PageHeader } from 'ui-modules';
 import { z } from 'zod';
+import { AssistantBillingSheet } from '~/modules/company-brain/components/AssistantBillingSheet';
+import { AssistantPaymentAlertDialog } from '~/modules/company-brain/components/AssistantPaymentAlertDialog';
 import { AssistantOrgManageSheet } from '~/modules/assistant-orgs/components/AssistantOrgManageSheet';
+import { useAgentAssistantLimit } from '~/modules/assistant-orgs/hooks/useAgentAssistantLimit';
 import { useCreateIdentifier } from '~/modules/assistant-orgs/hooks/useCreateAssistantOrg';
 import { useDeleteIdentifier } from '~/modules/assistant-orgs/hooks/useDeleteAssistantOrg';
 import {
@@ -175,6 +178,7 @@ const AssistantDiscordManageSheet = ({
     mode: 'manage',
     enabled: open,
   });
+  const refreshManagedDiscord = managedDiscord.refresh;
 
   const selectedInstallation = managedDiscord.installations.find(
     (installation) =>
@@ -326,7 +330,9 @@ const AssistantDiscordManageSheet = ({
       });
     } catch (updateError) {
       const message =
-        updateError instanceof Error ? updateError.message : String(updateError);
+        updateError instanceof Error
+          ? updateError.message
+          : String(updateError);
 
       setError(message);
       toast({
@@ -436,7 +442,7 @@ const AssistantDiscordManageSheet = ({
 
     if (connection === 'success') {
       setError('');
-      managedDiscord.refresh();
+      refreshManagedDiscord();
       toast({
         variant: 'success',
         title: 'Discord connected',
@@ -462,7 +468,7 @@ const AssistantDiscordManageSheet = ({
     }
   }, [
     identifier._id,
-    managedDiscord.refresh,
+    refreshManagedDiscord,
     searchParams,
     setSearchParams,
     toast,
@@ -522,7 +528,9 @@ const AssistantDiscordManageSheet = ({
             </div>
             <div className="flex items-center justify-between gap-3">
               <span className="text-muted-foreground">Server ID</span>
-              <span className="font-medium">{agent?.serverId || 'Not set'}</span>
+              <span className="font-medium">
+                {agent?.serverId || 'Not set'}
+              </span>
             </div>
           </div>
 
@@ -554,14 +562,14 @@ const AssistantDiscordManageSheet = ({
             agent?.status !== SERVER_STATUSES.PENDING &&
             agent?.status !== SERVER_STATUSES.DEPLOYING &&
             agent?.status !== SERVER_STATUSES.FAILED && (
-            <Alert variant="warning">
-              <Alert.Title>Runtime provisioning</Alert.Title>
-              <Alert.Description>
-                Discord is connected, but this assistant runtime is not ready
-                yet.
-              </Alert.Description>
-            </Alert>
-          )}
+              <Alert variant="warning">
+                <Alert.Title>Runtime provisioning</Alert.Title>
+                <Alert.Description>
+                  Discord is connected, but this assistant runtime is not ready
+                  yet.
+                </Alert.Description>
+              </Alert>
+            )}
 
           {runtimeFailed && (
             <div className="space-y-2 rounded-lg border border-border bg-muted/20 p-3">
@@ -719,6 +727,17 @@ const AssistantDiscordManageSheet = ({
               type="button"
               variant="outline"
               disabled={isBusy}
+              onClick={handleRefreshRuntime}
+            >
+              <IconRefresh
+                className={`size-4 ${refreshingRuntime ? 'animate-spin' : ''}`}
+              />
+              Refresh runtime
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={isBusy}
               onClick={handleInstallDiscord}
             >
               <IconBrandDiscord className="size-4" />
@@ -759,7 +778,15 @@ const AssistantDiscordManageSheet = ({
   );
 };
 
-const AssistantWorkspaceCard = ({ identifier }: { identifier: Identifier }) => {
+const AssistantWorkspaceCard = ({
+  identifier,
+  billingBlocked,
+  billingMessage,
+}: {
+  identifier: Identifier;
+  billingBlocked: boolean;
+  billingMessage?: string;
+}) => {
   const { agent, loading } = useAgent(identifier._id);
   const isManagedAssistant = isManagedAssistantAgent(agent);
 
@@ -802,14 +829,31 @@ const AssistantWorkspaceCard = ({ identifier }: { identifier: Identifier }) => {
 
       <InvitedMembersRow memberIds={identifier.memberIds} />
 
+      {billingBlocked && (
+        <Alert variant="warning">
+          <Alert.Title>You have to pay</Alert.Title>
+          <Alert.Description>
+            {billingMessage ||
+              'This assistant is blocked until the bill is paid.'}
+          </Alert.Description>
+        </Alert>
+      )}
+
       <Button
-        asChild
+        asChild={!billingBlocked}
         variant="ghost"
-        className="mt-auto w-fit gap-1 px-0 text-xs font-medium text-primary hover:bg-transparent hover:text-primary"
+        className="mt-auto w-fit gap-1 px-0 text-xs font-medium text-primary hover:bg-transparent hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
+        disabled={billingBlocked}
       >
-        <Link to={`/agent/assistant/${identifier._id}`}>
-          Open AI Assistant <IconArrowRight className="h-3 w-3" />
-        </Link>
+        {billingBlocked ? (
+          <span>
+            Open AI Assistant <IconArrowRight className="h-3 w-3" />
+          </span>
+        ) : (
+          <Link to={`/agent/assistant/${identifier._id}`}>
+            Open AI Assistant <IconArrowRight className="h-3 w-3" />
+          </Link>
+        )}
       </Button>
     </div>
   );
@@ -869,6 +913,11 @@ export const CompanyBrainWorkspacePage = ({
   const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
   const { identifiers, loading } = useIdentifiers(mode);
+  const {
+    limit: assistantLimit,
+    loading: loadingAssistantLimit,
+    refetch: refetchAssistantLimit,
+  } = useAgentAssistantLimit(mode === 'assistant');
   const { createIdentifier, loading: creatingIdentifier } =
     useCreateIdentifier();
   const { deleteIdentifier, loading: deletingIdentifier } =
@@ -986,6 +1035,42 @@ export const CompanyBrainWorkspacePage = ({
     refreshingManagedRuntime ||
     managedDiscord.loading ||
     managedDiscord.saving;
+  const assistantLimitReached =
+    mode === 'assistant' &&
+    !!assistantLimit?.limited &&
+    !assistantLimit.allowed;
+  const assistantBillingBlocked =
+    mode === 'assistant' && !!assistantLimit?.billingOverview?.blocked;
+  const assistantCreateDisabled =
+    mode === 'assistant' &&
+    (loadingAssistantLimit || assistantLimitReached || assistantBillingBlocked);
+  const createButtonDisabled = isSubmitting || assistantCreateDisabled;
+  const assistantLimitLabel =
+    mode !== 'assistant'
+      ? ''
+      : loadingAssistantLimit
+      ? 'Checking assistant limit'
+      : assistantBillingBlocked
+      ? 'Billing required'
+      : !assistantLimit?.limited
+      ? 'Unlimited assistants'
+      : `${assistantLimit.remaining || 0} of ${
+          assistantLimit.limit || 0
+        } assistants remaining`;
+  const assistantBillingOverview = assistantLimit?.billingOverview || null;
+
+  const billingItemByIdentifier = useMemo(() => {
+    const map = new Map<
+      string,
+      NonNullable<typeof assistantBillingOverview>['items'][number]
+    >();
+
+    (assistantBillingOverview?.items || []).forEach((item) => {
+      map.set(item.identifierId, item);
+    });
+
+    return map;
+  }, [assistantBillingOverview]);
 
   const resetCreateForm = () => {
     form.reset({
@@ -1211,7 +1296,11 @@ export const CompanyBrainWorkspacePage = ({
     const discordMode = searchParams.get('discordMode');
     const assistantId = searchParams.get('assistantId');
 
-    if (discordSetup !== 'managed' || discordMode === 'manage' || !assistantId) {
+    if (
+      discordSetup !== 'managed' ||
+      discordMode === 'manage' ||
+      !assistantId
+    ) {
       return;
     }
 
@@ -1614,6 +1703,10 @@ export const CompanyBrainWorkspacePage = ({
         throw new Error('Failed to create identifier');
       }
 
+      if (mode === 'assistant') {
+        await refetchAssistantLimit();
+      }
+
       if (isTransfer) {
         const transferServerName = values.transferServerName?.trim() || '';
         const transferGatewayToken = values.transferGatewayToken?.trim() || '';
@@ -1758,10 +1851,19 @@ export const CompanyBrainWorkspacePage = ({
     }
   };
 
-  const renderCard = (identifier: Identifier) => {
+  const renderCard = (
+    identifier: Identifier,
+    billingBlocked: boolean,
+    billingMessage?: string,
+  ) => {
     if (mode === 'assistant') {
       return (
-        <AssistantWorkspaceCard key={identifier._id} identifier={identifier} />
+        <AssistantWorkspaceCard
+          key={identifier._id}
+          identifier={identifier}
+          billingBlocked={billingBlocked}
+          billingMessage={billingMessage}
+        />
       );
     }
 
@@ -1772,6 +1874,13 @@ export const CompanyBrainWorkspacePage = ({
 
   return (
     <div className="flex h-full flex-col">
+      {mode === 'assistant' && (
+        <AssistantPaymentAlertDialog
+          warning={assistantLimit?.billingWarning}
+          overview={assistantBillingOverview}
+          payUrl={assistantLimit?.upgradeUrl}
+        />
+      )}
       <PageHeader>
         <PageHeader.Start>
           <Breadcrumb>
@@ -1809,10 +1918,31 @@ export const CompanyBrainWorkspacePage = ({
               </h1>
               <p className="text-sm text-muted-foreground">{config.subtitle}</p>
             </div>
-            <Button onClick={() => setOpen(true)} className="gap-2">
-              <IconPlus className="h-4 w-4" />
-              {config.buttonLabel}
-            </Button>
+            <div className="flex flex-col items-start gap-2 sm:items-end">
+              <div className="flex flex-wrap items-center gap-2">
+                {mode === 'assistant' && (
+                  <AssistantBillingSheet
+                    overview={assistantBillingOverview}
+                    loading={loadingAssistantLimit}
+                    limit={assistantLimit?.limit}
+                    onChanged={refetchAssistantLimit}
+                  />
+                )}
+                <Button
+                  onClick={() => setOpen(true)}
+                  disabled={createButtonDisabled}
+                  className="gap-2"
+                >
+                  <IconPlus className="h-4 w-4" />
+                  {config.buttonLabel}
+                </Button>
+              </div>
+              {mode === 'assistant' && (
+                <span className="text-xs text-muted-foreground">
+                  {assistantLimitLabel}
+                </span>
+              )}
+            </div>
           </div>
 
           {loading ? (
@@ -1832,15 +1962,66 @@ export const CompanyBrainWorkspacePage = ({
                   {config.emptyDescription}
                 </p>
               </div>
-              <Button onClick={() => setOpen(true)} className="gap-2">
+              <Button
+                onClick={() => setOpen(true)}
+                disabled={createButtonDisabled}
+                className="gap-2"
+              >
                 <IconPlus className="h-4 w-4" />
                 {config.buttonLabel}
               </Button>
+              {mode === 'assistant' && assistantLimitReached && (
+                <p className="max-w-md text-xs text-muted-foreground">
+                  Purchase or activate an AI Assistant add-on to create more
+                  assistants.
+                </p>
+              )}
+              {assistantBillingBlocked && assistantBillingOverview?.message && (
+                <Alert variant="warning" className="max-w-md">
+                  <Alert.Title>You have to pay</Alert.Title>
+                  <Alert.Description>
+                    {assistantBillingOverview.message}
+                  </Alert.Description>
+                </Alert>
+              )}
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-              {identifiers.map(renderCard)}
-            </div>
+            <>
+              {assistantBillingBlocked && assistantBillingOverview?.message && (
+                <Alert variant="warning">
+                  <Alert.Title>AI Assistant payment overdue</Alert.Title>
+                  <Alert.Description>
+                    {assistantBillingOverview.message}
+                    {assistantBillingOverview.billingUrl && (
+                      <>
+                        {' '}
+                        <a
+                          href={assistantBillingOverview.billingUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="font-medium text-primary underline-offset-4 hover:underline"
+                        >
+                          Pay bills
+                        </a>
+                      </>
+                    )}
+                  </Alert.Description>
+                </Alert>
+              )}
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+                {identifiers.map((identifier) => {
+                  const billingItem = billingItemByIdentifier.get(
+                    identifier._id,
+                  );
+
+                  return renderCard(
+                    identifier,
+                    billingItem?.blocked ?? assistantBillingBlocked,
+                    billingItem?.message ?? assistantBillingOverview?.message,
+                  );
+                })}
+              </div>
+            </>
           )}
         </div>
       </div>
@@ -2219,6 +2400,15 @@ export const CompanyBrainWorkspacePage = ({
                 <div className="grid w-full grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:items-center sm:justify-end">
                   {showManagedDiscordStep ? (
                     <>
+                      {mode === 'assistant' && assistantLimitReached && (
+                        <Alert variant="warning">
+                          <Alert.Title>Assistant limit reached</Alert.Title>
+                          <Alert.Description>
+                            Purchase or activate an AI Assistant add-on to
+                            create more assistants.
+                          </Alert.Description>
+                        </Alert>
+                      )}
                       <Button
                         type="button"
                         variant="outline"
@@ -2363,7 +2553,7 @@ export const CompanyBrainWorkspacePage = ({
                       >
                         Cancel
                       </Button>
-                      <Button type="submit" disabled={isSubmitting}>
+                      <Button type="submit" disabled={createButtonDisabled}>
                         {isSubmitting
                           ? 'Saving...'
                           : isManagedAssistantCreation

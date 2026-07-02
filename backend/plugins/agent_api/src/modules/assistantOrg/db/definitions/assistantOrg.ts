@@ -21,6 +21,9 @@ export const assistantOrgSchema = schemaWrapper(
         index: true,
         default: [],
       },
+      // Whether this assistant occupies one of the paid/gifted plan slots.
+      // Undefined = not yet chosen (defaults to oldest-first selection).
+      planActive: { type: Boolean, label: 'Active under plan' },
     },
     {
       timestamps: true,

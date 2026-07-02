@@ -8,7 +8,7 @@ import {
   IconPresentation,
   IconX,
 } from '@tabler/icons-react';
-import { Button, cn } from 'erxes-ui';
+import { Button, cn, Empty } from 'erxes-ui';
 import { EChart, type EChartHandle } from '~/modules/chat/charts';
 import {
   artifactIcon,
@@ -219,15 +219,21 @@ const FileListView = ({
       </div>
       <div className="ea-scroll min-h-0 flex-1 overflow-auto p-3">
         {artifacts.length === 0 ? (
-          <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-muted-foreground">
-            <IconFile className="size-8 opacity-40" />
-            <p className="text-sm">
-              {loading ? 'Loading…' : 'No charts, documents or images yet.'}
-            </p>
-            <p className="text-xs">
-              Ask the agent to chart data or generate a report.
-            </p>
-          </div>
+          <Empty className="h-full">
+            <Empty.Header>
+              <Empty.Media variant="icon">
+                <IconFile />
+              </Empty.Media>
+              <Empty.Title>
+                {loading ? 'Loading files…' : 'No files yet'}
+              </Empty.Title>
+              <Empty.Description>
+                {loading
+                  ? 'Fetching this thread’s charts and documents.'
+                  : 'Ask the agent to chart data or generate a report.'}
+              </Empty.Description>
+            </Empty.Header>
+          </Empty>
         ) : (
           <GroupedFiles threadId={threadId} />
         )}

@@ -1,4 +1,5 @@
 import { ExpectedError } from 'erxes-api-shared/utils';
+import { createTTLCache } from '~/utils/ttlCache';
 import {
   compileDefinition,
   CompiledDeps,
@@ -52,7 +53,11 @@ export function workflowDbName(tenant: string, env: Env = process.env): string {
   return `${prefix}_${tenant}`.replace(/[^a-zA-Z0-9_]/g, '_');
 }
 
-const storageCache = new Map<string, unknown>();
+// TTL-bounded so per-tenant snapshot stores expire instead of accumulating a
+// live MongoDBStore for every tenant ever seen. Keyed by the tenant's dbName;
+// a busy tenant simply rebuilds its store once after expiry.
+const STORAGE_TTL_MS = 30 * 60_000;
+const storageCache = createTTLCache<unknown>(STORAGE_TTL_MS);
 
 /** Builds (and caches) the tenant's dedicated Mastra snapshot store. */
 function getWorkflowStorage(tenant: string): unknown {

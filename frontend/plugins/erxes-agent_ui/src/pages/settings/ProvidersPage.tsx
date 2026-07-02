@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { IconPlus, IconTrash, IconKey, IconCheck } from '@tabler/icons-react';
-import { Badge, Button, cn, useConfirm } from 'erxes-ui';
+import { Badge, Button, cn } from 'erxes-ui';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useConfirmedRemove } from '~/components/useConfirmedRemove';
 import { useProviders } from './hooks/useProviders';
 import { ProviderForm } from './components/ProviderForm';
 import { IMastraProvider, IMastraProviderPreset } from './types';
@@ -18,7 +19,7 @@ const CUSTOM_KEY = '__custom__';
 export const ProvidersPage = () => {
   // `adding` holds the provider key being added/edited, or '__custom__' for a custom entry
   const [adding, setAdding] = useState<string | null>(null);
-  const { confirm } = useConfirm();
+  const { confirmRemove } = useConfirmedRemove();
 
   const {
     providers,
@@ -102,10 +103,13 @@ export const ProvidersPage = () => {
   };
 
   const handleRemove = (p: IMastraProvider) =>
-    confirm({
-      message: `Remove provider "${p.label || p.provider}"?`,
-      options: { okLabel: 'Remove', cancelLabel: 'Cancel' },
-    }).then(() => removeProvider({ variables: { _id: p._id } }));
+    confirmRemove(
+      {
+        message: `Remove provider "${p.label || p.provider}"?`,
+        okLabel: 'Remove',
+      },
+      () => removeProvider({ variables: { _id: p._id } }),
+    );
 
   const formProvider = form.watch('provider');
   // Single model of what's being edited: nothing, a custom entry (keyed by the

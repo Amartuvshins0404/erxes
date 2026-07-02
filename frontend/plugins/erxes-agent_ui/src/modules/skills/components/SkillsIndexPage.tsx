@@ -28,10 +28,11 @@ import {
   RecordTableInlineCell,
   RelativeDateDisplay,
   Separator,
-  useConfirm,
 } from 'erxes-ui';
 import { PageHeader } from 'ui-modules';
 import { PermissionButton } from '~/components/PermissionButton';
+import { buildActionColumns } from '~/components/buildActionColumns';
+import { useConfirmedRemove } from '~/components/useConfirmedRemove';
 import { useSkillList } from '../hooks/useSkillList';
 import { useSkillMutations } from '../hooks/useSkillMutations';
 import {
@@ -81,7 +82,7 @@ const SkillMoreCell = ({
   refetch: () => void;
 }) => {
   const navigate = useNavigate();
-  const { confirm } = useConfirm();
+  const { confirmRemove } = useConfirmedRemove();
   const { canEdit, canRemove, canPromote } = useSkillAccess();
   const { remove, publish, promote, demote } = useSkillMutations(refetch);
 
@@ -95,14 +96,15 @@ const SkillMoreCell = ({
   // Demote is the escape hatch from a one-way promote: a global skill its
   // author (or an admin) can pull back to private. Mirrors the backend's
   // author-or-admin gate on mastraSkillDemote.
-  const canDemoteRow =
-    skill.visibility === 'public' && (isOwner || canPromote);
+  const canDemoteRow = skill.visibility === 'public' && (isOwner || canPromote);
 
   const handleDelete = () =>
-    confirm({
-      message: `Delete "${skill.name}" and all its versions? This cannot be undone.`,
-      options: { okLabel: 'Delete', cancelLabel: 'Cancel' },
-    }).then(() => remove(skill._id));
+    confirmRemove(
+      {
+        message: `Delete "${skill.name}" and all its versions? This cannot be undone.`,
+      },
+      () => remove(skill._id),
+    );
 
   return (
     <Popover>
@@ -187,128 +189,144 @@ const SkillMoreCell = ({
   );
 };
 
-const buildColumns = (refetch: () => void): ColumnDef<IMastraSkillRow>[] => [
-  {
-    id: 'more',
-    cell: ({ row }) => <SkillMoreCell skill={row.original} refetch={refetch} />,
-    size: 33,
-  },
-  RecordTable.checkboxColumn as ColumnDef<IMastraSkillRow>,
-  {
-    id: 'name',
-    accessorKey: 'name',
-    header: () => <RecordTable.InlineHead icon={IconAlignLeft} label="Skill" />,
-    cell: ({ row }) => {
-      const { _id, name, description } = row.original;
-      return (
-        <RecordTableInlineCell>
-          <Link
-            to={`${SKILLS_PATH}/edit/${_id}`}
-            className="font-mono text-sm font-medium hover:underline cursor-pointer"
-          >
-            {name}
-          </Link>
-          {description && (
-            <div className="text-xs text-muted-foreground line-clamp-1">
-              {description}
-            </div>
-          )}
-        </RecordTableInlineCell>
-      );
-    },
-    size: 320,
-  },
-  {
-    id: 'status',
-    accessorKey: 'status',
-    header: () => <RecordTable.InlineHead icon={IconStack2} label="Status" />,
-    cell: ({ row }) => (
-      <RecordTableInlineCell>
-        <Badge variant={skillStatusVariant(row.original.status)}>
-          {skillStatusLabel(row.original.status)}
-        </Badge>
-      </RecordTableInlineCell>
-    ),
-    size: 110,
-  },
-  {
-    id: 'visibility',
-    accessorKey: 'visibility',
-    header: () => <RecordTable.InlineHead icon={IconWorldUp} label="Scope" />,
-    cell: ({ row }) => (
-      <RecordTableInlineCell>
-        <Badge
-          variant={
-            row.original.visibility === 'public' ? 'default' : 'secondary'
-          }
-        >
-          {skillVisibilityLabel(row.original.visibility)}
-        </Badge>
-      </RecordTableInlineCell>
-    ),
-    size: 100,
-  },
-  {
-    id: 'userInvocable',
-    accessorKey: 'userInvocable',
-    header: () => <RecordTable.InlineHead icon={IconCommand} label="Slash" />,
-    cell: ({ row }) => (
-      <RecordTableInlineCell>
-        {row.original.userInvocable ? (
-          <Badge variant="secondary">/{row.original.name}</Badge>
-        ) : (
-          <span className="text-muted-foreground">—</span>
-        )}
-      </RecordTableInlineCell>
-    ),
-    size: 150,
-  },
-  {
-    id: 'versionCount',
-    accessorKey: 'versionCount',
-    header: () => <RecordTable.InlineHead icon={IconStack2} label="Versions" />,
-    cell: ({ row }) => (
-      <RecordTableInlineCell>
-        <span className="text-sm tabular-nums">
-          {row.original.versionCount ?? 0}
-        </span>
-      </RecordTableInlineCell>
-    ),
-    size: 90,
-  },
-  {
-    id: 'updatedAt',
-    accessorKey: 'updatedAt',
-    header: () => <RecordTable.InlineHead icon={IconCalendar} label="Updated" />,
-    cell: ({ cell }) => {
-      const value = cell.getValue() as string | undefined;
-      return value ? (
-        <RelativeDateDisplay value={value} asChild>
+const buildColumns = (refetch: () => void): ColumnDef<IMastraSkillRow>[] =>
+  buildActionColumns<IMastraSkillRow>(
+    (skill) => <SkillMoreCell skill={skill} refetch={refetch} />,
+    [
+      {
+        id: 'name',
+        accessorKey: 'name',
+        header: () => (
+          <RecordTable.InlineHead icon={IconAlignLeft} label="Skill" />
+        ),
+        cell: ({ row }) => {
+          const { _id, name, description } = row.original;
+          return (
+            <RecordTableInlineCell>
+              <Link
+                to={`${SKILLS_PATH}/edit/${_id}`}
+                className="font-mono text-sm font-medium hover:underline cursor-pointer"
+              >
+                {name}
+              </Link>
+              {description && (
+                <div className="text-xs text-muted-foreground line-clamp-1">
+                  {description}
+                </div>
+              )}
+            </RecordTableInlineCell>
+          );
+        },
+        size: 320,
+      },
+      {
+        id: 'status',
+        accessorKey: 'status',
+        header: () => (
+          <RecordTable.InlineHead icon={IconStack2} label="Status" />
+        ),
+        cell: ({ row }) => (
           <RecordTableInlineCell>
-            <RelativeDateDisplay.Value value={value} />
+            <Badge variant={skillStatusVariant(row.original.status)}>
+              {skillStatusLabel(row.original.status)}
+            </Badge>
           </RecordTableInlineCell>
-        </RelativeDateDisplay>
-      ) : (
-        <RecordTableInlineCell>
-          <span className="text-muted-foreground">—</span>
-        </RecordTableInlineCell>
-      );
-    },
-    size: 130,
-  },
-];
+        ),
+        size: 110,
+      },
+      {
+        id: 'visibility',
+        accessorKey: 'visibility',
+        header: () => (
+          <RecordTable.InlineHead icon={IconWorldUp} label="Scope" />
+        ),
+        cell: ({ row }) => (
+          <RecordTableInlineCell>
+            <Badge
+              variant={
+                row.original.visibility === 'public' ? 'default' : 'secondary'
+              }
+            >
+              {skillVisibilityLabel(row.original.visibility)}
+            </Badge>
+          </RecordTableInlineCell>
+        ),
+        size: 100,
+      },
+      {
+        id: 'userInvocable',
+        accessorKey: 'userInvocable',
+        header: () => (
+          <RecordTable.InlineHead icon={IconCommand} label="Slash" />
+        ),
+        cell: ({ row }) => (
+          <RecordTableInlineCell>
+            {row.original.userInvocable ? (
+              <Badge variant="secondary">/{row.original.name}</Badge>
+            ) : (
+              <span className="text-muted-foreground">—</span>
+            )}
+          </RecordTableInlineCell>
+        ),
+        size: 150,
+      },
+      {
+        id: 'versionCount',
+        accessorKey: 'versionCount',
+        header: () => (
+          <RecordTable.InlineHead icon={IconStack2} label="Versions" />
+        ),
+        cell: ({ row }) => (
+          <RecordTableInlineCell>
+            <span className="text-sm tabular-nums">
+              {row.original.versionCount ?? 0}
+            </span>
+          </RecordTableInlineCell>
+        ),
+        size: 90,
+      },
+      {
+        id: 'updatedAt',
+        accessorKey: 'updatedAt',
+        header: () => (
+          <RecordTable.InlineHead icon={IconCalendar} label="Updated" />
+        ),
+        cell: ({ cell }) => {
+          const value = cell.getValue() as string | undefined;
+          return value ? (
+            <RelativeDateDisplay value={value} asChild>
+              <RecordTableInlineCell>
+                <RelativeDateDisplay.Value value={value} />
+              </RecordTableInlineCell>
+            </RelativeDateDisplay>
+          ) : (
+            <RecordTableInlineCell>
+              <span className="text-muted-foreground">—</span>
+            </RecordTableInlineCell>
+          );
+        },
+        size: 130,
+      },
+    ],
+  );
 
 export const SkillsIndexPage = () => {
   const [scope, setScope] = useState<SkillScope>('all');
   const [status, setStatus] = useState<SkillStatus | ''>('');
   const [search, setSearch] = useState('');
 
-  const { skillsList, totalCount, loading, pageInfo, handleFetchMore, refetch } =
-    useSkillList({
-      scope,
-      status: status || undefined,
-      searchValue: search,
-    });
+  const {
+    skillsList,
+    totalCount,
+    loading,
+    pageInfo,
+    handleFetchMore,
+    refetch,
+  } = useSkillList({
+    scope,
+    status: status || undefined,
+    searchValue: search,
+  });
 
   const columns = useMemo(() => buildColumns(refetch), [refetch]);
 

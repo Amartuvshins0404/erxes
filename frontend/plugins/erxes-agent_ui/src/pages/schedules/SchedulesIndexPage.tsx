@@ -18,11 +18,9 @@ import {
   Button,
   Command,
   RecordTableInlineCell,
-  RecordTable,
   RelativeDateDisplay,
   Tooltip,
   toast,
-  useConfirm,
 } from 'erxes-ui';
 import {
   MASTRA_SCHEDULE_REMOVE,
@@ -40,6 +38,8 @@ import {
 } from '~/components/RecordTableShared';
 import { ResourceIndexLayout } from '~/components/ResourceIndexLayout';
 import { SortState, SortValue, useTableSort } from '~/components/useTableSort';
+import { buildActionColumns } from '~/components/buildActionColumns';
+import { useConfirmedRemove } from '~/components/useConfirmedRemove';
 import { useSchedules } from './hooks/useSchedules';
 import { ISchedule, IScheduleRunNowResponse } from './types';
 
@@ -54,7 +54,7 @@ const ScheduleMoreCell = ({
   refetch: () => void;
 }) => {
   const navigate = useNavigate();
-  const { confirm } = useConfirm();
+  const { confirmRemove } = useConfirmedRemove();
 
   const [removeSchedule] = useMutation(MASTRA_SCHEDULE_REMOVE, {
     onCompleted: () => refetch(),
@@ -88,10 +88,12 @@ const ScheduleMoreCell = ({
 
   /** Confirm, then remove the schedule together with its output thread. */
   const handleDelete = () =>
-    confirm({
-      message: `Remove "${schedule.name}" and its output thread? This cannot be undone.`,
-      options: { okLabel: 'Delete', cancelLabel: 'Cancel' },
-    }).then(() => removeSchedule({ variables: { _id: schedule._id } }));
+    confirmRemove(
+      {
+        message: `Remove "${schedule.name}" and its output thread? This cannot be undone.`,
+      },
+      () => removeSchedule({ variables: { _id: schedule._id } }),
+    );
 
   return (
     <RowActionsMenu>
@@ -332,17 +334,11 @@ const buildColumns = (
   refetch: () => void,
   sort: SortState,
   onSort: (id: string) => void,
-): ColumnDef<ISchedule>[] => [
-  {
-    id: 'more',
-    cell: ({ row }) => (
-      <ScheduleMoreCell schedule={row.original} refetch={refetch} />
-    ),
-    size: 33,
-  },
-  RecordTable.checkboxColumn as ColumnDef<ISchedule>,
-  ...buildBaseColumns(sort, onSort),
-];
+): ColumnDef<ISchedule>[] =>
+  buildActionColumns<ISchedule>(
+    (schedule) => <ScheduleMoreCell schedule={schedule} refetch={refetch} />,
+    buildBaseColumns(sort, onSort),
+  );
 
 /** Record table of all agent schedules with row actions. */
 export const SchedulesIndexPage = () => {

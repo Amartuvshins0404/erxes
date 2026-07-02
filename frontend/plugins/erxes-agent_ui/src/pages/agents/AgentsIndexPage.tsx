@@ -28,7 +28,7 @@ import {
   RecordTableInlineCell,
   RelativeDateDisplay,
   Separator,
-  useConfirm,
+  toast,
 } from 'erxes-ui';
 import { MASTRA_AGENT_REMOVE, MASTRA_AGENT_UPDATE } from '~/graphql/mutations';
 import {
@@ -50,6 +50,8 @@ import { SortState, SortValue, useTableSort } from '~/components/useTableSort';
 import { PermissionButton } from '~/components/PermissionButton';
 import { ResourceIndexLayout } from '~/components/ResourceIndexLayout';
 import { SplitBadge } from '~/components/SplitBadge';
+import { buildActionColumns } from '~/components/buildActionColumns';
+import { useConfirmedRemove } from '~/components/useConfirmedRemove';
 import { useMastraAgentList, IMastraAgentRow } from './useMastraAgentList';
 import {
   agentMutationError,
@@ -101,7 +103,7 @@ const CreateAgentButton = ({ children }: { children: React.ReactNode }) => {
 const AgentMoreCell = ({ agent }: { agent: IAgent }) => {
   const navigate = useNavigate();
   const basePath = useAgentsBasePath();
-  const { confirm } = useConfirm();
+  const { confirmRemove } = useConfirmedRemove();
   const { canEditAgent, canRemoveAgent } = useAgentAccess();
 
   const canEdit = canEditAgent(agent);
@@ -117,12 +119,11 @@ const AgentMoreCell = ({ agent }: { agent: IAgent }) => {
     onError: agentMutationError(),
   });
 
-  const handleDelete = () => {
-    confirm({
-      message: `Remove "${agent.name}"? This cannot be undone.`,
-      options: { okLabel: 'Delete', cancelLabel: 'Cancel' },
-    }).then(() => removeAgent({ variables: { _id: agent._id } }));
-  };
+  const handleDelete = () =>
+    confirmRemove(
+      { message: `Remove "${agent.name}"? This cannot be undone.` },
+      () => removeAgent({ variables: { _id: agent._id } }),
+    );
 
   const handleToggle = () => {
     updateAgent({
@@ -172,7 +173,7 @@ const AgentMoreCell = ({ agent }: { agent: IAgent }) => {
 const AgentBulkDeleteCommandBar = () => {
   const { table } = RecordTable.useRecordTable();
   const selectedRows = table.getFilteredSelectedRowModel().rows as Row<IAgent>[];
-  const { confirm } = useConfirm();
+  const { confirmRemove } = useConfirmedRemove();
   const { canRemoveAgent } = useAgentAccess();
 
   const [removeAgent] = useMutation(MASTRA_AGENT_REMOVE, {
@@ -185,16 +186,30 @@ const AgentBulkDeleteCommandBar = () => {
   const handleBulkDelete = () => {
     const count = removable.length;
     if (!count) return;
-    confirm({
-      message: `Delete ${count} agent${count !== 1 ? 's' : ''}? This cannot be undone.`,
-      options: { okLabel: 'Delete', cancelLabel: 'Cancel' },
-    }).then(() => {
-      Promise.all(
-        removable.map((row) =>
-          removeAgent({ variables: { _id: row.original._id } }),
-        ),
-      ).then(() => table.resetRowSelection());
-    });
+    confirmRemove(
+      {
+        message: `Delete ${count} agent${count !== 1 ? 's' : ''}? This cannot be undone.`,
+      },
+      // allSettled so one rejected mutation never blocks the rest: the
+      // selection resets regardless, deleted rows drop out, and a single
+      // summary toast covers any failures (each also toasts via onError).
+      async () => {
+        const results = await Promise.allSettled(
+          removable.map((row) =>
+            removeAgent({ variables: { _id: row.original._id } }),
+          ),
+        );
+        table.resetRowSelection();
+        const failed = results.filter((r) => r.status === 'rejected').length;
+        if (failed > 0) {
+          toast({
+            title: 'Some deletions failed',
+            description: `${failed} of ${count} agent${count !== 1 ? 's' : ''} could not be removed.`,
+            variant: 'destructive',
+          });
+        }
+      },
+    );
   };
 
   return (
@@ -399,15 +414,11 @@ const buildColumns = (
   sort: SortState,
   onSort: (id: string) => void,
   basePath: string,
-): ColumnDef<IAgent>[] => [
-  {
-    id: 'more',
-    cell: ({ row }) => <AgentMoreCell agent={row.original} />,
-    size: 33,
-  },
-  RecordTable.checkboxColumn as ColumnDef<IAgent>,
-  ...buildBaseColumns(scopeNames, sort, onSort, basePath),
-];
+): ColumnDef<IAgent>[] =>
+  buildActionColumns<IAgent>(
+    (agent) => <AgentMoreCell agent={agent} />,
+    buildBaseColumns(scopeNames, sort, onSort, basePath),
+  );
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 

@@ -3,7 +3,6 @@ import { typeDefs } from '~/apollo/typeDefs';
 import { appRouter } from '~/trpc/init-trpc';
 import resolvers from './apollo/resolvers';
 import { generateModels } from '~/connectionResolvers';
-import { startAssistantDeletionCron } from '~/modules/assistantOrg/deletionJob';
 
 startPlugin({
   name: 'agent',
@@ -29,7 +28,5 @@ startPlugin({
       return context;
     },
   },
-  onServerInit: async () => {
-    startAssistantDeletionCron();
-  },
 });
+

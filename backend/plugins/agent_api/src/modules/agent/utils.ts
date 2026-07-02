@@ -85,22 +85,21 @@ const getRequiredEnv = (name: string) => {
 };
 
 const getManagedDeployerUrl = () =>
-  (
-    getEnv({ name: 'MANAGED_OPENCLAW_DEPLOYER_URL' }).trim() || getDeployerUrl()
-  ).replace(/\/$/, '');
+  (getEnv({ name: 'MANAGED_OPENCLAW_DEPLOYER_URL' }).trim() || getDeployerUrl())
+    .replace(/\/$/, '');
 
 const getManagedDeployerSecret = () =>
   getRequiredEnv('MANAGED_OPENCLAW_DEPLOYER_SECRET');
-
-const getOptionalManagedDeployerSecret = () =>
-  getEnv({ name: 'MANAGED_OPENCLAW_DEPLOYER_SECRET' }).trim();
 
 const getRuntimeSharedSecret = () =>
   getRequiredEnv('ERXES_AI_ASSISTANT_RUNTIME_SHARED_SECRET');
 
 const normalizeRuntimeUrl = (url: string) => url.trim().replace(/\/+$/, '');
 
-const managedRuntimeRequest = async (url: string, options: RequestInit = {}) =>
+const managedRuntimeRequest = async (
+  url: string,
+  options: RequestInit = {},
+) =>
   fetch(url, {
     ...options,
     signal: AbortSignal.timeout(30_000),
@@ -158,9 +157,7 @@ export const verifyManagedRuntime = async (runtimeUrl: string) => {
   const unauthenticated = await managedRuntimeRequest(healthUrl);
 
   if (unauthenticated.status !== 401) {
-    throw new Error(
-      'Managed runtime health endpoint did not reject unauthenticated requests',
-    );
+    throw new Error('Managed runtime health endpoint did not reject unauthenticated requests');
   }
 
   const authenticated = await managedRuntimeRequest(healthUrl, {
@@ -247,18 +244,14 @@ export const approveServer = async (
   return response.json();
 };
 
-const destroyServerAt = async (deployerUrl: string, serverName: string) => {
-  const deployerSecret = getOptionalManagedDeployerSecret();
-  const response = await fetch(`${deployerUrl}/agents/${serverName}`, {
+export const destroyServer = async (agent: IAgentServerDocument) => {
+  const DEPLOYER = getDeployerUrl();
+
+  const DEPLOYER_URL = `${DEPLOYER}/agents/${agent.name}`;
+
+  const response = await fetch(DEPLOYER_URL, {
     method: 'DELETE',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(deployerSecret
-        ? {
-            'x-erxes-managed-deployer-secret': deployerSecret,
-          }
-        : {}),
-    },
+    headers: { 'Content-Type': 'application/json' },
   });
 
   if (!response.ok) {
@@ -276,31 +269,6 @@ const destroyServerAt = async (deployerUrl: string, serverName: string) => {
   }
 
   return response.json();
-};
-
-export const destroyServer = async (
-  agent: Pick<IAgentServerDocument, 'name'>,
-) => {
-  const deployerUrls = Array.from(
-    new Set([getManagedDeployerUrl(), getDeployerUrl()]),
-  );
-  let notFoundError: Error | null = null;
-
-  for (const deployerUrl of deployerUrls) {
-    try {
-      return await destroyServerAt(deployerUrl, agent.name);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-
-      if (!message.toLowerCase().includes('not found')) {
-        throw error;
-      }
-
-      notFoundError = error instanceof Error ? error : new Error(message);
-    }
-  }
-
-  throw notFoundError || new Error('Destroy failed: server not found');
 };
 
 export interface AgentItem {
@@ -457,7 +425,9 @@ export const fixAndRestartServer = async (
   }
 };
 
-export const checkKimiKeySet = async (serverName: string): Promise<boolean> => {
+export const checkKimiKeySet = async (
+  serverName: string,
+): Promise<boolean> => {
   const DEPLOYER = getDeployerUrl();
   const response = await fetch(
     `${DEPLOYER}/agents/${serverName}/check-kimi-key`,

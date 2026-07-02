@@ -3,10 +3,6 @@ import {
   assertIdentifierManageAccess,
   requireUser,
 } from '~/modules/assistantOrg/permissions';
-import {
-  assertAssistantLimitAvailable,
-  setAssistantPlanSelection,
-} from '~/modules/assistantOrg/assistantLimits';
 import { buildUniqueSlug, ensureLegacyIdentifierLinks } from '../../../utils';
 import { destroyServer } from '~/modules/agent/utils';
 import { destroyOpencodeServer } from '~/modules/opencode/utils';
@@ -40,7 +36,7 @@ export const identifierMutations = {
         description?: string | null;
       };
     },
-    { models, subdomain, user }: IContext,
+    { models, user }: IContext,
   ) => {
     const currentUser = requireUser(user);
     const name = input?.name?.trim();
@@ -56,10 +52,6 @@ export const identifierMutations = {
     }
 
     await ensureLegacyIdentifierLinks(models);
-
-    if (kind === 'assistant') {
-      await assertAssistantLimitAvailable({ models, subdomain });
-    }
 
     const slug = await buildUniqueSlug(name, (nextSlug) =>
       models.Identifier.findOne({ slug: nextSlug }).lean(),
@@ -165,20 +157,5 @@ export const identifierMutations = {
     await models.Identifier.deleteOne({ _id: identifierId });
 
     return true;
-  },
-
-  setAssistantPlanSelection: async (
-    _root: undefined,
-    { identifierIds }: { identifierIds: string[] },
-    { models, subdomain, user }: IContext,
-  ) => {
-    requireUser(user);
-
-    return setAssistantPlanSelection({
-      models,
-      subdomain,
-      user,
-      identifierIds,
-    });
   },
 };

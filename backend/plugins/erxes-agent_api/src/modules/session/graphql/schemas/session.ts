@@ -35,4 +35,5 @@ export const queries = `
 export const mutations = `
   mastraThreadRename(threadId: String!, title: String!): MastraThread
   mastraThreadRemove(threadId: String!): JSON
+  mastraChatCancel(threadId: String!): Boolean
 `;

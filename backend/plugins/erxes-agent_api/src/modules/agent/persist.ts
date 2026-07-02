@@ -19,12 +19,19 @@ export async function persistTurn(params: {
   // One-line "what this turn accomplished" headline for the collapsed trace.
   turnSummary?: string;
   assistantMessageId?: string;
+  interrupted?: boolean;
 }): Promise<{
   titlePromise: Promise<string | null>;
   assistantMessageId: string | null;
 }> {
-  const { prepared, reply, assistantMessageId, reasoningSummaries, turnSummary } =
-    params;
+  const {
+    prepared,
+    reply,
+    assistantMessageId,
+    reasoningSummaries,
+    turnSummary,
+    interrupted,
+  } = params;
   const { useMemory, memCtx, agentConfig, attachments } = prepared;
 
   const titlePromise: Promise<string | null> =
@@ -48,6 +55,7 @@ export async function persistTurn(params: {
         reasoningSummaries,
         turnSummary,
         assistantMessageId,
+        interrupted,
       });
     } catch (e) {
       console.warn(
@@ -111,16 +119,21 @@ export async function patchNativeTurn(params: {
   reasoningSummaries?: (string | null)[];
   turnSummary?: string;
   assistantMessageId?: string;
+  interrupted?: boolean;
 }): Promise<string | null> {
   const { subdomain, binding, agentId, reply, attachments } = params;
-  const { reasoningSummaries, turnSummary, assistantMessageId } = params;
+  const { reasoningSummaries, turnSummary, assistantMessageId, interrupted } =
+    params;
 
   // The erxes-meta fields to stamp onto the assistant message (only the present
-  // ones), so a reload re-renders the short thoughts + turn headline.
+  // ones), so a reload re-renders the short thoughts + turn headline. A stopped
+  // turn also stamps `interrupted` so a reload shows the "stopped" badge instead
+  // of the partial reply as complete.
   const assistantMeta: Record<string, unknown> = {};
   if (reasoningSummaries?.length)
     assistantMeta.reasoningSummaries = reasoningSummaries;
   if (turnSummary) assistantMeta.turnSummary = turnSummary;
+  if (interrupted) assistantMeta.interrupted = true;
 
   await ensureThreadRegistered(
     subdomain,

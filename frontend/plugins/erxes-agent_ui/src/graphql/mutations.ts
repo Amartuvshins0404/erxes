@@ -17,6 +17,12 @@ export const MASTRA_THREAD_REMOVE = gql`
   }
 `;
 
+export const MASTRA_CHAT_CANCEL = gql`
+  mutation MastraChatCancel($threadId: String!) {
+    mastraChatCancel(threadId: $threadId)
+  }
+`;
+
 export const MASTRA_AGENT_CREATE = gql`
   mutation MastraAgentCreate($doc: MastraAgentInput!) {
     mastraAgentCreate(doc: $doc) {

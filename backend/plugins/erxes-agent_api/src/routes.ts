@@ -47,6 +47,7 @@ import { attachmentStorageStatus } from '@/settings/graphql/resolvers/queries/se
 import { registerVoiceRoutes } from './mastra/voice/routes';
 import { buildTurnSystem } from './mastra/voice/voicePrompt';
 import { makeIpRateLimiter } from './utils/rateLimit';
+import { registerActiveRun } from './mastra/runRegistry';
 
 export const router: Router = Router();
 
@@ -301,6 +302,14 @@ router.post('/chat/stream', llmRouteLimiter, async (req, res) => {
     controller.abort();
     stopHeartbeat();
   });
+
+  // Explicit server-driven cancel: track this run so mastraChatCancel can abort
+  // it even when the gateway proxy swallows the client disconnect (req.on close
+  // never fires upstream). Only tracked when the client sent its own threadId —
+  // the key the cancel mutation carries. Unregistered in the run's finally.
+  const unregisterRun = threadId
+    ? registerActiveRun(subdomain, user._id, threadId, controller)
+    : () => {};
 
   // Folds the model's UIMessage chunks into the erxes-only turn artifacts we
   // persist (ordered parts, thinking, tool calls). The live render is driven by
@@ -587,6 +596,9 @@ router.post('/chat/stream', llmRouteLimiter, async (req, res) => {
           // Mastra's assigned id for this turn's assistant row, captured off the
           // stream's `start` chunk — the id the client rates without a reload.
           assistantMessageId: acc.messageId,
+          // Stamp the persisted assistant row as stopped so a reload renders the
+          // "stopped" badge instead of the partial reply as if it were complete.
+          interrupted,
         });
 
         if (clientGone) {
@@ -638,6 +650,7 @@ router.post('/chat/stream', llmRouteLimiter, async (req, res) => {
       } finally {
         activity?.stop();
         stopHeartbeat();
+        unregisterRun();
       }
     },
   });

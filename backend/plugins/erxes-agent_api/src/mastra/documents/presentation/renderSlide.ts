@@ -21,8 +21,20 @@ import {
 //     -> chart refs (<img src="chart:ID"> / ![](chart:ID)) swapped for PNG data URLs
 //     -> parseHtml: a small, tolerant HTML -> Satori-VDOM parser
 //     -> house classes resolved to inline styles + display normalised
+//     -> measure pass: natural content height at slide width (autofit)
 //     -> satori (HTML/CSS -> SVG, real flexbox via yoga)
 //     -> @resvg/resvg-js -> PNG buffer @2x
+//
+// Autofit: the canvas is a fixed 16:9. When authored content is taller than
+// SLIDE_H, yoga would shrink each child's box while the glyphs still paint at
+// full size — headlines end up overprinted by the first bullet. Instead we
+// measure the slide's natural height first (satori width-only render sizes the
+// SVG to content) and, when it overflows, lay the slide out on a proportionally
+// LARGER 16:9 canvas; resvg then downscales it to the standard raster size, so
+// the whole slide uniformly shrinks to fit (like PowerPoint's autofit). As a
+// second guarantee, children of column containers default to flexShrink: 0, so
+// content that still can't fit (beyond MIN_AUTOFIT_SCALE) clips cleanly at the
+// bottom edge instead of overlapping.
 //
 // Satori ignores external/`<style>` CSS, so theme.ts ships the house classes as
 // a class -> inline-style map and we resolve them here before rendering.
@@ -251,8 +263,12 @@ function classStyle(classes: string | undefined): Style {
   return out;
 }
 
-/** Resolve house classes to inline styles and make the tree Satori-safe. */
-function resolveNode(node: unknown): unknown {
+/** Resolve house classes to inline styles and make the tree Satori-safe.
+ * `parentIsColumn` marks children of column flex containers: those default to
+ * flexShrink: 0 so vertical overflow clips past the bottom edge instead of
+ * squeezing boxes and overpainting siblings (row children keep the CSS shrink
+ * default — text inside a row must shrink to wrap). */
+function resolveNode(node: unknown, parentIsColumn = true): unknown {
   if (!isElement(node)) {
     // Primitive text/number children pass through; nullish is dropped upstream.
     return node;
@@ -264,13 +280,27 @@ function resolveNode(node: unknown): unknown {
   delete props.class;
   delete props.className;
 
+  if (parentIsColumn && merged.flex == null && merged.flexShrink == null) {
+    merged.flexShrink = 0;
+  }
+
+  // Effective direction for this node's children, decided without looking at
+  // them: an explicit flexDirection wins; explicit display:flex without one
+  // means the CSS default (row); otherwise the display-defaulting below makes
+  // it a column.
+  const isColumn = merged.flexDirection
+    ? String(merged.flexDirection).startsWith('column')
+    : merged.display == null;
+
   const rawChildren = props.children;
   const childList = Array.isArray(rawChildren)
     ? rawChildren
     : rawChildren == null
       ? []
       : [rawChildren];
-  const resolved = childList.map(resolveNode).filter((c) => c != null && c !== '');
+  const resolved = childList
+    .map((c) => resolveNode(c, isColumn))
+    .filter((c) => c != null && c !== '');
   const hasElementChild = resolved.some((c) => isElement(c));
 
   // Satori requires an explicit display on any node with multiple children;
@@ -322,6 +352,79 @@ function normaliseRoot(node: unknown): VElement {
   return root;
 }
 
+// Below this scale, stop shrinking (microtext is worse than a clean bottom
+// clip, which the flexShrink: 0 default guarantees stays overlap-free).
+export const MIN_AUTOFIT_SCALE = 0.5;
+
+// SLIDE_W:SLIDE_H reduces to 16:9, so keeping the canvas width a multiple of 16
+// keeps the height integral and the fitTo-width raster exactly
+// (SLIDE_W*RENDER_SCALE) x (SLIDE_H*RENDER_SCALE).
+const CANVAS_W_STEP = 16;
+
+/** Pick the 16:9 layout canvas for a slide whose natural content height is
+ * `contentH`: the standard canvas when it fits, else a proportionally larger
+ * one (content lays out the same, resvg downscales it back — uniform shrink). */
+export function autofitCanvas(contentH: number): {
+  width: number;
+  height: number;
+  scale: number;
+} {
+  if (!Number.isFinite(contentH) || contentH <= SLIDE_H) {
+    return { width: SLIDE_W, height: SLIDE_H, scale: 1 };
+  }
+  const scale = Math.max(SLIDE_H / contentH, MIN_AUTOFIT_SCALE);
+  const width = Math.ceil(SLIDE_W / scale / CANVAS_W_STEP) * CANVAS_W_STEP;
+  const height = (width * SLIDE_H) / SLIDE_W;
+  return { width, height, scale: SLIDE_W / width };
+}
+
+/** Element children of the wrapper root — the authored slide root(s). */
+function slideRoots(root: VElement): VElement[] {
+  const children = root.props.children;
+  const list = Array.isArray(children) ? children : children == null ? [] : [children];
+  return list.filter(isElement);
+}
+
+/** Strip the fixed canvas height for the measure pass so content sizes the
+ * SVG. Only the house canvas height is removed — an author's own explicit
+ * non-canvas height is layout, not canvas. */
+function unsizeCanvas(root: VElement): void {
+  delete root.props.style?.height;
+  for (const el of slideRoots(root)) {
+    const style = el.props.style;
+    if (!style) continue;
+    if (style.height === `${SLIDE_H}px` || style.height === SLIDE_H) {
+      delete style.height;
+    }
+  }
+}
+
+/** Point the wrapper root and any full-canvas slide roots at the (possibly
+ * enlarged) autofit canvas. */
+function sizeCanvas(root: VElement, w: number, h: number): void {
+  const rootStyle = (root.props.style = root.props.style || {});
+  rootStyle.width = `${w}px`;
+  rootStyle.height = `${h}px`;
+  for (const el of slideRoots(root)) {
+    const style = el.props.style;
+    if (!style) continue;
+    if (style.width === `${SLIDE_W}px` || style.width === SLIDE_W) {
+      style.width = `${w}px`;
+    }
+    if (style.height === `${SLIDE_H}px` || style.height === SLIDE_H) {
+      style.height = `${h}px`;
+    }
+  }
+}
+
+const SVG_HEIGHT_RE = /<svg[^>]*\bheight="([\d.]+)"/;
+
+function svgHeight(svg: string): number | null {
+  const m = SVG_HEIGHT_RE.exec(svg);
+  const h = m ? Number(m[1]) : NaN;
+  return Number.isFinite(h) ? h : null;
+}
+
 // Initialise Satori's yoga layout engine once, from the bundled wasm bytes.
 let yogaReady: Promise<void> | null = null;
 function ensureYoga(): Promise<void> {
@@ -340,23 +443,67 @@ function ensureYoga(): Promise<void> {
   return yogaReady;
 }
 
+export interface SlideSvg {
+  svg: string;
+  /** Layout canvas actually used (>= SLIDE_W x SLIDE_H, same 16:9 ratio). */
+  width: number;
+  height: number;
+  /** 1 when the content fit the standard canvas; < 1 when autofit shrank it. */
+  scale: number;
+}
+
+/** Lay out one slide's HTML to an SVG on its autofit canvas. Exported so tests
+ * can assert the autofit decision without decoding pixels. */
+export async function renderSlideSvg(
+  slideHtml: string,
+  charts: DocumentChartRef[] = [],
+): Promise<SlideSvg> {
+  await ensureYoga();
+  const prepared = sanitizeHtml(substituteCharts(slideHtml, charts));
+  const fonts = getFonts();
+  const satoriEl = (root: VElement) =>
+    root as unknown as Parameters<typeof satori>[0];
+  const build = () =>
+    normaliseRoot(resolveNode(parseHtml(prepared || '<div></div>')));
+
+  // Measure pass: with the canvas height stripped and no height option, satori
+  // sizes the SVG to the content — the slide's natural height at slide width.
+  const probe = build();
+  unsizeCanvas(probe);
+  // Only the SVG's height attribute is read from this render — skip glyph
+  // embedding (layout is identical; embedding only affects output), which
+  // roughly halves the measure pass's cost on a full deck.
+  const probeSvg = await satori(satoriEl(probe), {
+    width: SLIDE_W,
+    fonts,
+    embedFont: false,
+  });
+  const contentH = svgHeight(probeSvg) ?? SLIDE_H;
+
+  // Render pass on the fitting canvas. A wider canvas wraps text no tighter
+  // than the measured one, so the measured height is an upper bound: one
+  // measure pass is enough.
+  const canvas = autofitCanvas(Math.ceil(contentH));
+  const root = build();
+  sizeCanvas(root, canvas.width, canvas.height);
+  const svg = await satori(satoriEl(root), {
+    width: canvas.width,
+    height: canvas.height,
+    fonts,
+    embedFont: true,
+  });
+  return { svg, width: canvas.width, height: canvas.height, scale: canvas.scale };
+}
+
 /** Render one slide's HTML to a PNG Buffer at RENDER_SCALE. */
 export async function renderSlidePng(
   slideHtml: string,
   charts: DocumentChartRef[] = [],
 ): Promise<Buffer> {
-  await ensureYoga();
-  const prepared = sanitizeHtml(substituteCharts(slideHtml, charts));
-  const tree = parseHtml(prepared || '<div></div>');
-  const root = normaliseRoot(resolveNode(tree));
+  const { svg } = await renderSlideSvg(slideHtml, charts);
 
-  const svg = await satori(root as unknown as Parameters<typeof satori>[0], {
-    width: SLIDE_W,
-    height: SLIDE_H,
-    fonts: getFonts(),
-    embedFont: true,
-  });
-
+  // fitTo width is the standard raster width regardless of the layout canvas —
+  // an autofit (larger) canvas downscales here, shrinking the slide uniformly.
   const resvg = new Resvg(svg, {
     fitTo: { mode: 'width', value: SLIDE_W * RENDER_SCALE },
     background: BRAND.white,

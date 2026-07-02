@@ -1,4 +1,9 @@
-import { renderSlidePng } from '../renderSlide';
+import {
+  autofitCanvas,
+  MIN_AUTOFIT_SCALE,
+  renderSlidePng,
+  renderSlideSvg,
+} from '../renderSlide';
 import { renderPptxDocument } from '~/mastra/documents/pptx';
 import { RENDER_SCALE, SLIDE_H, SLIDE_W } from '../theme';
 import type { DocumentChartRef } from '~/mastra/documents/markdown';
@@ -128,6 +133,71 @@ describe('renderSlidePng', () => {
   it.each(ADVERSARIAL)('parses adversarial input without throwing: %s', async (_name, html) => {
     const png = await renderSlidePng(html);
     expect(pngInfo(png).ok).toBe(true);
+  });
+});
+
+// Regression: an overstuffed slide (more content than the 16:9 canvas holds)
+// used to shrink each flex box while glyphs painted full-size — the headline
+// ended up overprinted by the first bullet. Autofit must instead lay the slide
+// out on a larger 16:9 canvas (scale < 1) and still rasterise at standard size.
+describe('autofit', () => {
+  const OVERFLOWING_SLIDE = `
+    <div class="slide">
+      <div class="accent-bar mb-md"></div>
+      <div class="h1">Winter 2026 standouts</div>
+      <div class="bullets mt-lg">${Array.from(
+        { length: 8 },
+        (_, i) =>
+          `<div class="bullet"><span class="dot"></span><span><span class="bold">Company ${i + 1}</span><br>— a full description line that wraps the bullet onto a second line of text</span></div>`,
+      ).join('')}</div>
+    </div>`;
+
+  it('autofitCanvas keeps the standard canvas for fitting content', () => {
+    expect(autofitCanvas(SLIDE_H - 10)).toEqual({
+      width: SLIDE_W,
+      height: SLIDE_H,
+      scale: 1,
+    });
+    expect(autofitCanvas(SLIDE_H)).toEqual({
+      width: SLIDE_W,
+      height: SLIDE_H,
+      scale: 1,
+    });
+    expect(autofitCanvas(NaN).scale).toBe(1);
+  });
+
+  it('autofitCanvas grows the canvas 16:9 for overflowing content', () => {
+    const c = autofitCanvas(900);
+    expect(c.scale).toBeLessThan(1);
+    // Canvas holds the measured content and keeps the exact slide ratio.
+    expect(c.height).toBeGreaterThanOrEqual(900);
+    expect(c.width / c.height).toBeCloseTo(SLIDE_W / SLIDE_H, 10);
+    expect(Number.isInteger(c.width)).toBe(true);
+    expect(Number.isInteger(c.height)).toBe(true);
+  });
+
+  it('autofitCanvas never shrinks below the scale floor', () => {
+    const c = autofitCanvas(100_000);
+    expect(c.scale).toBeGreaterThanOrEqual(MIN_AUTOFIT_SCALE * 0.99);
+  });
+
+  it('shrinks an overflowing slide instead of overlapping (scale < 1)', async () => {
+    const fitted = await renderSlideSvg(SAMPLE_SLIDE);
+    expect(fitted.scale).toBe(1);
+    expect(fitted.width).toBe(SLIDE_W);
+
+    const shrunk = await renderSlideSvg(OVERFLOWING_SLIDE);
+    expect(shrunk.scale).toBeLessThan(1);
+    expect(shrunk.width).toBeGreaterThan(SLIDE_W);
+    expect(shrunk.width / shrunk.height).toBeCloseTo(SLIDE_W / SLIDE_H, 10);
+  });
+
+  it('rasterises an autofit slide at the standard @2x dimensions', async () => {
+    const png = await renderSlidePng(OVERFLOWING_SLIDE);
+    const info = pngInfo(png);
+    expect(info.ok).toBe(true);
+    expect(info.width).toBe(SLIDE_W * RENDER_SCALE);
+    expect(info.height).toBe(SLIDE_H * RENDER_SCALE);
   });
 });
 

@@ -152,7 +152,7 @@ export const PresentMode = ({
         <div className="ea-present-thumbs">
           {slides.map((url, i) => (
             <button
-              key={i}
+              key={url}
               type="button"
               aria-label={`Go to slide ${i + 1}`}
               className={cn('ea-present-thumb', i === index && 'is-active')}

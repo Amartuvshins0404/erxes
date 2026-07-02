@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { MASTRA_AGENT_CREATE, MASTRA_AGENT_UPDATE } from '~/graphql/mutations';
 import { AgentFormValues } from '../validations';
 import { agentMutationError } from './useAgentAccess';
+import { useAgentsBasePath } from './useAgentsBasePath';
 
 const cacheUpdate = (cache: ApolloCache<unknown>) => {
   cache.evict({ fieldName: 'mastraAgentsMain' });
@@ -13,7 +14,8 @@ const cacheUpdate = (cache: ApolloCache<unknown>) => {
 /** Create/update mutations for the agent form; navigates back on success. */
 export const useSaveAgent = (id?: string) => {
   const navigate = useNavigate();
-  const onCompleted = () => navigate('/settings/erxes-agent/agents');
+  const basePath = useAgentsBasePath();
+  const onCompleted = () => navigate(basePath);
 
   const [createAgent, { loading: creating }] = useMutation(MASTRA_AGENT_CREATE, {
     update: cacheUpdate,

@@ -1,4 +1,4 @@
-import { memo, useState } from 'react';
+import { memo, useMemo, useState } from 'react';
 import { IconSettings } from '@tabler/icons-react';
 import { Button, cn, ErxesLogoIcon, Skeleton, Tooltip } from 'erxes-ui';
 import { IChatAgent } from '~/modules/chat/hooks/useChatAgents';
@@ -8,17 +8,20 @@ import {
   useAgentWorking,
 } from '~/modules/chat/hooks/useChatView';
 import { EditAgentDialog } from '~/modules/chat/components/EditAgentDialog';
+import { duplicatedAgentNames } from '~/pages/agents/utils';
 
 // One agent row — subscribes to its own working/unread/activity slices so a
 // streaming reply only re-renders that row, not the whole rail.
 const AgentRailItem = memo(({
   agent,
   isActive,
+  isNameDuplicated,
   onSelect,
   onEdit,
 }: {
   agent: IChatAgent;
   isActive: boolean;
+  isNameDuplicated: boolean;
   onSelect: (agentId: string) => void;
   onEdit: (agent: IChatAgent) => void;
 }) => {
@@ -78,6 +81,11 @@ const AgentRailItem = memo(({
             <span className="size-1.5 shrink-0 rounded-full bg-destructive" />
           )}
           <span className="truncate">{agent.name}</span>
+          {isNameDuplicated && (
+            <span className="shrink-0 font-mono text-[10px] font-normal text-muted-foreground">
+              {agent.agentId}
+            </span>
+          )}
         </p>
         {/* While working, the model line gives way to the live step — one
             shimmering line — so the row stays the same height. */}
@@ -111,6 +119,14 @@ export const AgentRail = memo(({
   // only while open so its form/mutation/subscriptions don't exist per row.
   const [editingAgent, setEditingAgent] = useState<IChatAgent | null>(null);
 
+  // Names aren't unique, so duplicates would render as identical rows. Flag the
+  // colliding names once for the whole list and tag those rows with the unique
+  // agentId so they stay tellable apart.
+  const duplicatedNames = useMemo(
+    () => duplicatedAgentNames(agents.map((a) => a.name)),
+    [agents],
+  );
+
   return (
     <div className="flex flex-col h-full">
       <div className="px-3 py-2.5 border-b">
@@ -137,6 +153,7 @@ export const AgentRail = memo(({
                 key={agent._id}
                 agent={agent}
                 isActive={activeAgentId === agent._id}
+                isNameDuplicated={duplicatedNames.has(agent.name)}
                 onSelect={onSelect}
                 onEdit={setEditingAgent}
               />

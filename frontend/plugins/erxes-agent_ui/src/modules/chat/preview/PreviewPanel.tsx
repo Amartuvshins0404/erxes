@@ -9,7 +9,8 @@ import {
   IconX,
 } from '@tabler/icons-react';
 import { Button, cn, Empty } from 'erxes-ui';
-import { EChart, type EChartHandle } from '~/modules/chat/charts';
+import { type EChartHandle } from '~/modules/chat/charts';
+import { ChartArtifactView } from '~/modules/chat/components/ChartArtifactView';
 import {
   artifactIcon,
   Artifact,
@@ -332,7 +333,9 @@ const ItemView = ({
       <div className="min-h-0 flex-1 overflow-hidden">
         {artifact.kind === 'chart' ? (
           <div className="h-full w-full p-4">
-            <EChart ref={chartRef} spec={artifact.spec} height="100%" />
+            {/* Same unified view (and per-artifact filter state) as the inline
+                chat card and the expand dialog — slider positions carry over. */}
+            <ChartArtifactView ref={chartRef} artifact={artifact} />
           </div>
         ) : artifact.kind === 'diagram' ? (
           <MermaidViewer definition={artifact.definition} />

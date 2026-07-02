@@ -11,7 +11,12 @@ import {
 } from '@tabler/icons-react';
 import type { AgentUIMessage } from '~/modules/chat/types';
 import type { ArtifactGroup } from '~/modules/chat/hooks/useThreadArtifacts';
-import { messageText, type ToolPartView } from '~/modules/chat/lib/uiParts';
+import {
+  asToolPart,
+  messageText,
+  toolKind,
+  type ToolPartView,
+} from '~/modules/chat/lib/uiParts';
 import {
   normalizeArtifact,
   resolveStorageRef,
@@ -42,6 +47,34 @@ export const asArtifact = (output: unknown): Artifact | null =>
 export const asArtifactPart = (call: ToolPartView): Artifact | null => {
   if (call.isError || call.state !== 'output-available') return null;
   return asArtifact(call.output);
+};
+
+/**
+ * One pass over an assistant message's parts → the artifact cards to render
+ * plus the artifact-classified tools that settled WITHOUT producing one.
+ * Failures matter here because artifact tools are hidden from the run trace
+ * (a card is their surface) — an errored render-chart call would otherwise
+ * leave the turn looking like nothing happened at all.
+ */
+export const artifactOutcomes = (
+  parts: AgentUIMessage['parts'],
+): { artifacts: Artifact[]; failures: ToolPartView[] } => {
+  const artifacts: Artifact[] = [];
+  const failures: ToolPartView[] = [];
+  for (const part of parts) {
+    const tool = asToolPart(part);
+    if (!tool) continue;
+    const artifact = asArtifactPart(tool);
+    if (artifact) {
+      artifacts.push(artifact);
+    } else if (
+      toolKind(tool.toolName) === 'artifact' &&
+      (tool.state === 'output-available' || tool.state === 'output-error')
+    ) {
+      failures.push(tool);
+    }
+  }
+  return { artifacts, failures };
 };
 
 /**

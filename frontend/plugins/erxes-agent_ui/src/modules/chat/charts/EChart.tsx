@@ -20,12 +20,19 @@ import type { ChartSpec, DrilldownSpec } from './types';
 
 export interface EChartHandle {
   downloadPng: (fileName?: string) => void;
+  /** Window a continuous (value/time) x-axis via ECharts' native dataZoom —
+      the external range slider dispatches here instead of slicing rows. */
+  dataZoom: (startValue: number, endValue: number) => void;
 }
 
 interface EChartProps {
   spec: ChartSpec;
   className?: string;
   height?: number | string;
+  /** Skip the built-in top-level title row — for hosts that render the
+      artifact title in their own chrome (heading, dialog/panel header).
+      The drilldown back-header is unaffected. */
+  hideTitle?: boolean;
 }
 
 function useMounted(): boolean {
@@ -63,7 +70,7 @@ type DrillState = {
 };
 
 type DrillAction =
-  | { type: 'RESET'; spec: ChartSpec }
+  | { type: 'RESET'; spec: ChartSpec; soft?: boolean }
   | { type: 'DRILL_IN'; sub: DrilldownSpec }
   | { type: 'DRILL_BACK' }
   | { type: 'TOGGLE_LEGEND'; selected: Record<string, boolean> };
@@ -71,7 +78,15 @@ type DrillAction =
 function drillReducer(state: DrillState, action: DrillAction): DrillState {
   switch (action.type) {
     case 'RESET':
-      return { activeSpec: action.spec, history: [], hiddenLabels: new Set(), specKey: state.specKey + 1 };
+      // A soft reset keeps specKey (no ECharts remount) so the option update
+      // animates in place — used when only the data rows changed, e.g. the
+      // local filter sliders slicing spec.data continuously during a drag.
+      return {
+        activeSpec: action.spec,
+        history: [],
+        hiddenLabels: new Set(),
+        specKey: action.soft ? state.specKey : state.specKey + 1,
+      };
     case 'DRILL_IN':
       return {
         activeSpec: action.sub,
@@ -103,7 +118,7 @@ function drillReducer(state: DrillState, action: DrillAction): DrillState {
 // ── EChart ────────────────────────────────────────────────────────────────────
 
 export const EChart = forwardRef<EChartHandle, EChartProps>(function EChart(
-  { spec, className, height = 360 },
+  { spec, className, height = 360, hideTitle },
   ref,
 ) {
   const mounted     = useMounted();
@@ -168,13 +183,38 @@ export const EChart = forwardRef<EChartHandle, EChartProps>(function EChart(
   const specSig = useMemo(() => specSignature(spec), [spec]);
   const specRef = useRef(spec);
   specRef.current = spec;
+  // Snapshot of the drill state for the spec-change effect below, which must
+  // choose hard vs soft reset without widening its dep list beyond specSig.
+  const drillSnapRef = useRef({ inDrilldown: false, hiddenCount: 0, chartType: spec.chartType, seriesSig: '' });
+  drillSnapRef.current = {
+    inDrilldown: history.length > 0,
+    hiddenCount: hiddenLabels.size,
+    chartType: activeSpec.chartType,
+    seriesSig: JSON.stringify(activeSpec.series),
+  };
   const appliedSigRef = useRef(specSig);
   useEffect(() => {
     // Skip both the mount run (the reducer already initialized to this spec) and
     // pure reference churn; act only on a real content change.
     if (appliedSigRef.current === specSig) return;
     appliedSigRef.current = specSig;
-    dispatch({ type: 'RESET', spec: specRef.current });
+    const next = specRef.current;
+    // Same chart type + series, no drilldown open, no legend-hidden labels →
+    // only the rows changed (the local filter sliders slicing spec.data), so
+    // update the mounted instance in place and let ECharts animate the data
+    // transition instead of remounting the canvas on every slider tick. Any
+    // shape change keeps the hard remount (and its entry animation).
+    // Row-driven series changes (single-bar charts expand to one option-series
+    // per row label) are safe here because updates go through setOption with
+    // replaceMerge: ['series'] below — stale series are REMOVED with an exit
+    // animation, and survivors (matched by stable id) slide to their new slot.
+    const snap = drillSnapRef.current;
+    const soft =
+      !snap.inDrilldown &&
+      snap.hiddenCount === 0 &&
+      next.chartType === snap.chartType &&
+      JSON.stringify(next.series) === snap.seriesSig;
+    dispatch({ type: 'RESET', spec: next, soft });
   }, [specSig]);
 
   const isSingleBarSeries = useMemo(() =>
@@ -197,6 +237,27 @@ export const EChart = forwardRef<EChartHandle, EChartProps>(function EChart(
       : undefined;
     return chartSpecToEChartsOption(filteredSpec, colors, containerWidth || 360, hints);
   }, [filteredSpec, colors, isSingleBarSeries, hiddenLabels, activeSpec, containerWidth]);
+
+  // Option updates are applied imperatively, NOT through ReactECharts' own
+  // componentDidUpdate (shouldSetOption below always returns false). Reason:
+  // smooth collapse needs merge semantics (notMerge: false, so ECharts diffs
+  // old vs new data and animates bars/lines sliding together) PLUS
+  // replaceMerge: ['series'] so series absent from the new option are removed
+  // with an exit animation instead of lingering — echarts-for-react cannot
+  // pass replaceMerge. The axis category array and the series data both derive
+  // from the same filtered spec, so they stay in exact sync by construction.
+  const appliedOptionRef = useRef(option);
+  useEffect(() => {
+    if (option === appliedOptionRef.current) return;
+    appliedOptionRef.current = option;
+    const instance = instanceRef.current;
+    if (!instance || instance.isDisposed()) return;
+    instance.setOption(option as Parameters<EChartsType['setOption']>[0], {
+      notMerge: false,
+      replaceMerge: ['series'],
+      lazyUpdate: true,
+    });
+  }, [option]);
 
   const handleLegendChange = useCallback(
     (params: { selected: Record<string, boolean> }) => {
@@ -249,6 +310,13 @@ export const EChart = forwardRef<EChartHandle, EChartProps>(function EChart(
         anchor.click();
         anchor.remove();
       },
+      dataZoom: (startValue, endValue) => {
+        const instance = instanceRef.current;
+        if (!instance || instance.isDisposed()) return;
+        // Rides the native, highly-optimized zoom animation — the option's
+        // hidden 'inside' dataZoom component is the dispatch target.
+        instance.dispatchAction({ type: 'dataZoom', startValue, endValue });
+      },
     }),
     [activeSpec.title, colors],
   );
@@ -300,7 +368,7 @@ export const EChart = forwardRef<EChartHandle, EChartProps>(function EChart(
           )}
         </div>
       ) : (
-        activeSpec.title && (
+        activeSpec.title && !hideTitle && (
           <div style={{ textAlign: 'center', fontSize: 14, fontWeight: 700, fontFamily: CHART_FONT, color: colors.foreground, lineHeight: 1.35, padding: '8px 16px 6px', flexShrink: 0 }}>
             {activeSpec.title}
           </div>
@@ -318,12 +386,20 @@ export const EChart = forwardRef<EChartHandle, EChartProps>(function EChart(
             <ReactECharts
               key={specKey}
               option={option}
-              notMerge={false}
-              lazyUpdate
+              // All post-mount option updates go through the imperative
+              // setOption effect above (merge + replaceMerge:['series']);
+              // ReactECharts only paints the mount-time option, so its own
+              // update props (notMerge/lazyUpdate) would be inert here.
+              shouldSetOption={() => false}
               className={className}
               style={{ width: '100%', height: '100%', borderRadius: 8 }}
               opts={{ renderer: 'canvas' }}
-              onChartReady={(instance: EChartsType) => { instanceRef.current = instance; }}
+              onChartReady={(instance: EChartsType) => {
+                instanceRef.current = instance;
+                // The fresh instance was initialized with the current option —
+                // record it so the update effect doesn't re-apply it.
+                appliedOptionRef.current = option;
+              }}
               onEvents={{ click: handleClick, legendselectchanged: handleLegendChange }}
             />
           )}

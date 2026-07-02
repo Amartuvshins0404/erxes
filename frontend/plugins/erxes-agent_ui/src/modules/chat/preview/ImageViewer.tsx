@@ -42,7 +42,7 @@ export const ImageViewer = ({ artifact }: { artifact: ImageArtifact }) => {
 
   return (
     <div
-      className="flex h-full w-full items-center justify-center overflow-auto p-4"
+      className="ea-scroll flex h-full w-full items-center justify-center overflow-auto p-4"
       style={CHECKERBOARD_STYLE}
     >
       <img

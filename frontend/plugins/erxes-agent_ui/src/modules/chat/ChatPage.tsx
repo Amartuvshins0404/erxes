@@ -30,6 +30,7 @@ import { SessionList } from '~/modules/chat/components/SessionList';
 import { MessageList } from '~/modules/chat/components/MessageList';
 import { Composer } from '~/modules/chat/components/Composer';
 import { ApprovalBar } from '~/modules/chat/components/ApprovalBar';
+import { PreviewResizer } from '~/modules/chat/components/PreviewResizer';
 import { PreviewPanel } from '~/modules/chat/preview/PreviewPanel';
 import { previewStore } from '~/modules/chat/preview/previewStore';
 import { pendingApproval } from '~/modules/chat/lib/uiParts';
@@ -112,6 +113,10 @@ export const ChatPage = () => {
   const [showScrollDown, setShowScrollDown] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesBoxRef = useRef<HTMLDivElement>(null);
+  // The chat↔preview split row — PreviewResizer sets --ea-preview-w on it.
+  const splitRef = useRef<HTMLDivElement>(null);
+  // Decays the ghost scrollbar's `.is-scrolling` state after scrolling stops.
+  const scrollFadeTimer = useRef<ReturnType<typeof setTimeout>>();
   // Whether the view is pinned to the bottom. Gates streaming auto-scroll so a
   // user who scrolled up to read history isn't yanked back on every token.
   const atBottomRef = useRef(true);
@@ -194,6 +199,15 @@ export const ChatPage = () => {
   // Artifact Preview panel (charts / generated documents). Switching agent or
   // thread clears any open preview — it belongs to the prior conversation.
   const previewOpen = previewStore((s) => s.open);
+  // The split handle only makes sense while the panel is docked beside the
+  // chat — in fullscreen the panel is a fixed overlay with nothing to resize.
+  const previewFullscreen = previewStore((s) => s.fullscreen);
+  // Agents/sessions column auto-collapse — driven by PreviewResizer when a
+  // drag squeezes the chat column; always restored once the preview closes.
+  const [sideCollapsed, setSideCollapsed] = useState(false);
+  useEffect(() => {
+    if (!previewOpen) setSideCollapsed(false);
+  }, [previewOpen]);
   useEffect(() => {
     previewStore.getState().close();
   }, [agentId, activeThreadId]);
@@ -379,7 +393,17 @@ export const ChatPage = () => {
     const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
     atBottomRef.current = distanceFromBottom < SCROLL_PIN_THRESHOLD;
     setShowScrollDown(distanceFromBottom > SCROLL_BUTTON_THRESHOLD);
+    // Ghost scrollbar (chat.css .ea-scroll): visible while scrolling, gone at
+    // rest. Class toggled directly on the node — no re-render per scroll tick.
+    el.classList.add('is-scrolling');
+    clearTimeout(scrollFadeTimer.current);
+    scrollFadeTimer.current = setTimeout(
+      () => el.classList.remove('is-scrolling'),
+      800,
+    );
   };
+
+  useEffect(() => () => clearTimeout(scrollFadeTimer.current), []);
 
   const scrollToBottom = () => {
     atBottomRef.current = true;
@@ -444,10 +468,14 @@ export const ChatPage = () => {
       </PageHeader>
       )}
 
-      <div className="flex flex-1 overflow-hidden relative">
+      <div ref={splitRef} className="flex flex-1 overflow-hidden relative">
         {/* ── Side panel: AgentRail ↔ SessionList slide (hidden in voice mode) ── */}
         {!voiceActive && (
-        <div className="relative shrink-0 border-r overflow-hidden w-60">
+        <div
+          className={`ea-side-panel relative shrink-0 border-r overflow-hidden${
+            sideCollapsed ? ' is-collapsed' : ''
+          }`}
+        >
           <div
             className="absolute inset-0 transition-transform duration-200 ease-in-out"
             style={{
@@ -663,6 +691,13 @@ export const ChatPage = () => {
         </div>
 
         {/* ── Artifact Preview panel (charts / generated documents) ── */}
+        {previewOpen && selectedAgent && !previewFullscreen && (
+          <PreviewResizer
+            splitRef={splitRef}
+            sideCollapsed={sideCollapsed}
+            onSideCollapsedChange={setSideCollapsed}
+          />
+        )}
         {previewOpen && selectedAgent && (
           <PreviewPanel threadId={activeThreadId} />
         )}

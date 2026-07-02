@@ -203,7 +203,10 @@ export const SessionList = ({
           <IconPlus className="size-3.5" />
         </Button>
       </div>
-      <div ref={scrollRef} className="flex-1 overflow-auto p-1.5 space-y-0.5">
+      <div
+        ref={scrollRef}
+        className="ea-scroll flex-1 overflow-auto p-1.5 space-y-0.5"
+      >
         {!sessionsLoaded ? (
           <div className="space-y-1.5 p-1">
             {Array.from({ length: 5 }).map((_, i) => (

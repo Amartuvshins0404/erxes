@@ -176,7 +176,7 @@ const SidebarFileList = ({
           Files{artifacts.length ? ` · ${artifacts.length}` : ''}
         </p>
       </div>
-      <div className="min-h-0 flex-1 overflow-auto p-3">
+      <div className="ea-scroll min-h-0 flex-1 overflow-auto p-3">
         <GroupedFiles threadId={threadId} activeId={activeId} />
       </div>
     </>
@@ -217,7 +217,7 @@ const FileListView = ({
           <IconX className="size-4" />
         </Button>
       </div>
-      <div className="min-h-0 flex-1 overflow-auto p-3">
+      <div className="ea-scroll min-h-0 flex-1 overflow-auto p-3">
         {artifacts.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-muted-foreground">
             <IconFile className="size-8 opacity-40" />

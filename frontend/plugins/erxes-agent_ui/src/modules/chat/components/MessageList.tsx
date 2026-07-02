@@ -52,7 +52,11 @@ export const MessageList = ({
   const lastMsg = visible[visible.length - 1];
 
   return (
-    <div ref={boxRef} onScroll={onScroll} className="flex-1 overflow-auto p-4">
+    <div
+      ref={boxRef}
+      onScroll={onScroll}
+      className="ea-scroll flex-1 overflow-auto p-4"
+    >
       <div className="max-w-3xl mx-auto w-full space-y-6">
         {messagesLoading ? (
           <div className="p-2 space-y-3">

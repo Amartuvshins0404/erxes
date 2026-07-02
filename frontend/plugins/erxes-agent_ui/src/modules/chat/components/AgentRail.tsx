@@ -117,7 +117,7 @@ export const AgentRail = ({
           Agents
         </p>
       </div>
-      <div className="flex-1 overflow-auto">
+      <div className="ea-scroll flex-1 overflow-auto">
         {loading ? (
           <div className="p-3 space-y-1.5">
             {Array.from({ length: 4 }).map((_, i) => (

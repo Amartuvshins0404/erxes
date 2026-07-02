@@ -34,7 +34,7 @@ interface Disposable {
 const SlideImageDeck = ({ artifact }: { artifact: DocumentArtifact }) => {
   const urls = slideUrls(artifact);
   return (
-    <div className="ea-pptx-stage h-full w-full overflow-auto">
+    <div className="ea-scroll ea-pptx-stage h-full w-full overflow-auto">
       <div className="ea-pptx-deck">
         {urls.map((url, i) => (
           <img
@@ -151,7 +151,7 @@ const DocumentRenderer = ({ artifact }: { artifact: DocumentArtifact }) => {
         // renderer draws into the inner "deck" (width-capped + centered); the
         // card styling and the no-clip width rule live in chat.css. We must NOT
         // put max-width on the slides themselves or their layout collapses.
-        <div className="ea-pptx-stage h-full w-full overflow-auto">
+        <div className="ea-scroll ea-pptx-stage h-full w-full overflow-auto">
           <div ref={containerRef} className="ea-pptx-deck" />
         </div>
       )}
@@ -160,8 +160,8 @@ const DocumentRenderer = ({ artifact }: { artifact: DocumentArtifact }) => {
           ref={containerRef}
           className={
             artifact.format === 'docx'
-              ? 'h-full w-full overflow-auto px-6 py-5 text-sm leading-relaxed [&_*]:max-w-full'
-              : 'h-full w-full overflow-auto'
+              ? 'ea-scroll h-full w-full overflow-auto px-6 py-5 text-sm leading-relaxed [&_*]:max-w-full'
+              : 'ea-scroll h-full w-full overflow-auto'
           }
         />
       )}

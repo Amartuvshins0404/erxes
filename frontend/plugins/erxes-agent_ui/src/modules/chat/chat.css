@@ -901,10 +901,140 @@ a.ea-readchip:hover {
   .ea-preview-dock {
     position: static;
     z-index: auto;
-    width: 42%;
-    min-width: 360px;
-    max-width: 680px;
+    /* Width is user-adjustable via the split handle (PreviewResizer sets the
+       variable on the split container in px); 42% is the untouched default. */
+    width: var(--ea-preview-w, 42%);
+    min-width: 320px;
+    max-width: 75%;
   }
+}
+
+/* ── Chat ↔ Preview split handle ──────────────────────────────────────────
+   The draggable divider between the chat column and the docked Preview panel
+   (PreviewResizer). Invisible at rest — the dock's own 1px border is the only
+   chrome; on hover / drag / keyboard focus a small centred grab pill fades in
+   (the macOS split-view affordance) and the hairline tints to the brand
+   colour. Desktop-docked layout only: below the lg breakpoint the panel is a
+   full-area overlay, so the handle stays display:none. Lives here, not as
+   Tailwind utilities, for the same production-purge reason as .ea-preview-dock. */
+.ea-split-handle {
+  display: none;
+}
+@media (min-width: 1024px) {
+  .ea-split-handle {
+    position: relative;
+    z-index: 40;
+    display: block;
+    flex: none;
+    width: 9px;
+    /* Zero layout width: paints 4px over the chat edge and 5px over the dock
+       edge so the grab area straddles the dock's border-left exactly. */
+    margin-left: -4px;
+    margin-right: -5px;
+    cursor: col-resize;
+    touch-action: none;
+    outline: none;
+  }
+  /* The hairline — sits precisely over the dock's 1px border. */
+  .ea-split-handle::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 4px;
+    width: 1px;
+    background: transparent;
+    transition: background-color 0.15s ease;
+  }
+  /* The grab pill — always visible so the affordance is discoverable.
+     Hovering anywhere along the divider (or focusing it) shifts it to the
+     "ready to move" state: taller and brand-tinted. Dragging goes full
+     primary. */
+  .ea-split-handle::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 4px;
+    height: 36px;
+    border-radius: 9999px;
+    transform: translate(-50%, -50%);
+    background: color-mix(in oklch, var(--foreground) 20%, transparent);
+    transition: height 0.18s ease, background-color 0.18s ease;
+  }
+  .ea-split-handle:hover::after,
+  .ea-split-handle:focus-visible::after {
+    height: 56px;
+    background: color-mix(in oklch, var(--primary) 75%, transparent);
+  }
+  .ea-split-handle:hover::before,
+  .ea-split-handle:focus-visible::before,
+  .ea-split-handle.is-dragging::before {
+    background: color-mix(in oklch, var(--primary) 45%, transparent);
+  }
+  .ea-split-handle.is-dragging::after {
+    height: 56px;
+    background: var(--primary);
+  }
+}
+
+/* ── Collapsible side panel (agents ↔ sessions column) ────────────────────
+   Auto-collapses when the Preview panel is dragged wide enough to squeeze
+   the chat column (PreviewResizer drives .is-collapsed with hysteresis so
+   the boundary can't flap during a drag) and restores when space returns or
+   the preview closes. The inner slide layers keep their natural width so
+   the column clips away cleanly instead of reflowing mid-animation. */
+.ea-side-panel {
+  width: 15rem;
+  transition: width 0.2s ease;
+}
+.ea-side-panel > div {
+  right: auto;
+  width: 15rem;
+}
+.ea-side-panel.is-collapsed {
+  width: 0;
+  border-right-width: 0;
+}
+
+/* ── Ghost scrollbar ──────────────────────────────────────────────────────
+   macOS-style overlay scrollbar for the chat + panel scroll regions: no
+   track, no buttons — just a slim rounded pill that fades in while the
+   pointer is over the region or while it's actively scrolling (the chat's
+   scroll handler toggles `.is-scrolling`), and vanishes at rest. Modern
+   engines take the standard scrollbar-width/color pair; the ::-webkit-*
+   rules cover older Safari. Token-driven so both themes work and the rules
+   survive the production CSS purge (same rule as .ea-user-bubble above). */
+.ea-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+.ea-scroll:hover,
+.ea-scroll.is-scrolling {
+  scrollbar-color: color-mix(in oklch, var(--foreground) 25%, transparent)
+    transparent;
+}
+.ea-scroll::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+  background: transparent;
+}
+.ea-scroll::-webkit-scrollbar-track,
+.ea-scroll::-webkit-scrollbar-corner {
+  background: transparent;
+}
+.ea-scroll::-webkit-scrollbar-thumb {
+  background-color: transparent;
+  background-clip: padding-box;
+  border: 3px solid transparent;
+  border-radius: 9999px;
+}
+.ea-scroll:hover::-webkit-scrollbar-thumb,
+.ea-scroll.is-scrolling::-webkit-scrollbar-thumb {
+  background-color: color-mix(in oklch, var(--foreground) 25%, transparent);
+}
+.ea-scroll::-webkit-scrollbar-thumb:active {
+  background-color: color-mix(in oklch, var(--foreground) 40%, transparent);
 }
 
 /* The fullscreen file-list sidebar — hidden on narrow screens, shown from the

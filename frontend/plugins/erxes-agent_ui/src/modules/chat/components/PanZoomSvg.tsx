@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { IconMinus, IconPlus, IconMaximize } from '@tabler/icons-react';
+import DOMPurify from 'dompurify';
 
 interface View { scale: number; x: number; y: number }
 interface PanZoomSvgProps {
@@ -98,12 +99,18 @@ export const PanZoomSvg = ({ svgHtml, height = 340, className }: PanZoomSvgProps
   const hasInteracted  = useRef(false);
   const [scaleLabel, setScaleLabel] = useState('100%');
 
-  // Inject hover CSS into the SVG HTML once per svgHtml change.
+  // Sanitize the untrusted SVG (Mermaid/artifact output) to strip <script>,
+  // event handlers and javascript: URLs, then inject hover CSS. The svg/html
+  // profiles keep legitimate diagram content: paths, text, styles, gradients,
+  // filters, viewBox and foreignObject labels.
   const processedSvg = useMemo(() => {
     if (!svgHtml) return '';
-    return svgHtml.includes('id="panzoom-hover"')
-      ? svgHtml
-      : svgHtml.replace('</svg>', `${NODE_HOVER_CSS}</svg>`);
+    const clean = DOMPurify.sanitize(svgHtml, {
+      USE_PROFILES: { svg: true, svgFilters: true, html: true },
+    });
+    return clean.includes('id="panzoom-hover"')
+      ? clean
+      : clean.replace('</svg>', `${NODE_HOVER_CSS}</svg>`);
   }, [svgHtml]);
 
   // ── Apply transform without triggering a re-render ────────────────────────

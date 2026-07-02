@@ -242,6 +242,10 @@ function cartesian(spec: ChartSpec, c: ChartThemeColors, containerWidth = 360, h
 
         return {
           name: rawLabel,
+          // Stable id so a filtered update (setOption with replaceMerge:
+          // ['series']) matches surviving bars by identity — they slide to
+          // their new category slot while dropped ones animate out.
+          id: `bar:${rawLabel}`,
           type: 'bar',
           silent: false,
           clip: false,
@@ -297,7 +301,9 @@ function cartesian(spec: ChartSpec, c: ChartThemeColors, containerWidth = 360, h
             name: s.label, id: s.key, type: 'line', smooth: true, data,
             lineStyle: { width: 2.5, color },
             itemStyle: { color, borderWidth: 2 },
-            symbol: 'circle', symbolSize: 7,
+            // Dense series drop the per-point dots (they merge into a rope of
+            // markers); hovering still reveals the point via the axis pointer.
+            symbol: 'circle', symbolSize: 7, showSymbol: numPoints <= 20,
             emphasis: { scale: 1.4, itemStyle: { shadowBlur: 10, shadowColor: fade(color, 0.5) } },
             ...(isArea ? { areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
               colorStops: [{ offset: 0, color: fade(color, 0.28) }, { offset: 1, color: fade(color, 0.02) }] } } } : {}),
@@ -334,6 +340,7 @@ function cartesian(spec: ChartSpec, c: ChartThemeColors, containerWidth = 360, h
   const ghosts = (singleBarSeries && hints?.hiddenLabels.size)
     ? [...hints.hiddenLabels].map((lbl) => ({
         name: lbl,
+        id: `ghost:${lbl}`,
         type: 'bar',
         data: new Array(rawLabels.length).fill(null),
         barGap: '-100%',
@@ -384,7 +391,10 @@ function cartesian(spec: ChartSpec, c: ChartThemeColors, containerWidth = 360, h
           axisLabel: {
             ...axisLabel(c),
             rotate: 0,
-            interval: 0,
+            // Label every category only while they comfortably fit; past that
+            // let ECharts thin them out (a 41-point year axis must not print
+            // all 41 numbers shoulder to shoulder).
+            interval: numPoints > 12 ? ('auto' as const) : 0,
             hideOverlap: true,
             overflow: 'truncate',
             width: vLabelWidth,
@@ -438,6 +448,7 @@ function pie(spec: ChartSpec, c: ChartThemeColors): EChartsOption {
     },
     series: [{
       type: 'pie',
+      id: 'pie',
       name: spec.series[0]?.label ?? spec.title,
       radius: isDonut ? ['40%', '68%'] : '62%',
       center: ['50%', '52%'],
@@ -487,7 +498,7 @@ function radar(spec: ChartSpec, c: ChartThemeColors): EChartsOption {
       }},
       name: { textStyle: { color: c.mutedForeground, fontFamily: CHART_FONT } },
     },
-    series: [{ type: 'radar', data: series }],
+    series: [{ type: 'radar', id: 'radar', data: series }],
   };
 }
 
@@ -502,6 +513,7 @@ function scatter(spec: ChartSpec, c: ChartThemeColors): EChartsOption {
     return [
       {
         name: s.label,
+        id: `${s.key}:pts`,
         type: 'scatter',
         symbolSize: 9,
         itemStyle: { color, opacity: 0.85 },
@@ -511,6 +523,7 @@ function scatter(spec: ChartSpec, c: ChartThemeColors): EChartsOption {
       },
       {
         name: s.label,
+        id: `${s.key}:line`,
         type: 'line',
         data,
         showSymbol: false,
@@ -535,6 +548,20 @@ function scatter(spec: ChartSpec, c: ChartThemeColors): EChartsOption {
     tooltip: { trigger: 'item', confine: true, ...tooltipStyle(c) },
     xAxis: { type: 'value', name: spec.xAxisLabel, nameLocation: 'middle', nameGap: 32, axisLine: axisLine(c), splitLine: splitLine(c), ...sharedAxis },
     yAxis: { type: 'value', name: spec.yAxisLabel, nameLocation: 'middle', nameRotate: 90, nameGap: 56, axisLine: { show: false }, splitLine: splitLine(c), ...sharedAxis },
+    // Continuous x-axis: the external range slider zooms via
+    // dispatchAction({type:'dataZoom'}) instead of slicing rows, riding
+    // ECharts' native zoom animation. All direct interactions are off — the
+    // component exists purely as the dispatch target.
+    dataZoom: [{
+      type: 'inside',
+      id: 'x-window',
+      xAxisIndex: 0,
+      filterMode: 'none',
+      zoomOnMouseWheel: false,
+      moveOnMouseMove: false,
+      moveOnMouseWheel: false,
+      zoomLock: false,
+    }],
     series,
   };
 }

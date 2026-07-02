@@ -3,10 +3,13 @@ import { IconBolt, IconPencil, IconRefresh, IconRepeat } from '@tabler/icons-rea
 import { Tooltip } from 'erxes-ui';
 import { AgentUIMessage, ChatAttachment } from '~/modules/chat/types';
 import { asToolPart, messageText } from '~/modules/chat/lib/uiParts';
-import { asArtifactPart, type Artifact } from '~/modules/chat/lib/artifacts';
+import { artifactOutcomes, type Artifact } from '~/modules/chat/lib/artifacts';
 import { AgentAvatar } from '~/modules/chat/components/Avatars';
 import { AgentTrace } from '~/modules/chat/components/AgentTrace';
-import { ArtifactCard } from '~/modules/chat/components/ArtifactCard';
+import {
+  ArtifactCard,
+  ArtifactFailureCard,
+} from '~/modules/chat/components/ArtifactCard';
 import {
   ChatMarkdown,
   StreamingMarkdown,
@@ -139,12 +142,8 @@ export const MessageBubble = memo(function MessageBubble({
   // Preview-panel opener), not buried in the collapsed thinking section. Live
   // turns read them off the tool parts; after a reload (tool parts gone) we fall
   // back to the persisted store artifacts for this message.
-  const liveArtifacts: Artifact[] = msg.parts.reduce<Artifact[]>((acc, part) => {
-    const tool = asToolPart(part);
-    const artifact = tool ? asArtifactPart(tool) : null;
-    if (artifact) acc.push(artifact);
-    return acc;
-  }, []);
+  const { artifacts: liveArtifacts, failures: failedArtifactTools } =
+    artifactOutcomes(msg.parts);
   const artifacts = liveArtifacts.length
     ? liveArtifacts
     : (storeArtifacts ?? []);
@@ -208,6 +207,20 @@ export const MessageBubble = memo(function MessageBubble({
                 key={artifact.id || `artifact-${i}`}
                 artifact={artifact}
                 live={streaming}
+              />
+            ))}
+          </div>
+        )}
+        {failedArtifactTools.length > 0 && (
+          <div className="mt-1">
+            {failedArtifactTools.map((tool, i) => (
+              <ArtifactFailureCard
+                key={tool.toolCallId || `failed-${i}`}
+                toolName={tool.toolName}
+                errorText={
+                  tool.errorText ||
+                  (tool.output as { message?: string } | undefined)?.message
+                }
               />
             ))}
           </div>

@@ -1,6 +1,6 @@
-import { memo, useEffect, useRef } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import {
-  IconChartBar,
+  IconAlertTriangle,
   IconDownload,
   IconHierarchy,
   IconLayoutSidebarRightExpand,
@@ -8,7 +8,10 @@ import {
   IconPhoto,
 } from '@tabler/icons-react';
 import { Button } from 'erxes-ui';
-import { EChart } from '~/modules/chat/charts';
+import {
+  ChartArtifactView,
+  ChartExpandDialog,
+} from '~/modules/chat/components/ChartArtifactView';
 import {
   artifactIcon,
   type Artifact,
@@ -38,26 +41,51 @@ function usePresentIfLive(artifact: Artifact, live?: boolean) {
   }, [live, artifact.id, presentIfNew]);
 }
 
-// ── Chart card (inline EChart + open in preview) ──────────────────────────────
+// ── Inline chart (borderless, flows in the message column) ────────────────────
+// No card chrome — a large left-aligned heading with quiet actions on its
+// right, then the interactive chart + totals + filter sliders directly in the
+// chat flow, width-constrained by the message column itself.
 const ChartPreview = ({ artifact, live }: { artifact: ChartArtifact; live?: boolean }) => {
   const openArtifact = previewStore((s) => s.openArtifact);
+  const [expanded, setExpanded] = useState(false);
   usePresentIfLive(artifact, live);
 
   return (
-    <div className="ea-pop my-2 overflow-hidden rounded-xl border border-border/70 bg-background">
-      {/* Card header */}
-      <div className="flex items-center gap-2 px-3 py-2 bg-muted/30 border-b border-border/50">
-        <IconChartBar className="size-4 text-primary shrink-0" />
-        <p className="flex-1 min-w-0 truncate text-sm font-medium">{artifact.title}</p>
-        <Button variant="ghost" size="sm" onClick={() => openArtifact(artifact)}>
-          <IconLayoutSidebarRightExpand className="size-3.5" />
-          Open
-        </Button>
+    <div className="ea-pop my-4">
+      {/* Heading row */}
+      <div className="flex items-start gap-2">
+        <div className="min-w-0 flex-1">
+          <h3 className="text-2xl font-medium tracking-tight">{artifact.title}</h3>
+          {artifact.spec.description && (
+            <p className="mt-1 text-sm text-muted-foreground">
+              {artifact.spec.description}
+            </p>
+          )}
+        </div>
+        <div className="flex shrink-0 items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => openArtifact(artifact)}
+            aria-label="Open in side panel"
+            title="Open in side panel"
+          >
+            <IconLayoutSidebarRightExpand className="size-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setExpanded(true)}
+            aria-label="Expand chart"
+            title="Expand"
+          >
+            <IconMaximize className="size-4" />
+          </Button>
+        </div>
       </div>
-      {/* Inline chart */}
-      <div className="px-2 py-1" style={{ height: 380 }}>
-        <EChart spec={artifact.spec} height="100%" />
-      </div>
+      {/* Chart + totals + local filter sliders */}
+      <ChartArtifactView artifact={artifact} chartHeight={400} className="mt-2" />
+      <ChartExpandDialog artifact={artifact} open={expanded} onOpenChange={setExpanded} />
     </div>
   );
 };
@@ -149,6 +177,40 @@ const ImageCard = ({ artifact, live }: { artifact: ImageArtifact; live?: boolean
           className="max-w-full object-contain"
           style={{ maxHeight: '16rem' }}
         />
+      </div>
+    </div>
+  );
+};
+
+// ── Failed artifact tool (visible fallback) ───────────────────────────────────
+// Artifact tools are hidden from the run trace because they normally surface as
+// a card — so when one errors (or its output yields no valid artifact) the turn
+// would show NOTHING. This card makes that failure visible where the chart or
+// document would have appeared.
+const FAILURE_NOUNS: Record<string, string> = {
+  renderchart: 'chart',
+  renderdiagram: 'diagram',
+};
+
+export const ArtifactFailureCard = ({
+  toolName,
+  errorText,
+}: {
+  toolName: string;
+  errorText?: string;
+}) => {
+  const noun =
+    FAILURE_NOUNS[toolName.toLowerCase().replace(/[-_\s]/g, '')] ?? 'document';
+  return (
+    <div className="ea-pop my-2 flex items-center gap-3 rounded-xl border border-border/70 bg-background/60 px-3 py-2.5">
+      <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-destructive/10 text-destructive">
+        <IconAlertTriangle className="size-5" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-medium">{`The ${noun} could not be rendered`}</p>
+        <p className="truncate text-xs text-muted-foreground" title={errorText}>
+          {errorText || 'The tool call failed — ask the agent to try again.'}
+        </p>
       </div>
     </div>
   );

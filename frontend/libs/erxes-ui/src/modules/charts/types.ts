@@ -44,9 +44,30 @@ interface ChartSpecBase {
 /** A sub-chart shown when the user drills into a slice or bar. */
 export type DrilldownSpec = ChartSpecBase;
 
+// Interactive controls the AI opts into per chart — rendered under the chart
+// by consumers that support them (the agent chat) and ignored elsewhere
+// (e.g. document rendering). Mirrors chartControlSchema on the backend.
+export const CHART_CONTROL_TYPES = ['range', 'slider', 'toggle', 'param'] as const;
+export type ChartControlType = (typeof CHART_CONTROL_TYPES)[number];
+
+export interface ChartControl {
+  type: ChartControlType;
+  field: string;
+  label?: string;
+  min?: number;
+  max?: number;
+  step?: number;
+  default?: number;
+}
+
 export interface ChartSpec extends ChartSpecBase {
   /** Label → sub-chart. Clicking a matching slice/bar navigates into that view. */
   drilldowns?: Record<string, DrilldownSpec>;
+  /** Controls to mount under the chart; absent/empty → chart renders alone. */
+  controls?: ChartControl[];
+  /** Series key → arithmetic expression re-evaluated per row when a `param`
+      control moves (variables: param fields, x = row index, label as number). */
+  formulas?: Record<string, string>;
 }
 
 /** Narrow an unknown value (e.g. a tool result spec) to a ChartSpec. */

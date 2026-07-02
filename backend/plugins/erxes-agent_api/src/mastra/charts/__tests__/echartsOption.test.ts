@@ -33,7 +33,7 @@ const baseSpec = (overrides: Partial<ChartSpec> = {}): ChartSpec => ({
 });
 
 describe('sanitizeChartSpec', () => {
-  it('drops series with unsafe keys and coerces values to finite numbers', () => {
+  it('slugifies unsafe keys (keeping the series) and coerces values to finite numbers', () => {
     const spec = sanitizeChartSpec({
       chartType: 'bar',
       title: 'T',
@@ -44,9 +44,9 @@ describe('sanitizeChartSpec', () => {
       data: [{ label: 'A', ok: '12', '1bad': 5 }],
     } as ChartSpec);
 
-    expect(spec.series).toHaveLength(1);
-    expect(spec.series[0].key).toBe('ok');
+    expect(spec.series.map((s) => s.key)).toEqual(['ok', 'bad']);
     expect(spec.data[0].ok).toBe(12);
+    expect(spec.data[0].bad).toBe(5);
     expect('1bad' in spec.data[0]).toBe(false);
   });
 
@@ -65,13 +65,23 @@ describe('sanitizeChartSpec', () => {
     expect(spec.series[1].color).toBeUndefined();
   });
 
-  it('throws when no usable series remain', () => {
+  it('throws only when no series survive at all (blank keys)', () => {
+    // A merely unsafe key is rescued by the slug — the chart still renders.
+    const rescued = sanitizeChartSpec({
+      chartType: 'bar',
+      title: 'T',
+      series: [{ key: '9nope', label: 'X' }],
+      data: [{ label: 'a', '9nope': 1 }],
+    } as ChartSpec);
+    expect(rescued.series[0].key).toBe('nope');
+    expect(rescued.data[0].nope).toBe(1);
+
     expect(() =>
       sanitizeChartSpec({
         chartType: 'bar',
         title: 'T',
-        series: [{ key: '9nope', label: 'X' }],
-        data: [{ label: 'a', '9nope': 1 }],
+        series: [{ key: '   ', label: 'X' }],
+        data: [{ label: 'a' }],
       } as ChartSpec),
     ).toThrow();
   });

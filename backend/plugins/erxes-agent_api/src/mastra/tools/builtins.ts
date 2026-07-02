@@ -285,7 +285,11 @@ export const renderChartTool = createTool({
     'Use the optional `drilldowns` field to add a clickable detail view: provide ' +
     'a map of data-row label → sub-ChartSpec. For example, a pie chart of employees ' +
     'per department can include a drilldown for each department showing the team ' +
-    'breakdown — clicking the slice opens the detail chart automatically.',
+    'breakdown — clicking the slice opens the detail chart automatically. ' +
+    'The optional `controls` array mounts local range/threshold/toggle/param ' +
+    'controls under the chart (applied client-side — they never re-invoke you), ' +
+    'and `formulas` + param controls make series recompute live in the browser, ' +
+    'so parameter-driven what-if charts ARE supported.',
   inputSchema: chartSpecSchema,
   outputSchema: z.object({ artifact: chartArtifactSchema }),
   execute: async (input) => {

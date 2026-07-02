@@ -41,6 +41,9 @@ export interface IMushopMembershipModel
     _id: string,
     status: string,
   ): Promise<IMushopMembershipDocument | null>;
+  expireIfStale(
+    _id: string,
+  ): Promise<IMushopMembershipDocument | null>;
   expireStale(): Promise<void>;
 }
 
@@ -49,15 +52,6 @@ const addMonths = (date: Date, months: number): Date => {
   result.setMonth(result.getMonth() + months);
   return result;
 };
-
-const MS_PER_DAY = 1000 * 60 * 60 * 24;
-
-const addDays = (date: Date, days: number): Date =>
-  new Date(date.getTime() + days * MS_PER_DAY);
-
-// whole days remaining until `endDate` from now (min 1 so a near-expiry pause keeps at least a day)
-const daysUntil = (endDate: Date): number =>
-  Math.max(1, Math.ceil((endDate.getTime() - Date.now()) / MS_PER_DAY));
 
 export const loadMushopMembershipClass = (
   models: IModels,
@@ -267,6 +261,29 @@ export const loadMushopMembershipClass = (
       }
 
       return updated;
+    }
+
+    public static async expireIfStale(_id: string) {
+      const membership = await models.Membership.findOne({ _id }).lean();
+      
+      if (!membership) return null;
+
+      if (
+        membership.status === MEMBERSHIP_STATUS.ACTIVE &&
+        membership.endDate < new Date()
+      ) {
+        await models.Membership.updateOne(
+          { _id: membership._id },
+          { $set: { status: MEMBERSHIP_STATUS.EXPIRED } },
+        );
+        const plan = membership.planId
+          ? await models.MembershipPlan.findOne({ _id: membership.planId }).lean()
+          : null;
+        createActivityLog(buildMembershipExpiredLog(membership, plan?.name || 'Unknown'));
+        return { ...membership, status: MEMBERSHIP_STATUS.EXPIRED };
+      }
+
+      return membership;
     }
 
     public static async expireStale() {

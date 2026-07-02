@@ -135,220 +135,13 @@ export function compileDefinition(
 
   // createWorkflow/createStep come thinly typed from mastraChain — the untyped
   // CJS require() (and the cast it forces) is confined there, not threaded
-  // through every builder below.
+  // through the module-level builders below.
 
-  /** Bridges run state into the ref-resolution scope (plus static bindings). */
-  const mkScope = (state: WorkflowState): RefScope => ({
-    trigger: state.trigger,
-    steps: state.steps,
-    bindings: definition.bindings,
-  });
-
-  /** Compiles one effect step (operation / agent / end) into a Mastra step. */
-  const buildLeafStep = (step: WorkflowStep): unknown => {
-    switch (step.type) {
-      case 'operation':
-        return createStep({
-          id: step.id,
-          inputSchema: stateSchema,
-          outputSchema: stateSchema,
-          execute: async ({ inputData }: { inputData: WorkflowState }) => {
-            const state = inputData;
-            const args = resolveValue(
-              step.args || {},
-              mkScope(state),
-            ) as Record<string, unknown>;
-            const output = await deps.executeOperation(step.operation, args);
-            return withOutput(state, step.id, output);
-          },
-        });
-
-      case 'agent':
-        return createStep({
-          id: step.id,
-          inputSchema: stateSchema,
-          outputSchema: stateSchema,
-          execute: async ({ inputData }: { inputData: WorkflowState }) => {
-            const state = inputData;
-            const prompt = resolveValue(step.prompt, mkScope(state));
-            const raw = await deps.runJudgment({
-              agentBindingId: definition.bindings[step.agentRef].id,
-              prompt: String(prompt),
-              outputSpec: step.outputSchema,
-            });
-            // The declared output schema is a contract, not a hint — judgment
-            // either conforms or the step fails (and Mastra's retryConfig may
-            // re-attempt it).
-            const parsed = buildOutputZod(step.outputSchema).safeParse(raw);
-            if (!parsed.success) {
-              throw new ExpectedError(
-                `agent step "${
-                  step.id
-                }" returned output not matching its schema: ${parsed.error.issues
-                  .map((issue) => `${issue.path.join('.')}: ${issue.message}`)
-                  .join('; ')}`,
-              );
-            }
-            return withOutput(state, step.id, parsed.data);
-          },
-        });
-
-      case 'end':
-        return createStep({
-          id: step.id,
-          inputSchema: stateSchema,
-          outputSchema: stateSchema,
-          execute: ({ inputData }: { inputData: WorkflowState }) => {
-            const state = inputData;
-            const output =
-              step.output === undefined
-                ? undefined
-                : resolveValue(step.output, mkScope(state));
-            return Promise.resolve(withOutput(state, step.id, output));
-          },
-        });
-
-      default:
-        // validateDefinition guarantees we never get here.
-        throw new Error(`step type "${step.type}" is not compilable`);
-    }
-  };
-
-  /**
-   * True when this arm's condition holds AND no earlier arm's does — turning
-   * Mastra's run-every-match .branch into the DSL's if/else-if semantics.
-   */
-  const firstMatchCond =
-    (asts: ExprNode[], index: number) =>
-    ({ inputData }: { inputData: WorkflowState }) => {
-      const scope = mkScope(inputData);
-      if (!evalExpr(asts[index], scope)) return false;
-      for (let j = 0; j < index; j++) {
-        if (evalExpr(asts[j], scope)) return false;
-      }
-      return true;
-    };
-
-  /** Compiles a step list into a committed nested workflow over plain state. */
-  const buildNested = (id: string, steps: WorkflowStep[]): CompiledWorkflow =>
-    buildChain(
-      createWorkflow({
-        id,
-        inputSchema: stateSchema,
-        outputSchema: stateSchema,
-      }),
-      steps,
-    ).commit() as CompiledWorkflow;
-
-  /** Compiles a branch step: first-match arms, an always-runs else, an unwrap. */
-  const compileBranch = (chain: WorkflowChain, step: BranchStep) => {
-    const asts: ExprNode[] = step.branches.map((arm) => parseExpr(arm.when));
-    const pairs: Array<[unknown, unknown]> = step.branches.map(
-      (arm, i): [unknown, unknown] => [
-        firstMatchCond(asts, i),
-        buildNested(`${key}_${step.id}_b${i}`, arm.steps),
-      ],
-    );
-
-    // An arm always runs: the declared else, or an identity passthrough — so
-    // the post-branch unwrap always finds exactly one state.
-    const elseId = `${key}_${step.id}_else`;
-    const elseTarget = step.else?.length
-      ? buildNested(elseId, step.else)
-      : createWorkflow({
-          id: elseId,
-          inputSchema: stateSchema,
-          outputSchema: stateSchema,
-        })
-          .then(
-            createStep({
-              id: `${elseId}_noop`,
-              inputSchema: stateSchema,
-              outputSchema: stateSchema,
-              execute: ({ inputData }: { inputData: WorkflowState }) =>
-                Promise.resolve(inputData),
-            }),
-          )
-          .commit();
-    pairs.push([
-      ({ inputData }: { inputData: WorkflowState }) => {
-        const scope = mkScope(inputData);
-        return asts.every((ast) => !evalExpr(ast, scope));
-      },
-      elseTarget,
-    ]);
-
-    // Branch output is keyed by arm id with exactly one entry defined —
-    // unwrap it back into plain state, recording which arm ran.
-    return chain.branch(pairs).map(({ inputData }) => {
-      for (const [armId, value] of Object.entries(inputData || {})) {
-        if (isWorkflowState(value)) {
-          return Promise.resolve(
-            withOutput(value, step.id, { taken: armId }),
-          );
-        }
-      }
-      throw new Error(
-        `branch "${step.id}" produced no state — no arm executed`,
-      );
-    });
-  };
-
-  /** Compiles a parallel step: same-input fan-out plus a state-merging map. */
-  const compileParallel = (chain: WorkflowChain, step: ParallelStep) => {
-    const subs = step.steps.map((member) => buildLeafStep(member));
-    // Every fan-out member receives the same pre-parallel state; the merge
-    // recombines their step outputs (ids are globally unique, so no clashes).
-    return chain.parallel(subs).map(({ inputData }) => {
-      const states = unwrapContainerStates(inputData);
-      if (!states.length)
-        throw new Error(`parallel "${step.id}" produced no results`);
-      const merged: WorkflowState = {
-        trigger: states[0].trigger,
-        steps: Object.assign({}, ...states.map((state) => state?.steps || {})),
-      };
-      return Promise.resolve(
-        withOutput(merged, step.id, {
-          completed: step.steps.map((member) => member.id),
-        }),
-      );
-    });
-  };
-
-  /** Threads every top-level step onto the Mastra chain, container-aware. */
-  function buildChain(start: WorkflowChain, steps: WorkflowStep[]) {
-    let chain = start;
-    for (const step of steps) {
-      // validateDefinition rejects non-compiled types before we get here; the
-      // STEP_SUPPORT guard keeps the compiler's "what runs" in lockstep with
-      // the validator's "what's allowed" from the one source of truth.
-      if (!isCompiledStep(step.type)) {
-        // 'wait' is schema'd and emits a chain.sleep, but is 'planned' (no
-        // resume worker yet) — validation never lets a wait step reach here.
-        if (step.type === 'wait') {
-          chain = chain.sleep(step.duration);
-          continue;
-        }
-        throw new Error(
-          `step type "${step.type}" is not compilable (${
-            STEP_SUPPORT[step.type as keyof typeof STEP_SUPPORT] ?? 'unknown'
-          })`,
-        );
-      }
-      if (step.type === 'branch') {
-        chain = compileBranch(chain, step);
-        continue;
-      }
-      if (step.type === 'parallel') {
-        chain = compileParallel(chain, step);
-        continue;
-      }
-      chain = chain.then(buildLeafStep(step));
-    }
-    return chain;
-  }
+  // The shared state every builder used to close over, now passed explicitly.
+  const ctx: CompileCtx = { key, definition, deps };
 
   return buildChain(
+    ctx,
     createWorkflow({
       id: key,
       inputSchema: stateSchema,
@@ -356,6 +149,244 @@ export function compileDefinition(
     }),
     definition.steps,
   ).commit() as CompiledWorkflow;
+}
+
+/**
+ * The compile-time context the builders share, passed explicitly instead of
+ * captured by closure: the workflow key (for deriving nested container ids),
+ * the definition (bindings, steps) and the injected effect handlers.
+ */
+interface CompileCtx {
+  key: string;
+  definition: WorkflowDefinition;
+  deps: CompiledDeps;
+}
+
+/** Bridges run state into the ref-resolution scope (plus static bindings). */
+function mkScope(ctx: CompileCtx, state: WorkflowState): RefScope {
+  return {
+    trigger: state.trigger,
+    steps: state.steps,
+    bindings: ctx.definition.bindings,
+  };
+}
+
+/** Compiles one effect step (operation / agent / end) into a Mastra step. */
+function buildLeafStep(ctx: CompileCtx, step: WorkflowStep): unknown {
+  switch (step.type) {
+    case 'operation':
+      return createStep({
+        id: step.id,
+        inputSchema: stateSchema,
+        outputSchema: stateSchema,
+        execute: async ({ inputData }: { inputData: WorkflowState }) => {
+          const state = inputData;
+          const args = resolveValue(
+            step.args || {},
+            mkScope(ctx, state),
+          ) as Record<string, unknown>;
+          const output = await ctx.deps.executeOperation(step.operation, args);
+          return withOutput(state, step.id, output);
+        },
+      });
+
+    case 'agent':
+      return createStep({
+        id: step.id,
+        inputSchema: stateSchema,
+        outputSchema: stateSchema,
+        execute: async ({ inputData }: { inputData: WorkflowState }) => {
+          const state = inputData;
+          const prompt = resolveValue(step.prompt, mkScope(ctx, state));
+          const raw = await ctx.deps.runJudgment({
+            agentBindingId: ctx.definition.bindings[step.agentRef].id,
+            prompt: String(prompt),
+            outputSpec: step.outputSchema,
+          });
+          // The declared output schema is a contract, not a hint — judgment
+          // either conforms or the step fails (and Mastra's retryConfig may
+          // re-attempt it).
+          const parsed = buildOutputZod(step.outputSchema).safeParse(raw);
+          if (!parsed.success) {
+            throw new ExpectedError(
+              `agent step "${
+                step.id
+              }" returned output not matching its schema: ${parsed.error.issues
+                .map((issue) => `${issue.path.join('.')}: ${issue.message}`)
+                .join('; ')}`,
+            );
+          }
+          return withOutput(state, step.id, parsed.data);
+        },
+      });
+
+    case 'end':
+      return createStep({
+        id: step.id,
+        inputSchema: stateSchema,
+        outputSchema: stateSchema,
+        execute: ({ inputData }: { inputData: WorkflowState }) => {
+          const state = inputData;
+          const output =
+            step.output === undefined
+              ? undefined
+              : resolveValue(step.output, mkScope(ctx, state));
+          return Promise.resolve(withOutput(state, step.id, output));
+        },
+      });
+
+    default:
+      // validateDefinition guarantees we never get here.
+      throw new Error(`step type "${step.type}" is not compilable`);
+  }
+}
+
+/**
+ * True when this arm's condition holds AND no earlier arm's does — turning
+ * Mastra's run-every-match .branch into the DSL's if/else-if semantics.
+ */
+const firstMatchCond =
+  (ctx: CompileCtx, asts: ExprNode[], index: number) =>
+  ({ inputData }: { inputData: WorkflowState }) => {
+    const scope = mkScope(ctx, inputData);
+    if (!evalExpr(asts[index], scope)) return false;
+    for (let j = 0; j < index; j++) {
+      if (evalExpr(asts[j], scope)) return false;
+    }
+    return true;
+  };
+
+/** Compiles a step list into a committed nested workflow over plain state. */
+function buildNested(
+  ctx: CompileCtx,
+  id: string,
+  steps: WorkflowStep[],
+): CompiledWorkflow {
+  return buildChain(
+    ctx,
+    createWorkflow({
+      id,
+      inputSchema: stateSchema,
+      outputSchema: stateSchema,
+    }),
+    steps,
+  ).commit() as CompiledWorkflow;
+}
+
+/** Compiles a branch step: first-match arms, an always-runs else, an unwrap. */
+function compileBranch(
+  ctx: CompileCtx,
+  chain: WorkflowChain,
+  step: BranchStep,
+): WorkflowChain {
+  const asts: ExprNode[] = step.branches.map((arm) => parseExpr(arm.when));
+  const pairs: Array<[unknown, unknown]> = step.branches.map(
+    (arm, i): [unknown, unknown] => [
+      firstMatchCond(ctx, asts, i),
+      buildNested(ctx, `${ctx.key}_${step.id}_b${i}`, arm.steps),
+    ],
+  );
+
+  // An arm always runs: the declared else, or an identity passthrough — so
+  // the post-branch unwrap always finds exactly one state.
+  const elseId = `${ctx.key}_${step.id}_else`;
+  const elseTarget = step.else?.length
+    ? buildNested(ctx, elseId, step.else)
+    : createWorkflow({
+        id: elseId,
+        inputSchema: stateSchema,
+        outputSchema: stateSchema,
+      })
+        .then(
+          createStep({
+            id: `${elseId}_noop`,
+            inputSchema: stateSchema,
+            outputSchema: stateSchema,
+            execute: ({ inputData }: { inputData: WorkflowState }) =>
+              Promise.resolve(inputData),
+          }),
+        )
+        .commit();
+  pairs.push([
+    ({ inputData }: { inputData: WorkflowState }) => {
+      const scope = mkScope(ctx, inputData);
+      return asts.every((ast) => !evalExpr(ast, scope));
+    },
+    elseTarget,
+  ]);
+
+  // Branch output is keyed by arm id with exactly one entry defined —
+  // unwrap it back into plain state, recording which arm ran.
+  return chain.branch(pairs).map(({ inputData }) => {
+    for (const [armId, value] of Object.entries(inputData || {})) {
+      if (isWorkflowState(value)) {
+        return Promise.resolve(withOutput(value, step.id, { taken: armId }));
+      }
+    }
+    throw new Error(`branch "${step.id}" produced no state — no arm executed`);
+  });
+}
+
+/** Compiles a parallel step: same-input fan-out plus a state-merging map. */
+function compileParallel(
+  ctx: CompileCtx,
+  chain: WorkflowChain,
+  step: ParallelStep,
+): WorkflowChain {
+  const subs = step.steps.map((member) => buildLeafStep(ctx, member));
+  // Every fan-out member receives the same pre-parallel state; the merge
+  // recombines their step outputs (ids are globally unique, so no clashes).
+  return chain.parallel(subs).map(({ inputData }) => {
+    const states = unwrapContainerStates(inputData);
+    if (!states.length)
+      throw new Error(`parallel "${step.id}" produced no results`);
+    const merged: WorkflowState = {
+      trigger: states[0].trigger,
+      steps: Object.assign({}, ...states.map((state) => state?.steps || {})),
+    };
+    return Promise.resolve(
+      withOutput(merged, step.id, {
+        completed: step.steps.map((member) => member.id),
+      }),
+    );
+  });
+}
+
+/** Threads every top-level step onto the Mastra chain, container-aware. */
+function buildChain(
+  ctx: CompileCtx,
+  start: WorkflowChain,
+  steps: WorkflowStep[],
+): WorkflowChain {
+  let chain = start;
+  for (const step of steps) {
+    // validateDefinition rejects non-compiled types before we get here; the
+    // STEP_SUPPORT guard keeps the compiler's "what runs" in lockstep with
+    // the validator's "what's allowed" from the one source of truth.
+    if (!isCompiledStep(step.type)) {
+      // 'wait' is schema'd and emits a chain.sleep, but is 'planned' (no
+      // resume worker yet) — validation never lets a wait step reach here.
+      if (step.type === 'wait') {
+        chain = chain.sleep(step.duration);
+        continue;
+      }
+      throw new Error(
+        `step type "${step.type}" is not compilable (${
+          STEP_SUPPORT[step.type as keyof typeof STEP_SUPPORT] ?? 'unknown'
+        })`,
+      );
+    }
+    if (step.type === 'branch') {
+      chain = compileBranch(ctx, chain, step);
+      continue;
+    }
+    if (step.type === 'parallel') {
+      chain = compileParallel(ctx, chain, step);
+      continue;
+    }
+    chain = chain.then(buildLeafStep(ctx, step));
+  }
+  return chain;
 }
 
 /**

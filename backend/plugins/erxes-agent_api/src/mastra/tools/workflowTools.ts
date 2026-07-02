@@ -103,6 +103,19 @@ const fail = (e: unknown) => ({
   error: (e as { message?: string } | null | undefined)?.message || String(e),
 });
 
+/**
+ * The shared shape of every builder-tool result — the success flag plus the
+ * normalized error string produced by `fail`. Each tool extends it with its own
+ * fields via resultEnvelope(extra); the exact field set each schema exposes is
+ * unchanged, only the common `success`/`error` pair is factored out.
+ */
+const resultEnvelope = <T extends z.ZodRawShape>(extra: T) =>
+  z.object({
+    success: z.boolean(),
+    error: z.string().optional(),
+    ...extra,
+  });
+
 /** Models plus a lazy operation-registry loader, shared by the builder tools. */
 interface WorkflowContext {
   models: Awaited<ReturnType<typeof getModels>>;
@@ -227,7 +240,7 @@ export const workflowValidateTool = tool({
   description:
     'Validates a draft workflow definition against the schema AND the live erxes operation registry (operation existence, policy coverage, reference integrity, condition syntax). Returns structured errors to fix — iterate until ok=true before saving.',
   inputSchema: z.object({
-    definition: z.record(z.any()).describe('The full workflow definition JSON'),
+    definition: z.record(z.unknown()).describe('The full workflow definition JSON'),
   }),
   outputSchema: z.object({
     ok: z.boolean(),
@@ -254,25 +267,23 @@ export const workflowSimulateTool = tool({
   description:
     'Dry-runs a workflow definition WITHOUT touching erxes data or calling any LLM: operations return stubs, agent steps return your assumptions (or auto-samples). Returns the step-by-step trace — use it to show the user what the workflow will do, and to test branch routing by varying assumptions.',
   inputSchema: z.object({
-    definition: z.record(z.any()),
+    definition: z.record(z.unknown()),
     triggerPayload: z
-      .record(z.any())
+      .record(z.unknown())
       .default({})
       .describe('Simulated trigger payload'),
     assumptions: z
-      .record(z.record(z.any()))
+      .record(z.record(z.unknown()))
       .optional()
       .describe(
         'Assumed agent-step outputs keyed by step id, e.g. {"classify": {"intent": "order"}}. May be PARTIAL — unspecified required fields are auto-filled with samples.',
       ),
   }),
-  outputSchema: z.object({
-    success: z.boolean(),
+  outputSchema: resultEnvelope({
     status: z.string().optional(),
-    trace: z.array(z.any()).optional(),
-    output: z.any().optional(),
-    errors: z.any().optional(),
-    error: z.string().optional(),
+    trace: z.array(z.unknown()).optional(),
+    output: z.unknown().optional(),
+    errors: z.unknown().optional(),
   }),
   execute: async ({
     definition,
@@ -412,15 +423,13 @@ export const workflowSaveTool = tool({
   inputSchema: z.object({
     name: z.string().min(1),
     description: z.string().optional(),
-    definition: z.record(z.any()),
+    definition: z.record(z.unknown()),
     enable: z.boolean().default(false),
   }),
-  outputSchema: z.object({
-    success: z.boolean(),
+  outputSchema: resultEnvelope({
     workflowId: z.string().optional(),
     version: z.number().optional(),
-    errors: z.any().optional(),
-    error: z.string().optional(),
+    errors: z.unknown().optional(),
   }),
   execute: async ({
     name,
@@ -462,14 +471,12 @@ export const workflowUpdateTool = tool({
     workflowId: z.string(),
     name: z.string().optional(),
     description: z.string().optional(),
-    definition: z.record(z.any()).optional(),
+    definition: z.record(z.unknown()).optional(),
     enable: z.boolean().optional(),
   }),
-  outputSchema: z.object({
-    success: z.boolean(),
+  outputSchema: resultEnvelope({
     version: z.number().optional(),
-    errors: z.any().optional(),
-    error: z.string().optional(),
+    errors: z.unknown().optional(),
   }),
   execute: async ({
     workflowId,
@@ -517,7 +524,7 @@ export const workflowListTool = tool({
   description:
     "Lists the tenant's saved workflows (id, name, version, enabled, trigger type).",
   inputSchema: z.object({}),
-  outputSchema: z.object({ workflows: z.array(z.any()) }),
+  outputSchema: z.object({ workflows: z.array(z.unknown()) }),
   execute: async () => {
     requireTeamMember();
     const models = await getModels();
@@ -543,7 +550,7 @@ export const workflowRunsTool = tool({
     workflowId: z.string(),
     limit: z.number().int().min(1).max(20).default(5),
   }),
-  outputSchema: z.object({ runs: z.array(z.any()) }),
+  outputSchema: z.object({ runs: z.array(z.unknown()) }),
   execute: async ({
     workflowId,
     limit,
@@ -580,16 +587,14 @@ export const workflowRunNowTool = tool({
   inputSchema: z.object({
     workflowId: z.string(),
     payload: z
-      .record(z.any())
+      .record(z.unknown())
       .default({})
       .describe('Becomes {{trigger.payload.*}}'),
   }),
-  outputSchema: z.object({
-    success: z.boolean(),
+  outputSchema: resultEnvelope({
     status: z.string().optional(),
-    output: z.any().optional(),
-    stepsSummary: z.any().optional(),
-    error: z.string().optional(),
+    output: z.unknown().optional(),
+    stepsSummary: z.unknown().optional(),
   }),
   execute: async ({
     workflowId,

@@ -1,13 +1,5 @@
-import { IUserDocument } from 'erxes-api-shared/core-types';
-import { ExpectedError } from 'erxes-api-shared/utils';
 import { IContext } from '~/connectionResolvers';
-
-/** Resolve the logged-in user's _id, rejecting unauthenticated calls. */
-const requireUserId = (user: IUserDocument | null | undefined): string => {
-  const userId = user?._id;
-  if (!userId) throw new ExpectedError('Login required');
-  return userId;
-};
+import { requireUserId } from '@/_shared/auth';
 
 /** Queries over workflow definitions and their run history. */
 export const workflowQueries = {

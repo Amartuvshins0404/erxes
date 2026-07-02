@@ -1,4 +1,3 @@
-import { IUserDocument } from 'erxes-api-shared/core-types';
 import { ExpectedError } from 'erxes-api-shared/utils';
 import { IContext, IModels } from '~/connectionResolvers';
 import { validateDefinition } from '~/mastra/workflows/dsl';
@@ -7,13 +6,7 @@ import { runWorkflow } from '~/mastra/workflows/runtime';
 import { getOperationRegistry } from '~/mastra/tools/operationRegistry';
 import { runWithAuth } from '~/mastra/requestContext';
 import { IMastraWorkflow } from '@/workflow/@types/workflow';
-
-/** Resolve the logged-in user's _id, rejecting unauthenticated calls. */
-const requireUserId = (user: IUserDocument | null | undefined): string => {
-  const userId = user?._id;
-  if (!userId) throw new ExpectedError('Login required');
-  return userId;
-};
+import { requireUserId } from '@/_shared/auth';
 
 // Save-time validation runs with the LIVE operation registry, so a definition
 // referencing a nonexistent or out-of-policy operation never reaches Mongo.

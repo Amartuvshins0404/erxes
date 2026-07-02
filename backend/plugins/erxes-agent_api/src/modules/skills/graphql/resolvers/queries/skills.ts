@@ -1,4 +1,3 @@
-import { ExpectedError } from 'erxes-api-shared/utils';
 import { IContext } from '~/connectionResolvers';
 import {
   IMastraSkill,
@@ -13,11 +12,7 @@ import {
   listSkillVersions,
 } from '@/skills/service/skillsService';
 import { getSkillsStore } from '@/skills/store/skillsStore';
-
-const requireUser = (user: IContext['user']): string => {
-  if (!user?._id) throw new ExpectedError('Login required');
-  return user._id;
-};
+import { requireUserId } from '@/_shared/auth';
 
 export const skillQueries = {
   mastraSkills: async (
@@ -32,7 +27,7 @@ export const skillQueries = {
     { user, subdomain, checkPermission }: IContext,
   ) => {
     await checkPermission('skillsView');
-    return listSkills(subdomain, requireUser(user), params || {});
+    return listSkills(subdomain, requireUserId(user), params || {});
   },
 
   mastraSkill: async (
@@ -41,7 +36,7 @@ export const skillQueries = {
     { user, subdomain, checkPermission }: IContext,
   ) => {
     await checkPermission('skillsView');
-    return getSkill(subdomain, requireUser(user), _id);
+    return getSkill(subdomain, requireUserId(user), _id);
   },
 
   mastraSkillVersions: async (
@@ -50,7 +45,7 @@ export const skillQueries = {
     { user, subdomain, checkPermission }: IContext,
   ) => {
     await checkPermission('skillsView');
-    return listSkillVersions(subdomain, requireUser(user), skillId, page, perPage);
+    return listSkillVersions(subdomain, requireUserId(user), skillId, page, perPage);
   },
 
   mastraSkillVersion: async (
@@ -59,7 +54,7 @@ export const skillQueries = {
     { user, subdomain, checkPermission }: IContext,
   ) => {
     await checkPermission('skillsView');
-    return getSkillVersion(subdomain, requireUser(user), _id);
+    return getSkillVersion(subdomain, requireUserId(user), _id);
   },
 
   mastraInvocableSkills: async (
@@ -70,7 +65,7 @@ export const skillQueries = {
     await checkPermission('skillsView');
     const agent = await models.MastraAgent.findOne({ agentId });
     const globs = agent?.skills ?? [];
-    return listInvocableSkills(subdomain, requireUser(user), globs);
+    return listInvocableSkills(subdomain, requireUserId(user), globs);
   },
 };
 

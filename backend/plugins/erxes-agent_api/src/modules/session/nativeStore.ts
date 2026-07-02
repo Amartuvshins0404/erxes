@@ -14,6 +14,7 @@ import {
   getMastraStore,
   scopedResource,
 } from '~/mastra/memory/mastraMemory';
+import { clampPage } from '@/_shared/auth';
 
 // ── Minimal native shapes we read (Mastra's own types are wider). ───────────
 interface NativeThread {
@@ -299,8 +300,10 @@ export async function listOwnedThreads(
 ): Promise<ErxesThreadPage> {
   const memory = await getNativeMemory(subdomain);
   const resourceId = scopedResource(subdomain, userId);
-  const safePerPage = Math.min(Math.max(1, perPage), THREADS_MAX_PER_PAGE);
-  const safePage = Math.max(1, page);
+  const { page: safePage, perPage: safePerPage } = clampPage(page, perPage, {
+    def: THREADS_DEFAULT_PER_PAGE,
+    max: THREADS_MAX_PER_PAGE,
+  });
   const res = await memory.listThreads({
     filter: { resourceId, metadata: { agentId } },
     orderBy: { field: 'updatedAt', direction: 'DESC' },
@@ -446,18 +449,6 @@ export async function removeOwnedThread(
   if (!thread) throw new ExpectedError('Thread not found');
   await memory.deleteThread(threadId);
   return { ok: 1 };
-}
-
-/** Throw "Thread not found" unless the caller owns the thread (resource scope). */
-export async function assertOwnedThread(
-  subdomain: string,
-  userId: string,
-  threadId: string,
-): Promise<void> {
-  const memory = await getNativeMemory(subdomain);
-  const resourceId = scopedResource(subdomain, userId);
-  const thread = await memory.getThreadById({ threadId, resourceId });
-  if (!thread) throw new ExpectedError('Thread not found');
 }
 
 /** Current native title for a thread (for the SSE thread_title push). */

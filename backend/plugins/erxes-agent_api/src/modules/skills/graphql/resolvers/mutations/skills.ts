@@ -13,11 +13,7 @@ import {
   updateSkill,
 } from '@/skills/service/skillsService';
 import { distillThreadToSkill } from '@/skills/service/distill';
-
-const requireUser = (user: IContext['user']): string => {
-  if (!user?._id) throw new ExpectedError('Login required');
-  return user._id;
-};
+import { requireUserId } from '@/_shared/auth';
 
 // A skills "admin" is anyone who can promote (the Agent Admin group, plus the
 // instance owner — canGroup short-circuits true for isOwner). Only admins may
@@ -37,7 +33,7 @@ export const skillMutations = {
     await checkPermission('skillsCreate');
     // Creating a public (global) skill directly is a promotion — gate it.
     if (doc.visibility === 'public') await checkPermission('skillsPromote');
-    return createSkill(subdomain, requireUser(user), doc);
+    return createSkill(subdomain, requireUserId(user), doc);
   },
 
   mastraSkillUpdate: async (
@@ -46,7 +42,7 @@ export const skillMutations = {
     { user, subdomain, checkPermission }: IContext,
   ) => {
     await checkPermission('skillsEdit');
-    return updateSkill(subdomain, requireUser(user), _id, doc);
+    return updateSkill(subdomain, requireUserId(user), _id, doc);
   },
 
   mastraSkillRemove: async (
@@ -55,7 +51,7 @@ export const skillMutations = {
     { user, subdomain, checkPermission }: IContext,
   ) => {
     await checkPermission('skillsRemove');
-    const userId = requireUser(user);
+    const userId = requireUserId(user);
     return removeSkill(subdomain, userId, _id, await isSkillsAdmin(subdomain, user));
   },
 
@@ -65,7 +61,7 @@ export const skillMutations = {
     { user, subdomain, checkPermission }: IContext,
   ) => {
     await checkPermission('skillsEdit');
-    return publishSkill(subdomain, requireUser(user), _id);
+    return publishSkill(subdomain, requireUserId(user), _id);
   },
 
   mastraSkillActivateVersion: async (
@@ -74,7 +70,7 @@ export const skillMutations = {
     { user, subdomain, checkPermission }: IContext,
   ) => {
     await checkPermission('skillsEdit');
-    return activateSkillVersion(subdomain, requireUser(user), _id, versionId);
+    return activateSkillVersion(subdomain, requireUserId(user), _id, versionId);
   },
 
   mastraSkillPromote: async (
@@ -83,7 +79,7 @@ export const skillMutations = {
     { user, subdomain, checkPermission }: IContext,
   ) => {
     await checkPermission('skillsPromote');
-    return promoteSkill(subdomain, requireUser(user), _id);
+    return promoteSkill(subdomain, requireUserId(user), _id);
   },
 
   mastraSkillDemote: async (
@@ -96,7 +92,7 @@ export const skillMutations = {
     // action with skillsEdit and enforce author-or-admin ownership in the
     // service (admins may demote skills they don't own, e.g. seeds).
     await checkPermission('skillsEdit');
-    const userId = requireUser(user);
+    const userId = requireUserId(user);
     return demoteSkill(subdomain, userId, _id, await isSkillsAdmin(subdomain, user));
   },
 
@@ -111,7 +107,7 @@ export const skillMutations = {
     { models, user, subdomain, checkPermission }: IContext,
   ) => {
     await checkPermission('skillsCreate');
-    const userId = requireUser(user);
+    const userId = requireUserId(user);
 
     const agent = await models.MastraAgent.findOne({ agentId });
     if (!agent) throw new ExpectedError(`Agent "${agentId}" not found`);
@@ -148,6 +144,6 @@ export const skillMutations = {
     await checkPermission('skillsView');
     const agent = await models.MastraAgent.findOne({ agentId });
     const globs = agent?.skills ?? [];
-    return activateInvocableSkill(subdomain, requireUser(user), globs, name);
+    return activateInvocableSkill(subdomain, requireUserId(user), globs, name);
   },
 };

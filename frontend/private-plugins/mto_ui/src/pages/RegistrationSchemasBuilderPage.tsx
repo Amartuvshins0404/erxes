@@ -4,6 +4,7 @@ import {
   Checkbox,
   Input,
   Label,
+  ScrollArea,
   Sheet,
   Spinner,
   Textarea,
@@ -254,34 +255,38 @@ export function RegistrationSchemasBuilderPage() {
 
   return (
     <MtoPageLayout pageName="Registration Schemas">
-      <div className="p-6">
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="font-semibold">Schemas</h3>
-          <Button type="button" onClick={openCreateSheet}>
-            New schema
-          </Button>
+      <div className="flex flex-auto overflow-hidden flex-col">
+        <div className="shrink-0 p-6 pb-4">
+          <div className="mb-4 flex items-center justify-between">
+            <h3 className="font-semibold">Schemas</h3>
+            <Button type="button" onClick={openCreateSheet}>
+              New schema
+            </Button>
+          </div>
+
+          {loading ? <Spinner /> : null}
+          {error ? (
+            <p className="text-sm text-destructive">{error.message}</p>
+          ) : null}
         </div>
 
-        {loading ? <Spinner /> : null}
-        {error ? (
-          <p className="text-sm text-destructive">{error.message}</p>
-        ) : null}
-
-        <div className="space-y-2">
-          {rows.map((row) => (
-            <button
-              key={row._id}
-              type="button"
-              className="w-full border rounded-md p-3 text-left"
-              onClick={() => openEditSheet(row)}
-            >
-              <p className="font-medium">{row.title}</p>
-              <p className="text-xs text-muted-foreground">
-                {row.membershipTypeId} / {row.schemaVersion}
-              </p>
-            </button>
-          ))}
-        </div>
+        <ScrollArea className="flex-auto">
+          <div className="space-y-2 px-6 pb-6">
+            {rows.map((row) => (
+              <button
+                key={row._id}
+                type="button"
+                className="w-full border rounded-md p-3 text-left"
+                onClick={() => openEditSheet(row)}
+              >
+                <p className="font-medium">{row.title}</p>
+                <p className="text-xs text-muted-foreground">
+                  {row.membershipTypeId} / {row.schemaVersion}
+                </p>
+              </button>
+            ))}
+          </div>
+        </ScrollArea>
       </div>
 
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>

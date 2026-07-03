@@ -1,5 +1,5 @@
 import { useQuery } from '@apollo/client';
-import { Button, Dialog, Spinner } from 'erxes-ui';
+import { Button, Dialog, ScrollArea, Spinner } from 'erxes-ui';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { MtoPageLayout } from '~/components/MtoPageLayout';
@@ -112,8 +112,9 @@ export function RegistrationIndexPage() {
             </Dialog.Description>
           </Dialog.Header>
 
-          <div className="space-y-2 py-3">
-            {fillFormTypes.map(
+          <ScrollArea className="max-h-[min(60vh,24rem)]">
+            <div className="space-y-2 py-3 pr-3">
+              {fillFormTypes.map(
               (row: {
                 membershipTypeId: string;
                 title: string;
@@ -138,8 +139,9 @@ export function RegistrationIndexPage() {
                   </span>
                 </Button>
               ),
-            )}
-          </div>
+              )}
+            </div>
+          </ScrollArea>
 
           <Dialog.Footer>
             <Button

@@ -1,6 +1,6 @@
 import { useApolloClient, useQuery } from '@apollo/client';
 import { useState } from 'react';
-import { Button, Dialog, Spinner } from 'erxes-ui';
+import { Button, Dialog, ScrollArea, Spinner } from 'erxes-ui';
 import { MtoListPageLayout } from '~/components/MtoListPageLayout';
 import { RegistrationFilters } from '@/registration/components/RegistrationFilters';
 import { RegistrationsList } from '@/registration/components/RegistrationsList';
@@ -77,8 +77,9 @@ export function RegistrationsPage() {
               <Spinner />
             </div>
           ) : (
-            <div className="space-y-2 py-3">
-              {fillFormTypes.map(
+            <ScrollArea className="max-h-[min(60vh,24rem)]">
+              <div className="space-y-2 py-3 pr-3">
+                {fillFormTypes.map(
                 (row: {
                   membershipTypeId: string;
                   title: string;
@@ -102,8 +103,9 @@ export function RegistrationsPage() {
                     </span>
                   </Button>
                 ),
-              )}
-            </div>
+                )}
+              </div>
+            </ScrollArea>
           )}
         </Dialog.Content>
       </Dialog>

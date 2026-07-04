@@ -1,5 +1,11 @@
 import { memo, type ReactNode } from 'react';
-import { IconBolt, IconPencil, IconRefresh, IconRepeat } from '@tabler/icons-react';
+import {
+  IconAlertTriangle,
+  IconBolt,
+  IconPencil,
+  IconRefresh,
+  IconRepeat,
+} from '@tabler/icons-react';
 import { Tooltip } from 'erxes-ui';
 import { AgentUIMessage, ChatAttachment } from '~/modules/chat/types';
 import { asToolPart, messageText } from '~/modules/chat/lib/uiParts';
@@ -148,6 +154,14 @@ export const MessageBubble = memo(function MessageBubble({
     ? liveArtifacts
     : (storeArtifacts ?? []);
   const canRegenerate = isLast && !chatLoading;
+  // A settled assistant turn that produced neither prose nor any artifact —
+  // render an explicit interrupted/empty notice with a retry instead of a blank
+  // reading column (the "agent stopped mid-turn" symptom).
+  const showEmptyState =
+    !streaming &&
+    !text &&
+    artifacts.length === 0 &&
+    failedArtifactTools.length === 0;
   const activeSkills = msg.metadata?.activeSkills;
   const messageId = msg.metadata?.messageId;
   const handleRate =
@@ -197,6 +211,30 @@ export const MessageBubble = memo(function MessageBubble({
             <span className="ea-typing-dot" />
             <span className="ea-typing-dot" />
             <span className="ea-typing-dot" />
+          </div>
+        ) : showEmptyState ? (
+          // A settled turn with no answer text and no artifact must never read as
+          // a blank bubble — surface the outcome (interrupted mid-tool, or the
+          // model stopped without prose) and offer a retry. Newly-generated turns
+          // carry a backend fallback line, so this mainly catches turns that
+          // dead-ended before that fix and any residual empty edge case.
+          <div className="flex items-center gap-2 py-1 text-xs text-muted-foreground">
+            <IconAlertTriangle className="size-3.5 shrink-0 text-amber-600 dark:text-amber-500" />
+            <span>
+              {msg.metadata?.interrupted
+                ? 'This response was interrupted before it finished.'
+                : 'No response was generated for this message.'}
+            </span>
+            {canRegenerate && (
+              <button
+                type="button"
+                onClick={onRegenerate}
+                className="inline-flex items-center gap-1 text-primary hover:underline"
+              >
+                <IconRefresh className="size-3" />
+                Retry
+              </button>
+            )}
           </div>
         ) : null}
         {streaming && text && <span className="ea-caret" />}

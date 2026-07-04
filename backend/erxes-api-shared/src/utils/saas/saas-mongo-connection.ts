@@ -14,6 +14,7 @@ import {
 } from './definition';
 import {
   IOrganization,
+  ISaasAddon,
   ISaasBundle,
   ISaasOrganizationPlanHistory,
 } from './types';

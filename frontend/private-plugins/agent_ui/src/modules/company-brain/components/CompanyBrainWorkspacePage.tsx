@@ -781,11 +781,9 @@ const AssistantDiscordManageSheet = ({
 const AssistantWorkspaceCard = ({
   identifier,
   billingBlocked,
-  billingMessage,
 }: {
   identifier: Identifier;
   billingBlocked: boolean;
-  billingMessage?: string;
 }) => {
   const { agent, loading } = useAgent(identifier._id);
   const isManagedAssistant = isManagedAssistantAgent(agent);
@@ -828,16 +826,6 @@ const AssistantWorkspaceCard = ({
       </div>
 
       <InvitedMembersRow memberIds={identifier.memberIds} />
-
-      {billingBlocked && (
-        <Alert variant="warning">
-          <Alert.Title>You have to pay</Alert.Title>
-          <Alert.Description>
-            {billingMessage ||
-              'This assistant is blocked until the bill is paid.'}
-          </Alert.Description>
-        </Alert>
-      )}
 
       <Button
         asChild={!billingBlocked}
@@ -1854,7 +1842,6 @@ export const CompanyBrainWorkspacePage = ({
   const renderCard = (
     identifier: Identifier,
     billingBlocked: boolean,
-    billingMessage?: string,
   ) => {
     if (mode === 'assistant') {
       return (
@@ -1862,7 +1849,6 @@ export const CompanyBrainWorkspacePage = ({
           key={identifier._id}
           identifier={identifier}
           billingBlocked={billingBlocked}
-          billingMessage={billingMessage}
         />
       );
     }
@@ -2017,7 +2003,6 @@ export const CompanyBrainWorkspacePage = ({
                   return renderCard(
                     identifier,
                     billingItem?.blocked ?? assistantBillingBlocked,
-                    billingItem?.message ?? assistantBillingOverview?.message,
                   );
                 })}
               </div>

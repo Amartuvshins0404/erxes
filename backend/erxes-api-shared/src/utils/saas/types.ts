@@ -37,22 +37,6 @@ export interface ISaasBundle {
   pluginsLimits?: Record<string, unknown>;
 }
 
-export interface ISaasAddon {
-  _id?: string;
-  kind?: string;
-  quantity?: number;
-  installationId?: string;
-  subscriptionId?: string;
-  expiryDate?: Date;
-  interval?: string;
-  paymentStatus?: string;
-  paymentStatusMessage?: string;
-  isCanceled?: boolean;
-  createdAt?: Date;
-  updatedAt?: Date;
-  bundle?: ISaasBundle;
-}
-
 export interface ISaasOrganizationPlanHistory {
   _id?: string;
   organizationId: string;
@@ -64,10 +48,6 @@ export interface ISaasOrganizationPlanHistory {
   interval?: string;
   pluginsLimitsSnapshot?: Record<string, unknown>;
   assistantLimit?: number;
-  stripeCheckoutSessionId?: string;
-  stripePaymentIntentId?: string;
-  stripeSubscriptionId?: string;
-  stripeInvoiceId?: string;
   startsAt?: Date;
   endsAt?: Date;
   createdAt?: Date;

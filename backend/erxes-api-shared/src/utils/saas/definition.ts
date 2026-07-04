@@ -142,8 +142,6 @@ export const saasAddonSchema = new mongoose.Schema({
     type: String,
     label: 'Төлбөр төлөгдсөн талаарх тайлбар',
   },
-  createdAt: { type: Date },
-  isCanceled: { type: Boolean },
 });
 
 export const saasBundleSchema = new mongoose.Schema({

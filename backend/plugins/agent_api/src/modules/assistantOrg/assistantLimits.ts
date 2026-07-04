@@ -1,13 +1,11 @@
 import { IContext } from '~/connectionResolvers';
 import { buildIdentifierAccessQuery } from '~/modules/assistantOrg/permissions';
 import {
-  getSaasOrganizationActiveAddons,
   getSaasOrganizationDetail,
   getSaasOrganizationPlanHistories,
 } from 'erxes-api-shared/utils';
 import type {
   IOrganization,
-  ISaasAddon,
   ISaasOrganizationPlanHistory,
 } from 'erxes-api-shared/utils';
 import type { IIdentifierDocument } from './@types/assistantOrg';
@@ -154,23 +152,6 @@ const getFallbackAssistantLimitFromDescriptor = (value: string) => {
   return 0;
 };
 
-const getActiveAddonAssistantLimit = (addon: ISaasAddon): number => {
-  const snapshotLimit = getSnapshotAssistantLimit(addon.bundle?.pluginsLimits);
-
-  const fallbackLimit = getFallbackAssistantLimitFromDescriptor(
-    `${addon.kind || ''} ${addon.bundle?.title || ''} ${
-      addon.bundle?.type || ''
-    }`,
-  );
-  const baseLimit = snapshotLimit || fallbackLimit;
-  const quantity =
-    typeof addon.quantity === 'number' && Number.isFinite(addon.quantity)
-      ? Math.max(0, Math.floor(addon.quantity))
-      : 1;
-
-  return baseLimit * quantity;
-};
-
 const isHistoryCurrent = (history: ISaasOrganizationPlanHistory) => {
   const now = Date.now();
   const startsAt = history.startsAt ? new Date(history.startsAt).getTime() : 0;
@@ -218,47 +199,6 @@ const computeActivePlanLimit = (
     0,
   );
 };
-
-const getUncoveredAssistantAddons = (
-  addons: ISaasAddon[],
-  histories: ISaasOrganizationPlanHistory[],
-) => {
-  const activeHistorySubscriptionIds = new Set(
-    histories
-      .filter(
-        (history) =>
-          ACTIVE_HISTORY_STATUSES.includes(history.status || '') &&
-          isHistoryCurrent(history),
-      )
-      .map((history) => history.stripeSubscriptionId)
-      .filter(Boolean)
-      .map(String),
-  );
-
-  return addons.filter((addon) => {
-    if (getActiveAddonAssistantLimit(addon) <= 0) {
-      return false;
-    }
-
-    return (
-      !addon.subscriptionId ||
-      !activeHistorySubscriptionIds.has(String(addon.subscriptionId))
-    );
-  });
-};
-
-const computeActiveCoverageLimit = ({
-  histories,
-  addons,
-}: {
-  histories: ISaasOrganizationPlanHistory[];
-  addons: ISaasAddon[];
-}) =>
-  computeActivePlanLimit(histories) +
-  getUncoveredAssistantAddons(addons, histories).reduce(
-    (sum, addon) => sum + getActiveAddonAssistantLimit(addon),
-    0,
-  );
 
 const isSaasOrganization = (organization: IOrganization) => {
   const domain = normalizeText(organization.domain);
@@ -373,23 +313,6 @@ const getAssistantPlanHistory = (
     giftHistory || latestActiveHistory || getLatestAssistantHistory(histories)
   );
 };
-
-const getAssistantAddonPlanPeriod = (
-  addons: ISaasAddon[],
-  histories: ISaasOrganizationPlanHistory[],
-) =>
-  getUncoveredAssistantAddons(addons, histories)
-    .filter((addon) => getActiveAddonAssistantLimit(addon) > 0)
-    .sort((left, right) => {
-      const rightTime = right.expiryDate
-        ? new Date(right.expiryDate).getTime()
-        : 0;
-      const leftTime = left.expiryDate
-        ? new Date(left.expiryDate).getTime()
-        : 0;
-
-      return rightTime - leftTime;
-    })[0];
 
 const getBillingNoticeMessage = (overdueDays: number) => {
   if (overdueDays >= 20) {
@@ -544,17 +467,12 @@ export const getAssistantLimit = async ({
     };
   }
 
-  const [histories, activeAddons] = await Promise.all([
-    getSaasOrganizationPlanHistories({
-      organizationId: organization._id,
-      statuses: [],
-    }),
-    getSaasOrganizationActiveAddons({
-      organizationId: organization._id,
-    }),
-  ]);
+  const histories = await getSaasOrganizationPlanHistories({
+    organizationId: organization._id,
+    statuses: [],
+  });
 
-  const limit = computeActiveCoverageLimit({ histories, addons: activeAddons });
+  const limit = computeActivePlanLimit(histories);
   const remaining = Math.max(0, limit - used);
   const hasActivePlan = limit > 0;
 
@@ -610,19 +528,13 @@ export const getAssistantBillingOverview = async ({
     };
   }
 
-  const [histories, activeAddons] = await Promise.all([
-    getSaasOrganizationPlanHistories({
-      organizationId: organization._id,
-      statuses: [],
-    }),
-    getSaasOrganizationActiveAddons({
-      organizationId: organization._id,
-    }),
-  ]);
+  const histories = await getSaasOrganizationPlanHistories({
+    organizationId: organization._id,
+    statuses: [],
+  });
   const latestAssistantHistory = getLatestAssistantHistory(histories);
   const planHistory = getAssistantPlanHistory(histories);
-  const addonPlanPeriod = getAssistantAddonPlanPeriod(activeAddons, histories);
-  const limit = computeActiveCoverageLimit({ histories, addons: activeAddons });
+  const limit = computeActivePlanLimit(histories);
   const billingState =
     limit > 0
       ? {
@@ -689,13 +601,9 @@ export const getAssistantBillingOverview = async ({
       updatedAt: identifier.updatedAt?.toISOString?.() || undefined,
       planStartDate: planHistory?.startsAt
         ? new Date(planHistory.startsAt).toISOString()
-        : addonPlanPeriod?.createdAt
-        ? new Date(addonPlanPeriod.createdAt).toISOString()
         : null,
       planEndDate: planHistory?.endsAt
         ? new Date(planHistory.endsAt).toISOString()
-        : addonPlanPeriod?.expiryDate
-        ? new Date(addonPlanPeriod.expiryDate).toISOString()
         : null,
       paymentStatus: billingState.paymentStatus,
       blocked,

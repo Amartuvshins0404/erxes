@@ -47,7 +47,7 @@ Font.register({
 
 Font.register({
   family: 'Noto Sans SC',
-  fonts: [{ src: path.join(FONT_DIR, 'NotoSansSC-Regular.otf') }],
+  fonts: [{ src: path.join(FONT_DIR, 'NotoSansSC-Regular.ttf') }],
 });
 
 Font.register({

@@ -57,7 +57,10 @@ let cachedFonts: SatoriFont[] | null = null;
  * families for CJK (世界), Arabic (مرحبا) and monochrome emoji, so those scripts
  * no longer render as tofu. The Arabic TTFs have their Satori-unsupported GSUB
  * contextual lookups pruned (Satori throws on lookupType 5), and the emoji is a
- * static monochrome instance (Satori cannot parse the variable NotoEmoji). */
+ * static monochrome instance (Satori cannot parse the variable NotoEmoji).
+ * Noto Sans SC is a static wght=400 glyf instance of the Google Fonts variable
+ * TTF — NOT the upstream Noto CJK .otf, whose CFF outlines both Satori and
+ * @react-pdf/fontkit fail to resolve ("Could not resolve font for Noto Sans SC"). */
 export function getFonts(): SatoriFont[] {
   if (cachedFonts) return cachedFonts;
   const read = (file: string) => fs.readFileSync(path.join(FONT_DIR, file));
@@ -66,7 +69,7 @@ export function getFonts(): SatoriFont[] {
     { name: 'Noto Sans', data: read('NotoSans-Bold.ttf'), weight: 700, style: 'normal' },
     { name: 'Noto Sans', data: read('NotoSans-Italic.ttf'), weight: 400, style: 'italic' },
     { name: 'Noto Sans', data: read('NotoSans-BoldItalic.ttf'), weight: 700, style: 'italic' },
-    { name: 'Noto Sans SC', data: read('NotoSansSC-Regular.otf'), weight: 400, style: 'normal' },
+    { name: 'Noto Sans SC', data: read('NotoSansSC-Regular.ttf'), weight: 400, style: 'normal' },
     { name: 'Noto Sans Arabic', data: read('NotoSansArabic-Regular.ttf'), weight: 400, style: 'normal' },
     { name: 'Noto Sans Arabic', data: read('NotoSansArabic-Bold.ttf'), weight: 700, style: 'normal' },
     { name: 'Noto Emoji', data: read('NotoEmoji-Regular.ttf'), weight: 400, style: 'normal' },

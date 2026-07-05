@@ -6,6 +6,7 @@ import {
   DEFAULT_PARTS,
   describeTiming,
   FREQUENCIES,
+  MINUTE_INTERVALS,
   parseCron,
   pad,
   ScheduleFrequency,
@@ -186,6 +187,26 @@ export const ScheduleTimingFields = ({
             }}
             className="w-24"
           />
+        </div>
+      )}
+
+      {freq === 'minutely' && (
+        <div className="space-y-1.5">
+          <Label className="font-medium">Every</Label>
+          <div className="flex flex-wrap gap-1.5">
+            {MINUTE_INTERVALS.map((n) => (
+              <Button
+                key={n}
+                type="button"
+                variant={parts.interval === n ? 'secondary' : 'outline'}
+                size="sm"
+                className="h-8"
+                onClick={() => apply({ interval: n })}
+              >
+                {n} min
+              </Button>
+            ))}
+          </div>
         </div>
       )}
 

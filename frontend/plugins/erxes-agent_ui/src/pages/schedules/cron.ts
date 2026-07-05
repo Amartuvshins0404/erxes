@@ -3,6 +3,7 @@
 // stays unit-testable on its own.
 
 export type ScheduleFrequency =
+  | 'minutely'
   | 'hourly'
   | 'daily'
   | 'weekly'
@@ -15,7 +16,16 @@ export interface TimingParts {
   hour: number;
   weekdays: number[];
   dayOfMonth: number;
+  /** Sub-hour run interval in minutes, for the "Minutely" frequency. */
+  interval: number;
 }
+
+// Sub-hour interval presets offered by the friendly "Minutely" picker. The 5-min
+// floor is deliberate: per-minute agent runs are a cost/abuse risk (a backend
+// cron floor is planned in roadmap todo/13). Power users who genuinely need a
+// tighter cadence can still drop to "Custom (cron)".
+export const MIN_MINUTE_INTERVAL = 5;
+export const MINUTE_INTERVALS = [5, 10, 15, 20, 30];
 
 export const DEFAULT_PARTS: TimingParts = {
   freq: 'daily',
@@ -23,6 +33,7 @@ export const DEFAULT_PARTS: TimingParts = {
   hour: 9,
   weekdays: [1],
   dayOfMonth: 1,
+  interval: 15,
 };
 
 export const WEEKDAYS = [
@@ -36,6 +47,7 @@ export const WEEKDAYS = [
 ];
 
 export const FREQUENCIES: { value: ScheduleFrequency; label: string }[] = [
+  { value: 'minutely', label: 'Minutely' },
   { value: 'hourly', label: 'Hourly' },
   { value: 'daily', label: 'Daily' },
   { value: 'weekly', label: 'Weekly' },
@@ -45,7 +57,11 @@ export const FREQUENCIES: { value: ScheduleFrequency; label: string }[] = [
 
 /** Emit the cron expression for one structured timing choice. */
 export function buildCron(parts: TimingParts): string {
-  const { freq, minute, hour, weekdays, dayOfMonth } = parts;
+  const { freq, minute, hour, weekdays, dayOfMonth, interval } = parts;
+  if (freq === 'minutely') {
+    const step = Math.max(MIN_MINUTE_INTERVAL, interval || MIN_MINUTE_INTERVAL);
+    return `*/${step} * * * *`;
+  }
   if (freq === 'hourly') return `${minute} * * * *`;
   if (freq === 'daily') return `${minute} ${hour} * * *`;
   if (freq === 'weekly') {
@@ -82,6 +98,25 @@ function expandWeekdays(field: string): number[] | null {
 export function parseCron(cron: string): TimingParts | null {
   const fields = cron.trim().split(/\s+/);
   if (fields.length !== 5) return null;
+
+  // Sub-hour interval: "*/N * * * *". Only the presets the friendly picker
+  // offers round-trip here; other step values (e.g. */7, */1) stay in the raw
+  // "Custom (cron)" view rather than snapping to an interval we can't select.
+  const step = /^\*\/(\d+)$/.exec(fields[0]);
+  if (
+    step &&
+    fields[1] === '*' &&
+    fields[2] === '*' &&
+    fields[3] === '*' &&
+    fields[4] === '*'
+  ) {
+    const interval = Number.parseInt(step[1], 10);
+    if (MINUTE_INTERVALS.includes(interval)) {
+      return { ...DEFAULT_PARTS, freq: 'minutely', interval };
+    }
+    return null;
+  }
+
   const minute = num(fields[0]);
   if (minute == null || minute > 59) return null;
 
@@ -131,6 +166,9 @@ export function describeTiming(
 ): string {
   const time = `${pad(parts.hour)}:${pad(parts.minute)}`;
   const tz = timezone || 'UTC';
+  if (freq === 'minutely') {
+    return `Runs every ${parts.interval} minutes · ${tz}`;
+  }
   if (freq === 'hourly') {
     return `Runs every hour at minute ${parts.minute} · ${tz}`;
   }

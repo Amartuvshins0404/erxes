@@ -64,6 +64,19 @@ import type { IMastraAgentQuotaStatus } from './types';
 
 type IAgent = IMastraAgentRow;
 
+// The per-agent detail workspace (tabs) is a console-shell feature. Under the
+// Settings shell (`/settings/erxes-agent/agents`) there is no detail route, so
+// agent rows there keep opening the plain edit form.
+const isConsoleShell = (basePath: string) => !basePath.startsWith('/settings');
+
+/** Where clicking an agent row goes: detail workspace in console, edit in settings. */
+const agentOpenPath = (basePath: string, id: string) =>
+  isConsoleShell(basePath) ? `${basePath}/${id}` : `${basePath}/edit/${id}`;
+
+/** The agent's config: the detail Settings tab in console, the edit form in settings. */
+const agentSettingsPath = (basePath: string, id: string) =>
+  isConsoleShell(basePath) ? `${basePath}/${id}/settings` : `${basePath}/edit/${id}`;
+
 // Refresh the agent lists after a row mutation without prop-drilling a refetch
 // through the table columns: invalidate every cached instance of both list
 // fields (paginated table + dropdown/chat list). Shared by remove + toggle.
@@ -150,7 +163,7 @@ const AgentMoreCell = ({ agent }: { agent: IAgent }) => {
           className="justify-start w-full h-8"
           allowed={canEdit}
           onDenied={showAgentPermissionError}
-          onClick={() => navigate(`${basePath}/edit/${agent._id}`)}
+          onClick={() => navigate(agentSettingsPath(basePath, agent._id))}
         >
           <IconPencil className="size-4" /> Edit
         </PermissionButton>
@@ -294,7 +307,7 @@ const buildBaseColumns = (
           tone="muted"
           name={
             <Link
-              to={`${basePath}/edit/${_id}`}
+              to={agentOpenPath(basePath, _id)}
               className="font-medium hover:underline cursor-pointer"
             >
               {name}

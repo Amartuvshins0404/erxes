@@ -1,5 +1,10 @@
 import { useMemo, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import {
+  Link,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from 'react-router-dom';
 import {
   IconArrowLeft,
   IconCircleCheck,
@@ -58,7 +63,14 @@ const parseDefinition = (text: string): IWorkflowDefinition | null => {
 export const WorkflowFormPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const isEdit = !!id;
+
+  // Every workflow is owned by an agent (step 24). When the form is opened from
+  // an agent's Workflows tab the owning agentId rides in on the query string;
+  // it's sent on create so the now-required owner is set (the old standalone
+  // create form omitted it and failed at the boundary).
+  const presetAgentId = searchParams.get('agentId') || undefined;
 
   const [validation, setValidation] = useState<IWorkflowValidation | null>(
     null,
@@ -132,6 +144,8 @@ export const WorkflowFormPage = () => {
       description: values.description,
       definition,
       isEnabled: values.isEnabled,
+      // Only stamp the owner on create; edits keep their existing agentId.
+      ...(!isEdit && presetAgentId ? { agentId: presetAgentId } : {}),
     };
     if (isEdit) updateWorkflow({ variables: { _id: id, doc } });
     else createWorkflow({ variables: { doc } });

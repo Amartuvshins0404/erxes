@@ -283,8 +283,23 @@ const buildBaseColumns = (
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-export const WorkflowsIndexPage = () => {
-  const { workflows, loading, refetch } = useWorkflows();
+/**
+ * Standalone workflows index, and — when `agentId` is passed — the per-agent
+ * Workflows tab. In agent context the list is scoped and "New workflow" carries
+ * the agentId so the create form can attach the now-required owning agent.
+ */
+export const WorkflowsIndexPage = ({
+  agentId,
+  embedded,
+}: {
+  agentId?: string;
+  embedded?: boolean;
+} = {}) => {
+  const { workflows, loading, refetch } = useWorkflows(agentId);
+
+  const newPath = agentId
+    ? `/erxes-agent/workflows/new?agentId=${encodeURIComponent(agentId)}`
+    : '/erxes-agent/workflows/new';
 
   const getSortValue = useCallback(
     (w: IWorkflow, id: string): SortValue => {
@@ -330,13 +345,14 @@ export const WorkflowsIndexPage = () => {
       columns={columns}
       data={sorted}
       loading={loading}
-      newButton={{ to: '/erxes-agent/workflows/new', label: 'New Workflow' }}
+      embedded={embedded}
+      newButton={{ to: newPath, label: 'New Workflow' }}
       empty={{
         title: 'No workflows yet',
         description: 'Ask an agent to build one in Chat, or create one by hand.',
         action: (
           <Button asChild>
-            <Link to="/erxes-agent/workflows/new">
+            <Link to={newPath}>
               <IconPlus /> Create Workflow
             </Link>
           </Button>

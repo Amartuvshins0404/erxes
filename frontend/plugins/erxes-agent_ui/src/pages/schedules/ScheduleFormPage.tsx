@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation } from '@apollo/client';
 import { z } from 'zod';
 import { IconCalendarTime, IconInfoCircle } from '@tabler/icons-react';
@@ -108,7 +108,12 @@ const SelectAgent = ({
 export const ScheduleFormPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const isEdit = Boolean(id);
+
+  // Opened from an agent's Schedules tab, the owning agent rides in on the query
+  // string so the picker starts pre-selected on that agent.
+  const presetAgentId = searchParams.get('agentId') || '';
 
   const { data: scheduleData } = useQuery<IScheduleQueryResponse>(
     MASTRA_SCHEDULE,
@@ -120,7 +125,7 @@ export const ScheduleFormPage = () => {
 
   const form = useResourceForm<ScheduleFormValues, ISchedule>({
     schema: scheduleFormSchema,
-    defaults: DEFAULT_VALUES,
+    defaults: { ...DEFAULT_VALUES, agentId: presetAgentId },
     isEdit,
     record: scheduleData?.mastraSchedule,
     load: (schedule) => ({

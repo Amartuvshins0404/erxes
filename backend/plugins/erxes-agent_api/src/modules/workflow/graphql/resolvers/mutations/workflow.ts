@@ -5,7 +5,7 @@ import { buildManualEnvelope } from '~/mastra/workflows/envelope';
 import { runWorkflow } from '~/mastra/workflows/runtime';
 import { getOperationRegistry } from '~/mastra/tools/operationRegistry';
 import { runWithAuth } from '~/mastra/requestContext';
-import { backgroundRunEnableError } from '~/mastra/auth/backgroundPrincipal';
+import { assertWorkflowSchedulable } from '~/mastra/auth/backgroundPrincipal';
 import { IMastraWorkflow } from '@/workflow/@types/workflow';
 import { requireUserId } from '@/_shared/auth';
 
@@ -21,27 +21,6 @@ const validateWithRegistry = async (models: IModels, definition: unknown) => {
       .join('\n');
     throw new ExpectedError(`Workflow definition is invalid:\n${lines}`);
   }
-};
-
-/**
- * A schedule-triggered workflow runs unattended on a cron, so — like an agent
- * schedule — it may only be ENABLED when the secure owner-token path is
- * configured (secret + a workflow creator to bind as owner) and it does not run
- * destructive ops without asking. Only 'schedule' triggers are gated here; other
- * triggers (manual/automation/webhook) either run as a user or fail closed at
- * runtime via runBackgroundWorkflow.
- */
-const assertWorkflowSchedulable = (opts: {
-  owner: string | undefined;
-  definition: WorkflowDefinition;
-}) => {
-  if (opts.definition?.trigger?.type !== 'schedule') return;
-  const error = backgroundRunEnableError({
-    owner: opts.owner?.trim() || undefined,
-    destructiveAllow: opts.definition.destructiveOps === 'allow',
-    subject: 'workflow',
-  });
-  if (error) throw new ExpectedError(error);
 };
 
 /** Mutations for workflow definitions and manual workflow runs. */

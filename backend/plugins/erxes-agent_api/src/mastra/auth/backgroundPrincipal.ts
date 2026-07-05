@@ -13,7 +13,9 @@
 // ok:false. Fail-closed here is the security boundary — do not soften it.
 // ---------------------------------------------------------------------------
 
+import { ExpectedError } from 'erxes-api-shared/utils';
 import type { IMastraAgent } from '@/agent/@types/agent';
+import type { WorkflowDefinition } from '../workflows/dsl';
 import {
   resolveBackgroundToken,
   isSecureBackgroundRunRequired,
@@ -105,3 +107,26 @@ export function backgroundRunEnableError(opts: {
   }
   return null;
 }
+
+/**
+ * A schedule-triggered workflow runs unattended on a cron, so — like an agent
+ * schedule — it may only be ENABLED when the secure owner-token path is
+ * configured (secret + a workflow creator to bind as owner) and it does not run
+ * destructive ops without asking. Only 'schedule' triggers are gated here; other
+ * triggers (manual/automation/webhook) either run as a user or fail closed at
+ * runtime via runBackgroundWorkflow. Throws ExpectedError on refusal so both the
+ * GraphQL mutations and the agent-facing builder tools share one enable-time
+ * check (the tools convert the throw into their structured failure result).
+ */
+export const assertWorkflowSchedulable = (opts: {
+  owner: string | undefined;
+  definition: WorkflowDefinition;
+}) => {
+  if (opts.definition?.trigger?.type !== 'schedule') return;
+  const error = backgroundRunEnableError({
+    owner: opts.owner?.trim() || undefined,
+    destructiveAllow: opts.definition.destructiveOps === 'allow',
+    subject: 'workflow',
+  });
+  if (error) throw new ExpectedError(error);
+};

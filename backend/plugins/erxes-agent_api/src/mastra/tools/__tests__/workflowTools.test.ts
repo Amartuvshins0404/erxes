@@ -41,6 +41,13 @@ const mockCreateWorkflow = jest.fn((doc: Record<string, unknown>) =>
 );
 const mockGetWorkflows = jest.fn(() => Promise.resolve([]));
 const mockGetRuns = jest.fn(() => Promise.resolve([]));
+// Existing-workflow reads for the update tool's schedule-enable gate; each test
+// sets the stored shape (isEnabled/owner/definition) it needs.
+const mockGetWorkflow = jest.fn();
+const mockUpdateWorkflow = jest.fn(
+  (_id: string, patch: Record<string, unknown>) =>
+    Promise.resolve({ _id, version: 2, ...patch }),
+);
 
 jest.mock('../../../connectionResolvers', () => ({
   generateModels: jest.fn(() =>
@@ -49,6 +56,8 @@ jest.mock('../../../connectionResolvers', () => ({
       MastraWorkflow: {
         createWorkflow: mockCreateWorkflow,
         getWorkflows: mockGetWorkflows,
+        getWorkflow: mockGetWorkflow,
+        updateWorkflow: mockUpdateWorkflow,
       },
       MastraWorkflowRun: { getRuns: mockGetRuns },
     }),
@@ -84,6 +93,7 @@ import {
   workflowValidateTool,
   workflowSimulateTool,
   workflowSaveTool,
+  workflowUpdateTool,
   workflowGuideTool,
   workflowRunNowTool,
   workflowListTool,
@@ -199,6 +209,30 @@ const definition = (): DraftDefinition => ({
 /** Narrows a draft step to the branch shape for targeted mutation. */
 const asBranchStep = (step: unknown) =>
   step as { branches: Array<{ steps: Array<{ operation: string }> }> };
+
+/**
+ * A minimal VALID schedule-triggered definition — the unattended-cron shape the
+ * background-run enable gate protects. `over` patches top-level fields (e.g.
+ * destructiveOps) for the individual cases.
+ */
+const scheduleDefinition = (
+  over: Partial<DraftDefinition> = {},
+): DraftDefinition => ({
+  trigger: { type: 'schedule', config: { cron: '0 9 * * *' } },
+  policy: { mode: 'all', allowed: [] },
+  bindings: {},
+  limits: { maxLlmCalls: 10 },
+  steps: [{ id: 'lookup', type: 'operation', operation: 'customers', args: {} }],
+  ...over,
+});
+
+/** Result of workflowUpdate. */
+interface UpdateResult {
+  success: boolean;
+  version?: number;
+  errors?: ToolValidationError[];
+  error?: string;
+}
 
 describe('team-member gate (anonymous bot path)', () => {
   afterEach(() => {
@@ -372,5 +406,150 @@ describe('workflowSaveTool', () => {
     expect(mockCreateWorkflow).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'Support flow', isEnabled: false }),
     );
+  });
+});
+
+/**
+ * The agent-facing builder tools must apply the SAME enable-time gate the
+ * GraphQL mutations do: an enabled schedule-triggered workflow is a live cron,
+ * so it may only be enabled when a run-token secret and an owner are present and
+ * it doesn't run destructive ops unattended. The tools surface the refusal as a
+ * structured { success: false, error } result (not a thrown 500) so the agent
+ * gets an actionable message.
+ */
+describe('schedule-enable gate (agent builder tools)', () => {
+  const SECRET = 'ERXES_AGENT_RUN_TOKEN_SECRET';
+  let savedSecret: string | undefined;
+
+  beforeEach(() => {
+    savedSecret = process.env[SECRET];
+    delete process.env[SECRET]; // default: secure path NOT configured
+    mockCreateWorkflow.mockClear();
+    mockUpdateWorkflow.mockClear();
+    mockGetWorkflow.mockReset();
+  });
+
+  afterEach(() => {
+    if (savedSecret === undefined) delete process.env[SECRET];
+    else process.env[SECRET] = savedSecret;
+  });
+
+  describe('workflowSaveTool', () => {
+    it('refuses to enable a schedule workflow when the run-token secret is unset', async () => {
+      const res = await asTool<SaveResult>(workflowSaveTool).execute({
+        name: 'Nightly',
+        definition: scheduleDefinition(),
+        enable: true,
+      });
+      expect(res.success).toBe(false);
+      expect(res.error).toMatch(/ERXES_AGENT_RUN_TOKEN_SECRET/);
+      expect(mockCreateWorkflow).not.toHaveBeenCalled();
+    });
+
+    it('refuses to enable a schedule workflow with destructiveOps "allow"', async () => {
+      process.env[SECRET] = 'shh'; // secret + owner (u1) present; only the flag fails
+      const res = await asTool<SaveResult>(workflowSaveTool).execute({
+        name: 'Nightly',
+        definition: scheduleDefinition({ destructiveOps: 'allow' }),
+        enable: true,
+      });
+      expect(res.success).toBe(false);
+      expect(res.error).toMatch(/destructiveOps/);
+      expect(mockCreateWorkflow).not.toHaveBeenCalled();
+    });
+
+    it('allows enabling a schedule workflow once secret + owner are configured', async () => {
+      process.env[SECRET] = 'shh';
+      const res = await asTool<SaveResult>(workflowSaveTool).execute({
+        name: 'Nightly',
+        definition: scheduleDefinition(),
+        enable: true,
+      });
+      expect(res.success).toBe(true);
+      expect(mockCreateWorkflow).toHaveBeenCalledWith(
+        expect.objectContaining({ isEnabled: true }),
+      );
+    });
+
+    it('lets a schedule workflow be SAVED disabled without the secret (gate is enable-only)', async () => {
+      const res = await asTool<SaveResult>(workflowSaveTool).execute({
+        name: 'Nightly draft',
+        definition: scheduleDefinition(),
+        enable: false,
+      });
+      expect(res.success).toBe(true);
+      expect(mockCreateWorkflow).toHaveBeenCalledWith(
+        expect.objectContaining({ isEnabled: false }),
+      );
+    });
+  });
+
+  describe('workflowUpdateTool', () => {
+    it('refuses to flip isEnabled on an existing schedule workflow without the secret', async () => {
+      mockGetWorkflow.mockResolvedValue({
+        _id: 'wf-1',
+        isEnabled: false,
+        createdByUserId: 'u1',
+        definition: scheduleDefinition(),
+      });
+      const res = await asTool<UpdateResult>(workflowUpdateTool).execute({
+        workflowId: 'wf-1',
+        enable: true,
+      });
+      expect(res.success).toBe(false);
+      expect(res.error).toMatch(/ERXES_AGENT_RUN_TOKEN_SECRET/);
+      expect(mockUpdateWorkflow).not.toHaveBeenCalled();
+    });
+
+    it('refuses when an update repoints an already-enabled workflow to a schedule trigger', async () => {
+      // enable is left undefined — the workflow is ALREADY enabled, and this
+      // update swaps a manual trigger for a schedule one, arming the cron.
+      mockGetWorkflow.mockResolvedValue({
+        _id: 'wf-1',
+        isEnabled: true,
+        createdByUserId: 'u1',
+        definition: definition(), // previously a manual workflow
+      });
+      const res = await asTool<UpdateResult>(workflowUpdateTool).execute({
+        workflowId: 'wf-1',
+        definition: scheduleDefinition(),
+      });
+      expect(res.success).toBe(false);
+      expect(res.error).toMatch(/ERXES_AGENT_RUN_TOKEN_SECRET/);
+      expect(mockUpdateWorkflow).not.toHaveBeenCalled();
+    });
+
+    it('allows enabling a schedule workflow update once the secret is configured', async () => {
+      process.env[SECRET] = 'shh';
+      mockGetWorkflow.mockResolvedValue({
+        _id: 'wf-1',
+        isEnabled: false,
+        createdByUserId: 'u1',
+        definition: scheduleDefinition(),
+      });
+      const res = await asTool<UpdateResult>(workflowUpdateTool).execute({
+        workflowId: 'wf-1',
+        enable: true,
+      });
+      expect(res.success).toBe(true);
+      expect(res.version).toBe(2);
+      expect(mockUpdateWorkflow).toHaveBeenCalledWith(
+        'wf-1',
+        expect.objectContaining({ isEnabled: true }),
+      );
+    });
+
+    it('skips the gate (no existing read) when the update explicitly disables', async () => {
+      const res = await asTool<UpdateResult>(workflowUpdateTool).execute({
+        workflowId: 'wf-1',
+        enable: false,
+      });
+      expect(res.success).toBe(true);
+      expect(mockGetWorkflow).not.toHaveBeenCalled();
+      expect(mockUpdateWorkflow).toHaveBeenCalledWith(
+        'wf-1',
+        expect.objectContaining({ isEnabled: false }),
+      );
+    });
   });
 });

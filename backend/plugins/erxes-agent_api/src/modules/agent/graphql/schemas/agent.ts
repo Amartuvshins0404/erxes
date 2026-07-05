@@ -25,6 +25,8 @@ export const types = `
     unitId: String
     createdAt: Date
     updatedAt: Date
+    workflowsCount: Int
+    schedulesCount: Int
   }
 
   input MastraAgentInput {

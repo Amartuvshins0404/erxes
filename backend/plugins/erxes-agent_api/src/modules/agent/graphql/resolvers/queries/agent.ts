@@ -115,5 +115,16 @@ export const agentCustomResolvers = {
   MastraAgent: {
     isOwnAgent: (agent: IMastraAgentDocument, _args: unknown, { user }: IContext) =>
       Boolean(user?._id && agent.createdBy === user._id),
+
+    // Per-agent resource counts for the Agents table's summary chips. Owned
+    // workflows/schedules are keyed by the business `agentId`. These are field
+    // resolvers, so each row runs one indexed `countDocuments` per field — an
+    // N+1 the list tolerates for the ~tens of agents a user can see (no batch
+    // loader exists in this plugin yet). An empty agentId owns nothing.
+    workflowsCount: (agent: IMastraAgentDocument, _args: unknown, { models }: IContext) =>
+      agent.agentId ? models.MastraWorkflow.countDocuments({ agentId: agent.agentId }) : 0,
+
+    schedulesCount: (agent: IMastraAgentDocument, _args: unknown, { models }: IContext) =>
+      agent.agentId ? models.MastraSchedule.countDocuments({ agentId: agent.agentId }) : 0,
   },
 };

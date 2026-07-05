@@ -1,8 +1,9 @@
 // Enable-time validation for scheduled agent runs: a schedule may only be
-// ENABLED when the secure owner-token path is configured (the erxes app token in
-// Agent settings + an owner) and the agent does not run destructive ops
-// unattended. runSchedule is mocked so the resolver imports stay lightweight (no
-// @mastra agent runtime pulled in).
+// ENABLED when the secure path is configured (the erxes app token in Agent
+// settings) and the agent does not run destructive ops unattended. Since step 22
+// the schedule runs as the agent's SERVICE USER, so a human owner is no longer a
+// precondition. runSchedule is mocked so the resolver imports stay lightweight
+// (no @mastra agent runtime pulled in).
 jest.mock('~/mastra/schedules/runner', () => ({ runSchedule: jest.fn() }));
 
 import { scheduleMutations } from '../schedule';
@@ -68,13 +69,18 @@ describe('mastraScheduleCreate enable-time validation', () => {
     expect(createSchedule).not.toHaveBeenCalled();
   });
 
-  it('rejects creating an enabled schedule when the agent has no owner', async () => {
+  it('creates an enabled schedule for an OWNER-LESS agent (new: runs as the service user)', async () => {
+    // No ownerUserId / createdBy on the agent — before step 22 this was rejected
+    // ("owner is unset"). Now the schedule runs as the agent's service user, so
+    // the app token alone (with destructive gated) is enough to enable it.
     const { ctx, createSchedule } = makeCtx({ agentId: 'a1' }, APP_TOKEN);
 
-    await expect(
-      scheduleMutations.mastraScheduleCreate(undefined, { doc: baseDoc(true) }, ctx),
-    ).rejects.toThrow(/owner is unset/i);
-    expect(createSchedule).not.toHaveBeenCalled();
+    await scheduleMutations.mastraScheduleCreate(
+      undefined,
+      { doc: baseDoc(true) },
+      ctx,
+    );
+    expect(createSchedule).toHaveBeenCalledTimes(1);
   });
 
   it("rejects an enabled schedule whose agent is destructiveOps: 'allow'", async () => {
@@ -89,7 +95,7 @@ describe('mastraScheduleCreate enable-time validation', () => {
     expect(createSchedule).not.toHaveBeenCalled();
   });
 
-  it('creates an enabled schedule when app token + owner present and destructive is gated', async () => {
+  it('creates an enabled schedule when the app token is present and destructive is gated', async () => {
     const { ctx, createSchedule } = makeCtx(
       { agentId: 'a1', createdBy: 'u1', destructiveOps: 'ask' },
       APP_TOKEN,
@@ -104,8 +110,8 @@ describe('mastraScheduleCreate enable-time validation', () => {
   });
 
   it('creates a DISABLED schedule without the background preconditions', async () => {
-    // No app token, no owner — but disabled schedules never fire, so only the
-    // agent must exist.
+    // No app token — but disabled schedules never fire, so only the agent must
+    // exist.
     const { ctx, createSchedule } = makeCtx({ agentId: 'a1' });
 
     await scheduleMutations.mastraScheduleCreate(

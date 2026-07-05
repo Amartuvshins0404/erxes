@@ -36,6 +36,9 @@ interface CoreUser {
   role?: string;
   isActive?: boolean;
   email?: string;
+  /** The user's current permission groups — read so the mint path (step 22)
+   *  can skip a redundant group sync + cache bust when already in lock-step. */
+  permissionGroupIds?: string[];
 }
 
 const CORE_USERS = { pluginName: 'core', module: 'users' } as const;
@@ -144,7 +147,9 @@ const persistServiceUserId = async (
 
 /**
  * Idempotently ensure the agent has a dedicated core service user, returning
- * its id. Safe to call repeatedly and concurrently across replicas.
+ * its id AND its current permission groups (so the mint path can skip a
+ * redundant group sync). Safe to call repeatedly and concurrently across
+ * replicas.
  *
  *  a. If a serviceUserId is already stored, verify the user still exists; if
  *     so, reactivate it (if it had been deactivated) / repair its role and
@@ -159,7 +164,7 @@ export async function ensureServiceUser(opts: {
   agentConfig: ServiceUserAgentConfig;
   subdomain: string;
   models: IModels;
-}): Promise<{ serviceUserId: string }> {
+}): Promise<{ serviceUserId: string; permissionGroupIds: string[] }> {
   const { agentConfig, subdomain, models } = opts;
 
   // (a) Reconcile an already-provisioned user.
@@ -170,7 +175,10 @@ export async function ensureServiceUser(opts: {
     if (existing?._id) {
       await ensureActive(subdomain, existing);
       await ensureSystemRole(subdomain, existing);
-      return { serviceUserId: existing._id };
+      return {
+        serviceUserId: existing._id,
+        permissionGroupIds: existing.permissionGroupIds ?? [],
+      };
     }
     // Deleted out-of-band → fall through to re-create and re-point the config.
   }
@@ -206,7 +214,10 @@ export async function ensureServiceUser(opts: {
 
   // (d) Persist.
   await persistServiceUserId(models, agentConfig, user._id);
-  return { serviceUserId: user._id };
+  return {
+    serviceUserId: user._id,
+    permissionGroupIds: user.permissionGroupIds ?? [],
+  };
 }
 
 /**

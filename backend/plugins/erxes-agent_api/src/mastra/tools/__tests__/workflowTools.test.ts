@@ -445,10 +445,11 @@ describe('workflowSaveTool', () => {
 /**
  * The agent-facing builder tools must apply the SAME enable-time gate the
  * GraphQL mutations do: an enabled schedule-triggered workflow is a live cron,
- * so it may only be enabled when the erxes app token (Agent settings) and an
- * owner are present and it doesn't run destructive ops unattended. The tools
- * surface the refusal as a structured { success: false, error } result (not a
- * thrown 500) so the agent gets an actionable message.
+ * so it may only be enabled when the erxes app token (Agent settings) is present
+ * and it doesn't run destructive ops unattended. Since step 22 the run executes
+ * as the agent's service user, so no human owner is required. The tools surface
+ * the refusal as a structured { success: false, error } result (not a thrown
+ * 500) so the agent gets an actionable message.
  */
 describe('schedule-enable gate (agent builder tools)', () => {
   const APP_TOKEN = 'sk_app-token';
@@ -459,7 +460,7 @@ describe('schedule-enable gate (agent builder tools)', () => {
     mockCreateWorkflow.mockClear();
     mockUpdateWorkflow.mockClear();
     mockGetWorkflow.mockReset();
-    // Default owning agent: exists, enabled, has an owner, destructiveOps gated.
+    // Default owning agent: exists, enabled, destructiveOps gated.
     mockAgentFindOne.mockClear();
     setAgent({ agentId: 'agent-self', createdBy: 'u1' });
   });
@@ -483,8 +484,8 @@ describe('schedule-enable gate (agent builder tools)', () => {
     });
 
     it("refuses to enable when the OWNING AGENT is destructiveOps \"allow\"", async () => {
-      // app token + owner present; the refusal now comes from the agent's
-      // destructiveOps, not the definition's — consistent with schedules.
+      // app token present; the refusal now comes from the agent's destructiveOps,
+      // not the definition's — consistent with schedules.
       mockGetSettings.mockResolvedValue({
         erxesApiUrl: 'https://gw',
         erxesApiToken: APP_TOKEN,

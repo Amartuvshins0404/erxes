@@ -1,8 +1,9 @@
 // The background workflow entry point resolves its principal from the workflow's
 // OWNING AGENT (step 24) and fails CLOSED — recording a failed run without
-// executing — when there is no owning agent, the agent is missing, or the owner
-// token can't be minted. resolveBackgroundPrincipal is mocked so these tests pin
-// the fail-closed branches and that the owning agent's config is what's passed.
+// executing — when there is no owning agent, the agent is missing, or the
+// agent's service-user token can't be minted. resolveBackgroundPrincipal is
+// mocked so these tests pin the fail-closed branches and that the owning agent's
+// config (and models, for the service-user lifecycle) is what's passed.
 const resolveBackgroundPrincipal = jest.fn();
 jest.mock('../../auth/backgroundPrincipal', () => ({
   resolveBackgroundPrincipal: (...args: unknown[]) =>
@@ -109,13 +110,14 @@ describe('runBackgroundWorkflow fail-closed', () => {
     const agent = {
       agentId: 'agent-A',
       isEnabled: true,
-      ownerUserId: 'owner-9',
+      serviceUserId: 'svc-1',
       createdBy: 'u1',
     };
     const { models } = makeModels(agent);
     resolveBackgroundPrincipal.mockResolvedValue({
       ok: false,
-      error: 'Background run refused: owner token mint failed',
+      error:
+        "Background run refused: could not mint a run token for the agent's service user",
     });
 
     const rec = await runBackgroundWorkflow({
@@ -125,11 +127,17 @@ describe('runBackgroundWorkflow fail-closed', () => {
       envelope,
     });
 
-    // The owning agent's config — not a createdByUserId shim — is what's passed.
+    // The owning agent's config (+ models, for the service-user lifecycle) — not
+    // a createdByUserId shim — is what's passed.
     expect(resolveBackgroundPrincipal).toHaveBeenCalledWith(
-      expect.objectContaining({ agentConfig: agent, subdomain: 'os', appToken: 'sk_app' }),
+      expect.objectContaining({
+        agentConfig: agent,
+        subdomain: 'os',
+        appToken: 'sk_app',
+        models,
+      }),
     );
     expect(rec.status).toBe('failed');
-    expect(rec.error).toMatch(/mint failed/i);
+    expect(rec.error).toMatch(/could not mint/i);
   });
 });

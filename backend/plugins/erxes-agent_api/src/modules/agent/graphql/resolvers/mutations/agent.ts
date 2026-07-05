@@ -6,18 +6,41 @@ import {
   deactivateServiceUser,
   syncServiceUserGroup,
 } from '~/mastra/auth/servicePrincipal';
+import type { GroupPermission } from '~/mastra/tools/actionsToAllowedTools';
+import { deriveGrantAllowedTools } from './grantTools';
 import { toUserFacingAgentError } from './agentErrors';
 
+/** A permission group as returned by core `permissionGroups.find`. */
+interface CoreGroup {
+  _id: string;
+  name?: string;
+  permissions?: GroupPermission[];
+}
+
 /**
- * Validate that a requested grant group exists before it is bound to the agent.
- * The group is the agent's server-side permission grant: a background run mints
- * a service-user token carrying this group's actions, so a dangling id would
- * silently leave the agent with no grant. Read-only core trpc
- * (`permissionGroups.find`) — group CREATION/EDIT stays in core's Settings →
- * Permissions UI (gated by permissionsManage); here we only reference an
- * existing one. Throws ExpectedError when it does not exist.
+ * The deterministic name of an agent's OWN, auto-managed dedicated group. The
+ * Access surface (step 23) creates it via core's permissionsManage-gated
+ * `permissionGroupAdd`, so its very existence with those actions already
+ * required a permission-manager — which is what lets us relax the org-owner
+ * grant gate for it (see assertGrantAssignable).
  */
-const assertGrantGroupExists = async (subdomain: string, groupId: string) => {
+const selfOwnedGroupName = (agentId: string): string =>
+  `agent-grant:${agentId}`;
+
+/**
+ * Fetch a requested grant group (core `permissionGroups.find`), asserting it
+ * exists before it is bound to the agent. The group is the agent's server-side
+ * permission grant: a background run mints a service-user token carrying this
+ * group's actions, so a dangling id would silently leave the agent with no
+ * grant. Read-only core trpc — group CREATION/EDIT stays in core (gated by
+ * permissionsManage). Returns the group so the caller can both authorize it
+ * (self-owned vs foreign) and DERIVE the tool filter from its permissions
+ * without a second round-trip. Throws ExpectedError when it does not exist.
+ */
+const fetchGrantGroup = async (
+  subdomain: string,
+  groupId: string,
+): Promise<CoreGroup> => {
   const groups = await sendTRPCMessage({
     subdomain,
     pluginName: 'core',
@@ -32,6 +55,7 @@ const assertGrantGroupExists = async (subdomain: string, groupId: string) => {
       `Permission group "${groupId}" was not found — pick an existing group from Settings → Permissions.`,
     );
   }
+  return groups[0] as CoreGroup;
 };
 
 /**
@@ -72,16 +96,25 @@ const assertOwnerAssignable = (
  * deliberately NOT enough here: an agent-admin is not necessarily an org owner
  * and could still gain cross-plugin actions by binding a privileged group.
  * Clearing a grant (null) is de-escalation — allowed for anyone who can edit.
- * No-op when a grant is not being set. TODO(step 23+): swap the owner gate for
- * a real subset check against the caller's effective action map.
+ * No-op when a grant is not being set.
+ *
+ * RELAXATION (step 23): the agent's OWN dedicated group (`agent-grant:<agentId>`)
+ * is exempt from the owner gate. That group is created/edited only via core's
+ * permissionsManage-gated `permissionGroupAdd`/`Edit`, so a permission-manager
+ * already authored exactly these actions FOR THIS AGENT — binding it can't
+ * escalate beyond what that manager deliberately configured. The owner gate is
+ * kept for pointing at FOREIGN/shared groups (the advanced escape hatch), where
+ * no such authoring guarantee holds. TODO: swap the owner gate for a real subset
+ * check against the caller's effective action map.
  */
 const assertGrantAssignable = (
   grantGroupId: string | null,
   callerIsOwner: boolean,
+  isSelfOwnedGroup: boolean,
 ) => {
-  if (!grantGroupId || callerIsOwner) return;
+  if (!grantGroupId || callerIsOwner || isSelfOwnedGroup) return;
   throw new ExpectedError(
-    'Only an organization owner may bind an agent to a permission group (grant). You can still clear an existing grant.',
+    'Only an organization owner may bind an agent to a foreign permission group (grant). You can still clear an existing grant.',
   );
 };
 
@@ -138,20 +171,43 @@ export const agentMutations = {
 
     // Grant-group change: the group carries the agent's server-side permissions,
     // synced onto its service user. Validate a set group exists BEFORE persisting
-    // (an empty/blank value clears the grant → empty permissions). Step 23 builds
-    // the selection UI; wiring it through the update mutation makes grants usable
-    // today via core's existing Settings → Permissions groups.
+    // (an empty/blank value clears the grant → empty permissions). Step 23's
+    // Access surface drives this: one action-picker writes the group AND, here,
+    // DERIVES the tool filter from it so the two never drift.
     const grantChanged = doc.grantGroupId !== undefined;
     // A cleared grant persists as null (NOT undefined) so `$set` actually clears
     // the stored field — mongoose strips undefined from $set, which would leave a
     // stale grantGroupId the mint path would then re-sync back onto the user.
     const grantGroupId: string | null = doc.grantGroupId?.trim() || null;
+
+    // The tool-registry filter (toolPolicy/allowedTools) is DERIVED from the
+    // grant and persisted ATOMICALLY with it (same updateAgent write) so grant
+    // and filter can't diverge. Empty until we know a grant changed.
+    let toolFields: Partial<IMastraAgent> = {};
+
     if (grantChanged && grantGroupId) {
-      // Escalation guard BEFORE the existence check: only an org owner may set
-      // a grant (see assertGrantAssignable). Running it first denies a
-      // non-owner without leaking whether the target group exists.
-      assertGrantAssignable(grantGroupId, Boolean(user.isOwner));
-      await assertGrantGroupExists(subdomain, grantGroupId);
+      // Resolve the group (existence + name + permissions) once, then authorize.
+      // The self-owned group (agent-grant:<agentId>) relaxes the org-owner gate
+      // — see assertGrantAssignable — so we need the group's NAME (hence agentId)
+      // before the guard; fetching first means a non-owner probing a foreign id
+      // learns it exists, an accepted, minor disclosure for this surface.
+      const agentConfig = await models.MastraAgent.findOne({ _id });
+      const group = await fetchGrantGroup(subdomain, grantGroupId);
+      const isSelfOwned =
+        !!agentConfig?.agentId &&
+        group.name === selfOwnedGroupName(agentConfig.agentId);
+
+      assertGrantAssignable(grantGroupId, Boolean(user.isOwner), isSelfOwned);
+
+      const allowedTools = await deriveGrantAllowedTools(
+        models,
+        group.permissions || [],
+      );
+      toolFields = { toolPolicy: 'custom', allowedTools };
+    } else if (grantChanged) {
+      // Clearing a grant is de-escalation: drop the derived custom filter back to
+      // the 'all' default rather than leaving a stale, now-unbounded allowlist.
+      toolFields = { toolPolicy: 'all', allowedTools: [] };
     }
 
     try {
@@ -159,7 +215,7 @@ export const agentMutations = {
         _id,
         grantChanged
           ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            ({ ...doc, grantGroupId } as any)
+            ({ ...doc, grantGroupId, ...toolFields } as any)
           : doc,
         admin ? undefined : user._id,
       );

@@ -389,14 +389,15 @@ export async function runWorkflow(args: {
 /**
  * Background (schedule- or automation-triggered) workflow entry point. Unlike a
  * manual run — which executes AS the requesting user (the mutation wraps it in
- * runWithAuth) — a background run has no user session, so it must resolve the
- * workflow OWNER (its creator) and run as that bounded principal.
+ * runWithAuth) — a background run has no user session, so it runs as the
+ * workflow's OWNING AGENT (step 24): its principal is minted from that agent's
+ * config, exactly as scheduled agent runs are.
  *
- * A workflow has no single owning agent (it may bind zero or many judge agents),
- * so its `createdByUserId` is the bound owner — mirroring the agent's createdBy
- * fallback. Fails CLOSED: when the owner token can't be minted it records a
- * failed run and does NOT execute, so operation steps can never fall through to
- * the admin app token (buildAuthHeaders' no-context fallback).
+ * A workflow with no owning agent (or one pointing at a deleted agent) has no
+ * identity to run under, so it fails CLOSED — records a failed run and does NOT
+ * execute. Likewise when the owner token can't be minted: operation steps can
+ * never fall through to the admin app token (buildAuthHeaders' no-context
+ * fallback).
  */
 export async function runBackgroundWorkflow(args: {
   models: IModels;
@@ -406,27 +407,44 @@ export async function runBackgroundWorkflow(args: {
 }): Promise<IMastraWorkflowRunDocument> {
   const { models, subdomain, workflow, envelope } = args;
 
-  // The app token (settings.erxesApiToken) is only the CLIENT CREDENTIAL that
-  // authenticates to core's mint endpoint — the minted owner token, not the app
-  // token, is the principal every operation step runs as.
-  const settings = await models.MastraSettings.getSettings();
-  const principal = await resolveBackgroundPrincipal({
-    agentConfig: { createdBy: workflow.createdByUserId },
-    subdomain,
-    appToken: settings?.erxesApiToken,
-  });
-  if (!principal.ok) {
-    return models.MastraWorkflowRun.createRun({
+  /** Records a failed run without executing — the fail-closed exit. */
+  const failClosed = (error: string) =>
+    models.MastraWorkflowRun.createRun({
       workflowId: workflow._id,
       version: workflow.version,
       runId: '',
       status: 'failed',
       triggerEnvelope: envelope,
       definitionSnapshot: workflow.definition,
-      error: principal.error,
+      error,
       startedAt: new Date(),
       finishedAt: new Date(),
     });
+
+  const agentId = workflow.agentId?.trim();
+  if (!agentId) {
+    return failClosed(
+      'This workflow has no owning agent — assign one before it can run in the background.',
+    );
+  }
+  const agentConfig = await models.MastraAgent.findOne({ agentId });
+  if (!agentConfig) {
+    return failClosed(
+      `This workflow's owning agent "${agentId}" was not found — reassign an existing agent before it can run.`,
+    );
+  }
+
+  // The app token (settings.erxesApiToken) is only the CLIENT CREDENTIAL that
+  // authenticates to core's mint endpoint — the minted owner token, bound to the
+  // owning agent's principal, is what every operation step runs as.
+  const settings = await models.MastraSettings.getSettings();
+  const principal = await resolveBackgroundPrincipal({
+    agentConfig,
+    subdomain,
+    appToken: settings?.erxesApiToken,
+  });
+  if (!principal.ok) {
+    return failClosed(principal.error);
   }
 
   // AsyncLocalStorage carries the owner principal (and background:true) into

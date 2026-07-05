@@ -91,6 +91,17 @@ startPlugin({
       await initLearningSweep(redis);
     }
 
+    // Workflow ownership backfill (step 24): give every legacy workflow an
+    // owning agent before the schedule reconciler runs, so unassignable ones are
+    // disabled first and never armed. Idempotent — a no-op once every workflow
+    // has an agentId.
+    {
+      const { backfillWorkflowAgents } = await import(
+        '~/mastra/workflows/agentBackfill'
+      );
+      await backfillWorkflowAgents();
+    }
+
     // Workflow schedule trigger: reconcile BullMQ job schedulers with enabled
     // schedule-workflows (boot kick + every 5 minutes).
     {

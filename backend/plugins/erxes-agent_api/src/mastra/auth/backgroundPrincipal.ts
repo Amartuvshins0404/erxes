@@ -15,10 +15,12 @@
 
 import { ExpectedError } from 'erxes-api-shared/utils';
 import type { IMastraAgent } from '@/agent/@types/agent';
+import type { IModels } from '~/connectionResolvers';
 import type { WorkflowDefinition } from '../workflows/dsl';
 import {
   resolveBackgroundToken,
   isSecureBackgroundRunRequired,
+  resolveOwner,
 } from './runToken';
 
 /**
@@ -39,9 +41,11 @@ export type BackgroundPrincipalResult =
 
 /**
  * The owner source: any object exposing the same ownerUserId/createdBy fields an
- * agent config does. Agent-backed runs pass the agent config; workflow runs pass
- * a `{ createdBy: workflow.createdByUserId }` shim — a workflow has no single
- * owning agent (it may bind zero or many), so its creator is the bound owner.
+ * agent config does. Every background run now resolves its principal from an
+ * OWNING AGENT's config — scheduled agent runs, the frontline bot, and (since
+ * step 24) workflows, which each carry a required `agentId`. The old
+ * `{ createdBy: workflow.createdByUserId }` shim is gone: a workflow's identity
+ * is its owning agent, not its human creator.
  */
 export type OwnerSource =
   | Pick<IMastraAgent, 'ownerUserId' | 'createdBy'>
@@ -120,25 +124,43 @@ export function backgroundRunEnableError(opts: {
 /**
  * A schedule-triggered workflow runs unattended on a cron, so — like an agent
  * schedule — it may only be ENABLED when the secure owner-token path is
- * configured (the erxes app token in Agent settings + a workflow creator to bind
- * as owner) and it does not run destructive ops without asking. Only 'schedule'
+ * configured and it does not run destructive ops without asking. Since step 24
+ * the preconditions resolve from the workflow's OWNING AGENT's config, exactly
+ * as assertScheduleEnablable does for schedules: the owner is the agent's
+ * resolved principal (ownerUserId → createdBy) and the destructive gate reads the
+ * agent's destructiveOps — NOT the workflow creator or the definition. A workflow
+ * with no owning agent (or one pointing at a missing agent) cannot be enabled at
+ * all: without an identity it can never mint a background token. Only 'schedule'
  * triggers are gated here; other triggers (manual/automation/webhook) either run
  * as a user or fail closed at runtime via runBackgroundWorkflow. Throws
  * ExpectedError on refusal so both the GraphQL mutations and the agent-facing
  * builder tools share one enable-time check (the tools convert the throw into
  * their structured failure result).
  */
-export const assertWorkflowSchedulable = (opts: {
-  owner: string | undefined;
+export const assertWorkflowSchedulable = async (opts: {
+  models: IModels;
+  agentId: string | undefined;
   definition: WorkflowDefinition;
-  appToken: string | undefined;
 }) => {
   if (opts.definition?.trigger?.type !== 'schedule') return;
+  const agentId = opts.agentId?.trim();
+  if (!agentId) {
+    throw new ExpectedError(
+      'Cannot enable this workflow: it has no owning agent — assign one before enabling.',
+    );
+  }
+  const agent = await opts.models.MastraAgent.findOne({ agentId });
+  if (!agent) {
+    throw new ExpectedError(
+      `Cannot enable this workflow: its owning agent "${agentId}" was not found — reassign an existing agent before enabling.`,
+    );
+  }
+  const settings = await opts.models.MastraSettings.getSettings();
   const error = backgroundRunEnableError({
-    owner: opts.owner?.trim() || undefined,
-    destructiveAllow: opts.definition.destructiveOps === 'allow',
+    owner: resolveOwner(agent),
+    destructiveAllow: agent.destructiveOps === 'allow',
     subject: 'workflow',
-    appToken: opts.appToken,
+    appToken: settings?.erxesApiToken,
   });
   if (error) throw new ExpectedError(error);
 };

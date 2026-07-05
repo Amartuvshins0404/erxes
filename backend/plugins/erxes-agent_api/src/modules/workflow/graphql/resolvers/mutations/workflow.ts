@@ -9,6 +9,21 @@ import { assertWorkflowSchedulable } from '~/mastra/auth/backgroundPrincipal';
 import { IMastraWorkflow } from '@/workflow/@types/workflow';
 import { requireUserId } from '@/_shared/auth';
 
+// The owning agent is the workflow's identity anchor (its background principal
+// and enable preconditions resolve from this agent). New workflows MUST name an
+// existing one; validated here by the same business agentId schedules use.
+const assertOwningAgentExists = async (models: IModels, agentId: unknown) => {
+  if (typeof agentId !== 'string' || !agentId.trim()) {
+    throw new ExpectedError(
+      'A workflow must have an owning agent — set agentId to an existing agent.',
+    );
+  }
+  const agent = await models.MastraAgent.findOne({ agentId: agentId.trim() });
+  if (!agent) {
+    throw new ExpectedError(`Agent "${agentId}" not found`);
+  }
+};
+
 // Save-time validation runs with the LIVE operation registry, so a definition
 // referencing a nonexistent or out-of-policy operation never reaches Mongo.
 const validateWithRegistry = async (models: IModels, definition: unknown) => {
@@ -32,15 +47,16 @@ export const workflowMutations = {
   ) => {
     await checkPermission('workflowsCreate');
     const userId = requireUserId(user);
+    // Every workflow is owned by an agent — required, and it must exist.
+    await assertOwningAgentExists(models, doc.agentId);
     await validateWithRegistry(models, doc.definition);
-    // The creator is the workflow's bound background owner — validate the
-    // schedule-enable preconditions when creating already-enabled.
+    // The owning agent is the workflow's bound background principal — validate
+    // the schedule-enable preconditions (from THAT agent) when creating enabled.
     if (doc.isEnabled) {
-      const settings = await models.MastraSettings.getSettings();
-      assertWorkflowSchedulable({
-        owner: userId,
+      await assertWorkflowSchedulable({
+        models,
+        agentId: doc.agentId,
         definition: doc.definition,
-        appToken: settings?.erxesApiToken,
       });
     }
     return models.MastraWorkflow.createWorkflow({
@@ -56,19 +72,23 @@ export const workflowMutations = {
   ) => {
     await checkPermission('workflowsEdit');
     requireUserId(user);
+    // An update may only change agentId to another EXISTING agent (never clear
+    // it) — the owning agent is the workflow's identity and can't be dropped.
+    if (doc.agentId !== undefined) {
+      await assertOwningAgentExists(models, doc.agentId);
+    }
     if (doc.definition) await validateWithRegistry(models, doc.definition);
     // Re-check the schedule-enable preconditions whenever the resulting workflow
     // is enabled — this update may enable it, repoint its trigger to a schedule,
-    // or flip destructiveOps on an already-enabled scheduled workflow.
+    // reassign the owning agent, or flip the owning agent's destructiveOps.
     const existing = await models.MastraWorkflow.getWorkflow(_id);
     const willBeEnabled =
       doc.isEnabled !== undefined ? doc.isEnabled : existing.isEnabled;
     if (willBeEnabled) {
-      const settings = await models.MastraSettings.getSettings();
-      assertWorkflowSchedulable({
-        owner: existing.createdByUserId,
+      await assertWorkflowSchedulable({
+        models,
+        agentId: doc.agentId ?? existing.agentId,
         definition: (doc.definition ?? existing.definition) as WorkflowDefinition,
-        appToken: settings?.erxesApiToken,
       });
     }
     return models.MastraWorkflow.updateWorkflow(_id, doc);
@@ -95,11 +115,10 @@ export const workflowMutations = {
     // the secure background preconditions.
     if (isEnabled) {
       const workflow = await models.MastraWorkflow.getWorkflow(_id);
-      const settings = await models.MastraSettings.getSettings();
-      assertWorkflowSchedulable({
-        owner: workflow.createdByUserId,
+      await assertWorkflowSchedulable({
+        models,
+        agentId: workflow.agentId,
         definition: workflow.definition,
-        appToken: settings?.erxesApiToken,
       });
     }
     return models.MastraWorkflow.setEnabled(_id, isEnabled);

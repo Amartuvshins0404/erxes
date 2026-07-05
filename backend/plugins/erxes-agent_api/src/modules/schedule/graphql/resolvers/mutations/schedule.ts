@@ -2,16 +2,39 @@ import { ExpectedError } from 'erxes-api-shared/utils';
 import { IContext, IModels } from '~/connectionResolvers';
 import { IMastraSchedule } from '@/schedule/@types/schedule';
 import { runSchedule } from '~/mastra/schedules/runner';
+import { resolveOwner } from '~/mastra/auth/runToken';
+import { backgroundRunEnableError } from '~/mastra/auth/backgroundPrincipal';
 import { requireUserId } from '@/_shared/auth';
+import type { IMastraAgentDocument } from '@/agent/@types/agent';
 
 /** The referenced agent must exist and be enabled before a schedule saves. */
-const assertAgentRunnable = async (models: IModels, agentId: unknown) => {
+const assertAgentRunnable = async (
+  models: IModels,
+  agentId: unknown,
+): Promise<IMastraAgentDocument> => {
   if (typeof agentId !== 'string' || !agentId) {
     throw new ExpectedError('agentId must be a non-empty string');
   }
   const agent = await models.MastraAgent.findOne({ agentId, isEnabled: true });
   if (!agent)
     throw new ExpectedError(`Agent "${agentId}" not found or disabled`);
+  return agent;
+};
+
+/**
+ * A schedule may only be ENABLED when its agent is safe for unattended runs:
+ * the secure owner-token path is configured (secret + owner) AND the agent does
+ * not run destructive ops without asking. Caught here so the misconfig surfaces
+ * at setup, not silently when the runner fails closed at 3am.
+ */
+const assertScheduleEnablable = async (models: IModels, agentId: unknown) => {
+  const agent = await assertAgentRunnable(models, agentId);
+  const error = backgroundRunEnableError({
+    owner: resolveOwner(agent),
+    destructiveAllow: agent.destructiveOps === 'allow',
+    subject: 'schedule',
+  });
+  if (error) throw new ExpectedError(error);
 };
 
 /** Mutations for scheduled agent runs. */
@@ -23,7 +46,10 @@ export const scheduleMutations = {
   ) => {
     await checkPermission('schedulesCreate');
     const userId = requireUserId(user);
-    await assertAgentRunnable(models, doc.agentId);
+    // Creating already-enabled gates on the same background preconditions as a
+    // later enable; otherwise only require the agent to exist.
+    if (doc.isEnabled) await assertScheduleEnablable(models, doc.agentId);
+    else await assertAgentRunnable(models, doc.agentId);
     return models.MastraSchedule.createSchedule({
       ...doc,
       createdByUserId: userId,
@@ -39,6 +65,16 @@ export const scheduleMutations = {
     requireUserId(user);
     if (doc.agentId !== undefined) {
       await assertAgentRunnable(models, doc.agentId);
+    }
+    // Validate the background preconditions whenever the resulting schedule is
+    // enabled — either this update enables it, or it was already enabled and the
+    // agent is being repointed. The effective agent is the new one if supplied,
+    // else the existing one.
+    const existing = await models.MastraSchedule.getSchedule(_id);
+    const willBeEnabled =
+      doc.isEnabled !== undefined ? doc.isEnabled : existing.isEnabled;
+    if (willBeEnabled) {
+      await assertScheduleEnablable(models, doc.agentId ?? existing.agentId);
     }
     return models.MastraSchedule.updateSchedule(_id, doc);
   },
@@ -60,6 +96,12 @@ export const scheduleMutations = {
   ) => {
     await checkPermission('schedulesEdit');
     requireUserId(user);
+    // Enabling is the moment the cron becomes live — gate it on the secure
+    // background preconditions.
+    if (isEnabled) {
+      const schedule = await models.MastraSchedule.getSchedule(_id);
+      await assertScheduleEnablable(models, schedule.agentId);
+    }
     return models.MastraSchedule.setEnabled(_id, isEnabled);
   },
 

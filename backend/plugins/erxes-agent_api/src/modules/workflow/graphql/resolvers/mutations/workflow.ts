@@ -1,10 +1,11 @@
 import { ExpectedError } from 'erxes-api-shared/utils';
 import { IContext, IModels } from '~/connectionResolvers';
-import { validateDefinition } from '~/mastra/workflows/dsl';
+import { validateDefinition, WorkflowDefinition } from '~/mastra/workflows/dsl';
 import { buildManualEnvelope } from '~/mastra/workflows/envelope';
 import { runWorkflow } from '~/mastra/workflows/runtime';
 import { getOperationRegistry } from '~/mastra/tools/operationRegistry';
 import { runWithAuth } from '~/mastra/requestContext';
+import { backgroundRunEnableError } from '~/mastra/auth/backgroundPrincipal';
 import { IMastraWorkflow } from '@/workflow/@types/workflow';
 import { requireUserId } from '@/_shared/auth';
 
@@ -22,6 +23,27 @@ const validateWithRegistry = async (models: IModels, definition: unknown) => {
   }
 };
 
+/**
+ * A schedule-triggered workflow runs unattended on a cron, so — like an agent
+ * schedule — it may only be ENABLED when the secure owner-token path is
+ * configured (secret + a workflow creator to bind as owner) and it does not run
+ * destructive ops without asking. Only 'schedule' triggers are gated here; other
+ * triggers (manual/automation/webhook) either run as a user or fail closed at
+ * runtime via runBackgroundWorkflow.
+ */
+const assertWorkflowSchedulable = (opts: {
+  owner: string | undefined;
+  definition: WorkflowDefinition;
+}) => {
+  if (opts.definition?.trigger?.type !== 'schedule') return;
+  const error = backgroundRunEnableError({
+    owner: opts.owner?.trim() || undefined,
+    destructiveAllow: opts.definition.destructiveOps === 'allow',
+    subject: 'workflow',
+  });
+  if (error) throw new ExpectedError(error);
+};
+
 /** Mutations for workflow definitions and manual workflow runs. */
 export const workflowMutations = {
   mastraWorkflowCreate: async (
@@ -32,6 +54,11 @@ export const workflowMutations = {
     await checkPermission('workflowsCreate');
     const userId = requireUserId(user);
     await validateWithRegistry(models, doc.definition);
+    // The creator is the workflow's bound background owner — validate the
+    // schedule-enable preconditions when creating already-enabled.
+    if (doc.isEnabled) {
+      assertWorkflowSchedulable({ owner: userId, definition: doc.definition });
+    }
     return models.MastraWorkflow.createWorkflow({
       ...doc,
       createdByUserId: userId,
@@ -46,6 +73,18 @@ export const workflowMutations = {
     await checkPermission('workflowsEdit');
     requireUserId(user);
     if (doc.definition) await validateWithRegistry(models, doc.definition);
+    // Re-check the schedule-enable preconditions whenever the resulting workflow
+    // is enabled — this update may enable it, repoint its trigger to a schedule,
+    // or flip destructiveOps on an already-enabled scheduled workflow.
+    const existing = await models.MastraWorkflow.getWorkflow(_id);
+    const willBeEnabled =
+      doc.isEnabled !== undefined ? doc.isEnabled : existing.isEnabled;
+    if (willBeEnabled) {
+      assertWorkflowSchedulable({
+        owner: existing.createdByUserId,
+        definition: (doc.definition ?? existing.definition) as WorkflowDefinition,
+      });
+    }
     return models.MastraWorkflow.updateWorkflow(_id, doc);
   },
 
@@ -66,6 +105,15 @@ export const workflowMutations = {
   ) => {
     await checkPermission('workflowsEdit');
     requireUserId(user);
+    // Enabling a schedule-triggered workflow makes the cron live — gate it on
+    // the secure background preconditions.
+    if (isEnabled) {
+      const workflow = await models.MastraWorkflow.getWorkflow(_id);
+      assertWorkflowSchedulable({
+        owner: workflow.createdByUserId,
+        definition: workflow.definition,
+      });
+    }
     return models.MastraWorkflow.setEnabled(_id, isEnabled);
   },
 

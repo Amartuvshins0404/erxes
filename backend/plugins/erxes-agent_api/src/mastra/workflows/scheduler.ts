@@ -19,7 +19,7 @@ import {
 import { generateModels } from '../../connectionResolvers';
 import { pruneStaleJobSchedulers } from '../jobSchedulers';
 import { TriggerEnvelope } from './envelope';
-import { runWorkflow } from './runtime';
+import { runBackgroundWorkflow } from './runtime';
 
 const SERVICE = 'erxes-agent';
 const RECONCILE_QUEUE = 'workflow-schedule-reconcile';
@@ -117,7 +117,14 @@ async function runScheduledWorkflow(
     payload: { firedAt: new Date().toISOString() },
   };
 
-  const record = await runWorkflow({ models, subdomain, workflow, envelope });
+  // Background entry point: resolves the workflow owner's bounded principal and
+  // fails closed (records a failed run) rather than executing as the app token.
+  const record = await runBackgroundWorkflow({
+    models,
+    subdomain,
+    workflow,
+    envelope,
+  });
   return `run ${record._id}: ${record.status}`;
 }
 

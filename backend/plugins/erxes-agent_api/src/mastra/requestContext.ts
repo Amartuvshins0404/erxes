@@ -31,6 +31,12 @@ interface RequestAuth {
   /** Destructive ops the user approved for THIS turn — the execute guard runs an
    *  otherwise-gated delete/merge only when it matches one of these. */
   approvedOps?: ApprovedOp[];
+  /** True when this is an unattended background run (scheduled agent, frontline
+   *  bot, or automation-triggered workflow) authenticated as the agent's bound
+   *  owner rather than a live user. Defense-in-depth reads it to force
+   *  destructive ops to 'ask' (which, with no approvals possible in the
+   *  background, blocks them) regardless of the agent/workflow config. */
+  background?: boolean;
 }
 
 const authStorage = new AsyncLocalStorage<RequestAuth>();

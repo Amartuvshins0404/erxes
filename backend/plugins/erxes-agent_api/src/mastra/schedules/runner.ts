@@ -97,8 +97,15 @@ export async function runSchedule(args: {
     // Scheduled runs have no user session — run as the agent's bound owner and
     // fail closed when that principal can't be minted. NEVER falls back to the
     // app token: doing so would silently escalate the run to admin instead of
-    // stopping the schedule.
-    const principal = await resolveBackgroundPrincipal({ agentConfig, subdomain });
+    // stopping the schedule. The app token (settings.erxesApiToken) is only the
+    // CLIENT CREDENTIAL for core's mint endpoint — the minted owner token is the
+    // acting principal.
+    const settings = await models.MastraSettings.getSettings();
+    const principal = await resolveBackgroundPrincipal({
+      agentConfig,
+      subdomain,
+      appToken: settings?.erxesApiToken,
+    });
     if (!principal.ok) {
       return finish({ status: 'failed', error: principal.error });
     }

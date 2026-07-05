@@ -452,13 +452,15 @@ export const workflowSaveTool = tool({
 
         // Enabling a schedule-triggered workflow makes its cron live, so it must
         // clear the same background-run preconditions the GraphQL mutations
-        // enforce (secret configured, an owner to bind, no unattended
-        // destructive ops). Reuse the shared check; the throw becomes this
-        // tool's structured failure so the agent gets an actionable message.
+        // enforce (app token configured in Agent settings, an owner to bind, no
+        // unattended destructive ops). Reuse the shared check; the throw becomes
+        // this tool's structured failure so the agent gets an actionable message.
         if (enable) {
+          const settings = await models.MastraSettings.getSettings();
           assertWorkflowSchedulable({
             owner: currentUserId(),
             definition: check.definition,
+            appToken: settings?.erxesApiToken,
           });
         }
 
@@ -531,10 +533,12 @@ export const workflowUpdateTool = tool({
           const willBeEnabled =
             enable !== undefined ? enable : existing.isEnabled;
           if (willBeEnabled) {
+            const settings = await models.MastraSettings.getSettings();
             assertWorkflowSchedulable({
               owner: existing.createdByUserId,
               definition: (patch.definition ??
                 existing.definition) as WorkflowDefinition,
+              appToken: settings?.erxesApiToken,
             });
           }
         }

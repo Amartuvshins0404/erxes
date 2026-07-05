@@ -1,12 +1,13 @@
 // Enable-time validation for scheduled agent runs: a schedule may only be
-// ENABLED when the secure owner-token path is configured and the agent does not
-// run destructive ops unattended. runSchedule is mocked so the resolver imports
-// stay lightweight (no @mastra agent runtime pulled in).
+// ENABLED when the secure owner-token path is configured (the erxes app token in
+// Agent settings + an owner) and the agent does not run destructive ops
+// unattended. runSchedule is mocked so the resolver imports stay lightweight (no
+// @mastra agent runtime pulled in).
 jest.mock('~/mastra/schedules/runner', () => ({ runSchedule: jest.fn() }));
 
 import { scheduleMutations } from '../schedule';
 
-const SECRET = 'shared-run-secret';
+const APP_TOKEN = 'sk_app-token';
 
 type Agent = {
   agentId: string;
@@ -15,7 +16,9 @@ type Agent = {
   destructiveOps?: 'allow' | 'ask' | 'block';
 };
 
-const makeCtx = (agent: Agent | null) => {
+// `appToken` seeds Agent settings' erxesApiToken — undefined = the secure path
+// is not configured.
+const makeCtx = (agent: Agent | null, appToken?: string) => {
   const createSchedule = jest.fn((doc: unknown) => Promise.resolve(doc));
   const setEnabled = jest.fn().mockResolvedValue({});
   const getSchedule = jest.fn().mockResolvedValue({
@@ -23,11 +26,15 @@ const makeCtx = (agent: Agent | null) => {
     agentId: agent?.agentId ?? 'a1',
     isEnabled: false,
   });
+  const getSettings = jest
+    .fn()
+    .mockResolvedValue({ erxesApiToken: appToken });
   return {
     ctx: {
       models: {
         MastraAgent: { findOne: jest.fn().mockResolvedValue(agent) },
         MastraSchedule: { createSchedule, setEnabled, getSchedule },
+        MastraSettings: { getSettings },
       },
       user: { _id: 'u1' },
       checkPermission: jest.fn().mockResolvedValue(undefined),
@@ -48,13 +55,8 @@ const baseDoc = (isEnabled: boolean) => ({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 }) as any;
 
-afterEach(() => {
-  delete process.env.ERXES_AGENT_RUN_TOKEN_SECRET;
-});
-
 describe('mastraScheduleCreate enable-time validation', () => {
-  it('rejects creating an enabled schedule when the run-token secret is unset', async () => {
-    delete process.env.ERXES_AGENT_RUN_TOKEN_SECRET;
+  it('rejects creating an enabled schedule when the app token is unconfigured', async () => {
     const { ctx, createSchedule } = makeCtx({
       agentId: 'a1',
       createdBy: 'u1',
@@ -62,13 +64,12 @@ describe('mastraScheduleCreate enable-time validation', () => {
 
     await expect(
       scheduleMutations.mastraScheduleCreate(undefined, { doc: baseDoc(true) }, ctx),
-    ).rejects.toThrow(/ERXES_AGENT_RUN_TOKEN_SECRET/);
+    ).rejects.toThrow(/erxes app token/i);
     expect(createSchedule).not.toHaveBeenCalled();
   });
 
   it('rejects creating an enabled schedule when the agent has no owner', async () => {
-    process.env.ERXES_AGENT_RUN_TOKEN_SECRET = SECRET;
-    const { ctx, createSchedule } = makeCtx({ agentId: 'a1' });
+    const { ctx, createSchedule } = makeCtx({ agentId: 'a1' }, APP_TOKEN);
 
     await expect(
       scheduleMutations.mastraScheduleCreate(undefined, { doc: baseDoc(true) }, ctx),
@@ -77,12 +78,10 @@ describe('mastraScheduleCreate enable-time validation', () => {
   });
 
   it("rejects an enabled schedule whose agent is destructiveOps: 'allow'", async () => {
-    process.env.ERXES_AGENT_RUN_TOKEN_SECRET = SECRET;
-    const { ctx, createSchedule } = makeCtx({
-      agentId: 'a1',
-      createdBy: 'u1',
-      destructiveOps: 'allow',
-    });
+    const { ctx, createSchedule } = makeCtx(
+      { agentId: 'a1', createdBy: 'u1', destructiveOps: 'allow' },
+      APP_TOKEN,
+    );
 
     await expect(
       scheduleMutations.mastraScheduleCreate(undefined, { doc: baseDoc(true) }, ctx),
@@ -90,13 +89,11 @@ describe('mastraScheduleCreate enable-time validation', () => {
     expect(createSchedule).not.toHaveBeenCalled();
   });
 
-  it('creates an enabled schedule when secret + owner present and destructive is gated', async () => {
-    process.env.ERXES_AGENT_RUN_TOKEN_SECRET = SECRET;
-    const { ctx, createSchedule } = makeCtx({
-      agentId: 'a1',
-      createdBy: 'u1',
-      destructiveOps: 'ask',
-    });
+  it('creates an enabled schedule when app token + owner present and destructive is gated', async () => {
+    const { ctx, createSchedule } = makeCtx(
+      { agentId: 'a1', createdBy: 'u1', destructiveOps: 'ask' },
+      APP_TOKEN,
+    );
 
     await scheduleMutations.mastraScheduleCreate(
       undefined,
@@ -107,9 +104,8 @@ describe('mastraScheduleCreate enable-time validation', () => {
   });
 
   it('creates a DISABLED schedule without the background preconditions', async () => {
-    // No secret, no owner — but disabled schedules never fire, so only the agent
-    // must exist.
-    delete process.env.ERXES_AGENT_RUN_TOKEN_SECRET;
+    // No app token, no owner — but disabled schedules never fire, so only the
+    // agent must exist.
     const { ctx, createSchedule } = makeCtx({ agentId: 'a1' });
 
     await scheduleMutations.mastraScheduleCreate(
@@ -123,7 +119,6 @@ describe('mastraScheduleCreate enable-time validation', () => {
 
 describe('mastraScheduleSetEnabled validation', () => {
   it('rejects enabling when the secure background path is unconfigured', async () => {
-    delete process.env.ERXES_AGENT_RUN_TOKEN_SECRET;
     const { ctx, setEnabled } = makeCtx({ agentId: 'a1' });
 
     await expect(
@@ -132,12 +127,11 @@ describe('mastraScheduleSetEnabled validation', () => {
         { _id: 's1', isEnabled: true },
         ctx,
       ),
-    ).rejects.toThrow(/ERXES_AGENT_RUN_TOKEN_SECRET/);
+    ).rejects.toThrow(/erxes app token/i);
     expect(setEnabled).not.toHaveBeenCalled();
   });
 
   it('allows DISABLING regardless of configuration', async () => {
-    delete process.env.ERXES_AGENT_RUN_TOKEN_SECRET;
     const { ctx, setEnabled } = makeCtx({ agentId: 'a1' });
 
     await scheduleMutations.mastraScheduleSetEnabled(

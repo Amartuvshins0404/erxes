@@ -1,7 +1,8 @@
 // Phase 3 — background owner-token resolution. resolveBackgroundToken mints a
 // short-lived owner token via core's `users.issueRunToken` and falls back to
-// undefined (caller → app token) whenever the owner or the shared secret is
-// missing, or the mint fails.
+// undefined (caller → app token) whenever the owner or the erxes app token is
+// missing, or the mint fails. The app token is passed only as the client
+// credential authenticating to core — never as the minted principal.
 const sendTRPCMessage = jest.fn();
 jest.mock('erxes-api-shared/utils', () => ({
   sendTRPCMessage: (...args: unknown[]) => sendTRPCMessage(...args),
@@ -9,24 +10,20 @@ jest.mock('erxes-api-shared/utils', () => ({
 
 import { resolveBackgroundToken } from '../runToken';
 
-const SECRET = 'shared-run-secret';
+const APP_TOKEN = 'sk_app-token';
 
 describe('resolveBackgroundToken', () => {
   beforeEach(() => {
     sendTRPCMessage.mockReset();
-    process.env.ERXES_AGENT_RUN_TOKEN_SECRET = SECRET;
   });
 
-  afterEach(() => {
-    delete process.env.ERXES_AGENT_RUN_TOKEN_SECRET;
-  });
-
-  it('mints the owner token when owner + secret are present', async () => {
+  it('mints the owner token when owner + app token are present', async () => {
     sendTRPCMessage.mockResolvedValue({ token: 'MINTED' });
 
     const token = await resolveBackgroundToken(
       { createdBy: 'user-1' },
       'os',
+      APP_TOKEN,
     );
 
     expect(token).toBe('MINTED');
@@ -37,7 +34,7 @@ describe('resolveBackgroundToken', () => {
         module: 'users',
         action: 'issueRunToken',
         method: 'mutation',
-        input: { userId: 'user-1', secret: SECRET },
+        input: { userId: 'user-1', appToken: APP_TOKEN },
       }),
     );
   });
@@ -48,23 +45,28 @@ describe('resolveBackgroundToken', () => {
     await resolveBackgroundToken(
       { ownerUserId: 'owner-9', createdBy: 'user-1' },
       'os',
+      APP_TOKEN,
     );
 
     expect(sendTRPCMessage).toHaveBeenCalledWith(
-      expect.objectContaining({ input: { userId: 'owner-9', secret: SECRET } }),
+      expect.objectContaining({
+        input: { userId: 'owner-9', appToken: APP_TOKEN },
+      }),
     );
   });
 
   it('returns undefined when the agent has no owner', async () => {
-    const token = await resolveBackgroundToken({}, 'os');
+    const token = await resolveBackgroundToken({}, 'os', APP_TOKEN);
     expect(token).toBeUndefined();
     expect(sendTRPCMessage).not.toHaveBeenCalled();
   });
 
-  it('returns undefined when the secret is unset', async () => {
-    delete process.env.ERXES_AGENT_RUN_TOKEN_SECRET;
-
-    const token = await resolveBackgroundToken({ createdBy: 'user-1' }, 'os');
+  it('returns undefined when the app token is unset', async () => {
+    const token = await resolveBackgroundToken(
+      { createdBy: 'user-1' },
+      'os',
+      undefined,
+    );
 
     expect(token).toBeUndefined();
     expect(sendTRPCMessage).not.toHaveBeenCalled();
@@ -73,7 +75,11 @@ describe('resolveBackgroundToken', () => {
   it('returns undefined when the TRPC call throws', async () => {
     sendTRPCMessage.mockRejectedValue(new Error('core unreachable'));
 
-    const token = await resolveBackgroundToken({ createdBy: 'user-1' }, 'os');
+    const token = await resolveBackgroundToken(
+      { createdBy: 'user-1' },
+      'os',
+      APP_TOKEN,
+    );
 
     expect(token).toBeUndefined();
   });
@@ -81,7 +87,11 @@ describe('resolveBackgroundToken', () => {
   it('returns undefined when the mint returns no token', async () => {
     sendTRPCMessage.mockResolvedValue(null);
 
-    const token = await resolveBackgroundToken({ createdBy: 'user-1' }, 'os');
+    const token = await resolveBackgroundToken(
+      { createdBy: 'user-1' },
+      'os',
+      APP_TOKEN,
+    );
 
     expect(token).toBeUndefined();
   });

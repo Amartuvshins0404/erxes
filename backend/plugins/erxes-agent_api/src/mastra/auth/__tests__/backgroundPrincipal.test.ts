@@ -14,6 +14,8 @@ import {
   backgroundRunEnableError,
 } from '../backgroundPrincipal';
 
+const APP_TOKEN = 'sk_app-token';
+
 describe('resolveBackgroundPrincipal', () => {
   beforeEach(() => {
     resolveBackgroundToken.mockReset();
@@ -26,6 +28,7 @@ describe('resolveBackgroundPrincipal', () => {
     const result = await resolveBackgroundPrincipal({
       agentConfig: { ownerUserId: 'owner-9', createdBy: 'creator-1' },
       subdomain: 'os',
+      appToken: APP_TOKEN,
     });
 
     expect(result).toEqual({
@@ -33,9 +36,11 @@ describe('resolveBackgroundPrincipal', () => {
       authCtx: { token: 'MINTED', subdomain: 'os', background: true },
     });
     // The owner identity, not the app token, is what forwards to the gateway.
+    // The app token is passed to the mint only as the client credential.
     expect(resolveBackgroundToken).toHaveBeenCalledWith(
       { ownerUserId: 'owner-9', createdBy: 'creator-1' },
       'os',
+      APP_TOKEN,
     );
   });
 
@@ -46,26 +51,30 @@ describe('resolveBackgroundPrincipal', () => {
     const result = await resolveBackgroundPrincipal({
       agentConfig: {},
       subdomain: 'os',
+      appToken: undefined,
     });
 
     expect(result.ok).toBe(false);
     // No token / auth ctx is ever produced — the app-token fallback is gone.
     expect(result).not.toHaveProperty('authCtx');
     if (!result.ok) {
-      expect(result.error).toMatch(/ERXES_AGENT_RUN_TOKEN_SECRET/);
+      expect(result.error).toMatch(/erxes app token/i);
+      expect(result.error).toMatch(/Agent settings/i);
       expect(result.error).toMatch(/owner/i);
     }
   });
 
   it('fails closed (no fallback) when the mint fails despite the secure path being active', async () => {
-    // Secret set + owner present, but core returns no token (deactivated owner,
-    // secret skew, unreachable) — must refuse, not downgrade to the app token.
+    // App token set + owner present, but core returns no token (deactivated
+    // owner, revoked app token, unreachable) — must refuse, not downgrade to the
+    // app token.
     resolveBackgroundToken.mockResolvedValue(undefined);
     isSecureBackgroundRunRequired.mockReturnValue(true);
 
     const result = await resolveBackgroundPrincipal({
       agentConfig: { createdBy: 'creator-1' },
       subdomain: 'os',
+      appToken: APP_TOKEN,
     });
 
     expect(result.ok).toBe(false);
@@ -78,49 +87,45 @@ describe('resolveBackgroundPrincipal', () => {
 });
 
 describe('backgroundRunEnableError', () => {
-  const SECRET = 'shared-run-secret';
-  afterEach(() => {
-    delete process.env.ERXES_AGENT_RUN_TOKEN_SECRET;
-  });
-
-  it('rejects when the run-token secret is unset', () => {
-    delete process.env.ERXES_AGENT_RUN_TOKEN_SECRET;
+  it('rejects when the erxes app token is unset', () => {
     const error = backgroundRunEnableError({
       owner: 'owner-1',
       destructiveAllow: false,
       subject: 'schedule',
+      appToken: undefined,
     });
-    expect(error).toMatch(/ERXES_AGENT_RUN_TOKEN_SECRET/);
+    expect(error).toMatch(/erxes app token/i);
+    expect(error).toMatch(/Agent settings/i);
     expect(error).toMatch(/schedule/);
   });
 
   it('rejects when the background owner is unset', () => {
-    process.env.ERXES_AGENT_RUN_TOKEN_SECRET = SECRET;
     const error = backgroundRunEnableError({
       owner: undefined,
       destructiveAllow: false,
       subject: 'workflow',
+      appToken: APP_TOKEN,
     });
     expect(error).toMatch(/owner is unset/i);
     expect(error).toMatch(/workflow/);
   });
 
   it("rejects destructiveOps: 'allow' outright", () => {
-    process.env.ERXES_AGENT_RUN_TOKEN_SECRET = SECRET;
     const error = backgroundRunEnableError({
       owner: 'owner-1',
       destructiveAllow: true,
       subject: 'schedule',
+      appToken: APP_TOKEN,
     });
     expect(error).toMatch(/destructiveOps/);
   });
 
-  it('allows enabling when secret + owner are present and destructive is gated', () => {
-    process.env.ERXES_AGENT_RUN_TOKEN_SECRET = SECRET;
+  it('allows enabling when app token + owner are present and destructive is gated', () => {
     const error = backgroundRunEnableError({
       owner: 'owner-1',
       destructiveAllow: false,
       subject: 'schedule',
+      appToken: APP_TOKEN,
     });
     expect(error).toBeNull();
   });

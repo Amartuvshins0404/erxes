@@ -28,13 +28,16 @@ jest.mock('./agentErrors', () => ({
 
 import { agentMutations } from './agent';
 
-const makeCtx = (updatedAgent: Record<string, unknown>) => {
+const makeCtx = (
+  updatedAgent: Record<string, unknown>,
+  userOverrides: Record<string, unknown> = { isOwner: true },
+) => {
   const updateAgent = jest.fn().mockResolvedValue(updatedAgent);
   return {
     updateAgent,
     ctx: {
       models: { MastraAgent: { updateAgent } },
-      user: { _id: 'u1', isOwner: true },
+      user: { _id: 'u1', ...userOverrides },
       subdomain: 'os',
       checkPermission: jest.fn().mockResolvedValue(undefined),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -149,6 +152,101 @@ describe('mastraAgentUpdate grant wiring', () => {
 
     expect(sendTRPCMessage).not.toHaveBeenCalled();
     expect(syncServiceUserGroup).not.toHaveBeenCalled();
+    expect(updateAgent).toHaveBeenCalledWith(
+      'a1',
+      { name: 'Renamed' },
+      undefined,
+    );
+  });
+});
+
+// F2 — a grant carries the agent's server-side permissions, so binding one is a
+// privilege escalation unless the caller already holds top privilege. Only an
+// org owner may SET a grant; clearing it (de-escalation) stays open to any
+// editor. NOTE: isAgentAdmin is mocked to `true` for every test here, so these
+// cases also prove the gate keys on org ownership — NOT agent-admin.
+describe('mastraAgentUpdate grant assignment authorization', () => {
+  it('denies a non-owner setting grantGroupId (no existence check, no update)', async () => {
+    sendTRPCMessage.mockResolvedValue([{ _id: 'grp-9' }]); // would exist if reached
+    const { ctx, updateAgent } = makeCtx(
+      { _id: 'a1', serviceUserId: 'svc-1' },
+      { isOwner: false },
+    );
+
+    await expect(
+      agentMutations.mastraAgentUpdate(
+        undefined,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        { _id: 'a1', doc: { grantGroupId: 'grp-9' } as any },
+        ctx,
+      ),
+    ).rejects.toThrow(/organization owner/i);
+
+    // Guard runs before the existence check → no group leak, no persistence.
+    expect(sendTRPCMessage).not.toHaveBeenCalled();
+    expect(updateAgent).not.toHaveBeenCalled();
+    expect(syncServiceUserGroup).not.toHaveBeenCalled();
+  });
+
+  it('allows an org owner to set grantGroupId', async () => {
+    sendTRPCMessage.mockResolvedValue([{ _id: 'grp-9' }]);
+    const { ctx, updateAgent } = makeCtx(
+      { _id: 'a1', serviceUserId: 'svc-1' },
+      { isOwner: true },
+    );
+
+    await agentMutations.mastraAgentUpdate(
+      undefined,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      { _id: 'a1', doc: { grantGroupId: 'grp-9' } as any },
+      ctx,
+    );
+
+    expect(updateAgent).toHaveBeenCalledWith(
+      'a1',
+      expect.objectContaining({ grantGroupId: 'grp-9' }),
+      undefined,
+    );
+  });
+
+  it('allows a non-owner to CLEAR a grant (de-escalation)', async () => {
+    const { ctx, updateAgent } = makeCtx(
+      { _id: 'a1', serviceUserId: 'svc-1' },
+      { isOwner: false },
+    );
+
+    await agentMutations.mastraAgentUpdate(
+      undefined,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      { _id: 'a1', doc: { grantGroupId: '' } as any },
+      ctx,
+    );
+
+    expect(updateAgent).toHaveBeenCalledWith(
+      'a1',
+      expect.objectContaining({ grantGroupId: null }),
+      undefined,
+    );
+    expect(syncServiceUserGroup).toHaveBeenCalledWith({
+      serviceUserId: 'svc-1',
+      groupId: null,
+      subdomain: 'os',
+    });
+  });
+
+  it('does not block a non-owner editing unrelated fields (grant untouched)', async () => {
+    const { ctx, updateAgent } = makeCtx(
+      { _id: 'a1', serviceUserId: 'svc-1' },
+      { isOwner: false },
+    );
+
+    await agentMutations.mastraAgentUpdate(
+      undefined,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      { _id: 'a1', doc: { name: 'Renamed' } as any },
+      ctx,
+    );
+
     expect(updateAgent).toHaveBeenCalledWith(
       'a1',
       { name: 'Renamed' },

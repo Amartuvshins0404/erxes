@@ -55,6 +55,36 @@ const assertOwnerAssignable = (
   );
 };
 
+/**
+ * Authorize a requested `grantGroupId` value. The grant group carries the
+ * agent's server-side permissions: a background run mints a service-user token
+ * whose actions ARE this group's. Binding the agent to a group whose actions
+ * exceed the caller's own is a privilege escalation — a prompt-injectable
+ * background run could then drive ops the caller can't perform (e.g. a group
+ * carrying core `permissionsManage`), which is exactly the risk `ownerUserId`
+ * guards against above.
+ *
+ * The precise bar is a SUBSET check (the group's actions ⊆ the caller's own
+ * effective actions), but that isn't cleanly available from the resolver
+ * context, so — exactly like `assertOwnerAssignable` — we require true
+ * ORGANIZATION OWNERSHIP: only an org owner (already top privilege, so nothing
+ * an assignment could grant escalates them) may SET a grant. `isAgentAdmin` is
+ * deliberately NOT enough here: an agent-admin is not necessarily an org owner
+ * and could still gain cross-plugin actions by binding a privileged group.
+ * Clearing a grant (null) is de-escalation — allowed for anyone who can edit.
+ * No-op when a grant is not being set. TODO(step 23+): swap the owner gate for
+ * a real subset check against the caller's effective action map.
+ */
+const assertGrantAssignable = (
+  grantGroupId: string | null,
+  callerIsOwner: boolean,
+) => {
+  if (!grantGroupId || callerIsOwner) return;
+  throw new ExpectedError(
+    'Only an organization owner may bind an agent to a permission group (grant). You can still clear an existing grant.',
+  );
+};
+
 export const agentMutations = {
   mastraAgentCreate: async (
     _parent: undefined,
@@ -117,6 +147,10 @@ export const agentMutations = {
     // stale grantGroupId the mint path would then re-sync back onto the user.
     const grantGroupId: string | null = doc.grantGroupId?.trim() || null;
     if (grantChanged && grantGroupId) {
+      // Escalation guard BEFORE the existence check: only an org owner may set
+      // a grant (see assertGrantAssignable). Running it first denies a
+      // non-owner without leaking whether the target group exists.
+      assertGrantAssignable(grantGroupId, Boolean(user.isOwner));
       await assertGrantGroupExists(subdomain, grantGroupId);
     }
 

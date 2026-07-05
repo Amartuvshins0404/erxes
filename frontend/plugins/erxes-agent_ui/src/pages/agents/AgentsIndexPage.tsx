@@ -15,7 +15,6 @@ import {
   IconTool,
   IconCalendar,
   IconLock,
-  IconMessageCircle,
   IconEye,
   IconSitemap,
   IconStack2,
@@ -26,7 +25,6 @@ import {
 import {
   Button,
   CommandBar,
-  Command,
   cn,
   RecordTable,
   RecordTableInlineCell,
@@ -34,7 +32,7 @@ import {
   Separator,
   toast,
 } from 'erxes-ui';
-import { MASTRA_AGENT_REMOVE, MASTRA_AGENT_UPDATE } from '~/graphql/mutations';
+import { MASTRA_AGENT_REMOVE } from '~/graphql/mutations';
 import {
   MASTRA_MY_AGENT_QUOTA_STATUS,
   AGENT_FORM_BRANCHES,
@@ -44,9 +42,7 @@ import {
 import {
   IconBadge,
   IdentityCell,
-  RowActionsMenu,
   SortableHead,
-  ToggleDeleteMenuItems,
   enabledStatusColumn,
 } from '~/components/RecordTableShared';
 import { GroupByConfig } from '~/components/GroupedRowList';
@@ -115,69 +111,6 @@ const CreateAgentButton = ({ children }: { children: React.ReactNode }) => {
     >
       {children}
     </PermissionButton>
-  );
-};
-
-// ─── More menu cell ───────────────────────────────────────────────────────────
-
-// A hover-revealed row-actions menu, pinned to the row END. Editing an agent's
-// config lives in the workspace Settings tab (reachable by opening the row), so
-// the menu drops the redundant "Edit" and stays minimal: Chat, Enable/Disable,
-// Delete. Stays visible while its popover is open (focus-within) or on hover.
-const AgentMoreCell = ({ agent }: { agent: IAgent }) => {
-  const navigate = useNavigate();
-  const { confirmRemove } = useConfirmedRemove();
-  const { canEditAgent, canRemoveAgent } = useAgentAccess();
-
-  const canEdit = canEditAgent(agent);
-  const canRemove = canRemoveAgent(agent);
-
-  const [removeAgent] = useMutation(MASTRA_AGENT_REMOVE, {
-    update: agentListCacheUpdate,
-    onError: agentMutationError(),
-  });
-
-  const [updateAgent] = useMutation(MASTRA_AGENT_UPDATE, {
-    update: agentListCacheUpdate,
-    onError: agentMutationError(),
-  });
-
-  const handleDelete = () =>
-    confirmRemove(
-      { message: `Remove "${agent.name}"? This cannot be undone.` },
-      () => removeAgent({ variables: { _id: agent._id } }),
-    );
-
-  const handleToggle = () => {
-    updateAgent({
-      variables: { _id: agent._id, doc: { isEnabled: !agent.isEnabled } },
-    });
-  };
-
-  return (
-    <div className="opacity-0 transition-opacity group-hover/table-row:opacity-100 focus-within:opacity-100">
-      <RowActionsMenu>
-        <Command.Item asChild>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="justify-start w-full h-8"
-            onClick={() => navigate(`/erxes-agent/chat/${agent._id}`)}
-          >
-            <IconMessageCircle className="size-4" /> Chat
-          </Button>
-        </Command.Item>
-        <ToggleDeleteMenuItems
-          isEnabled={agent.isEnabled}
-          onToggle={handleToggle}
-          onDelete={handleDelete}
-          toggleDisabled={!canEdit}
-          deleteDisabled={!canRemove}
-          onToggleDenied={showAgentPermissionError}
-          onDeleteDenied={showAgentPermissionError}
-        />
-      </RowActionsMenu>
-    </div>
   );
 };
 
@@ -476,8 +409,9 @@ const buildBaseColumns = (
 ];
 
 // Column order: the selection checkbox leads (it drives the bulk-delete command
-// bar), then the data columns, and the row-actions kebab trails at the row END —
-// no permanent leading actions column. The kebab reveals on row hover.
+// bar), then the data columns. No row-actions column — opening the row reaches
+// everything (chat, settings, enable/disable, delete) in the agent workspace,
+// and bulk delete lives on the selection command bar.
 const buildColumns = (
   scopeNames: Record<string, string>,
   sort: SortState,
@@ -486,11 +420,6 @@ const buildColumns = (
 ): ColumnDef<IAgent>[] => [
   RecordTable.checkboxColumn as ColumnDef<IAgent>,
   ...buildBaseColumns(scopeNames, sort, onSort, basePath),
-  {
-    id: 'actions',
-    cell: ({ row }) => <AgentMoreCell agent={row.original} />,
-    size: 44,
-  },
 ];
 
 // ─── Page ─────────────────────────────────────────────────────────────────────

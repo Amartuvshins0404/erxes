@@ -50,6 +50,12 @@ export const agentSchema = new Schema(
     // Background-run principal (Phase 3): bounded user whose gateway permissions
     // background runs (bot/schedule) act under. Unset → defaults to createdBy.
     ownerUserId: { type: String, label: 'Owner User' },
+    // Agent-as-principal (step 21). serviceUserId: the agent's dedicated core
+    // service user (passwordless, role:'system'), provisioned lazily by
+    // ensureServiceUser. grantGroupId: the permission group synced onto that
+    // user (its server-side grant). Both unset until the lifecycle runs.
+    serviceUserId: { type: String, label: 'Service User' },
+    grantGroupId: { type: String, label: 'Grant Group' },
     visibility: {
       type: String,
       enum: ['private', 'team', 'department', 'unit', 'org'],

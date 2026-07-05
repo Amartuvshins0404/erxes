@@ -27,6 +27,14 @@ export interface IMastraAgent {
   // permissions frontline-bot and scheduled runs act under. Defaults to the
   // creator (`createdBy`) when unset; reassignable to scope an exposed agent.
   ownerUserId?: string;
+  // Agent-as-principal (step 21): the agent's dedicated core "service user" — a
+  // passwordless, non-owner, role:'system' user provisioned lazily by
+  // ensureServiceUser. Background runs will mint run tokens for it (step 22).
+  serviceUserId?: string;
+  // The permission group assigned to the service user, carrying the agent's
+  // server-side grant. Synced onto the user via syncServiceUserGroup (step 23
+  // drives the selection). Unset → no group (empty permissionGroupIds).
+  grantGroupId?: string;
   // Access control: who can see and chat with this agent.
   visibility?: 'private' | 'team' | 'department' | 'unit' | 'org';
   // teamId stores the branch _id for all scoped modes (team/department/unit) so

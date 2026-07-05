@@ -21,6 +21,7 @@ const APP_TOKEN = 'sk_app-token';
 
 type Agent = {
   agentId: string;
+  isEnabled?: boolean;
   ownerUserId?: string;
   createdBy?: string;
   destructiveOps?: 'allow' | 'ask' | 'block';
@@ -33,10 +34,14 @@ const scheduleDef = () => ({
 });
 
 /**
- * A context double. `agent` is what MastraAgent.findOne resolves (null =
- * not found); `appToken` seeds Agent settings' erxesApiToken.
+ * A context double. `agent` is the STORED owning agent (null = not found);
+ * `appToken` seeds Agent settings' erxesApiToken. The findOne is FILTER-AWARE:
+ * it honors the resolver's `isEnabled: true` clause, so a disabled agent
+ * resolves to null (the kill switch). Test agents default to enabled unless a
+ * case explicitly passes `isEnabled: false`.
  */
 const makeCtx = (agent: Agent, appToken?: string) => {
+  const stored = agent ? { isEnabled: true, ...agent } : null;
   const createWorkflow = jest.fn((doc: unknown) =>
     Promise.resolve({ _id: 'wf-1', version: 1, ...(doc as object) }),
   );
@@ -46,6 +51,12 @@ const makeCtx = (agent: Agent, appToken?: string) => {
   );
   const getWorkflow = jest.fn();
   const getSettings = jest.fn().mockResolvedValue({ erxesApiToken: appToken });
+  const findOne = jest.fn((q: Record<string, unknown> = {}) => {
+    if (!stored) return Promise.resolve(null);
+    if (q.isEnabled === true && stored.isEnabled !== true)
+      return Promise.resolve(null);
+    return Promise.resolve(stored);
+  });
   return {
     createWorkflow,
     setEnabled,
@@ -53,7 +64,7 @@ const makeCtx = (agent: Agent, appToken?: string) => {
     getWorkflow,
     ctx: {
       models: {
-        MastraAgent: { findOne: jest.fn().mockResolvedValue(agent) },
+        MastraAgent: { findOne },
         MastraSettings: { getSettings },
         MastraWorkflow: {
           createWorkflow,
@@ -94,6 +105,25 @@ describe('mastraWorkflowCreate ownership', () => {
         ctx,
       ),
     ).rejects.toThrow(/not found/i);
+    expect(createWorkflow).not.toHaveBeenCalled();
+  });
+
+  it('rejects creating a workflow whose owning agent is DISABLED (kill switch)', async () => {
+    // The agent exists but isEnabled:false — a disabled agent must not be handed
+    // new workflows to drive, exactly as schedules refuse a disabled agent.
+    const { ctx, createWorkflow } = makeCtx({
+      agentId: 'off',
+      isEnabled: false,
+      createdBy: 'u1',
+    });
+    await expect(
+      workflowMutations.mastraWorkflowCreate(
+        undefined,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        { doc: { name: 'w', agentId: 'off', definition: manualDef() } as any },
+        ctx,
+      ),
+    ).rejects.toThrow(/not found or disabled/i);
     expect(createWorkflow).not.toHaveBeenCalled();
   });
 
@@ -173,6 +203,23 @@ describe('mastraWorkflowUpdate ownership', () => {
     ).rejects.toThrow(/not found/i);
     expect(updateWorkflow).not.toHaveBeenCalled();
   });
+
+  it('refuses reassigning ownership to a DISABLED agent (kill switch)', async () => {
+    const { ctx, updateWorkflow } = makeCtx({
+      agentId: 'off',
+      isEnabled: false,
+      createdBy: 'u1',
+    });
+    await expect(
+      workflowMutations.mastraWorkflowUpdate(
+        undefined,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        { _id: 'wf-1', doc: { agentId: 'off' } as any },
+        ctx,
+      ),
+    ).rejects.toThrow(/not found or disabled/i);
+    expect(updateWorkflow).not.toHaveBeenCalled();
+  });
 });
 
 describe('mastraWorkflowSetEnabled', () => {
@@ -190,6 +237,28 @@ describe('mastraWorkflowSetEnabled', () => {
         ctx,
       ),
     ).rejects.toThrow(/no owning agent/i);
+    expect(setEnabled).not.toHaveBeenCalled();
+  });
+
+  it('rejects enabling a schedule workflow whose owning agent is DISABLED', async () => {
+    // The workflow names an agent that exists but is disabled — the kill switch
+    // must block arming its cron, not just its own scheduled runs.
+    const { ctx, setEnabled, getWorkflow } = makeCtx(
+      { agentId: 'a1', isEnabled: false, createdBy: 'u1', destructiveOps: 'ask' },
+      APP_TOKEN,
+    );
+    getWorkflow.mockResolvedValue({
+      _id: 'wf-1',
+      agentId: 'a1',
+      definition: scheduleDef(),
+    });
+    await expect(
+      workflowMutations.mastraWorkflowSetEnabled(
+        undefined,
+        { _id: 'wf-1', isEnabled: true },
+        ctx,
+      ),
+    ).rejects.toThrow(/not found or is disabled/i);
     expect(setEnabled).not.toHaveBeenCalled();
   });
 

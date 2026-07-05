@@ -45,16 +45,32 @@ const mockCreateWorkflow = jest.fn((doc: Record<string, unknown>) =>
 const mockGetWorkflows = jest.fn(() => Promise.resolve([]));
 const mockGetRuns = jest.fn(() => Promise.resolve([]));
 // Owning-agent lookups (existence check + enable-gate owner/destructiveOps).
-// Default: the agent exists with an owner and destructiveOps gated. Individual
-// tests override the resolved agent (missing → not found; 'allow' → refused).
+// Default: the agent exists, is enabled, has an owner and destructiveOps gated.
+// Individual tests set the stored agent via setAgent (missing → not found;
+// isEnabled:false → refused as the kill switch; 'allow' → refused).
 type MockAgent = {
   agentId: string;
+  isEnabled?: boolean;
   ownerUserId?: string;
   createdBy?: string;
   destructiveOps?: 'allow' | 'ask' | 'block';
 } | null;
+// The STORED owning agent the FILTER-AWARE findOne resolves against. The mock
+// honors the resolver's `{ isEnabled: true }` clause so a disabled agent resolves
+// to null (the kill switch) — a blanket mock would hide that the lookup ever
+// filtered on isEnabled. setAgent defaults a passed agent to enabled unless it
+// explicitly carries isEnabled:false.
+let storedAgent: MockAgent = { agentId: 'agent-self', isEnabled: true, createdBy: 'u1' };
+const setAgent = (a: MockAgent) => {
+  storedAgent = a && a.isEnabled === undefined ? { ...a, isEnabled: true } : a;
+};
 const mockAgentFindOne = jest.fn<Promise<MockAgent>, [Record<string, unknown>]>(
-  () => Promise.resolve({ agentId: 'agent-self', createdBy: 'u1' }),
+  (q: Record<string, unknown> = {}) => {
+    if (!storedAgent) return Promise.resolve(null);
+    if (q.isEnabled === true && storedAgent.isEnabled !== true)
+      return Promise.resolve(null);
+    return Promise.resolve(storedAgent);
+  },
 );
 // Existing-workflow reads for the update tool's schedule-enable gate; each test
 // sets the stored shape (isEnabled/owner/definition) it needs.
@@ -443,15 +459,15 @@ describe('schedule-enable gate (agent builder tools)', () => {
     mockCreateWorkflow.mockClear();
     mockUpdateWorkflow.mockClear();
     mockGetWorkflow.mockReset();
-    // Default owning agent: exists, has an owner, destructiveOps gated.
-    mockAgentFindOne.mockReset();
-    mockAgentFindOne.mockResolvedValue({ agentId: 'agent-self', createdBy: 'u1' });
+    // Default owning agent: exists, enabled, has an owner, destructiveOps gated.
+    mockAgentFindOne.mockClear();
+    setAgent({ agentId: 'agent-self', createdBy: 'u1' });
   });
 
   afterEach(() => {
     // Restore the module-default settings + agent shapes for other suites.
     mockGetSettings.mockResolvedValue({ erxesApiUrl: 'https://gw' });
-    mockAgentFindOne.mockResolvedValue({ agentId: 'agent-self', createdBy: 'u1' });
+    setAgent({ agentId: 'agent-self', createdBy: 'u1' });
   });
 
   describe('workflowSaveTool', () => {
@@ -473,7 +489,7 @@ describe('schedule-enable gate (agent builder tools)', () => {
         erxesApiUrl: 'https://gw',
         erxesApiToken: APP_TOKEN,
       });
-      mockAgentFindOne.mockResolvedValue({
+      setAgent({
         agentId: 'agent-self',
         createdBy: 'u1',
         destructiveOps: 'allow',
@@ -598,8 +614,10 @@ describe('schedule-enable gate (agent builder tools)', () => {
 describe('workflow ownership (agent builder tools)', () => {
   beforeEach(() => {
     mockCreateWorkflow.mockClear();
-    mockAgentFindOne.mockReset();
-    mockAgentFindOne.mockResolvedValue({ agentId: 'agent-self', createdBy: 'u1' });
+    mockUpdateWorkflow.mockClear();
+    mockGetWorkflow.mockReset();
+    mockAgentFindOne.mockClear();
+    setAgent({ agentId: 'agent-self', createdBy: 'u1' });
     mockAuth.current = {
       subdomain: 'os',
       userHeader: Buffer.from('{"_id":"u1"}').toString('base64'),
@@ -622,14 +640,17 @@ describe('workflow ownership (agent builder tools)', () => {
       enable: false,
     });
     expect(res.success).toBe(true);
-    expect(mockAgentFindOne).toHaveBeenCalledWith({ agentId: 'agent-self' });
+    expect(mockAgentFindOne).toHaveBeenCalledWith({
+      agentId: 'agent-self',
+      isEnabled: true,
+    });
     expect(mockCreateWorkflow).toHaveBeenCalledWith(
       expect.objectContaining({ agentId: 'agent-self' }),
     );
   });
 
   it('honors an explicit agentId (ownership handed to another agent)', async () => {
-    mockAgentFindOne.mockResolvedValue({ agentId: 'agent-other', createdBy: 'u2' });
+    setAgent({ agentId: 'agent-other', createdBy: 'u2' });
     const res = await asTool<SaveResult>(workflowSaveTool).execute({
       name: 'Handoff',
       agentId: 'agent-other',
@@ -637,14 +658,17 @@ describe('workflow ownership (agent builder tools)', () => {
       enable: false,
     });
     expect(res.success).toBe(true);
-    expect(mockAgentFindOne).toHaveBeenCalledWith({ agentId: 'agent-other' });
+    expect(mockAgentFindOne).toHaveBeenCalledWith({
+      agentId: 'agent-other',
+      isEnabled: true,
+    });
     expect(mockCreateWorkflow).toHaveBeenCalledWith(
       expect.objectContaining({ agentId: 'agent-other' }),
     );
   });
 
   it('refuses to save when the referenced agent does not exist', async () => {
-    mockAgentFindOne.mockResolvedValue(null);
+    setAgent(null);
     const res = await asTool<SaveResult>(workflowSaveTool).execute({
       name: 'Ghost',
       agentId: 'agent-ghost',
@@ -654,6 +678,36 @@ describe('workflow ownership (agent builder tools)', () => {
     expect(res.success).toBe(false);
     expect(res.error).toMatch(/not found/i);
     expect(mockCreateWorkflow).not.toHaveBeenCalled();
+  });
+
+  it('refuses to save when handing ownership to a DISABLED agent (kill switch)', async () => {
+    // The agent exists but is disabled — ownership can't be handed to one, so the
+    // filter-aware findOne resolves it to null and the tool refuses.
+    setAgent({ agentId: 'agent-off', isEnabled: false, createdBy: 'u2' });
+    const res = await asTool<SaveResult>(workflowSaveTool).execute({
+      name: 'Handoff to disabled',
+      agentId: 'agent-off',
+      definition: definition(),
+      enable: false,
+    });
+    expect(res.success).toBe(false);
+    expect(res.error).toMatch(/not found or disabled/i);
+    expect(mockAgentFindOne).toHaveBeenCalledWith({
+      agentId: 'agent-off',
+      isEnabled: true,
+    });
+    expect(mockCreateWorkflow).not.toHaveBeenCalled();
+  });
+
+  it('refuses an update that reassigns ownership to a DISABLED agent', async () => {
+    setAgent({ agentId: 'agent-off', isEnabled: false, createdBy: 'u2' });
+    const res = await asTool<UpdateResult>(workflowUpdateTool).execute({
+      workflowId: 'wf-1',
+      agentId: 'agent-off',
+    });
+    expect(res.success).toBe(false);
+    expect(res.error).toMatch(/not found or disabled/i);
+    expect(mockUpdateWorkflow).not.toHaveBeenCalled();
   });
 
   it('refuses to save when no agentId is given and the calling agent is unknown', async () => {

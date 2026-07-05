@@ -108,13 +108,21 @@ function currentAgentId(): string | undefined {
   return getCurrentAuth()?.agentId?.trim() || undefined;
 }
 
-/** The referenced agent must exist before a workflow can be owned by it. */
+/**
+ * The referenced agent must exist AND be enabled before a workflow can be owned
+ * by it: a disabled agent is the kill switch (schedules gate on isEnabled too),
+ * so ownership can't be handed to one — its background runs would be refused.
+ */
 async function assertAgentExists(
   models: Awaited<ReturnType<typeof getModels>>,
   agentId: string,
 ): Promise<void> {
-  const agent = await models.MastraAgent.findOne({ agentId });
-  if (!agent) throw new ExpectedError(`Agent "${agentId}" not found`);
+  const agent = await models.MastraAgent.findOne({ agentId, isEnabled: true });
+  if (!agent) {
+    throw new ExpectedError(
+      `Owning agent "${agentId}" not found or disabled — enable it or reassign the workflow.`,
+    );
+  }
 }
 
 /** Normalizes a thrown value into the tools' { success: false, error } shape. */

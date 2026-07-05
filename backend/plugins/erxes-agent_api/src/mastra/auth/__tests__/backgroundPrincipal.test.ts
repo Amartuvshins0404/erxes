@@ -44,6 +44,33 @@ describe('resolveBackgroundPrincipal', () => {
     );
   });
 
+  it('stamps the owning agentId on the background ctx so a background turn can self-own workflows', async () => {
+    // The owning agent's identity must ride along so a scheduled/bot turn calling
+    // workflowSave defaults ownership to it (currentAgentId() → agentId), instead
+    // of refusing for want of a caller.
+    resolveBackgroundToken.mockResolvedValue('MINTED');
+
+    const result = await resolveBackgroundPrincipal({
+      agentConfig: {
+        agentId: 'agent-A',
+        ownerUserId: 'owner-9',
+        createdBy: 'creator-1',
+      },
+      subdomain: 'os',
+      appToken: APP_TOKEN,
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      authCtx: {
+        token: 'MINTED',
+        subdomain: 'os',
+        background: true,
+        agentId: 'agent-A',
+      },
+    });
+  });
+
   it('fails closed with an actionable message when the secure path is not configured', async () => {
     resolveBackgroundToken.mockResolvedValue(undefined);
     isSecureBackgroundRunRequired.mockReturnValue(false);

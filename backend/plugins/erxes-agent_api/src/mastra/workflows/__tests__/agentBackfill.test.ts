@@ -36,18 +36,24 @@ interface Workflow {
 }
 
 /**
- * A tiny in-memory models double. `find`/`findOne` honor the subset of the
- * Mongo query the backfill actually issues; `.sort()` is chainable and applied
- * to the filtered result so oldest-first determinism is exercised.
+ * A tiny in-memory models double. `findOne` honors the subset of the Mongo query
+ * the backfill actually issues; its result is BOTH directly awaitable (rule (a)
+ * resolves an agent by _id with no sort) AND `.sort()`-chainable (rules b/c want
+ * oldest-first), so the same double serves every lookup. Pending workflows are
+ * streamed through a `.cursor()` async-iterable, matching the real backfill.
  */
 const makeModels = (workflows: Workflow[], agents: Agent[]) => {
   const updateOne = jest.fn(() => Promise.resolve({ acknowledged: true }));
 
   const matchesAgent = (a: Agent, q: Record<string, unknown>): boolean => {
     if (q.isEnabled !== undefined && a.isEnabled !== q.isEnabled) return false;
-    if (q._id && typeof q._id === 'object') {
-      const inList = (q._id as { $in: string[] }).$in;
-      if (!inList.includes(a._id)) return false;
+    if (q._id !== undefined) {
+      if (typeof q._id === 'object') {
+        const inList = (q._id as { $in: string[] }).$in;
+        if (!inList.includes(a._id)) return false;
+      } else if (a._id !== q._id) {
+        return false;
+      }
     }
     if (q.$or) {
       const ok = (q.$or as Array<Record<string, unknown>>).some((clause) =>
@@ -60,33 +66,41 @@ const makeModels = (workflows: Workflow[], agents: Agent[]) => {
     return true;
   };
 
-  const sortable = (rows: Agent[]) => ({
-    sort: () =>
-      Promise.resolve(
-        [...rows].sort(
-          (x, y) =>
-            (x.createdAt?.getTime() ?? 0) - (y.createdAt?.getTime() ?? 0) ||
-            x._id.localeCompare(y._id),
-        )[0] ?? null,
-      ),
+  const oldestFirst = (rows: Agent[]) =>
+    [...rows].sort(
+      (x, y) =>
+        (x.createdAt?.getTime() ?? 0) - (y.createdAt?.getTime() ?? 0) ||
+        x._id.localeCompare(y._id),
+    );
+
+  // A findOne result that is awaitable (first match) and .sort()-chainable
+  // (oldest-first), so rule (a)'s bare await and rules b/c's .sort() both work.
+  const findOneResult = (rows: Agent[]) => ({
+    sort: () => Promise.resolve(oldestFirst(rows)[0] ?? null),
+    then: (
+      resolve: (v: Agent | null) => unknown,
+      reject?: (e: unknown) => unknown,
+    ) => Promise.resolve(rows[0] ?? null).then(resolve, reject),
   });
 
   return {
     updateOne,
     models: {
       MastraWorkflow: {
-        // Only the "missing agentId" branch is queried by the backfill.
-        find: jest.fn(() =>
-          Promise.resolve(workflows.filter((w) => !w.agentId)),
-        ),
+        // The backfill streams the "missing agentId" set with a cursor.
+        find: jest.fn(() => ({
+          cursor: () => {
+            const pending = workflows.filter((w) => !w.agentId);
+            return (async function* () {
+              for (const w of pending) yield w;
+            })();
+          },
+        })),
         updateOne,
       },
       MastraAgent: {
-        find: jest.fn((q: Record<string, unknown> = {}) =>
-          Promise.resolve(agents.filter((a) => matchesAgent(a, q))),
-        ),
         findOne: jest.fn((q: Record<string, unknown> = {}) =>
-          sortable(agents.filter((a) => matchesAgent(a, q))),
+          findOneResult(agents.filter((a) => matchesAgent(a, q))),
         ),
       },
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -149,6 +163,47 @@ describe('backfillTenantWorkflows', () => {
 
     await backfillTenantWorkflows(models);
 
+    expect(updateOne).toHaveBeenCalledWith(
+      { _id: 'wf-1' },
+      { $set: { agentId: 'agent-C' } },
+    );
+  });
+
+  it('rule (a) does NOT collapse to the survivor when one of two referenced agents was deleted', async () => {
+    // Two DISTINCT ids are referenced but only one still resolves (the other
+    // agent was deleted). "Exactly one referenced" is measured on the referenced
+    // ids, not the resolved docs, so this is still ambiguous → rule (b), NOT an
+    // assignment of the lone survivor the definition never singled out.
+    const { models, updateOne } = makeModels(
+      [
+        {
+          _id: 'wf-1',
+          createdByUserId: 'u1',
+          definition: {
+            bindings: {
+              a: { kind: 'agent', id: 'A_id' },
+              b: { kind: 'agent', id: 'GONE_id' }, // agent since deleted
+            },
+          },
+        },
+      ],
+      [
+        // Only A_id survives; GONE_id has no agent doc.
+        { _id: 'A_id', agentId: 'agent-A', isEnabled: true },
+        // The creator's oldest enabled agent is what rule (b) should pick.
+        {
+          _id: 'C_id',
+          agentId: 'agent-C',
+          isEnabled: true,
+          createdBy: 'u1',
+          createdAt: new Date('2020-01-01'),
+        },
+      ],
+    );
+
+    await backfillTenantWorkflows(models);
+
+    // NOT agent-A (the survivor) — rule (b) resolves the creator's oldest.
     expect(updateOne).toHaveBeenCalledWith(
       { _id: 'wf-1' },
       { $set: { agentId: 'agent-C' } },

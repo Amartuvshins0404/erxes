@@ -427,10 +427,16 @@ export async function runBackgroundWorkflow(args: {
       'This workflow has no owning agent — assign one before it can run in the background.',
     );
   }
-  const agentConfig = await models.MastraAgent.findOne({ agentId });
+  // A DISABLED owning agent is the kill switch: it must stop the workflows it
+  // owns from running in the background, exactly as it stops the agent's own
+  // scheduled runs. Fail closed just as for a missing agent.
+  const agentConfig = await models.MastraAgent.findOne({
+    agentId,
+    isEnabled: true,
+  });
   if (!agentConfig) {
     return failClosed(
-      `This workflow's owning agent "${agentId}" was not found — reassign an existing agent before it can run.`,
+      `This workflow's owning agent "${agentId}" was not found or is disabled — enable it or reassign the workflow before it can run.`,
     );
   }
 

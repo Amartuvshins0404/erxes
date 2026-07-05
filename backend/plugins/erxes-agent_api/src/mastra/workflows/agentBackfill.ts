@@ -44,18 +44,22 @@ function referencedAgentBindingIds(
  * Rule (a): the single distinct agent referenced in the definition's bindings.
  * Bindings hold an agent's mongoose `_id`; the workflow's owning agentId is the
  * business id, so resolve _id → agent and return its `agentId`. Only applies
- * when EXACTLY one distinct existing agent is referenced.
+ * when EXACTLY ONE DISTINCT id is REFERENCED — the ambiguity test counts
+ * referenced ids, NOT resolved docs. Two distinct referenced ids where one agent
+ * was since deleted is still ambiguous (we can't know which the author meant), so
+ * it falls through to rule (b); collapsing to the lone survivor would silently
+ * pick an owner the definition never singled out.
  */
 async function agentFromBindings(
   models: IModels,
   workflow: IMastraWorkflowDocument,
 ): Promise<string | undefined> {
   const ids = referencedAgentBindingIds(workflow);
-  if (ids.length === 0) return undefined;
-  const agents = await models.MastraAgent.find({ _id: { $in: ids } });
-  const distinct = new Map(agents.map((a) => [a._id, a]));
-  if (distinct.size !== 1) return undefined;
-  return [...distinct.values()][0].agentId || undefined;
+  if (ids.length !== 1) return undefined;
+  // Exactly one referenced id: resolve it. If that agent was deleted the lookup
+  // is empty → undefined → rule (b), never a wrong assignment.
+  const agent = await models.MastraAgent.findOne({ _id: ids[0] });
+  return agent?.agentId || undefined;
 }
 
 /** Rule (b): oldest enabled agent owned or created by the workflow's creator. */
@@ -103,44 +107,62 @@ async function resolveOwningAgent(
   return { rule: 'none' };
 }
 
+/** Assigns (or disables) one pending workflow. Throws on a Mongo failure so the
+ *  caller can contain it per workflow. */
+async function backfillOneWorkflow(
+  models: IModels,
+  workflow: IMastraWorkflowDocument,
+): Promise<void> {
+  const { agentId, rule } = await resolveOwningAgent(models, workflow);
+
+  if (agentId) {
+    await models.MastraWorkflow.updateOne(
+      { _id: workflow._id },
+      { $set: { agentId } },
+    );
+    // eslint-disable-next-line no-console
+    console.log(
+      `[erxes-agent:workflows] backfill: workflow ${workflow._id} → agent ${agentId} (rule: ${rule})`,
+    );
+    return;
+  }
+
+  // Rule (d): no agent to assign — a workflow can't run in the background
+  // without an identity, so disable it and leave agentId unset for an admin to
+  // assign later.
+  if (workflow.isEnabled) {
+    await models.MastraWorkflow.updateOne(
+      { _id: workflow._id },
+      { $set: { isEnabled: false } },
+    );
+  }
+  // eslint-disable-next-line no-console
+  console.warn(
+    `[erxes-agent:workflows] backfill: workflow ${workflow._id} has no assignable agent — left unassigned and disabled`,
+  );
+}
+
 /**
  * Backfills every workflow in ONE tenant that is missing an agentId. Pure over
  * the passed models so it can be unit-tested without a live Mongo. Idempotent:
- * the query only selects workflows without an agentId.
+ * the query only selects workflows without an agentId. Streams the pending set
+ * with a cursor rather than loading it all into memory, and contains a
+ * per-workflow failure (log + continue) so one bad doc can't abort the rest.
  */
 export async function backfillTenantWorkflows(models: IModels): Promise<void> {
-  const pending = (await models.MastraWorkflow.find({
+  const cursor = models.MastraWorkflow.find({
     $or: [{ agentId: { $exists: false } }, { agentId: null }, { agentId: '' }],
-  })) as IMastraWorkflowDocument[];
+  }).cursor() as AsyncIterable<IMastraWorkflowDocument>;
 
-  for (const workflow of pending) {
-    const { agentId, rule } = await resolveOwningAgent(models, workflow);
-
-    if (agentId) {
-      await models.MastraWorkflow.updateOne(
-        { _id: workflow._id },
-        { $set: { agentId } },
-      );
+  for await (const workflow of cursor) {
+    try {
+      await backfillOneWorkflow(models, workflow);
+    } catch (e) {
       // eslint-disable-next-line no-console
-      console.log(
-        `[erxes-agent:workflows] backfill: workflow ${workflow._id} → agent ${agentId} (rule: ${rule})`,
-      );
-      continue;
-    }
-
-    // Rule (d): no agent to assign — a workflow can't run in the background
-    // without an identity, so disable it and leave agentId unset for an admin to
-    // assign later.
-    if (workflow.isEnabled) {
-      await models.MastraWorkflow.updateOne(
-        { _id: workflow._id },
-        { $set: { isEnabled: false } },
+      console.error(
+        `[erxes-agent:workflows] backfill: workflow ${workflow._id} failed — skipping: ${(e as Error)?.message}`,
       );
     }
-    // eslint-disable-next-line no-console
-    console.warn(
-      `[erxes-agent:workflows] backfill: workflow ${workflow._id} has no assignable agent — left unassigned and disabled`,
-    );
   }
 }
 

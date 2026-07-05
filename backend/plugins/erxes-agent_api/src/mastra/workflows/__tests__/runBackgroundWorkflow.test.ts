@@ -13,12 +13,22 @@ import { runBackgroundWorkflow } from '../runtime';
 
 const envelope = { source: 'schedule', type: 'schedule', payload: {} } as never;
 
-/** A models double capturing the failed-run record and the agent lookup. */
-const makeModels = (agent: unknown) => {
+/**
+ * A models double capturing the failed-run record and the agent lookup. The
+ * findOne is FILTER-AWARE: it honors the `isEnabled: true` clause the runtime
+ * issues, so a disabled owning agent resolves to null (the kill switch) — a
+ * blanket mock would hide that the query ever filtered on isEnabled.
+ */
+const makeModels = (agent: { isEnabled?: boolean } | null) => {
   const createRun = jest.fn((doc: Record<string, unknown>) =>
     Promise.resolve({ _id: 'run-1', ...doc }),
   );
-  const findOne = jest.fn().mockResolvedValue(agent);
+  const findOne = jest.fn((q: Record<string, unknown> = {}) => {
+    if (!agent) return Promise.resolve(null);
+    if (q.isEnabled === true && agent.isEnabled !== true)
+      return Promise.resolve(null);
+    return Promise.resolve(agent);
+  });
   return {
     createRun,
     findOne,
@@ -75,8 +85,33 @@ describe('runBackgroundWorkflow fail-closed', () => {
     expect(resolveBackgroundPrincipal).not.toHaveBeenCalled();
   });
 
+  it('fails closed when the owning agent is DISABLED (kill switch)', async () => {
+    // The agent exists but isEnabled:false — the filter-aware findOne resolves it
+    // to null exactly as the runtime's { isEnabled: true } query does, so the
+    // background run is refused instead of running under a killed agent.
+    const { models } = makeModels({
+      agentId: 'agent-A',
+      isEnabled: false,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
+    const rec = await runBackgroundWorkflow({
+      models,
+      subdomain: 'os',
+      workflow: workflow({ agentId: 'agent-A' }),
+      envelope,
+    });
+    expect(rec.status).toBe('failed');
+    expect(rec.error).toMatch(/not found or is disabled/i);
+    expect(resolveBackgroundPrincipal).not.toHaveBeenCalled();
+  });
+
   it('resolves the principal from the OWNING AGENT config and fails closed on mint failure', async () => {
-    const agent = { agentId: 'agent-A', ownerUserId: 'owner-9', createdBy: 'u1' };
+    const agent = {
+      agentId: 'agent-A',
+      isEnabled: true,
+      ownerUserId: 'owner-9',
+      createdBy: 'u1',
+    };
     const { models } = makeModels(agent);
     resolveBackgroundPrincipal.mockResolvedValue({
       ok: false,

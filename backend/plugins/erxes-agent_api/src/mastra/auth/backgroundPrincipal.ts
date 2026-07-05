@@ -33,6 +33,10 @@ export interface BackgroundAuthCtx {
   token: string;
   subdomain: string;
   background: true;
+  /** The owning agent's business agentId, so a background turn can self-own the
+   *  workflows it builds (currentAgentId() resolves to it) — mirrors how chat
+   *  turns stamp agentId in prepare.ts. Absent only for identity-less owners. */
+  agentId?: string;
 }
 
 export type BackgroundPrincipalResult =
@@ -48,7 +52,7 @@ export type BackgroundPrincipalResult =
  * is its owning agent, not its human creator.
  */
 export type OwnerSource =
-  | Pick<IMastraAgent, 'ownerUserId' | 'createdBy'>
+  | Pick<IMastraAgent, 'ownerUserId' | 'createdBy' | 'agentId'>
   | null
   | undefined;
 
@@ -78,7 +82,17 @@ export async function resolveBackgroundPrincipal(opts: {
 
   const token = await resolveBackgroundToken(agentConfig, subdomain, appToken);
   if (token) {
-    return { ok: true, authCtx: { token, subdomain, background: true } };
+    return {
+      ok: true,
+      authCtx: {
+        token,
+        subdomain,
+        background: true,
+        // Stamp the owning agent's identity so a background turn can self-own
+        // the workflows it builds (workflowSave defaults ownership to it).
+        agentId: agentConfig?.agentId?.trim() || undefined,
+      },
+    };
   }
 
   const error = isSecureBackgroundRunRequired(agentConfig, appToken)
@@ -129,8 +143,9 @@ export function backgroundRunEnableError(opts: {
  * as assertScheduleEnablable does for schedules: the owner is the agent's
  * resolved principal (ownerUserId → createdBy) and the destructive gate reads the
  * agent's destructiveOps — NOT the workflow creator or the definition. A workflow
- * with no owning agent (or one pointing at a missing agent) cannot be enabled at
- * all: without an identity it can never mint a background token. Only 'schedule'
+ * with no owning agent (or one pointing at a missing OR DISABLED agent) cannot be
+ * enabled at all: a disabled agent is the kill switch, and without a live
+ * identity it can never mint a background token. Only 'schedule'
  * triggers are gated here; other triggers (manual/automation/webhook) either run
  * as a user or fail closed at runtime via runBackgroundWorkflow. Throws
  * ExpectedError on refusal so both the GraphQL mutations and the agent-facing
@@ -149,10 +164,16 @@ export const assertWorkflowSchedulable = async (opts: {
       'Cannot enable this workflow: it has no owning agent — assign one before enabling.',
     );
   }
-  const agent = await opts.models.MastraAgent.findOne({ agentId });
+  // Enable requires an ENABLED owning agent — a disabled agent is the kill
+  // switch (schedules gate on isEnabled too), so it must stop the workflows it
+  // owns from being armed, not just its own runs.
+  const agent = await opts.models.MastraAgent.findOne({
+    agentId,
+    isEnabled: true,
+  });
   if (!agent) {
     throw new ExpectedError(
-      `Cannot enable this workflow: its owning agent "${agentId}" was not found — reassign an existing agent before enabling.`,
+      `Cannot enable this workflow: its owning agent "${agentId}" was not found or is disabled — enable it or reassign the workflow before enabling.`,
     );
   }
   const settings = await opts.models.MastraSettings.getSettings();

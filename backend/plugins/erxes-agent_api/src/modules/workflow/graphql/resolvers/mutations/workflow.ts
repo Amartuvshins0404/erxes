@@ -18,9 +18,17 @@ const assertOwningAgentExists = async (models: IModels, agentId: unknown) => {
       'A workflow must have an owning agent — set agentId to an existing agent.',
     );
   }
-  const agent = await models.MastraAgent.findOne({ agentId: agentId.trim() });
+  // Only an ENABLED agent may own a workflow: a disabled agent is the kill
+  // switch (schedules gate on isEnabled too), so it can't be handed new
+  // workflows to drive in the background.
+  const agent = await models.MastraAgent.findOne({
+    agentId: agentId.trim(),
+    isEnabled: true,
+  });
   if (!agent) {
-    throw new ExpectedError(`Agent "${agentId}" not found`);
+    throw new ExpectedError(
+      `Owning agent "${agentId}" not found or disabled — enable it or reassign the workflow.`,
+    );
   }
 };
 

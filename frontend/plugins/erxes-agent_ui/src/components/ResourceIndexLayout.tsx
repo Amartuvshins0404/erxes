@@ -134,7 +134,7 @@ export const ResourceIndexLayout = <T,>({
           </Empty>
         </div>
       ) : (
-        <div className="flex-1 min-h-0">
+        <div className="flex-1 min-h-0 flex flex-col">
           <RecordTable.Provider
             columns={columns}
             data={data}
@@ -148,28 +148,30 @@ export const ResourceIndexLayout = <T,>({
               dataLength={data.length}
               sessionKey={sessionKey}
             >
-              <RecordTable>
-                <RecordTable.Header />
-                <RecordTable.Body>
-                  {onFetchMore && (
-                    <RecordTable.CursorBackwardSkeleton
-                      handleFetchMore={onFetchMore}
-                    />
-                  )}
-                  {loading && data.length === 0 ? (
-                    <RecordTable.RowSkeleton rows={skeletonRows} />
-                  ) : groupBy ? (
-                    <GroupedRowList<T> groupBy={groupBy} />
-                  ) : (
-                    <RecordTable.RowList />
-                  )}
-                  {onFetchMore && (
-                    <RecordTable.CursorForwardSkeleton
-                      handleFetchMore={onFetchMore}
-                    />
-                  )}
-                </RecordTable.Body>
-              </RecordTable>
+              <RecordTable.Scroll>
+                <RecordTable>
+                  <RecordTable.Header />
+                  <RecordTable.Body>
+                    {onFetchMore && (
+                      <RecordTable.CursorBackwardSkeleton
+                        handleFetchMore={onFetchMore}
+                      />
+                    )}
+                    {loading && data.length === 0 ? (
+                      <RecordTable.RowSkeleton rows={skeletonRows} />
+                    ) : groupBy ? (
+                      <GroupedRowList<T> groupBy={groupBy} />
+                    ) : (
+                      <RecordTable.RowList />
+                    )}
+                    {onFetchMore && (
+                      <RecordTable.CursorForwardSkeleton
+                        handleFetchMore={onFetchMore}
+                      />
+                    )}
+                  </RecordTable.Body>
+                </RecordTable>
+              </RecordTable.Scroll>
             </RecordTable.CursorProvider>
             {commandBar}
           </RecordTable.Provider>

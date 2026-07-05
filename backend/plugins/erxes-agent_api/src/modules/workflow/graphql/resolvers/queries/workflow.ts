@@ -5,12 +5,13 @@ import { requireUserId } from '@/_shared/auth';
 export const workflowQueries = {
   mastraWorkflows: async (
     _parent: undefined,
-    _args: undefined,
+    { agentId }: { agentId?: string },
     { models, user, checkPermission }: IContext,
   ) => {
     await checkPermission('workflowsView');
     requireUserId(user);
-    return models.MastraWorkflow.getWorkflows();
+    // Optional per-agent scoping — step 25's UI lists a single agent's workflows.
+    return models.MastraWorkflow.getWorkflows({ agentId });
   },
 
   mastraWorkflow: async (

@@ -98,6 +98,33 @@ function currentUserId(): string | undefined {
   }
 }
 
+/**
+ * The business agentId of the agent whose turn is running these tools — stamped
+ * on the auth context in prepare.ts. This is what a workflow the agent builds is
+ * owned by when the model doesn't name an explicit agentId, so a self-built
+ * workflow inherits its builder's identity (and background principal).
+ */
+function currentAgentId(): string | undefined {
+  return getCurrentAuth()?.agentId?.trim() || undefined;
+}
+
+/**
+ * The referenced agent must exist AND be enabled before a workflow can be owned
+ * by it: a disabled agent is the kill switch (schedules gate on isEnabled too),
+ * so ownership can't be handed to one — its background runs would be refused.
+ */
+async function assertAgentExists(
+  models: Awaited<ReturnType<typeof getModels>>,
+  agentId: string,
+): Promise<void> {
+  const agent = await models.MastraAgent.findOne({ agentId, isEnabled: true });
+  if (!agent) {
+    throw new ExpectedError(
+      `Owning agent "${agentId}" not found or disabled — enable it or reassign the workflow.`,
+    );
+  }
+}
+
 /** Normalizes a thrown value into the tools' { success: false, error } shape. */
 const fail = (e: unknown) => ({
   success: false as const,
@@ -420,10 +447,16 @@ export const workflowSimulateTool = tool({
 export const workflowSaveTool = tool({
   id: 'workflow-save',
   description:
-    'Saves a NEW workflow after the user explicitly confirmed the presented step list. Validates first; returns the saved workflow id. Workflows are saved DISABLED unless enable=true.',
+    "Saves a NEW workflow after the user explicitly confirmed the presented step list. Validates first; returns the saved workflow id. Workflows are saved DISABLED unless enable=true. The workflow is OWNED by an agent (its background identity) — defaults to you, the agent building it; pass agentId only to hand ownership to a different existing agent.",
   inputSchema: z.object({
     name: z.string().min(1),
     description: z.string().optional(),
+    agentId: z
+      .string()
+      .optional()
+      .describe(
+        "The owning agent's id. Omit to own it yourself (the building agent).",
+      ),
     definition: z.record(z.unknown()),
     enable: z.boolean().default(false),
   }),
@@ -435,16 +468,29 @@ export const workflowSaveTool = tool({
   execute: async ({
     name,
     description,
+    agentId,
     definition,
     enable,
   }: {
     name: string;
     description?: string;
+    agentId?: string;
     definition: Record<string, unknown>;
     enable?: boolean;
   }) =>
     withWorkflowContext(async ({ models, getRegistry }) => {
       try {
+        // Own it: the explicit agentId, else the agent running this turn. Every
+        // workflow needs an owning agent — its background principal and enable
+        // preconditions resolve from it.
+        const ownerAgentId = agentId?.trim() || currentAgentId();
+        if (!ownerAgentId) {
+          throw new ExpectedError(
+            'This workflow needs an owning agent — pass agentId (the calling agent could not be determined).',
+          );
+        }
+        await assertAgentExists(models, ownerAgentId);
+
         const check = await validatedDefinition(definition, getRegistry);
         if (!check.ok) {
           return { success: false, errors: check.errors };
@@ -452,21 +498,21 @@ export const workflowSaveTool = tool({
 
         // Enabling a schedule-triggered workflow makes its cron live, so it must
         // clear the same background-run preconditions the GraphQL mutations
-        // enforce (app token configured in Agent settings, an owner to bind, no
-        // unattended destructive ops). Reuse the shared check; the throw becomes
-        // this tool's structured failure so the agent gets an actionable message.
+        // enforce (app token configured in Agent settings, the OWNING AGENT's
+        // owner + destructiveOps). Reuse the shared check; the throw becomes this
+        // tool's structured failure so the agent gets an actionable message.
         if (enable) {
-          const settings = await models.MastraSettings.getSettings();
-          assertWorkflowSchedulable({
-            owner: currentUserId(),
+          await assertWorkflowSchedulable({
+            models,
+            agentId: ownerAgentId,
             definition: check.definition,
-            appToken: settings?.erxesApiToken,
           });
         }
 
         const doc = await models.MastraWorkflow.createWorkflow({
           name,
           description,
+          agentId: ownerAgentId,
           definition: check.definition,
           isEnabled: Boolean(enable),
           createdByUserId: currentUserId(),
@@ -486,6 +532,10 @@ export const workflowUpdateTool = tool({
     workflowId: z.string(),
     name: z.string().optional(),
     description: z.string().optional(),
+    agentId: z
+      .string()
+      .optional()
+      .describe('Reassign the owning agent (must be an existing agent).'),
     definition: z.record(z.unknown()).optional(),
     enable: z.boolean().optional(),
   }),
@@ -497,12 +547,14 @@ export const workflowUpdateTool = tool({
     workflowId,
     name,
     description,
+    agentId,
     definition,
     enable,
   }: {
     workflowId: string;
     name?: string;
     description?: string;
+    agentId?: string;
     definition?: Record<string, unknown>;
     enable?: boolean;
   }) =>
@@ -511,6 +563,7 @@ export const workflowUpdateTool = tool({
         const patch: {
           name?: string;
           description?: string;
+          agentId?: string;
           definition?: WorkflowDefinition;
           isEnabled?: boolean;
         } = {};
@@ -522,23 +575,28 @@ export const workflowUpdateTool = tool({
         }
         if (name !== undefined) patch.name = name;
         if (description !== undefined) patch.description = description;
+        // Reassigning ownership: only to an existing agent (never clear it).
+        if (agentId !== undefined) {
+          const next = agentId.trim();
+          await assertAgentExists(models, next);
+          patch.agentId = next;
+        }
         if (enable !== undefined) patch.isEnabled = enable;
 
         // Re-run the schedule-enable gate whenever this update leaves the
         // workflow enabled — it may flip isEnabled on, repoint the trigger to a
-        // schedule, or flip destructiveOps on an already-enabled schedule.
-        // Mirrors mastraWorkflowUpdate; the throw becomes a structured failure.
+        // schedule, reassign the owning agent, or flip the owning agent's
+        // destructiveOps. Mirrors mastraWorkflowUpdate; throw → structured fail.
         if (enable !== false) {
           const existing = await models.MastraWorkflow.getWorkflow(workflowId);
           const willBeEnabled =
             enable !== undefined ? enable : existing.isEnabled;
           if (willBeEnabled) {
-            const settings = await models.MastraSettings.getSettings();
-            assertWorkflowSchedulable({
-              owner: existing.createdByUserId,
+            await assertWorkflowSchedulable({
+              models,
+              agentId: patch.agentId ?? existing.agentId,
               definition: (patch.definition ??
                 existing.definition) as WorkflowDefinition,
-              appToken: settings?.erxesApiToken,
             });
           }
         }
@@ -569,6 +627,7 @@ export const workflowListTool = tool({
         _id: doc._id,
         name: doc.name,
         description: doc.description,
+        agentId: doc.agentId,
         version: doc.version,
         isEnabled: doc.isEnabled,
         triggerType: doc.definition?.trigger?.type,

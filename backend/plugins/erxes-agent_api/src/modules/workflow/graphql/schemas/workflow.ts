@@ -3,6 +3,7 @@ export const types = `
     _id: String
     name: String
     description: String
+    agentId: String
     definition: JSON
     version: Int
     isEnabled: Boolean
@@ -14,6 +15,7 @@ export const types = `
   input MastraWorkflowInput {
     name: String
     description: String
+    agentId: String
     definition: JSON
     isEnabled: Boolean
   }
@@ -36,7 +38,7 @@ export const types = `
 `;
 
 export const queries = `
-  mastraWorkflows: [MastraWorkflow]
+  mastraWorkflows(agentId: String): [MastraWorkflow]
   mastraWorkflow(_id: String!): MastraWorkflow
   mastraWorkflowRuns(workflowId: String!, page: Int, perPage: Int): [MastraWorkflowRun]
 `;

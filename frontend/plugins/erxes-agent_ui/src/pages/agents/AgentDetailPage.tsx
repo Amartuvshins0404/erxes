@@ -14,6 +14,7 @@ import {
   IconCalendarTime,
   IconRobot,
   IconSettings,
+  IconShieldLock,
   IconSitemap,
 } from '@tabler/icons-react';
 import {
@@ -27,6 +28,7 @@ import { PageHeader } from 'ui-modules';
 import { useAgent } from './hooks/useAgent';
 import { useAgentsBasePath } from './hooks/useAgentsBasePath';
 import { AgentSkillsTab } from './components/AgentSkillsTab';
+import { AgentAccessTab } from './components/AgentAccessTab';
 
 // The tab pages are the existing resource index pages, reused in `embedded`
 // mode and scoped to this agent's business agentId (workflows/schedules/
@@ -55,6 +57,7 @@ const TABS = [
   { value: 'schedules', label: 'Schedules', icon: IconCalendarTime },
   { value: 'skills', label: 'Skills', icon: IconBook2 },
   { value: 'learnings', label: 'Learnings', icon: IconBulb },
+  { value: 'access', label: 'Access', icon: IconShieldLock },
   { value: 'settings', label: 'Settings', icon: IconSettings },
 ] as const;
 
@@ -175,6 +178,7 @@ export const AgentDetailPage = () => {
                 <LearningsIndexPage agentId={agent.agentId} embedded />
               }
             />
+            <Route path="access" element={<AgentAccessTab agent={agent} />} />
             <Route path="settings" element={<AgentFormPage embedded />} />
             <Route path="*" element={<Navigate to="workflows" replace />} />
           </Routes>

@@ -11,6 +11,7 @@ export const AGENT_FIELDS = gql`
     model
     toolPolicy
     allowedTools
+    grantGroupId
     skills
     destructiveOps
     memoryEnabled

@@ -17,6 +17,7 @@ import {
   isDestructiveOperation,
   isApprovedOperation,
   destructiveApprovalRequiredResult,
+  destructiveOpsPreapproved,
 } from './destructiveGuard';
 import {
   isSecurityBlockedOperation,
@@ -351,7 +352,17 @@ export function buildErxesMetaTools(params: {
       // asks instead of running — it never silently destroys data, and never
       // hard-refuses. Enforced here, beside the policy check, so the boundary
       // holds even if the model guesses a name.
-      if (destructiveOps !== 'allow' && isDestructiveOperation(op)) {
+      //
+      // Defense-in-depth: a background run (scheduled agent / bot) is unattended,
+      // so it can never carry an approval — force 'ask' regardless of the agent's
+      // destructiveOps, making destructive ops impossible without a human even if
+      // the agent is configured 'allow'.
+      const background = getCurrentAuth()?.background === true;
+      const destructiveAllowed = destructiveOpsPreapproved(
+        destructiveOps,
+        background,
+      );
+      if (!destructiveAllowed && isDestructiveOperation(op)) {
         const approvedOps = getCurrentAuth()?.approvedOps;
         if (!isApprovedOperation(operation, approvedOps)) {
           recordAction?.({

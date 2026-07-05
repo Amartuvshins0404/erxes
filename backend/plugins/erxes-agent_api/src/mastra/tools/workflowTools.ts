@@ -15,6 +15,7 @@ import {
 } from '../workflows/compiler';
 import { buildManualEnvelope } from '../workflows/envelope';
 import { runWorkflow } from '../workflows/runtime';
+import { assertWorkflowSchedulable } from '../auth/backgroundPrincipal';
 import { getOperationRegistry, OperationRegistry } from './operationRegistry';
 
 /**
@@ -449,6 +450,18 @@ export const workflowSaveTool = tool({
           return { success: false, errors: check.errors };
         }
 
+        // Enabling a schedule-triggered workflow makes its cron live, so it must
+        // clear the same background-run preconditions the GraphQL mutations
+        // enforce (secret configured, an owner to bind, no unattended
+        // destructive ops). Reuse the shared check; the throw becomes this
+        // tool's structured failure so the agent gets an actionable message.
+        if (enable) {
+          assertWorkflowSchedulable({
+            owner: currentUserId(),
+            definition: check.definition,
+          });
+        }
+
         const doc = await models.MastraWorkflow.createWorkflow({
           name,
           description,
@@ -508,6 +521,24 @@ export const workflowUpdateTool = tool({
         if (name !== undefined) patch.name = name;
         if (description !== undefined) patch.description = description;
         if (enable !== undefined) patch.isEnabled = enable;
+
+        // Re-run the schedule-enable gate whenever this update leaves the
+        // workflow enabled — it may flip isEnabled on, repoint the trigger to a
+        // schedule, or flip destructiveOps on an already-enabled schedule.
+        // Mirrors mastraWorkflowUpdate; the throw becomes a structured failure.
+        if (enable !== false) {
+          const existing = await models.MastraWorkflow.getWorkflow(workflowId);
+          const willBeEnabled =
+            enable !== undefined ? enable : existing.isEnabled;
+          if (willBeEnabled) {
+            assertWorkflowSchedulable({
+              owner: existing.createdByUserId,
+              definition: (patch.definition ??
+                existing.definition) as WorkflowDefinition,
+            });
+          }
+        }
+
         const doc = await models.MastraWorkflow.updateWorkflow(
           workflowId,
           patch,

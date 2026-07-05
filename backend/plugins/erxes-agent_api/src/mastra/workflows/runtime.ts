@@ -13,7 +13,10 @@ import { isOperationAllowed, ToolPolicy } from '../tools/scope';
 import {
   isDestructiveOperation,
   resolveDestructiveOpsPolicy,
+  destructiveOpsPreapproved,
 } from '../tools/destructiveGuard';
+import { runWithAuth, getCurrentAuth } from '../requestContext';
+import { resolveBackgroundPrincipal } from '../auth/backgroundPrincipal';
 import { writeAgentAction, makeAgentProcessId } from '../auditLog';
 import { getOperationRegistry } from '../tools/operationRegistry';
 import type { IModels } from '~/connectionResolvers';
@@ -194,10 +197,15 @@ export async function buildRunDeps(
       // Defense-in-depth: validation already rejects destructive ops without
       // consent, but re-check at execution time (a definition could be run
       // without re-validation) so a remove/delete/merge never slips through.
-      if (
-        isDestructiveOperation(meta) &&
-        resolveDestructiveOpsPolicy(definition) !== 'allow'
-      ) {
+      // A background (schedule/automation) run is UNATTENDED — force the gate on
+      // regardless of the definition's destructiveOps, so a saved
+      // destructiveOps:'allow' can never delete/merge on a cron with no human.
+      const backgroundRun = getCurrentAuth()?.background === true;
+      const destructiveAllowed = destructiveOpsPreapproved(
+        resolveDestructiveOpsPolicy(definition),
+        backgroundRun,
+      );
+      if (isDestructiveOperation(meta) && !destructiveAllowed) {
         if (isMutation)
           writeAgentAction(models, {
             source: 'workflow',
@@ -376,4 +384,49 @@ export async function runWorkflow(args: {
       finishedAt: new Date(),
     });
   }
+}
+
+/**
+ * Background (schedule- or automation-triggered) workflow entry point. Unlike a
+ * manual run — which executes AS the requesting user (the mutation wraps it in
+ * runWithAuth) — a background run has no user session, so it must resolve the
+ * workflow OWNER (its creator) and run as that bounded principal.
+ *
+ * A workflow has no single owning agent (it may bind zero or many judge agents),
+ * so its `createdByUserId` is the bound owner — mirroring the agent's createdBy
+ * fallback. Fails CLOSED: when the owner token can't be minted it records a
+ * failed run and does NOT execute, so operation steps can never fall through to
+ * the admin app token (buildAuthHeaders' no-context fallback).
+ */
+export async function runBackgroundWorkflow(args: {
+  models: IModels;
+  subdomain: string;
+  workflow: IMastraWorkflowDocument;
+  envelope: TriggerEnvelope;
+}): Promise<IMastraWorkflowRunDocument> {
+  const { models, subdomain, workflow, envelope } = args;
+
+  const principal = await resolveBackgroundPrincipal({
+    agentConfig: { createdBy: workflow.createdByUserId },
+    subdomain,
+  });
+  if (!principal.ok) {
+    return models.MastraWorkflowRun.createRun({
+      workflowId: workflow._id,
+      version: workflow.version,
+      runId: '',
+      status: 'failed',
+      triggerEnvelope: envelope,
+      definitionSnapshot: workflow.definition,
+      error: principal.error,
+      startedAt: new Date(),
+      finishedAt: new Date(),
+    });
+  }
+
+  // AsyncLocalStorage carries the owner principal (and background:true) into
+  // every operation step's buildAuthHeaders and the destructive-op gate above.
+  return runWithAuth(principal.authCtx, () =>
+    runWorkflow({ models, subdomain, workflow, envelope }),
+  );
 }

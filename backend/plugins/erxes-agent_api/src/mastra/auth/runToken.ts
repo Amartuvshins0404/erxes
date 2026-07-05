@@ -22,7 +22,7 @@ import type { IMastraAgent } from '@/agent/@types/agent';
  * The agent's resolved owner principal (explicit ownerUserId, else the
  * creator). Background runs mint a gateway token for this identity.
  */
-const resolveOwner = (
+export const resolveOwner = (
   agentConfig: Pick<IMastraAgent, 'ownerUserId' | 'createdBy'> | null | undefined,
 ): string | undefined => {
   // Normalize empty/whitespace to "not supplied" so a stored ownerUserId: "" (or

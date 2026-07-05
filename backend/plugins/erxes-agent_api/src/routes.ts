@@ -6,10 +6,7 @@ import { generateModels } from './connectionResolvers';
 import { getOrCreateAgent } from './mastra/agentRuntime';
 import { isReasoningEffort } from './mastra/providers';
 import { runWithAuth, ApprovedOp } from './mastra/requestContext';
-import {
-  resolveBackgroundToken,
-  isSecureBackgroundRunRequired,
-} from './mastra/auth/runToken';
+import { resolveBackgroundPrincipal } from './mastra/auth/backgroundPrincipal';
 import { isAdvancedMemoryEnabled } from './mastra/memory/config';
 import { scopedResource } from './mastra/memory/mastraMemory';
 import { augmentConvo } from './mastra/memory';
@@ -372,18 +369,13 @@ router.post('/bot/:conversationId', llmRouteLimiter, async (req, res) => {
       learnedDigestBlock: digest?.block,
     });
 
-    // Bot requests have no user session — run as the agent's bound owner
-    // (Phase 3). Falls back to the static app token ONLY in the degraded mode
-    // where the secure path isn't active (secret unset or no owner). When the
-    // secure path IS active (secret set + owner present) but the mint failed
-    // (owner deactivated, secret skew, core unreachable) we fail closed rather
-    // than fall back to the privileged app token — falling back would silently
-    // escalate the run to admin instead of stopping the bot.
-    const ownerToken = await resolveBackgroundToken(agentConfig, subdomain);
-    if (!ownerToken && isSecureBackgroundRunRequired(agentConfig)) {
-      console.error(
-        '[agent] bot run refused — owner token mint failed (owner deactivated or secret skew); not falling back to app token',
-      );
+    // Bot requests have no user session — run as the agent's bound owner and
+    // fail closed when that principal can't be minted. NEVER falls back to the
+    // app token: doing so would silently escalate the bot to admin instead of
+    // stopping it.
+    const principal = await resolveBackgroundPrincipal({ agentConfig, subdomain });
+    if (!principal.ok) {
+      console.error(`[agent] bot run refused — ${principal.error}`);
       return res.json({
         responses: [
           {
@@ -393,11 +385,7 @@ router.post('/bot/:conversationId', llmRouteLimiter, async (req, res) => {
         ],
       });
     }
-    if (!ownerToken)
-      console.warn(
-        '[agent] bot run falling back to app token — set ERXES_AGENT_RUN_TOKEN_SECRET and an agent owner',
-      );
-    const authCtx = { token: ownerToken ?? settings?.erxesApiToken, subdomain };
+    const authCtx = principal.authCtx;
     const reply =
       (await runWithAuth(authCtx, () =>
         runAgentTurn({

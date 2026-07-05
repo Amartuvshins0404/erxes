@@ -340,9 +340,23 @@ const buildColumns = (
     buildBaseColumns(sort, onSort),
   );
 
-/** Record table of all agent schedules with row actions. */
-export const SchedulesIndexPage = () => {
-  const { schedules, loading, refetch } = useSchedules();
+/**
+ * Record table of agent schedules with row actions. When `agentId` is passed
+ * (the per-agent Schedules tab) the list is scoped and "New schedule" prefills
+ * the owning agent.
+ */
+export const SchedulesIndexPage = ({
+  agentId,
+  embedded,
+}: {
+  agentId?: string;
+  embedded?: boolean;
+} = {}) => {
+  const { schedules, loading, refetch } = useSchedules(agentId);
+
+  const newPath = agentId
+    ? `/erxes-agent/schedules/new?agentId=${encodeURIComponent(agentId)}`
+    : '/erxes-agent/schedules/new';
 
   const getSortValue = useCallback(
     (s: ISchedule, id: string): SortValue => {
@@ -382,14 +396,15 @@ export const SchedulesIndexPage = () => {
       columns={columns}
       data={sorted}
       loading={loading}
-      newButton={{ to: '/erxes-agent/schedules/new', label: 'New Schedule' }}
+      embedded={embedded}
+      newButton={{ to: newPath, label: 'New Schedule' }}
       empty={{
         title: 'No schedules yet',
         description:
           'Run an agent on a recurring cron — daily reports, periodic checks, reminders.',
         action: (
           <Button asChild>
-            <Link to="/erxes-agent/schedules/new">
+            <Link to={newPath}>
               <IconPlus /> Create Schedule
             </Link>
           </Button>

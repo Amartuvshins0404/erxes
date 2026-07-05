@@ -10,12 +10,22 @@ import { LearningDetailSheet } from './components/LearningDetailSheet';
 import { useLearningColumns } from './hooks/useLearningColumns';
 import { ILearningRow, StatusFilter, STATUS_FILTERS } from './types';
 
-export const LearningsIndexPage = () => {
+/**
+ * Standalone learnings index, and — when `agentId` is passed — the per-agent
+ * Learnings tab (the list is filtered to that agent's distilled learnings).
+ */
+export const LearningsIndexPage = ({
+  agentId,
+  embedded,
+}: {
+  agentId?: string;
+  embedded?: boolean;
+} = {}) => {
   const [status, setStatus] = useState<StatusFilter>('');
   const [selected, setSelected] = useState<ILearningRow | null>(null);
 
   const { data, loading, refetch } = useQuery(MASTRA_LEARNINGS, {
-    variables: { status: status || undefined, perPage: 200 },
+    variables: { status: status || undefined, agentId, perPage: 200 },
     fetchPolicy: 'cache-and-network',
     notifyOnNetworkStatusChange: true,
   });
@@ -64,6 +74,7 @@ export const LearningsIndexPage = () => {
         columns={columns}
         data={sorted}
         loading={loading}
+        embedded={embedded}
         skeletonRows={8}
         stickyColumns={['more', 'statement']}
         headerExtra={

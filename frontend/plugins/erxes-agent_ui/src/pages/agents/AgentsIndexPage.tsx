@@ -7,15 +7,17 @@ import {
   IconPlus,
   IconRobot,
   IconAlignLeft,
+  IconBook2,
   IconBuilding,
   IconBuildingCommunity,
+  IconCalendarTime,
   IconCpu,
   IconTool,
   IconCalendar,
   IconLock,
-  IconPencil,
-  IconMessageCircle,
   IconEye,
+  IconSitemap,
+  IconStack2,
   IconTrash,
   IconUsersGroup,
   IconWorld,
@@ -23,14 +25,14 @@ import {
 import {
   Button,
   CommandBar,
-  Command,
+  cn,
   RecordTable,
   RecordTableInlineCell,
   RelativeDateDisplay,
   Separator,
   toast,
 } from 'erxes-ui';
-import { MASTRA_AGENT_REMOVE, MASTRA_AGENT_UPDATE } from '~/graphql/mutations';
+import { MASTRA_AGENT_REMOVE } from '~/graphql/mutations';
 import {
   MASTRA_MY_AGENT_QUOTA_STATUS,
   AGENT_FORM_BRANCHES,
@@ -40,9 +42,7 @@ import {
 import {
   IconBadge,
   IdentityCell,
-  RowActionsMenu,
   SortableHead,
-  ToggleDeleteMenuItems,
   enabledStatusColumn,
 } from '~/components/RecordTableShared';
 import { GroupByConfig } from '~/components/GroupedRowList';
@@ -50,7 +50,6 @@ import { SortState, SortValue, useTableSort } from '~/components/useTableSort';
 import { PermissionButton } from '~/components/PermissionButton';
 import { ResourceIndexLayout } from '~/components/ResourceIndexLayout';
 import { SplitBadge } from '~/components/SplitBadge';
-import { buildActionColumns } from '~/components/buildActionColumns';
 import { useConfirmedRemove } from '~/components/useConfirmedRemove';
 import { useMastraAgentList, IMastraAgentRow } from './useMastraAgentList';
 import {
@@ -63,6 +62,23 @@ import { useAgentsBasePath } from './hooks/useAgentsBasePath';
 import type { IMastraAgentQuotaStatus } from './types';
 
 type IAgent = IMastraAgentRow;
+
+// The per-agent detail workspace (tabs) is a console-shell feature. Under the
+// Settings shell (`/settings/erxes-agent/agents`) there is no detail route, so
+// agent rows there keep opening the plain edit form.
+const isConsoleShell = (basePath: string) => !basePath.startsWith('/settings');
+
+/** Where clicking an agent row goes: detail workspace in console, edit in settings. */
+const agentOpenPath = (basePath: string, id: string) =>
+  isConsoleShell(basePath) ? `${basePath}/${id}` : `${basePath}/edit/${id}`;
+
+/**
+ * Deep-link to one of the agent workspace tabs (workflows/schedules/skills).
+ * Only the console shell has the tabbed detail route; under Settings there is no
+ * detail view, so every chip just opens the edit form.
+ */
+const agentTabPath = (basePath: string, id: string, tab: string) =>
+  isConsoleShell(basePath) ? `${basePath}/${id}/${tab}` : `${basePath}/edit/${id}`;
 
 // Refresh the agent lists after a row mutation without prop-drilling a refetch
 // through the table columns: invalidate every cached instance of both list
@@ -98,73 +114,46 @@ const CreateAgentButton = ({ children }: { children: React.ReactNode }) => {
   );
 };
 
-// ─── More menu cell ───────────────────────────────────────────────────────────
+// ─── Resource summary chips ─────────────────────────────────────────────────
+//
+// A compact per-agent count of its workflows / schedules / skills using the same
+// tabler glyphs as the workspace tabs. Each chip deep-links to that agent's tab;
+// zero counts render muted (not hidden) so the affordance stays discoverable.
+// stopPropagation so a chip click navigates without also toggling row selection.
 
-const AgentMoreCell = ({ agent }: { agent: IAgent }) => {
-  const navigate = useNavigate();
-  const basePath = useAgentsBasePath();
-  const { confirmRemove } = useConfirmedRemove();
-  const { canEditAgent, canRemoveAgent } = useAgentAccess();
-
-  const canEdit = canEditAgent(agent);
-  const canRemove = canRemoveAgent(agent);
-
-  const [removeAgent] = useMutation(MASTRA_AGENT_REMOVE, {
-    update: agentListCacheUpdate,
-    onError: agentMutationError(),
-  });
-
-  const [updateAgent] = useMutation(MASTRA_AGENT_UPDATE, {
-    update: agentListCacheUpdate,
-    onError: agentMutationError(),
-  });
-
-  const handleDelete = () =>
-    confirmRemove(
-      { message: `Remove "${agent.name}"? This cannot be undone.` },
-      () => removeAgent({ variables: { _id: agent._id } }),
-    );
-
-  const handleToggle = () => {
-    updateAgent({
-      variables: { _id: agent._id, doc: { isEnabled: !agent.isEnabled } },
-    });
-  };
+const AgentResourcesCell = ({
+  agent,
+  basePath,
+}: {
+  agent: IAgent;
+  basePath: string;
+}) => {
+  const chips = [
+    { icon: IconSitemap, count: agent.workflowsCount ?? 0, tab: 'workflows', label: 'workflows' },
+    { icon: IconCalendarTime, count: agent.schedulesCount ?? 0, tab: 'schedules', label: 'schedules' },
+    { icon: IconBook2, count: agent.skills?.length ?? 0, tab: 'skills', label: 'skills' },
+  ] as const;
 
   return (
-    <RowActionsMenu>
-      <Command.Item asChild>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="justify-start w-full h-8"
-          onClick={() => navigate(`/erxes-agent/chat/${agent._id}`)}
-        >
-          <IconMessageCircle className="size-4" /> Chat
-        </Button>
-      </Command.Item>
-      <Command.Item asChild>
-        <PermissionButton
-          variant="ghost"
-          size="sm"
-          className="justify-start w-full h-8"
-          allowed={canEdit}
-          onDenied={showAgentPermissionError}
-          onClick={() => navigate(`${basePath}/edit/${agent._id}`)}
-        >
-          <IconPencil className="size-4" /> Edit
-        </PermissionButton>
-      </Command.Item>
-      <ToggleDeleteMenuItems
-        isEnabled={agent.isEnabled}
-        onToggle={handleToggle}
-        onDelete={handleDelete}
-        toggleDisabled={!canEdit}
-        deleteDisabled={!canRemove}
-        onToggleDenied={showAgentPermissionError}
-        onDeleteDenied={showAgentPermissionError}
-      />
-    </RowActionsMenu>
+    <RecordTableInlineCell>
+      <div className="flex items-center gap-0.5">
+        {chips.map(({ icon: ChipIcon, count, tab, label }) => (
+          <Link
+            key={tab}
+            to={agentTabPath(basePath, agent._id, tab)}
+            onClick={(e) => e.stopPropagation()}
+            aria-label={`${count} ${label}`}
+            className={cn(
+              'inline-flex h-6 items-center gap-1 rounded px-1.5 text-xs transition-colors hover:bg-accent',
+              count === 0 && 'text-muted-foreground/50',
+            )}
+          >
+            <ChipIcon className="size-3.5 shrink-0" />
+            <span className="tabular-nums">{count}</span>
+          </Link>
+        ))}
+      </div>
+    </RecordTableInlineCell>
   );
 };
 
@@ -294,7 +283,7 @@ const buildBaseColumns = (
           tone="muted"
           name={
             <Link
-              to={`${basePath}/edit/${_id}`}
+              to={agentOpenPath(basePath, _id)}
               className="font-medium hover:underline cursor-pointer"
             >
               {name}
@@ -310,6 +299,16 @@ const buildBaseColumns = (
       );
     },
     size: 260,
+  },
+  {
+    id: 'resources',
+    header: () => (
+      <RecordTable.InlineHead icon={IconStack2} label="Resources" />
+    ),
+    cell: ({ row }) => (
+      <AgentResourcesCell agent={row.original} basePath={basePath} />
+    ),
+    size: 150,
   },
   {
     id: 'model',
@@ -409,16 +408,19 @@ const buildBaseColumns = (
   },
 ];
 
+// Column order: the selection checkbox leads (it drives the bulk-delete command
+// bar), then the data columns. No row-actions column — opening the row reaches
+// everything (chat, settings, enable/disable, delete) in the agent workspace,
+// and bulk delete lives on the selection command bar.
 const buildColumns = (
   scopeNames: Record<string, string>,
   sort: SortState,
   onSort: (id: string) => void,
   basePath: string,
-): ColumnDef<IAgent>[] =>
-  buildActionColumns<IAgent>(
-    (agent) => <AgentMoreCell agent={agent} />,
-    buildBaseColumns(scopeNames, sort, onSort, basePath),
-  );
+): ColumnDef<IAgent>[] => [
+  RecordTable.checkboxColumn as ColumnDef<IAgent>,
+  ...buildBaseColumns(scopeNames, sort, onSort, basePath),
+];
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
@@ -479,6 +481,7 @@ export const AgentsIndexPage = () => {
       title="Agents"
       rootPath={basePath}
       sessionKey="erxes_agent_agents"
+      stickyColumns={['checkbox', 'name']}
       columns={columns}
       data={sorted}
       loading={loading}

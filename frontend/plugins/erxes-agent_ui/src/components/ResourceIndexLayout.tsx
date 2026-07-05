@@ -42,6 +42,13 @@ interface ResourceIndexLayoutProps<T> {
   headerExtra?: ReactNode;
   /** Rendered inside RecordTable.Provider — use for CommandBar or other table-context consumers. */
   commandBar?: ReactNode;
+  /**
+   * Render inside a host page (e.g. the per-agent detail tabs) that already
+   * supplies its own breadcrumb/header. Drops the full PageHeader and shows only
+   * a compact action row (headerExtra + new-button) so the two headers don't
+   * stack.
+   */
+  embedded?: boolean;
 }
 
 // Shared shell for the plugin's resource index pages (agents, schedules,
@@ -64,39 +71,52 @@ export const ResourceIndexLayout = <T,>({
   empty,
   headerExtra,
   commandBar,
+  embedded,
 }: ResourceIndexLayoutProps<T>) => {
   const EmptyIcon = empty.icon ?? Icon;
 
+  const actions = (
+    <>
+      {headerExtra}
+      {newButton && (
+        <Button asChild>
+          <Link to={newButton.to}>
+            <IconPlus /> {newButton.label}
+          </Link>
+        </Button>
+      )}
+    </>
+  );
+
   return (
     <div className="flex flex-col h-full">
-      <PageHeader>
-        <PageHeader.Start>
-          <Breadcrumb>
-            <Breadcrumb.List className="gap-1">
-              <Breadcrumb.Item>
-                <Button variant="ghost" asChild>
-                  <Link to={rootPath}>
-                    <Icon />
-                    {title}
-                  </Link>
-                </Button>
-              </Breadcrumb.Item>
-            </Breadcrumb.List>
-          </Breadcrumb>
-          <Separator.Inline />
-          <PageHeader.FavoriteToggleButton />
-        </PageHeader.Start>
-        <PageHeader.End>
-          {headerExtra}
-          {newButton && (
-            <Button asChild>
-              <Link to={newButton.to}>
-                <IconPlus /> {newButton.label}
-              </Link>
-            </Button>
-          )}
-        </PageHeader.End>
-      </PageHeader>
+      {embedded ? (
+        (headerExtra || newButton) && (
+          <div className="flex items-center justify-end gap-2 px-3 pt-3">
+            {actions}
+          </div>
+        )
+      ) : (
+        <PageHeader>
+          <PageHeader.Start>
+            <Breadcrumb>
+              <Breadcrumb.List className="gap-1">
+                <Breadcrumb.Item>
+                  <Button variant="ghost" asChild>
+                    <Link to={rootPath}>
+                      <Icon />
+                      {title}
+                    </Link>
+                  </Button>
+                </Breadcrumb.Item>
+              </Breadcrumb.List>
+            </Breadcrumb>
+            <Separator.Inline />
+            <PageHeader.FavoriteToggleButton />
+          </PageHeader.Start>
+          <PageHeader.End>{actions}</PageHeader.End>
+        </PageHeader>
+      )}
 
       {!loading && data.length === 0 ? (
         <div className="flex-1 flex items-center justify-center p-4">

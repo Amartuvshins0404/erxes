@@ -14,6 +14,12 @@ const AgentFormPage = lazy(() =>
   })),
 );
 
+const AgentDetailPage = lazy(() =>
+  import('~/pages/agents/AgentDetailPage').then((m) => ({
+    default: m.AgentDetailPage,
+  })),
+);
+
 const ChatPage = lazy(() =>
   import('~/modules/chat/ChatPage').then((m) => ({ default: m.ChatPage })),
 );
@@ -74,6 +80,10 @@ const MastraMain = () => {
       <Route path="/agents" element={<AgentsIndexPage />} />
       <Route path="/agents/new" element={<AgentFormPage />} />
       <Route path="/agents/edit/:id" element={<AgentFormPage />} />
+      {/* Per-agent workspace: workflows / schedules / skills / learnings /
+          settings tabs, each scoped to the selected agent. The nested `*`
+          lets AgentDetailPage own the tab sub-routes. */}
+      <Route path="/agents/:id/*" element={<AgentDetailPage />} />
       <Route path="/workflows" element={<WorkflowsIndexPage />} />
       <Route path="/workflows/new" element={<WorkflowFormPage />} />
       <Route path="/workflows/edit/:id" element={<WorkflowFormPage />} />

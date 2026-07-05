@@ -13,6 +13,7 @@ export interface IMastraAgentRow {
   model: string;
   toolPolicy?: 'all' | 'custom';
   allowedTools?: string[];
+  skills?: string[];
   isEnabled: boolean;
   visibility?: 'private' | 'team' | 'department' | 'unit' | 'org';
   teamId?: string;
@@ -21,6 +22,8 @@ export interface IMastraAgentRow {
   createdBy?: string;
   isOwnAgent?: boolean;
   createdAt: string;
+  workflowsCount?: number;
+  schedulesCount?: number;
 }
 
 interface IMastraAgentsMainResponse {

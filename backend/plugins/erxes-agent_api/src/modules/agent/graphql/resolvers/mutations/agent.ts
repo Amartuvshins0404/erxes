@@ -2,6 +2,7 @@ import { ExpectedError } from 'erxes-api-shared/utils';
 import { IContext } from '~/connectionResolvers';
 import { IMastraAgent } from '@/agent/@types/agent';
 import { isAgentAdmin, getAgentQuotaStatus } from '@/agent/utils';
+import { deactivateServiceUser } from '~/mastra/auth/servicePrincipal';
 import { toUserFacingAgentError } from './agentErrors';
 
 /**
@@ -85,11 +86,33 @@ export const agentMutations = {
   mastraAgentRemove: async (
     _parent: undefined,
     { _id }: { _id: string },
-    { models, user, checkPermission }: IContext,
+    { models, subdomain, user, checkPermission }: IContext,
   ) => {
     await checkPermission('agentsRemove');
     if (!user?._id) throw new ExpectedError('Login required');
     const admin = isAgentAdmin(user);
+    const ownerScope = admin ? {} : { createdBy: user._id };
+
+    // Deactivate the agent's service user before removal (best-effort). This
+    // stops new run-token mints; any already-issued token expires within its
+    // ≤1h TTL. Never fail the delete if core is unreachable — the removal is
+    // the user's intent and the service user can be reaped in bulk later
+    // (role:'system' selector). Scoped to the caller's own agent for non-admins.
+    const agent = await models.MastraAgent.findOne({ _id, ...ownerScope });
+    if (agent?.serviceUserId) {
+      try {
+        await deactivateServiceUser({
+          serviceUserId: agent.serviceUserId,
+          subdomain,
+        });
+      } catch (error) {
+        console.error(
+          `Failed to deactivate service user for agent ${_id}:`,
+          error,
+        );
+      }
+    }
+
     return models.MastraAgent.removeAgent(_id, admin ? undefined : user._id);
   },
 };

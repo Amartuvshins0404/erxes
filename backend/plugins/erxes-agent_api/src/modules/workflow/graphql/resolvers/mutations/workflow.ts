@@ -36,7 +36,12 @@ export const workflowMutations = {
     // The creator is the workflow's bound background owner — validate the
     // schedule-enable preconditions when creating already-enabled.
     if (doc.isEnabled) {
-      assertWorkflowSchedulable({ owner: userId, definition: doc.definition });
+      const settings = await models.MastraSettings.getSettings();
+      assertWorkflowSchedulable({
+        owner: userId,
+        definition: doc.definition,
+        appToken: settings?.erxesApiToken,
+      });
     }
     return models.MastraWorkflow.createWorkflow({
       ...doc,
@@ -59,9 +64,11 @@ export const workflowMutations = {
     const willBeEnabled =
       doc.isEnabled !== undefined ? doc.isEnabled : existing.isEnabled;
     if (willBeEnabled) {
+      const settings = await models.MastraSettings.getSettings();
       assertWorkflowSchedulable({
         owner: existing.createdByUserId,
         definition: (doc.definition ?? existing.definition) as WorkflowDefinition,
+        appToken: settings?.erxesApiToken,
       });
     }
     return models.MastraWorkflow.updateWorkflow(_id, doc);
@@ -88,9 +95,11 @@ export const workflowMutations = {
     // the secure background preconditions.
     if (isEnabled) {
       const workflow = await models.MastraWorkflow.getWorkflow(_id);
+      const settings = await models.MastraSettings.getSettings();
       assertWorkflowSchedulable({
         owner: workflow.createdByUserId,
         definition: workflow.definition,
+        appToken: settings?.erxesApiToken,
       });
     }
     return models.MastraWorkflow.setEnabled(_id, isEnabled);

@@ -23,16 +23,19 @@ const assertAgentRunnable = async (
 
 /**
  * A schedule may only be ENABLED when its agent is safe for unattended runs:
- * the secure owner-token path is configured (secret + owner) AND the agent does
- * not run destructive ops without asking. Caught here so the misconfig surfaces
- * at setup, not silently when the runner fails closed at 3am.
+ * the secure owner-token path is configured (the erxes app token in Agent
+ * settings + owner) AND the agent does not run destructive ops without asking.
+ * Caught here so the misconfig surfaces at setup, not silently when the runner
+ * fails closed at 3am.
  */
 const assertScheduleEnablable = async (models: IModels, agentId: unknown) => {
   const agent = await assertAgentRunnable(models, agentId);
+  const settings = await models.MastraSettings.getSettings();
   const error = backgroundRunEnableError({
     owner: resolveOwner(agent),
     destructiveAllow: agent.destructiveOps === 'allow',
     subject: 'schedule',
+    appToken: settings?.erxesApiToken,
   });
   if (error) throw new ExpectedError(error);
 };

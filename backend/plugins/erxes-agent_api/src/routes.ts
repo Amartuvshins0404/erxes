@@ -372,8 +372,14 @@ router.post('/bot/:conversationId', llmRouteLimiter, async (req, res) => {
     // Bot requests have no user session — run as the agent's bound owner and
     // fail closed when that principal can't be minted. NEVER falls back to the
     // app token: doing so would silently escalate the bot to admin instead of
-    // stopping it.
-    const principal = await resolveBackgroundPrincipal({ agentConfig, subdomain });
+    // stopping it. The app token (settings.erxesApiToken) is passed only as the
+    // CLIENT CREDENTIAL that authenticates to core's mint endpoint — the minted
+    // owner token, not the app token, is the acting principal for the run.
+    const principal = await resolveBackgroundPrincipal({
+      agentConfig,
+      subdomain,
+      appToken: settings?.erxesApiToken,
+    });
     if (!principal.ok) {
       console.error(`[agent] bot run refused — ${principal.error}`);
       return res.json({

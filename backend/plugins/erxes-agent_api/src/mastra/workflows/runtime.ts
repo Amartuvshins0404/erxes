@@ -406,9 +406,14 @@ export async function runBackgroundWorkflow(args: {
 }): Promise<IMastraWorkflowRunDocument> {
   const { models, subdomain, workflow, envelope } = args;
 
+  // The app token (settings.erxesApiToken) is only the CLIENT CREDENTIAL that
+  // authenticates to core's mint endpoint — the minted owner token, not the app
+  // token, is the principal every operation step runs as.
+  const settings = await models.MastraSettings.getSettings();
   const principal = await resolveBackgroundPrincipal({
     agentConfig: { createdBy: workflow.createdByUserId },
     subdomain,
+    appToken: settings?.erxesApiToken,
   });
   if (!principal.ok) {
     return models.MastraWorkflowRun.createRun({

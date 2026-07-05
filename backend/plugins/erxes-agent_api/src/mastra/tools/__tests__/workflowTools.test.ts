@@ -412,42 +412,45 @@ describe('workflowSaveTool', () => {
 /**
  * The agent-facing builder tools must apply the SAME enable-time gate the
  * GraphQL mutations do: an enabled schedule-triggered workflow is a live cron,
- * so it may only be enabled when a run-token secret and an owner are present and
- * it doesn't run destructive ops unattended. The tools surface the refusal as a
- * structured { success: false, error } result (not a thrown 500) so the agent
- * gets an actionable message.
+ * so it may only be enabled when the erxes app token (Agent settings) and an
+ * owner are present and it doesn't run destructive ops unattended. The tools
+ * surface the refusal as a structured { success: false, error } result (not a
+ * thrown 500) so the agent gets an actionable message.
  */
 describe('schedule-enable gate (agent builder tools)', () => {
-  const SECRET = 'ERXES_AGENT_RUN_TOKEN_SECRET';
-  let savedSecret: string | undefined;
+  const APP_TOKEN = 'sk_app-token';
 
   beforeEach(() => {
-    savedSecret = process.env[SECRET];
-    delete process.env[SECRET]; // default: secure path NOT configured
+    // Default: no app token in Agent settings → secure path NOT configured.
+    mockGetSettings.mockResolvedValue({ erxesApiUrl: 'https://gw' });
     mockCreateWorkflow.mockClear();
     mockUpdateWorkflow.mockClear();
     mockGetWorkflow.mockReset();
   });
 
   afterEach(() => {
-    if (savedSecret === undefined) delete process.env[SECRET];
-    else process.env[SECRET] = savedSecret;
+    // Restore the module-default settings shape for other suites.
+    mockGetSettings.mockResolvedValue({ erxesApiUrl: 'https://gw' });
   });
 
   describe('workflowSaveTool', () => {
-    it('refuses to enable a schedule workflow when the run-token secret is unset', async () => {
+    it('refuses to enable a schedule workflow when the app token is unconfigured', async () => {
       const res = await asTool<SaveResult>(workflowSaveTool).execute({
         name: 'Nightly',
         definition: scheduleDefinition(),
         enable: true,
       });
       expect(res.success).toBe(false);
-      expect(res.error).toMatch(/ERXES_AGENT_RUN_TOKEN_SECRET/);
+      expect(res.error).toMatch(/erxes app token/i);
       expect(mockCreateWorkflow).not.toHaveBeenCalled();
     });
 
     it('refuses to enable a schedule workflow with destructiveOps "allow"', async () => {
-      process.env[SECRET] = 'shh'; // secret + owner (u1) present; only the flag fails
+      // app token + owner (u1) present; only the flag fails
+      mockGetSettings.mockResolvedValue({
+        erxesApiUrl: 'https://gw',
+        erxesApiToken: APP_TOKEN,
+      });
       const res = await asTool<SaveResult>(workflowSaveTool).execute({
         name: 'Nightly',
         definition: scheduleDefinition({ destructiveOps: 'allow' }),
@@ -458,8 +461,11 @@ describe('schedule-enable gate (agent builder tools)', () => {
       expect(mockCreateWorkflow).not.toHaveBeenCalled();
     });
 
-    it('allows enabling a schedule workflow once secret + owner are configured', async () => {
-      process.env[SECRET] = 'shh';
+    it('allows enabling a schedule workflow once app token + owner are configured', async () => {
+      mockGetSettings.mockResolvedValue({
+        erxesApiUrl: 'https://gw',
+        erxesApiToken: APP_TOKEN,
+      });
       const res = await asTool<SaveResult>(workflowSaveTool).execute({
         name: 'Nightly',
         definition: scheduleDefinition(),
@@ -471,7 +477,7 @@ describe('schedule-enable gate (agent builder tools)', () => {
       );
     });
 
-    it('lets a schedule workflow be SAVED disabled without the secret (gate is enable-only)', async () => {
+    it('lets a schedule workflow be SAVED disabled without the app token (gate is enable-only)', async () => {
       const res = await asTool<SaveResult>(workflowSaveTool).execute({
         name: 'Nightly draft',
         definition: scheduleDefinition(),
@@ -485,7 +491,7 @@ describe('schedule-enable gate (agent builder tools)', () => {
   });
 
   describe('workflowUpdateTool', () => {
-    it('refuses to flip isEnabled on an existing schedule workflow without the secret', async () => {
+    it('refuses to flip isEnabled on an existing schedule workflow without the app token', async () => {
       mockGetWorkflow.mockResolvedValue({
         _id: 'wf-1',
         isEnabled: false,
@@ -497,7 +503,7 @@ describe('schedule-enable gate (agent builder tools)', () => {
         enable: true,
       });
       expect(res.success).toBe(false);
-      expect(res.error).toMatch(/ERXES_AGENT_RUN_TOKEN_SECRET/);
+      expect(res.error).toMatch(/erxes app token/i);
       expect(mockUpdateWorkflow).not.toHaveBeenCalled();
     });
 
@@ -515,12 +521,15 @@ describe('schedule-enable gate (agent builder tools)', () => {
         definition: scheduleDefinition(),
       });
       expect(res.success).toBe(false);
-      expect(res.error).toMatch(/ERXES_AGENT_RUN_TOKEN_SECRET/);
+      expect(res.error).toMatch(/erxes app token/i);
       expect(mockUpdateWorkflow).not.toHaveBeenCalled();
     });
 
-    it('allows enabling a schedule workflow update once the secret is configured', async () => {
-      process.env[SECRET] = 'shh';
+    it('allows enabling a schedule workflow update once the app token is configured', async () => {
+      mockGetSettings.mockResolvedValue({
+        erxesApiUrl: 'https://gw',
+        erxesApiToken: APP_TOKEN,
+      });
       mockGetWorkflow.mockResolvedValue({
         _id: 'wf-1',
         isEnabled: false,

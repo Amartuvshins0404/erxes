@@ -24,10 +24,29 @@ jest.mock('~/init-trpc', () => ({}));
 import { userTrpcRouter } from '../user';
 
 const GATEWAY_SECRET = 'gateway-jwt-secret';
-const RUN_SECRET = 'super-shared-run-secret';
+// A representative erxes App token (sk_ + 48 hex, per Apps.createApp).
+const APP_TOKEN =
+  'sk_0123456789abcdef0123456789abcdef0123456789abcdef';
 
-const makeCtx = (findOne: jest.Mock) =>
-  ({ subdomain: 'test', models: { Users: { findOne } } }) as any;
+// The Apps lookup is tenant-scoped (ctx.models). It returns the ACTIVE app doc
+// only when the queried token matches AND status:'active' — mirroring the
+// gateway's `findOne({ token, status:'active' })`.
+const makeApps = () => ({
+  findOne: jest.fn(
+    ({ token, status }: { token: string; status: string }) =>
+      Promise.resolve(
+        token === APP_TOKEN && status === 'active'
+          ? { _id: 'app-1', token: APP_TOKEN, status: 'active' }
+          : null,
+      ),
+  ),
+});
+
+const makeCtx = (userFindOne: jest.Mock, apps = makeApps()) =>
+  ({
+    subdomain: 'test',
+    models: { Users: { findOne: userFindOne }, Apps: apps },
+  }) as any;
 
 describe('users.issueRunToken', () => {
   const OLD_ENV = process.env;
@@ -37,7 +56,6 @@ describe('users.issueRunToken', () => {
     for (const k of Object.keys(redisStore)) delete redisStore[k];
     process.env = { ...OLD_ENV };
     process.env.JWT_TOKEN_SECRET = GATEWAY_SECRET;
-    process.env.ERXES_AGENT_RUN_TOKEN_SECRET = RUN_SECRET;
   });
 
   afterAll(() => {
@@ -54,7 +72,7 @@ describe('users.issueRunToken', () => {
 
     const res = await caller.users.issueRunToken({
       userId: 'owner-1',
-      secret: RUN_SECRET,
+      appToken: APP_TOKEN,
     });
 
     expect(res).not.toBeNull();
@@ -93,20 +111,20 @@ describe('users.issueRunToken', () => {
 
     const res = await caller.users.issueRunToken({
       userId: 'org-owner',
-      secret: RUN_SECRET,
+      appToken: APP_TOKEN,
     });
 
     expect(res).toBeNull();
     expect(mockRedisSet).not.toHaveBeenCalled();
   });
 
-  it('returns null for a wrong secret without minting or hitting Redis', async () => {
+  it('returns null for an unknown/invalid app token without hitting Users or Redis', async () => {
     const findOne = jest.fn();
     const caller = userTrpcRouter.createCaller(makeCtx(findOne));
 
     const res = await caller.users.issueRunToken({
       userId: 'owner-1',
-      secret: 'not-the-secret',
+      appToken: 'sk_not-a-real-token',
     });
 
     expect(res).toBeNull();
@@ -114,17 +132,25 @@ describe('users.issueRunToken', () => {
     expect(mockRedisSet).not.toHaveBeenCalled();
   });
 
-  it('returns null when the run-token secret is not configured', async () => {
-    delete process.env.ERXES_AGENT_RUN_TOKEN_SECRET;
+  it('returns null for a revoked app token (findOne(status:active) misses)', async () => {
+    // A revoked app is not status:'active', so the tenant-scoped lookup returns
+    // null exactly like an unknown token — never revealing which it was.
+    const apps = {
+      findOne: jest.fn().mockResolvedValue(null),
+    };
     const findOne = jest.fn();
-    const caller = userTrpcRouter.createCaller(makeCtx(findOne));
+    const caller = userTrpcRouter.createCaller(makeCtx(findOne, apps));
 
     const res = await caller.users.issueRunToken({
       userId: 'owner-1',
-      secret: RUN_SECRET,
+      appToken: APP_TOKEN,
     });
 
     expect(res).toBeNull();
+    expect(apps.findOne).toHaveBeenCalledWith({
+      token: APP_TOKEN,
+      status: 'active',
+    });
     expect(findOne).not.toHaveBeenCalled();
     expect(mockRedisSet).not.toHaveBeenCalled();
   });
@@ -135,7 +161,7 @@ describe('users.issueRunToken', () => {
 
     const res = await caller.users.issueRunToken({
       userId: 'ghost',
-      secret: RUN_SECRET,
+      appToken: APP_TOKEN,
     });
 
     expect(res).toBeNull();

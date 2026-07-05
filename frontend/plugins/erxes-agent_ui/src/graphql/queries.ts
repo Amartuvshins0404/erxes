@@ -89,6 +89,7 @@ export const MASTRA_AGENTS_MAIN = gql`
         model
         toolPolicy
         allowedTools
+        skills
         isEnabled
         visibility
         teamId
@@ -97,6 +98,8 @@ export const MASTRA_AGENTS_MAIN = gql`
         createdBy
         isOwnAgent
         createdAt
+        workflowsCount
+        schedulesCount
       }
       totalCount
     }

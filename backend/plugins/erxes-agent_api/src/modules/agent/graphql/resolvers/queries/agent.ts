@@ -121,10 +121,13 @@ export const agentCustomResolvers = {
     // resolvers, so each row runs one indexed `countDocuments` per field — an
     // N+1 the list tolerates for the ~tens of agents a user can see (no batch
     // loader exists in this plugin yet). An empty agentId owns nothing.
-    workflowsCount: (agent: IMastraAgentDocument, _args: unknown, { models }: IContext) =>
-      agent.agentId ? models.MastraWorkflow.countDocuments({ agentId: agent.agentId }) : 0,
+    // Await inside so a plain number is returned — a mongoose Query re-executes
+    // on every `.then()`, and both the resolver wrapper and the graphql executor
+    // await the returned value ("Query was already executed" otherwise).
+    workflowsCount: async (agent: IMastraAgentDocument, _args: unknown, { models }: IContext) =>
+      agent.agentId ? await models.MastraWorkflow.countDocuments({ agentId: agent.agentId }) : 0,
 
-    schedulesCount: (agent: IMastraAgentDocument, _args: unknown, { models }: IContext) =>
-      agent.agentId ? models.MastraSchedule.countDocuments({ agentId: agent.agentId }) : 0,
+    schedulesCount: async (agent: IMastraAgentDocument, _args: unknown, { models }: IContext) =>
+      agent.agentId ? await models.MastraSchedule.countDocuments({ agentId: agent.agentId }) : 0,
   },
 };

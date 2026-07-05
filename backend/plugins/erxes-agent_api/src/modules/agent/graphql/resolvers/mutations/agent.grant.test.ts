@@ -11,6 +11,16 @@ jest.mock('erxes-api-shared/utils', () => ({
   sendTRPCMessage: (...args: unknown[]) => sendTRPCMessage(...args),
 }));
 
+// The grant-assignment gate resolves the caller's authority via core's
+// `canGroup`. Mock it FILTER-AWARE (mirrors the real impl): an org owner always
+// passes; everyone else passes only for actions listed on the mock user's
+// `actions` array — so a caller WITH `permissionsManage` is allowed and one
+// WITHOUT it is denied, actually exercising the gate.
+const canGroup = jest.fn();
+jest.mock('erxes-api-shared/core-modules', () => ({
+  canGroup: (...args: unknown[]) => canGroup(...args),
+}));
+
 const syncServiceUserGroup = jest.fn();
 const deactivateServiceUser = jest.fn();
 jest.mock('~/mastra/auth/servicePrincipal', () => ({
@@ -76,6 +86,17 @@ beforeEach(() => {
   deactivateServiceUser.mockReset();
   deriveGrantAllowedTools.mockReset();
   deriveGrantAllowedTools.mockResolvedValue(DERIVED);
+  canGroup.mockReset();
+  canGroup.mockImplementation(
+    (
+      _subdomain: string,
+      action: string,
+      user?: { isOwner?: boolean; actions?: string[] },
+    ) =>
+      Promise.resolve(
+        user?.isOwner === true || (user?.actions || []).includes(action),
+      ),
+  );
 });
 
 describe('mastraAgentUpdate grant wiring', () => {
@@ -205,14 +226,16 @@ describe('mastraAgentUpdate grant wiring', () => {
   });
 });
 
-// F2 — a grant carries the agent's server-side permissions, so binding one is a
-// privilege escalation unless the caller already holds top privilege OR the
-// group is the agent's OWN dedicated group (authored via permissionsManage).
-// Only an org owner may SET a FOREIGN grant; clearing (de-escalation) stays open
-// to any editor. NOTE: isAgentAdmin is mocked to `true` for every test here, so
-// these cases also prove the gate keys on org ownership — NOT agent-admin.
+// F1 (PR #273) — a grant carries the agent's server-side permissions, so binding
+// one is a privilege escalation unless the caller already holds the authority to
+// AUTHOR such a group in core: `permissionsManage` (org owners short-circuit).
+// This REPLACES the old org-owner-only gate plus its spoofable, name-based
+// `agent-grant:<agentId>` self-owned exemption — so a name match no longer helps.
+// Clearing (de-escalation) stays open to any editor. NOTE: isAgentAdmin is mocked
+// to `true` for every test here, so these cases also prove the gate keys on
+// permissionsManage/ownership — NOT agent-admin.
 describe('mastraAgentUpdate grant assignment authorization', () => {
-  it('denies a non-owner binding a FOREIGN grant (no update, no derive)', async () => {
+  it('denies a non-owner WITHOUT permissionsManage binding a FOREIGN grant (no core probe, no derive, no update)', async () => {
     sendTRPCMessage.mockResolvedValue(foreignGroup()); // exists but foreign
     const { ctx, updateAgent } = makeCtx(
       { _id: 'a1', serviceUserId: 'svc-1' },
@@ -226,31 +249,56 @@ describe('mastraAgentUpdate grant assignment authorization', () => {
         { _id: 'a1', doc: { grantGroupId: 'grp-9' } as any },
         ctx,
       ),
-    ).rejects.toThrow(/organization owner/i);
+    ).rejects.toThrow(/Manage Permissions/i);
 
+    // Authorized BEFORE the core round-trip, so the group is never even probed.
+    expect(sendTRPCMessage).not.toHaveBeenCalled();
     expect(deriveGrantAllowedTools).not.toHaveBeenCalled();
     expect(updateAgent).not.toHaveBeenCalled();
     expect(syncServiceUserGroup).not.toHaveBeenCalled();
   });
 
-  it("allows a non-owner to bind the agent's OWN dedicated group (permissionsManage-authored)", async () => {
+  it('denies a non-owner WITHOUT permissionsManage even for a SELF-NAMED group (name exemption is gone — the spoof no longer helps)', async () => {
+    // The old code exempted a group named agent-grant:<agentId>. An attacker who
+    // spoofed their agentId onto an orphaned privileged group would sail through.
+    // With the permissionsManage gate, the name is irrelevant → still rejected.
     sendTRPCMessage.mockResolvedValue(selfGroup()); // agent-grant:<agentId>
     const { ctx, updateAgent } = makeCtx(
       { _id: 'a1', serviceUserId: 'svc-1' },
       { isOwner: false },
     );
 
+    await expect(
+      agentMutations.mastraAgentUpdate(
+        undefined,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        { _id: 'a1', doc: { grantGroupId: 'grp-self' } as any },
+        ctx,
+      ),
+    ).rejects.toThrow(/Manage Permissions/i);
+
+    expect(deriveGrantAllowedTools).not.toHaveBeenCalled();
+    expect(updateAgent).not.toHaveBeenCalled();
+  });
+
+  it('allows a non-owner WITH permissionsManage to bind a foreign grant', async () => {
+    sendTRPCMessage.mockResolvedValue(foreignGroup());
+    const { ctx, updateAgent } = makeCtx(
+      { _id: 'a1', serviceUserId: 'svc-1' },
+      { isOwner: false, actions: ['permissionsManage'] },
+    );
+
     await agentMutations.mastraAgentUpdate(
       undefined,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      { _id: 'a1', doc: { grantGroupId: 'grp-self' } as any },
+      { _id: 'a1', doc: { grantGroupId: 'grp-9' } as any },
       ctx,
     );
 
     expect(updateAgent).toHaveBeenCalledWith(
       'a1',
       expect.objectContaining({
-        grantGroupId: 'grp-self',
+        grantGroupId: 'grp-9',
         toolPolicy: 'custom',
       }),
       undefined,
@@ -319,6 +367,51 @@ describe('mastraAgentUpdate grant assignment authorization', () => {
     expect(updateAgent).toHaveBeenCalledWith(
       'a1',
       { name: 'Renamed' },
+      undefined,
+    );
+  });
+});
+
+// agentId immutability (defense-in-depth on Finding #1). agentId is the stable
+// business key schedules/workflows/learnings are scoped by, and was the spoof
+// vector. The UI freezes it after create; changing it via raw API is rejected.
+describe('mastraAgentUpdate agentId immutability', () => {
+  it('rejects changing agentId to a different value (no update)', async () => {
+    const { ctx, updateAgent } = makeCtx(
+      { _id: 'a1' },
+      { isOwner: true },
+      { _id: 'a1', agentId: AGENT_ID },
+    );
+
+    await expect(
+      agentMutations.mastraAgentUpdate(
+        undefined,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        { _id: 'a1', doc: { agentId: 'someone-elses-agent' } as any },
+        ctx,
+      ),
+    ).rejects.toThrow(/immutable/i);
+
+    expect(updateAgent).not.toHaveBeenCalled();
+  });
+
+  it('allows re-submitting the unchanged agentId (UI sends it on every edit)', async () => {
+    const { ctx, updateAgent } = makeCtx(
+      { _id: 'a1' },
+      { isOwner: false },
+      { _id: 'a1', agentId: AGENT_ID },
+    );
+
+    await agentMutations.mastraAgentUpdate(
+      undefined,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      { _id: 'a1', doc: { agentId: AGENT_ID, name: 'Renamed' } as any },
+      ctx,
+    );
+
+    expect(updateAgent).toHaveBeenCalledWith(
+      'a1',
+      expect.objectContaining({ agentId: AGENT_ID, name: 'Renamed' }),
       undefined,
     );
   });

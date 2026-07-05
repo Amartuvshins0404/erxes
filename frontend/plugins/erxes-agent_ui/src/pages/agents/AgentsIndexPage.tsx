@@ -276,19 +276,14 @@ const buildBaseColumns = (
       />
     ),
     cell: ({ row }) => {
-      const { _id, name, agentId, description } = row.original;
+      const { agentId, name, description } = row.original;
       return (
         <IdentityCell
           icon={IconRobot}
           tone="muted"
-          name={
-            <Link
-              to={agentOpenPath(basePath, _id)}
-              className="font-medium hover:underline cursor-pointer"
-            >
-              {name}
-            </Link>
-          }
+          // Plain text: opening the agent is handled by the whole-row click
+          // (see VISIBILITY_GROUP.onRowClick), not a per-name link.
+          name={<span className="font-medium">{name}</span>}
           sub={
             <>
               <span className="font-mono">{agentId}</span>
@@ -425,6 +420,7 @@ const buildColumns = (
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export const AgentsIndexPage = () => {
+  const navigate = useNavigate();
   const basePath = useAgentsBasePath();
   const { agentsList, loading, pageInfo, handleFetchMore } =
     useMastraAgentList();
@@ -475,6 +471,16 @@ export const AgentsIndexPage = () => {
     [scopeNames, sort, toggle, basePath],
   );
 
+  // Whole-row click opens the agent workspace (console) / edit form (settings).
+  // Built here (not at module scope) so it can navigate with the resolved base.
+  const groupBy = useMemo<GroupByConfig<IAgent>>(
+    () => ({
+      ...VISIBILITY_GROUP,
+      onRowClick: (agent) => navigate(agentOpenPath(basePath, agent._id)),
+    }),
+    [navigate, basePath],
+  );
+
   return (
     <ResourceIndexLayout<IAgent>
       icon={IconRobot}
@@ -488,7 +494,7 @@ export const AgentsIndexPage = () => {
       skeletonRows={20}
       pageInfo={pageInfo}
       onFetchMore={handleFetchMore}
-      groupBy={VISIBILITY_GROUP}
+      groupBy={groupBy}
       commandBar={<AgentBulkDeleteCommandBar />}
       headerExtra={
         <CreateAgentButton>

@@ -151,6 +151,24 @@ export const MASTRA_THREAD_ARTIFACTS = gql`
   }
 `;
 
+// Read-only transcript of a schedule's background run thread. Same MastraMessage
+// shape as mastraThreadMessages, but authorized by AGENT ACCESS (not thread
+// ownership) and read under the schedule's own principal — so a human who can
+// see the agent can read its scheduled runs.
+export const MASTRA_SCHEDULE_TRANSCRIPT = gql`
+  query MastraScheduleTranscript($scheduleId: String!) {
+    mastraScheduleTranscript(scheduleId: $scheduleId) {
+      _id
+      role
+      content
+      parts
+      meta
+      attachments
+      createdAt
+    }
+  }
+`;
+
 export const MASTRA_ATTACHMENT_STORAGE_STATUS = gql`
   query MastraAttachmentStorageStatus {
     mastraAttachmentStorageStatus {

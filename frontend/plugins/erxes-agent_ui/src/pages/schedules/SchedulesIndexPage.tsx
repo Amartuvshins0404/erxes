@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useMutation } from '@apollo/client';
 import { ColumnDef } from '@tanstack/react-table';
@@ -41,7 +41,6 @@ import { SortState, SortValue, useTableSort } from '~/components/useTableSort';
 import { buildActionColumns } from '~/components/buildActionColumns';
 import { useConfirmedRemove } from '~/components/useConfirmedRemove';
 import { useSchedules } from './hooks/useSchedules';
-import { ScheduleOutputSheet } from './components/ScheduleOutputSheet';
 import {
   ISchedule,
   IScheduleRunNowResponse,
@@ -58,7 +57,7 @@ const ScheduleMoreCell = ({
 }: {
   schedule: ISchedule;
   refetch: () => void;
-  onViewOutput: (id: string) => void;
+  onViewOutput: (schedule: ISchedule) => void;
 }) => {
   const navigate = useNavigate();
   const { confirmRemove } = useConfirmedRemove();
@@ -120,11 +119,11 @@ const ScheduleMoreCell = ({
       </Command.Item>
       <Command.Item asChild>
         {/*
-          Output is shown in an in-place panel, NOT the chat view: a schedule's
-          run thread is ownership-scoped to the background principal (the agent's
-          owner / service user), so the human-scoped thread query returns
-          "Thread not found" and chat renders an empty composer. See
-          ScheduleOutputSheet for the full rationale.
+          Opens the full run transcript in Chat → Scheduled mode. The schedule's
+          run thread is authorized by AGENT ACCESS and read under the schedule's
+          own principal (mastraScheduleTranscript), so anyone who can see the
+          agent can read its runs — the rich transcript (markdown, tool/chart
+          artifacts) instead of just the last-run summary.
         */}
         <Button
           variant="ghost"
@@ -134,7 +133,7 @@ const ScheduleMoreCell = ({
           title={
             schedule.lastRunAt ? undefined : 'No output yet — this hasn’t run'
           }
-          onClick={() => onViewOutput(schedule._id)}
+          onClick={() => onViewOutput(schedule)}
         >
           <IconFileText className="size-4" /> View output
         </Button>
@@ -212,7 +211,7 @@ const LastRunCell = ({ schedule }: { schedule: ISchedule }) => {
 const buildBaseColumns = (
   sort: SortState,
   onSort: (id: string) => void,
-  onViewOutput: (id: string) => void,
+  onViewOutput: (schedule: ISchedule) => void,
 ): ColumnDef<ISchedule>[] => [
   {
     id: 'name',
@@ -326,8 +325,8 @@ const buildBaseColumns = (
             <button
               type="button"
               className="text-sm tabular-nums hover:underline cursor-pointer"
-              title="View last-run output"
-              onClick={() => onViewOutput(row.original._id)}
+              title="View run transcript"
+              onClick={() => onViewOutput(row.original)}
             >
               {count}
             </button>
@@ -350,7 +349,7 @@ const buildColumns = (
   refetch: () => void,
   sort: SortState,
   onSort: (id: string) => void,
-  onViewOutput: (id: string) => void,
+  onViewOutput: (schedule: ISchedule) => void,
 ): ColumnDef<ISchedule>[] =>
   buildActionColumns<ISchedule>(
     (schedule) => (
@@ -375,14 +374,21 @@ export const SchedulesIndexPage = ({
   agentId?: string;
   embedded?: boolean;
 } = {}) => {
+  const navigate = useNavigate();
   const { schedules, loading, refetch } = useSchedules(agentId);
 
-  // Selected by _id (not the object) so the open panel reflects fresh data after
-  // a "Run now" refetch, which replaces the schedule object in the list.
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const selected = useMemo(
-    () => schedules.find((s) => s._id === selectedId) ?? null,
-    [schedules, selectedId],
+  // "View output" / run-count now open the FULL run transcript in Chat →
+  // Scheduled mode (one viewer), instead of the last-run-summary sheet. The chat
+  // route accepts the agent slug; ?mode=scheduled&schedule=<id> is restored on
+  // reload/deep-link by ChatPage.
+  const openTranscript = useCallback(
+    (schedule: ISchedule) =>
+      navigate(
+        `/erxes-agent/chat/${encodeURIComponent(
+          schedule.agentId,
+        )}?mode=scheduled&schedule=${encodeURIComponent(schedule._id)}`,
+      ),
+    [navigate],
   );
 
   const newPath = agentId
@@ -411,13 +417,12 @@ export const SchedulesIndexPage = ({
   const { sort, toggle, sorted } = useTableSort(schedules, getSortValue);
 
   const columns = useMemo(
-    () => buildColumns(refetch, sort, toggle, setSelectedId),
-    [refetch, sort, toggle],
+    () => buildColumns(refetch, sort, toggle, openTranscript),
+    [refetch, sort, toggle, openTranscript],
   );
 
   return (
-    <>
-      <ResourceIndexLayout<ISchedule>
+    <ResourceIndexLayout<ISchedule>
         icon={IconCalendarTime}
         title="Schedules"
         rootPath="/erxes-agent/schedules"
@@ -439,11 +444,6 @@ export const SchedulesIndexPage = ({
             </Button>
           ),
         }}
-      />
-      <ScheduleOutputSheet
-        schedule={selected}
-        onClose={() => setSelectedId(null)}
-      />
-    </>
+    />
   );
 };

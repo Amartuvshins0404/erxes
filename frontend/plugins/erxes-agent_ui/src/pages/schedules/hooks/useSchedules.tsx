@@ -6,7 +6,7 @@ import { ISchedule, ISchedulesQueryResponse } from '../types';
  * All schedules for the list page. Network-only so the table reflects edits.
  * `agentId` scopes the list to a single agent (the per-agent Schedules tab).
  */
-export const useSchedules = (agentId?: string) => {
+export const useSchedules = (agentId?: string, skip?: boolean) => {
   const { items, loading, refetch } = useResourceList<
     ISchedulesQueryResponse,
     ISchedule
@@ -14,6 +14,7 @@ export const useSchedules = (agentId?: string) => {
     MASTRA_SCHEDULES,
     (data) => data?.mastraSchedules ?? [],
     agentId ? { agentId } : undefined,
+    skip,
   );
 
   return { schedules: items, loading, refetch };

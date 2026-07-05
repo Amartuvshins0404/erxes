@@ -29,9 +29,20 @@ import { useAttachments } from '~/modules/chat/hooks/useAttachments';
 import { useThreadArtifacts } from '~/modules/chat/hooks/useThreadArtifacts';
 import { useSessionBootstrap } from '~/modules/chat/hooks/useSessionBootstrap';
 import { withThreadParam } from '~/modules/chat/lib/threadParam';
+import {
+  readChatMode,
+  readScheduleParam,
+  withChatMode,
+  withScheduleParam,
+  type ChatMode,
+} from '~/modules/chat/lib/chatMode';
+import { useSchedules } from '~/pages/schedules/hooks/useSchedules';
 import { useIsNarrow } from '~/modules/chat/hooks/useIsNarrow';
 import { AgentRail } from '~/modules/chat/components/AgentRail';
 import { SessionList } from '~/modules/chat/components/SessionList';
+import { SessionModeToggle } from '~/modules/chat/components/SessionModeToggle';
+import { ScheduleSessionList } from '~/modules/chat/components/ScheduleSessionList';
+import { ScheduleTranscriptView } from '~/modules/chat/components/ScheduleTranscriptView';
 import { MessageList } from '~/modules/chat/components/MessageList';
 import { Composer } from '~/modules/chat/components/Composer';
 import { ApprovalBar } from '~/modules/chat/components/ApprovalBar';
@@ -66,10 +77,24 @@ export const ChatPage = () => {
   // writes it (push, so browser Back walks between conversations); reload/deep-
   // link restores it (useSessionBootstrap). An agent-only URL keeps the old
   // behavior — bootstrap opens the most-recent thread or a fresh draft.
-  const [, setSearchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const setThreadParam = useCallback(
     (threadId: string | undefined, replace = false) =>
       setSearchParams((prev) => withThreadParam(prev, threadId), { replace }),
+    [setSearchParams],
+  );
+  // Sessions sidebar mode (Chat | Scheduled), addressable via ?mode= exactly as
+  // the active conversation is via ?thread= — reload/deep-link restores it.
+  const chatMode = readChatMode(searchParams);
+  const scheduleParam = readScheduleParam(searchParams);
+  const setChatMode = useCallback(
+    (mode: ChatMode) =>
+      setSearchParams((prev) => withChatMode(prev, mode), { replace: false }),
+    [setSearchParams],
+  );
+  const setScheduleParam = useCallback(
+    (scheduleId: string | undefined, replace = false) =>
+      setSearchParams((prev) => withScheduleParam(prev, scheduleId), { replace }),
     [setSearchParams],
   );
   const [railOpen, setRailOpen] = useState(!agentId);
@@ -132,6 +157,34 @@ export const ChatPage = () => {
   const sessionsLoaded = !!selectedAgent && !threadsLoading;
   const { renameThread } = useRenameMastraThread();
   const { removeThread } = useRemoveMastraThread(selectedAgent?.agentId);
+
+  // Scheduled mode: the selected agent's schedules become the "sessions". Fetched
+  // by the agent's business id (mastraSchedules(agentId)); selecting one loads its
+  // transcript into the shared message view.
+  const { schedules, loading: schedulesLoading } = useSchedules(
+    selectedAgent?.agentId,
+    // Only fetch (and only trip the schedulesView permission check) once the
+    // sidebar is actually in Scheduled mode — a pure chat user never hits it.
+    chatMode !== 'scheduled',
+  );
+  const selectedSchedule = useMemo(
+    () => schedules.find((s) => s._id === scheduleParam) ?? null,
+    [schedules, scheduleParam],
+  );
+  const handleSelectSchedule = useCallback(
+    (scheduleId: string) => {
+      setSidebarOpen(false);
+      setScheduleParam(scheduleId);
+    },
+    [setScheduleParam],
+  );
+  // Auto-open the first schedule when entering Scheduled mode with none selected,
+  // so the view isn't an empty pane. `replace` keeps it out of the Back history.
+  useEffect(() => {
+    if (chatMode !== 'scheduled') return;
+    if (scheduleParam || schedulesLoading || schedules.length === 0) return;
+    setScheduleParam(schedules[0]._id, true);
+  }, [chatMode, scheduleParam, schedulesLoading, schedules, setScheduleParam]);
 
   const [input, setInput] = useState('');
   const [showScrollDown, setShowScrollDown] = useState(false);
@@ -538,7 +591,7 @@ export const ChatPage = () => {
             </Breadcrumb.List>
           </Breadcrumb>
         </PageHeader.Start>
-        {selectedAgent && !voiceActive && (
+        {selectedAgent && !voiceActive && chatMode === 'chat' && (
           <PageHeader.End>
             <Button
               variant="outline"
@@ -614,21 +667,41 @@ export const ChatPage = () => {
                       : 'translateX(0)',
                   }}
                 >
-                  <SessionList
-                    agentId={agentId}
-                    sessions={threads}
-                    sessionsLoaded={sessionsLoaded}
-                    isDraft={isDraft}
-                    activeThreadId={activeThreadId}
-                    hasMore={hasMoreSessions}
-                    loadingMore={loadingMoreSessions}
-                    onLoadMore={loadMoreSessions}
-                    onSelect={handleSelectSession}
-                    onNew={handleNewThread}
-                    onDelete={handleDeleteSession}
-                    onRename={handleRenameSession}
-                    onBack={handleRailOpen}
-                  />
+                  <div className="flex flex-col h-full">
+                    <div className="px-2 pt-2">
+                      <SessionModeToggle
+                        mode={chatMode}
+                        onChange={setChatMode}
+                      />
+                    </div>
+                    <div className="flex-1 min-h-0">
+                      {chatMode === 'chat' ? (
+                        <SessionList
+                          agentId={agentId}
+                          sessions={threads}
+                          sessionsLoaded={sessionsLoaded}
+                          isDraft={isDraft}
+                          activeThreadId={activeThreadId}
+                          hasMore={hasMoreSessions}
+                          loadingMore={loadingMoreSessions}
+                          onLoadMore={loadMoreSessions}
+                          onSelect={handleSelectSession}
+                          onNew={handleNewThread}
+                          onDelete={handleDeleteSession}
+                          onRename={handleRenameSession}
+                          onBack={handleRailOpen}
+                        />
+                      ) : (
+                        <ScheduleSessionList
+                          schedules={schedules}
+                          loading={schedulesLoading}
+                          activeScheduleId={scheduleParam}
+                          onSelect={handleSelectSchedule}
+                          onBack={handleRailOpen}
+                        />
+                      )}
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
@@ -679,6 +752,12 @@ export const ChatPage = () => {
                 </Empty.Header>
               </Empty>
             </div>
+          ) : chatMode === 'scheduled' ? (
+            <ScheduleTranscriptView
+              agent={selectedAgent}
+              scheduleId={scheduleParam}
+              scheduleName={selectedSchedule?.name}
+            />
           ) : (
             <>
               <MessageList
@@ -827,14 +906,14 @@ export const ChatPage = () => {
         </div>
 
         {/* ── Artifact Preview panel (charts / generated documents) ── */}
-        {previewOpen && selectedAgent && !previewFullscreen && (
+        {previewOpen && selectedAgent && chatMode === 'chat' && !previewFullscreen && (
           <PreviewResizer
             splitRef={splitRef}
             sideCollapsed={sideCollapsed}
             onSideCollapsedChange={setSideCollapsed}
           />
         )}
-        {previewOpen && selectedAgent && (
+        {previewOpen && selectedAgent && chatMode === 'chat' && (
           <PreviewPanel threadId={activeThreadId} />
         )}
       </div>

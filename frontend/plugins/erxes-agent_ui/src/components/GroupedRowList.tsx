@@ -18,6 +18,13 @@ export interface GroupByConfig<T> {
   getKey: (row: T) => string;
   /** Sections render in this order; empty ones are skipped. */
   sections: GroupSection[];
+  /**
+   * When set, the whole data row becomes clickable and invokes this with the
+   * row's original. Clicks that originate inside an interactive control
+   * (checkbox, link, button, input) are ignored so per-cell affordances —
+   * selection, chip deep-links — keep working independently.
+   */
+  onRowClick?: (row: T) => void;
 }
 
 /**
@@ -110,6 +117,22 @@ export const GroupedRowList = <T,>({
                   key={row.id}
                   original={row.original}
                   data-state={row.getIsSelected() && 'selected'}
+                  className={cn(groupBy.onRowClick && 'cursor-pointer')}
+                  onClick={
+                    groupBy.onRowClick
+                      ? (e) => {
+                          // Ignore clicks on in-row controls (checkbox toggles,
+                          // chip deep-links) so they act independently.
+                          if (
+                            (e.target as HTMLElement).closest(
+                              'a, button, input, label, [role="checkbox"]',
+                            )
+                          )
+                            return;
+                          groupBy.onRowClick?.(row.original as T);
+                        }
+                      : undefined
+                  }
                 >
                   {row.getVisibleCells().map((cell) => (
                     <RecordTable.Cell cell={cell} key={cell.id}>

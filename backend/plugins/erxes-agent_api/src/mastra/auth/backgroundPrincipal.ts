@@ -7,27 +7,35 @@
 // admin app token — a privileged, identity-less principal. Combined with the
 // default tool policy (mode:'all'), that let a saved schedule/workflow — or any
 // untrusted text it ingests (prompt injection) — drive any mutation in any
-// plugin on a cron, as admin. This resolver removes that fallback: it mints a
-// short-lived token bound to the agent's/workflow's OWNER and FAILS CLOSED when
-// it cannot. It NEVER returns the app token; the caller must refuse the run on
-// ok:false. Fail-closed here is the security boundary — do not soften it.
+// plugin on a cron, as admin.
+//
+// Since step 22 each agent is its own principal: this resolver ensures the
+// agent's dedicated SERVICE USER exists, keeps its permission grant in sync, and
+// mints a short-lived token bound to THAT service user (not the human owner, not
+// the app token). It FAILS CLOSED when it cannot — it NEVER returns the app
+// token; the caller must refuse the run on ok:false. Fail-closed here is the
+// security boundary — do not soften it.
 // ---------------------------------------------------------------------------
 
 import { ExpectedError } from 'erxes-api-shared/utils';
-import type { IMastraAgent } from '@/agent/@types/agent';
 import type { IModels } from '~/connectionResolvers';
 import type { WorkflowDefinition } from '../workflows/dsl';
+import { mintRunToken } from './runToken';
 import {
-  resolveBackgroundToken,
-  isSecureBackgroundRunRequired,
-  resolveOwner,
-} from './runToken';
+  ensureServiceUser,
+  syncServiceUserGroup,
+  type ServiceUserAgentConfig,
+} from './servicePrincipal';
+
+/** The exact user-facing sentence explaining the one required precondition. */
+const CONFIGURE_APP_TOKEN =
+  "Background runs execute as the agent's service user; configure the erxes app token in Agent settings.";
 
 /**
  * The auth context a resolved background principal runs under. Shaped for
- * runWithAuth: an owner-bound gateway token, the tenant, and the `background`
- * flag the destructive-op defense-in-depth reads. `token` is always the minted
- * owner token — never the app token.
+ * runWithAuth: the agent's service-user gateway token, the tenant, and the
+ * `background` flag the destructive-op defense-in-depth reads. `token` is always
+ * the minted service-user token — never the app token, never a human owner's.
  */
 export interface BackgroundAuthCtx {
   token: string;
@@ -35,7 +43,7 @@ export interface BackgroundAuthCtx {
   background: true;
   /** The owning agent's business agentId, so a background turn can self-own the
    *  workflows it builds (currentAgentId() resolves to it) — mirrors how chat
-   *  turns stamp agentId in prepare.ts. Absent only for identity-less owners. */
+   *  turns stamp agentId in prepare.ts. */
   agentId?: string;
 }
 
@@ -44,77 +52,156 @@ export type BackgroundPrincipalResult =
   | { ok: false; error: string };
 
 /**
- * The owner source: any object exposing the same ownerUserId/createdBy fields an
- * agent config does. Every background run now resolves its principal from an
- * OWNING AGENT's config — scheduled agent runs, the frontline bot, and (since
- * step 24) workflows, which each carry a required `agentId`. The old
- * `{ createdBy: workflow.createdByUserId }` shim is gone: a workflow's identity
- * is its owning agent, not its human creator.
+ * The agent config a background run resolves its principal from. Every
+ * background run (scheduled agent, frontline bot, and — since step 24 —
+ * workflows, which carry a required `agentId`) resolves from an OWNING AGENT's
+ * config. The resolver reads/persists the service-user lifecycle fields, so it
+ * needs the full ServiceUserAgentConfig slice.
  */
-export type OwnerSource =
-  | Pick<IMastraAgent, 'ownerUserId' | 'createdBy' | 'agentId'>
-  | null
-  | undefined;
+export type OwnerSource = ServiceUserAgentConfig | null | undefined;
 
 /**
- * Resolve the owner-bound principal for a background run, or fail closed.
+ * Resolve the agent's SERVICE-USER principal for a background run, or fail closed.
  *
- * Returns ok:true with an owner-token auth context when the secure path is
- * active (erxes app token configured in Agent settings + owner present) AND the
- * mint succeeds. Otherwise returns ok:false with an actionable error — for a
- * missing precondition (no app token / no owner) vs a genuine mint failure
- * (owner deactivated, app token revoked, core unreachable). The caller MUST NOT
+ * On success returns ok:true with a service-user-token auth context. The steps:
+ *   1. require the erxes app token (the only precondition — a human owner is no
+ *      longer needed);
+ *   2. ensure the agent's dedicated service user exists (create/reconcile +
+ *      persist serviceUserId);
+ *   3. sync its permission group to the agent's current grantGroupId, skipping
+ *      the write when already in lock-step (a grant-less service user is allowed
+ *      — the run proceeds and permission-gated ops are simply refused by the
+ *      gateway until a grant is assigned; logged once per run);
+ *   4. mint a short-lived token for the service user.
+ *
+ * Any step failing (core unreachable, app token missing/revoked, service user
+ * deactivated) returns ok:false with an actionable error. The caller MUST NOT
  * proceed on ok:false: falling back to the app token would silently escalate the
  * run to admin, which is exactly the escalation this resolver exists to close.
  *
  * `appToken` is the erxes App token (from Agent settings' erxesApiToken). Here
  * it is ONLY the client credential presented to core's minting endpoint — never
- * the acting principal. The returned authCtx.token is always the minted owner
- * token; the app-token interactive fallback in buildAuthHeaders is never reached
- * on this path.
+ * the acting principal. The returned authCtx.token is always the minted
+ * service-user token.
  */
 export async function resolveBackgroundPrincipal(opts: {
   agentConfig: OwnerSource;
   subdomain: string;
   appToken: string | undefined;
+  models: IModels;
 }): Promise<BackgroundPrincipalResult> {
-  const { agentConfig, subdomain, appToken } = opts;
+  const { agentConfig, subdomain, appToken, models } = opts;
 
-  const token = await resolveBackgroundToken(agentConfig, subdomain, appToken);
-  if (token) {
+  const token = appToken?.trim();
+  if (!token) {
+    return { ok: false, error: `Background run refused: ${CONFIGURE_APP_TOKEN}` };
+  }
+
+  const agentId = agentConfig?.agentId?.trim();
+  if (!agentConfig?._id || !agentId) {
     return {
-      ok: true,
-      authCtx: {
-        token,
-        subdomain,
-        background: true,
-        // Stamp the owning agent's identity so a background turn can self-own
-        // the workflows it builds (workflowSave defaults ownership to it).
-        agentId: agentConfig?.agentId?.trim() || undefined,
-      },
+      ok: false,
+      error:
+        'Background run refused: no owning agent to resolve a service-user ' +
+        'principal from.',
     };
   }
 
-  const error = isSecureBackgroundRunRequired(agentConfig, appToken)
-    ? 'Background run refused: owner token mint failed (owner deactivated, ' +
-      'app token revoked, or core unreachable). Not falling back to the app token.'
-    : 'Background runs require a secure owner token. Configure the erxes app ' +
-      'token in Agent settings and assign an agent owner.';
-  return { ok: false, error };
+  // (2) Ensure the agent's dedicated service user (create/reconcile + persist
+  // serviceUserId). Fail closed if core is unreachable — never fall back to the
+  // app token.
+  let serviceUserId: string;
+  let currentGroupIds: string[];
+  try {
+    const ensured = await ensureServiceUser({ agentConfig, subdomain, models });
+    serviceUserId = ensured.serviceUserId;
+    currentGroupIds = ensured.permissionGroupIds;
+  } catch {
+    return {
+      ok: false,
+      error:
+        "Background run refused: could not provision the agent's service user " +
+        '(core unreachable). Not falling back to the app token.',
+    };
+  }
+
+  // (3) Keep the service user's permission group in lock-step with the agent's
+  // current grantGroupId, so a grant change takes effect on the very next run.
+  // Skip the write (and its cache bust) when the user is already in sync — the
+  // agent update mutation syncs eagerly on change, so the steady state is a
+  // no-op here.
+  const desired = agentConfig.grantGroupId?.trim()
+    ? [agentConfig.grantGroupId.trim()]
+    : [];
+  const inSync =
+    desired.length === currentGroupIds.length &&
+    desired.every((g, i) => g === currentGroupIds[i]);
+  if (!inSync) {
+    try {
+      await syncServiceUserGroup({
+        serviceUserId,
+        groupId: desired[0] ?? null,
+        subdomain,
+      });
+    } catch {
+      return {
+        ok: false,
+        error:
+          "Background run refused: could not sync the agent's permission grant " +
+          '(core unreachable). Not falling back to the app token.',
+      };
+    }
+  }
+
+  // A grant-less service user is ALLOWED to run — permission-gated gateway ops
+  // are simply refused until a grant group is assigned. Surface it once per run
+  // so the misconfiguration is visible without blocking the run.
+  if (desired.length === 0) {
+    console.info(
+      `[agent] background run for agent "${agentId}" is minting for a grant-less ` +
+        `service user (${serviceUserId}); permission-gated operations will be ` +
+        'refused by the gateway until a grant group is assigned in Agent settings.',
+    );
+  }
+
+  // (4) Mint the run token for the SERVICE USER. Fail closed on any mint failure
+  // (service user deactivated, app token revoked, core unreachable).
+  const minted = await mintRunToken({ userId: serviceUserId, subdomain, appToken: token });
+  if (!minted) {
+    return {
+      ok: false,
+      error:
+        "Background run refused: could not mint a run token for the agent's " +
+        'service user (service user deactivated, app token revoked, or core ' +
+        'unreachable). Not falling back to the app token.',
+    };
+  }
+
+  return {
+    ok: true,
+    authCtx: {
+      token: minted,
+      subdomain,
+      background: true,
+      // Stamp the owning agent's identity so a background turn can self-own the
+      // workflows it builds (workflowSave defaults ownership to it).
+      agentId,
+    },
+  };
 }
 
 /**
  * Enable-time precondition for anything that starts unattended background runs
  * (an agent schedule, or a schedule-triggered workflow). Rejects enabling when
- * the secure owner-token path isn't fully configured, so the misconfiguration
- * surfaces at setup instead of silently failing closed at 3am — and refuses
- * `destructiveOps: 'allow'` outright, because unattended deletes/merges must
- * never be a one-checkbox decision. Returns an error message, or null when the
- * subject may be enabled.
+ * the secure path isn't configured, so the misconfiguration surfaces at setup
+ * instead of silently failing closed at 3am — and refuses `destructiveOps:
+ * 'allow'` outright, because unattended deletes/merges must never be a
+ * one-checkbox decision. Since step 22 a human owner is NOT required: background
+ * runs execute as the agent's service user, so the only precondition is the
+ * erxes app token. Returns an error message, or null when the subject may be
+ * enabled.
  */
 export function backgroundRunEnableError(opts: {
-  /** The resolved background owner id (already trimmed), or undefined/empty. */
-  owner: string | undefined;
   /** True when the config requests destructiveOps: 'allow'. */
   destructiveAllow: boolean;
   /** 'schedule' | 'workflow' — used verbatim in the error message. */
@@ -122,12 +209,9 @@ export function backgroundRunEnableError(opts: {
   /** The erxes App token from Agent settings (settings.erxesApiToken). */
   appToken: string | undefined;
 }): string | null {
-  const { owner, destructiveAllow, subject, appToken } = opts;
+  const { destructiveAllow, subject, appToken } = opts;
   if (!appToken?.trim()) {
-    return `Cannot enable this ${subject}: background runs require the erxes app token to be configured in Agent settings.`;
-  }
-  if (!owner) {
-    return `Cannot enable this ${subject}: its background owner is unset. Assign an owner (the agent's ownerUserId, or the workflow's creator) before enabling.`;
+    return `Cannot enable this ${subject}: ${CONFIGURE_APP_TOKEN}`;
   }
   if (destructiveAllow) {
     return `Cannot enable this ${subject}: destructiveOps is "allow", which is refused for unattended background runs — deletes/merges must never run on a cron. Set destructiveOps to "ask".`;
@@ -137,15 +221,14 @@ export function backgroundRunEnableError(opts: {
 
 /**
  * A schedule-triggered workflow runs unattended on a cron, so — like an agent
- * schedule — it may only be ENABLED when the secure owner-token path is
- * configured and it does not run destructive ops without asking. Since step 24
- * the preconditions resolve from the workflow's OWNING AGENT's config, exactly
- * as assertScheduleEnablable does for schedules: the owner is the agent's
- * resolved principal (ownerUserId → createdBy) and the destructive gate reads the
- * agent's destructiveOps — NOT the workflow creator or the definition. A workflow
- * with no owning agent (or one pointing at a missing OR DISABLED agent) cannot be
- * enabled at all: a disabled agent is the kill switch, and without a live
- * identity it can never mint a background token. Only 'schedule'
+ * schedule — it may only be ENABLED when the secure path is configured (the
+ * erxes app token) and it does not run destructive ops without asking. Since
+ * step 24 the preconditions resolve from the workflow's OWNING AGENT's config,
+ * exactly as assertScheduleEnablable does for schedules: the destructive gate
+ * reads the agent's destructiveOps (NOT the workflow creator or the definition).
+ * A workflow with no owning agent (or one pointing at a missing OR DISABLED
+ * agent) cannot be enabled at all: a disabled agent is the kill switch, and
+ * without a live identity it can never mint a background token. Only 'schedule'
  * triggers are gated here; other triggers (manual/automation/webhook) either run
  * as a user or fail closed at runtime via runBackgroundWorkflow. Throws
  * ExpectedError on refusal so both the GraphQL mutations and the agent-facing
@@ -178,7 +261,6 @@ export const assertWorkflowSchedulable = async (opts: {
   }
   const settings = await opts.models.MastraSettings.getSettings();
   const error = backgroundRunEnableError({
-    owner: resolveOwner(agent),
     destructiveAllow: agent.destructiveOps === 'allow',
     subject: 'workflow',
     appToken: settings?.erxesApiToken,

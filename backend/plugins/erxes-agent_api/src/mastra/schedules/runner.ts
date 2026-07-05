@@ -105,6 +105,7 @@ export async function runSchedule(args: {
       agentConfig,
       subdomain,
       appToken: settings?.erxesApiToken,
+      models,
     });
     if (!principal.ok) {
       return finish({ status: 'failed', error: principal.error });

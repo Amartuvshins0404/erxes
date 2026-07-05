@@ -25,6 +25,13 @@ interface ResourceFormLayoutProps<T extends FieldValues> {
   onSubmit: SubmitHandler<T>;
   /** Mobile-only sticky footer (cancel/save); omitted for forms that lack one. */
   mobileFooter?: boolean;
+  /**
+   * Rendered inside a host that already supplies its own PageHeader (e.g. the
+   * agent detail Settings tab). Drops the full PageHeader — whose Sidebar.Trigger
+   * would otherwise stack a second collapse control under the host's — and keeps
+   * only a compact Save action bar.
+   */
+  embedded?: boolean;
   children: ReactNode;
 }
 
@@ -44,9 +51,21 @@ export const ResourceFormLayout = <T extends FieldValues>({
   form,
   onSubmit,
   mobileFooter = false,
+  embedded = false,
   children,
 }: ResourceFormLayoutProps<T>) => (
   <div className="flex flex-col h-full">
+    {embedded ? (
+      <div className="flex items-center justify-end gap-2 px-3 pt-3">
+        <Button
+          type="submit"
+          form={formId}
+          disabled={saving || submitDisabled}
+        >
+          {saving ? 'Saving…' : saveLabel}
+        </Button>
+      </div>
+    ) : (
     <PageHeader>
       <PageHeader.Start>
         <Breadcrumb>
@@ -84,6 +103,7 @@ export const ResourceFormLayout = <T extends FieldValues>({
         </Button>
       </PageHeader.End>
     </PageHeader>
+    )}
 
     <div className="flex-1 overflow-auto p-4">
       <Form {...form}>

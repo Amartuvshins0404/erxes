@@ -1,7 +1,8 @@
 // Ownership + enable-time validation for workflow mutations. Every workflow is
 // owned by an agent: create REQUIRES an existing one, and a schedule-triggered
 // workflow may only be enabled when THAT agent's background preconditions hold
-// (app token configured, owner resolvable, destructiveOps not 'allow'). The
+// (app token configured + destructiveOps not 'allow' — since step 22 the run
+// executes as the agent's service user, so no human owner is required). The
 // heavy mastra modules are mocked so these tests stay on the resolver logic.
 jest.mock('~/mastra/workflows/runtime', () => ({ runWorkflow: jest.fn() }));
 jest.mock('~/mastra/workflows/envelope', () => ({

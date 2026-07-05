@@ -2,7 +2,6 @@ import { ExpectedError } from 'erxes-api-shared/utils';
 import { IContext, IModels } from '~/connectionResolvers';
 import { IMastraSchedule } from '@/schedule/@types/schedule';
 import { runSchedule } from '~/mastra/schedules/runner';
-import { resolveOwner } from '~/mastra/auth/runToken';
 import { backgroundRunEnableError } from '~/mastra/auth/backgroundPrincipal';
 import { requireUserId } from '@/_shared/auth';
 import type { IMastraAgentDocument } from '@/agent/@types/agent';
@@ -23,8 +22,9 @@ const assertAgentRunnable = async (
 
 /**
  * A schedule may only be ENABLED when its agent is safe for unattended runs:
- * the secure owner-token path is configured (the erxes app token in Agent
- * settings + owner) AND the agent does not run destructive ops without asking.
+ * the secure path is configured (the erxes app token in Agent settings) AND the
+ * agent does not run destructive ops without asking. Since step 22 the schedule
+ * runs as the agent's SERVICE USER, so a human owner is no longer required.
  * Caught here so the misconfig surfaces at setup, not silently when the runner
  * fails closed at 3am.
  */
@@ -32,7 +32,6 @@ const assertScheduleEnablable = async (models: IModels, agentId: unknown) => {
   const agent = await assertAgentRunnable(models, agentId);
   const settings = await models.MastraSettings.getSettings();
   const error = backgroundRunEnableError({
-    owner: resolveOwner(agent),
     destructiveAllow: agent.destructiveOps === 'allow',
     subject: 'schedule',
     appToken: settings?.erxesApiToken,

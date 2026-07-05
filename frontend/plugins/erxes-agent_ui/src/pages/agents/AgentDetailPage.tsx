@@ -175,7 +175,7 @@ export const AgentDetailPage = () => {
                 <LearningsIndexPage agentId={agent.agentId} embedded />
               }
             />
-            <Route path="settings" element={<AgentFormPage />} />
+            <Route path="settings" element={<AgentFormPage embedded />} />
             <Route path="*" element={<Navigate to="workflows" replace />} />
           </Routes>
         </Suspense>

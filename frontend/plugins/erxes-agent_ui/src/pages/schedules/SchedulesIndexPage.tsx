@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useMutation } from '@apollo/client';
 import { ColumnDef } from '@tanstack/react-table';
@@ -7,8 +7,8 @@ import {
   IconAlignLeft,
   IconCalendarTime,
   IconClock,
+  IconFileText,
   IconHistory,
-  IconMessageCircle,
   IconPencil,
   IconPlayerPlay,
   IconRobot,
@@ -41,17 +41,24 @@ import { SortState, SortValue, useTableSort } from '~/components/useTableSort';
 import { buildActionColumns } from '~/components/buildActionColumns';
 import { useConfirmedRemove } from '~/components/useConfirmedRemove';
 import { useSchedules } from './hooks/useSchedules';
-import { ISchedule, IScheduleRunNowResponse } from './types';
+import { ScheduleOutputSheet } from './components/ScheduleOutputSheet';
+import {
+  ISchedule,
+  IScheduleRunNowResponse,
+  SCHEDULE_STATUS_VARIANTS,
+} from './types';
 
 // ─── More menu cell ───────────────────────────────────────────────────────────
 
-/** Row actions: run now, view output thread, edit, enable/disable, delete. */
+/** Row actions: run now, view last-run output, edit, enable/disable, delete. */
 const ScheduleMoreCell = ({
   schedule,
   refetch,
+  onViewOutput,
 }: {
   schedule: ISchedule;
   refetch: () => void;
+  onViewOutput: (id: string) => void;
 }) => {
   const navigate = useNavigate();
   const { confirmRemove } = useConfirmedRemove();
@@ -112,23 +119,24 @@ const ScheduleMoreCell = ({
         </Button>
       </Command.Item>
       <Command.Item asChild>
+        {/*
+          Output is shown in an in-place panel, NOT the chat view: a schedule's
+          run thread is ownership-scoped to the background principal (the agent's
+          owner / service user), so the human-scoped thread query returns
+          "Thread not found" and chat renders an empty composer. See
+          ScheduleOutputSheet for the full rationale.
+        */}
         <Button
           variant="ghost"
           size="sm"
           className="justify-start w-full h-8"
           disabled={!schedule.lastRunAt}
           title={
-            schedule.lastRunAt
-              ? undefined
-              : 'No output yet — the thread is created on the first run'
+            schedule.lastRunAt ? undefined : 'No output yet — this hasn’t run'
           }
-          onClick={() =>
-            navigate(
-              `/erxes-agent/chat/${schedule.agentId}?thread=${schedule.threadId}`,
-            )
-          }
+          onClick={() => onViewOutput(schedule._id)}
         >
-          <IconMessageCircle className="size-4" /> View output
+          <IconFileText className="size-4" /> View output
         </Button>
       </Command.Item>
       <Command.Item asChild>
@@ -161,13 +169,6 @@ const ScheduleMoreCell = ({
 
 // ─── Columns ──────────────────────────────────────────────────────────────────
 
-/** Badge variant per run status — skipped is neutral, not a green success. */
-const STATUS_VARIANTS = {
-  failed: 'destructive',
-  skipped: 'secondary',
-  success: 'success',
-} as const;
-
 /** Status badge (with error tooltip on failure) plus relative run time. */
 const LastRunCell = ({ schedule }: { schedule: ISchedule }) => {
   if (!schedule.lastRunAt) {
@@ -179,7 +180,7 @@ const LastRunCell = ({ schedule }: { schedule: ISchedule }) => {
   }
   const failed = schedule.lastStatus === 'failed';
   const badge = (
-    <Badge variant={STATUS_VARIANTS[schedule.lastStatus ?? 'success']}>
+    <Badge variant={SCHEDULE_STATUS_VARIANTS[schedule.lastStatus ?? 'success']}>
       {schedule.lastStatus}
     </Badge>
   );
@@ -211,6 +212,7 @@ const LastRunCell = ({ schedule }: { schedule: ISchedule }) => {
 const buildBaseColumns = (
   sort: SortState,
   onSort: (id: string) => void,
+  onViewOutput: (id: string) => void,
 ): ColumnDef<ISchedule>[] => [
   {
     id: 'name',
@@ -316,13 +318,27 @@ const buildBaseColumns = (
         onSort={onSort}
       />
     ),
-    cell: ({ cell }) => (
-      <RecordTableInlineCell>
-        <span className="text-sm tabular-nums">
-          {(cell.getValue() as number) || 0}
-        </span>
-      </RecordTableInlineCell>
-    ),
+    cell: ({ row }) => {
+      const count = row.original.runCount || 0;
+      return (
+        <RecordTableInlineCell>
+          {count > 0 ? (
+            <button
+              type="button"
+              className="text-sm tabular-nums hover:underline cursor-pointer"
+              title="View last-run output"
+              onClick={() => onViewOutput(row.original._id)}
+            >
+              {count}
+            </button>
+          ) : (
+            <span className="text-sm tabular-nums text-muted-foreground">
+              0
+            </span>
+          )}
+        </RecordTableInlineCell>
+      );
+    },
     size: 70,
   },
 ];
@@ -334,10 +350,17 @@ const buildColumns = (
   refetch: () => void,
   sort: SortState,
   onSort: (id: string) => void,
+  onViewOutput: (id: string) => void,
 ): ColumnDef<ISchedule>[] =>
   buildActionColumns<ISchedule>(
-    (schedule) => <ScheduleMoreCell schedule={schedule} refetch={refetch} />,
-    buildBaseColumns(sort, onSort),
+    (schedule) => (
+      <ScheduleMoreCell
+        schedule={schedule}
+        refetch={refetch}
+        onViewOutput={onViewOutput}
+      />
+    ),
+    buildBaseColumns(sort, onSort, onViewOutput),
   );
 
 /**
@@ -354,62 +377,73 @@ export const SchedulesIndexPage = ({
 } = {}) => {
   const { schedules, loading, refetch } = useSchedules(agentId);
 
+  // Selected by _id (not the object) so the open panel reflects fresh data after
+  // a "Run now" refetch, which replaces the schedule object in the list.
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const selected = useMemo(
+    () => schedules.find((s) => s._id === selectedId) ?? null,
+    [schedules, selectedId],
+  );
+
   const newPath = agentId
     ? `/erxes-agent/schedules/new?agentId=${encodeURIComponent(agentId)}`
     : '/erxes-agent/schedules/new';
 
-  const getSortValue = useCallback(
-    (s: ISchedule, id: string): SortValue => {
-      switch (id) {
-        case 'name':
-          return s.name;
-        case 'agent':
-          return s.agentId;
-        case 'cron':
-          return s.cron;
-        case 'status':
-          return s.isEnabled;
-        case 'lastRun':
-          return s.lastRunAt;
-        case 'runCount':
-          return s.runCount;
-        default:
-          return undefined;
-      }
-    },
-    [],
-  );
+  const getSortValue = useCallback((s: ISchedule, id: string): SortValue => {
+    switch (id) {
+      case 'name':
+        return s.name;
+      case 'agent':
+        return s.agentId;
+      case 'cron':
+        return s.cron;
+      case 'status':
+        return s.isEnabled;
+      case 'lastRun':
+        return s.lastRunAt;
+      case 'runCount':
+        return s.runCount;
+      default:
+        return undefined;
+    }
+  }, []);
 
   const { sort, toggle, sorted } = useTableSort(schedules, getSortValue);
 
   const columns = useMemo(
-    () => buildColumns(refetch, sort, toggle),
+    () => buildColumns(refetch, sort, toggle, setSelectedId),
     [refetch, sort, toggle],
   );
 
   return (
-    <ResourceIndexLayout<ISchedule>
-      icon={IconCalendarTime}
-      title="Schedules"
-      rootPath="/erxes-agent/schedules"
-      sessionKey="erxes_agent_schedules"
-      columns={columns}
-      data={sorted}
-      loading={loading}
-      embedded={embedded}
-      newButton={{ to: newPath, label: 'New Schedule' }}
-      empty={{
-        title: 'No schedules yet',
-        description:
-          'Run an agent on a recurring cron — daily reports, periodic checks, reminders.',
-        action: (
-          <Button asChild>
-            <Link to={newPath}>
-              <IconPlus /> Create Schedule
-            </Link>
-          </Button>
-        ),
-      }}
-    />
+    <>
+      <ResourceIndexLayout<ISchedule>
+        icon={IconCalendarTime}
+        title="Schedules"
+        rootPath="/erxes-agent/schedules"
+        sessionKey="erxes_agent_schedules"
+        columns={columns}
+        data={sorted}
+        loading={loading}
+        embedded={embedded}
+        newButton={{ to: newPath, label: 'New Schedule' }}
+        empty={{
+          title: 'No schedules yet',
+          description:
+            'Run an agent on a recurring cron — daily reports, periodic checks, reminders.',
+          action: (
+            <Button asChild>
+              <Link to={newPath}>
+                <IconPlus /> Create Schedule
+              </Link>
+            </Button>
+          ),
+        }}
+      />
+      <ScheduleOutputSheet
+        schedule={selected}
+        onClose={() => setSelectedId(null)}
+      />
+    </>
   );
 };

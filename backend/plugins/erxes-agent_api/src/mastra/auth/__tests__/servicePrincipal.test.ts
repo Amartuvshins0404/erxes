@@ -46,10 +46,17 @@ beforeEach(() => {
 });
 
 describe('ensureServiceUser', () => {
-  it('returns the stored user when it is intact (idempotent, no create)', async () => {
+  it('returns the stored user + its current groups when intact (idempotent, no create)', async () => {
     sendTRPCMessage.mockImplementation(async ({ action }: TrpcCall) => {
       if (action === 'findOne') {
-        return { _id: 'svc-1', role: 'system', isActive: true };
+        // The mint path (step 22) reads permissionGroupIds off the reconciled
+        // user to decide whether a group sync is needed.
+        return {
+          _id: 'svc-1',
+          role: 'system',
+          isActive: true,
+          permissionGroupIds: ['grp-9'],
+        };
       }
       return null;
     });
@@ -61,7 +68,7 @@ describe('ensureServiceUser', () => {
       models,
     });
 
-    expect(res).toEqual({ serviceUserId: 'svc-1' });
+    expect(res).toEqual({ serviceUserId: 'svc-1', permissionGroupIds: ['grp-9'] });
     expect(callsFor('create')).toHaveLength(0);
     expect(callsFor('updateOne')).toHaveLength(0); // already active + system
     expect(models.MastraAgent.updateOne).not.toHaveBeenCalled();
@@ -78,7 +85,8 @@ describe('ensureServiceUser', () => {
 
     const res = await ensureServiceUser({ agentConfig: cfg, subdomain: 'os', models });
 
-    expect(res).toEqual({ serviceUserId: 'svc-new' });
+    // A freshly created user has no groups yet.
+    expect(res).toEqual({ serviceUserId: 'svc-new', permissionGroupIds: [] });
     const create = callsFor('create')[0];
     expect(create.input.data).toMatchObject({
       notUsePassword: true,
@@ -117,7 +125,7 @@ describe('ensureServiceUser', () => {
       models,
     });
 
-    expect(res).toEqual({ serviceUserId: 'svc-1' });
+    expect(res).toEqual({ serviceUserId: 'svc-1', permissionGroupIds: [] });
     expect(callsFor('create')).toHaveLength(0);
     expect(callsFor('updateOne')).toEqual([
       expect.objectContaining({
@@ -141,7 +149,7 @@ describe('ensureServiceUser', () => {
 
     const res = await ensureServiceUser({ agentConfig: cfg, subdomain: 'os', models });
 
-    expect(res).toEqual({ serviceUserId: 'svc-raced' });
+    expect(res).toEqual({ serviceUserId: 'svc-raced', permissionGroupIds: [] });
     // adopted by email lookup
     expect(callsFor('findOne')[0].input).toEqual({
       query: { email: 'agent-sales_bot@agents.local' },

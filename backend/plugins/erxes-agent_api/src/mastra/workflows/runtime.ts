@@ -448,6 +448,7 @@ export async function runBackgroundWorkflow(args: {
     agentConfig,
     subdomain,
     appToken: settings?.erxesApiToken,
+    models,
   });
   if (!principal.ok) {
     return failClosed(principal.error);

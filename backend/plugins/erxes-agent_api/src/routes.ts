@@ -379,6 +379,7 @@ router.post('/bot/:conversationId', llmRouteLimiter, async (req, res) => {
       agentConfig,
       subdomain,
       appToken: settings?.erxesApiToken,
+      models,
     });
     if (!principal.ok) {
       console.error(`[agent] bot run refused — ${principal.error}`);

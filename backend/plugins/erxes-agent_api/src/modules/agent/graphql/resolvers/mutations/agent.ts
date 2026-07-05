@@ -1,9 +1,38 @@
-import { ExpectedError } from 'erxes-api-shared/utils';
+import { ExpectedError, sendTRPCMessage } from 'erxes-api-shared/utils';
 import { IContext } from '~/connectionResolvers';
 import { IMastraAgent } from '@/agent/@types/agent';
 import { isAgentAdmin, getAgentQuotaStatus } from '@/agent/utils';
-import { deactivateServiceUser } from '~/mastra/auth/servicePrincipal';
+import {
+  deactivateServiceUser,
+  syncServiceUserGroup,
+} from '~/mastra/auth/servicePrincipal';
 import { toUserFacingAgentError } from './agentErrors';
+
+/**
+ * Validate that a requested grant group exists before it is bound to the agent.
+ * The group is the agent's server-side permission grant: a background run mints
+ * a service-user token carrying this group's actions, so a dangling id would
+ * silently leave the agent with no grant. Read-only core trpc
+ * (`permissionGroups.find`) — group CREATION/EDIT stays in core's Settings →
+ * Permissions UI (gated by permissionsManage); here we only reference an
+ * existing one. Throws ExpectedError when it does not exist.
+ */
+const assertGrantGroupExists = async (subdomain: string, groupId: string) => {
+  const groups = await sendTRPCMessage({
+    subdomain,
+    pluginName: 'core',
+    module: 'permissionGroups',
+    action: 'find',
+    method: 'query',
+    input: { query: { _id: groupId } },
+    defaultValue: [],
+  });
+  if (!Array.isArray(groups) || groups.length === 0) {
+    throw new ExpectedError(
+      `Permission group "${groupId}" was not found — pick an existing group from Settings → Permissions.`,
+    );
+  }
+};
 
 /**
  * Authorize a requested `ownerUserId` value. The owner is the identity
@@ -23,6 +52,36 @@ const assertOwnerAssignable = (
   if (!ownerUserId || callerIsOwner || ownerUserId === callerId) return;
   throw new ExpectedError(
     'Only an organization owner may assign another user as the agent owner',
+  );
+};
+
+/**
+ * Authorize a requested `grantGroupId` value. The grant group carries the
+ * agent's server-side permissions: a background run mints a service-user token
+ * whose actions ARE this group's. Binding the agent to a group whose actions
+ * exceed the caller's own is a privilege escalation — a prompt-injectable
+ * background run could then drive ops the caller can't perform (e.g. a group
+ * carrying core `permissionsManage`), which is exactly the risk `ownerUserId`
+ * guards against above.
+ *
+ * The precise bar is a SUBSET check (the group's actions ⊆ the caller's own
+ * effective actions), but that isn't cleanly available from the resolver
+ * context, so — exactly like `assertOwnerAssignable` — we require true
+ * ORGANIZATION OWNERSHIP: only an org owner (already top privilege, so nothing
+ * an assignment could grant escalates them) may SET a grant. `isAgentAdmin` is
+ * deliberately NOT enough here: an agent-admin is not necessarily an org owner
+ * and could still gain cross-plugin actions by binding a privileged group.
+ * Clearing a grant (null) is de-escalation — allowed for anyone who can edit.
+ * No-op when a grant is not being set. TODO(step 23+): swap the owner gate for
+ * a real subset check against the caller's effective action map.
+ */
+const assertGrantAssignable = (
+  grantGroupId: string | null,
+  callerIsOwner: boolean,
+) => {
+  if (!grantGroupId || callerIsOwner) return;
+  throw new ExpectedError(
+    'Only an organization owner may bind an agent to a permission group (grant). You can still clear an existing grant.',
   );
 };
 
@@ -66,7 +125,7 @@ export const agentMutations = {
   mastraAgentUpdate: async (
     _parent: undefined,
     { _id, doc }: { _id: string; doc: Partial<IMastraAgent> },
-    { models, user, checkPermission }: IContext,
+    { models, subdomain, user, checkPermission }: IContext,
   ) => {
     await checkPermission('agentsEdit');
     if (!user?._id) throw new ExpectedError('Login required');
@@ -76,8 +135,54 @@ export const agentMutations = {
     // name someone other than themselves (the createdBy filter scopes non-owners
     // to their own agents, but the owner VALUE is otherwise unconstrained).
     assertOwnerAssignable(doc.ownerUserId, user._id, Boolean(user.isOwner));
+
+    // Grant-group change: the group carries the agent's server-side permissions,
+    // synced onto its service user. Validate a set group exists BEFORE persisting
+    // (an empty/blank value clears the grant → empty permissions). Step 23 builds
+    // the selection UI; wiring it through the update mutation makes grants usable
+    // today via core's existing Settings → Permissions groups.
+    const grantChanged = doc.grantGroupId !== undefined;
+    // A cleared grant persists as null (NOT undefined) so `$set` actually clears
+    // the stored field — mongoose strips undefined from $set, which would leave a
+    // stale grantGroupId the mint path would then re-sync back onto the user.
+    const grantGroupId: string | null = doc.grantGroupId?.trim() || null;
+    if (grantChanged && grantGroupId) {
+      // Escalation guard BEFORE the existence check: only an org owner may set
+      // a grant (see assertGrantAssignable). Running it first denies a
+      // non-owner without leaking whether the target group exists.
+      assertGrantAssignable(grantGroupId, Boolean(user.isOwner));
+      await assertGrantGroupExists(subdomain, grantGroupId);
+    }
+
     try {
-      return await models.MastraAgent.updateAgent(_id, doc, admin ? undefined : user._id);
+      const updated = await models.MastraAgent.updateAgent(
+        _id,
+        grantChanged
+          ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            ({ ...doc, grantGroupId } as any)
+          : doc,
+        admin ? undefined : user._id,
+      );
+
+      // Push the new grant onto the service user immediately (if one is already
+      // provisioned) + bust its action cache, so the change takes effect on the
+      // next background run without waiting for the mint-time reconcile. The
+      // agent config already persisted the id via updateAgent, so pass no models
+      // here to avoid a redundant second write. Best-effort: never fail the
+      // update if core is unreachable — the mint path re-syncs from grantGroupId.
+      if (grantChanged && updated.serviceUserId) {
+        try {
+          await syncServiceUserGroup({
+            serviceUserId: updated.serviceUserId,
+            groupId: grantGroupId,
+            subdomain,
+          });
+        } catch (error) {
+          console.error(`Failed to sync grant group for agent ${_id}:`, error);
+        }
+      }
+
+      return updated;
     } catch (error) {
       throw toUserFacingAgentError(error);
     }

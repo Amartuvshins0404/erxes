@@ -20,6 +20,20 @@ export interface ISchedule {
   updatedAt: string;
 }
 
+/** Badge variant per run status — skipped is neutral, not a green success. */
+export const SCHEDULE_STATUS_VARIANTS = {
+  failed: 'destructive',
+  skipped: 'secondary',
+  success: 'success',
+} as const;
+
+/** ms → compact human duration, e.g. 23000 → "23.0s", 640 → "640ms". */
+export const formatScheduleDuration = (ms?: number): string | null => {
+  if (ms == null) return null;
+  if (ms < 1000) return `${ms}ms`;
+  return `${(ms / 1000).toFixed(1)}s`;
+};
+
 export interface ISchedulesQueryResponse {
   mastraSchedules: ISchedule[];
 }

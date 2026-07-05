@@ -23,7 +23,7 @@ interface IQuotaStatusResponse {
   mastraMyAgentQuotaStatus: IMastraAgentQuotaStatus;
 }
 
-export const AgentFormPage = () => {
+export const AgentFormPage = ({ embedded = false }: { embedded?: boolean } = {}) => {
   const { id } = useParams();
   const isEdit = !!id;
   const basePath = useAgentsBasePath();
@@ -129,6 +129,7 @@ export const AgentFormPage = () => {
       form={form}
       onSubmit={onSubmit}
       mobileFooter
+      embedded={embedded}
     >
       <AgentFormFields
         form={form}

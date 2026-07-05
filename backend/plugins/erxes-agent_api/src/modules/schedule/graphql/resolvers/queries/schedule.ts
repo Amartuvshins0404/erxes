@@ -7,12 +7,13 @@ import { requireUserId } from '@/_shared/auth';
 export const scheduleQueries = {
   mastraSchedules: async (
     _parent: undefined,
-    _args: undefined,
+    { agentId }: { agentId?: string },
     { models, user, checkPermission }: IContext,
   ) => {
     await checkPermission('schedulesView');
     requireUserId(user);
-    return models.MastraSchedule.getSchedules();
+    // Optional per-agent scoping — step 25's UI lists a single agent's schedules.
+    return models.MastraSchedule.getSchedules({ agentId });
   },
 
   mastraSchedule: async (

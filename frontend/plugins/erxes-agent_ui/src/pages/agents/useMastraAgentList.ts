@@ -1,5 +1,7 @@
 import { useQuery } from '@apollo/client';
 import { useCallback, useMemo } from 'react';
+import { useAtomValue } from 'jotai';
+import { currentUserState } from 'ui-modules';
 import { MASTRA_AGENTS_MAIN } from '~/graphql/queries';
 
 export const AGENTS_PER_PAGE = 30;
@@ -43,17 +45,20 @@ interface IMastraAgentsMainResponse {
  * refresh.
  */
 export const useMastraAgentList = (searchValue?: string) => {
+  const currentUserId = useAtomValue(currentUserState)?._id;
+
   const variables = {
     page: 1,
     perPage: AGENTS_PER_PAGE,
     searchValue: searchValue || undefined,
   };
 
-  const { data, loading, fetchMore, refetch } =
+  const { data, loading, error, fetchMore, refetch } =
     useQuery<IMastraAgentsMainResponse>(MASTRA_AGENTS_MAIN, {
       variables,
       notifyOnNetworkStatusChange: true,
       fetchPolicy: 'network-only',
+      skip: !currentUserId,
     });
 
   const agentsList = useMemo<IMastraAgentRow[]>(
@@ -100,7 +105,8 @@ export const useMastraAgentList = (searchValue?: string) => {
   return {
     agentsList,
     totalCount,
-    loading,
+    loading: loading || !currentUserId,
+    error,
     pageInfo,
     handleFetchMore,
     refetch,

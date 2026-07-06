@@ -39,6 +39,15 @@ interface ResourceIndexLayoutProps<T> {
     action: ReactNode;
     className?: string;
   };
+  /**
+   * When set and the list is empty, the fetch failed: render an error state
+   * with a retry action instead of the create-first-resource empty state.
+   */
+  error?: {
+    title: string;
+    description: ReactNode;
+    onRetry: () => void;
+  };
   headerExtra?: ReactNode;
   /** Rendered inside RecordTable.Provider — use for CommandBar or other table-context consumers. */
   commandBar?: ReactNode;
@@ -69,11 +78,26 @@ export const ResourceIndexLayout = <T,>({
   groupBy,
   newButton,
   empty,
+  error,
   headerExtra,
   commandBar,
   embedded,
 }: ResourceIndexLayoutProps<T>) => {
   const EmptyIcon = empty.icon ?? Icon;
+
+  // When the fetch failed (error set) the empty slot shows a retry instead of
+  // the create-first-resource call to action.
+  const emptyView = error
+    ? {
+        title: error.title,
+        description: error.description,
+        action: (
+          <Button variant="outline" onClick={error.onRetry}>
+            Retry
+          </Button>
+        ),
+      }
+    : { title: empty.title, description: empty.description, action: empty.action };
 
   const actions = (
     <>
@@ -127,10 +151,10 @@ export const ResourceIndexLayout = <T,>({
               <Empty.Media variant="icon">
                 <EmptyIcon />
               </Empty.Media>
-              <Empty.Title>{empty.title}</Empty.Title>
-              <Empty.Description>{empty.description}</Empty.Description>
+              <Empty.Title>{emptyView.title}</Empty.Title>
+              <Empty.Description>{emptyView.description}</Empty.Description>
             </Empty.Header>
-            <Empty.Content>{empty.action}</Empty.Content>
+            <Empty.Content>{emptyView.action}</Empty.Content>
           </Empty>
         </div>
       ) : (

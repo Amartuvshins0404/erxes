@@ -426,7 +426,7 @@ const buildColumns = (
 export const AgentsIndexPage = () => {
   const navigate = useNavigate();
   const basePath = useAgentsBasePath();
-  const { agentsList, loading, pageInfo, handleFetchMore } =
+  const { agentsList, loading, error, pageInfo, handleFetchMore, refetch } =
     useMastraAgentList();
 
   // Fetch scope labels for the visibility column (branches, depts, units).
@@ -520,6 +520,17 @@ export const AgentsIndexPage = () => {
           </CreateAgentButton>
         ),
       }}
+      error={
+        error
+          ? {
+              title: "Couldn't load agents",
+              description: 'Something went wrong while fetching your agents.',
+              onRetry: () => {
+                void refetch().catch(() => undefined);
+              },
+            }
+          : undefined
+      }
     />
   );
 };

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   IconMicrophone,
   IconMicrophoneFilled,
@@ -27,6 +27,7 @@ export const VoiceOverlay = ({
   voice: VoiceConversation;
   onExit: () => void;
 }) => {
+  const dialogRef = useRef<HTMLDialogElement>(null);
   const [showTranscript, setShowTranscript] = useState(false);
   const {
     phase,
@@ -39,14 +40,16 @@ export const VoiceOverlay = ({
     toggleRecording,
   } = voice;
 
-  // Esc leaves voice mode, matching the composer's stop-on-Esc muscle memory.
+  // A native modal dialog gives the focus trap, backdrop, and Esc-to-close the
+  // aria-modal contract already promises. Open it on mount, close it on unmount.
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onExit();
+    const dialog = dialogRef.current;
+    if (!dialog || dialog.open) return;
+    dialog.showModal();
+    return () => {
+      if (dialog.open) dialog.close();
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onExit]);
+  }, []);
 
   const listening = phase === 'listening';
   // While the agent is thinking or speaking, the mic stays live so a tap barges
@@ -56,11 +59,14 @@ export const VoiceOverlay = ({
   const busy = phase === 'transcribing';
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
+    <dialog
+      ref={dialogRef}
       aria-label={`Voice conversation with ${agentName}`}
-      className="ea-voice-surface absolute inset-0 z-30 flex overflow-hidden"
+      onCancel={(e) => {
+        e.preventDefault();
+        onExit();
+      }}
+      className="ea-voice-surface fixed inset-0 z-30 m-0 flex max-h-none max-w-none border-0 p-0 overflow-hidden"
     >
       <div className="relative flex-1 flex flex-col min-w-0">
         {/* ── The living blob, full-bleed behind everything ── */}
@@ -209,6 +215,6 @@ export const VoiceOverlay = ({
           <VoiceTranscript messages={messages} />
         </aside>
       )}
-    </div>
+    </dialog>
   );
 };

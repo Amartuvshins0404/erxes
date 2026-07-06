@@ -28,9 +28,12 @@ export const useSpeechQueue = (): SpeechQueue => {
   // past the item currently playing without losing queue order.
   const itemsRef = useRef<string[]>([]);
   const cursorRef = useRef(0);
-  const prefetchRef = useRef<Map<number, Promise<Blob>>>(new Map());
+  const prefetchRef = useRef<Map<number, Promise<Blob>> | null>(null);
+  if (!prefetchRef.current) prefetchRef.current = new Map();
+  const prefetch = prefetchRef.current;
   const pumpingRef = useRef(false);
-  const abortRef = useRef<AbortController>(new AbortController());
+  const abortRef = useRef<AbortController | null>(null);
+  if (!abortRef.current) abortRef.current = new AbortController();
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // One audio tap for the hook's lifetime — survives reset() (turn interrupts)
@@ -44,17 +47,17 @@ export const useSpeechQueue = (): SpeechQueue => {
   // abort generation as its consumer (reset() reassigns abortRef between runs).
   const synthesizeAt = useCallback(
     (index: number, signal: AbortSignal): Promise<Blob> => {
-      const cached = prefetchRef.current.get(index);
+      const cached = prefetch.get(index);
       if (cached) return cached;
       const promise = fetchSpeech(itemsRef.current[index], signal);
       // A one-ahead prefetch may never be awaited (reset/abort drops it). Attach
       // a detached handler so its AbortError can't surface as an
       // unhandledrejection; the stored promise still rejects for whoever awaits.
       promise.catch(() => undefined);
-      prefetchRef.current.set(index, promise);
+      prefetch.set(index, promise);
       return promise;
     },
-    [],
+    [prefetch],
   );
 
   const playBlob = useCallback((blob: Blob): Promise<void> => {
@@ -83,20 +86,22 @@ export const useSpeechQueue = (): SpeechQueue => {
     // Snapshot this run's controller. reset() aborts THEN reassigns
     // abortRef.current, so reading the ref after an await would see the fresh
     // (non-aborted) controller and fire a spurious error on every interrupt.
-    const controller = abortRef.current;
+    const controller = abortRef.current!;
     try {
       while (cursorRef.current < itemsRef.current.length) {
+        // Skip the fetch/await entirely once the run is aborted.
+        if (controller.signal.aborted) return;
         const index = cursorRef.current;
-        const current = synthesizeAt(index, controller.signal);
-        // Warm the next sentence's audio while this one is fetched/played.
-        if (index + 1 < itemsRef.current.length)
-          synthesizeAt(index + 1, controller.signal);
-
-        const blob = await current;
+        // Warm the next sentence in the background so it's ready for the next
+        // loop, but only gate playback on the current clip's synthesis.
+        if (index + 1 < itemsRef.current.length) {
+          void synthesizeAt(index + 1, controller.signal);
+        }
+        const blob = await synthesizeAt(index, controller.signal);
         if (controller.signal.aborted) return;
         setSpeaking(true);
         await playBlob(blob);
-        prefetchRef.current.delete(index);
+        prefetch.delete(index);
         cursorRef.current += 1;
       }
     } catch (err) {
@@ -107,7 +112,7 @@ export const useSpeechQueue = (): SpeechQueue => {
       pumpingRef.current = false;
       if (cursorRef.current >= itemsRef.current.length) setSpeaking(false);
     }
-  }, [synthesizeAt, playBlob]);
+  }, [synthesizeAt, playBlob, prefetch]);
 
   const enqueue = useCallback(
     (text: string) => {
@@ -122,7 +127,7 @@ export const useSpeechQueue = (): SpeechQueue => {
 
   // Stop playback and drop everything queued (turn cancelled / mode closed).
   const reset = useCallback(() => {
-    abortRef.current.abort();
+    abortRef.current?.abort();
     abortRef.current = new AbortController();
     if (audioRef.current) {
       audioRef.current.pause();
@@ -130,10 +135,10 @@ export const useSpeechQueue = (): SpeechQueue => {
     }
     itemsRef.current = [];
     cursorRef.current = 0;
-    prefetchRef.current.clear();
+    prefetch.clear();
     pumpingRef.current = false;
     setSpeaking(false);
-  }, []);
+  }, [prefetch]);
 
   // reset() stops playback between turns; the audio tap is closed only when the
   // hook unmounts (voice mode fully torn down).

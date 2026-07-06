@@ -25,13 +25,16 @@ export interface SkillListFilters {
  */
 export const useSkillList = (filters: SkillListFilters = {}) => {
   const { scope, status, searchValue } = filters;
-  const variables = {
-    page: 1,
-    perPage: SKILLS_PER_PAGE,
-    scope,
-    status,
-    searchValue: searchValue || undefined,
-  };
+  const variables = useMemo(
+    () => ({
+      page: 1,
+      perPage: SKILLS_PER_PAGE,
+      scope,
+      status,
+      searchValue: searchValue || undefined,
+    }),
+    [scope, status, searchValue],
+  );
 
   const { data, loading, fetchMore, refetch } =
     useQuery<IMastraSkillsResponse>(MASTRA_SKILLS, {
@@ -78,10 +81,7 @@ export const useSkillList = (filters: SkillListFilters = {}) => {
         };
       },
     });
-    // `variables` is rebuilt each render; the filter primitives below keep the
-    // memoized callback paginating the CURRENT filter, not a stale closure.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, skillsList.length, totalCount, fetchMore, scope, status, searchValue]);
+  }, [loading, skillsList.length, totalCount, fetchMore, variables]);
 
   return {
     skillsList,

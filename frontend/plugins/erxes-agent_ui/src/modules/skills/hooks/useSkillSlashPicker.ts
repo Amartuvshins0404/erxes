@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'erxes-ui';
 import { IMastraInvocableSkill } from '../types';
 import { matchSlashQuery } from '../utils';
@@ -39,6 +39,16 @@ export const useSkillSlashPicker = ({
   const [dismissed, setDismissed] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const [activeSkill, setActiveSkill] = useState<string | null>(null);
+  const [prevQuery, setPrevQuery] = useState(query);
+
+  // Each keystroke changes the query: reset the highlight and clear a prior
+  // Escape-dismiss so the picker re-opens as the user keeps typing. Adjusting
+  // during render (not in an effect) keeps the reset in the same commit.
+  if (query !== prevQuery) {
+    setPrevQuery(query);
+    setActiveIndex(0);
+    setDismissed(false);
+  }
 
   const items = useMemo<IMastraInvocableSkill[]>(() => {
     if (!isSlashMode) return [];
@@ -52,13 +62,6 @@ export const useSkillSlashPicker = ({
   }, [isSlashMode, query, skills]);
 
   const open = isSlashMode && !dismissed && (loading || items.length > 0);
-
-  // Each keystroke changes the query: reset the highlight and clear a prior
-  // Escape-dismiss so the picker re-opens as the user keeps typing.
-  useEffect(() => {
-    setActiveIndex(0);
-    setDismissed(false);
-  }, [query]);
 
   const onSelect = useCallback(
     async (skill: IMastraInvocableSkill) => {

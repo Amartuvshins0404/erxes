@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useMemo } from 'react';
 import { IconRocket, IconSparkles } from '@tabler/icons-react';
 import { Badge, Button, Dialog, Form, Spinner, toast } from 'erxes-ui';
 import { useForm } from 'react-hook-form';
@@ -35,9 +35,28 @@ export const SkillDraftPreviewDialog = ({
   const { canEdit } = useSkillAccess();
   const { skill, loading } = useSkill(open && skillId ? skillId : undefined);
 
+  // Populate the form from the loaded draft the moment it arrives. Feeding the
+  // distilled skill through react-hook-form's `values` lets RHF reset the fields
+  // on data change directly — no effect faking a "skill loaded" event handler.
+  const values = useMemo<SkillFormValues | undefined>(
+    () =>
+      open && skill
+        ? {
+            name: skill.name || '',
+            description: skill.description || '',
+            instructions: skill.instructions || '',
+            userInvocable: skill.userInvocable ?? true,
+            category: skill.category || '',
+            metadataText: stringifyMetadata(skill.metadata),
+          }
+        : undefined,
+    [open, skill],
+  );
+
   const form = useForm<SkillFormValues>({
     resolver: zodResolver(skillFormSchema),
     defaultValues: SKILL_FORM_DEFAULTS,
+    values,
   });
 
   // No toast on save here — the explicit Save/Publish handlers below own the
@@ -50,19 +69,6 @@ export const SkillDraftPreviewDialog = ({
     onDone?.();
     onOpenChange(false);
   });
-
-  useEffect(() => {
-    if (open && skill) {
-      form.reset({
-        name: skill.name || '',
-        description: skill.description || '',
-        instructions: skill.instructions || '',
-        userInvocable: skill.userInvocable ?? true,
-        category: skill.category || '',
-        metadataText: stringifyMetadata(skill.metadata),
-      });
-    }
-  }, [open, skill, form]);
 
   const toDoc = (values: SkillFormValues) => {
     const { doc, metadataError } = skillFormToDoc(values);

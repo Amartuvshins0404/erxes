@@ -944,9 +944,9 @@ export const CompanyBrainWorkspacePage = ({
     () =>
       mode === 'assistant'
         ? {
-            title: 'AI Assistant',
-            subtitle: 'Manage assistants for your company brain.',
-            buttonLabel: 'Add AI Assistant',
+            title: 'OpenClaw Assistant',
+            subtitle: 'Multi-platform AI with explicit, auditable memory and community skills.',
+            buttonLabel: 'Add OpenClaw Assistant',
             emptyTitle: 'No AI assistants yet',
             emptyDescription:
               'Create your first AI assistant or link one transferred from another SaaS.',
@@ -956,9 +956,9 @@ export const CompanyBrainWorkspacePage = ({
               'Create a new server or link an existing assistant server from another SaaS.',
           }
         : {
-            title: 'AI Agents',
-            subtitle: 'Manage agents for your company brain.',
-            buttonLabel: 'Add AI Agent',
+            title: 'OpenCode Coder',
+            subtitle: 'AI coding agent for terminal, IDE, and desktop. Any model, any provider.',
+            buttonLabel: 'Add OpenCode Coder',
             emptyTitle: 'No AI agents yet',
             emptyDescription:
               'Create your first AI agent or link one transferred from another SaaS.',

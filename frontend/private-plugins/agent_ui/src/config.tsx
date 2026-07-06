@@ -22,12 +22,12 @@ export const CONFIG: IUIConfig = {
   },
   modules: [
     {
-      name: 'AI Assistant',
+      name: 'OpenClaw Assistant',
       icon: IconSparkles,
       path: 'agent/assistant',
     },
     {
-      name: 'AI Agents',
+      name: 'OpenCode Coder',
       icon: IconCode,
       path: 'agent/agents',
     },

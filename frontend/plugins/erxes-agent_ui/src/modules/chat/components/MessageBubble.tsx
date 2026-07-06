@@ -258,6 +258,7 @@ export const MessageBubble = memo(function MessageBubble({
               <ArtifactCard
                 key={artifact.id || `artifact-${i}`}
                 artifact={artifact}
+                live={streaming}
               />
             ))}
           </div>

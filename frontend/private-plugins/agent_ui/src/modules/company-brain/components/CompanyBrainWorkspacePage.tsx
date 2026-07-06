@@ -908,7 +908,7 @@ export const CompanyBrainWorkspacePage = ({
       mode === 'assistant'
         ? {
             title: 'OpenClaw Assistant',
-            subtitle: 'Manage assistants for your company brain.',
+            subtitle: 'Multi-platform AI with explicit, auditable memory and community skills.',
             buttonLabel: 'Add OpenClaw Assistant',
             emptyTitle: 'No AI assistants yet',
             emptyDescription:
@@ -920,7 +920,7 @@ export const CompanyBrainWorkspacePage = ({
           }
         : {
             title: 'OpenCode Coder',
-            subtitle: 'Manage agents for your company brain.',
+            subtitle: 'AI coding agent for terminal, IDE, and desktop. Any model, any provider.',
             buttonLabel: 'Add OpenCode Coder',
             emptyTitle: 'No AI agents yet',
             emptyDescription:

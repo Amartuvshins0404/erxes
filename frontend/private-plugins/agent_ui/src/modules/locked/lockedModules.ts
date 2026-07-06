@@ -1,6 +1,7 @@
 import {
   IconBolt,
   IconBrain,
+  IconMessage,
   IconPalette,
   IconSitemap,
 } from '@tabler/icons-react';
@@ -17,6 +18,13 @@ export interface LockedModule {
 // Company Brain sidebar and, when opened, render a blurred mock behind a
 // "buy a plan to unlock" card (see LockedModulePage).
 export const LOCKED_MODULES: LockedModule[] = [
+  {
+    name: 'Postiz Agent',
+    description:
+      'Plan, generate, and schedule posts automatically to 30+ social media networks.',
+    path: 'postiz',
+    icon: IconMessage,
+  },
   {
     name: 'Hermes Agent',
     description:

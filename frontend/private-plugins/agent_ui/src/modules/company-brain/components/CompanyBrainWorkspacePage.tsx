@@ -79,7 +79,7 @@ type ManagedCreationStep =
   | 'channel'
   | 'complete';
 
-const DEFAULT_DISCORD_CONNECTION_MODE: DiscordConnectionMode = 'byob';
+const DEFAULT_DISCORD_CONNECTION_MODE: DiscordConnectionMode = 'managed';
 
 const getStatusLabel = (status?: string | null) => {
   if (!status) {
@@ -999,18 +999,6 @@ export const CompanyBrainWorkspacePage = ({
     managedAgent?.status === SERVER_STATUSES.APPROVED && !!managedAgent?.url;
   const isManagedRuntimeFailed =
     managedAgent?.status === SERVER_STATUSES.FAILED;
-
-  const setDiscordConnectionMode = (value: DiscordConnectionMode) => {
-    setDiscordConnectionModeState(value);
-    form.setValue('discordConnectionMode', value, {
-      shouldDirty: true,
-      shouldValidate: true,
-    });
-
-    if (value === 'managed') {
-      form.setValue('discordBotToken', '');
-    }
-  };
 
   const isSubmitting =
     creatingIdentifier ||
@@ -2140,105 +2128,6 @@ export const CompanyBrainWorkspacePage = ({
                       />
                     )}
 
-                    {!isTransfer && mode === 'assistant' && (
-                      <Form.Field
-                        name="discordConnectionMode"
-                        render={() => (
-                          <Form.Item>
-                            <Form.Label>Discord connection</Form.Label>
-                            <Form.Control>
-                              <div className="grid gap-3 sm:grid-cols-2">
-                                <button
-                                  type="button"
-                                  className={`flex cursor-pointer items-center gap-3 rounded-lg border p-3 text-left text-sm transition-colors ${
-                                    discordConnectionMode === 'managed'
-                                      ? 'border-primary bg-primary/5'
-                                      : 'border-border bg-background'
-                                  }`}
-                                  onClick={() =>
-                                    setDiscordConnectionMode('managed')
-                                  }
-                                >
-                                  <span
-                                    className={`flex size-4 shrink-0 items-center justify-center rounded-full border ${
-                                      discordConnectionMode === 'managed'
-                                        ? 'border-primary'
-                                        : 'border-input'
-                                    }`}
-                                  >
-                                    {discordConnectionMode === 'managed' && (
-                                      <span className="size-2 rounded-full bg-primary" />
-                                    )}
-                                  </span>
-                                  <span className="space-y-1">
-                                    <span className="block font-medium">
-                                      Use erxes Ai Assistant
-                                    </span>
-                                  </span>
-                                </button>
-                                <button
-                                  type="button"
-                                  className={`flex cursor-pointer items-center gap-3 rounded-lg border p-3 text-left text-sm transition-colors ${
-                                    discordConnectionMode === 'byob'
-                                      ? 'border-primary bg-primary/5'
-                                      : 'border-border bg-background'
-                                  }`}
-                                  onClick={() =>
-                                    setDiscordConnectionMode('byob')
-                                  }
-                                >
-                                  <span
-                                    className={`flex size-4 shrink-0 items-center justify-center rounded-full border ${
-                                      discordConnectionMode === 'byob'
-                                        ? 'border-primary'
-                                        : 'border-input'
-                                    }`}
-                                  >
-                                    {discordConnectionMode === 'byob' && (
-                                      <span className="size-2 rounded-full bg-primary" />
-                                    )}
-                                  </span>
-                                  <span className="space-y-1">
-                                    <span className="block font-medium">
-                                      Bring your own bot
-                                    </span>
-                                  </span>
-                                </button>
-                              </div>
-                            </Form.Control>
-                            <Form.Message />
-                          </Form.Item>
-                        )}
-                      />
-                    )}
-
-                    {!isTransfer &&
-                      mode === 'assistant' &&
-                      discordConnectionMode === 'byob' && (
-                        <Form.Field
-                          name="discordBotToken"
-                          render={({ field }) => (
-                            <Form.Item>
-                              <Form.Label>Discord bot token</Form.Label>
-                              <Form.Control>
-                                <Input
-                                  {...field}
-                                  value={field.value || ''}
-                                  placeholder="Paste your Discord bot token"
-                                  autoComplete="off"
-                                />
-                              </Form.Control>
-                              <p className="text-xs text-muted-foreground">
-                                Required. Uses this token during bootstrap so
-                                the bot can come online and send the pairing
-                                code.
-                              </p>
-                              <Form.Message />
-                            </Form.Item>
-                          )}
-                        />
-                      )}
-
                     {isTransfer && (
                       <>
                         <Form.Field
@@ -2470,19 +2359,6 @@ export const CompanyBrainWorkspacePage = ({
 
                       {managedStep === 'channel' && (
                         <>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            disabled={isSubmitting}
-                            onClick={handleRefreshManagedRuntime}
-                          >
-                            <IconRefresh
-                              className={`size-4 ${
-                                refreshingManagedRuntime ? 'animate-spin' : ''
-                              }`}
-                            />
-                            Refresh runtime
-                          </Button>
                           {isManagedRuntimeFailed && (
                             <Button
                               type="button"

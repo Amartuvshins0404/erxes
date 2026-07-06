@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { IconLock, IconShieldCheck } from '@tabler/icons-react';
 import { Button, Label, Separator, Spinner, Switch } from 'erxes-ui';
 import { useAgentGrant } from '../hooks/useAgentGrant';
@@ -30,11 +30,10 @@ export const AgentAccessTab = ({
     save,
   } = useAgentGrant(agent);
 
-  const [selectedPlugin, setSelectedPlugin] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!selectedPlugin && plugins.length) setSelectedPlugin(plugins[0].plugin);
-  }, [plugins, selectedPlugin]);
+  // Null = no explicit pick yet; fall back to the first plugin at render time
+  // rather than syncing a default into state through an effect.
+  const [picked, setPicked] = useState<string | null>(null);
+  const selectedPlugin = picked ?? plugins[0]?.plugin ?? null;
 
   if (loading) {
     return (
@@ -77,7 +76,7 @@ export const AgentAccessTab = ({
             <button
               key={plugin}
               type="button"
-              onClick={() => setSelectedPlugin(plugin)}
+              onClick={() => setPicked(plugin)}
               className={`w-full text-left rounded-md px-3 py-2 text-sm capitalize transition-colors ${
                 selectedPlugin === plugin
                   ? 'bg-primary/10 text-primary font-medium'

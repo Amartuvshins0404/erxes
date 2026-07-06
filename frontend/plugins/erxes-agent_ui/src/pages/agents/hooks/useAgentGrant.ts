@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useApolloClient } from '@apollo/client';
 import { toast } from 'erxes-ui';
 import { usePermissionCheck } from 'ui-modules';
@@ -45,34 +45,34 @@ const groupNameFor = (agentId: string) => `agent-grant:${agentId}`;
 const signature = (perms: GroupPermission[]) =>
   JSON.stringify(
     perms
-      .map((p) => ({ ...p, actions: [...p.actions].sort() }))
+      .map((p) => ({ ...p, actions: Array.from(p.actions).sort() }))
       .sort((a, b) =>
         keyOf(a.plugin, a.module).localeCompare(keyOf(b.plugin, b.module)),
       ),
   );
 
-/** Expand the enabled-modules + selected-actions state into group permissions. */
+/**
+ * Expand the selection map into group permissions. A module is enabled IFF it
+ * is a key; its Set holds the chosen non-`always` action names. `always` view
+ * gates ride along with any enabled module.
+ */
 const buildPermissions = (
-  enabled: Set<string>,
-  selected: Map<string, Set<string>>,
+  selection: Map<string, Set<string>>,
   moduleByKey: Map<string, { plugin: string; module: PermissionModule }>,
 ): GroupPermission[] => {
   const out: GroupPermission[] = [];
-  for (const k of enabled) {
+  for (const [k, picked] of selection) {
     const meta = moduleByKey.get(k);
     if (!meta) continue;
-    const alwaysNames = meta.module.actions
-      .filter((a) => a.always)
-      .map((a) => a.name);
-    const picked = [...(selected.get(k) ?? [])];
     // Explicit names only (never '*') so BOTH the server grant and the derived
     // tool filter resolve concrete actions. View gates ride along automatically.
-    const actions = [...new Set([...alwaysNames, ...picked])];
-    if (actions.length)
+    const actions = new Set(picked);
+    for (const a of meta.module.actions) if (a.always) actions.add(a.name);
+    if (actions.size)
       out.push({
         plugin: meta.plugin,
         module: meta.module.name,
-        actions,
+        actions: [...actions],
         scope: 'all',
       });
   }
@@ -128,42 +128,50 @@ export const useAgentGrant = (agent: AgentLike) => {
     return map;
   }, [plugins]);
 
-  // enabled modules + explicitly selected (non-always) action names per module.
-  const [enabled, setEnabled] = useState<Set<string>>(new Set());
-  const [selected, setSelected] = useState<Map<string, Set<string>>>(new Map());
-  const [initialSig, setInitialSig] = useState<string>('[]');
-
-  // Seed selection from the agent's current group once the catalog + group are
-  // loaded (expand '*' to explicit names against the catalog).
-  useEffect(() => {
-    if (modulesLoading || groupLoading || !moduleByKey.size) return;
+  // Single source of truth: a module is enabled IFF it is a key here, and its
+  // Set holds the chosen non-`always` action names.
+  //
+  // Seed derived (not effect-synced) from the agent's current group once the
+  // catalog + group are loaded — '*' expands to explicit names against the
+  // catalog, `always` names are dropped since they ride along implicitly.
+  const seed = useMemo(() => {
+    const map = new Map<string, Set<string>>();
+    if (modulesLoading || groupLoading || !moduleByKey.size) return map;
     const perms = groupData?.permissionGroupDetail?.permissions ?? [];
-    const nextEnabled = new Set<string>();
-    const nextSelected = new Map<string, Set<string>>();
-
     for (const perm of perms) {
       const k = keyOf(perm.plugin, perm.module);
       const meta = moduleByKey.get(k);
       if (!meta) continue; // stale/unknown module — drop from the picker
-      nextEnabled.add(k);
-      const allNames = meta.module.actions.map((a) => a.name);
-      const alwaysNames = new Set(
-        meta.module.actions.filter((a) => a.always).map((a) => a.name),
-      );
+      const allNames: string[] = [];
+      const alwaysNames = new Set<string>();
+      for (const a of meta.module.actions) {
+        allNames.push(a.name);
+        if (a.always) alwaysNames.add(a.name);
+      }
       const names = perm.actions.includes('*') ? allNames : perm.actions;
-      nextSelected.set(k, new Set(names.filter((n) => !alwaysNames.has(n))));
+      const set = new Set<string>();
+      for (const n of names) if (!alwaysNames.has(n)) set.add(n);
+      map.set(k, set);
     }
-
-    setEnabled(nextEnabled);
-    setSelected(nextSelected);
-    setInitialSig(
-      signature(buildPermissions(nextEnabled, nextSelected, moduleByKey)),
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    return map;
   }, [modulesLoading, groupLoading, groupData, moduleByKey]);
 
+  const [selection, setSelection] = useState<Map<string, Set<string>>>(seed);
+  const [seededFrom, setSeededFrom] = useState(seed);
+  const [initialSig, setInitialSig] = useState(() =>
+    signature(buildPermissions(seed, moduleByKey)),
+  );
+
+  // Re-seed at render time (the recommended prev-value comparison) whenever the
+  // loaded group produces a fresh seed, instead of syncing state in an effect.
+  if (seed !== seededFrom) {
+    setSeededFrom(seed);
+    setSelection(seed);
+    setInitialSig(signature(buildPermissions(seed, moduleByKey)));
+  }
+
   const isModuleOn = (plugin: string, module: string) =>
-    enabled.has(keyOf(plugin, module));
+    selection.has(keyOf(plugin, module));
 
   const isActionOn = (
     plugin: string,
@@ -171,24 +179,28 @@ export const useAgentGrant = (agent: AgentLike) => {
     action: PermissionAction,
   ) => {
     const k = keyOf(plugin, module);
-    if (action.always) return enabled.has(k); // view gates ride along with module
-    return selected.get(k)?.has(action.name) ?? false;
+    if (action.always) return selection.has(k); // view gates ride along
+    return selection.get(k)?.has(action.name) ?? false;
   };
 
+  // Enabling a module pre-selects ALL its toggleable actions (everything except
+  // `always`/`disabled`); the user can un-toggle any afterward.
   const toggleModule = (plugin: string, module: string, on: boolean) => {
     const k = keyOf(plugin, module);
-    setEnabled((prev) => {
-      const next = new Set(prev);
-      if (on) next.add(k);
-      else next.delete(k);
-      return next;
-    });
-    if (!on)
-      setSelected((prev) => {
-        const next = new Map(prev);
+    setSelection((prev) => {
+      const next = new Map(prev);
+      if (!on) {
         next.delete(k);
         return next;
-      });
+      }
+      const names = new Set<string>();
+      const meta = moduleByKey.get(k);
+      if (meta)
+        for (const a of meta.module.actions)
+          if (!a.always && !a.disabled) names.add(a.name);
+      next.set(k, names);
+      return next;
+    });
   };
 
   const toggleAction = (
@@ -199,8 +211,10 @@ export const useAgentGrant = (agent: AgentLike) => {
   ) => {
     if (action.always || action.disabled) return;
     const k = keyOf(plugin, module);
-    setEnabled((prev) => (on && !prev.has(k) ? new Set(prev).add(k) : prev));
-    setSelected((prev) => {
+    setSelection((prev) => {
+      // Turning an action OFF on a module that isn't enabled is a no-op — never
+      // create an empty Set, which would falsely mark the module enabled.
+      if (!on && !prev.has(k)) return prev;
       const next = new Map(prev);
       const set = new Set(next.get(k) ?? []);
       if (on) set.add(action.name);
@@ -211,8 +225,8 @@ export const useAgentGrant = (agent: AgentLike) => {
   };
 
   const permissions = useMemo(
-    () => buildPermissions(enabled, selected, moduleByKey),
-    [enabled, selected, moduleByKey],
+    () => buildPermissions(selection, moduleByKey),
+    [selection, moduleByKey],
   );
   const dirty = signature(permissions) !== initialSig;
 

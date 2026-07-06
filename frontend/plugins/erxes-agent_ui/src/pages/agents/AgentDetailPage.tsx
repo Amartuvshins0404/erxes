@@ -58,7 +58,7 @@ const TABS = [
   { value: 'skills', label: 'Skills', icon: IconBook2 },
   { value: 'learnings', label: 'Learnings', icon: IconBulb },
   { value: 'access', label: 'Access', icon: IconShieldLock },
-  { value: 'settings', label: 'Settings', icon: IconSettings },
+  { value: 'config', label: 'Settings', icon: IconSettings },
 ] as const;
 
 type TabValue = (typeof TABS)[number]['value'];
@@ -179,7 +179,7 @@ export const AgentDetailPage = () => {
               }
             />
             <Route path="access" element={<AgentAccessTab agent={agent} />} />
-            <Route path="settings" element={<AgentFormPage embedded />} />
+            <Route path="config" element={<AgentFormPage embedded />} />
             <Route path="*" element={<Navigate to="workflows" replace />} />
           </Routes>
         </Suspense>

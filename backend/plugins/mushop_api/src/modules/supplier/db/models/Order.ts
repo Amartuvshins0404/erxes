@@ -10,15 +10,20 @@ export interface IOrderModel extends Model<IOrderDocument> {
     result: {
       ok: boolean;
       orderId?: string;
-      customerId?: string;
+      order?: any;
       error?: string;
     },
+  ): Promise<void>;
+  syncFromSupplier(
+    subdomain: string,
+    entityId: string,
+    order: any,
+    status?: string,
   ): Promise<void>;
 }
 
 export const loadOrderClass = (models: IModels) => {
   class Order {
-    // Recorded right before mushop hands the order to the supplier server.
     public static async logForward(doc: IOrder) {
       return models.Order.create({
         ...doc,
@@ -26,13 +31,12 @@ export const loadOrderClass = (models: IModels) => {
       });
     }
 
-    // Closes out the record once the supplier server responds.
     public static async markResult(
       _id: string,
       result: {
         ok: boolean;
         orderId?: string;
-        customerId?: string;
+        order?: any;
         error?: string;
       },
     ) {
@@ -43,13 +47,31 @@ export const loadOrderClass = (models: IModels) => {
             ? {
                 status: ORDER_STATUS.FORWARDED,
                 entityId: result.orderId ?? null,
-                customerId: result.customerId ?? null,
+                ...(result.order ? { order: result.order } : {}),
                 error: null,
               }
             : {
                 status: ORDER_STATUS.FAILED,
                 error: result.error ?? 'forward failed',
               },
+        },
+      );
+    }
+
+    public static async syncFromSupplier(
+      subdomain: string,
+      entityId: string,
+      order: any,
+      status?: string,
+    ) {
+      await models.Order.updateOne(
+        { subdomain, entityId },
+        {
+          $set: {
+            order,
+            ...(status ? { status } : {}),
+            error: null,
+          },
         },
       );
     }

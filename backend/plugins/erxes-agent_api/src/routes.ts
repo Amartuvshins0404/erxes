@@ -1,52 +1,31 @@
 import { Router } from 'express';
-import {
-  createUIMessageStream,
-  pipeUIMessageStreamToResponse,
-  type UIMessageChunk,
-} from 'ai';
-import { toAISdkStream } from '@mastra/ai-sdk';
-import type { MastraModelOutput } from '@mastra/core/stream';
+import { createUIMessageStream, pipeUIMessageStreamToResponse } from 'ai';
 import { extractUserFromHeader, getSubdomain } from 'erxes-api-shared/utils';
 import { checkPermissionGroup } from 'erxes-api-shared/core-modules';
 import { generateModels } from './connectionResolvers';
 import { getOrCreateAgent } from './mastra/agentRuntime';
-import {
-  ActivityTracker,
-  createActivityTracker,
-  summarizeActivity,
-  summarizeTurnAndSteps,
-  REASONING_STEP_MIN_CHARS,
-} from './mastra/activity';
-import { toolStatusLine } from './mastra/activity-signals';
-import {
-  isReasoningEffort,
-  buildReasoningProviderOptions,
-  ReasoningEffort,
-} from './mastra/providers';
+import { isReasoningEffort } from './mastra/providers';
 import { runWithAuth, ApprovedOp } from './mastra/requestContext';
-import {
-  resolveBackgroundToken,
-  isSecureBackgroundRunRequired,
-} from './mastra/auth/runToken';
+import { resolveBackgroundPrincipal } from './mastra/auth/backgroundPrincipal';
 import { isAdvancedMemoryEnabled } from './mastra/memory/config';
 import { scopedResource } from './mastra/memory/mastraMemory';
 import { augmentConvo } from './mastra/memory';
 import { readLearnedDigest } from './mastra/learning/digest';
 import {
-  prepareChatTurn,
-  persistTurn,
-  synthesizeFromToolResults,
   toUserFacingError,
   runAgentTurn,
   patchNativeTurn,
   TurnAgent,
 } from '@/agent/turn';
 import { IMastraChatAttachment } from '@/session/@types/session';
-import { UITurnAccumulator } from '@/agent/uiTurn';
 import { attachmentStorageStatus } from '@/settings/graphql/resolvers/queries/settings';
 import { registerVoiceRoutes } from './mastra/voice/routes';
-import { buildTurnSystem } from './mastra/voice/voicePrompt';
+import {
+  streamAgentTurn,
+  type ChatStreamRequest,
+} from './mastra/streamTurn';
 import { makeIpRateLimiter } from './utils/rateLimit';
+import { registerActiveRun } from './mastra/runRegistry';
 
 export const router: Router = Router();
 
@@ -81,30 +60,32 @@ const llmRouteLimiter = makeIpRateLimiter();
 // agent run via AbortSignal. Whatever text already streamed is persisted and
 // marked `interrupted` so the partial reply survives reloads.
 
-// A Mastra stream may expose `traceId` as a value or a promise — sniff and
-// resolve it, accepting only a string (a non-string truthy value would slip past
-// the falsy guard in pushUserScore and ship bad data to Langfuse).
-async function resolveTraceId(
-  stream: { traceId?: unknown },
-): Promise<string | undefined> {
-  const tid = stream.traceId;
-  const resolved =
-    tid && typeof (tid as PromiseLike<unknown>).then === 'function'
-      ? await (tid as Promise<unknown>).catch(() => undefined)
-      : tid;
-  return typeof resolved === 'string' ? resolved : undefined;
+// Shared skeleton for the untrusted-array shape guards below: an absent value is
+// an empty list; anything that isn't an array or overflows the cap is malformed
+// (null); otherwise each item is run through `validateItem`, and the first item
+// that fails (returns null) rejects the whole payload. Keeps the per-item
+// validation of each caller intact — this only owns the outer envelope.
+function parseBoundedArray<T>(
+  raw: unknown,
+  max: number,
+  validateItem: (item: unknown) => T | null,
+): T[] | null {
+  if (raw === undefined || raw === null) return [];
+  if (!Array.isArray(raw) || raw.length > max) return null;
+  const out: T[] = [];
+  for (const item of raw) {
+    const parsed = validateItem(item);
+    if (parsed === null) return null;
+    out.push(parsed);
+  }
+  return out;
 }
 
 // Shape-check the attachments array a chat turn may carry. Returns the
 // sanitized list, or null when the payload is malformed.
 const MAX_ATTACHMENTS_PER_MESSAGE = 10;
 function sanitizeAttachments(raw: unknown): IMastraChatAttachment[] | null {
-  if (raw === undefined || raw === null) return [];
-  if (!Array.isArray(raw) || raw.length > MAX_ATTACHMENTS_PER_MESSAGE)
-    return null;
-
-  const out: IMastraChatAttachment[] = [];
-  for (const item of raw) {
+  return parseBoundedArray(raw, MAX_ATTACHMENTS_PER_MESSAGE, (item) => {
     const candidate = item as Record<string, unknown> | null | undefined;
     if (
       !candidate ||
@@ -115,7 +96,7 @@ function sanitizeAttachments(raw: unknown): IMastraChatAttachment[] | null {
     const url = candidate.url.trim();
     const name = candidate.name.trim();
     if (!url || url.length > 2048 || !name || name.length > 512) return null;
-    out.push({
+    return {
       url,
       name,
       type:
@@ -127,25 +108,8 @@ function sanitizeAttachments(raw: unknown): IMastraChatAttachment[] | null {
         typeof candidate.size === 'number' && candidate.size >= 0
           ? candidate.size
           : undefined,
-    });
-  }
-  return out;
-}
-
-// Validated POST /chat/stream payload. All shape-checking for the untrusted
-// request body lives here so the handler reads as straight-line logic.
-interface ChatStreamRequest {
-  agentId: string;
-  message: string;
-  threadId?: string;
-  reasoningEffort?: ReasoningEffort;
-  attachments: IMastraChatAttachment[];
-  approvedOperations: ApprovedOp[];
-  // Skill names the user slash-activated in the composer for THIS message.
-  activeSkillNames: string[];
-  // True when this turn originated from hands-free voice mode: the reply is
-  // read aloud by TTS, so the agent should answer short and conversational.
-  voiceMode: boolean;
+    };
+  });
 }
 
 // Shape-check the slash-activated skill names the composer echoes on send.
@@ -155,35 +119,27 @@ interface ChatStreamRequest {
 const MAX_ACTIVE_SKILLS = 10;
 const MAX_SKILL_NAME_LEN = 64;
 function sanitizeActiveSkillNames(raw: unknown): string[] | null {
-  if (raw === undefined || raw === null) return [];
-  if (!Array.isArray(raw) || raw.length > MAX_ACTIVE_SKILLS) return null;
-  const out: string[] = [];
-  for (const item of raw) {
+  return parseBoundedArray(raw, MAX_ACTIVE_SKILLS, (item) => {
     if (typeof item !== 'string') return null;
     const name = item.trim();
     if (!name || name.length > MAX_SKILL_NAME_LEN) return null;
-    out.push(name);
-  }
-  return out;
+    return name;
+  });
 }
 
 // Shape-check the per-turn destructive-op approvals the client echoes back when
 // the user clicks Approve. Returns the sanitized list, or null when malformed.
 const MAX_APPROVED_OPS = 20;
 function sanitizeApprovedOperations(raw: unknown): ApprovedOp[] | null {
-  if (raw === undefined || raw === null) return [];
-  if (!Array.isArray(raw) || raw.length > MAX_APPROVED_OPS) return null;
-  const out: ApprovedOp[] = [];
-  for (const item of raw) {
+  return parseBoundedArray(raw, MAX_APPROVED_OPS, (item) => {
     const candidate = item as Record<string, unknown> | null | undefined;
     if (!candidate || typeof candidate.operation !== 'string') return null;
     const args =
       candidate.args && typeof candidate.args === 'object'
         ? (candidate.args as Record<string, unknown>)
         : undefined;
-    out.push({ operation: candidate.operation, args });
-  }
-  return out;
+    return { operation: candidate.operation, args };
+  });
 }
 
 type ParseResult =
@@ -252,10 +208,11 @@ router.post('/chat/stream', llmRouteLimiter, async (req, res) => {
   if (!parsed.ok) {
     return res.status(400).json({ error: parsed.error });
   }
-  // reasoningEffort is the optional per-conversation override from the composer.
-  const { agentId, message, threadId, reasoningEffort, attachments } =
-    parsed.value;
-  const { approvedOperations, activeSkillNames, voiceMode } = parsed.value;
+  // The validated turn payload (agentId, message, reasoningEffort, attachments,
+  // approvedOperations, activeSkillNames, voiceMode …) is handed to
+  // streamAgentTurn wholesale; only `attachments` is inspected here for the
+  // early storage guard below.
+  const { attachments, threadId } = parsed.value;
 
   const subdomain = getSubdomain(req);
 
@@ -302,11 +259,13 @@ router.post('/chat/stream', llmRouteLimiter, async (req, res) => {
     stopHeartbeat();
   });
 
-  // Folds the model's UIMessage chunks into the erxes-only turn artifacts we
-  // persist (ordered parts, thinking, tool calls). The live render is driven by
-  // the chunks themselves — this only assembles what gets written to Mongo.
-  const acc = new UITurnAccumulator();
-  let activity: ActivityTracker | null = null;
+  // Explicit server-driven cancel: track this run so mastraChatCancel can abort
+  // it even when the gateway proxy swallows the client disconnect (req.on close
+  // never fires upstream). Only tracked when the client sent its own threadId —
+  // the key the cancel mutation carries. Unregistered in the run's finally.
+  const unregisterRun = threadId
+    ? registerActiveRun(subdomain, user._id, threadId, controller)
+    : () => {};
 
   const stream = createUIMessageStream({
     onError: (err) => {
@@ -323,321 +282,18 @@ router.post('/chat/stream', llmRouteLimiter, async (req, res) => {
       }, 10000);
 
       try {
-        const prepared = await prepareChatTurn({
+        await streamAgentTurn({
+          writer,
           models,
           subdomain,
           user,
-          agentId,
-          message,
-          threadId,
-          attachments,
-          approvedOperations,
-          activeSkillNames,
+          controller,
+          clientGone: () => clientGone,
+          request: parsed.value,
         });
-        const { agent, convo, authCtx, memoryBinding } = prepared;
-
-        // Per-turn system message: voice brevity directive (voice turns only) +
-        // any slash-activated skill instructions. Undefined leaves the agent's
-        // base instructions untouched (the typed-chat path).
-        const turnSystem = buildTurnSystem({
-          voiceMode,
-          activeSkillInstructions: prepared.activeSkillInstructions,
-        });
-
-        // Per-conversation reasoning override → provider-specific options,
-        // resolved once against the agent's provider. Providers without a
-        // portable reasoning knob yield undefined, so the model's configured
-        // default stands untouched.
-        const reasoningOptions = buildReasoningProviderOptions(
-          prepared.agentConfig.provider,
-          reasoningEffort,
-        );
-
-        // Narrates "what is the agent doing" while the turn runs — throttled
-        // summaries of the live reasoning/tool signals, pushed as transient
-        // `data-activity` parts.
-        activity = createActivityTracker({
-          userMessage: message,
-          emit: (text) => {
-            if (!clientGone)
-              writer.write({
-                type: 'data-activity',
-                data: { text },
-                transient: true,
-              });
-          },
-          // Tool steps narrate instantly (no LLM); reasoning bursts use the model.
-          toolSignal: toolStatusLine,
-          summarize: (snapshot) =>
-            summarizeActivity({
-              provider: prepared.agentConfig.provider,
-              model: prepared.agentConfig.model,
-              providers: prepared.providers,
-              authCtx,
-              snapshot,
-            }),
-        });
-
-        // Plan B: the Langfuse trace id for this turn — stamped onto the
-        // assistant message (via the finish chunk below) so a later thumbs
-        // rating can attach a human score to the right trace. Undefined when
-        // evaluation is off.
-        let langfuseTraceId: string | undefined;
-
-        // The assistant turn's reasoning / tool / text parts are persisted by
-        // Mastra natively (content.parts, on the correct row) and replayed on
-        // reload via the resolver's `parts` field — so no turn-meta stamping is
-        // needed here. langfuseTraceId / interrupted / activeSkills still ride the
-        // finish chunk for the live client.
-
-        // Per-reasoning-step short summaries ("short thoughts"): substantial
-        // reasoning bursts are COLLECTED here (by reasoning ordinal, matching the
-        // client's per-reasoning-part index) and summarized together in ONE model
-        // call at turn end — no per-burst LLM round-trips during the stream.
-        const reasoningBursts: { index: number; text: string }[] = [];
-        let reasoningBurst = '';
-        let reasoningBurstIndex = 0;
-        // Cap per-turn step summaries: a generous backstop so a pathological,
-        // many-burst turn keeps the single summary call's prompt bounded. Beyond
-        // it, the extra steps fall back to the raw-reasoning lead in the UI.
-        const MAX_STEP_SUMMARIES = 12;
-
-        // A reasoning burst just ended (a non-reasoning chunk arrived). Give it
-        // the next ordinal — kept in lockstep with the client even for bursts too
-        // short to summarize — and queue substantial ones for the batched call.
-        const closeReasoningBurst = () => {
-          const text = reasoningBurst;
-          reasoningBurst = '';
-          if (!text) return;
-          const index = reasoningBurstIndex++;
-          if (text.trim().length < REASONING_STEP_MIN_CHARS) return;
-          if (reasoningBursts.length >= MAX_STEP_SUMMARIES) return;
-          reasoningBursts.push({ index, text });
-        };
-
-        try {
-          await runWithAuth(authCtx, async () => {
-            const modelStream = await agent.stream(convo, {
-              abortSignal: controller.signal,
-              ...(memoryBinding ? { memory: memoryBinding } : {}),
-              ...(reasoningOptions
-                ? { providerOptions: reasoningOptions }
-                : {}),
-              // Per-turn system additions (additive to the agent's base
-              // instructions + the native SkillsProcessor metadata): a voice-mode
-              // brevity directive when the turn came from speech, plus an
-              // explicitly slash-activated skill's full instructions.
-              ...(turnSystem ? { system: turnSystem } : {}),
-            });
-            langfuseTraceId = await resolveTraceId(
-              modelStream as { traceId?: unknown },
-            );
-
-            // Convert Mastra's native stream to the AI SDK v5 UIMessage chunk
-            // stream. sendFinish:false — we emit the final `finish` ourselves
-            // after persisting, so it carries the native messageId the client
-            // rates. Chunks are structurally the published `ai` UIMessageChunk.
-            const uiStream = toAISdkStream(
-              modelStream as unknown as MastraModelOutput,
-              {
-                from: 'agent',
-                sendReasoning: true,
-                sendSources: false,
-                sendFinish: false,
-              },
-              // Node web ReadableStream is async-iterable at runtime; the DOM lib
-              // type doesn't declare it, so iterate via this view.
-            ) as unknown as AsyncIterable<UIMessageChunk>;
-
-            for await (const chunk of uiStream) {
-              acc.fold(chunk);
-              switch (chunk.type) {
-                case 'reasoning-delta':
-                  reasoningBurst += chunk.delta ?? '';
-                  activity?.onThinking(chunk.delta ?? '');
-                  break;
-                // The same chunk types that close a reasoning burst in the
-                // accumulator (a non-reasoning chunk ends the current burst).
-                case 'reasoning-end':
-                case 'text-start':
-                case 'text-delta':
-                case 'tool-input-available':
-                case 'tool-input-error':
-                  closeReasoningBurst();
-                  if (chunk.type === 'tool-input-available')
-                    activity?.onToolCall(chunk.toolName, chunk.input);
-                  break;
-                default:
-                  break;
-              }
-              writer.write(chunk);
-            }
-            // Flush a burst still open when the model ended on reasoning.
-            closeReasoningBurst();
-            // No flush barrier or post-write needed: Mastra persists the turn's
-            // parts natively as it saves the row. persistTurn below only
-            // reconciles the thread binding, attachments, title, and the native
-            // message id.
-          });
-        } catch (err) {
-          // An abort lands here on most providers — an interrupt, not an error.
-          if (!controller.signal.aborted) throw err;
-        }
-
-        activity?.stop();
-
-        const interrupted = controller.signal.aborted;
-        let reply: string | null = acc.text || null;
-
-        if (!interrupted && !acc.text) {
-          // No answer text streamed — synthesize from tool results. (Native
-          // generate() produces the final text itself, so this only fires when
-          // the model ended a turn on tool calls without prose.)
-          // synthesizeFromToolResults internally skips synthesis when nothing
-          // real came back, so we never fabricate a success.
-          const toolResults = acc.toolResults();
-          if (toolResults.length) {
-            reply = await synthesizeFromToolResults({
-              agent,
-              message,
-              authCtx,
-              toolResults,
-            });
-            if (reply) {
-              const id = `synth-${Date.now()}`;
-              writer.write({ type: 'text-start', id });
-              writer.write({ type: 'text-delta', id, delta: reply });
-              writer.write({ type: 'text-end', id });
-            }
-          }
-        }
-
-        // Close the assistant message NOW — the full reply already streamed, so
-        // nothing user-visible should wait on the turn-end DB write. The native
-        // message id (rated without a reload) and the thread title are reconciled
-        // over the still-open stream once the background persist resolves; on a
-        // reload the message recovers its id from the store regardless.
-        writer.write({
-          type: 'finish',
-          messageMetadata: {
-            messageId: null,
-            interrupted,
-            langfuseTraceId,
-            ...(prepared.appliedSkillNames?.length
-              ? { activeSkills: prepared.appliedSkillNames }
-              : {}),
-          },
-        });
-
-        // Run-timeline summaries — the turn headline + each step's gist — are
-        // produced together in ONE model call, OFF the felt path (the reply has
-        // already streamed, so this never slows the response). Only for turns that
-        // did real work (tools or reasoning); a plain answer needs none. Streamed
-        // to the live client + persisted; on failure each item degrades to the
-        // raw-reasoning lead / no header.
-        let turnSummary: string | null = null;
-        let reasoningSummaryList: (string | null)[] | undefined;
-        const wantSummaries =
-          !interrupted &&
-          !!reply &&
-          (acc.toolCalls.length > 0 || reasoningBursts.length > 0);
-        if (wantSummaries) {
-          const { turn, steps } = await summarizeTurnAndSteps({
-            provider: prepared.agentConfig.provider,
-            model: prepared.agentConfig.model,
-            providers: prepared.providers,
-            authCtx,
-            userMessage: message,
-            reply,
-            steps: reasoningBursts,
-          });
-          turnSummary = turn;
-          if (steps.length) {
-            const byIndex: (string | null)[] = [];
-            for (const s of steps) byIndex[s.index] = s.summary;
-            reasoningSummaryList = Array.from(byIndex, (s) => s ?? null);
-          }
-          if (!clientGone) {
-            if (turnSummary)
-              writer.write({
-                type: 'data-turn-summary',
-                data: { text: turnSummary },
-                transient: true,
-              });
-            if (reasoningSummaryList)
-              writer.write({
-                type: 'data-reasoning-summaries',
-                data: { summaries: reasoningSummaryList },
-                transient: true,
-              });
-          }
-        }
-
-        // Persistence OFF the critical path. Mastra persists the turn's parts
-        // natively as it saves the row; persistTurn now only reconciles the
-        // thread binding, any user-message attachments, the per-step summaries,
-        // the title, and the native message id. We never block `finish` on it,
-        // but we never drop it (errors are logged, not swallowed).
-        const persistPromise = persistTurn({
-          models,
-          prepared,
-          reply,
-          reasoningSummaries: reasoningSummaryList,
-          turnSummary: turnSummary ?? undefined,
-          // Mastra's assigned id for this turn's assistant row, captured off the
-          // stream's `start` chunk — the id the client rates without a reload.
-          assistantMessageId: acc.messageId,
-        });
-
-        if (clientGone) {
-          // Nobody is waiting — let the write finish in the background, surfacing
-          // any failure so a lost turn is visible.
-          void persistPromise.catch((e) =>
-            console.warn(
-              `[mastra chat] background persist failed: ${
-                (e as Error)?.message || e
-              }`,
-            ),
-          );
-        } else {
-          // Client still connected: forward the reconciled native id + the new
-          // sidebar title over the already-open stream. This runs AFTER `finish`,
-          // so it is off the felt path — the user has the complete, rendered
-          // reply. Bounded titling: a slow/failed title never hangs the stream
-          // (it self-persists for the next session-list load).
-          try {
-            const { titlePromise, assistantMessageId } = await persistPromise;
-            if (assistantMessageId && !clientGone) {
-              writer.write({
-                type: 'data-message-id',
-                data: { messageId: assistantMessageId },
-                transient: true,
-              });
-            }
-            const title = await Promise.race([
-              titlePromise,
-              new Promise<null>((resolve) =>
-                setTimeout(() => resolve(null), 8000),
-              ),
-            ]);
-            if (title && !clientGone) {
-              writer.write({
-                type: 'data-thread-title',
-                data: { threadId: prepared.sessionId, title },
-                transient: true,
-              });
-            }
-          } catch (e) {
-            console.warn(
-              `[mastra chat] persist/title reconcile failed: ${
-                (e as Error)?.message || e
-              }`,
-            );
-          }
-        }
       } finally {
-        activity?.stop();
         stopHeartbeat();
+        unregisterRun();
       }
     },
   });
@@ -713,18 +369,20 @@ router.post('/bot/:conversationId', llmRouteLimiter, async (req, res) => {
       learnedDigestBlock: digest?.block,
     });
 
-    // Bot requests have no user session — run as the agent's bound owner
-    // (Phase 3). Falls back to the static app token ONLY in the degraded mode
-    // where the secure path isn't active (secret unset or no owner). When the
-    // secure path IS active (secret set + owner present) but the mint failed
-    // (owner deactivated, secret skew, core unreachable) we fail closed rather
-    // than fall back to the privileged app token — falling back would silently
-    // escalate the run to admin instead of stopping the bot.
-    const ownerToken = await resolveBackgroundToken(agentConfig, subdomain);
-    if (!ownerToken && isSecureBackgroundRunRequired(agentConfig)) {
-      console.error(
-        '[agent] bot run refused — owner token mint failed (owner deactivated or secret skew); not falling back to app token',
-      );
+    // Bot requests have no user session — run as the agent's bound owner and
+    // fail closed when that principal can't be minted. NEVER falls back to the
+    // app token: doing so would silently escalate the bot to admin instead of
+    // stopping it. The app token (settings.erxesApiToken) is passed only as the
+    // CLIENT CREDENTIAL that authenticates to core's mint endpoint — the minted
+    // owner token, not the app token, is the acting principal for the run.
+    const principal = await resolveBackgroundPrincipal({
+      agentConfig,
+      subdomain,
+      appToken: settings?.erxesApiToken,
+      models,
+    });
+    if (!principal.ok) {
+      console.error(`[agent] bot run refused — ${principal.error}`);
       return res.json({
         responses: [
           {
@@ -734,11 +392,7 @@ router.post('/bot/:conversationId', llmRouteLimiter, async (req, res) => {
         ],
       });
     }
-    if (!ownerToken)
-      console.warn(
-        '[agent] bot run falling back to app token — set ERXES_AGENT_RUN_TOKEN_SECRET and an agent owner',
-      );
-    const authCtx = { token: ownerToken ?? settings?.erxesApiToken, subdomain };
+    const authCtx = principal.authCtx;
     const reply =
       (await runWithAuth(authCtx, () =>
         runAgentTurn({

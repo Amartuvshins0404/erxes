@@ -7,8 +7,8 @@ import {
   IconAlignLeft,
   IconCalendarTime,
   IconClock,
+  IconFileText,
   IconHistory,
-  IconMessageCircle,
   IconPencil,
   IconPlayerPlay,
   IconRobot,
@@ -18,11 +18,9 @@ import {
   Button,
   Command,
   RecordTableInlineCell,
-  RecordTable,
   RelativeDateDisplay,
   Tooltip,
   toast,
-  useConfirm,
 } from 'erxes-ui';
 import {
   MASTRA_SCHEDULE_REMOVE,
@@ -40,21 +38,29 @@ import {
 } from '~/components/RecordTableShared';
 import { ResourceIndexLayout } from '~/components/ResourceIndexLayout';
 import { SortState, SortValue, useTableSort } from '~/components/useTableSort';
+import { buildActionColumns } from '~/components/buildActionColumns';
+import { useConfirmedRemove } from '~/components/useConfirmedRemove';
 import { useSchedules } from './hooks/useSchedules';
-import { ISchedule, IScheduleRunNowResponse } from './types';
+import {
+  ISchedule,
+  IScheduleRunNowResponse,
+  SCHEDULE_STATUS_VARIANTS,
+} from './types';
 
 // ─── More menu cell ───────────────────────────────────────────────────────────
 
-/** Row actions: run now, view output thread, edit, enable/disable, delete. */
+/** Row actions: run now, view last-run output, edit, enable/disable, delete. */
 const ScheduleMoreCell = ({
   schedule,
   refetch,
+  onViewOutput,
 }: {
   schedule: ISchedule;
   refetch: () => void;
+  onViewOutput: (schedule: ISchedule) => void;
 }) => {
   const navigate = useNavigate();
-  const { confirm } = useConfirm();
+  const { confirmRemove } = useConfirmedRemove();
 
   const [removeSchedule] = useMutation(MASTRA_SCHEDULE_REMOVE, {
     onCompleted: () => refetch(),
@@ -88,10 +94,12 @@ const ScheduleMoreCell = ({
 
   /** Confirm, then remove the schedule together with its output thread. */
   const handleDelete = () =>
-    confirm({
-      message: `Remove "${schedule.name}" and its output thread? This cannot be undone.`,
-      options: { okLabel: 'Delete', cancelLabel: 'Cancel' },
-    }).then(() => removeSchedule({ variables: { _id: schedule._id } }));
+    confirmRemove(
+      {
+        message: `Remove "${schedule.name}" and its output thread? This cannot be undone.`,
+      },
+      () => removeSchedule({ variables: { _id: schedule._id } }),
+    );
 
   return (
     <RowActionsMenu>
@@ -110,23 +118,24 @@ const ScheduleMoreCell = ({
         </Button>
       </Command.Item>
       <Command.Item asChild>
+        {/*
+          Opens the full run transcript in Chat → Scheduled mode. The schedule's
+          run thread is authorized by AGENT ACCESS and read under the schedule's
+          own principal (mastraScheduleTranscript), so anyone who can see the
+          agent can read its runs — the rich transcript (markdown, tool/chart
+          artifacts) instead of just the last-run summary.
+        */}
         <Button
           variant="ghost"
           size="sm"
           className="justify-start w-full h-8"
           disabled={!schedule.lastRunAt}
           title={
-            schedule.lastRunAt
-              ? undefined
-              : 'No output yet — the thread is created on the first run'
+            schedule.lastRunAt ? undefined : 'No output yet — this hasn’t run'
           }
-          onClick={() =>
-            navigate(
-              `/erxes-agent/chat/${schedule.agentId}?thread=${schedule.threadId}`,
-            )
-          }
+          onClick={() => onViewOutput(schedule)}
         >
-          <IconMessageCircle className="size-4" /> View output
+          <IconFileText className="size-4" /> View output
         </Button>
       </Command.Item>
       <Command.Item asChild>
@@ -159,13 +168,6 @@ const ScheduleMoreCell = ({
 
 // ─── Columns ──────────────────────────────────────────────────────────────────
 
-/** Badge variant per run status — skipped is neutral, not a green success. */
-const STATUS_VARIANTS = {
-  failed: 'destructive',
-  skipped: 'secondary',
-  success: 'success',
-} as const;
-
 /** Status badge (with error tooltip on failure) plus relative run time. */
 const LastRunCell = ({ schedule }: { schedule: ISchedule }) => {
   if (!schedule.lastRunAt) {
@@ -177,7 +179,7 @@ const LastRunCell = ({ schedule }: { schedule: ISchedule }) => {
   }
   const failed = schedule.lastStatus === 'failed';
   const badge = (
-    <Badge variant={STATUS_VARIANTS[schedule.lastStatus ?? 'success']}>
+    <Badge variant={SCHEDULE_STATUS_VARIANTS[schedule.lastStatus ?? 'success']}>
       {schedule.lastStatus}
     </Badge>
   );
@@ -209,6 +211,7 @@ const LastRunCell = ({ schedule }: { schedule: ISchedule }) => {
 const buildBaseColumns = (
   sort: SortState,
   onSort: (id: string) => void,
+  onViewOutput: (schedule: ISchedule) => void,
 ): ColumnDef<ISchedule>[] => [
   {
     id: 'name',
@@ -314,13 +317,27 @@ const buildBaseColumns = (
         onSort={onSort}
       />
     ),
-    cell: ({ cell }) => (
-      <RecordTableInlineCell>
-        <span className="text-sm tabular-nums">
-          {(cell.getValue() as number) || 0}
-        </span>
-      </RecordTableInlineCell>
-    ),
+    cell: ({ row }) => {
+      const count = row.original.runCount || 0;
+      return (
+        <RecordTableInlineCell>
+          {count > 0 ? (
+            <button
+              type="button"
+              className="text-sm tabular-nums hover:underline cursor-pointer"
+              title="View run transcript"
+              onClick={() => onViewOutput(row.original)}
+            >
+              {count}
+            </button>
+          ) : (
+            <span className="text-sm tabular-nums text-muted-foreground">
+              0
+            </span>
+          )}
+        </RecordTableInlineCell>
+      );
+    },
     size: 70,
   },
 ];
@@ -332,73 +349,101 @@ const buildColumns = (
   refetch: () => void,
   sort: SortState,
   onSort: (id: string) => void,
-): ColumnDef<ISchedule>[] => [
-  {
-    id: 'more',
-    cell: ({ row }) => (
-      <ScheduleMoreCell schedule={row.original} refetch={refetch} />
+  onViewOutput: (schedule: ISchedule) => void,
+): ColumnDef<ISchedule>[] =>
+  buildActionColumns<ISchedule>(
+    (schedule) => (
+      <ScheduleMoreCell
+        schedule={schedule}
+        refetch={refetch}
+        onViewOutput={onViewOutput}
+      />
     ),
-    size: 33,
-  },
-  RecordTable.checkboxColumn as ColumnDef<ISchedule>,
-  ...buildBaseColumns(sort, onSort),
-];
-
-/** Record table of all agent schedules with row actions. */
-export const SchedulesIndexPage = () => {
-  const { schedules, loading, refetch } = useSchedules();
-
-  const getSortValue = useCallback(
-    (s: ISchedule, id: string): SortValue => {
-      switch (id) {
-        case 'name':
-          return s.name;
-        case 'agent':
-          return s.agentId;
-        case 'cron':
-          return s.cron;
-        case 'status':
-          return s.isEnabled;
-        case 'lastRun':
-          return s.lastRunAt;
-        case 'runCount':
-          return s.runCount;
-        default:
-          return undefined;
-      }
-    },
-    [],
+    buildBaseColumns(sort, onSort, onViewOutput),
   );
+
+/**
+ * Record table of agent schedules with row actions. When `agentId` is passed
+ * (the per-agent Schedules tab) the list is scoped and "New schedule" prefills
+ * the owning agent.
+ */
+export const SchedulesIndexPage = ({
+  agentId,
+  embedded,
+}: {
+  agentId?: string;
+  embedded?: boolean;
+} = {}) => {
+  const navigate = useNavigate();
+  const { schedules, loading, refetch } = useSchedules(agentId);
+
+  // "View output" / run-count now open the FULL run transcript in Chat →
+  // Scheduled mode (one viewer), instead of the last-run-summary sheet. The chat
+  // route accepts the agent slug; ?mode=scheduled&schedule=<id> is restored on
+  // reload/deep-link by ChatPage.
+  const openTranscript = useCallback(
+    (schedule: ISchedule) =>
+      navigate(
+        `/erxes-agent/chat/${encodeURIComponent(
+          schedule.agentId,
+        )}?mode=scheduled&schedule=${encodeURIComponent(schedule._id)}`,
+      ),
+    [navigate],
+  );
+
+  const newPath = agentId
+    ? `/erxes-agent/schedules/new?agentId=${encodeURIComponent(agentId)}`
+    : '/erxes-agent/schedules/new';
+
+  const getSortValue = useCallback((s: ISchedule, id: string): SortValue => {
+    switch (id) {
+      case 'name':
+        return s.name;
+      case 'agent':
+        return s.agentId;
+      case 'cron':
+        return s.cron;
+      case 'status':
+        return s.isEnabled;
+      case 'lastRun':
+        return s.lastRunAt;
+      case 'runCount':
+        return s.runCount;
+      default:
+        return undefined;
+    }
+  }, []);
 
   const { sort, toggle, sorted } = useTableSort(schedules, getSortValue);
 
   const columns = useMemo(
-    () => buildColumns(refetch, sort, toggle),
-    [refetch, sort, toggle],
+    () => buildColumns(refetch, sort, toggle, openTranscript),
+    [refetch, sort, toggle, openTranscript],
   );
 
   return (
     <ResourceIndexLayout<ISchedule>
-      icon={IconCalendarTime}
-      title="Schedules"
-      rootPath="/erxes-agent/schedules"
-      sessionKey="erxes_agent_schedules"
-      columns={columns}
-      data={sorted}
-      loading={loading}
-      newButton={{ to: '/erxes-agent/schedules/new', label: 'New Schedule' }}
-      empty={{
-        title: 'No schedules yet',
-        description:
-          'Run an agent on a recurring cron — daily reports, periodic checks, reminders.',
-        action: (
-          <Button asChild>
-            <Link to="/erxes-agent/schedules/new">
-              <IconPlus /> Create Schedule
-            </Link>
-          </Button>
-        ),
-      }}
+        icon={IconCalendarTime}
+        title="Schedules"
+        rootPath="/erxes-agent/schedules"
+        sessionKey="erxes_agent_schedules"
+        columns={columns}
+        data={sorted}
+        loading={loading}
+        embedded={embedded}
+        newButton={{ to: newPath, label: 'New Schedule' }}
+        empty={{
+          title: 'No schedules yet',
+          description:
+            'Run an agent on a recurring cron — daily reports, periodic checks, reminders.',
+          action: (
+            <Button asChild>
+              <Link to={newPath}>
+                <IconPlus /> Create Schedule
+              </Link>
+            </Button>
+          ),
+        }}
     />
   );
 };

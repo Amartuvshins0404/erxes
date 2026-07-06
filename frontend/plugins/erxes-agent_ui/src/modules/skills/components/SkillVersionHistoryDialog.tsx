@@ -6,8 +6,8 @@ import {
   Dialog,
   RelativeDateDisplay,
   Spinner,
-  useConfirm,
 } from 'erxes-ui';
+import { useConfirmedRemove } from '~/components/useConfirmedRemove';
 import { useSkillVersions } from '../hooks/useSkillVersions';
 import { useSkillMutations } from '../hooks/useSkillMutations';
 
@@ -27,7 +27,7 @@ export const SkillVersionHistoryDialog = ({
   activeVersionId: string | null;
   canRestore: boolean;
 }) => {
-  const { confirm } = useConfirm();
+  const { confirmRemove } = useConfirmedRemove();
   const { versions, loading, loadVersion, version, versionLoading } =
     useSkillVersions(skillId, !open);
   // The shared hook toasts "Version restored" on success; close the dialog then
@@ -57,13 +57,15 @@ export const SkillVersionHistoryDialog = ({
     loadVersion(versionId);
   };
 
-  const handleRestore = (versionId: string) => {
-    confirm({
-      message:
-        'Restore this version? It becomes the active version that agents use.',
-      options: { okLabel: 'Restore', cancelLabel: 'Cancel' },
-    }).then(() => activateVersion(skillId, versionId));
-  };
+  const handleRestore = (versionId: string) =>
+    confirmRemove(
+      {
+        message:
+          'Restore this version? It becomes the active version that agents use.',
+        okLabel: 'Restore',
+      },
+      () => activateVersion(skillId, versionId),
+    );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

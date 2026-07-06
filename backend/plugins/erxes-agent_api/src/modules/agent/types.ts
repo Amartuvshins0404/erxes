@@ -34,6 +34,11 @@ export interface TurnAuthCtx {
   turnId?: string;
   turnPrompt?: string;
   resourceId?: string;
+  // True for unattended background runs (scheduled agent / frontline bot) whose
+  // BackgroundAuthCtx is passed here as the turn's auth context. Type-tracked so
+  // a future spread/rebuild of this ctx can't silently drop the flag the
+  // destructive-op defense-in-depth reads (getCurrentAuth().background).
+  background?: boolean;
 }
 
 // One message of the assembled LLM conversation. `content` widens beyond a

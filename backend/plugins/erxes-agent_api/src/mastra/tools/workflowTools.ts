@@ -15,6 +15,7 @@ import {
 } from '../workflows/compiler';
 import { buildManualEnvelope } from '../workflows/envelope';
 import { runWorkflow } from '../workflows/runtime';
+import { assertWorkflowSchedulable } from '../auth/backgroundPrincipal';
 import { getOperationRegistry, OperationRegistry } from './operationRegistry';
 
 /**
@@ -97,11 +98,51 @@ function currentUserId(): string | undefined {
   }
 }
 
+/**
+ * The business agentId of the agent whose turn is running these tools — stamped
+ * on the auth context in prepare.ts. This is what a workflow the agent builds is
+ * owned by when the model doesn't name an explicit agentId, so a self-built
+ * workflow inherits its builder's identity (and background principal).
+ */
+function currentAgentId(): string | undefined {
+  return getCurrentAuth()?.agentId?.trim() || undefined;
+}
+
+/**
+ * The referenced agent must exist AND be enabled before a workflow can be owned
+ * by it: a disabled agent is the kill switch (schedules gate on isEnabled too),
+ * so ownership can't be handed to one — its background runs would be refused.
+ */
+async function assertAgentExists(
+  models: Awaited<ReturnType<typeof getModels>>,
+  agentId: string,
+): Promise<void> {
+  const agent = await models.MastraAgent.findOne({ agentId, isEnabled: true });
+  if (!agent) {
+    throw new ExpectedError(
+      `Owning agent "${agentId}" not found or disabled — enable it or reassign the workflow.`,
+    );
+  }
+}
+
 /** Normalizes a thrown value into the tools' { success: false, error } shape. */
 const fail = (e: unknown) => ({
   success: false as const,
   error: (e as { message?: string } | null | undefined)?.message || String(e),
 });
+
+/**
+ * The shared shape of every builder-tool result — the success flag plus the
+ * normalized error string produced by `fail`. Each tool extends it with its own
+ * fields via resultEnvelope(extra); the exact field set each schema exposes is
+ * unchanged, only the common `success`/`error` pair is factored out.
+ */
+const resultEnvelope = <T extends z.ZodRawShape>(extra: T) =>
+  z.object({
+    success: z.boolean(),
+    error: z.string().optional(),
+    ...extra,
+  });
 
 /** Models plus a lazy operation-registry loader, shared by the builder tools. */
 interface WorkflowContext {
@@ -227,7 +268,7 @@ export const workflowValidateTool = tool({
   description:
     'Validates a draft workflow definition against the schema AND the live erxes operation registry (operation existence, policy coverage, reference integrity, condition syntax). Returns structured errors to fix — iterate until ok=true before saving.',
   inputSchema: z.object({
-    definition: z.record(z.any()).describe('The full workflow definition JSON'),
+    definition: z.record(z.unknown()).describe('The full workflow definition JSON'),
   }),
   outputSchema: z.object({
     ok: z.boolean(),
@@ -254,25 +295,23 @@ export const workflowSimulateTool = tool({
   description:
     'Dry-runs a workflow definition WITHOUT touching erxes data or calling any LLM: operations return stubs, agent steps return your assumptions (or auto-samples). Returns the step-by-step trace — use it to show the user what the workflow will do, and to test branch routing by varying assumptions.',
   inputSchema: z.object({
-    definition: z.record(z.any()),
+    definition: z.record(z.unknown()),
     triggerPayload: z
-      .record(z.any())
+      .record(z.unknown())
       .default({})
       .describe('Simulated trigger payload'),
     assumptions: z
-      .record(z.record(z.any()))
+      .record(z.record(z.unknown()))
       .optional()
       .describe(
         'Assumed agent-step outputs keyed by step id, e.g. {"classify": {"intent": "order"}}. May be PARTIAL — unspecified required fields are auto-filled with samples.',
       ),
   }),
-  outputSchema: z.object({
-    success: z.boolean(),
+  outputSchema: resultEnvelope({
     status: z.string().optional(),
-    trace: z.array(z.any()).optional(),
-    output: z.any().optional(),
-    errors: z.any().optional(),
-    error: z.string().optional(),
+    trace: z.array(z.unknown()).optional(),
+    output: z.unknown().optional(),
+    errors: z.unknown().optional(),
   }),
   execute: async ({
     definition,
@@ -408,41 +447,72 @@ export const workflowSimulateTool = tool({
 export const workflowSaveTool = tool({
   id: 'workflow-save',
   description:
-    'Saves a NEW workflow after the user explicitly confirmed the presented step list. Validates first; returns the saved workflow id. Workflows are saved DISABLED unless enable=true.',
+    "Saves a NEW workflow after the user explicitly confirmed the presented step list. Validates first; returns the saved workflow id. Workflows are saved DISABLED unless enable=true. The workflow is OWNED by an agent (its background identity) — defaults to you, the agent building it; pass agentId only to hand ownership to a different existing agent.",
   inputSchema: z.object({
     name: z.string().min(1),
     description: z.string().optional(),
-    definition: z.record(z.any()),
+    agentId: z
+      .string()
+      .optional()
+      .describe(
+        "The owning agent's id. Omit to own it yourself (the building agent).",
+      ),
+    definition: z.record(z.unknown()),
     enable: z.boolean().default(false),
   }),
-  outputSchema: z.object({
-    success: z.boolean(),
+  outputSchema: resultEnvelope({
     workflowId: z.string().optional(),
     version: z.number().optional(),
-    errors: z.any().optional(),
-    error: z.string().optional(),
+    errors: z.unknown().optional(),
   }),
   execute: async ({
     name,
     description,
+    agentId,
     definition,
     enable,
   }: {
     name: string;
     description?: string;
+    agentId?: string;
     definition: Record<string, unknown>;
     enable?: boolean;
   }) =>
     withWorkflowContext(async ({ models, getRegistry }) => {
       try {
+        // Own it: the explicit agentId, else the agent running this turn. Every
+        // workflow needs an owning agent — its background principal and enable
+        // preconditions resolve from it.
+        const ownerAgentId = agentId?.trim() || currentAgentId();
+        if (!ownerAgentId) {
+          throw new ExpectedError(
+            'This workflow needs an owning agent — pass agentId (the calling agent could not be determined).',
+          );
+        }
+        await assertAgentExists(models, ownerAgentId);
+
         const check = await validatedDefinition(definition, getRegistry);
         if (!check.ok) {
           return { success: false, errors: check.errors };
         }
 
+        // Enabling a schedule-triggered workflow makes its cron live, so it must
+        // clear the same background-run preconditions the GraphQL mutations
+        // enforce (app token configured in Agent settings, the OWNING AGENT's
+        // owner + destructiveOps). Reuse the shared check; the throw becomes this
+        // tool's structured failure so the agent gets an actionable message.
+        if (enable) {
+          await assertWorkflowSchedulable({
+            models,
+            agentId: ownerAgentId,
+            definition: check.definition,
+          });
+        }
+
         const doc = await models.MastraWorkflow.createWorkflow({
           name,
           description,
+          agentId: ownerAgentId,
           definition: check.definition,
           isEnabled: Boolean(enable),
           createdByUserId: currentUserId(),
@@ -462,25 +532,29 @@ export const workflowUpdateTool = tool({
     workflowId: z.string(),
     name: z.string().optional(),
     description: z.string().optional(),
-    definition: z.record(z.any()).optional(),
+    agentId: z
+      .string()
+      .optional()
+      .describe('Reassign the owning agent (must be an existing agent).'),
+    definition: z.record(z.unknown()).optional(),
     enable: z.boolean().optional(),
   }),
-  outputSchema: z.object({
-    success: z.boolean(),
+  outputSchema: resultEnvelope({
     version: z.number().optional(),
-    errors: z.any().optional(),
-    error: z.string().optional(),
+    errors: z.unknown().optional(),
   }),
   execute: async ({
     workflowId,
     name,
     description,
+    agentId,
     definition,
     enable,
   }: {
     workflowId: string;
     name?: string;
     description?: string;
+    agentId?: string;
     definition?: Record<string, unknown>;
     enable?: boolean;
   }) =>
@@ -489,6 +563,7 @@ export const workflowUpdateTool = tool({
         const patch: {
           name?: string;
           description?: string;
+          agentId?: string;
           definition?: WorkflowDefinition;
           isEnabled?: boolean;
         } = {};
@@ -500,7 +575,32 @@ export const workflowUpdateTool = tool({
         }
         if (name !== undefined) patch.name = name;
         if (description !== undefined) patch.description = description;
+        // Reassigning ownership: only to an existing agent (never clear it).
+        if (agentId !== undefined) {
+          const next = agentId.trim();
+          await assertAgentExists(models, next);
+          patch.agentId = next;
+        }
         if (enable !== undefined) patch.isEnabled = enable;
+
+        // Re-run the schedule-enable gate whenever this update leaves the
+        // workflow enabled — it may flip isEnabled on, repoint the trigger to a
+        // schedule, reassign the owning agent, or flip the owning agent's
+        // destructiveOps. Mirrors mastraWorkflowUpdate; throw → structured fail.
+        if (enable !== false) {
+          const existing = await models.MastraWorkflow.getWorkflow(workflowId);
+          const willBeEnabled =
+            enable !== undefined ? enable : existing.isEnabled;
+          if (willBeEnabled) {
+            await assertWorkflowSchedulable({
+              models,
+              agentId: patch.agentId ?? existing.agentId,
+              definition: (patch.definition ??
+                existing.definition) as WorkflowDefinition,
+            });
+          }
+        }
+
         const doc = await models.MastraWorkflow.updateWorkflow(
           workflowId,
           patch,
@@ -517,7 +617,7 @@ export const workflowListTool = tool({
   description:
     "Lists the tenant's saved workflows (id, name, version, enabled, trigger type).",
   inputSchema: z.object({}),
-  outputSchema: z.object({ workflows: z.array(z.any()) }),
+  outputSchema: z.object({ workflows: z.array(z.unknown()) }),
   execute: async () => {
     requireTeamMember();
     const models = await getModels();
@@ -527,6 +627,7 @@ export const workflowListTool = tool({
         _id: doc._id,
         name: doc.name,
         description: doc.description,
+        agentId: doc.agentId,
         version: doc.version,
         isEnabled: doc.isEnabled,
         triggerType: doc.definition?.trigger?.type,
@@ -543,7 +644,7 @@ export const workflowRunsTool = tool({
     workflowId: z.string(),
     limit: z.number().int().min(1).max(20).default(5),
   }),
-  outputSchema: z.object({ runs: z.array(z.any()) }),
+  outputSchema: z.object({ runs: z.array(z.unknown()) }),
   execute: async ({
     workflowId,
     limit,
@@ -580,16 +681,14 @@ export const workflowRunNowTool = tool({
   inputSchema: z.object({
     workflowId: z.string(),
     payload: z
-      .record(z.any())
+      .record(z.unknown())
       .default({})
       .describe('Becomes {{trigger.payload.*}}'),
   }),
-  outputSchema: z.object({
-    success: z.boolean(),
+  outputSchema: resultEnvelope({
     status: z.string().optional(),
-    output: z.any().optional(),
-    stepsSummary: z.any().optional(),
-    error: z.string().optional(),
+    output: z.unknown().optional(),
+    stepsSummary: z.unknown().optional(),
   }),
   execute: async ({
     workflowId,

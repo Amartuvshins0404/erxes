@@ -11,7 +11,7 @@
 // shared-tier 500-collection cap). Tenant isolation is enforced by the
 // tenant-prefixed resourceId (see scopedResource) — semantic recall and
 // resource-scoped working memory both filter by that resource, so tenant A
-// never reads tenant B. ToolCallFilter is NOT configured here — in
+// never reads tenant B. The tool-call filter is NOT configured here — in
 // @mastra/memory 1.20.3 it lives on the Agent's inputProcessors
 // (Memory({ processors }) was removed); agentRuntime attaches it.
 // ---------------------------------------------------------------------------

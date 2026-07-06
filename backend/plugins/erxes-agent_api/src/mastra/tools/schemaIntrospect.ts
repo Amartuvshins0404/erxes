@@ -31,6 +31,31 @@ export interface GqlFieldDef {
   args?: GqlArgDef[];
 }
 
+/**
+ * The innermost named type reached by stripping all NON_NULL/LIST wrappers,
+ * plus whether any LIST wrapper was crossed. `node` is the underlying type-ref
+ * (falsy when the wrapper chain bottoms out without a named type). This is the
+ * single traversal behind resolveReturnTypeKind / resolveReturnTypeName /
+ * namedTypeOf; graphqlTypeToString stays separate because it re-serializes the
+ * full wrapper chain rather than unwrapping to the innermost type.
+ */
+interface UnwrappedType {
+  node: GqlTypeRef | null | undefined;
+  kind: string;
+  name: string;
+  isList: boolean;
+}
+
+function unwrapType(type: GqlTypeRef | null | undefined): UnwrappedType {
+  let node = type;
+  let isList = false;
+  while (node && (node.kind === 'NON_NULL' || node.kind === 'LIST')) {
+    if (node.kind === 'LIST') isList = true;
+    node = node.ofType;
+  }
+  return { node, kind: node?.kind || '', name: node?.name || '', isList };
+}
+
 // LLMs often serialize array/object values as JSON strings when calling tools,
 // and frequently use Python-style single quotes instead of standard JSON double
 // quotes (e.g. "['id1','id2']" instead of ["id1","id2"]).  Both forms must be
@@ -69,12 +94,12 @@ export function graphqlTypeToString(
 
 // inputTypesMap: name → inputFields[], populated via fetchInputTypesMap().
 // Passed through the Zod builders so INPUT_OBJECT types get real schemas
-// instead of z.any(), giving the LLM correct field names up front.
+// instead of z.unknown(), giving the LLM correct field names up front.
 function graphqlTypeToZod(
   type: GqlTypeRef | null | undefined,
   inputTypesMap?: Record<string, GqlArgDef[]>,
 ): z.ZodTypeAny {
-  if (!type) return z.any().optional();
+  if (!type) return z.unknown().optional();
   const name = type.name || '';
   const kind = type.kind || '';
 
@@ -134,9 +159,9 @@ function graphqlTypeToZod(
         return undefined;
       }, z.string().optional());
     case 'JSON':
-      return z.preprocess(parseJsonPreprocess, z.any().optional());
+      return z.preprocess(parseJsonPreprocess, z.unknown().optional());
     default:
-      return z.any().optional();
+      return z.unknown().optional();
   }
 }
 
@@ -154,10 +179,7 @@ export function buildZodSchemaFromArgs(
 
 /** Unwrap NON_NULL/LIST wrappers to the underlying return-type kind. */
 function resolveReturnTypeKind(type: GqlTypeRef | null | undefined): string {
-  if (!type) return 'UNKNOWN';
-  if (type.kind === 'NON_NULL' || type.kind === 'LIST')
-    return resolveReturnTypeKind(type.ofType);
-  return type.kind || 'UNKNOWN';
+  return unwrapType(type).kind || 'UNKNOWN';
 }
 
 /** True when the operation's return type requires a GraphQL selection set. */
@@ -172,10 +194,7 @@ export function needsSelectionSet(
 export function resolveReturnTypeName(
   type: GqlTypeRef | null | undefined,
 ): string {
-  if (!type) return '';
-  if (type.kind === 'NON_NULL' || type.kind === 'LIST')
-    return resolveReturnTypeName(type.ofType);
-  return type.name || '';
+  return unwrapType(type).name;
 }
 
 // ─── Response-selection builder (introspection-driven) ───────────────────────
@@ -192,10 +211,9 @@ function namedTypeOf(type: GqlTypeRef | null | undefined): {
   kind: string;
   name: string;
 } {
-  if (!type) return { kind: 'SCALAR', name: 'String' };
-  if (type.kind === 'NON_NULL' || type.kind === 'LIST')
-    return namedTypeOf(type.ofType);
-  return { kind: type.kind || 'SCALAR', name: type.name || '' };
+  const unwrapped = unwrapType(type);
+  if (!unwrapped.node) return { kind: 'SCALAR', name: 'String' };
+  return { kind: unwrapped.kind || 'SCALAR', name: unwrapped.name };
 }
 
 /**

@@ -24,6 +24,7 @@ import {
 import { readSnapshotMetadata } from '@/skills/store/skillContent';
 import { decodeAuthorId } from '@/skills/store/tenancy';
 import { resolveReachableSkills } from '@/skills/store/resolveSkills';
+import { clampPage } from '@/_shared/auth';
 
 // High-level skill operations shared by the GraphQL resolvers and the makeSkill
 // tool. Decodes storage records into erxes-facing IMastraSkill objects, enforces
@@ -78,36 +79,23 @@ const isOwner = (skill: IMastraSkill, requesterId: string): boolean =>
 const canRead = (skill: IMastraSkill): boolean =>
   !!skill.isMine || skill.visibility === 'public';
 
-/** Owned skill resolved at its latest version, or a "not found" error. */
-const requireOwned = async (
-  subdomain: string,
-  requesterId: string,
-  id: string,
-): Promise<IMastraSkill> => {
-  const resolved = await getScopedResolved(subdomain, id, 'latest');
-  const skill = resolved && decodeSkill(subdomain, resolved, requesterId);
-  if (!skill || !isOwner(skill, requesterId)) {
-    throw new ExpectedError('Skill not found');
-  }
-  return skill;
-};
-
 /**
- * Owned-OR-admin skill resolved at its latest version, or a "not found" error.
- * Like requireOwned but also lets a skills admin manage a skill they don't
- * author (seeds, other users' promoted globals). A non-owner non-admin still
- * gets "not found" (no existence leak) — so this never loosens access to
+ * Skill resolved at its latest version, gated by ownership, or a "not found"
+ * error. By default only the AUTHOR passes. Pass `allowAdmin: true` (the
+ * requester is a skills admin) to also let an admin manage a skill they don't
+ * author (seeds, other users' promoted globals). A non-owner non-admin always
+ * gets "not found" (no existence leak) — so admin access never loosens access to
  * another user's PRIVATE skill.
  */
-const requireManageable = async (
+const requireSkill = async (
   subdomain: string,
   requesterId: string,
-  isAdmin: boolean,
   id: string,
+  { allowAdmin = false }: { allowAdmin?: boolean } = {},
 ): Promise<IMastraSkill> => {
   const resolved = await getScopedResolved(subdomain, id, 'latest');
   const skill = resolved && decodeSkill(subdomain, resolved, requesterId);
-  if (!skill || (!isOwner(skill, requesterId) && !isAdmin)) {
+  if (!skill || (!isOwner(skill, requesterId) && !allowAdmin)) {
     throw new ExpectedError('Skill not found');
   }
   return skill;
@@ -151,8 +139,10 @@ export const listSkills = async (
   all.sort((a, b) => (b.updatedAt?.getTime() ?? 0) - (a.updatedAt?.getTime() ?? 0));
 
   const totalCount = all.length;
-  const page = Math.max(params.page ?? 1, 1);
-  const perPage = Math.min(Math.max(params.perPage ?? 30, 1), 100);
+  const { page, perPage } = clampPage(params.page, params.perPage, {
+    def: 30,
+    max: 100,
+  });
   const list = all.slice((page - 1) * perPage, (page - 1) * perPage + perPage);
   return { list, totalCount };
 };
@@ -330,7 +320,7 @@ export const updateSkill = async (
   id: string,
   input: ISkillUpdateInput,
 ): Promise<IMastraSkill> => {
-  const current = await requireOwned(subdomain, requesterId, id);
+  const current = await requireSkill(subdomain, requesterId, id);
   const merged = {
     name: input.name ?? current.name,
     description: input.description ?? current.description,
@@ -351,7 +341,7 @@ export const removeSkill = async (
   id: string,
   isAdmin = false,
 ): Promise<{ ok: number }> => {
-  await requireManageable(subdomain, requesterId, isAdmin, id);
+  await requireSkill(subdomain, requesterId, id, { allowAdmin: isAdmin });
   await deleteScopedSkill(subdomain, id);
   return { ok: 1 };
 };
@@ -361,7 +351,7 @@ export const publishSkill = async (
   requesterId: string,
   id: string,
 ): Promise<IMastraSkill> => {
-  await requireOwned(subdomain, requesterId, id);
+  await requireSkill(subdomain, requesterId, id);
   const skills = await getSkillsStore(subdomain);
   const latest = await skills.getLatestVersion(id);
   if (!latest) throw new ExpectedError('Skill has no version to publish');
@@ -381,7 +371,7 @@ export const activateSkillVersion = async (
   id: string,
   versionId: string,
 ): Promise<IMastraSkill> => {
-  await requireOwned(subdomain, requesterId, id);
+  await requireSkill(subdomain, requesterId, id);
   const skills = await getSkillsStore(subdomain);
   const version = await skills.getVersion(versionId);
   if (!version || version.skillId !== id) {
@@ -411,7 +401,7 @@ export const promoteSkill = async (
   requesterId: string,
   id: string,
 ): Promise<IMastraSkill> => {
-  const current = await requireOwned(subdomain, requesterId, id);
+  const current = await requireSkill(subdomain, requesterId, id);
   if (current.status !== 'published' || !current.activeVersionId) {
     throw new ExpectedError('Only a published skill can be promoted to global');
   }
@@ -446,7 +436,7 @@ export const demoteSkill = async (
   id: string,
   isAdmin = false,
 ): Promise<IMastraSkill> => {
-  const current = await requireManageable(subdomain, requesterId, isAdmin, id);
+  const current = await requireSkill(subdomain, requesterId, id, { allowAdmin: isAdmin });
   if (current.visibility !== 'public') {
     throw new ExpectedError('Only a global skill can be demoted');
   }

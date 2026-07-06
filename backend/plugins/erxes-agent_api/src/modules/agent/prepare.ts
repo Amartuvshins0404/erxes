@@ -20,6 +20,9 @@ import {
   resourceHasThreads,
 } from '@/session/nativeStore';
 import { buildActivatedSkillsBlock } from '@/skills/service/skillsService';
+import { IMastraAgentDocument } from '@/agent/@types/agent';
+import { IMastraProviderDocument } from '@/provider/@types/provider';
+import { IMastraSettingsDocument } from '@/settings/@types/settings';
 import {
   MemoryBinding,
   PreparedTurn,
@@ -78,49 +81,39 @@ function resolveIdentity(
   }
 }
 
-export interface PrepareTurnParams {
-  models: IModels;
-  subdomain: string;
-  identity: TurnIdentity;
-  agentId: string;
-  message: string;
-  threadId?: string;
-  attachments?: IMastraChatAttachment[];
-  approvedOperations?: ApprovedOp[];
-  // Weave the tenant's learned digest into the convo (and stamp its ids onto
-  // the turn). On for chat/bot; off for scheduled runs (whose prompt is run
-  // verbatim, the pre-generalization behaviour).
-  weaveDigest?: boolean;
-  // Skill names the user explicitly slash-activated for THIS turn.
-  activeSkillNames?: string[];
-}
-
-export async function prepareTurn(
-  params: PrepareTurnParams,
-): Promise<PreparedTurn> {
-  const {
-    models,
-    subdomain,
-    identity,
-    agentId,
-    message,
-    threadId,
-    attachments,
-    approvedOperations,
-    weaveDigest = true,
-    activeSkillNames,
-  } = params;
-
-  // Same NoSQL-injection guard as sessionId below: agentId arrives from the
-  // request body, so a crafted object must never reach a Mongo query.
+// Same NoSQL-injection guard used for sessionId below: agentId arrives from the
+// request body, so a crafted object must never reach a Mongo query.
+function assertAgentId(agentId: string): void {
   if (typeof agentId !== 'string' || !agentId) {
     throw new ExpectedError('agentId must be a non-empty string');
   }
+}
 
-  // Four independent reads collapsed into one round trip. Unit membership lives
-  // on the unit document (not the user), so it needs its own query — issued in
-  // parallel with the other three so it adds no wall-clock latency. Non-user
-  // identities (bot, schedule) don't need unit membership.
+// Stable session id — the persisted thread this turn belongs to. The typeof
+// guard keeps crafted non-string payloads out of Mongo queries (NoSQL injection
+// via query operators).
+function deriveSessionId(threadId?: string): string {
+  return typeof threadId === 'string' && threadId
+    ? threadId
+    : `chat-${Date.now()}`;
+}
+
+interface TurnConfig {
+  agentConfig: IMastraAgentDocument;
+  settings: IMastraSettingsDocument;
+  providers: IMastraProviderDocument[];
+}
+
+// The concurrent config/access reads plus the access-control gate. Four
+// independent reads collapsed into one round trip. Unit membership lives on the
+// unit document (not the user), so it needs its own query — issued in parallel
+// with the other three so it adds no wall-clock latency. Non-user identities
+// (bot, schedule) don't need unit membership.
+async function readTurnConfig(
+  models: IModels,
+  identity: TurnIdentity,
+  agentId: string,
+): Promise<TurnConfig> {
   const [agentConfig, settings, providers, unitIds] = await Promise.all([
     models.MastraAgent.findOne({ agentId, isEnabled: true }),
     models.MastraSettings.getSettings(),
@@ -147,11 +140,30 @@ export async function prepareTurn(
     }
   }
 
-  // Stable session id — the persisted thread this turn belongs to.
-  // typeof guard keeps crafted non-string payloads out of Mongo queries
-  // (NoSQL injection via query operators).
-  const sessionId =
-    typeof threadId === 'string' && threadId ? threadId : `chat-${Date.now()}`;
+  return { agentConfig, settings, providers };
+}
+
+interface TurnMemory {
+  advanced: boolean;
+  resourceId: string;
+  useMemory: boolean;
+  userHeader?: string;
+  token?: string;
+  memCtx: MemoryContext;
+  memoryBinding?: MemoryBinding;
+}
+
+// Identity + memory-binding resolution: the memory toggle, per-identity resource
+// id/auth, and the per-turn Mastra Memory binding.
+function resolveTurnMemory(args: {
+  identity: TurnIdentity;
+  agentConfig: IMastraAgentDocument;
+  agentId: string;
+  message: string;
+  subdomain: string;
+  sessionId: string;
+}): TurnMemory {
+  const { identity, agentConfig, agentId, message, subdomain, sessionId } = args;
 
   const useHistory = agentConfig.memoryEnabled !== false;
   // Advanced memory rides on the agent's own memory toggle.
@@ -180,17 +192,52 @@ export async function prepareTurn(
     ? { thread: sessionId, resource: scopedResource(subdomain, resourceId) }
     : undefined;
 
+  return {
+    advanced,
+    resourceId,
+    useMemory,
+    userHeader,
+    token,
+    memCtx,
+    memoryBinding,
+  };
+}
+
+// Build the agent, read the thread (ownership + thread-history), and — under
+// resource-scoped recall — probe whether the resource owns any prior thread, all
+// concurrently. None needs another's result, so they overlap instead of stacking
+// round trips. The resource probe is issued speculatively (its result is only
+// consulted when the thread itself turns out to be new); it rides alongside the
+// ownership read, so it adds no wall-clock on the common path. Enforces the
+// ownership gate and decides the scope-aware recall skip.
+async function buildAgentAndGateMemory(args: {
+  agentConfig: IMastraAgentDocument;
+  models: IModels;
+  subdomain: string;
+  settings: IMastraSettingsDocument;
+  providers: IMastraProviderDocument[];
+  identity: TurnIdentity;
+  threadId: string | undefined;
+  sessionId: string;
+  memoryBinding: MemoryBinding | undefined;
+}) {
+  const {
+    agentConfig,
+    models,
+    subdomain,
+    settings,
+    providers,
+    identity,
+    threadId,
+    sessionId,
+    memoryBinding,
+  } = args;
+
   // What the semantic recall is scoped to (env-driven, default 'resource'). This
   // decides what "nothing to recall" means for the first-turn skip below.
   const recallResource = memoryBinding?.resource;
   const recallScope = resolveRecallTuning().scope;
 
-  // Build the agent, read the thread (ownership + thread-history), and — under
-  // resource-scoped recall — probe whether the resource owns any prior thread,
-  // all concurrently. None needs another's result, so they overlap instead of
-  // stacking round trips. The resource probe is issued speculatively (its result
-  // is only consulted when the thread itself turns out to be new); it rides
-  // alongside the ownership read, so it adds no wall-clock on the common path.
   const needsThreadRead = Boolean(
     identity.kind === 'user' &&
       memoryBinding &&
@@ -252,19 +299,27 @@ export async function prepareTurn(
     !memoryBinding ||
     !!priorThread ||
     (recallScope === 'resource' && resourceHadThreads !== false);
-  if (memoryBinding && !recallCanReturnHistory) {
-    memoryBinding.options = { semanticRecall: false };
-  }
+  const skipSemanticRecall = Boolean(memoryBinding && !recallCanReturnHistory);
 
-  // Register the thread + its agent binding NOW, before the model streams, so
-  // the session is listable the moment the turn starts — not only after it
-  // finishes. This is what lets a refresh WHILE the agent is still running keep
-  // the session: the sidebar query (listOwnedThreads → metadata.agentId) finds
-  // it, and reopening it hydrates the persisted turn. patchNativeTurn re-stamps
-  // the same binding at turn-end. In-app chat only (bot/schedule threads are not
-  // user-listable, and their binding stamp at turn-end suffices). Best-effort:
-  // never block the turn on a store hiccup (the end-of-turn stamp is the
-  // backstop).
+  return { agent, tools, skipSemanticRecall };
+}
+
+// Register the thread + its agent binding NOW, before the model streams, so the
+// session is listable the moment the turn starts — not only after it finishes.
+// This is what lets a refresh WHILE the agent is still running keep the session:
+// the sidebar query (listOwnedThreads → metadata.agentId) finds it, and reopening
+// it hydrates the persisted turn. patchNativeTurn re-stamps the same binding at
+// turn-end. In-app chat only (bot/schedule threads are not user-listable, and
+// their binding stamp at turn-end suffices). Best-effort: never block the turn on
+// a store hiccup (the end-of-turn stamp is the backstop).
+async function preRegisterThread(args: {
+  identity: TurnIdentity;
+  memoryBinding: MemoryBinding | undefined;
+  subdomain: string;
+  sessionId: string;
+  agentId: string;
+}): Promise<void> {
+  const { identity, memoryBinding, subdomain, sessionId, agentId } = args;
   if (identity.kind === 'user' && memoryBinding) {
     await ensureThreadRegistered(
       subdomain,
@@ -279,10 +334,22 @@ export async function prepareTurn(
       ),
     );
   }
+}
 
-  // The tenant's learned digest (shared "Agent knowledge") is woven into the
-  // turn — separate from Mastra Memory. Best-effort: null on error. Skipped for
-  // scheduled runs (weaveDigest=false), whose prompt is run verbatim.
+// The tenant's learned digest (shared "Agent knowledge") woven into the turn,
+// plus attachment content-building. The digest is separate from Mastra Memory;
+// best-effort (null on error) and skipped for scheduled runs (weaveDigest=false),
+// whose prompt is run verbatim.
+async function buildTurnConvo(args: {
+  models: IModels;
+  agentId: string;
+  message: string;
+  weaveDigest: boolean;
+  attachments: IMastraChatAttachment[] | undefined;
+  settings: IMastraSettingsDocument;
+}): Promise<{ convo: TurnMessage[]; learningIds: string[] }> {
+  const { models, agentId, message, weaveDigest, attachments, settings } = args;
+
   const digest = weaveDigest ? await readLearnedDigest(models, agentId) : null;
 
   // Mastra Memory replays recent history + recall itself, so generate() gets
@@ -308,27 +375,135 @@ export async function prepareTurn(
     convo[convo.length - 1] = { role: 'user', content };
   }
 
+  return { convo, learningIds: digest?.ids ?? [] };
+}
+
+// Explicit slash-activation force-loads the chosen skill's FULL instructions into
+// this turn (vs. the native skill tool, which the model may never call). Resolved
+// through the reachable set so a crafted name can't reach a skill the user can't:
+// the agent's globs still gate which GLOBAL skills are reachable, but a user's OWN
+// published skill is always reachable, so an explicit activation works on any
+// agent — matching what the slash palette offers. No store hit unless something
+// is activated.
+async function activateTurnSkills(args: {
+  userId: string | undefined;
+  activeSkillNames: string[] | undefined;
+  subdomain: string;
+  agentConfig: IMastraAgentDocument;
+}): Promise<{ instructions: string; names: string[] } | undefined> {
+  const { userId, activeSkillNames, subdomain, agentConfig } = args;
+  return userId && activeSkillNames?.length
+    ? buildActivatedSkillsBlock(
+        subdomain,
+        userId,
+        agentConfig.skills ?? [],
+        activeSkillNames,
+      )
+    : undefined;
+}
+
+export interface PrepareTurnParams {
+  models: IModels;
+  subdomain: string;
+  identity: TurnIdentity;
+  agentId: string;
+  message: string;
+  threadId?: string;
+  attachments?: IMastraChatAttachment[];
+  approvedOperations?: ApprovedOp[];
+  // Weave the tenant's learned digest into the convo (and stamp its ids onto
+  // the turn). On for chat/bot; off for scheduled runs (whose prompt is run
+  // verbatim, the pre-generalization behaviour).
+  weaveDigest?: boolean;
+  // Skill names the user explicitly slash-activated for THIS turn.
+  activeSkillNames?: string[];
+}
+
+export async function prepareTurn(
+  params: PrepareTurnParams,
+): Promise<PreparedTurn> {
+  const {
+    models,
+    subdomain,
+    identity,
+    agentId,
+    message,
+    threadId,
+    attachments,
+    approvedOperations,
+    weaveDigest = true,
+    activeSkillNames,
+  } = params;
+
+  assertAgentId(agentId);
+
+  const { agentConfig, settings, providers } = await readTurnConfig(
+    models,
+    identity,
+    agentId,
+  );
+
+  const sessionId = deriveSessionId(threadId);
+
+  const {
+    advanced,
+    resourceId,
+    useMemory,
+    userHeader,
+    token,
+    memCtx,
+    memoryBinding,
+  } = resolveTurnMemory({
+    identity,
+    agentConfig,
+    agentId,
+    message,
+    subdomain,
+    sessionId,
+  });
+
+  const { agent, tools, skipSemanticRecall } = await buildAgentAndGateMemory({
+    agentConfig,
+    models,
+    subdomain,
+    settings,
+    providers,
+    identity,
+    threadId,
+    sessionId,
+    memoryBinding,
+  });
+  if (memoryBinding && skipSemanticRecall) {
+    memoryBinding.options = { semanticRecall: false };
+  }
+
+  await preRegisterThread({
+    identity,
+    memoryBinding,
+    subdomain,
+    sessionId,
+    agentId,
+  });
+
+  const { convo, learningIds } = await buildTurnConvo({
+    models,
+    agentId,
+    message,
+    weaveDigest,
+    attachments,
+    settings,
+  });
+
   // Only an in-app user can slash-activate skills (bot/schedule turns carry no
   // composer). The user's id resolves their own reachable skills below.
-  const userId =
-    identity.kind === 'user' ? identity.user?._id : undefined;
+  const userId = identity.kind === 'user' ? identity.user?._id : undefined;
 
-  // Explicit slash-activation force-loads the chosen skill's FULL instructions
-  // into this turn (vs. the native skill tool, which the model may never call).
-  // Resolved through the reachable set so a crafted name can't reach a skill the
-  // user can't: the agent's globs still gate which GLOBAL skills are reachable,
-  // but a user's OWN published skill is always reachable, so an explicit
-  // activation works on any agent — matching what the slash palette offers. No
-  // store hit unless something is activated.
-  const activated =
-    userId && activeSkillNames?.length
-      ? await buildActivatedSkillsBlock(
-          subdomain,
-          userId,
-          agentConfig.skills ?? [],
-          activeSkillNames,
-        )
-      : undefined;
+  const activated = await activateTurnSkills({
+    userId,
+    activeSkillNames,
+    subdomain,
+    agentConfig,
+  });
 
   const authCtx = {
     userHeader,
@@ -362,7 +537,7 @@ export async function prepareTurn(
     memoryBinding,
     memCtx,
     attachments,
-    learningIds: digest?.ids ?? [],
+    learningIds,
     activeSkillInstructions: activated?.instructions,
     appliedSkillNames: activated?.names ?? [],
   };

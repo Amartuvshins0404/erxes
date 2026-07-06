@@ -1,0 +1,46 @@
+diff --git a/frontend/core-ui/src/modules/automations/components/common/RenderPluginsComponentWrapper.tsx b/frontend/core-ui/src/modules/automations/components/common/RenderPluginsComponentWrapper.tsx
+index 7395e08a5b..55493a118e 100644
+--- a/frontend/core-ui/src/modules/automations/components/common/RenderPluginsComponentWrapper.tsx
++++ b/frontend/core-ui/src/modules/automations/components/common/RenderPluginsComponentWrapper.tsx
+@@ -24,6 +24,11 @@ export const RenderPluginsComponentWrapper = ({
+ 
+   const { isEnabled } = useAutomationsRemoteModules(pluginName);
+ 
++  // Dashed plugin names map to underscore MF container names (see
++  // useAutomationsRemoteModules / core-api get-frontend-plugins `remoteName()`),
++  // so the remote is "erxes_agent_ui", never "erxes-agent_ui".
++  const remoteContainerName = `${pluginName.replaceAll('-', '_')}_ui`;
++
+   if (!isEnabled) {
+     return (
+       <p className="flex flex-row gap-2 items-center size-full justify-center">
+@@ -41,7 +46,7 @@ export const RenderPluginsComponentWrapper = ({
+         )}
+       >
+         <RenderPluginsComponent
+-          pluginName={`${pluginName}_ui`}
++          pluginName={remoteContainerName}
+           remoteModuleName="automationsWidget"
+           props={{
+             ...props,
+diff --git a/frontend/core-ui/src/modules/automations/utils/useAutomationsModules.ts b/frontend/core-ui/src/modules/automations/utils/useAutomationsModules.ts
+index e2441e18ac..9b4eda53a4 100644
+--- a/frontend/core-ui/src/modules/automations/utils/useAutomationsModules.ts
++++ b/frontend/core-ui/src/modules/automations/utils/useAutomationsModules.ts
+@@ -10,8 +10,15 @@ export const useAutomationsRemoteModules = (pluginName: string) => {
+ 
+   const plugins = Object.values(pluginsMetaData);
+ 
++  // Module-federation container names can't contain dashes, so a dashed plugin
++  // name (e.g. "erxes-agent") is registered — and stored in pluginsConfigState —
++  // in its underscore form ("erxes_agent"). Automation node types keep the real
++  // dashed name, so normalize before matching. Mirrors core-api's
++  // get-frontend-plugins `remoteName()`.
++  const normalizedName = pluginName.replaceAll('-', '_');
++
+   const result = plugins
+-    .filter(({ name }) => name === pluginName)
++    .filter(({ name }) => name === normalizedName)
+     .flatMap((plugin) =>
+       (plugin.modules || [])
+         .filter((module) => module.hasAutomation)

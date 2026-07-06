@@ -21,6 +21,7 @@
 import type { Agent } from '@mastra/core/agent';
 import { trimEdgeChars } from '~/mastra/text';
 import type { ProviderDocLike } from '~/mastra/providers';
+import { createAgentCache } from '~/mastra/cachedAgent';
 
 /** Auth context accepted by runWithAuth (the module itself loads lazily). */
 type AuthCtx = Parameters<
@@ -116,7 +117,7 @@ export function sanitizeActivity(
 // ── One-shot summarizer ──────────────────────────────────────────────────────
 
 // Tool-less summarizer agents, cached per provider+model.
-const _summarizers = new Map<string, Agent>();
+const summarizerCache = createAgentCache<Agent>();
 
 /** Get (or lazily create and cache) the summarizer agent for a model. */
 async function summarizerFor(
@@ -125,19 +126,12 @@ async function summarizerFor(
   providers: ProviderDocLike[],
 ): Promise<Agent> {
   const key = `${provider}:${model}`;
-  let summarizer = _summarizers.get(key);
-  if (!summarizer) {
-    const { Agent: AgentCtor } = await import('@mastra/core/agent');
-    const { buildModel } = await import('~/mastra/providers');
-    summarizer = new AgentCtor({
-      id: 'mastra-activity-summarizer',
-      name: 'Activity Summarizer',
-      instructions: ACTIVITY_INSTRUCTIONS,
-      model: buildModel(provider, model, providers),
-    });
-    _summarizers.set(key, summarizer);
-  }
-  return summarizer;
+  return summarizerCache.getOrBuild(key, ({ buildModel }) => ({
+    id: 'mastra-activity-summarizer',
+    name: 'Activity Summarizer',
+    instructions: ACTIVITY_INSTRUCTIONS,
+    model: buildModel(provider, model, providers),
+  }));
 }
 
 /**
@@ -240,7 +234,7 @@ function summarizerTarget(
 }
 
 // One combined summarizer agent, cached per provider+model.
-const _summaryAgents = new Map<string, Agent>();
+const summaryAgentCache = createAgentCache<Agent>();
 
 async function summaryAgentFor(
   provider: string,
@@ -248,19 +242,12 @@ async function summaryAgentFor(
   providers: ProviderDocLike[],
 ): Promise<Agent> {
   const key = `${provider}:${model}`;
-  let agent = _summaryAgents.get(key);
-  if (!agent) {
-    const { Agent: AgentCtor } = await import('@mastra/core/agent');
-    const { buildModel } = await import('~/mastra/providers');
-    agent = new AgentCtor({
-      id: 'mastra-turn-summarizer',
-      name: 'Turn Summarizer',
-      instructions: COMBINED_SUMMARY_INSTRUCTIONS,
-      model: buildModel(provider, model, providers),
-    });
-    _summaryAgents.set(key, agent);
-  }
-  return agent;
+  return summaryAgentCache.getOrBuild(key, ({ buildModel }) => ({
+    id: 'mastra-turn-summarizer',
+    name: 'Turn Summarizer',
+    instructions: COMBINED_SUMMARY_INSTRUCTIONS,
+    model: buildModel(provider, model, providers),
+  }));
 }
 
 export interface ReasoningStepInput {

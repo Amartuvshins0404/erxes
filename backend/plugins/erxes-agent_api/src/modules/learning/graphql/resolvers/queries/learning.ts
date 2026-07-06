@@ -1,14 +1,8 @@
-import { ExpectedError } from 'erxes-api-shared/utils';
 import { IContext } from '~/connectionResolvers';
 import { computeLearningStatus } from '~/mastra/learning/config';
 import { MastraLearningStatus } from '@/learning/@types/learning';
-import { assertOwnedThread } from '@/session/nativeStore';
-
-/** Throws unless a logged-in user is on the context; returns their _id. */
-function requireUserId(user: { _id?: string } | null | undefined): string {
-  if (!user?._id) throw new ExpectedError('Login required');
-  return user._id;
-}
+import { assertThreadOwned } from '@/session/nativeStore';
+import { requireUserId } from '@/_shared/auth';
 
 // Field resolver: expose only the COUNT of hashed contributors, never the
 // hashes themselves.
@@ -85,7 +79,7 @@ export const learningQueries = {
   ) => {
     await checkPermission('agentsChat');
     const userId = requireUserId(user);
-    await assertOwnedThread(subdomain, userId, threadId);
+    await assertThreadOwned(subdomain, userId, threadId);
     const docs = await models.MastraFeedback.find({ threadId, userId });
     const byMessage: Record<string, { rating: number; comment?: string }> = {};
     for (const d of docs) {

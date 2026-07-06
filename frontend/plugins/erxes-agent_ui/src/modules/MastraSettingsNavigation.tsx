@@ -8,11 +8,8 @@ export const MastraSettingsNavigation = () => {
       <Sidebar.GroupLabel className="h-4">AI / erxes Agent</Sidebar.GroupLabel>
       <Sidebar.GroupContent className="pt-1">
         <Sidebar.Menu>
-          <SettingsNavigationMenuLinkItem
-            pathPrefix="erxes-agent"
-            path="/agents"
-            name="Agents"
-          />
+          {/* "Agents" is not listed here: it lives in the main plugin nav
+              (MastraNavigation) and a Settings copy was a confusing duplicate. */}
           <SettingsNavigationMenuLinkItem
             pathPrefix="erxes-agent"
             path="/skills"

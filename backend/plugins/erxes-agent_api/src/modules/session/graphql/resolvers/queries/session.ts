@@ -1,20 +1,15 @@
-import { IUserDocument } from 'erxes-api-shared/core-types';
-import { ExpectedError } from 'erxes-api-shared/utils';
 import { IContext } from '~/connectionResolvers';
 import {
   listOwnedThreads,
   getOwnedThreadMessages,
   assertThreadOwned,
 } from '@/session/nativeStore';
+import { requireUserId } from '@/_shared/auth';
 
 // Threads are private: every query requires a logged-in user and is filtered
 // to threads that user owns. Ownership + tenant isolation is by the native
 // thread's resourceId (scopedResource(subdomain, userId)); bot threads
 // (resource "<sub>:bot:*") never match.
-function requireUserId(user: IUserDocument | null | undefined): string {
-  if (!user?._id) throw new ExpectedError('Login required');
-  return user._id;
-}
 
 /** Queries over a user's own chat threads and their transcripts (Mastra-native). */
 export const sessionQueries = {

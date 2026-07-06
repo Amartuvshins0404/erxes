@@ -8,8 +8,9 @@ import {
   IconPresentation,
   IconX,
 } from '@tabler/icons-react';
-import { Button, cn } from 'erxes-ui';
-import { EChart, type EChartHandle } from '~/modules/chat/charts';
+import { Button, cn, Empty } from 'erxes-ui';
+import { type EChartHandle } from '~/modules/chat/charts';
+import { ChartArtifactView } from '~/modules/chat/components/ChartArtifactView';
 import {
   artifactIcon,
   Artifact,
@@ -219,15 +220,21 @@ const FileListView = ({
       </div>
       <div className="ea-scroll min-h-0 flex-1 overflow-auto p-3">
         {artifacts.length === 0 ? (
-          <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-muted-foreground">
-            <IconFile className="size-8 opacity-40" />
-            <p className="text-sm">
-              {loading ? 'Loading…' : 'No charts, documents or images yet.'}
-            </p>
-            <p className="text-xs">
-              Ask the agent to chart data or generate a report.
-            </p>
-          </div>
+          <Empty className="h-full">
+            <Empty.Header>
+              <Empty.Media variant="icon">
+                <IconFile />
+              </Empty.Media>
+              <Empty.Title>
+                {loading ? 'Loading files…' : 'No files yet'}
+              </Empty.Title>
+              <Empty.Description>
+                {loading
+                  ? 'Fetching this thread’s charts and documents.'
+                  : 'Ask the agent to chart data or generate a report.'}
+              </Empty.Description>
+            </Empty.Header>
+          </Empty>
         ) : (
           <GroupedFiles threadId={threadId} />
         )}
@@ -326,7 +333,9 @@ const ItemView = ({
       <div className="min-h-0 flex-1 overflow-hidden">
         {artifact.kind === 'chart' ? (
           <div className="h-full w-full p-4">
-            <EChart ref={chartRef} spec={artifact.spec} height="100%" />
+            {/* Same unified view (and per-artifact filter state) as the inline
+                chat card and the expand dialog — slider positions carry over. */}
+            <ChartArtifactView ref={chartRef} artifact={artifact} />
           </div>
         ) : artifact.kind === 'diagram' ? (
           <MermaidViewer definition={artifact.definition} />

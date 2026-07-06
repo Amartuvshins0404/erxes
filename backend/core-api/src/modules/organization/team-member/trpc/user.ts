@@ -97,26 +97,33 @@ export const userTrpcRouter = t.router({
       }),
     // Mints a short-lived (1h) gateway-verifiable token for an agent's owner so
     // background runs (bot/schedule) act as a real, bounded user instead of the
-    // privileged app token. Secret-gated: callers must present the shared
-    // ERXES_AGENT_RUN_TOKEN_SECRET. Returns null (never throws / never reveals
-    // which check failed) when the secret is unset/wrong or the owner is
-    // missing/inactive. Never logs the token or the secret.
+    // privileged app token. Authenticated with the erxes App token (the core
+    // Apps collection, tenant-scoped via ctx.models — the same credential the
+    // gateway validates) rather than a bespoke shared secret, so there is no
+    // extra env var to provision. Returns null (never throws / never reveals
+    // which check failed) when the app token is missing/invalid/revoked or the
+    // owner is missing/inactive. Never logs the token.
     issueRunToken: t.procedure
-      .input(z.object({ userId: z.string(), secret: z.string() }))
+      .input(z.object({ userId: z.string(), appToken: z.string() }))
       .mutation(async ({ ctx, input }) => {
         const { models } = ctx;
-        const { userId, secret } = input;
+        const { userId, appToken } = input;
 
-        const runSecret = process.env.ERXES_AGENT_RUN_TOKEN_SECRET;
+        // Authenticate the caller with the erxes App token. Look it up as an
+        // ACTIVE app (revoked apps are rejected), then do a constant-time
+        // compare on the final match. A missing/invalid/revoked token returns
+        // null — never leaking which check failed.
+        const app = await models.Apps.findOne({
+          token: appToken,
+          status: 'active',
+        });
 
-        // Gate on the shared secret with a constant-time compare. Refuse if the
-        // secret is unset or does not match — without leaking which it was.
-        if (!runSecret) {
+        if (!app) {
           return null;
         }
 
-        const provided = Buffer.from(secret);
-        const expected = Buffer.from(runSecret);
+        const provided = Buffer.from(appToken);
+        const expected = Buffer.from(app.token);
 
         if (
           provided.length !== expected.length ||

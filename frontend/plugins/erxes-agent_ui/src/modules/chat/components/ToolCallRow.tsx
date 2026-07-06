@@ -25,7 +25,9 @@ export const ToolCallRow = memo(function ToolCallRow({
   const pending = call.pending && streaming;
   const settled =
     call.state === 'output-available' || call.state === 'output-error';
-  const result = call.isError ? call.errorText : call.output;
+  // Hard errors carry errorText; a soft {error:true} output has none, so fall
+  // back to the output itself — otherwise the failed row would show nothing.
+  const result = call.isError ? (call.errorText ?? call.output) : call.output;
   // Compute the hint only when the call's input/name change, not on every token.
   const hint = useMemo(
     () => toolHint(call.input, call.toolName),

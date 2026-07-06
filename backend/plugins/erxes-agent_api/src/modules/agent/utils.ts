@@ -51,7 +51,9 @@ export const canUserAccessAgent = (
  */
 export async function getUserUnitIds(models: IModels, userId: string): Promise<string[]> {
   try {
-    const db = (models.MastraAgent as any).db.db as import('mongodb').Db;
+    const db = (
+      models.MastraAgent as unknown as { db: { db: import('mongodb').Db } }
+    ).db.db;
     const docs = await db
       .collection('units')
       .find({ userIds: userId }, { projection: { _id: 1 } })

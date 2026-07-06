@@ -42,8 +42,9 @@ export const types = `
 `;
 
 export const queries = `
-  mastraSchedules: [MastraSchedule]
+  mastraSchedules(agentId: String): [MastraSchedule]
   mastraSchedule(_id: String!): MastraSchedule
+  mastraScheduleTranscript(scheduleId: String!): [MastraMessage]
 `;
 
 export const mutations = `

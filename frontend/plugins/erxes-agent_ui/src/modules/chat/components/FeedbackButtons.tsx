@@ -19,6 +19,7 @@ export const FeedbackButtons = ({
           <Tooltip.Trigger asChild>
             <button
               type="button"
+              aria-label={value === 1 ? 'Good response' : 'Bad response'}
               onClick={() => !active && onRate(value)}
               className={`size-6 flex items-center justify-center rounded hover:bg-black/5 dark:hover:bg-white/10 transition-colors ${
                 active

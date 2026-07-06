@@ -7,6 +7,7 @@ import { useResourceForm } from '~/components/useResourceForm';
 import { AgentFormFields } from './components/AgentFormFields';
 import { useAgent } from './hooks/useAgent';
 import { useAgentAccess, showAgentPermissionError, showAgentQuotaError } from './hooks/useAgentAccess';
+import { useAgentsBasePath } from './hooks/useAgentsBasePath';
 import type { IMastraAgentQuotaStatus } from './types';
 import { useSaveAgent } from './hooks/useSaveAgent';
 import {
@@ -22,9 +23,10 @@ interface IQuotaStatusResponse {
   mastraMyAgentQuotaStatus: IMastraAgentQuotaStatus;
 }
 
-export const AgentFormPage = () => {
+export const AgentFormPage = ({ embedded = false }: { embedded?: boolean } = {}) => {
   const { id } = useParams();
   const isEdit = !!id;
+  const basePath = useAgentsBasePath();
 
   // Auto-fill the slug from the name only for brand-new agents, and only until
   // the user edits the slug by hand. Never derived in render, so a ref (no
@@ -85,17 +87,17 @@ export const AgentFormPage = () => {
 
   // No create permission (viewer or unassigned) — redirect silently.
   if (!isEdit && !canCreate) {
-    return <Navigate to="/settings/erxes-agent/agents" replace />;
+    return <Navigate to={basePath} replace />;
   }
 
   // Create page: block if at quota (toast was already fired by useEffect above).
   if (atQuota) {
-    return <Navigate to="/settings/erxes-agent/agents" replace />;
+    return <Navigate to={basePath} replace />;
   }
 
   // Edit page: block if the user can't edit this specific agent (not owner, not admin).
   if (editBlocked) {
-    return <Navigate to="/settings/erxes-agent/agents" replace />;
+    return <Navigate to={basePath} replace />;
   }
 
   // ── Form ────────────────────────────────────────────────────────────────────
@@ -118,7 +120,7 @@ export const AgentFormPage = () => {
       icon={IconRobot}
       title="Agents"
       noun="Agent"
-      rootPath="/settings/erxes-agent/agents"
+      rootPath={basePath}
       isEdit={isEdit}
       saving={saving}
       saveLabel={isEdit ? 'Save Changes' : 'Create Agent'}
@@ -127,6 +129,7 @@ export const AgentFormPage = () => {
       form={form}
       onSubmit={onSubmit}
       mobileFooter
+      embedded={embedded}
     >
       <AgentFormFields
         form={form}

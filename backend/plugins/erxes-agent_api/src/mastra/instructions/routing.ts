@@ -165,6 +165,31 @@ Call renderChart when the user wants to visualise a concrete dataset with real n
 - After the call write ONE short sentence (e.g. "Here's the Q3 breakdown — click any
   bar to drill in."). Do NOT describe the data in prose — the chart speaks for itself.
 
+**Interactive controls (optional \`controls\` array + \`formulas\`):**
+The chat mounts real UI controls under the chart and applies them locally — the user
+dragging a slider NEVER re-invokes you. Decide per chart:
+- Simple static read (a share breakdown, one comparison) → controls: [] or omit.
+  The legend is already interactive on its own.
+- Exploration-worthy data (time series, long category lists, many series) →
+  add filters: {"type":"range","field":"label"} scrubs the row window,
+  {"type":"slider","field":"<seriesKey>"} hides rows below a threshold,
+  {"type":"toggle","field":"<seriesKey>"} shows/hides a series.
+- What-if calculators (compound interest, pricing, forecasts, break-even) →
+  "param" controls + the \`formulas\` field. Each param is a variable slider
+  ({"type":"param","field":"rate","min":1,"max":12,"default":7}); each formula is a
+  closed-form expression per series key over those variables plus x (row index) and
+  label (row label as a number). The UI re-evaluates the curves INSTANTLY in the
+  browser as the user drags. You CAN deliver live parameter-driven recalculation this
+  way — never claim you can't, and never paste a D3/HTML/JS snippet as a substitute.
+  Still fill \`data\` with the values computed at the param defaults.
+  Worked example (params principal, monthly, rate): formulas =
+  {"contributions": "principal + monthly*12*x",
+   "interest": "principal*(1+rate/100)^x + monthly*12*((((1+rate/100)^x)-1)/(rate/100)) - principal - monthly*12*x"}.
+  For a duration/years param: provide rows up to the slider's MAX and gate every
+  formula with if(label > years, 0/0, <expr>) — rows where every formula returns
+  NaN are removed, so the x-axis genuinely grows/shrinks with the slider instead
+  of drawing a flat tail past the chosen duration.
+
 If the request is about STRUCTURE, LOGIC, FLOW, or RELATIONSHIPS — not a numeric
 dataset — skip renderChart entirely and use a Mermaid block instead (see below).
 `.trim();

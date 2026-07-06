@@ -14,16 +14,19 @@ import {
   scopeSummary,
   capabilityInventory,
 } from './tools/scope';
+import type { ToolPolicy } from './tools/scope';
 import { resolveDestructiveOpsPolicy } from './tools/destructiveGuard';
+import type { DestructiveOpsPolicy } from './tools/destructiveGuard';
 import { writeAgentAction, AgentActionInput } from './auditLog';
 import { isAdvancedMemoryEnabled } from './memory/config';
 import { getMastraMemory } from './memory/mastraMemory';
-import { ToolCallFilter } from '@mastra/core/processors';
+import { ToolCallSignalFilter } from './memory/toolCallSignalFilter';
 import { isEvaluationEnabled } from './scoring/config';
 import { buildAgentScorers } from './scoring/scorers';
 import { getObservabilityHost } from './scoring/observability';
 import { getSkillsWorkspace } from '@/skills/store/skillsWorkspace';
 import { createMakeSkillTool } from '@/skills/tools/makeSkill';
+import type { OperationRegistry } from './tools/operationRegistry';
 import type { IMastraProviderDocument } from '@/provider/@types/provider';
 import type { IMastraSettingsDocument } from '@/settings/@types/settings';
 
@@ -51,80 +54,68 @@ export interface GetOrCreateAgentOptions {
   settings?: IMastraSettingsDocument;
 }
 
-/** Build (or return the cached) Mastra agent for a stored agent config. */
-export async function getOrCreateAgent(
-  agentConfig: IMastraAgentDocument,
-  models: IModels,
-  subdomain?: string,
-  options: GetOrCreateAgentOptions = {},
-): Promise<AgentWithTools> {
-  // Mastra Memory (persistence + semantic recall + working memory) is attached
-  // whenever advanced memory is on and the agent hasn't opted out. An unknown
-  // tenant must NOT detach memory — that would stop the turn from being
-  // persisted (and lose the session); scopedResource defaults an empty subdomain
-  // to the "os" scope.
-  const useMemory =
-    isAdvancedMemoryEnabled() && agentConfig.memoryEnabled !== false;
-  // Reuse the caller's already-fetched config when present; otherwise load it.
-  const [providers, settings] =
-    options.providers && options.settings
-      ? [options.providers, options.settings]
-      : await Promise.all([
-          models.MastraProvider.find({ isEnabled: true }),
-          models.MastraSettings.getSettings(),
-        ]);
+/**
+ * Composite cache key over every dimension that changes the built agent.
+ *
+ * A different composition would silently break cache hits/evictions, so this
+ * mirrors the original key exactly:
+ *   • updatedAt + ROUTING_VERSION + inventory fingerprint rebuild on config /
+ *     routing / installed-plugin changes.
+ *   • memory joins the subdomain only when advanced memory is on.
+ *   • evaluation binds each tenant to its own Langfuse project (per-subdomain
+ *     observability host) when on.
+ *   • skills key the subdomain + allowlist so a cached agent can't be reused
+ *     for another tenant with the wrong skills source.
+ */
+function buildAgentCacheKey(params: {
+  agentConfig: IMastraAgentDocument;
+  subdomain?: string;
+  useMemory: boolean;
+  evaluationEnabled: boolean;
+  inventoryFingerprint: string;
+}): string {
+  const {
+    agentConfig,
+    subdomain,
+    useMemory,
+    evaluationEnabled,
+    inventoryFingerprint,
+  } = params;
 
-  // The agent's reach: 'all' (every erxes operation + builtin) by default, or a
-  // restricted allowlist. The two meta-tools enforce this at execution time.
-  const policy = resolveToolPolicy(agentConfig);
-
-  // Consent for irreversible deletes/merges. Defaults to 'block' (incl. legacy
-  // agents with no field persisted) so the AI cannot remove data by mistake;
-  // the execute meta-tool refuses destructive ops unless this is 'allow'.
-  const destructiveOps = resolveDestructiveOpsPolicy(agentConfig);
-
-  // The live, cached schema registry powers search + execute. No per-operation
-  // tool docs are bound any more — capabilities are derived from the gateway.
-  const registry = await getOperationRegistry(settings);
-
-  // The installed-services inventory both grounds the system prompt AND keys
-  // the cache: enabling/disabling a plugin changes the fingerprint, so the
-  // agent (and its prompt) is rebuilt as soon as the registry refreshes.
-  const inventory = capabilityInventory(registry.list, policy);
-
-  // Evaluation is process-wide (env), but the observability host is per-tenant
-  // — so when it's on, the subdomain joins the cache key to keep each tenant's
-  // agent bound to its own Langfuse project (serviceName).
-  const evaluationEnabled = isEvaluationEnabled();
   const evalTag = evaluationEnabled ? subdomain || 'os' : 'off';
-
-  // When skills are enabled the agent carries a per-subdomain Workspace, so the
-  // subdomain + allowlist MUST key the cache (otherwise a cached agent could be
-  // reused for another tenant with the wrong skills source). Per-user scoping
-  // still happens at request time inside the skills resolver.
   const skillsTag = agentConfig.skills?.length
     ? `${subdomain || 'os'}:${agentConfig.skills.join('|')}`
     : 'off';
 
-  const cacheKey = `${agentConfig._id}:${agentConfig.updatedAt?.getTime?.() ?? 0}:v${ROUTING_VERSION}:${inventory.fingerprint}:mem${useMemory ? subdomain : 'off'}:eval${evalTag}:skills${skillsTag}`;
+  return `${agentConfig._id}:${agentConfig.updatedAt?.getTime?.() ?? 0}:v${ROUTING_VERSION}:${inventoryFingerprint}:mem${useMemory ? subdomain : 'off'}:eval${evalTag}:skills${skillsTag}`;
+}
 
-  const cached = agentCache.get(cacheKey);
-  if (cached) {
-    return {
-      agent: cached,
-      tools: toolsCache.get(cacheKey) ?? {},
-    };
-  }
-
-  // Evict stale entries for this agent
-  for (const key of agentCache.keys()) {
-    if (key.startsWith(`${agentConfig._id}:`)) {
-      agentCache.delete(key);
-      toolsCache.delete(key);
-    }
-  }
-
-  const model = buildModel(agentConfig.provider, agentConfig.model, providers);
+/**
+ * Assemble the agent's tool map: erxes meta-tools (only when the policy grants
+ * an operation), policy-filtered builtins, the always-on fileReader, and — for
+ * skills-enabled agents — the make_skill tool. Also returns the ToolInfo list
+ * that grounds the system prompt.
+ */
+function assembleAgentTools(params: {
+  agentConfig: IMastraAgentDocument;
+  models: IModels;
+  providers: IMastraProviderDocument[];
+  registry: OperationRegistry;
+  settings: IMastraSettingsDocument;
+  policy: ToolPolicy;
+  destructiveOps: DestructiveOpsPolicy;
+  hasErxes: boolean;
+}): { tools: ToolsInput; builtinInfos: ToolInfo[] } {
+  const {
+    agentConfig,
+    models,
+    providers,
+    registry,
+    settings,
+    policy,
+    destructiveOps,
+    hasErxes,
+  } = params;
 
   const tools: ToolsInput = {};
   const builtinInfos: ToolInfo[] = [];
@@ -140,7 +131,6 @@ export async function getOrCreateAgent(
       agentId: agentConfig.agentId,
     });
 
-  const hasErxes = hasAnyOperation(registry.list, policy);
   if (hasErxes) {
     Object.assign(
       tools,
@@ -195,6 +185,149 @@ export async function getOrCreateAgent(
     });
   }
 
+  return { tools, builtinInfos };
+}
+
+/**
+ * Step budget for a turn. Workflow builds are 20+ steps (guide → searches →
+ * validate → simulate → save → run), so workflow-capable agents floor at 32.
+ * Pure chat/search/chart agents only ever need ~5 steps — use the configured
+ * value with a floor of 8 so they don't waste LLM round-trips. Tool-less agents
+ * take the configured value verbatim.
+ */
+function resolveMaxSteps(
+  agentConfig: IMastraAgentDocument,
+  toolNames: string[],
+): number {
+  const configuredSteps = agentConfig.maxSteps || 8;
+  const hasWorkflowTools = toolNames.some((k) => k.startsWith('workflow'));
+  const stepFloor = hasWorkflowTools ? 32 : 8;
+  return toolNames.length
+    ? Math.max(configuredSteps, stepFloor)
+    : configuredSteps;
+}
+
+/**
+ * Wire the agent to the per-tenant observability host so traces + scores reach
+ * the central Langfuse. Two distinct hooks, both guarded (internal Mastra APIs):
+ *   • __registerMastra(host)  → the agent emits TRACES to host.observability.
+ *   • host.addScorer(scorer)  → registers each scorer so Mastra's onScorerRun
+ *     hook can resolve it (findScorer → getScorerById) AND sets scorer.#mastra
+ *     = host, so the scorer's run() emits its SCORE to Langfuse. (The host's
+ *     storage, set above, is what stops the hook from bailing.)
+ * Null host = evaluation off or Langfuse unconfigured → no-op.
+ */
+async function wireAgentObservability(params: {
+  agent: Agent;
+  subdomain?: string;
+  scorers?: ReturnType<typeof buildAgentScorers>;
+}): Promise<void> {
+  const { agent, subdomain, scorers } = params;
+
+  const host = await getObservabilityHost(subdomain);
+  if (!host) return;
+
+  const register = (
+    agent as unknown as { __registerMastra?: (m: unknown) => void }
+  ).__registerMastra;
+  if (typeof register === 'function') register.call(agent, host);
+
+  const addScorer = (
+    host as unknown as {
+      addScorer?: (s: unknown, key?: string, o?: { source: string }) => void;
+    }
+  ).addScorer;
+  if (scorers && typeof addScorer === 'function') {
+    for (const [id, entry] of Object.entries(scorers)) {
+      addScorer.call(host, entry.scorer, id, { source: 'code' });
+    }
+  }
+}
+
+/** Build (or return the cached) Mastra agent for a stored agent config. */
+export async function getOrCreateAgent(
+  agentConfig: IMastraAgentDocument,
+  models: IModels,
+  subdomain?: string,
+  options: GetOrCreateAgentOptions = {},
+): Promise<AgentWithTools> {
+  // Mastra Memory (persistence + semantic recall + working memory) is attached
+  // whenever advanced memory is on and the agent hasn't opted out. An unknown
+  // tenant must NOT detach memory — that would stop the turn from being
+  // persisted (and lose the session); scopedResource defaults an empty subdomain
+  // to the "os" scope.
+  const useMemory =
+    isAdvancedMemoryEnabled() && agentConfig.memoryEnabled !== false;
+  // Reuse the caller's already-fetched config when present; otherwise load it.
+  const [providers, settings] =
+    options.providers && options.settings
+      ? [options.providers, options.settings]
+      : await Promise.all([
+          models.MastraProvider.find({ isEnabled: true }),
+          models.MastraSettings.getSettings(),
+        ]);
+
+  // The agent's reach: 'all' (every erxes operation + builtin) by default, or a
+  // restricted allowlist. The two meta-tools enforce this at execution time.
+  const policy = resolveToolPolicy(agentConfig);
+
+  // Consent for irreversible deletes/merges. Defaults to 'block' (incl. legacy
+  // agents with no field persisted) so the AI cannot remove data by mistake;
+  // the execute meta-tool refuses destructive ops unless this is 'allow'.
+  const destructiveOps = resolveDestructiveOpsPolicy(agentConfig);
+
+  // The live, cached schema registry powers search + execute. No per-operation
+  // tool docs are bound any more — capabilities are derived from the gateway.
+  const registry = await getOperationRegistry(settings);
+
+  // The installed-services inventory both grounds the system prompt AND keys
+  // the cache: enabling/disabling a plugin changes the fingerprint, so the
+  // agent (and its prompt) is rebuilt as soon as the registry refreshes.
+  const inventory = capabilityInventory(registry.list, policy);
+
+  // Evaluation is process-wide (env), but the observability host is per-tenant
+  // — so when it's on, the subdomain joins the cache key to keep each tenant's
+  // agent bound to its own Langfuse project (serviceName).
+  const evaluationEnabled = isEvaluationEnabled();
+
+  const cacheKey = buildAgentCacheKey({
+    agentConfig,
+    subdomain,
+    useMemory,
+    evaluationEnabled,
+    inventoryFingerprint: inventory.fingerprint,
+  });
+
+  const cached = agentCache.get(cacheKey);
+  if (cached) {
+    return {
+      agent: cached,
+      tools: toolsCache.get(cacheKey) ?? {},
+    };
+  }
+
+  // Evict stale entries for this agent
+  for (const key of agentCache.keys()) {
+    if (key.startsWith(`${agentConfig._id}:`)) {
+      agentCache.delete(key);
+      toolsCache.delete(key);
+    }
+  }
+
+  const model = buildModel(agentConfig.provider, agentConfig.model, providers);
+
+  const hasErxes = hasAnyOperation(registry.list, policy);
+  const { tools, builtinInfos } = assembleAgentTools({
+    agentConfig,
+    models,
+    providers,
+    registry,
+    settings,
+    policy,
+    destructiveOps,
+    hasErxes,
+  });
+
   // Conversation persistence + recent-history replay + recall are owned by the
   // attached Mastra Memory (the chat store IS the native memory store; see
   // memory below + session/nativeStore.ts). No custom message store.
@@ -206,16 +339,7 @@ export async function getOrCreateAgent(
     builtins: builtinInfos,
   });
 
-  // Workflow builds are 20+ steps (guide → searches → validate → simulate →
-  // save → run). A cap of 32 is the floor for workflow-capable agents.
-  // Pure chat/search/chart agents only ever need ~5 steps — use the configured
-  // value with a floor of 8 so they don't waste LLM round-trips.
-  const configuredSteps = agentConfig.maxSteps || 8;
-  const hasWorkflowTools = toolNames.some((k) => k.startsWith('workflow'));
-  const stepFloor = hasWorkflowTools ? 32 : 8;
-  const maxSteps = toolNames.length
-    ? Math.max(configuredSteps, stepFloor)
-    : configuredSteps;
+  const maxSteps = resolveMaxSteps(agentConfig, toolNames);
 
   // Configured sampling temperature. Unset → provider/SDK default (the legacy
   // loop hardcodes 0, which models like Kimi thinking — "only 1 is allowed" —
@@ -223,9 +347,11 @@ export async function getOrCreateAgent(
   const temperature = agentConfig.temperature;
   const hasTemperature = typeof temperature === 'number';
 
-  // Per-tenant Mastra Memory (recall + working memory). ToolCallFilter strips
-  // tool-call frames from any replayed/recalled history so reasoning models
-  // (Kimi) don't reject the request. Both are opt-in via advanced memory.
+  // Per-tenant Mastra Memory (recall + working memory). ToolCallSignalFilter
+  // strips raw tool-call frames from any replayed/recalled history so reasoning
+  // models (Kimi) don't reject the request, but leaves a text breadcrumb so the
+  // model keeps calling render tools on later turns. Both are opt-in via
+  // advanced memory.
   const memory = useMemory ? await getMastraMemory(subdomain) : undefined;
 
   // Quality scorers (heuristic + LLM-judge using this agent's own model) — only
@@ -248,7 +374,9 @@ export async function getOrCreateAgent(
     instructions: systemPrompt,
     model,
     tools: toolNames.length ? tools : undefined,
-    ...(memory ? { memory, inputProcessors: [new ToolCallFilter()] } : {}),
+    ...(memory
+      ? { memory, inputProcessors: [new ToolCallSignalFilter()] }
+      : {}),
     ...(scorers ? { scorers } : {}),
     ...(skillsWorkspace ? { workspace: skillsWorkspace } : {}),
     // generate()/stream() read defaultOptions. Temperature is only set when the
@@ -260,33 +388,8 @@ export async function getOrCreateAgent(
     },
   } as never);
 
-  // Wire the agent to the per-tenant observability host so traces + scores reach
-  // the central Langfuse. Two distinct hooks, both guarded (internal Mastra APIs):
-  //   • __registerMastra(host)  → the agent emits TRACES to host.observability.
-  //   • host.addScorer(scorer)  → registers each scorer so Mastra's onScorerRun
-  //     hook can resolve it (findScorer → getScorerById) AND sets scorer.#mastra
-  //     = host, so the scorer's run() emits its SCORE to Langfuse. (The host's
-  //     storage, set above, is what stops the hook from bailing.)
-  // Null host = evaluation off or Langfuse unconfigured → no-op.
   if (evaluationEnabled) {
-    const host = await getObservabilityHost(subdomain);
-    if (host) {
-      const register = (
-        agent as unknown as { __registerMastra?: (m: unknown) => void }
-      ).__registerMastra;
-      if (typeof register === 'function') register.call(agent, host);
-
-      const addScorer = (
-        host as unknown as {
-          addScorer?: (s: unknown, key?: string, o?: { source: string }) => void;
-        }
-      ).addScorer;
-      if (scorers && typeof addScorer === 'function') {
-        for (const [id, entry] of Object.entries(scorers)) {
-          addScorer.call(host, entry.scorer, id, { source: 'code' });
-        }
-      }
-    }
+    await wireAgentObservability({ agent, subdomain, scorers });
   }
 
   agentCache.set(cacheKey, agent);

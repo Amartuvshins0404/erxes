@@ -18,6 +18,7 @@ export const types = `
     isEnabled: Boolean
     createdBy: String
     ownerUserId: String
+    grantGroupId: String
     isOwnAgent: Boolean
     visibility: String
     teamId: String
@@ -25,6 +26,8 @@ export const types = `
     unitId: String
     createdAt: Date
     updatedAt: Date
+    workflowsCount: Int
+    schedulesCount: Int
   }
 
   input MastraAgentInput {
@@ -44,6 +47,7 @@ export const types = `
     temperature: Float
     isEnabled: Boolean
     ownerUserId: String
+    grantGroupId: String
     visibility: String
     teamId: String
     departmentId: String

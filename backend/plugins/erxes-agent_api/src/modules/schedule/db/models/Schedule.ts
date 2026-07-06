@@ -12,7 +12,9 @@ import { getMastraMemory } from '~/mastra/memory/mastraMemory';
 
 export interface IMastraScheduleModel extends Model<IMastraScheduleDocument> {
   getSchedule(_id: string): Promise<IMastraScheduleDocument>;
-  getSchedules(): Promise<IMastraScheduleDocument[]>;
+  getSchedules(filter?: {
+    agentId?: string;
+  }): Promise<IMastraScheduleDocument[]>;
   createSchedule(doc: IMastraSchedule): Promise<IMastraScheduleDocument>;
   updateSchedule(
     _id: string,
@@ -44,8 +46,11 @@ export const loadScheduleClass = (_models: IModels) => {
     }
 
     /** All schedules, newest first. */
-    public static getSchedules() {
-      return _models.MastraSchedule.find().sort({ createdAt: -1 });
+    public static getSchedules(filter: { agentId?: string } = {}) {
+      // agentId scoping (step 25's per-agent UI): only narrow when a non-empty
+      // id is supplied, so an unfiltered call still returns every schedule.
+      const query = filter.agentId ? { agentId: filter.agentId } : {};
+      return _models.MastraSchedule.find(query).sort({ createdAt: -1 });
     }
 
     /** Create a schedule after validating its cron and timezone. */

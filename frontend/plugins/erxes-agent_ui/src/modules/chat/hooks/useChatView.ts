@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useChat } from '@ai-sdk/react';
 import { AgentChatState, AgentUIMessage } from '~/modules/chat/types';
@@ -20,6 +21,7 @@ export interface AgentChatView extends AgentChatState {
   loading: boolean; // a reply is being written (in flight AND not yet settled)
   messagesLoading: boolean; // hydrating this thread's history from the DB
   error?: Error;
+  retry: () => void; // re-run the failed turn (clears error, re-requests)
 }
 
 // The active agent's session + conversation view. `useChat` binds to the active
@@ -34,16 +36,30 @@ export const useAgentChatView = (agentId?: string): AgentChatView => {
   // open for the server's reconcile tail — status alone would keep the UI in
   // "working" mode (stop button, shimmer) for those extra seconds.
   const settled = useChatStore((s) => selectActiveThreadSettled(s, key));
-  const { messages, status, error } = useChat({
+  const { messages, status, error, regenerate } = useChat({
     chat,
     experimental_throttle: 50,
   });
+  // Retry a turn that errored mid-stream. `regenerate` drops the failed
+  // assistant message (or re-requests from the last user message when the
+  // error hit before one existed) and clears the error state itself. Carry the
+  // persistent turn params so the retry matches the original request.
+  const { reasoningEffort, voiceMode } = shell;
+  const retry = useCallback(() => {
+    void regenerate({
+      body: {
+        ...(reasoningEffort ? { reasoningEffort } : {}),
+        ...(voiceMode ? { voiceMode: true } : {}),
+      },
+    });
+  }, [regenerate, reasoningEffort, voiceMode]);
   return {
     ...shell,
     messages,
     loading: (status === 'submitted' || status === 'streaming') && !settled,
     messagesLoading,
     error,
+    retry,
   };
 };
 

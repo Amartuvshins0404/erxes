@@ -18,10 +18,7 @@ import {
 } from '@/agent/turn';
 import { getOrCreateAgent } from '~/mastra/agentRuntime';
 import { runWithAuth } from '~/mastra/requestContext';
-import {
-  resolveBackgroundToken,
-  isSecureBackgroundRunRequired,
-} from '~/mastra/auth/runToken';
+import { resolveBackgroundPrincipal } from '~/mastra/auth/backgroundPrincipal';
 import { isAdvancedMemoryEnabled } from '~/mastra/memory/config';
 import { scopedResource } from '~/mastra/memory/mastraMemory';
 
@@ -80,7 +77,6 @@ export async function runSchedule(args: {
       });
     }
 
-    const settings = await models.MastraSettings.findOne({});
     const { agent } = await getOrCreateAgent(agentConfig, models, subdomain);
 
     const threadId = scheduleThreadId(schedule._id);
@@ -98,26 +94,23 @@ export async function runSchedule(args: {
         }
       : undefined;
 
-    // Scheduled runs have no user session — run as the agent's bound owner
-    // (Phase 3). Falls back to the static app token ONLY in the degraded mode
-    // where the secure path isn't active (secret unset or no owner). When the
-    // secure path IS active (secret set + owner present) but the mint failed
-    // (owner deactivated, secret skew, core unreachable) we fail closed rather
-    // than fall back to the privileged app token — falling back would silently
-    // escalate the run to admin instead of stopping the schedule.
-    const ownerToken = await resolveBackgroundToken(agentConfig, subdomain);
-    if (!ownerToken && isSecureBackgroundRunRequired(agentConfig)) {
-      return finish({
-        status: 'failed',
-        error:
-          'Owner token mint failed (owner deactivated or secret skew); run refused — not falling back to app token',
-      });
+    // Scheduled runs have no user session — run as the agent's bound owner and
+    // fail closed when that principal can't be minted. NEVER falls back to the
+    // app token: doing so would silently escalate the run to admin instead of
+    // stopping the schedule. The app token (settings.erxesApiToken) is only the
+    // CLIENT CREDENTIAL for core's mint endpoint — the minted owner token is the
+    // acting principal.
+    const settings = await models.MastraSettings.getSettings();
+    const principal = await resolveBackgroundPrincipal({
+      agentConfig,
+      subdomain,
+      appToken: settings?.erxesApiToken,
+      models,
+    });
+    if (!principal.ok) {
+      return finish({ status: 'failed', error: principal.error });
     }
-    if (!ownerToken)
-      console.warn(
-        '[agent] scheduled run falling back to app token — set ERXES_AGENT_RUN_TOKEN_SECRET and an agent owner',
-      );
-    const authCtx = { token: ownerToken ?? settings?.erxesApiToken, subdomain };
+    const authCtx = principal.authCtx;
 
     const convo: TurnMessage[] = [{ role: 'user', content: schedule.prompt }];
     const reply = await runWithAuth(authCtx, () =>

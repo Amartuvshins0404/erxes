@@ -16,9 +16,20 @@ import { markdownToPdfHtml, type DocumentChartRef } from './markdown';
 // CSS (see markdown.ts DOC_CSS). The TTFs live next to this module; __dirname
 // resolves correctly under both tsx-dev (src/) and the compiled build (dist/),
 // and the build script copies the fonts/ dir into dist.
+//
+// Noto Sans covers Latin/Cyrillic only, so CJK (世界), Arabic (مرحبا) and emoji
+// fell back to Helvetica and dropped/corrupted. Register the script-specific
+// Noto families and set FONT_FALLBACK as a per-glyph fallback chain (Noto Sans
+// stays primary so Latin output is byte-for-byte unchanged); react-pdf walks the
+// chain per codepoint. The Arabic TTFs have their satori-incompatible GSUB
+// contextual lookups pruned but keep the joining lookups react-pdf applies.
 // ---------------------------------------------------------------------------
 
 const FONT_DIR = path.join(__dirname, 'fonts');
+
+// Per-glyph fallback chain: Latin/Cyrillic -> CJK -> Arabic -> emoji. Noto Sans
+// leads so unchanged Latin documents render identically to before.
+const FONT_FALLBACK = ['Noto Sans', 'Noto Sans SC', 'Noto Sans Arabic', 'Noto Emoji'];
 
 Font.register({
   family: 'Noto Sans',
@@ -32,6 +43,24 @@ Font.register({
       fontStyle: 'italic',
     },
   ],
+});
+
+Font.register({
+  family: 'Noto Sans SC',
+  fonts: [{ src: path.join(FONT_DIR, 'NotoSansSC-Regular.ttf') }],
+});
+
+Font.register({
+  family: 'Noto Sans Arabic',
+  fonts: [
+    { src: path.join(FONT_DIR, 'NotoSansArabic-Regular.ttf'), fontWeight: 'normal' },
+    { src: path.join(FONT_DIR, 'NotoSansArabic-Bold.ttf'), fontWeight: 'bold' },
+  ],
+});
+
+Font.register({
+  family: 'Noto Emoji',
+  fonts: [{ src: path.join(FONT_DIR, 'NotoEmoji-Regular.ttf') }],
 });
 
 // Disable hyphenation: the default splits Cyrillic words at odd points.
@@ -52,8 +81,10 @@ export async function renderPdfDocument(
       { size: 'A4', style: { paddingTop: 48, paddingBottom: 56, paddingHorizontal: 48 } },
       // react-pdf-html ignores the <style> body{} rule (the fragment has no
       // <body>), so set the embedded family on <Html> directly — it inherits to
-      // every rendered tag and keeps the body off the Latin-only Helvetica.
-      createElement(Html, { style: { fontFamily: 'Noto Sans' }, children: html }),
+      // every rendered tag and keeps the body off the Latin-only Helvetica. The
+      // fallback chain (not a single family) lets each glyph resolve to the Noto
+      // that covers it while Latin stays on the primary Noto Sans.
+      createElement(Html, { style: { fontFamily: FONT_FALLBACK }, children: html }),
     ),
   );
 

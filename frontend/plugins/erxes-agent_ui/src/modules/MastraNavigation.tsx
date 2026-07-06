@@ -1,11 +1,4 @@
-import {
-  IconRobot,
-  IconMessageCircle,
-  IconSitemap,
-  IconBulb,
-  IconBook2,
-  IconCalendarTime,
-} from '@tabler/icons-react';
+import { IconRobot, IconMessageCircle } from '@tabler/icons-react';
 import { NavigationMenuLinkItem } from 'erxes-ui';
 import { useHasAnyActivity } from '~/modules/chat/hooks/useChatView';
 
@@ -27,6 +20,9 @@ const ChatNavItem = () => {
   );
 };
 
+// Top-level nav is deliberately just Chat + Agents. Workflows, Schedules,
+// Skills and Learnings are no longer global views — they live per-agent inside
+// the agent detail page (see AgentDetailPage), scoped to the selected agent.
 export const MastraNavigation = () => {
   return (
     <>
@@ -35,26 +31,6 @@ export const MastraNavigation = () => {
         name="Agents"
         icon={IconRobot}
         path="erxes-agent/agents"
-      />
-      <NavigationMenuLinkItem
-        name="Workflows"
-        icon={IconSitemap}
-        path="erxes-agent/workflows"
-      />
-      <NavigationMenuLinkItem
-        name="Skills"
-        icon={IconBook2}
-        path="erxes-agent/skills"
-      />
-      <NavigationMenuLinkItem
-        name="Schedules"
-        icon={IconCalendarTime}
-        path="erxes-agent/schedules"
-      />
-      <NavigationMenuLinkItem
-        name="Agent learnings"
-        icon={IconBulb}
-        path="erxes-agent/learnings"
       />
     </>
   );

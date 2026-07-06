@@ -1,0 +1,348 @@
+// The boot-time backfill that gives legacy workflows an owning agent. These
+// tests pin the deterministic assignment order (binding → creator → tenant →
+// disable) and idempotency. Mongo is mocked — the module's tenant enumeration
+// (backfillWorkflowAgents) is exercised separately from the pure per-tenant
+// logic (backfillTenantWorkflows), which takes models directly.
+// The module imports generateModels + erxes-api-shared/utils at load time (used
+// only by the tenant-enumerating backfillWorkflowAgents); stub them so the pure
+// per-tenant logic under test doesn't drag the ESM-shipping module graph in.
+jest.mock('../../../connectionResolvers', () => ({ generateModels: jest.fn() }));
+jest.mock('erxes-api-shared/utils', () => ({
+  getEnv: jest.fn(() => ''),
+  getSaasOrganizations: jest.fn(() => []),
+}));
+
+import { backfillTenantWorkflows } from '../agentBackfill';
+
+/** A stored agent, as MastraAgent.find/findOne return it. */
+interface Agent {
+  _id: string;
+  agentId: string;
+  isEnabled?: boolean;
+  ownerUserId?: string;
+  createdBy?: string;
+  createdAt?: Date;
+}
+
+/** A stored workflow missing (or carrying) an agentId. */
+interface Workflow {
+  _id: string;
+  agentId?: string;
+  isEnabled?: boolean;
+  createdByUserId?: string;
+  definition?: {
+    bindings?: Record<string, { kind: string; id: string }>;
+  };
+}
+
+/**
+ * A tiny in-memory models double. `findOne` honors the subset of the Mongo query
+ * the backfill actually issues; its result is BOTH directly awaitable (rule (a)
+ * resolves an agent by _id with no sort) AND `.sort()`-chainable (rules b/c want
+ * oldest-first), so the same double serves every lookup. Pending workflows are
+ * streamed through a `.cursor()` async-iterable, matching the real backfill.
+ */
+const makeModels = (workflows: Workflow[], agents: Agent[]) => {
+  const updateOne = jest.fn(() => Promise.resolve({ acknowledged: true }));
+
+  const matchesAgent = (a: Agent, q: Record<string, unknown>): boolean => {
+    if (q.isEnabled !== undefined && a.isEnabled !== q.isEnabled) return false;
+    if (q._id !== undefined) {
+      if (typeof q._id === 'object') {
+        const inList = (q._id as { $in: string[] }).$in;
+        if (!inList.includes(a._id)) return false;
+      } else if (a._id !== q._id) {
+        return false;
+      }
+    }
+    if (q.$or) {
+      const ok = (q.$or as Array<Record<string, unknown>>).some((clause) =>
+        Object.entries(clause).every(
+          ([k, v]) => (a as Record<string, unknown>)[k] === v,
+        ),
+      );
+      if (!ok) return false;
+    }
+    return true;
+  };
+
+  const oldestFirst = (rows: Agent[]) =>
+    [...rows].sort(
+      (x, y) =>
+        (x.createdAt?.getTime() ?? 0) - (y.createdAt?.getTime() ?? 0) ||
+        x._id.localeCompare(y._id),
+    );
+
+  // A findOne result that is awaitable (first match) and .sort()-chainable
+  // (oldest-first), so rule (a)'s bare await and rules b/c's .sort() both work.
+  const findOneResult = (rows: Agent[]) => ({
+    sort: () => Promise.resolve(oldestFirst(rows)[0] ?? null),
+    then: (
+      resolve: (v: Agent | null) => unknown,
+      reject?: (e: unknown) => unknown,
+    ) => Promise.resolve(rows[0] ?? null).then(resolve, reject),
+  });
+
+  return {
+    updateOne,
+    models: {
+      MastraWorkflow: {
+        // The backfill streams the "missing agentId" set with a cursor.
+        find: jest.fn(() => ({
+          cursor: () => {
+            const pending = workflows.filter((w) => !w.agentId);
+            return (async function* () {
+              for (const w of pending) yield w;
+            })();
+          },
+        })),
+        updateOne,
+      },
+      MastraAgent: {
+        findOne: jest.fn((q: Record<string, unknown> = {}) =>
+          findOneResult(agents.filter((a) => matchesAgent(a, q))),
+        ),
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any,
+  };
+};
+
+describe('backfillTenantWorkflows', () => {
+  it('rule (a): assigns the single agent referenced in the definition bindings', async () => {
+    const { models, updateOne } = makeModels(
+      [
+        {
+          _id: 'wf-1',
+          createdByUserId: 'u1',
+          definition: { bindings: { judge: { kind: 'agent', id: 'A_id' } } },
+        },
+      ],
+      [
+        { _id: 'A_id', agentId: 'agent-A', isEnabled: true },
+        { _id: 'B_id', agentId: 'agent-B', isEnabled: true },
+      ],
+    );
+
+    await backfillTenantWorkflows(models);
+
+    expect(updateOne).toHaveBeenCalledWith(
+      { _id: 'wf-1' },
+      { $set: { agentId: 'agent-A' } },
+    );
+  });
+
+  it('rule (a) does NOT apply when bindings reference two distinct agents', async () => {
+    const { models, updateOne } = makeModels(
+      [
+        {
+          _id: 'wf-1',
+          createdByUserId: 'u1',
+          definition: {
+            bindings: {
+              a: { kind: 'agent', id: 'A_id' },
+              b: { kind: 'agent', id: 'B_id' },
+            },
+          },
+        },
+      ],
+      [
+        // Two referenced agents → ambiguous → fall through to the creator rule,
+        // which resolves to the creator's oldest enabled agent (agent-C).
+        { _id: 'A_id', agentId: 'agent-A', isEnabled: true },
+        { _id: 'B_id', agentId: 'agent-B', isEnabled: true },
+        {
+          _id: 'C_id',
+          agentId: 'agent-C',
+          isEnabled: true,
+          createdBy: 'u1',
+          createdAt: new Date('2020-01-01'),
+        },
+      ],
+    );
+
+    await backfillTenantWorkflows(models);
+
+    expect(updateOne).toHaveBeenCalledWith(
+      { _id: 'wf-1' },
+      { $set: { agentId: 'agent-C' } },
+    );
+  });
+
+  it('rule (a) does NOT collapse to the survivor when one of two referenced agents was deleted', async () => {
+    // Two DISTINCT ids are referenced but only one still resolves (the other
+    // agent was deleted). "Exactly one referenced" is measured on the referenced
+    // ids, not the resolved docs, so this is still ambiguous → rule (b), NOT an
+    // assignment of the lone survivor the definition never singled out.
+    const { models, updateOne } = makeModels(
+      [
+        {
+          _id: 'wf-1',
+          createdByUserId: 'u1',
+          definition: {
+            bindings: {
+              a: { kind: 'agent', id: 'A_id' },
+              b: { kind: 'agent', id: 'GONE_id' }, // agent since deleted
+            },
+          },
+        },
+      ],
+      [
+        // Only A_id survives; GONE_id has no agent doc.
+        { _id: 'A_id', agentId: 'agent-A', isEnabled: true },
+        // The creator's oldest enabled agent is what rule (b) should pick.
+        {
+          _id: 'C_id',
+          agentId: 'agent-C',
+          isEnabled: true,
+          createdBy: 'u1',
+          createdAt: new Date('2020-01-01'),
+        },
+      ],
+    );
+
+    await backfillTenantWorkflows(models);
+
+    // NOT agent-A (the survivor) — rule (b) resolves the creator's oldest.
+    expect(updateOne).toHaveBeenCalledWith(
+      { _id: 'wf-1' },
+      { $set: { agentId: 'agent-C' } },
+    );
+  });
+
+  it("rule (b): assigns the creator's oldest enabled agent (deterministic)", async () => {
+    const { models, updateOne } = makeModels(
+      [{ _id: 'wf-1', createdByUserId: 'u1', definition: { bindings: {} } }],
+      [
+        {
+          _id: 'newer',
+          agentId: 'agent-new',
+          isEnabled: true,
+          ownerUserId: 'u1',
+          createdAt: new Date('2022-01-01'),
+        },
+        {
+          _id: 'older',
+          agentId: 'agent-old',
+          isEnabled: true,
+          createdBy: 'u1',
+          createdAt: new Date('2020-01-01'),
+        },
+        // A disabled agent of the same creator must be ignored.
+        {
+          _id: 'disabled',
+          agentId: 'agent-off',
+          isEnabled: false,
+          createdBy: 'u1',
+          createdAt: new Date('2019-01-01'),
+        },
+      ],
+    );
+
+    await backfillTenantWorkflows(models);
+
+    expect(updateOne).toHaveBeenCalledWith(
+      { _id: 'wf-1' },
+      { $set: { agentId: 'agent-old' } },
+    );
+  });
+
+  it("rule (c): falls back to the tenant's oldest enabled agent", async () => {
+    const { models, updateOne } = makeModels(
+      // Creator has no agents of their own.
+      [{ _id: 'wf-1', createdByUserId: 'ghost', definition: { bindings: {} } }],
+      [
+        {
+          _id: 'a2',
+          agentId: 'agent-2',
+          isEnabled: true,
+          createdBy: 'someone',
+          createdAt: new Date('2021-06-01'),
+        },
+        {
+          _id: 'a1',
+          agentId: 'agent-1',
+          isEnabled: true,
+          createdBy: 'someone',
+          createdAt: new Date('2021-01-01'),
+        },
+      ],
+    );
+
+    await backfillTenantWorkflows(models);
+
+    expect(updateOne).toHaveBeenCalledWith(
+      { _id: 'wf-1' },
+      { $set: { agentId: 'agent-1' } },
+    );
+  });
+
+  it('rule (d): no assignable agent → leaves unassigned and disables an enabled workflow', async () => {
+    const { models, updateOne } = makeModels(
+      [
+        {
+          _id: 'wf-1',
+          isEnabled: true,
+          createdByUserId: 'u1',
+          definition: { bindings: {} },
+        },
+      ],
+      [], // no agents at all in the tenant
+    );
+
+    await backfillTenantWorkflows(models);
+
+    // Never assigns an agentId; only disables the live workflow.
+    expect(updateOne).toHaveBeenCalledWith(
+      { _id: 'wf-1' },
+      { $set: { isEnabled: false } },
+    );
+    expect(updateOne).not.toHaveBeenCalledWith(
+      { _id: 'wf-1' },
+      expect.objectContaining({ $set: expect.objectContaining({ agentId: expect.anything() }) }),
+    );
+  });
+
+  it('rule (d): a disabled unassignable workflow is left completely untouched', async () => {
+    const { models, updateOne } = makeModels(
+      [
+        {
+          _id: 'wf-1',
+          isEnabled: false,
+          createdByUserId: 'u1',
+          definition: { bindings: {} },
+        },
+      ],
+      [],
+    );
+
+    await backfillTenantWorkflows(models);
+    expect(updateOne).not.toHaveBeenCalled();
+  });
+
+  it('is idempotent: workflows that already have an agentId are skipped', async () => {
+    const { models, updateOne } = makeModels(
+      [
+        {
+          _id: 'wf-owned',
+          agentId: 'agent-existing',
+          createdByUserId: 'u1',
+          definition: { bindings: {} },
+        },
+      ],
+      [
+        {
+          _id: 'a1',
+          agentId: 'agent-1',
+          isEnabled: true,
+          createdBy: 'u1',
+          createdAt: new Date('2020-01-01'),
+        },
+      ],
+    );
+
+    await backfillTenantWorkflows(models);
+    // The find() double already excludes owned workflows, and nothing is written.
+    expect(updateOne).not.toHaveBeenCalled();
+  });
+});

@@ -170,12 +170,14 @@ const components: Components = {
   ),
   li: ({ children }) => <li className="leading-relaxed">{children}</li>,
   h1: ({ children }) => (
-    <h1 className="text-base font-bold mt-1">{children}</h1>
+    <h1 className="text-lg font-bold mt-2">{children}</h1>
   ),
   h2: ({ children }) => (
-    <h2 className="text-base font-semibold mt-1">{children}</h2>
+    <h2 className="text-base font-semibold mt-2">{children}</h2>
   ),
-  h3: ({ children }) => <h3 className="font-semibold mt-1">{children}</h3>,
+  h3: ({ children }) => (
+    <h3 className="text-sm font-semibold mt-1">{children}</h3>
+  ),
   a: ({ children, href }) => (
     <a
       href={href}

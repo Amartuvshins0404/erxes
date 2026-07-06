@@ -19,11 +19,9 @@ import {
 import {
   Button,
   Command,
-  RecordTable,
   RecordTableInlineCell,
   RelativeDateDisplay,
   toast,
-  useConfirm,
 } from 'erxes-ui';
 import {
   IconBadge,
@@ -36,6 +34,8 @@ import {
 } from '~/components/RecordTableShared';
 import { ResourceIndexLayout } from '~/components/ResourceIndexLayout';
 import { SortState, SortValue, useTableSort } from '~/components/useTableSort';
+import { buildActionColumns } from '~/components/buildActionColumns';
+import { useConfirmedRemove } from '~/components/useConfirmedRemove';
 import { stepCount, triggerLabel } from './shared';
 import { useWorkflows } from './hooks/useWorkflows';
 import { useWorkflowActions } from './hooks/useWorkflowMutations';
@@ -83,7 +83,7 @@ const WorkflowMoreCell = ({
   refetch: () => void;
 }) => {
   const navigate = useNavigate();
-  const { confirm } = useConfirm();
+  const { confirmRemove } = useConfirmedRemove();
   const { removeWorkflow, setEnabled, runStart } = useWorkflowActions(
     refetch,
     () => {
@@ -96,10 +96,12 @@ const WorkflowMoreCell = ({
     runStart({ variables: { _id: workflow._id, input: {} } });
 
   const handleDelete = () =>
-    confirm({
-      message: `Remove "${workflow.name}" and all its run history? This cannot be undone.`,
-      options: { okLabel: 'Delete', cancelLabel: 'Cancel' },
-    }).then(() => removeWorkflow({ variables: { _id: workflow._id } }));
+    confirmRemove(
+      {
+        message: `Remove "${workflow.name}" and all its run history? This cannot be undone.`,
+      },
+      () => removeWorkflow({ variables: { _id: workflow._id } }),
+    );
 
   return (
     <RowActionsMenu>
@@ -281,8 +283,23 @@ const buildBaseColumns = (
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-export const WorkflowsIndexPage = () => {
-  const { workflows, loading, refetch } = useWorkflows();
+/**
+ * Standalone workflows index, and — when `agentId` is passed — the per-agent
+ * Workflows tab. In agent context the list is scoped and "New workflow" carries
+ * the agentId so the create form can attach the now-required owning agent.
+ */
+export const WorkflowsIndexPage = ({
+  agentId,
+  embedded,
+}: {
+  agentId?: string;
+  embedded?: boolean;
+} = {}) => {
+  const { workflows, loading, refetch } = useWorkflows(agentId);
+
+  const newPath = agentId
+    ? `/erxes-agent/workflows/new?agentId=${encodeURIComponent(agentId)}`
+    : '/erxes-agent/workflows/new';
 
   const getSortValue = useCallback(
     (w: IWorkflow, id: string): SortValue => {
@@ -309,17 +326,13 @@ export const WorkflowsIndexPage = () => {
   const { sort, toggle, sorted } = useTableSort(workflows, getSortValue);
 
   const columns = useMemo<ColumnDef<IWorkflow>[]>(
-    () => [
-      {
-        id: 'more',
-        cell: ({ row }) => (
-          <WorkflowMoreCell workflow={row.original} refetch={refetch} />
+    () =>
+      buildActionColumns<IWorkflow>(
+        (workflow) => (
+          <WorkflowMoreCell workflow={workflow} refetch={refetch} />
         ),
-        size: 33,
-      },
-      RecordTable.checkboxColumn as ColumnDef<IWorkflow>,
-      ...buildBaseColumns(sort, toggle),
-    ],
+        buildBaseColumns(sort, toggle),
+      ),
     [refetch, sort, toggle],
   );
 
@@ -332,13 +345,14 @@ export const WorkflowsIndexPage = () => {
       columns={columns}
       data={sorted}
       loading={loading}
-      newButton={{ to: '/erxes-agent/workflows/new', label: 'New Workflow' }}
+      embedded={embedded}
+      newButton={{ to: newPath, label: 'New Workflow' }}
       empty={{
         title: 'No workflows yet',
         description: 'Ask an agent to build one in Chat, or create one by hand.',
         action: (
           <Button asChild>
-            <Link to="/erxes-agent/workflows/new">
+            <Link to={newPath}>
               <IconPlus /> Create Workflow
             </Link>
           </Button>

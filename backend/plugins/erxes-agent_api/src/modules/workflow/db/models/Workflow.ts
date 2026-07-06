@@ -10,7 +10,9 @@ import { validateDefinition } from '~/mastra/workflows/dsl';
 
 export interface IMastraWorkflowModel extends Model<IMastraWorkflowDocument> {
   getWorkflow(_id: string): Promise<IMastraWorkflowDocument>;
-  getWorkflows(): Promise<IMastraWorkflowDocument[]>;
+  getWorkflows(filter?: {
+    agentId?: string;
+  }): Promise<IMastraWorkflowDocument[]>;
   createWorkflow(doc: IMastraWorkflow): Promise<IMastraWorkflowDocument>;
   updateWorkflow(
     _id: string,
@@ -42,8 +44,11 @@ export const loadWorkflowClass = (_models: IModels) => {
       return workflow;
     }
 
-    public static async getWorkflows() {
-      return _models.MastraWorkflow.find().sort({ createdAt: -1 });
+    public static async getWorkflows(filter: { agentId?: string } = {}) {
+      // agentId scoping (step 25's per-agent UI): only narrow when a non-empty
+      // id is supplied, so an unfiltered call still returns every workflow.
+      const query = filter.agentId ? { agentId: filter.agentId } : {};
+      return _models.MastraWorkflow.find(query).sort({ createdAt: -1 });
     }
 
     public static async createWorkflow(doc: IMastraWorkflow) {

@@ -4,10 +4,10 @@ import { mongooseStringRandomId } from 'erxes-api-shared/utils';
 export const agentSchema = new Schema(
   {
     _id: mongooseStringRandomId,
-    name: { type: String, required: true, label: 'Name' },
+    name: { type: String, required: true, maxlength: 200, label: 'Name' },
     agentId: { type: String, required: true, unique: true, label: 'Agent ID' },
     description: { type: String, label: 'Description' },
-    instructions: { type: String, label: 'Instructions' },
+    instructions: { type: String, maxlength: 20000, label: 'Instructions' },
     provider: { type: String, required: true, label: 'Provider' },
     model: { type: String, required: true, label: 'Model' },
     // Tool reach. 'all' (default) lets the agent search & execute every erxes
@@ -40,7 +40,7 @@ export const agentSchema = new Schema(
     // (web searches, fetches, operations, raw I/O). Off (default) → the chat
     // shows only a one-line turn summary that expands to the short thoughts.
     debug: { type: Boolean, default: false },
-    maxSteps: { type: Number, default: 10 },
+    maxSteps: { type: Number, default: 10, min: 1, max: 50 },
     // Sampling temperature sent to the model. Unset → the provider/SDK default
     // (the legacy OpenAI-compatible loop defaults to 0). Some models pin it:
     // e.g. Kimi thinking models reject anything but 1.
@@ -50,6 +50,12 @@ export const agentSchema = new Schema(
     // Background-run principal (Phase 3): bounded user whose gateway permissions
     // background runs (bot/schedule) act under. Unset → defaults to createdBy.
     ownerUserId: { type: String, label: 'Owner User' },
+    // Agent-as-principal (step 21). serviceUserId: the agent's dedicated core
+    // service user (passwordless, role:'system'), provisioned lazily by
+    // ensureServiceUser. grantGroupId: the permission group synced onto that
+    // user (its server-side grant). Both unset until the lifecycle runs.
+    serviceUserId: { type: String, label: 'Service User' },
+    grantGroupId: { type: String, label: 'Grant Group' },
     visibility: {
       type: String,
       enum: ['private', 'team', 'department', 'unit', 'org'],

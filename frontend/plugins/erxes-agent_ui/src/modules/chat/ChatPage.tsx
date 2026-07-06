@@ -1,17 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useApolloClient } from '@apollo/client';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
+  IconAlertTriangle,
   IconArrowDown,
   IconFiles,
   IconFileUpload,
+  IconLayoutSidebar,
   IconMessageCircle,
   IconPlus,
+  IconReload,
   IconSparkles,
 } from '@tabler/icons-react';
-import { Breadcrumb, Button, Empty } from 'erxes-ui';
+import { AlertDialog, Breadcrumb, Button, cn, Empty } from 'erxes-ui';
 import { PageHeader } from 'ui-modules';
-import { ChatAttachment, ApprovedOp } from '~/modules/chat/types';
+import { ChatAttachment, ApprovedOp, ReasoningEffort } from '~/modules/chat/types';
 import { chatStore } from '~/modules/chat/store/chatStore';
 import {
   useChatAgents,
@@ -25,8 +28,21 @@ import { useRemoveMastraThread } from '~/modules/chat/hooks/useRemoveMastraThrea
 import { useAttachments } from '~/modules/chat/hooks/useAttachments';
 import { useThreadArtifacts } from '~/modules/chat/hooks/useThreadArtifacts';
 import { useSessionBootstrap } from '~/modules/chat/hooks/useSessionBootstrap';
+import { withThreadParam } from '~/modules/chat/lib/threadParam';
+import {
+  readChatMode,
+  readScheduleParam,
+  withChatMode,
+  withScheduleParam,
+  type ChatMode,
+} from '~/modules/chat/lib/chatMode';
+import { useSchedules } from '~/pages/schedules/hooks/useSchedules';
+import { useIsNarrow } from '~/modules/chat/hooks/useIsNarrow';
 import { AgentRail } from '~/modules/chat/components/AgentRail';
 import { SessionList } from '~/modules/chat/components/SessionList';
+import { SessionModeToggle } from '~/modules/chat/components/SessionModeToggle';
+import { ScheduleSessionList } from '~/modules/chat/components/ScheduleSessionList';
+import { ScheduleTranscriptView } from '~/modules/chat/components/ScheduleTranscriptView';
 import { MessageList } from '~/modules/chat/components/MessageList';
 import { Composer } from '~/modules/chat/components/Composer';
 import { ApprovalBar } from '~/modules/chat/components/ApprovalBar';
@@ -57,7 +73,38 @@ const SCROLL_BUTTON_THRESHOLD = 280;
 export const ChatPage = () => {
   const { agentId } = useParams<{ agentId: string }>();
   const navigate = useNavigate();
+  // The active conversation is addressable via ?thread=<id>. Selecting a session
+  // writes it (push, so browser Back walks between conversations); reload/deep-
+  // link restores it (useSessionBootstrap). An agent-only URL keeps the old
+  // behavior — bootstrap opens the most-recent thread or a fresh draft.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const setThreadParam = useCallback(
+    (threadId: string | undefined, replace = false) =>
+      setSearchParams((prev) => withThreadParam(prev, threadId), { replace }),
+    [setSearchParams],
+  );
+  // Sessions sidebar mode (Chat | Scheduled), addressable via ?mode= exactly as
+  // the active conversation is via ?thread= — reload/deep-link restores it.
+  const chatMode = readChatMode(searchParams);
+  const scheduleParam = readScheduleParam(searchParams);
+  const setChatMode = useCallback(
+    (mode: ChatMode) =>
+      setSearchParams((prev) => withChatMode(prev, mode), { replace: false }),
+    [setSearchParams],
+  );
+  const setScheduleParam = useCallback(
+    (scheduleId: string | undefined, replace = false) =>
+      setSearchParams((prev) => withScheduleParam(prev, scheduleId), { replace }),
+    [setSearchParams],
+  );
   const [railOpen, setRailOpen] = useState(!agentId);
+  // Below `md` the sessions side panel becomes an off-canvas drawer; closed by
+  // default so the message column keeps full width. Desktop ignores this.
+  const isNarrow = useIsNarrow();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  // Thread id awaiting delete confirmation — drives the styled AlertDialog that
+  // replaced the native window.confirm().
+  const [pendingDelete, setPendingDelete] = useState<string | null>(null);
   const apolloClient = useApolloClient();
 
   const { agents, loading: agentsLoading } = useChatAgents();
@@ -84,6 +131,8 @@ export const ChatPage = () => {
     messages,
     loading: chatLoading,
     messagesLoading,
+    error: chatError,
+    retry,
   } = view;
 
   // Hands-free voice loop (mic → STT → existing send flow → spoken reply).
@@ -108,6 +157,34 @@ export const ChatPage = () => {
   const sessionsLoaded = !!selectedAgent && !threadsLoading;
   const { renameThread } = useRenameMastraThread();
   const { removeThread } = useRemoveMastraThread(selectedAgent?.agentId);
+
+  // Scheduled mode: the selected agent's schedules become the "sessions". Fetched
+  // by the agent's business id (mastraSchedules(agentId)); selecting one loads its
+  // transcript into the shared message view.
+  const { schedules, loading: schedulesLoading } = useSchedules(
+    selectedAgent?.agentId,
+    // Only fetch (and only trip the schedulesView permission check) once the
+    // sidebar is actually in Scheduled mode — a pure chat user never hits it.
+    chatMode !== 'scheduled',
+  );
+  const selectedSchedule = useMemo(
+    () => schedules.find((s) => s._id === scheduleParam) ?? null,
+    [schedules, scheduleParam],
+  );
+  const handleSelectSchedule = useCallback(
+    (scheduleId: string) => {
+      setSidebarOpen(false);
+      setScheduleParam(scheduleId);
+    },
+    [setScheduleParam],
+  );
+  // Auto-open the first schedule when entering Scheduled mode with none selected,
+  // so the view isn't an empty pane. `replace` keeps it out of the Back history.
+  useEffect(() => {
+    if (chatMode !== 'scheduled') return;
+    if (scheduleParam || schedulesLoading || schedules.length === 0) return;
+    setScheduleParam(schedules[0]._id, true);
+  }, [chatMode, scheduleParam, schedulesLoading, schedules, setScheduleParam]);
 
   const [input, setInput] = useState('');
   const [showScrollDown, setShowScrollDown] = useState(false);
@@ -232,37 +309,82 @@ export const ChatPage = () => {
     el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
   }, [input]);
 
-  const handleNewThread = () => {
-    if (agentId && selectedAgent)
-      chatStore.newDraft(apolloClient, agentId, selectedAgent.agentId);
-  };
-
-  const handleSelectSession = (threadId: string) => {
-    if (!agentId || !selectedAgent || threadId === activeThreadId) return;
-    chatStore.selectSession(
-      apolloClient,
-      agentId,
-      selectedAgent.agentId,
-      threadId,
-    );
-  };
-
-  const handleDeleteSession = (
-    e: React.MouseEvent | React.KeyboardEvent,
-    threadId: string,
-  ) => {
-    e.stopPropagation();
+  // Sidebar handlers are wrapped in useCallback so their identities stay stable
+  // across streamed-token / keystroke re-renders — that's what lets the memoized
+  // SessionList / AgentRail skip re-rendering while a reply streams.
+  const handleNewThread = useCallback(() => {
     if (!agentId || !selectedAgent) return;
-    if (!window.confirm('Delete this session and all its messages?')) return;
+    chatStore.newDraft(apolloClient, agentId, selectedAgent.agentId);
+    // A draft isn't persisted yet, so it has nothing to address — drop ?thread=
+    // and let reload/back fall back to the agent's default (most-recent/draft).
+    setThreadParam(undefined);
+  }, [apolloClient, agentId, selectedAgent, setThreadParam]);
+
+  const handleSelectSession = useCallback(
+    (threadId: string) => {
+      // On narrow screens the sidebar is a drawer over the chat — close it.
+      setSidebarOpen(false);
+      if (!agentId || !selectedAgent || threadId === activeThreadId) return;
+      chatStore.selectSession(
+        apolloClient,
+        agentId,
+        selectedAgent.agentId,
+        threadId,
+      );
+      // Make the conversation addressable: push ?thread= so reload restores it
+      // and browser Back returns to the previously viewed conversation.
+      setThreadParam(threadId);
+    },
+    [apolloClient, agentId, selectedAgent, activeThreadId, setThreadParam],
+  );
+
+  // Open the confirmation dialog; the teardown itself runs in confirmDelete once
+  // the user confirms (replaces the native window.confirm()).
+  const handleDeleteSession = useCallback(
+    (e: React.MouseEvent | React.KeyboardEvent, threadId: string) => {
+      e.stopPropagation();
+      if (!agentId || !selectedAgent) return;
+      setPendingDelete(threadId);
+    },
+    [agentId, selectedAgent],
+  );
+
+  const confirmDelete = useCallback(() => {
+    if (!agentId || !pendingDelete) return;
     // The cached list filter (hook) + local state teardown (store); the
     // bootstrap effect re-selects the next session if this one was active.
-    removeThread(threadId);
-    chatStore.discardThread(agentId, threadId);
-  };
+    const wasActive = pendingDelete === activeThreadId;
+    removeThread(pendingDelete);
+    chatStore.discardThread(agentId, pendingDelete);
+    setPendingDelete(null);
+    // Drop the deleted thread from the URL so it doesn't point at a dead session
+    // and the bootstrap effect is free to re-home to the next one.
+    if (wasActive) setThreadParam(undefined, true);
+  }, [agentId, pendingDelete, activeThreadId, removeThread, setThreadParam]);
 
-  const handleRenameSession = (id: string, threadId: string, title: string) => {
-    renameThread(id, threadId, title);
-  };
+  const handleRenameSession = useCallback(
+    (id: string, threadId: string, title: string) => {
+      renameThread(id, threadId, title);
+    },
+    [renameThread],
+  );
+
+  const handleRailOpen = useCallback(() => setRailOpen(true), []);
+
+  const handleAgentSelect = useCallback(
+    (id: string) => {
+      navigate(`/erxes-agent/chat/${id}`);
+      setRailOpen(false);
+      setSidebarOpen(false);
+    },
+    [navigate],
+  );
+
+  // Retry a turn that errored mid-stream (drives the error banner's action).
+  const handleRetry = useCallback(() => {
+    if (chatLoading) return;
+    retry();
+  }, [retry, chatLoading]);
 
   const sendMessage = useCallback(
     (
@@ -371,8 +493,25 @@ export const ChatPage = () => {
   );
 
   const handleStop = () => {
-    if (agentId) chatStore.stop(agentId);
+    if (agentId) chatStore.stop(apolloClient, agentId);
   };
+
+  // Composer callback props, stabilized so the memoized Composer /
+  // ReasoningEffortControl don't re-render on every streamed token.
+  const handleReasoningEffortChange = useCallback(
+    (effort?: ReasoningEffort) => chatStore.setReasoningEffort(agentId!, effort),
+    [agentId],
+  );
+
+  const handleVoiceModeToggle = useCallback(
+    () => chatStore.setVoiceMode(agentId!, !voiceMode),
+    [agentId, voiceMode],
+  );
+
+  const handleVoiceSetup = useCallback(
+    () => navigate('/settings/erxes-agent/voice'),
+    [navigate],
+  );
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     // The /slash skill picker claims arrow/Enter/Tab/Esc while it's open.
@@ -411,12 +550,26 @@ export const ChatPage = () => {
   };
 
   const showAgentRail = !selectedAgent || railOpen;
+  // Below `md`, once an agent is picked the side panel slides in over the chat
+  // as a drawer instead of holding a fixed 240px column. Without a selected
+  // agent it stays in flow so the AgentRail is always reachable.
+  const asDrawer = isNarrow && !!selectedAgent;
 
   return (
     <div className="flex flex-col h-full">
       {!voiceActive && (
       <PageHeader>
         <PageHeader.Start>
+          {asDrawer && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setSidebarOpen((v) => !v)}
+              aria-label="Toggle sessions"
+            >
+              <IconLayoutSidebar className="size-4" />
+            </Button>
+          )}
           <Breadcrumb>
             <Breadcrumb.List className="gap-1">
               <Breadcrumb.Item>
@@ -438,7 +591,7 @@ export const ChatPage = () => {
             </Breadcrumb.List>
           </Breadcrumb>
         </PageHeader.Start>
-        {selectedAgent && !voiceActive && (
+        {selectedAgent && !voiceActive && chatMode === 'chat' && (
           <PageHeader.End>
             <Button
               variant="outline"
@@ -446,7 +599,7 @@ export const ChatPage = () => {
               onClick={() => previewStore.getState().openList()}
             >
               <IconFiles className="size-3.5" />
-              Files
+              <span className="hidden sm:inline">Files</span>
             </Button>
             {activeThreadId && !isDraft && (
               <Button
@@ -456,12 +609,14 @@ export const ChatPage = () => {
                 disabled={making || chatLoading}
               >
                 <IconSparkles className="size-3.5" />
-                {making ? 'Distilling…' : 'Make skill'}
+                <span className="hidden sm:inline">
+                  {making ? 'Distilling…' : 'Make skill'}
+                </span>
               </Button>
             )}
             <Button variant="outline" size="sm" onClick={handleNewThread}>
               <IconPlus className="size-3.5" />
-              New chat
+              <span className="hidden sm:inline">New chat</span>
             </Button>
           </PageHeader.End>
         )}
@@ -471,52 +626,86 @@ export const ChatPage = () => {
       <div ref={splitRef} className="flex flex-1 overflow-hidden relative">
         {/* ── Side panel: AgentRail ↔ SessionList slide (hidden in voice mode) ── */}
         {!voiceActive && (
-        <div
-          className={`ea-side-panel relative shrink-0 border-r overflow-hidden${
-            sideCollapsed ? ' is-collapsed' : ''
-          }`}
-        >
-          <div
-            className="absolute inset-0 transition-transform duration-200 ease-in-out"
-            style={{
-              transform: showAgentRail ? 'translateX(0)' : 'translateX(-100%)',
-            }}
-          >
-            <AgentRail
-              agents={agents}
-              loading={agentsLoading}
-              activeAgentId={agentId}
-              onSelect={(id) => {
-                navigate(`/erxes-agent/chat/${id}`);
-                setRailOpen(false);
-              }}
-            />
-          </div>
-          {selectedAgent && agentId && (
-            <div
-              className="absolute inset-0 transition-transform duration-200 ease-in-out"
-              style={{
-                transform: showAgentRail ? 'translateX(100%)' : 'translateX(0)',
-              }}
-            >
-              <SessionList
-                agentId={agentId}
-                sessions={threads}
-                sessionsLoaded={sessionsLoaded}
-                isDraft={isDraft}
-                activeThreadId={activeThreadId}
-                hasMore={hasMoreSessions}
-                loadingMore={loadingMoreSessions}
-                onLoadMore={loadMoreSessions}
-                onSelect={handleSelectSession}
-                onNew={handleNewThread}
-                onDelete={handleDeleteSession}
-                onRename={handleRenameSession}
-                onBack={() => setRailOpen(true)}
+          <>
+            {asDrawer && sidebarOpen && (
+              <div
+                className="absolute inset-0 z-30 bg-black/40"
+                onClick={() => setSidebarOpen(false)}
+                aria-hidden
               />
+            )}
+            <div
+              className={cn(
+                'shrink-0 border-r overflow-hidden w-60',
+                asDrawer
+                  ? 'absolute inset-y-0 left-0 z-40 shadow-xl transition-transform duration-200 ease-in-out'
+                  : 'relative',
+                asDrawer && !sidebarOpen && '-translate-x-full',
+              )}
+            >
+              <div
+                className="absolute inset-0 transition-transform duration-200 ease-in-out"
+                style={{
+                  transform: showAgentRail
+                    ? 'translateX(0)'
+                    : 'translateX(-100%)',
+                }}
+              >
+                <AgentRail
+                  agents={agents}
+                  loading={agentsLoading}
+                  activeAgentId={agentId}
+                  onSelect={handleAgentSelect}
+                />
+              </div>
+              {selectedAgent && agentId && (
+                <div
+                  className="absolute inset-0 transition-transform duration-200 ease-in-out"
+                  style={{
+                    transform: showAgentRail
+                      ? 'translateX(100%)'
+                      : 'translateX(0)',
+                  }}
+                >
+                  <div className="flex flex-col h-full">
+                    <div className="px-2 pt-2">
+                      <SessionModeToggle
+                        mode={chatMode}
+                        onChange={setChatMode}
+                      />
+                    </div>
+                    <div className="flex-1 min-h-0">
+                      {chatMode === 'chat' ? (
+                        <SessionList
+                          agentId={agentId}
+                          sessions={threads}
+                          sessionsLoaded={sessionsLoaded}
+                          isDraft={isDraft}
+                          activeThreadId={activeThreadId}
+                          hasMore={hasMoreSessions}
+                          loadingMore={loadingMoreSessions}
+                          onLoadMore={loadMoreSessions}
+                          onSelect={handleSelectSession}
+                          onNew={handleNewThread}
+                          onDelete={handleDeleteSession}
+                          onRename={handleRenameSession}
+                          onBack={handleRailOpen}
+                        />
+                      ) : (
+                        <ScheduleSessionList
+                          schedules={schedules}
+                          loading={schedulesLoading}
+                          activeScheduleId={scheduleParam}
+                          onSelect={handleSelectSchedule}
+                          onBack={handleRailOpen}
+                        />
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
-          )}
-        </div>
+          </>
         )}
 
         {/* ── Chat area ── */}
@@ -563,6 +752,12 @@ export const ChatPage = () => {
                 </Empty.Header>
               </Empty>
             </div>
+          ) : chatMode === 'scheduled' ? (
+            <ScheduleTranscriptView
+              agent={selectedAgent}
+              scheduleId={scheduleParam}
+              scheduleName={selectedSchedule?.name}
+            />
           ) : (
             <>
               <MessageList
@@ -591,11 +786,35 @@ export const ChatPage = () => {
                 <button
                   type="button"
                   onClick={scrollToBottom}
-                  className="ea-pop absolute bottom-28 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1.5 rounded-full border border-border bg-background/95 backdrop-blur px-3 py-1.5 text-xs shadow-md hover:border-primary/40 hover:text-primary transition-colors"
+                  className="ea-pop absolute bottom-28 right-4 z-10 flex items-center gap-1.5 rounded-full border border-border bg-background/95 backdrop-blur px-3 py-1.5 text-xs shadow-md hover:border-primary/40 hover:text-primary transition-colors"
                 >
                   <IconArrowDown className="size-3.5" />
                   Latest
                 </button>
+              )}
+
+              {chatError && !chatLoading && (
+                <div className="max-w-3xl mx-auto w-full px-3 pb-1.5">
+                  <div className="flex items-center gap-2 rounded-lg border border-destructive/40 bg-destructive/8 px-3 py-2 text-xs">
+                    <IconAlertTriangle className="size-4 shrink-0 text-destructive" />
+                    <span
+                      className="min-w-0 flex-1 truncate text-destructive"
+                      title={chatError.message}
+                    >
+                      {chatError.message ||
+                        'Something went wrong generating a response.'}
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      className="h-6 shrink-0"
+                      onClick={handleRetry}
+                    >
+                      <IconReload className="size-3.5" />
+                      Retry
+                    </Button>
+                  </div>
+                </div>
               )}
 
               {approval && !chatLoading && (
@@ -666,15 +885,11 @@ export const ChatPage = () => {
                 attachments={attachments}
                 agentName={selectedAgent.name}
                 reasoningEffort={reasoningEffort}
-                onReasoningEffortChange={(effort) =>
-                  chatStore.setReasoningEffort(agentId!, effort)
-                }
+                onReasoningEffortChange={handleReasoningEffortChange}
                 voiceEnabled={voiceEnabled}
                 voiceMode={!!voiceMode}
-                onVoiceModeToggle={() =>
-                  chatStore.setVoiceMode(agentId!, !voiceMode)
-                }
-                onVoiceSetup={() => navigate('/settings/erxes-agent/voice')}
+                onVoiceModeToggle={handleVoiceModeToggle}
+                onVoiceSetup={handleVoiceSetup}
                 textareaRef={textareaRef}
                 fileInputRef={fileInputRef}
               />
@@ -691,14 +906,14 @@ export const ChatPage = () => {
         </div>
 
         {/* ── Artifact Preview panel (charts / generated documents) ── */}
-        {previewOpen && selectedAgent && !previewFullscreen && (
+        {previewOpen && selectedAgent && chatMode === 'chat' && !previewFullscreen && (
           <PreviewResizer
             splitRef={splitRef}
             sideCollapsed={sideCollapsed}
             onSideCollapsedChange={setSideCollapsed}
           />
         )}
-        {previewOpen && selectedAgent && (
+        {previewOpen && selectedAgent && chatMode === 'chat' && (
           <PreviewPanel threadId={activeThreadId} />
         )}
       </div>
@@ -709,6 +924,30 @@ export const ChatPage = () => {
         onOpenChange={setDraftOpen}
         onDone={() => setDraftDismissed(true)}
       />
+
+      <AlertDialog
+        open={!!pendingDelete}
+        onOpenChange={(open) => !open && setPendingDelete(null)}
+      >
+        <AlertDialog.Content>
+          <AlertDialog.Header>
+            <AlertDialog.Title>Delete this session?</AlertDialog.Title>
+            <AlertDialog.Description>
+              This permanently deletes the session and all of its messages. This
+              can’t be undone.
+            </AlertDialog.Description>
+          </AlertDialog.Header>
+          <AlertDialog.Footer>
+            <AlertDialog.Cancel>Cancel</AlertDialog.Cancel>
+            <AlertDialog.Action
+              onClick={confirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialog.Action>
+          </AlertDialog.Footer>
+        </AlertDialog.Content>
+      </AlertDialog>
     </div>
   );
 };

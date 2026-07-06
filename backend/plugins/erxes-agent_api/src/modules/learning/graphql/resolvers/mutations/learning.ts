@@ -15,12 +15,7 @@ import {
 } from '~/mastra/learning/store';
 import { findOwnedAssistantMessage } from '@/session/nativeStore';
 import { pushUserScore } from '~/mastra/scoring/langfuseClient';
-
-/** Throws unless a logged-in user is on the context; returns their _id. */
-function requireUserId(user: { _id?: string } | null | undefined): string {
-  if (!user?._id) throw new ExpectedError('Login required');
-  return user._id;
-}
+import { requireUserId } from '@/_shared/auth';
 
 // Shape of the MastraLearningInput GraphQL input.
 export interface IMastraLearningInput {

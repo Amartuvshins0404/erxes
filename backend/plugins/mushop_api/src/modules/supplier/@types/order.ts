@@ -3,20 +3,17 @@ import { Document } from 'mongoose';
 export const ORDER_STATUS = {
   PENDING: 'pending',
   FORWARDED: 'forwarded',
+  CANCELLED: 'cancelled',
   FAILED: 'failed',
-  ALL: ['pending', 'forwarded', 'failed'],
+  ALL: ['pending', 'forwarded', 'cancelled', 'failed'],
 };
 
 export interface IOrder {
-  // Supplier subdomain the order was routed to.
   subdomain?: string;
   posToken?: string;
-  // The order payload forwarded to the supplier (after product-id remap).
   order?: any;
   status?: string;
-  // Order id returned by the supplier server on success.
   entityId?: string | null;
-  // The supplier tenant's own customer id for this order, returned on success.
   customerId?: string | null;
   error?: string | null;
 }

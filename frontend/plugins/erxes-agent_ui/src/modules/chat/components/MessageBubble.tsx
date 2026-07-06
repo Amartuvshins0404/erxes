@@ -1,12 +1,21 @@
 import { memo, type ReactNode } from 'react';
-import { IconBolt, IconPencil, IconRefresh, IconRepeat } from '@tabler/icons-react';
+import {
+  IconAlertTriangle,
+  IconBolt,
+  IconPencil,
+  IconRefresh,
+  IconRepeat,
+} from '@tabler/icons-react';
 import { Tooltip } from 'erxes-ui';
 import { AgentUIMessage, ChatAttachment } from '~/modules/chat/types';
 import { asToolPart, messageText } from '~/modules/chat/lib/uiParts';
-import { asArtifactPart, type Artifact } from '~/modules/chat/lib/artifacts';
+import { artifactOutcomes, type Artifact } from '~/modules/chat/lib/artifacts';
 import { AgentAvatar } from '~/modules/chat/components/Avatars';
 import { AgentTrace } from '~/modules/chat/components/AgentTrace';
-import { ArtifactCard } from '~/modules/chat/components/ArtifactCard';
+import {
+  ArtifactCard,
+  ArtifactFailureCard,
+} from '~/modules/chat/components/ArtifactCard';
 import {
   ChatMarkdown,
   StreamingMarkdown,
@@ -139,16 +148,20 @@ export const MessageBubble = memo(function MessageBubble({
   // Preview-panel opener), not buried in the collapsed thinking section. Live
   // turns read them off the tool parts; after a reload (tool parts gone) we fall
   // back to the persisted store artifacts for this message.
-  const liveArtifacts: Artifact[] = msg.parts.reduce<Artifact[]>((acc, part) => {
-    const tool = asToolPart(part);
-    const artifact = tool ? asArtifactPart(tool) : null;
-    if (artifact) acc.push(artifact);
-    return acc;
-  }, []);
+  const { artifacts: liveArtifacts, failures: failedArtifactTools } =
+    artifactOutcomes(msg.parts);
   const artifacts = liveArtifacts.length
     ? liveArtifacts
     : (storeArtifacts ?? []);
   const canRegenerate = isLast && !chatLoading;
+  // A settled assistant turn that produced neither prose nor any artifact —
+  // render an explicit interrupted/empty notice with a retry instead of a blank
+  // reading column (the "agent stopped mid-turn" symptom).
+  const showEmptyState =
+    !streaming &&
+    !text &&
+    artifacts.length === 0 &&
+    failedArtifactTools.length === 0;
   const activeSkills = msg.metadata?.activeSkills;
   const messageId = msg.metadata?.messageId;
   const handleRate =
@@ -199,6 +212,30 @@ export const MessageBubble = memo(function MessageBubble({
             <span className="ea-typing-dot" />
             <span className="ea-typing-dot" />
           </div>
+        ) : showEmptyState ? (
+          // A settled turn with no answer text and no artifact must never read as
+          // a blank bubble — surface the outcome (interrupted mid-tool, or the
+          // model stopped without prose) and offer a retry. Newly-generated turns
+          // carry a backend fallback line, so this mainly catches turns that
+          // dead-ended before that fix and any residual empty edge case.
+          <div className="flex items-center gap-2 py-1 text-xs text-muted-foreground">
+            <IconAlertTriangle className="size-3.5 shrink-0 text-amber-600 dark:text-amber-500" />
+            <span>
+              {msg.metadata?.interrupted
+                ? 'This response was interrupted before it finished.'
+                : 'No response was generated for this message.'}
+            </span>
+            {canRegenerate && (
+              <button
+                type="button"
+                onClick={onRegenerate}
+                className="inline-flex items-center gap-1 text-primary hover:underline"
+              >
+                <IconRefresh className="size-3" />
+                Retry
+              </button>
+            )}
+          </div>
         ) : null}
         {streaming && text && <span className="ea-caret" />}
         {artifacts.length > 0 && (
@@ -208,6 +245,20 @@ export const MessageBubble = memo(function MessageBubble({
                 key={artifact.id || `artifact-${i}`}
                 artifact={artifact}
                 live={streaming}
+              />
+            ))}
+          </div>
+        )}
+        {failedArtifactTools.length > 0 && (
+          <div className="mt-1">
+            {failedArtifactTools.map((tool, i) => (
+              <ArtifactFailureCard
+                key={tool.toolCallId || `failed-${i}`}
+                toolName={tool.toolName}
+                errorText={
+                  tool.errorText ||
+                  (tool.output as { message?: string } | undefined)?.message
+                }
               />
             ))}
           </div>

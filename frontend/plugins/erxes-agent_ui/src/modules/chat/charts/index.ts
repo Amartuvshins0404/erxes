@@ -9,5 +9,5 @@ export type { EChartsOption, SingleBarRenderHints } from './chartSpecToEChartsOp
 export { CHART_FONT, useChartColors, useAppChartColors, chartPalette, fmtChartValue } from './chartColors';
 export type { ChartThemeColors } from './chartColors';
 export { legacyPayloadToChartSpec, parseChartViz } from './legacyChartViz';
-export { CHART_TYPES, isChartSpec } from './types';
-export type { ChartType, ChartSeries, ChartDataPoint, ChartSpec, DrilldownSpec } from './types';
+export { CHART_TYPES, CHART_CONTROL_TYPES, isChartSpec } from './types';
+export type { ChartType, ChartSeries, ChartDataPoint, ChartSpec, DrilldownSpec, ChartControl, ChartControlType } from './types';

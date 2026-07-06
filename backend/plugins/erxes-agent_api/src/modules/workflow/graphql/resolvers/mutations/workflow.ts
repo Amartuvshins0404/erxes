@@ -1,18 +1,35 @@
-import { IUserDocument } from 'erxes-api-shared/core-types';
 import { ExpectedError } from 'erxes-api-shared/utils';
 import { IContext, IModels } from '~/connectionResolvers';
-import { validateDefinition } from '~/mastra/workflows/dsl';
+import { validateDefinition, WorkflowDefinition } from '~/mastra/workflows/dsl';
 import { buildManualEnvelope } from '~/mastra/workflows/envelope';
 import { runWorkflow } from '~/mastra/workflows/runtime';
 import { getOperationRegistry } from '~/mastra/tools/operationRegistry';
 import { runWithAuth } from '~/mastra/requestContext';
+import { assertWorkflowSchedulable } from '~/mastra/auth/backgroundPrincipal';
 import { IMastraWorkflow } from '@/workflow/@types/workflow';
+import { requireUserId } from '@/_shared/auth';
 
-/** Resolve the logged-in user's _id, rejecting unauthenticated calls. */
-const requireUserId = (user: IUserDocument | null | undefined): string => {
-  const userId = user?._id;
-  if (!userId) throw new ExpectedError('Login required');
-  return userId;
+// The owning agent is the workflow's identity anchor (its background principal
+// and enable preconditions resolve from this agent). New workflows MUST name an
+// existing one; validated here by the same business agentId schedules use.
+const assertOwningAgentExists = async (models: IModels, agentId: unknown) => {
+  if (typeof agentId !== 'string' || !agentId.trim()) {
+    throw new ExpectedError(
+      'A workflow must have an owning agent — set agentId to an existing agent.',
+    );
+  }
+  // Only an ENABLED agent may own a workflow: a disabled agent is the kill
+  // switch (schedules gate on isEnabled too), so it can't be handed new
+  // workflows to drive in the background.
+  const agent = await models.MastraAgent.findOne({
+    agentId: agentId.trim(),
+    isEnabled: true,
+  });
+  if (!agent) {
+    throw new ExpectedError(
+      `Owning agent "${agentId}" not found or disabled — enable it or reassign the workflow.`,
+    );
+  }
 };
 
 // Save-time validation runs with the LIVE operation registry, so a definition
@@ -38,7 +55,18 @@ export const workflowMutations = {
   ) => {
     await checkPermission('workflowsCreate');
     const userId = requireUserId(user);
+    // Every workflow is owned by an agent — required, and it must exist.
+    await assertOwningAgentExists(models, doc.agentId);
     await validateWithRegistry(models, doc.definition);
+    // The owning agent is the workflow's bound background principal — validate
+    // the schedule-enable preconditions (from THAT agent) when creating enabled.
+    if (doc.isEnabled) {
+      await assertWorkflowSchedulable({
+        models,
+        agentId: doc.agentId,
+        definition: doc.definition,
+      });
+    }
     return models.MastraWorkflow.createWorkflow({
       ...doc,
       createdByUserId: userId,
@@ -52,7 +80,25 @@ export const workflowMutations = {
   ) => {
     await checkPermission('workflowsEdit');
     requireUserId(user);
+    // An update may only change agentId to another EXISTING agent (never clear
+    // it) — the owning agent is the workflow's identity and can't be dropped.
+    if (doc.agentId !== undefined) {
+      await assertOwningAgentExists(models, doc.agentId);
+    }
     if (doc.definition) await validateWithRegistry(models, doc.definition);
+    // Re-check the schedule-enable preconditions whenever the resulting workflow
+    // is enabled — this update may enable it, repoint its trigger to a schedule,
+    // reassign the owning agent, or flip the owning agent's destructiveOps.
+    const existing = await models.MastraWorkflow.getWorkflow(_id);
+    const willBeEnabled =
+      doc.isEnabled !== undefined ? doc.isEnabled : existing.isEnabled;
+    if (willBeEnabled) {
+      await assertWorkflowSchedulable({
+        models,
+        agentId: doc.agentId ?? existing.agentId,
+        definition: (doc.definition ?? existing.definition) as WorkflowDefinition,
+      });
+    }
     return models.MastraWorkflow.updateWorkflow(_id, doc);
   },
 
@@ -73,6 +119,16 @@ export const workflowMutations = {
   ) => {
     await checkPermission('workflowsEdit');
     requireUserId(user);
+    // Enabling a schedule-triggered workflow makes the cron live — gate it on
+    // the secure background preconditions.
+    if (isEnabled) {
+      const workflow = await models.MastraWorkflow.getWorkflow(_id);
+      await assertWorkflowSchedulable({
+        models,
+        agentId: workflow.agentId,
+        definition: workflow.definition,
+      });
+    }
     return models.MastraWorkflow.setEnabled(_id, isEnabled);
   },
 

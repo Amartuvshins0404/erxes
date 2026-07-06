@@ -11,6 +11,8 @@ export const AGENT_FIELDS = gql`
     model
     toolPolicy
     allowedTools
+    grantGroupId
+    skills
     destructiveOps
     memoryEnabled
     debug
@@ -88,6 +90,7 @@ export const MASTRA_AGENTS_MAIN = gql`
         model
         toolPolicy
         allowedTools
+        skills
         isEnabled
         visibility
         teamId
@@ -96,6 +99,8 @@ export const MASTRA_AGENTS_MAIN = gql`
         createdBy
         isOwnAgent
         createdAt
+        workflowsCount
+        schedulesCount
       }
       totalCount
     }
@@ -143,6 +148,24 @@ export const MASTRA_THREAD_MESSAGES = gql`
 export const MASTRA_THREAD_ARTIFACTS = gql`
   query MastraThreadArtifacts($threadId: String!) {
     mastraThreadArtifacts(threadId: $threadId)
+  }
+`;
+
+// Read-only transcript of a schedule's background run thread. Same MastraMessage
+// shape as mastraThreadMessages, but authorized by AGENT ACCESS (not thread
+// ownership) and read under the schedule's own principal — so a human who can
+// see the agent can read its scheduled runs.
+export const MASTRA_SCHEDULE_TRANSCRIPT = gql`
+  query MastraScheduleTranscript($scheduleId: String!) {
+    mastraScheduleTranscript(scheduleId: $scheduleId) {
+      _id
+      role
+      content
+      parts
+      meta
+      attachments
+      createdAt
+    }
   }
 `;
 
@@ -399,8 +422,8 @@ export const MASTRA_MESSAGE_FEEDBACKS = gql`
 `;
 
 export const MASTRA_WORKFLOWS = gql`
-  query MastraWorkflows {
-    mastraWorkflows {
+  query MastraWorkflows($agentId: String) {
+    mastraWorkflows(agentId: $agentId) {
       ...WorkflowFields
     }
   }
@@ -418,8 +441,8 @@ export const MASTRA_WORKFLOW = gql`
 `;
 
 export const MASTRA_SCHEDULES = gql`
-  query MastraSchedules {
-    mastraSchedules {
+  query MastraSchedules($agentId: String) {
+    mastraSchedules(agentId: $agentId) {
       ...ScheduleFields
     }
   }

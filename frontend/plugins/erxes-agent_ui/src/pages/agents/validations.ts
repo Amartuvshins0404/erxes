@@ -1,10 +1,13 @@
 import { z } from 'zod';
 
 export const agentFormSchema = z.object({
-  name: z.string().min(1, 'Name is required'),
+  name: z.string().min(1, 'Name is required').max(200, 'Name is too long'),
   agentId: z.string().min(1, 'Agent ID is required'),
   description: z.string(),
-  instructions: z.string().min(1, 'System instructions are required'),
+  instructions: z
+    .string()
+    .min(1, 'System instructions are required')
+    .max(20000, 'System instructions are too long'),
   provider: z.string(),
   model: z.string().min(1, 'Model is required'),
   toolPolicy: z.enum(['all', 'custom']),

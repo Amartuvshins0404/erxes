@@ -20,7 +20,6 @@ import {
   Command,
   RecordTableInlineCell,
   RelativeDateDisplay,
-  useConfirm,
 } from 'erxes-ui';
 import {
   MASTRA_LEARNING_PIN,
@@ -35,6 +34,7 @@ import {
   SortableHead,
 } from '~/components/RecordTableShared';
 import { SortState } from '~/components/useTableSort';
+import { useConfirmedRemove } from '~/components/useConfirmedRemove';
 import { ILearningRow, confidencePct, statusVariant } from '../types';
 
 const LearningMoreCell = ({
@@ -44,7 +44,7 @@ const LearningMoreCell = ({
   learning: ILearningRow;
   refetch: () => void;
 }) => {
-  const { confirm } = useConfirm();
+  const { confirmRemove } = useConfirmedRemove();
 
   const [pin] = useMutation(MASTRA_LEARNING_PIN, {
     onCompleted: () => refetch(),
@@ -60,10 +60,10 @@ const LearningMoreCell = ({
   });
 
   const handleDelete = () =>
-    confirm({
-      message: 'Remove this learning permanently? This cannot be undone.',
-      options: { okLabel: 'Delete', cancelLabel: 'Cancel' },
-    }).then(() => remove({ variables: { _id: learning._id } }));
+    confirmRemove(
+      { message: 'Remove this learning permanently? This cannot be undone.' },
+      () => remove({ variables: { _id: learning._id } }),
+    );
 
   const statusItem = (
     next: string,

@@ -8,10 +8,12 @@ interface IData {
 }
 
 interface IPayload {
-  data: IData;
+  data?: IData;
   entityId?: string;
   entityIds?: string[];
   entities?: IData;
+  order?: IData;
+  status?: string;
 }
 
 interface SendMessagePayload {
@@ -31,7 +33,10 @@ interface ConsumerConfig {
 const getConsumers = (): ConsumerConfig[] => {
   const consumers: ConsumerConfig[] = [];
 
-  if (process.env.MUSHOP_API_URL && (process.env.MUSHOP_SECRET || process.env.MUSHOP_PUBLIC_API_KEY)) {
+  if (
+    process.env.MUSHOP_API_URL &&
+    (process.env.MUSHOP_SECRET || process.env.MUSHOP_PUBLIC_API_KEY)
+  ) {
     consumers.push({
       name: 'mushop',
       url: process.env.MUSHOP_API_URL,
@@ -39,11 +44,15 @@ const getConsumers = (): ConsumerConfig[] => {
     });
   }
 
-  if (process.env.BLOCKADMIN_API_URL && (process.env.BLOCKADMIN_SECRET || process.env.BLOCKADMIN_PUBLIC_API_KEY)) {
+  if (
+    process.env.BLOCKADMIN_API_URL &&
+    (process.env.BLOCKADMIN_SECRET || process.env.BLOCKADMIN_PUBLIC_API_KEY)
+  ) {
     consumers.push({
       name: 'blockadmin',
       url: process.env.BLOCKADMIN_API_URL,
-      secret: (process.env.BLOCKADMIN_SECRET || process.env.BLOCKADMIN_PUBLIC_API_KEY)!,
+      secret: (process.env.BLOCKADMIN_SECRET ||
+        process.env.BLOCKADMIN_PUBLIC_API_KEY)!,
     });
   }
 
@@ -76,24 +85,39 @@ const sendToConsumer = async (
     });
 
     if (!res.ok) {
-      console.error(`Failed to send message to ${consumer.name}: HTTP ${res.status}`);
+      console.error(
+        `Failed to send message to ${consumer.name}: HTTP ${res.status}`,
+      );
     }
   } catch (e) {
     console.error(`Failed to send message to ${consumer.name}: ${e}`);
   }
 };
 
-export const sendMessage = async ({ subdomain, path, payload, platform }: SendMessagePayload): Promise<void> => {
+export const sendMessage = async ({
+  subdomain,
+  path,
+  payload,
+  platform,
+}: SendMessagePayload): Promise<void> => {
   const consumers = getConsumers();
 
   if (!consumers.length) {
-    console.error('No consumers configured (MUSHOP_API_URL / BLOCKADMIN_API_URL)');
+    console.error(
+      'No consumers configured (MUSHOP_API_URL / BLOCKADMIN_API_URL)',
+    );
     return;
   }
 
-  const targets = platform ? consumers.filter((c) => c.name === platform) : consumers;
+  const targets = platform
+    ? consumers.filter((c) => c.name === platform)
+    : consumers;
 
-  await Promise.all(targets.map((consumer) => sendToConsumer(consumer, subdomain, path, payload)));
+  await Promise.all(
+    targets.map((consumer) =>
+      sendToConsumer(consumer, subdomain, path, payload),
+    ),
+  );
 };
 
 interface RequestMessagePayload {

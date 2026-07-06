@@ -319,6 +319,7 @@ const aggregateFullOrders = async (
         await models.Order.find({
           customerId,
           status: { $in: [ORDER_STATUS.FORWARDED, ORDER_STATUS.CANCELLED] },
+          'order.paidDate': null,
         })
           .sort({ createdAt: -1 })
           .lean()
@@ -456,7 +457,8 @@ export const supplierBeforeResolvers: BeforeResolversConfig = {
     }
 
     const cpUser = extractCPUserFromHeader((headers || {}) as any);
-    const customerId = args.customerId || cpUser?.erxesCustomerId || cpUser?._id;
+    const customerId =
+      args.customerId || cpUser?.erxesCustomerId || cpUser?._id;
 
     const models = await generateModels(subdomain);
 
@@ -486,7 +488,7 @@ export const supplierBeforeResolvers: BeforeResolversConfig = {
     switch (resolver) {
       case 'cpOrdersAdd': {
         const orderCustomerId = args.customerId || customerId;
-      
+
         const customerInfo = await buildCustomerInfo(
           subdomain,
           orderCustomerId,

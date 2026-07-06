@@ -3,10 +3,12 @@ import { Router, Request, Response } from 'express';
 import {
   isDev,
   sendTRPCMessage,
+  sendWorkerMessage,
   sendWorkerQueue,
 } from 'erxes-api-shared/utils';
 import { splitType } from 'erxes-api-shared/core-modules';
 import { isValid } from '@/collective/utils/isCollective';
+import { sendMessage } from '~/modules/admin/utils';
 import { generateModels } from '~/connectionResolvers';
 
 const COLLECTIVE_BUNDLE_TYPE = 'COLLECTIVE_BUNDLE_TYPE';
@@ -130,21 +132,15 @@ router.post('/collective', async (req: Request, res: Response) => {
       new Set([...(primaryPhone ? [primaryPhone] : []), ...phoneList]),
     );
 
-    await upsertCore(
-      subdomain,
-      'companies',
-      'createCompany',
-      companyId,
-      {
-        primaryName: supplierLabel,
-        names: [supplierLabel],
-        code: supplierKey,
-        ...(primaryEmail ? { primaryEmail } : {}),
-        ...(primaryPhone ? { primaryPhone } : {}),
-        ...(emails.length ? { emails } : {}),
-        ...(phones.length ? { phones } : {}),
-      },
-    );
+    await upsertCore(subdomain, 'companies', 'createCompany', companyId, {
+      primaryName: supplierLabel,
+      names: [supplierLabel],
+      code: supplierKey,
+      ...(primaryEmail ? { primaryEmail } : {}),
+      ...(primaryPhone ? { primaryPhone } : {}),
+      ...(emails.length ? { emails } : {}),
+      ...(phones.length ? { phones } : {}),
+    });
 
     const supplierCategoryId = deterministicObjectId(
       'collective-supplier-cat',
@@ -172,7 +168,12 @@ router.post('/collective', async (req: Request, res: Response) => {
     }
 
     const targetCatId = (sourceId: string) =>
-      deterministicObjectId('collective-cat', collectiveId, supplierId, sourceId);
+      deterministicObjectId(
+        'collective-cat',
+        collectiveId,
+        supplierId,
+        sourceId,
+      );
 
     const targetCategoryBySource = new Map<string, string>();
     const ensureCategory = async (
@@ -354,7 +355,7 @@ router.post('/collective-push', async (req: Request, res: Response) => {
     const models = await generateModels(subdomain);
     const supplier = await models.Supplier.findOne({}).lean();
 
-    const products = (await sendTRPCMessage({
+    const products = await sendTRPCMessage({
       subdomain,
       pluginName: 'posclient',
       method: 'query',
@@ -362,7 +363,7 @@ router.post('/collective-push', async (req: Request, res: Response) => {
       action: 'findByToken',
       input: { token: posToken },
       defaultValue: [],
-    }))
+    });
 
     if (!products.length) {
       return res.status(200).json({
@@ -389,7 +390,7 @@ router.post('/collective-push', async (req: Request, res: Response) => {
     let pending = Array.from(leafCategoryIds);
 
     while (pending.length) {
-      const fetched = (await sendTRPCMessage({
+      const fetched = await sendTRPCMessage({
         subdomain,
         pluginName: 'core',
         method: 'query',
@@ -400,7 +401,7 @@ router.post('/collective-push', async (req: Request, res: Response) => {
           fields: { _id: 1, name: 1, code: 1, parentId: 1 },
         },
         defaultValue: [],
-      }))
+      });
 
       const nextParents: string[] = [];
       for (const cat of fetched) {
@@ -481,12 +482,8 @@ router.post('/collective-push', async (req: Request, res: Response) => {
 router.post('/collective-purge', async (req: Request, res: Response) => {
   try {
     const { subdomain, payload } = req.body || {};
-    const {
-      collectiveId,
-      productIds,
-      supplierId,
-      targetPosToken,
-    } = payload || {};
+    const { collectiveId, productIds, supplierId, targetPosToken } =
+      payload || {};
 
     if (!subdomain) {
       return res.status(400).json({ error: 'subdomain is required' });
@@ -539,7 +536,11 @@ router.post('/collective-purge', async (req: Request, res: Response) => {
         });
         results.push({ _id: productId, ok: true });
       } catch (e: any) {
-        results.push({ _id: productId, ok: false, error: e?.message || String(e) });
+        results.push({
+          _id: productId,
+          ok: false,
+          error: e?.message || String(e),
+        });
       }
     }
 
@@ -627,7 +628,7 @@ router.post('/collective-purge-push', async (req: Request, res: Response) => {
       });
     }
 
-    const products = (await sendTRPCMessage({
+    const products = await sendTRPCMessage({
       subdomain,
       pluginName: 'posclient',
       method: 'query',
@@ -635,7 +636,7 @@ router.post('/collective-purge-push', async (req: Request, res: Response) => {
       action: 'findByToken',
       input: { token: posToken },
       defaultValue: [],
-    }))
+    });
 
     const productIds = products
       .map((p) => p?._id)
@@ -710,7 +711,7 @@ router.post('/create-pos', async (req: Request, res: Response) => {
       });
     }
 
-    const owner = (await sendTRPCMessage({
+    const owner = await sendTRPCMessage({
       subdomain,
       pluginName: 'core',
       method: 'query',
@@ -718,7 +719,7 @@ router.post('/create-pos', async (req: Request, res: Response) => {
       action: 'findOne',
       input: { query: { isOwner: true } },
       defaultValue: null,
-    }))
+    });
 
     if (!owner?._id) {
       return res.status(400).json({
@@ -726,7 +727,7 @@ router.post('/create-pos', async (req: Request, res: Response) => {
       });
     }
 
-    const pos = (await sendTRPCMessage({
+    const pos = await sendTRPCMessage({
       subdomain,
       pluginName: 'sales',
       method: 'mutation',
@@ -741,7 +742,7 @@ router.post('/create-pos', async (req: Request, res: Response) => {
           cashierIds: [owner._id],
         },
       },
-    }))
+    });
 
     if (!pos?.token) {
       return res
@@ -855,10 +856,15 @@ router.post('/order', async (req: Request, res: Response) => {
     }
 
     const orderInput = localCustomerId
-      ? { ...order, posToken, customerId: localCustomerId, customerType: 'customer' }
+      ? {
+          ...order,
+          posToken,
+          customerId: localCustomerId,
+          customerType: 'customer',
+        }
       : { ...order, posToken };
 
-    const created = (await sendTRPCMessage({
+    const created = await sendTRPCMessage({
       subdomain,
       pluginName: 'posclient',
       method: 'mutation',
@@ -866,7 +872,7 @@ router.post('/order', async (req: Request, res: Response) => {
       action: 'createOrder',
       input: { order: orderInput },
       defaultValue: null,
-    }))
+    });
 
     if (!created?._id) {
       return res
@@ -916,14 +922,14 @@ router.post('/invoice', async (req: Request, res: Response) => {
     }
 
     let customerId: string | undefined;
-    
+
     try {
       customerId = await upsertLocalCustomer(subdomain, customerInfo);
     } catch (e: any) {
       console.error('mushop/invoice: customer upsert failed:', e.message);
     }
 
-    const invoice = (await sendTRPCMessage({
+    const invoice = await sendTRPCMessage({
       subdomain,
       pluginName: 'payment',
       method: 'mutation',
@@ -937,13 +943,13 @@ router.post('/invoice', async (req: Request, res: Response) => {
         description: description || '',
         customerId: customerId,
         customerType: 'customer',
-        contentType: 'pos:orders',
+        contentType: 'sales:pos:orders',
         contentTypeId,
         paymentIds: [paymentId],
         data: { posToken },
       },
       defaultValue: null,
-    }))
+    });
 
     if (!invoice?._id) {
       return res
@@ -951,7 +957,7 @@ router.post('/invoice', async (req: Request, res: Response) => {
         .json({ error: 'payment plugin did not create the invoice' });
     }
 
-    const invoiceWithTransactions = (await sendTRPCMessage({
+    const invoiceWithTransactions = await sendTRPCMessage({
       subdomain,
       pluginName: 'payment',
       method: 'query',
@@ -959,7 +965,7 @@ router.post('/invoice', async (req: Request, res: Response) => {
       action: 'getInvoiceWithTransactions',
       input: { _id: invoice._id },
       defaultValue: null,
-    }))
+    });
 
     const transactions = invoiceWithTransactions?.transactions || [];
 
@@ -993,7 +999,7 @@ router.post('/transaction', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'payload.amount is required' });
     }
 
-    const transaction = (await sendTRPCMessage({
+    const transaction = await sendTRPCMessage({
       subdomain,
       pluginName: 'payment',
       method: 'mutation',
@@ -1001,7 +1007,7 @@ router.post('/transaction', async (req: Request, res: Response) => {
       action: 'addTransaction',
       input: { invoiceId, paymentId, amount, details },
       defaultValue: null,
-    }))
+    });
 
     if (!transaction?._id) {
       return res
@@ -1148,6 +1154,86 @@ router.post('/order-cancel', async (req: Request, res: Response) => {
   }
 });
 
+const syncPaidOrderToMushop = async (subdomain: string, invoiceId: string) => {
+  const invoiceWithTransactions = await sendTRPCMessage({
+    subdomain,
+    pluginName: 'payment',
+    method: 'query',
+    module: 'payment',
+    action: 'getInvoiceWithTransactions',
+    input: { _id: invoiceId },
+    defaultValue: null,
+  });
+
+  if (!invoiceWithTransactions?._id) {
+    return;
+  }
+
+  const { transactions, ...invoice } = invoiceWithTransactions;
+
+  const contentTypeId = invoice.contentTypeId;
+  const posToken = invoice.data?.posToken;
+
+  if (!contentTypeId || !posToken) {
+    return;
+  }
+
+  const fetchOrder = () =>
+    sendTRPCMessage({
+      subdomain,
+      pluginName: 'posclient',
+      method: 'query',
+      module: 'posclient',
+      action: 'orderDetail',
+      input: { posToken, _id: contentTypeId, customerId: invoice.customerId },
+      defaultValue: null,
+    });
+
+  let order = await fetchOrder();
+
+  if (order && !order.paidDate) {
+    const [pluginName, moduleName, collectionType] = splitType(
+      invoice.contentType || 'sales:pos:orders',
+    );
+
+    try {
+      await sendWorkerMessage({
+        subdomain,
+        pluginName: pluginName === 'pos' ? 'sales' : pluginName,
+        queueName: 'payments',
+        jobName: 'callback',
+        data: {
+          ...invoice,
+          status: 'paid',
+          moduleName,
+          collectionType,
+          apiResponse: 'success',
+        },
+        defaultValue: null,
+        timeout: 10000,
+      });
+    } catch (e: any) {
+      console.error(
+        'mushop/invoice-check: payment callback failed:',
+        e.message,
+      );
+    }
+
+    order = await fetchOrder();
+  }
+
+  if (!order) {
+    return;
+  }
+
+  await sendMessage({
+    subdomain,
+    path: 'order-sync',
+    payload: { entityId: contentTypeId, order },
+    platform: 'mushop',
+  });
+};
+
 router.post('/invoice-check', async (req: Request, res: Response) => {
   try {
     const { subdomain, payload } = req.body || {};
@@ -1160,7 +1246,7 @@ router.post('/invoice-check', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'payload.invoiceId is required' });
     }
 
-    const status = (await sendTRPCMessage({
+    const status = await sendTRPCMessage({
       subdomain,
       pluginName: 'payment',
       method: 'mutation',
@@ -1168,7 +1254,15 @@ router.post('/invoice-check', async (req: Request, res: Response) => {
       action: 'checkInvoice',
       input: { _id: invoiceId },
       defaultValue: null,
-    }))
+    });
+
+    if (status === 'paid') {
+      try {
+        await syncPaidOrderToMushop(subdomain, invoiceId);
+      } catch (e: any) {
+        console.error('mushop/invoice-check: order sync failed:', e.message);
+      }
+    }
 
     return res.status(200).json({ success: true, status });
   } catch (e: any) {

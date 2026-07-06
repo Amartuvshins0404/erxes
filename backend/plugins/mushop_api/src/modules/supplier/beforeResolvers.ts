@@ -6,6 +6,7 @@ import {
   sendTRPCMessage,
 } from 'erxes-api-shared/utils';
 import { IModels, generateModels } from '~/connectionResolvers';
+import { ORDER_STATUS } from '@/supplier/@types/order';
 import { getSupplierId } from '~/utils/getSupplierId';
 import { sendSupplierMessage } from '~/utils/sendSupplierMessage';
 
@@ -121,6 +122,7 @@ const proxyOrder = async (
     subdomain: supplier.subdomain,
     posToken: supplier.posToken,
     order,
+    customerId: customerInfo?.sourceUserId ?? null,
   });
 
   try {
@@ -136,7 +138,7 @@ const proxyOrder = async (
     await models.Order.markResult(log._id, {
       ok: true,
       orderId: res?.order?._id,
-      customerId: res?.customerId,
+      order: res?.order ?? null,
     });
 
     return { status: 'resolved', data: res?.order ?? null };
@@ -304,93 +306,53 @@ const proxyCurrentOrder = (
   customerInfo?: CustomerInfo,
 ) => proxyOrderAction(supplier, 'orders-list', { params: args, customerInfo });
 
-const orderTime = (order: any): number => {
-  const t = order?.createdAt ?? order?.modifiedAt;
-  const ms = t ? new Date(t).getTime() : 0;
-  return Number.isNaN(ms) ? 0 : ms;
-};
-
 const aggregateFullOrders = async (
   subdomain: string,
   models: IModels,
   args: Record<string, any>,
-  customerInfo?: CustomerInfo,
   mushopPosToken?: string,
 ): Promise<BeforeResolverResult> => {
-  const { page, perPage, ...params } = args;
+  const { customerId, ...params } = args;
 
-  const suppliers = await models.Supplier.find({
-    subdomain: { $exists: true, $ne: null },
-    posToken: { $exists: true, $ne: null },
-  }).lean<ForwardSupplier[]>();
+  const supplierOrders = customerId
+    ? (
+        await models.Order.find({
+          customerId,
+          status: { $in: [ORDER_STATUS.FORWARDED, ORDER_STATUS.CANCELLED] },
+        })
+          .sort({ createdAt: -1 })
+          .lean()
+      ).map((row) => row.order)
+    : [];
 
-  type Leg = () => Promise<any[]>;
-  const legs: Leg[] = [];
+  let ownOrders: any[] = [];
 
   if (mushopPosToken) {
-    legs.push(async () => {
-      const result = await callOwnPosclient(subdomain, mushopPosToken, params);
-      return Array.isArray(result) ? result : [];
+    const result = await sendTRPCMessage({
+      subdomain,
+      pluginName: 'posclient',
+      method: 'query',
+      module: 'posclient',
+      action: 'fullOrders',
+      input: { posToken: mushopPosToken, ...params },
+      defaultValue: [],
     });
-  }
 
-  for (const supplier of suppliers) {
-    if (!supplier.posToken) continue;
-    legs.push(async () => {
-      const res = await sendSupplierMessage<{ result?: unknown }>({
-        subdomain: supplier.subdomain,
-        action: 'orders-list',
-        payload: { posToken: supplier.posToken, params, customerInfo },
-      });
-      return Array.isArray(res?.result) ? (res?.result as any[]) : [];
-    });
+    ownOrders = Array.isArray(result) ? result : [];
   }
 
   console.log(
-    `[cpFullOrders] aggregate: subdomain=${subdomain} mushopPosToken=${
+    `[cpFullOrders] local aggregate: subdomain=${subdomain} mushopPosToken=${
       mushopPosToken ? 'yes' : 'no'
-    } suppliers=${suppliers.length} legs=${legs.length} customerId=${
-      params.customerId
-    }`,
+    } ownOrders=${ownOrders.length} supplierOrders=${
+      supplierOrders.length
+    } customerId=${customerId}`,
   );
 
-  const settled = await Promise.allSettled(legs.map((leg) => leg()));
+  const orders = [...ownOrders, ...supplierOrders].filter(Boolean);
 
-  const merged: any[] = [];
-  settled.forEach((outcome, i) => {
-    if (outcome.status === 'fulfilled') {
-      console.log(`[cpFullOrders] leg ${i}: ${outcome.value.length} orders`);
-      merged.push(...outcome.value);
-    } else {
-      console.error('[cpFullOrders] leg', i, 'failed:', outcome.reason);
-    }
-  });
-
-  console.log(`[cpFullOrders] merged total before paging: ${merged.length}`);
-
-  merged.sort((a, b) => orderTime(b) - orderTime(a));
-
-  const _perPage = Number(perPage) || 20;
-  const _page = Number(page) || 1;
-  const paged = merged.slice((_page - 1) * _perPage, _page * _perPage);
-
-  return { status: 'resolved', data: paged };
+  return { status: 'resolved', data: orders };
 };
-
-const callOwnPosclient = (
-  subdomain: string,
-  posToken: string,
-  params: Record<string, any>,
-) =>
-  sendTRPCMessage({
-    subdomain,
-    pluginName: 'posclient',
-    method: 'query',
-    module: 'posclient',
-    action: 'fullOrders',
-    input: { posToken, ...params },
-    defaultValue: [],
-  });
 
 const getMushopPosToken = (
   headers?: Record<string, unknown>,
@@ -436,13 +398,40 @@ const proxyOrdersEdit = async (
     doc = { ...args, items: forwardItems };
   }
 
-  return proxyOrderAction(supplier, 'order-edit', { doc });
+  const result = await proxyOrderAction(supplier, 'order-edit', { doc });
+
+  if (result?.status === 'resolved' && args._id) {
+    await models.Order.syncFromSupplier(
+      supplier.subdomain,
+      args._id,
+      result.data ?? doc,
+      ORDER_STATUS.FORWARDED,
+    );
+  }
+
+  return result;
 };
 
-const proxyOrdersCancel = (
+const proxyOrdersCancel = async (
+  models: IModels,
   supplier: ForwardSupplier,
   args: Record<string, any>,
-) => proxyOrderAction(supplier, 'order-cancel', { _id: args._id });
+): Promise<BeforeResolverResult> => {
+  const result = await proxyOrderAction(supplier, 'order-cancel', {
+    _id: args._id,
+  });
+
+  if (result?.status === 'resolved' && args._id) {
+    await models.Order.syncFromSupplier(
+      supplier.subdomain,
+      args._id,
+      result.data,
+      ORDER_STATUS.CANCELLED,
+    );
+  }
+
+  return result;
+};
 
 export const supplierBeforeResolvers: BeforeResolversConfig = {
   resolvers: {
@@ -473,17 +462,11 @@ export const supplierBeforeResolvers: BeforeResolversConfig = {
 
     if (resolver === 'cpFullOrders') {
       const mushopPosToken = getMushopPosToken(headers);
-      const customerInfo = await buildCustomerInfo(
-        subdomain,
-        customerId,
-        cpUser,
-      );
 
       return aggregateFullOrders(
         subdomain,
         models,
-        args,
-        customerInfo,
+        { ...args, customerId },
         mushopPosToken,
       );
     }
@@ -529,7 +512,7 @@ export const supplierBeforeResolvers: BeforeResolversConfig = {
       case 'cpOrdersEdit':
         return proxyOrdersEdit(models, supplier, args);
       case 'cpOrdersCancel':
-        return proxyOrdersCancel(supplier, args);
+        return proxyOrdersCancel(models, supplier, args);
       case 'cpCurrentOrder': {
         const customerInfo = await buildCustomerInfo(
           subdomain,

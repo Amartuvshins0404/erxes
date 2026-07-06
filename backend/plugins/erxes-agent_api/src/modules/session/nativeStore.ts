@@ -420,6 +420,11 @@ export async function getOwnedThreadMessages(
 /**
  * Read a thread's messages under an EXPLICIT resource — no ownership check.
  *
+ * SECURITY: this primitive performs NO ownership/authorization check of its own.
+ * Callers MUST authorize (e.g. agent-access) BEFORE calling, and MUST derive
+ * threadId/resourceId from trusted SERVER state — never from raw caller input.
+ * Wiring caller-influenced ids in here would let any caller read any thread.
+ *
  * Unlike getOwnedThreadMessages this does NOT scope the resource to the viewer:
  * the caller passes the exact resourceId the thread lives under and is fully
  * responsible for authorizing the read BEFORE calling. Used by the schedule

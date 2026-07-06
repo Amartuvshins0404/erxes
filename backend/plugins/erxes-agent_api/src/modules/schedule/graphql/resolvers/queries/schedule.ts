@@ -56,14 +56,19 @@ export const scheduleQueries = {
     await checkPermission('schedulesView');
     const userId = requireUserId(user);
 
-    const schedule = await models.MastraSchedule.getSchedule(scheduleId);
+    // Non-throwing lookup: a missing schedule must be INDISTINGUISHABLE from an
+    // unauthorized one (getSchedule would throw a different 'Schedule not found'
+    // message, leaking existence to anyone with schedulesView). Fold the null
+    // case into the single generic refusal below.
+    const schedule = await models.MastraSchedule.findOne({ _id: scheduleId });
 
     // Authorize by agent access (same helper the agents list resolver uses).
-    const agent = await models.MastraAgent.findOne({
-      agentId: schedule.agentId,
-    });
+    const agent =
+      schedule &&
+      (await models.MastraAgent.findOne({ agentId: schedule.agentId }));
     const unitIds = await getUserUnitIds(models, userId);
     const authorized =
+      schedule &&
       agent &&
       canUserAccessAgent(
         agent,
@@ -73,7 +78,8 @@ export const scheduleQueries = {
         user?.departmentIds ?? [],
         unitIds,
       );
-    // Generic error — never distinguish "no such schedule" from "not yours".
+    // Generic error — never distinguish "no such schedule" from "not yours":
+    // both the bad-id and no-access paths throw this identical message/shape.
     if (!authorized) throw new ExpectedError('Schedule transcript not found');
 
     // Read with the schedule's OWN background resource, not the viewer's.

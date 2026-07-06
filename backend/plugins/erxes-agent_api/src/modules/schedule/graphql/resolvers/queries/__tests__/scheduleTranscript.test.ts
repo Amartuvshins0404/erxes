@@ -27,14 +27,20 @@ type Agent = {
 };
 
 // Viewer u1; the schedule s1 belongs to agent a1. `agent` is what
-// MastraAgent.findOne resolves to (null = agent gone).
-const makeCtx = (agent: Agent | null, user: { _id?: string } = { _id: 'u1' }) => ({
+// MastraAgent.findOne resolves to (null = agent gone). `schedule` is what
+// MastraSchedule.findOne resolves to (null = no such schedule / bad id).
+const makeCtx = (
+  agent: Agent | null,
+  user: { _id?: string } = { _id: 'u1' },
+  schedule: { _id: string; agentId: string } | null = {
+    _id: 's1',
+    agentId: 'a1',
+  },
+) => ({
   models: {
     MastraAgent: { findOne: jest.fn().mockResolvedValue(agent) },
     MastraSchedule: {
-      getSchedule: jest
-        .fn()
-        .mockResolvedValue({ _id: 's1', agentId: 'a1' }),
+      findOne: jest.fn().mockResolvedValue(schedule),
     },
   },
   user,
@@ -81,6 +87,38 @@ describe('mastraScheduleTranscript authorization', () => {
     await expect(
       scheduleQueries.mastraScheduleTranscript(undefined, { scheduleId: 's1' }, ctx),
     ).rejects.toThrow(/not found/i);
+    expect(readMock).not.toHaveBeenCalled();
+  });
+
+  // Existence-oracle guard: a nonexistent schedule id must be INDISTINGUISHABLE
+  // from a valid-id-but-unauthorized read — same message, same shape — so a
+  // caller with schedulesView cannot probe which schedule ids exist.
+  it('refuses a nonexistent schedule with the SAME error as the unauthorized path', async () => {
+    // Unauthorized: schedule exists, private agent owned by someone else.
+    const unauthorizedCtx = makeCtx({
+      agentId: 'a1',
+      createdBy: 'someone-else',
+      visibility: 'private',
+    });
+    // Not found: schedule lookup returns null (bad id).
+    const notFoundCtx = makeCtx(
+      { agentId: 'a1', createdBy: 'u1', visibility: 'private' },
+      { _id: 'u1' },
+      null,
+    );
+
+    const unauthorizedErr = await scheduleQueries
+      .mastraScheduleTranscript(undefined, { scheduleId: 's1' }, unauthorizedCtx)
+      .catch((e) => e);
+    const notFoundErr = await scheduleQueries
+      .mastraScheduleTranscript(undefined, { scheduleId: 'nope' }, notFoundCtx)
+      .catch((e) => e);
+
+    // Same message AND same constructor — no way to tell the two apart.
+    expect(notFoundErr.message).toBe('Schedule transcript not found');
+    expect(notFoundErr.message).toBe(unauthorizedErr.message);
+    expect(notFoundErr.constructor).toBe(unauthorizedErr.constructor);
+    // Never reached the thread read on either path.
     expect(readMock).not.toHaveBeenCalled();
   });
 });

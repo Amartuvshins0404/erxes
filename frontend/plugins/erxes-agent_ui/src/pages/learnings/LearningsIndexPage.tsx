@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@apollo/client';
 import { IconBulb, IconRefresh } from '@tabler/icons-react';
@@ -64,6 +64,32 @@ export const LearningsIndexPage = ({
     onSort: toggle,
   });
 
+  const headerExtra = useMemo(
+    () => (
+      <>
+        <div className="flex items-center gap-1">
+          {STATUS_FILTERS.map((f) => (
+            <Button
+              key={f.value || 'all'}
+              variant={status === f.value ? 'secondary' : 'ghost'}
+              size="sm"
+              onClick={() => setStatus(f.value)}
+            >
+              {f.label}
+            </Button>
+          ))}
+        </div>
+        <Badge variant="secondary">
+          {totalCount} {totalCount === 1 ? 'learning' : 'learnings'}
+        </Badge>
+        <Button variant="secondary" onClick={() => refetch()} disabled={loading}>
+          <IconRefresh /> Refresh
+        </Button>
+      </>
+    ),
+    [status, totalCount, loading, refetch],
+  );
+
   return (
     <>
       <ResourceIndexLayout<ILearningRow>
@@ -77,32 +103,7 @@ export const LearningsIndexPage = ({
         embedded={embedded}
         skeletonRows={8}
         stickyColumns={['more', 'statement']}
-        headerExtra={
-          <>
-            <div className="flex items-center gap-1">
-              {STATUS_FILTERS.map((f) => (
-                <Button
-                  key={f.value || 'all'}
-                  variant={status === f.value ? 'secondary' : 'ghost'}
-                  size="sm"
-                  onClick={() => setStatus(f.value)}
-                >
-                  {f.label}
-                </Button>
-              ))}
-            </div>
-            <Badge variant="secondary">
-              {totalCount} {totalCount === 1 ? 'learning' : 'learnings'}
-            </Badge>
-            <Button
-              variant="secondary"
-              onClick={() => refetch()}
-              disabled={loading}
-            >
-              <IconRefresh /> Refresh
-            </Button>
-          </>
-        }
+        headerExtra={headerExtra}
         empty={{
           className: 'max-w-md',
           title: 'No learnings yet',

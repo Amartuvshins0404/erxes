@@ -157,6 +157,25 @@ const AgentResourcesCell = ({
   );
 };
 
+// Agent identity cell — name + id/description sub-line. The two nodes are
+// memoized so a memoized IdentityCell isn't handed fresh JSX every render.
+const AgentNameCell = ({ agent }: { agent: IAgent }) => {
+  const name = useMemo(
+    () => <span className="font-medium">{agent.name}</span>,
+    [agent.name],
+  );
+  const sub = useMemo(
+    () => (
+      <>
+        <span className="font-mono">{agent.agentId}</span>
+        {agent.description ? ` · ${agent.description}` : ''}
+      </>
+    ),
+    [agent.agentId, agent.description],
+  );
+  return <IdentityCell icon={IconRobot} tone="muted" name={name} sub={sub} />;
+};
+
 // ─── Bulk delete command bar ──────────────────────────────────────────────────
 
 const AgentBulkDeleteCommandBar = () => {
@@ -275,24 +294,9 @@ const buildBaseColumns = (
         onSort={onSort}
       />
     ),
-    cell: ({ row }) => {
-      const { agentId, name, description } = row.original;
-      return (
-        <IdentityCell
-          icon={IconRobot}
-          tone="muted"
-          // Plain text: opening the agent is handled by the whole-row click
-          // (see VISIBILITY_GROUP.onRowClick), not a per-name link.
-          name={<span className="font-medium">{name}</span>}
-          sub={
-            <>
-              <span className="font-mono">{agentId}</span>
-              {description ? ` · ${description}` : ''}
-            </>
-          }
-        />
-      );
-    },
+    // Plain text: opening the agent is handled by the whole-row click
+    // (see VISIBILITY_GROUP.onRowClick), not a per-name link.
+    cell: ({ row }) => <AgentNameCell agent={row.original} />,
     size: 260,
   },
   {
@@ -481,6 +485,16 @@ export const AgentsIndexPage = () => {
     [navigate, basePath],
   );
 
+  const commandBar = useMemo(() => <AgentBulkDeleteCommandBar />, []);
+  const headerExtra = useMemo(
+    () => (
+      <CreateAgentButton>
+        <IconPlus /> New Agent
+      </CreateAgentButton>
+    ),
+    [],
+  );
+
   return (
     <ResourceIndexLayout<IAgent>
       icon={IconRobot}
@@ -495,12 +509,8 @@ export const AgentsIndexPage = () => {
       pageInfo={pageInfo}
       onFetchMore={handleFetchMore}
       groupBy={groupBy}
-      commandBar={<AgentBulkDeleteCommandBar />}
-      headerExtra={
-        <CreateAgentButton>
-          <IconPlus /> New Agent
-        </CreateAgentButton>
-      }
+      commandBar={commandBar}
+      headerExtra={headerExtra}
       empty={{
         title: 'No agents yet',
         description: 'Create your first Mastra AI agent to get started.',

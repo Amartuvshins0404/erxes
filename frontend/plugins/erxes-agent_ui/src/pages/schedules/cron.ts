@@ -65,7 +65,7 @@ export function buildCron(parts: TimingParts): string {
   if (freq === 'hourly') return `${minute} * * * *`;
   if (freq === 'daily') return `${minute} ${hour} * * *`;
   if (freq === 'weekly') {
-    const days = [...weekdays].sort((a, b) => a - b).join(',');
+    const days = weekdays.slice().sort((a, b) => a - b).join(',');
     return `${minute} ${hour} * * ${days || '1'}`;
   }
   return `${minute} ${hour} ${dayOfMonth} * *`;

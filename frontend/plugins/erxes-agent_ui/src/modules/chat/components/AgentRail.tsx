@@ -32,25 +32,47 @@ const AgentRailItem = memo(({
 
   return (
     <div
-      role="button"
-      tabIndex={0}
       className={cn(
-        'group relative w-full cursor-pointer rounded-md px-2.5 py-2 text-left transition-colors hover:bg-accent',
+        'group relative rounded-md transition-colors hover:bg-accent',
         (isActive || isWorking) && 'bg-accent',
       )}
-      onClick={() => onSelect(agent._id)}
-      onKeyDown={(e) => {
-        // Only act on the row's own keys — ignore Enter/Space that bubbled up
-        // from the focused gear button (which has its own handler).
-        if (
-          (e.key === 'Enter' || e.key === ' ') &&
-          e.target === e.currentTarget
-        ) {
-          e.preventDefault();
-          onSelect(agent._id);
-        }
-      }}
     >
+      {/* The whole row is one real button — native Enter/Space activation, no
+          role/keydown shim. The gear is a sibling (not nested) so it stays a
+          valid, independently focusable control. */}
+      <button
+        type="button"
+        className="w-full cursor-pointer rounded-md px-2.5 py-2 text-left"
+        onClick={() => onSelect(agent._id)}
+      >
+        {/* No icon — the name carries the row. pr-7 keeps text clear of the
+            hover gear. An unread dot sits inline before the name. */}
+        <div className="min-w-0 pr-7">
+          <p className="flex items-center gap-1.5 text-sm font-medium leading-tight">
+            {hasUnread && (
+              <span className="size-1.5 shrink-0 rounded-full bg-destructive" />
+            )}
+            <span className="truncate">{agent.name}</span>
+            {isNameDuplicated && (
+              <span className="shrink-0 font-mono text-[10px] font-normal text-muted-foreground">
+                {agent.agentId}
+              </span>
+            )}
+          </p>
+          {/* While working, the model line gives way to the live step — one
+              shimmering line — so the row stays the same height. */}
+          {showActivity ? (
+            <p className="mt-0.5 truncate text-xs">
+              <span className="ea-shimmer-text">{showActivity}</span>
+            </p>
+          ) : (
+            <p className="mt-0.5 truncate font-mono text-xs text-muted-foreground">
+              {agent.model}
+            </p>
+          )}
+        </div>
+      </button>
+
       {/* Quick-edit affordance — appears on hover/focus, opens the in-chat
           settings modal without leaving the conversation. */}
       <Tooltip.Provider>
@@ -61,10 +83,7 @@ const AgentRailItem = memo(({
               variant="ghost"
               aria-label={`Edit ${agent.name} settings`}
               className="absolute right-1 top-1 z-10 size-6 text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100"
-              onClick={(e) => {
-                e.stopPropagation();
-                onEdit(agent);
-              }}
+              onClick={() => onEdit(agent)}
             >
               <IconSettings className="size-3.5" />
             </Button>
@@ -72,33 +91,6 @@ const AgentRailItem = memo(({
           <Tooltip.Content>Edit agent settings</Tooltip.Content>
         </Tooltip>
       </Tooltip.Provider>
-
-      {/* No icon — the name carries the row. pr-7 keeps text clear of the
-          hover gear. An unread dot sits inline before the name. */}
-      <div className="min-w-0 pr-7">
-        <p className="flex items-center gap-1.5 text-sm font-medium leading-tight">
-          {hasUnread && (
-            <span className="size-1.5 shrink-0 rounded-full bg-destructive" />
-          )}
-          <span className="truncate">{agent.name}</span>
-          {isNameDuplicated && (
-            <span className="shrink-0 font-mono text-[10px] font-normal text-muted-foreground">
-              {agent.agentId}
-            </span>
-          )}
-        </p>
-        {/* While working, the model line gives way to the live step — one
-            shimmering line — so the row stays the same height. */}
-        {showActivity ? (
-          <p className="mt-0.5 truncate text-xs">
-            <span className="ea-shimmer-text">{showActivity}</span>
-          </p>
-        ) : (
-          <p className="mt-0.5 truncate font-mono text-xs text-muted-foreground">
-            {agent.model}
-          </p>
-        )}
-      </div>
     </div>
   );
 });

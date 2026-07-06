@@ -1,17 +1,8 @@
-import { useState, type CSSProperties } from 'react';
+import { useState } from 'react';
 import { IconDownload, IconPhotoOff } from '@tabler/icons-react';
 import { Button } from 'erxes-ui';
 import { documentUrl, type ImageArtifact } from '~/modules/chat/lib/artifacts';
-
-// Checkerboard backdrop so a transparent PNG's cut-out edge is visible. Inline
-// style (not a Tailwind utility) — plugin-unique utilities are purged from the
-// production host CSS. Shared with the inline ImageCard.
-export const CHECKERBOARD_STYLE: CSSProperties = {
-  backgroundImage:
-    'linear-gradient(45deg, rgba(0,0,0,0.06) 25%, transparent 25%, transparent 75%, rgba(0,0,0,0.06) 75%), linear-gradient(45deg, rgba(0,0,0,0.06) 25%, transparent 25%, transparent 75%, rgba(0,0,0,0.06) 75%)',
-  backgroundSize: '16px 16px',
-  backgroundPosition: '0 0, 8px 8px',
-};
+import { CHECKERBOARD_STYLE } from '~/modules/chat/preview/checkerboard';
 
 // Renders an image artifact (a background-removed transparent PNG) in the
 // Preview panel. A plain <img> at the /read-file URL is fine here — same-origin

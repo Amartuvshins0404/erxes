@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useApolloClient } from '@apollo/client';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { IMastraThread } from '~/modules/chat/types';
 import { chatStore, useChatStore } from '~/modules/chat/store/chatStore';
 
@@ -13,9 +13,8 @@ export const useSessionBootstrap = (
   selectedAgent: { _id: string; agentId: string } | null,
   threads: IMastraThread[],
   sessionsLoaded: boolean,
-) => {
+): string | null => {
   const { agentId } = useParams<{ agentId: string }>();
-  const navigate = useNavigate();
   const apolloClient = useApolloClient();
   const [searchParams] = useSearchParams();
 
@@ -27,15 +26,13 @@ export const useSessionBootstrap = (
   const selectedId = selectedAgent?._id;
 
   // Slug routes normalize to the _id route so the chat store stays keyed by _id.
-  useEffect(() => {
-    if (selectedId && agentId && selectedId !== agentId) {
-      const search = searchParams.toString();
-      navigate(
-        `/erxes-agent/chat/${selectedId}${search ? `?${search}` : ''}`,
-        { replace: true },
-      );
-    }
-  }, [selectedId, agentId, searchParams, navigate]);
+  // Returned as a redirect target (rendered via <Navigate replace/> by the view)
+  // rather than fired from an effect, so the normalization isn't a faked handler.
+  const search = searchParams.toString();
+  const slugRedirect =
+    selectedId && agentId && selectedId !== agentId
+      ? `/erxes-agent/chat/${selectedId}${search ? `?${search}` : ''}`
+      : null;
 
   // ?thread=<id> is the addressable active conversation: this opens it once
   // sessions have loaded, and re-fires whenever the value changes — a deep-link,
@@ -80,4 +77,6 @@ export const useSessionBootstrap = (
     threads,
     apolloClient,
   ]);
+
+  return slugRedirect;
 };

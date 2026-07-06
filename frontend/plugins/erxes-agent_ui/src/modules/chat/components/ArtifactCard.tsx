@@ -24,7 +24,7 @@ import {
 import { formatFileSize } from '~/modules/chat/lib/attachments';
 import { previewStore } from '~/modules/chat/preview/previewStore';
 import { MermaidViewer } from '~/modules/chat/preview/MermaidViewer';
-import { CHECKERBOARD_STYLE } from '~/modules/chat/preview/ImageViewer';
+import { CHECKERBOARD_STYLE } from '~/modules/chat/preview/checkerboard';
 
 // Registers the artifact in the Files list (without auto-opening the panel) on
 // the first live render. Shared by all artifact card variants.

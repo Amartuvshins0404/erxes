@@ -110,19 +110,25 @@ export function useMermaidRender(
   isDark: boolean,
   debounceMs = 0,
 ) {
-  const [phase, setPhase] = useState<Phase>('loading');
-  const [svgHtml, setSvgHtml] = useState('');
-  const [errorMsg, setErrorMsg] = useState('');
+  const [state, setState] = useState<{
+    phase: Phase;
+    svgHtml: string;
+    errorMsg: string;
+  }>({ phase: 'loading', svgHtml: '', errorMsg: '' });
 
   const cleaned = useMemo(() => sanitizeMermaid(definition), [definition]);
+
+  const [prevCleaned, setPrevCleaned] = useState(cleaned);
+  const [prevDark, setPrevDark] = useState(isDark);
+  if (cleaned !== prevCleaned || isDark !== prevDark) {
+    setPrevCleaned(cleaned);
+    setPrevDark(isDark);
+    setState({ phase: 'loading', svgHtml: '', errorMsg: '' });
+  }
 
   useEffect(() => {
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout>;
-
-    setPhase('loading');
-    setSvgHtml('');
-    setErrorMsg('');
 
     timer = setTimeout(async () => {
       if (cancelled) return;
@@ -148,16 +154,14 @@ export function useMermaidRender(
         const { svg } = await Promise.race([renderPromise, timeoutPromise]);
         if (!svg?.trim()) throw new Error('Mermaid returned an empty diagram');
         if (cancelled) return;
-        setSvgHtml(svg);
-        setPhase('ready');
+        setState({ phase: 'ready', svgHtml: svg, errorMsg: '' });
       } catch (err) {
         if (cancelled) return;
         const msg =
           err instanceof Error
             ? err.message.replace(/^Error:\s*/i, '').split('\n')[0]
             : String(err);
-        setErrorMsg(msg);
-        setPhase('error');
+        setState({ phase: 'error', svgHtml: '', errorMsg: msg });
       } finally {
         document.getElementById(`d${renderId}`)?.remove();
         document.getElementById(renderId)?.remove();
@@ -170,5 +174,5 @@ export function useMermaidRender(
     };
   }, [cleaned, isDark, debounceMs]);
 
-  return { phase, svgHtml, errorMsg, cleaned };
+  return { ...state, cleaned };
 }

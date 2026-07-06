@@ -39,21 +39,8 @@ export const AgentMark = ({
   );
 };
 
-// Message avatar — the agent mark at message size; `live` sweeps the ring.
-export const AgentAvatar = ({ live }: { live?: boolean }) => (
-  <AgentMark size="md" working={live} />
-);
-
-// Shown only between sending and the first streamed event — once thinking /
-// tool / text events arrive, the live assistant column takes over. Borderless to
-// match that column (no bubble), so there's no shape-change on the handoff.
-export const WaitingIndicator = () => (
-  <div className="flex items-start gap-3 ea-msg-in">
-    <AgentAvatar live />
-    <div className="flex items-center gap-1.5 pt-2.5">
-      <span className="ea-typing-dot" />
-      <span className="ea-typing-dot" />
-      <span className="ea-typing-dot" />
-    </div>
-  </div>
-);
+// One component per file: the message avatar and the waiting indicator now live
+// in their own modules. Re-exported here so existing `Avatars` imports keep
+// working.
+export { AgentAvatar } from '~/modules/chat/components/AgentAvatar';
+export { WaitingIndicator } from '~/modules/chat/components/WaitingIndicator';

@@ -9,7 +9,11 @@ import {
 import { Tooltip } from 'erxes-ui';
 import { AgentUIMessage, ChatAttachment } from '~/modules/chat/types';
 import { asToolPart, messageText } from '~/modules/chat/lib/uiParts';
-import { artifactOutcomes, type Artifact } from '~/modules/chat/lib/artifacts';
+import {
+  artifactOutcomes,
+  mergeArtifacts,
+  type Artifact,
+} from '~/modules/chat/lib/artifacts';
 import { AgentAvatar } from '~/modules/chat/components/Avatars';
 import { AgentTrace } from '~/modules/chat/components/AgentTrace';
 import {
@@ -146,13 +150,23 @@ export const MessageBubble = memo(function MessageBubble({
   );
   // Charts and generated documents surface as prominent ArtifactCards (with a
   // Preview-panel opener), not buried in the collapsed thinking section. Live
-  // turns read them off the tool parts; after a reload (tool parts gone) we fall
-  // back to the persisted store artifacts for this message.
+  // turns read them off the tool parts, merged with the persisted store rows
+  // for this message — either source can have holes (a rehydrated tool part
+  // without its artifact blob; a store row whose message link failed), so each
+  // rescues the other.
   const { artifacts: liveArtifacts, failures: failedArtifactTools } =
-    artifactOutcomes(msg.parts);
-  const artifacts = liveArtifacts.length
-    ? liveArtifacts
-    : (storeArtifacts ?? []);
+    artifactOutcomes(msg.parts, !streaming);
+  const artifacts = mergeArtifacts(liveArtifacts, storeArtifacts);
+  // A tool that finished without an artifact on it (lost/truncated output, not
+  // an error) may be exactly what a merged store row just rescued — don't show
+  // a failure card next to the rescued chart. Genuine tool errors always show;
+  // artifact-less finishes show only when the store rows don't cover them.
+  const rescuedCount = artifacts.length - liveArtifacts.length;
+  const visibleFailures = failedArtifactTools
+    .filter((t) => t.isError)
+    .concat(
+      failedArtifactTools.filter((t) => !t.isError).slice(rescuedCount),
+    );
   const canRegenerate = isLast && !chatLoading;
   // A settled assistant turn that produced neither prose nor any artifact —
   // render an explicit interrupted/empty notice with a retry instead of a blank
@@ -244,14 +258,13 @@ export const MessageBubble = memo(function MessageBubble({
               <ArtifactCard
                 key={artifact.id || `artifact-${i}`}
                 artifact={artifact}
-                live={streaming}
               />
             ))}
           </div>
         )}
-        {failedArtifactTools.length > 0 && (
+        {visibleFailures.length > 0 && (
           <div className="mt-1">
-            {failedArtifactTools.map((tool, i) => (
+            {visibleFailures.map((tool, i) => (
               <ArtifactFailureCard
                 key={tool.toolCallId || `failed-${i}`}
                 toolName={tool.toolName}

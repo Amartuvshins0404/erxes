@@ -32,6 +32,7 @@ export interface TurnAuthCtx {
   subdomain?: string;
   threadId?: string;
   turnId?: string;
+  turnStartedAt?: Date;
   turnPrompt?: string;
   resourceId?: string;
   // True for unattended background runs (scheduled agent / frontline bot) whose

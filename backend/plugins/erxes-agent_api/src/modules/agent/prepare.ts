@@ -515,6 +515,7 @@ export async function prepareTurn(
     agentId,
     subdomain,
     turnId: randomUUID(),
+    turnStartedAt: new Date(),
     turnPrompt: (message || '').slice(0, 200),
     resourceId,
     approvedOps: approvedOperations,

@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef, useState } from 'react';
+import { memo, useState } from 'react';
 import {
   IconAlertTriangle,
   IconDownload,
@@ -26,29 +26,13 @@ import { previewStore } from '~/modules/chat/preview/previewStore';
 import { MermaidViewer } from '~/modules/chat/preview/MermaidViewer';
 import { CHECKERBOARD_STYLE } from '~/modules/chat/preview/checkerboard';
 
-// Registers the artifact in the Files list (without auto-opening the panel) on
-// the first live render. Shared by all artifact card variants.
-function usePresentIfLive(artifact: Artifact, live?: boolean) {
-  const presentIfNew = previewStore((s) => s.presentIfNew);
-  // A streaming turn hands us a fresh `artifact` object on every throttled tick,
-  // so depending on the object itself would re-fire this effect ~20×/s. Key it on
-  // the stable id instead — `presentIfNew` is a one-shot (guarded by `seen`), and
-  // a settled artifact's content never changes for a given id.
-  const artifactRef = useRef(artifact);
-  artifactRef.current = artifact;
-  useEffect(() => {
-    if (live) presentIfNew(artifactRef.current);
-  }, [live, artifact.id, presentIfNew]);
-}
-
 // ── Inline chart (borderless, flows in the message column) ────────────────────
 // No card chrome — a large left-aligned heading with quiet actions on its
 // right, then the interactive chart + totals + filter sliders directly in the
 // chat flow, width-constrained by the message column itself.
-const ChartPreview = ({ artifact, live }: { artifact: ChartArtifact; live?: boolean }) => {
+const ChartPreview = ({ artifact }: { artifact: ChartArtifact }) => {
   const openArtifact = previewStore((s) => s.openArtifact);
   const [expanded, setExpanded] = useState(false);
-  usePresentIfLive(artifact, live);
 
   return (
     <div className="ea-pop my-4">
@@ -91,9 +75,8 @@ const ChartPreview = ({ artifact, live }: { artifact: ChartArtifact; live?: bool
 };
 
 // ── Diagram card (inline Mermaid + open in preview) ───────────────────────────
-const DiagramPreview = ({ artifact, live }: { artifact: DiagramArtifact; live?: boolean }) => {
+const DiagramPreview = ({ artifact }: { artifact: DiagramArtifact }) => {
   const openArtifact = previewStore((s) => s.openArtifact);
-  usePresentIfLive(artifact, live);
 
   return (
     <div className="ea-pop my-2 overflow-hidden rounded-xl border border-border/70 bg-background">
@@ -114,9 +97,8 @@ const DiagramPreview = ({ artifact, live }: { artifact: DiagramArtifact; live?: 
 };
 
 // ── Document card (no inline rendering — PDF/DOCX/XLSX aren't embeddable) ─────
-const DocumentCard = ({ artifact, live }: { artifact: DocumentArtifact; live?: boolean }) => {
+const DocumentCard = ({ artifact }: { artifact: DocumentArtifact }) => {
   const openArtifact = previewStore((s) => s.openArtifact);
-  usePresentIfLive(artifact, live);
 
   const Icon = artifactIcon(artifact);
   const subtitle = [artifact.format.toUpperCase(), formatFileSize(artifact.size)]
@@ -148,9 +130,8 @@ const DocumentCard = ({ artifact, live }: { artifact: DocumentArtifact; live?: b
 };
 
 // ── Image card (inline transparent-PNG preview + open in preview) ─────────────
-const ImageCard = ({ artifact, live }: { artifact: ImageArtifact; live?: boolean }) => {
+const ImageCard = ({ artifact }: { artifact: ImageArtifact }) => {
   const openArtifact = previewStore((s) => s.openArtifact);
-  usePresentIfLive(artifact, live);
 
   return (
     <div className="ea-pop my-2 overflow-hidden rounded-xl border border-border/70 bg-background">
@@ -232,12 +213,11 @@ const artifactsEqual = (a: Artifact, b: Artifact): boolean =>
 // of propagating into EChart/Mermaid and remounting the visualization. EChart is
 // itself reference-churn-resilient; this just spares it the wasted renders.
 export const ArtifactCard = memo(
-  function ArtifactCard({ artifact, live }: { artifact: Artifact; live?: boolean }) {
-    if (artifact.kind === 'chart') return <ChartPreview artifact={artifact} live={live} />;
-    if (artifact.kind === 'diagram') return <DiagramPreview artifact={artifact} live={live} />;
-    if (artifact.kind === 'image') return <ImageCard artifact={artifact} live={live} />;
-    return <DocumentCard artifact={artifact} live={live} />;
+  function ArtifactCard({ artifact }: { artifact: Artifact }) {
+    if (artifact.kind === 'chart') return <ChartPreview artifact={artifact} />;
+    if (artifact.kind === 'diagram') return <DiagramPreview artifact={artifact} />;
+    if (artifact.kind === 'image') return <ImageCard artifact={artifact} />;
+    return <DocumentCard artifact={artifact} />;
   },
-  (prev, next) =>
-    prev.live === next.live && artifactsEqual(prev.artifact, next.artifact),
+  (prev, next) => artifactsEqual(prev.artifact, next.artifact),
 );

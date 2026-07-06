@@ -24,6 +24,10 @@ interface RequestAuth {
   /** Unique id for THIS turn — artifacts created in the turn share it, so they
    *  can be grouped per chat instance and linked to the assistant message. */
   turnId?: string;
+  /** When THIS turn started — guards the assistant-id recovery in persistTurn
+   *  against recalling a PREVIOUS turn's assistant row (a mislink that detaches
+   *  the turn's artifacts from their real message). */
+  turnStartedAt?: Date;
   /** The user's message that drove this turn — the Files-list group header. */
   turnPrompt?: string;
   /** Owner (scoped) resource id — stamped on artifacts for ownership scoping. */

@@ -417,6 +417,41 @@ export async function getOwnedThreadMessages(
   return (res?.messages ?? []).map(toErxesMessage);
 }
 
+/**
+ * Read a thread's messages under an EXPLICIT resource — no ownership check.
+ *
+ * SECURITY: this primitive performs NO ownership/authorization check of its own.
+ * Callers MUST authorize (e.g. agent-access) BEFORE calling, and MUST derive
+ * threadId/resourceId from trusted SERVER state — never from raw caller input.
+ * Wiring caller-influenced ids in here would let any caller read any thread.
+ *
+ * Unlike getOwnedThreadMessages this does NOT scope the resource to the viewer:
+ * the caller passes the exact resourceId the thread lives under and is fully
+ * responsible for authorizing the read BEFORE calling. Used by the schedule
+ * transcript query, which authorizes by AGENT ACCESS (canUserAccessAgent) and
+ * then reads the schedule's dedicated output thread under the schedule's OWN
+ * background resource (scopedResource(subdomain, `schedule:<id>`)) — the same
+ * resource its runs wrote under — never the viewer's. A missing thread (schedule
+ * that has not run yet) reads back as an empty transcript rather than throwing.
+ */
+export async function getThreadMessagesByResource(
+  subdomain: string,
+  threadId: string,
+  resourceId: string,
+): Promise<ErxesMessage[]> {
+  const memory = await getNativeMemory(subdomain);
+  const thread = await memory.getThreadById({ threadId, resourceId });
+  if (!thread) return [];
+  const res = await memory.recall({
+    threadId,
+    resourceId,
+    perPage: false,
+    page: 0,
+    orderBy: { field: 'createdAt', direction: 'ASC' },
+  });
+  return (res?.messages ?? []).map(toErxesMessage);
+}
+
 /** Rename a thread the caller owns. Records titleSource='manual' so native
  *  generateTitle (which only fires while the title is empty) never overrides it. */
 export async function renameOwnedThread(

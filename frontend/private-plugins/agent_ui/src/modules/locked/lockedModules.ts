@@ -21,7 +21,7 @@ export const LOCKED_MODULES: LockedModule[] = [
   {
     name: 'Postiz Agent',
     description:
-      'Plan, generate, and schedule posts automatically to 30+ social media networks.',
+      'Plan, generate and schedule posts automatically to 30+ social media networks.',
     path: 'postiz',
     icon: IconMessage,
   },

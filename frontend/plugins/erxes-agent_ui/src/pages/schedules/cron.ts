@@ -174,9 +174,9 @@ export function describeTiming(
   }
   if (freq === 'daily') return `Runs every day at ${time} · ${tz}`;
   if (freq === 'weekly') {
-    const names = WEEKDAYS.filter((d) => parts.weekdays.includes(d.value))
-      .map((d) => d.label)
-      .join(', ');
+    const names = WEEKDAYS.flatMap((d) =>
+      parts.weekdays.includes(d.value) ? [d.label] : [],
+    ).join(', ');
     return `Runs every ${names || 'Mon'} at ${time} · ${tz}`;
   }
   if (freq === 'monthly') {

@@ -3,6 +3,8 @@ import { Button, Form, Input, Label, Textarea } from 'erxes-ui';
 import { UseFormReturn } from 'react-hook-form';
 import { ProviderFormValues } from '../validations';
 
+const EMPTY_HEADER_KEYS: string[] = [];
+
 interface ProviderFormProps {
   form: UseFormReturn<ProviderFormValues>;
   title: string;
@@ -26,7 +28,7 @@ export const ProviderForm = ({
   isEdit,
   isCustom,
   existingKeyHint,
-  existingHeaderKeys = [],
+  existingHeaderKeys = EMPTY_HEADER_KEYS,
   saving,
   onSubmit,
   onCancel,
@@ -189,6 +191,7 @@ export const ProviderForm = ({
             <input
               type="checkbox"
               id="providerOpenAI"
+              aria-label="OpenAI-compatible API"
               checked={field.value}
               onChange={(e) => field.onChange(e.target.checked)}
             />
@@ -205,6 +208,7 @@ export const ProviderForm = ({
             <input
               type="checkbox"
               id="providerDefault"
+              aria-label="Set as default provider"
               checked={field.value}
               onChange={(e) => field.onChange(e.target.checked)}
             />
@@ -221,6 +225,7 @@ export const ProviderForm = ({
             <input
               type="checkbox"
               id="providerEnabled"
+              aria-label="Enabled"
               checked={field.value}
               onChange={(e) => field.onChange(e.target.checked)}
             />

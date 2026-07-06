@@ -155,6 +155,32 @@ const WorkflowMoreCell = ({
 
 // ─── Columns ──────────────────────────────────────────────────────────────────
 
+const WorkflowNameLink = ({ _id, name }: { _id: string; name: string }) => (
+  <Link
+    to={`/erxes-agent/workflows/${_id}`}
+    className="font-medium hover:underline cursor-pointer"
+  >
+    {name}
+  </Link>
+);
+
+const WorkflowNameCell = ({ workflow }: { workflow: IWorkflow }) => {
+  const { _id, name, description, definition } = workflow;
+  const meta = triggerMeta(definition);
+  const nameNode = useMemo(
+    () => <WorkflowNameLink _id={_id} name={name} />,
+    [_id, name],
+  );
+  return (
+    <IdentityCell
+      icon={meta.icon}
+      tone={meta.tone}
+      name={nameNode}
+      sub={description}
+    />
+  );
+};
+
 const buildBaseColumns = (
   sort: SortState,
   onSort: (id: string) => void,
@@ -171,25 +197,7 @@ const buildBaseColumns = (
         onSort={onSort}
       />
     ),
-    cell: ({ row }) => {
-      const { _id, name, description, definition } = row.original;
-      const meta = triggerMeta(definition);
-      return (
-        <IdentityCell
-          icon={meta.icon}
-          tone={meta.tone}
-          name={
-            <Link
-              to={`/erxes-agent/workflows/${_id}`}
-              className="font-medium hover:underline cursor-pointer"
-            >
-              {name}
-            </Link>
-          }
-          sub={description}
-        />
-      );
-    },
+    cell: ({ row }) => <WorkflowNameCell workflow={row.original} />,
     size: 280,
   },
   {

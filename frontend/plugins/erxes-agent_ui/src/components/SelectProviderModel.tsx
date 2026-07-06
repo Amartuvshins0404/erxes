@@ -64,15 +64,17 @@ export const useProviderOptions = () => {
 
   const catalogConfigured: ProviderOption[] = (
     catalogData?.mastraProviderCatalog || []
-  )
-    .filter((p) => p.isConfigured)
-    .map((p) => ({ provider: p.provider, label: p.label }));
+  ).flatMap((p) =>
+    p.isConfigured ? [{ provider: p.provider, label: p.label }] : [],
+  );
   const catalogKeys = new Set(catalogConfigured.map((p) => p.provider));
   const customDbProviders: ProviderOption[] = (
     providersData?.mastraProviders || []
-  )
-    .filter((p) => p.isEnabled && !catalogKeys.has(p.provider))
-    .map((p) => ({ provider: p.provider, label: p.label || p.provider }));
+  ).flatMap((p) =>
+    p.isEnabled && !catalogKeys.has(p.provider)
+      ? [{ provider: p.provider, label: p.label || p.provider }]
+      : [],
+  );
 
   return {
     providers: [...catalogConfigured, ...customDbProviders],

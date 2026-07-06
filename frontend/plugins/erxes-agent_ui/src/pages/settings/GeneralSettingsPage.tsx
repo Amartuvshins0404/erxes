@@ -92,13 +92,15 @@ export const GeneralSettingsPage = () => {
                       onChange={(e) => field.onChange(e.target.value)}
                     >
                       <option value="">None</option>
-                      {agents
-                        .filter((a) => a.isEnabled)
-                        .map((a) => (
-                          <option key={a._id} value={a.agentId}>
-                            {a.name} ({a.agentId})
-                          </option>
-                        ))}
+                      {agents.flatMap((a) =>
+                        a.isEnabled
+                          ? [
+                              <option key={a._id} value={a.agentId}>
+                                {a.name} ({a.agentId})
+                              </option>,
+                            ]
+                          : [],
+                      )}
                     </select>
                   </Form.Control>
                   <Form.Description>

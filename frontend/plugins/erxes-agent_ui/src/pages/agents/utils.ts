@@ -13,10 +13,13 @@ export const resolveAgentsBasePath = (pathname: string): string =>
 // tagged with their unique agentId.
 export const duplicatedAgentNames = (names: string[]): Set<string> => {
   const counts = new Map<string, number>();
-  names.forEach((n) => counts.set(n, (counts.get(n) ?? 0) + 1));
-  return new Set(
-    [...counts.entries()].filter(([, n]) => n > 1).map(([name]) => name),
-  );
+  const duplicates = new Set<string>();
+  for (const name of names) {
+    const next = (counts.get(name) ?? 0) + 1;
+    counts.set(name, next);
+    if (next === 2) duplicates.add(name);
+  }
+  return duplicates;
 };
 
 // Slugify a name into an agentId. Names with no ASCII alphanumerics (e.g.

@@ -208,6 +208,31 @@ const LastRunCell = ({ schedule }: { schedule: ISchedule }) => {
   );
 };
 
+const ScheduleNameLink = ({ _id, name }: { _id: string; name: string }) => (
+  <Link
+    to={`/erxes-agent/schedules/edit/${_id}`}
+    className="font-medium hover:underline cursor-pointer"
+  >
+    {name}
+  </Link>
+);
+
+const ScheduleNameCell = ({ schedule }: { schedule: ISchedule }) => {
+  const { _id, name, description } = schedule;
+  const nameNode = useMemo(
+    () => <ScheduleNameLink _id={_id} name={name} />,
+    [_id, name],
+  );
+  return (
+    <IdentityCell
+      icon={IconClock}
+      tone="info"
+      name={nameNode}
+      sub={description}
+    />
+  );
+};
+
 const buildBaseColumns = (
   sort: SortState,
   onSort: (id: string) => void,
@@ -225,24 +250,7 @@ const buildBaseColumns = (
         onSort={onSort}
       />
     ),
-    cell: ({ row }) => {
-      const { _id, name, description } = row.original;
-      return (
-        <IdentityCell
-          icon={IconClock}
-          tone="info"
-          name={
-            <Link
-              to={`/erxes-agent/schedules/edit/${_id}`}
-              className="font-medium hover:underline cursor-pointer"
-            >
-              {name}
-            </Link>
-          }
-          sub={description}
-        />
-      );
-    },
+    cell: ({ row }) => <ScheduleNameCell schedule={row.original} />,
     size: 260,
   },
   {

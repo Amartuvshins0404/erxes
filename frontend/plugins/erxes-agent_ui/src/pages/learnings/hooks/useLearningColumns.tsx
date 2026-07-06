@@ -29,13 +29,13 @@ import {
 import { toastError } from '~/lib/mutationToast';
 import {
   IconBadge,
-  IdentityCell,
   RowActionsMenu,
   SortableHead,
 } from '~/components/RecordTableShared';
 import { SortState } from '~/components/useTableSort';
 import { useConfirmedRemove } from '~/components/useConfirmedRemove';
 import { ILearningRow, confidencePct, statusVariant } from '../types';
+import { LearningStatementCell } from './LearningStatementCell';
 
 const LearningMoreCell = ({
   learning,
@@ -159,18 +159,9 @@ export const useLearningColumns = ({
           />
         ),
         cell: ({ row }) => (
-          <IdentityCell
-            icon={row.original.pinned ? IconPinFilled : IconBulb}
-            tone={row.original.pinned ? 'primary' : 'muted'}
-            name={
-              <button
-                type="button"
-                onClick={() => setSelected(row.original)}
-                className="text-left font-medium hover:underline line-clamp-1 cursor-pointer"
-              >
-                {row.original.statement || 'Untitled'}
-              </button>
-            }
+          <LearningStatementCell
+            learning={row.original}
+            setSelected={setSelected}
           />
         ),
         size: 420,

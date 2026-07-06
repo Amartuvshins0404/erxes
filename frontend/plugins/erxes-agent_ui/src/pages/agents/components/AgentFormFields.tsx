@@ -26,41 +26,21 @@ import { AgentVisibilitySectionFields } from './AgentVisibilitySectionFields';
 import { useAvailableErxesTools } from '../hooks/useAvailableErxesTools';
 import { AgentFormValues } from '../validations';
 
-// Canonical agent form body — every field group, shared by the Agents settings
-// page (AgentFormPage) and the in-chat quick editor (EditAgentDialog). The two
-// only differ in chrome (page header vs modal footer) and save behaviour
-// (navigate-away vs stay-put), plus whether agentId is editable: on the create
-// page it's a writable slug, in edit contexts it keys the bot endpoint and
-// every persisted thread, so it stays read-only.
-export const AgentFormFields = ({
+type AgentForm = UseFormReturn<AgentFormValues>;
+
+const BasicInfoSection = ({
   form,
-  agentIdEditable = false,
-  isAdmin = false,
+  agentIdEditable,
   onNameChange,
   onAgentIdChange,
 }: {
-  form: UseFormReturn<AgentFormValues>;
-  /** Create flow only — agentId is the bot-endpoint key, frozen once it exists. */
-  agentIdEditable?: boolean;
-  /** When true the Visibility section is shown (admin-only feature). */
-  isAdmin?: boolean;
-  /** Lets the create page drive its auto-slug behaviour off the name field. */
+  form: AgentForm;
+  agentIdEditable: boolean;
   onNameChange?: (value: string) => void;
-  /** Lets the create page stop auto-slugging once agentId is hand-edited. */
   onAgentIdChange?: (value: string) => void;
 }) => {
-  const toolPolicy  = form.watch('toolPolicy');
-  const provider    = form.watch('provider');
-  const temperature = form.watch('temperature');
-
-  const { providers: enabledProviders } = useProviderOptions();
-  const { operations, loading: availableLoading } = useAvailableErxesTools(
-    toolPolicy === 'custom',
-  );
-
   return (
-    <>
-      <FormSection title="Basic Info">
+    <FormSection title="Basic Info">
         <Form.Field
           control={form.control}
           name="name"
@@ -146,12 +126,19 @@ export const AgentFormFields = ({
           )}
         />
       </FormSection>
+  );
+};
 
-      <FormSection
-        title="AI Model"
-        description="Select the provider and model that powers this agent."
-      >
-        {enabledProviders.length === 0 ? (
+const AiModelSection = ({ form }: { form: AgentForm }) => {
+  const provider = form.watch('provider');
+  const { providers: enabledProviders } = useProviderOptions();
+
+  return (
+    <FormSection
+      title="AI Model"
+      description="Select the provider and model that powers this agent."
+    >
+      {enabledProviders.length === 0 ? (
           <Alert>
             <IconInfoCircle className="size-4" />
             <Alert.Title>No providers configured</Alert.Title>
@@ -206,11 +193,20 @@ export const AgentFormFields = ({
           </>
         )}
       </FormSection>
+  );
+};
 
-      <FormSection
-        title="Tool Access"
-        description="Control which erxes operations this agent can search and run."
-      >
+const ToolAccessSection = ({ form }: { form: AgentForm }) => {
+  const toolPolicy = form.watch('toolPolicy');
+  const { operations, loading: availableLoading } = useAvailableErxesTools(
+    toolPolicy === 'custom',
+  );
+
+  return (
+    <FormSection
+      title="Tool Access"
+      description="Control which erxes operations this agent can search and run."
+    >
         <Form.Field
           control={form.control}
           name="toolPolicy"
@@ -280,10 +276,14 @@ export const AgentFormFields = ({
           )}
         />
       </FormSection>
+  );
+};
 
-      {isAdmin && <AgentVisibilitySectionFields form={form} />}
+const BehaviorSection = ({ form }: { form: AgentForm }) => {
+  const temperature = form.watch('temperature');
 
-      <FormSection title="Behavior">
+  return (
+    <FormSection title="Behavior">
         <Form.Field
           control={form.control}
           name="memoryEnabled"
@@ -421,7 +421,45 @@ export const AgentFormFields = ({
             </div>
           )}
         />
-      </FormSection>
+    </FormSection>
+  );
+};
+
+// Canonical agent form body — every field group, shared by the Agents settings
+// page (AgentFormPage) and the in-chat quick editor (EditAgentDialog). The two
+// only differ in chrome (page header vs modal footer) and save behaviour
+// (navigate-away vs stay-put), plus whether agentId is editable: on the create
+// page it's a writable slug, in edit contexts it keys the bot endpoint and
+// every persisted thread, so it stays read-only.
+export const AgentFormFields = ({
+  form,
+  agentIdEditable = false,
+  isAdmin = false,
+  onNameChange,
+  onAgentIdChange,
+}: {
+  form: AgentForm;
+  /** Create flow only — agentId is the bot-endpoint key, frozen once it exists. */
+  agentIdEditable?: boolean;
+  /** When true the Visibility section is shown (admin-only feature). */
+  isAdmin?: boolean;
+  /** Lets the create page drive its auto-slug behaviour off the name field. */
+  onNameChange?: (value: string) => void;
+  /** Lets the create page stop auto-slugging once agentId is hand-edited. */
+  onAgentIdChange?: (value: string) => void;
+}) => {
+  return (
+    <>
+      <BasicInfoSection
+        form={form}
+        agentIdEditable={agentIdEditable}
+        onNameChange={onNameChange}
+        onAgentIdChange={onAgentIdChange}
+      />
+      <AiModelSection form={form} />
+      <ToolAccessSection form={form} />
+      {isAdmin && <AgentVisibilitySectionFields form={form} />}
+      <BehaviorSection form={form} />
     </>
   );
 };

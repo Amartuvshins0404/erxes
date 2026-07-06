@@ -62,7 +62,7 @@ export const GroupedRowList = <T,>({
   }
 
   const orderedKeys = [
-    ...groupBy.sections.map((s) => s.key).filter((k) => buckets.has(k)),
+    ...groupBy.sections.flatMap((s) => (buckets.has(s.key) ? [s.key] : [])),
     ...[...buckets.keys()].filter(
       (k) => !groupBy.sections.some((s) => s.key === k),
     ),

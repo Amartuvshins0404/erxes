@@ -1,7 +1,6 @@
-import { useMutation, useQuery } from '@apollo/client';
-import { useAtomValue } from 'jotai';
+import { useMutation } from '@apollo/client';
 import { useCallback, useMemo } from 'react';
-import { currentUserState } from 'ui-modules';
+import { useAuthedListQuery } from '~/hooks/useAuthedListQuery';
 import { useChatAgents } from '~/modules/chat/hooks/useChatAgents';
 import {
   GET_FAVORITES_BY_CURRENT_USER,
@@ -40,13 +39,11 @@ export interface IFavoriteAgent {
  * state.
  */
 export const useFavoriteAgents = () => {
-  const currentUserId = useAtomValue(currentUserState)?._id;
   const { agents } = useChatAgents();
 
-  const { data, loading, error } = useQuery<IFavoritesResponse>(
+  const { data, loading, error } = useAuthedListQuery<IFavoritesResponse>(
     GET_FAVORITES_BY_CURRENT_USER,
     {
-      skip: !currentUserId,
       fetchPolicy: 'cache-and-network',
     },
   );
@@ -100,7 +97,7 @@ export const useFavoriteAgents = () => {
     isFavorite,
     toggleFavorite,
     toggling,
-    loading: loading || !currentUserId,
+    loading,
     error,
   };
 };

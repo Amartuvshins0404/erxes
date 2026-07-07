@@ -1,8 +1,7 @@
 import { IZoning } from '@/building/types/buildingTypes';
 import { PricingForm } from '@/pricing/components/PricingForm';
 import { useProjectDetail } from '@/project/hooks/useProjectDetail';
-import { SelectTenureType } from '@/unit/components/SelectTenureType';
-import { SelectUsageType } from '@/unit/components/SelectUsageType';
+import { SelectUnitType } from '@/unit/components/SelectUnitType';
 import { addUnitSchema } from '@/unit/constants/addUnitSchema';
 import { useUnitCreate } from '@/unit/hooks/useUnitCreate';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -33,8 +32,7 @@ export const AddUnit = ({
     resolver: zodResolver(addUnitSchema),
     defaultValues: {
       number: (zone.floor < 0 ? `B${zone.floor * -1}` : zone.floor).toString(),
-      type: zone.usageType,
-      tenureType: zone.tenureType,
+      type: '',
       size: 0,
       useProjectPrice: true,
       mainPrice: project?.mainPrice,
@@ -87,20 +85,11 @@ export const AddUnit = ({
                 render={({ field }) => (
                   <Form.Item>
                     <Form.Label>Type</Form.Label>
-                    <SelectUsageType
+                    <SelectUnitType
                       value={field.value}
                       onValueChange={field.onChange}
                       inForm
                     />
-                  </Form.Item>
-                )}
-              />
-              <Form.Field
-                name="tenureType"
-                render={({ field }) => (
-                  <Form.Item>
-                    <Form.Label>Tenure type</Form.Label>
-                    <SelectTenureType value={field.value} inForm />
                   </Form.Item>
                 )}
               />

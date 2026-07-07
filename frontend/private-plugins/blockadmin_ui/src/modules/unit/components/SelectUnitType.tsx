@@ -5,9 +5,11 @@ import { useParams } from 'react-router-dom';
 
 export const SelectUnitType = ({
   value,
+  onValueChange,
   inForm = false,
 }: {
   value?: string;
+  onValueChange?: (value: string) => void;
   inForm?: boolean;
 }) => {
   const { id } = useParams();
@@ -15,7 +17,7 @@ export const SelectUnitType = ({
   const Control = inForm ? Form.Control : React.Fragment;
 
   return (
-    <Select value={value}>
+    <Select value={value} onValueChange={onValueChange}>
       <Control>
         <Select.Trigger className="h-8 bg-background">
           <Select.Value placeholder="Select unit type" />

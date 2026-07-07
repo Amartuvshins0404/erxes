@@ -1,6 +1,15 @@
 import { Schema } from 'mongoose';
 import { schemaWrapper } from '~/utils';
 
+const unitTypePriceSchema = new Schema(
+  {
+    currency: { type: String },
+    priceType: { type: String },
+    price: { type: Number },
+  },
+  { _id: false },
+);
+
 export const unitTypeSchema = schemaWrapper(
   new Schema(
     {
@@ -14,7 +23,7 @@ export const unitTypeSchema = schemaWrapper(
       tenureTypes: { type: [String] },
       content: { type: String },
       price: { type: Number },
-      prices: { type: Schema.Types.Mixed },
+      prices: { type: [unitTypePriceSchema] },
       status: { type: String },
       rooms: { type: Schema.Types.Mixed },
       roomsCount: { type: Number },

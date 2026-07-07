@@ -4,20 +4,26 @@ export const types = `
     building: String
     buildingData: BlockAdminBuilding
     zoning: String
+    zoningData: BlockAdminBuildingZoning
     number: String
     status: BlockAdminUnitStatus
     isFeatured: Boolean
     leads: [String]
 
+    projectData: BlockAdminProject
+
     type: String
+    unitType: BlockAdminUnitType
     agencySubdomain: String
     agencyEntityId: String
+    locked: Boolean
     createdAt: Date
     updatedAt: Date
   }
 
   input BlockAdminUnitInput {
     isFeatured: Boolean
+    type: String
   }
 `;
 

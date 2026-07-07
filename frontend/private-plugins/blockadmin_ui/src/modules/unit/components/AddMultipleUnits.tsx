@@ -11,8 +11,7 @@ import {
   toast,
 } from 'erxes-ui';
 import { IZoning } from '@/building/types/buildingTypes';
-import { SelectTenureType } from '@/unit/components/SelectTenureType';
-import { SelectUsageType } from '@/unit/components/SelectUsageType';
+import { SelectUnitType } from '@/unit/components/SelectUnitType';
 import { addUnitsMultipleSchema } from '@/unit/constants/addUnitSchema';
 import { useUnitCreate } from '@/unit/hooks/useUnitCreate';
 import { useState } from 'react';
@@ -53,8 +52,7 @@ export const AddUnitsMultipleForm = ({
   const form = useForm({
     resolver: zodResolver(addUnitsMultipleSchema),
     defaultValues: {
-      type: zone.usageType,
-      tenureType: zone.tenureType,
+      type: '',
       size: 0,
       count: 0,
     },
@@ -71,7 +69,6 @@ export const AddUnitsMultipleForm = ({
         variables: {
           input: {
             type: data.type,
-            tenureType: data.tenureType,
             size: data.size,
             number,
             zoning: zone._id,
@@ -110,20 +107,7 @@ export const AddUnitsMultipleForm = ({
             render={({ field }) => (
               <Form.Item>
                 <Form.Label>Type</Form.Label>
-                <SelectUsageType
-                  value={field.value}
-                  onValueChange={field.onChange}
-                  inForm
-                />
-              </Form.Item>
-            )}
-          />
-          <Form.Field
-            name="tenureType"
-            render={({ field }) => (
-              <Form.Item>
-                <Form.Label>Tenure type</Form.Label>
-                <SelectTenureType
+                <SelectUnitType
                   value={field.value}
                   onValueChange={field.onChange}
                   inForm

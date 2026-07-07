@@ -154,10 +154,6 @@ export const unitMutations = {
     if (!unit) {
       throw new Error('Unit not found');
     }
-    return models.Unit.findOneAndUpdate(
-      { _id },
-      { $set: { locked } },
-      { new: true },
-    );
+    return models.Unit.toggleUnitLock(_id, locked);
   },
 };

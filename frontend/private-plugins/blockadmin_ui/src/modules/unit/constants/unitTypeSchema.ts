@@ -5,7 +5,10 @@ export const unitTypeSchema = z.object({
   description: z.string().optional(),
   size: z.number().min(0),
   type: z.string().min(1, 'Type is required'),
-  tenureType: z.string().min(1, 'Tenure type is required'),
+  subTypes: z.array(z.string()).optional(),
+  featureTypes: z.array(z.string()).optional(),
+  areaType: z.string(),
+  tenureTypes: z.array(z.string()),
   content: z.string().optional(),
   price: z.number(),
   prices: z

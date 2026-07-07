@@ -1,6 +1,6 @@
-import { useQuery } from '@apollo/client';
 import { useCallback, useMemo } from 'react';
 import { MASTRA_SKILLS } from '../graphql/queries';
+import { useAuthedListQuery } from '~/hooks/useAuthedListQuery';
 import {
   IMastraSkillRow,
   IMastraSkillsResponse,
@@ -36,8 +36,8 @@ export const useSkillList = (filters: SkillListFilters = {}) => {
     [scope, status, searchValue],
   );
 
-  const { data, loading, fetchMore, refetch } =
-    useQuery<IMastraSkillsResponse>(MASTRA_SKILLS, {
+  const { data, loading, rawLoading, error, fetchMore, refetch } =
+    useAuthedListQuery<IMastraSkillsResponse>(MASTRA_SKILLS, {
       variables,
       notifyOnNetworkStatusChange: true,
       fetchPolicy: 'network-only',
@@ -61,7 +61,7 @@ export const useSkillList = (filters: SkillListFilters = {}) => {
   );
 
   const handleFetchMore = useCallback(() => {
-    if (loading || skillsList.length >= totalCount) return;
+    if (rawLoading || skillsList.length >= totalCount) return;
 
     fetchMore({
       variables: {
@@ -81,12 +81,13 @@ export const useSkillList = (filters: SkillListFilters = {}) => {
         };
       },
     });
-  }, [loading, skillsList.length, totalCount, fetchMore, variables]);
+  }, [rawLoading, skillsList.length, totalCount, fetchMore, variables]);
 
   return {
     skillsList,
     totalCount,
     loading,
+    error,
     pageInfo,
     handleFetchMore,
     refetch,

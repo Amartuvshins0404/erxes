@@ -140,6 +140,9 @@ interface SessionListProps {
   onDelete: DeleteHandler;
   onRename: RenameHandler;
   onBack?: () => void;
+  /** The session list fetch failed — show a retry instead of "No sessions yet." */
+  hasError?: boolean;
+  onRetry?: () => void;
 }
 
 export const SessionList = memo(({
@@ -156,6 +159,8 @@ export const SessionList = memo(({
   onDelete,
   onRename,
   onBack,
+  hasError,
+  onRetry,
 }: SessionListProps) => {
   // Infinite scroll: load the next page when a sentinel near the bottom of the
   // list scrolls into view. Observing within the scroll container (root) with a
@@ -229,7 +234,23 @@ export const SessionList = memo(({
                 </p>
               </div>
             )}
-            {sessions.length === 0 && !isDraft ? (
+            {sessions.length === 0 && !isDraft && hasError ? (
+              <div className="flex flex-col items-start gap-1.5 px-2.5 py-3">
+                <p className="text-xs text-muted-foreground">
+                  Couldn't load sessions.
+                </p>
+                {onRetry && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-6"
+                    onClick={onRetry}
+                  >
+                    Retry
+                  </Button>
+                )}
+              </div>
+            ) : sessions.length === 0 && !isDraft ? (
               <p className="text-xs text-muted-foreground px-2.5 py-3">
                 No sessions yet.
               </p>

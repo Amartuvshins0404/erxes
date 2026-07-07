@@ -303,7 +303,7 @@ export const WorkflowsIndexPage = ({
   agentId?: string;
   embedded?: boolean;
 } = {}) => {
-  const { workflows, loading, refetch } = useWorkflows(agentId);
+  const { workflows, loading, error, refetch } = useWorkflows(agentId);
 
   const newPath = agentId
     ? `/erxes-agent/workflows/new?agentId=${encodeURIComponent(agentId)}`
@@ -366,6 +366,18 @@ export const WorkflowsIndexPage = ({
           </Button>
         ),
       }}
+      error={
+        error
+          ? {
+              title: "Couldn't load workflows",
+              description:
+                'Something went wrong while fetching your workflows.',
+              onRetry: () => {
+                void refetch().catch(() => undefined);
+              },
+            }
+          : undefined
+      }
     />
   );
 };

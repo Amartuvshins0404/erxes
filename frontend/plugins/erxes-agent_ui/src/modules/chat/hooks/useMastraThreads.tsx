@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
-import { useQuery } from '@apollo/client';
 import { MASTRA_THREADS } from '~/graphql/queries';
 import { IMastraThreadsResponse } from '~/modules/chat/types';
+import { useAuthedListQuery } from '~/hooks/useAuthedListQuery';
 import {
   THREADS_PER_PAGE,
   threadsListVars,
@@ -14,15 +14,17 @@ import {
 // rename, remove, and the turn-end refetch all write into the same cached query
 // (keyed by `threadsListVars`), so this stays in sync without a copied array.
 export const useMastraThreads = (mastraAgentId?: string) => {
-  const { data, loading, fetchMore } = useQuery<IMastraThreadsResponse>(
-    MASTRA_THREADS,
-    {
+  // Composes two gates: the agent-slug skip (no agent selected → no list) and
+  // the auth-hydration gate from useAuthedListQuery (`loading` stays true until
+  // currentUser exists, so the sidebar shows the skeleton, not a "No sessions"
+  // flash, on first navigation — see PR #278).
+  const { data, loading, rawLoading, error, fetchMore, refetch } =
+    useAuthedListQuery<IMastraThreadsResponse>(MASTRA_THREADS, {
       variables: mastraAgentId ? threadsListVars(mastraAgentId) : undefined,
       skip: !mastraAgentId,
       fetchPolicy: 'cache-and-network',
       notifyOnNetworkStatusChange: true,
-    },
-  );
+    });
 
   const threads = data?.mastraThreads?.list ?? [];
   const totalCount = data?.mastraThreads?.totalCount ?? 0;
@@ -34,7 +36,7 @@ export const useMastraThreads = (mastraAgentId?: string) => {
   // stacking requests; `fetchMore` merges the page back into the first-page
   // cache entry, deduped by threadId so a re-fired page can't double up.
   const loadMore = useCallback(async () => {
-    if (!mastraAgentId || loading || loadingMore || !hasMore) return;
+    if (!mastraAgentId || rawLoading || loadingMore || !hasMore) return;
     setLoadingMore(true);
     try {
       await fetchMore({
@@ -62,13 +64,24 @@ export const useMastraThreads = (mastraAgentId?: string) => {
     } finally {
       setLoadingMore(false);
     }
-  }, [mastraAgentId, loading, loadingMore, hasMore, threads.length, fetchMore]);
+  }, [
+    mastraAgentId,
+    rawLoading,
+    loadingMore,
+    hasMore,
+    threads.length,
+    fetchMore,
+  ]);
 
   return {
     threads,
-    // Only "still loading" before the first read resolves — background refetches
-    // (turn end) keep `data`, so the sidebar skeleton never flickers back.
+    // Only "still loading" before the first read resolves (or while auth is
+    // still hydrating — `loading` already ORs in the currentUser gate), because
+    // background refetches (turn end) keep `data`, so the skeleton never
+    // flickers back.
     loading: loading && !data,
+    error,
+    refetch,
     hasMore,
     loadingMore,
     loadMore,

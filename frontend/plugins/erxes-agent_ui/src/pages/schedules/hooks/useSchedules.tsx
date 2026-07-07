@@ -7,7 +7,7 @@ import { ISchedule, ISchedulesQueryResponse } from '../types';
  * `agentId` scopes the list to a single agent (the per-agent Schedules tab).
  */
 export const useSchedules = (agentId?: string, skip?: boolean) => {
-  const { items, loading, refetch } = useResourceList<
+  const { items, loading, error, refetch } = useResourceList<
     ISchedulesQueryResponse,
     ISchedule
   >(
@@ -17,5 +17,5 @@ export const useSchedules = (agentId?: string, skip?: boolean) => {
     skip,
   );
 
-  return { schedules: items, loading, refetch };
+  return { schedules: items, loading, error, refetch };
 };

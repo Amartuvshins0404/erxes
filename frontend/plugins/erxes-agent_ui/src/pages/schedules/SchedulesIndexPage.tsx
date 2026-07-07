@@ -383,7 +383,7 @@ export const SchedulesIndexPage = ({
   embedded?: boolean;
 } = {}) => {
   const navigate = useNavigate();
-  const { schedules, loading, refetch } = useSchedules(agentId);
+  const { schedules, loading, error, refetch } = useSchedules(agentId);
 
   // "View output" / run-count now open the FULL run transcript in Chat →
   // Scheduled mode (one viewer), instead of the last-run-summary sheet. The chat
@@ -452,6 +452,18 @@ export const SchedulesIndexPage = ({
             </Button>
           ),
         }}
+        error={
+          error
+            ? {
+                title: "Couldn't load schedules",
+                description:
+                  'Something went wrong while fetching your schedules.',
+                onRetry: () => {
+                  void refetch().catch(() => undefined);
+                },
+              }
+            : undefined
+        }
     />
   );
 };

@@ -35,8 +35,12 @@ export const ChatSidePanel = ({
   onDeleteSession,
   onRenameSession,
   onRailOpen,
+  sessionsError,
+  onRetrySessions,
   schedules,
   schedulesLoading,
+  schedulesError,
+  onRetrySchedules,
   scheduleParam,
   onSelectSchedule,
 }: {
@@ -66,8 +70,12 @@ export const ChatSidePanel = ({
   ) => void;
   onRenameSession: (id: string, threadId: string, title: string) => void;
   onRailOpen: () => void;
+  sessionsError?: boolean;
+  onRetrySessions?: () => void;
   schedules: ISchedule[];
   schedulesLoading: boolean;
+  schedulesError?: boolean;
+  onRetrySchedules?: () => void;
   scheduleParam?: string;
   onSelectSchedule: (scheduleId: string) => void;
 }) => {
@@ -129,6 +137,8 @@ export const ChatSidePanel = ({
                     onDelete={onDeleteSession}
                     onRename={onRenameSession}
                     onBack={onRailOpen}
+                    hasError={sessionsError}
+                    onRetry={onRetrySessions}
                   />
                 ) : (
                   <ScheduleSessionList
@@ -137,6 +147,8 @@ export const ChatSidePanel = ({
                     activeScheduleId={scheduleParam}
                     onSelect={onSelectSchedule}
                     onBack={onRailOpen}
+                    hasError={schedulesError}
+                    onRetry={onRetrySchedules}
                   />
                 )}
               </div>

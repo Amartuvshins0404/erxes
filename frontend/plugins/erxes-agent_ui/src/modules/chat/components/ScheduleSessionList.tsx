@@ -56,12 +56,17 @@ export const ScheduleSessionList = memo(
     activeScheduleId,
     onSelect,
     onBack,
+    hasError,
+    onRetry,
   }: {
     schedules: ISchedule[];
     loading: boolean;
     activeScheduleId?: string;
     onSelect: (scheduleId: string) => void;
     onBack?: () => void;
+    /** The schedules fetch failed — show a retry instead of the empty state. */
+    hasError?: boolean;
+    onRetry?: () => void;
   }) => (
     <div className="flex flex-col h-full">
       <div className="px-2 py-2 border-b flex items-center gap-1">
@@ -86,6 +91,21 @@ export const ScheduleSessionList = memo(
             {Array.from({ length: 5 }).map((_, i) => (
               <Skeleton key={i} className="h-12 w-full rounded-md" />
             ))}
+          </div>
+        ) : schedules.length === 0 && hasError ? (
+          <div className="flex flex-col items-center gap-1.5 px-2.5 py-8 text-center text-muted-foreground">
+            <IconClock className="size-5" />
+            <p className="text-xs">Couldn't load schedules.</p>
+            {onRetry && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-6"
+                onClick={onRetry}
+              >
+                Retry
+              </Button>
+            )}
           </div>
         ) : schedules.length === 0 ? (
           <div className="flex flex-col items-center gap-1.5 px-2.5 py-8 text-center text-muted-foreground">

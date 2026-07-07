@@ -319,6 +319,7 @@ export const SkillsIndexPage = () => {
     skillsList,
     totalCount,
     loading,
+    error,
     pageInfo,
     handleFetchMore,
     refetch,
@@ -329,6 +330,32 @@ export const SkillsIndexPage = () => {
   });
 
   const columns = useMemo(() => buildColumns(refetch), [refetch]);
+
+  const emptyView = error
+    ? {
+        title: "Couldn't load skills",
+        description: 'Something went wrong while fetching your skills.',
+        action: (
+          <Button
+            variant="outline"
+            onClick={() => {
+              void refetch().catch(() => undefined);
+            }}
+          >
+            Retry
+          </Button>
+        ),
+      }
+    : {
+        title: 'No skills yet',
+        description:
+          'Skills are reusable SKILL.md playbooks agents apply on demand. Create one, or distill a chat into a draft with “Make skill”.',
+        action: (
+          <CreateSkillButton>
+            <IconPlus /> Create skill
+          </CreateSkillButton>
+        ),
+      };
 
   return (
     <div className="flex flex-col h-full">
@@ -403,17 +430,10 @@ export const SkillsIndexPage = () => {
               <Empty.Media variant="icon">
                 <IconBook2 />
               </Empty.Media>
-              <Empty.Title>No skills yet</Empty.Title>
-              <Empty.Description>
-                Skills are reusable SKILL.md playbooks agents apply on demand.
-                Create one, or distill a chat into a draft with “Make skill”.
-              </Empty.Description>
+              <Empty.Title>{emptyView.title}</Empty.Title>
+              <Empty.Description>{emptyView.description}</Empty.Description>
             </Empty.Header>
-            <Empty.Content>
-              <CreateSkillButton>
-                <IconPlus /> Create skill
-              </CreateSkillButton>
-            </Empty.Content>
+            <Empty.Content>{emptyView.action}</Empty.Content>
           </Empty>
         </div>
       ) : (

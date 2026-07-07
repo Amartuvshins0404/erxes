@@ -7,7 +7,7 @@ import { IWorkflow, IWorkflowsQueryResponse } from '../types';
  * `agentId` scopes the list to a single agent (the per-agent Workflows tab).
  */
 export const useWorkflows = (agentId?: string) => {
-  const { items, loading, refetch } = useResourceList<
+  const { items, loading, error, refetch } = useResourceList<
     IWorkflowsQueryResponse,
     IWorkflow
   >(
@@ -16,5 +16,5 @@ export const useWorkflows = (agentId?: string) => {
     agentId ? { agentId } : undefined,
   );
 
-  return { workflows: items, loading, refetch };
+  return { workflows: items, loading, error, refetch };
 };

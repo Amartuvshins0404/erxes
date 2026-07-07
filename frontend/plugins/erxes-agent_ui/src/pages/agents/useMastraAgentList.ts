@@ -1,8 +1,6 @@
-import { useQuery } from '@apollo/client';
 import { useCallback, useMemo } from 'react';
-import { useAtomValue } from 'jotai';
-import { currentUserState } from 'ui-modules';
 import { MASTRA_AGENTS_MAIN } from '~/graphql/queries';
+import { useAuthedListQuery } from '~/hooks/useAuthedListQuery';
 
 export const AGENTS_PER_PAGE = 30;
 
@@ -45,20 +43,17 @@ interface IMastraAgentsMainResponse {
  * refresh.
  */
 export const useMastraAgentList = (searchValue?: string) => {
-  const currentUserId = useAtomValue(currentUserState)?._id;
-
   const variables = {
     page: 1,
     perPage: AGENTS_PER_PAGE,
     searchValue: searchValue || undefined,
   };
 
-  const { data, loading, error, fetchMore, refetch } =
-    useQuery<IMastraAgentsMainResponse>(MASTRA_AGENTS_MAIN, {
+  const { data, loading, rawLoading, error, fetchMore, refetch } =
+    useAuthedListQuery<IMastraAgentsMainResponse>(MASTRA_AGENTS_MAIN, {
       variables,
       notifyOnNetworkStatusChange: true,
       fetchPolicy: 'network-only',
-      skip: !currentUserId,
     });
 
   const agentsList = useMemo<IMastraAgentRow[]>(
@@ -79,7 +74,7 @@ export const useMastraAgentList = (searchValue?: string) => {
   );
 
   const handleFetchMore = useCallback(() => {
-    if (loading || agentsList.length >= totalCount) return;
+    if (rawLoading || agentsList.length >= totalCount) return;
 
     fetchMore({
       variables: {
@@ -100,12 +95,12 @@ export const useMastraAgentList = (searchValue?: string) => {
         };
       },
     });
-  }, [loading, agentsList.length, totalCount, fetchMore, searchValue]);
+  }, [rawLoading, agentsList.length, totalCount, fetchMore, searchValue]);
 
   return {
     agentsList,
     totalCount,
-    loading: loading || !currentUserId,
+    loading,
     error,
     pageInfo,
     handleFetchMore,

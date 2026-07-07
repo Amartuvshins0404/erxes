@@ -144,23 +144,36 @@ export const ChatPage = () => {
   const {
     threads,
     loading: threadsLoading,
+    error: threadsError,
+    refetch: refetchThreads,
     hasMore: hasMoreSessions,
     loadingMore: loadingMoreSessions,
     loadMore: loadMoreSessions,
   } = useMastraThreads(selectedAgent?.agentId);
   const sessionsLoaded = !!selectedAgent && !threadsLoading;
+  const retrySessions = useCallback(() => {
+    void refetchThreads().catch(() => undefined);
+  }, [refetchThreads]);
   const { renameThread } = useRenameMastraThread();
   const { removeThread } = useRemoveMastraThread(selectedAgent?.agentId);
 
   // Scheduled mode: the selected agent's schedules become the "sessions". Fetched
   // by the agent's business id (mastraSchedules(agentId)); selecting one loads its
   // transcript into the shared message view.
-  const { schedules, loading: schedulesLoading } = useSchedules(
+  const {
+    schedules,
+    loading: schedulesLoading,
+    error: schedulesError,
+    refetch: refetchSchedules,
+  } = useSchedules(
     selectedAgent?.agentId,
     // Only fetch (and only trip the schedulesView permission check) once the
     // sidebar is actually in Scheduled mode — a pure chat user never hits it.
     chatMode !== 'scheduled',
   );
+  const retrySchedules = useCallback(() => {
+    void refetchSchedules().catch(() => undefined);
+  }, [refetchSchedules]);
   const selectedSchedule = useMemo(
     () => schedules.find((s) => s._id === scheduleParam) ?? null,
     [schedules, scheduleParam],
@@ -598,8 +611,12 @@ export const ChatPage = () => {
             onDeleteSession={handleDeleteSession}
             onRenameSession={handleRenameSession}
             onRailOpen={handleRailOpen}
+            sessionsError={!!threadsError}
+            onRetrySessions={retrySessions}
             schedules={schedules}
             schedulesLoading={schedulesLoading}
+            schedulesError={!!schedulesError}
+            onRetrySchedules={retrySchedules}
             scheduleParam={scheduleParam}
             onSelectSchedule={handleSelectSchedule}
           />

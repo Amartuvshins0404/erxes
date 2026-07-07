@@ -6,7 +6,7 @@
  */
 jest.mock('../erxesTools', () => ({
   fetchAvailableErxesTools: jest.fn(),
-  fetchInputTypesMap: jest.fn(),
+  fetchInputSchemaMaps: jest.fn(),
   fetchObjectFieldsMap: jest.fn(),
 }));
 
@@ -32,7 +32,10 @@ const meta = (operation: string): OperationMeta =>
 describe('getOperationRegistry — security strip', () => {
   beforeEach(() => {
     invalidateOperationRegistry();
-    asMock(erxesTools.fetchInputTypesMap).mockResolvedValue({});
+    asMock(erxesTools.fetchInputSchemaMaps).mockResolvedValue({
+      inputTypesMap: {},
+      enumValuesMap: {},
+    });
     asMock(erxesTools.fetchObjectFieldsMap).mockResolvedValue({});
   });
 

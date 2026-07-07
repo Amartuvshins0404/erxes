@@ -8,8 +8,18 @@ import {
 } from './erxesTools';
 import {
   describeSelectableFields,
+  isRequiredType,
   parseJsonPreprocess,
+  underlyingNamedType,
+  type GqlArgDef,
+  type SchemaMaps,
 } from './schemaIntrospect';
+import { truncateChars } from './humanize';
+import {
+  getStaticOperationHints,
+  applyStaticHints,
+  paginationConvention,
+} from './operationHints';
 import { OperationMeta, OperationRegistry } from './operationRegistry';
 import { ToolPolicy, isOperationAllowed } from './scope';
 import {
@@ -53,13 +63,70 @@ function coerceFields(val: unknown): string[] {
   return arr.map((field) => field.trim()).filter(Boolean);
 }
 
-// Render an operation's args as a compact, model-readable signature.
-function argSignature(op: OperationMeta) {
-  return (op.graphqlArgs || []).map((arg) => ({
-    name: arg.name,
-    type: graphqlTypeToString(arg.type),
-    required: arg.type?.kind === 'NON_NULL',
-  }));
+// One field of an INPUT_OBJECT arg, broken out so the model sees the object's
+// shape (names + types + which are required) instead of a bare type name.
+// `enumValues` and `requiredNote` are set from the static operation-hints seed
+// (see operationHints.ts) when a constraint is enforced in server code but
+// absent from the GraphQL schema.
+export interface ArgFieldSpec {
+  name: string;
+  type: string;
+  required: boolean;
+  enumValues?: string[];
+  requiredNote?: string;
+}
+
+// A model-readable arg signature: the type string, required flag (strict
+// GraphQL semantics — outermost NON_NULL), plus — where they exist — the
+// enum choices, the INPUT_OBJECT field breakdown, and a short description.
+// The breakdown is capped; when cut, its last entry is an "…and N more"
+// marker string so the model knows the shape is truncated.
+export interface ArgSpec extends ArgFieldSpec {
+  description?: string;
+  fields?: Array<ArgFieldSpec | string>;
+}
+
+// Cap on the per-arg INPUT_OBJECT field breakdown — signatures ship with every
+// search result, so a fat input type must not blow up the payload.
+const MAX_INPUT_OBJECT_FIELDS = 24;
+
+const fieldSpecOf = (arg: GqlArgDef): ArgFieldSpec => ({
+  name: arg.name,
+  type: graphqlTypeToString(arg.type),
+  required: isRequiredType(arg.type),
+});
+
+// Render an operation's args as a compact, model-readable signature. Enum args
+// carry their allowed values and input-object args their one-level field
+// breakdown, so the model stops inventing tokens/shapes the schema already knows.
+function argSignature(
+  op: OperationMeta,
+  schemaMaps: Pick<SchemaMaps, 'inputTypesMap' | 'enumValuesMap'>,
+): ArgSpec[] {
+  const { inputTypesMap, enumValuesMap } = schemaMaps;
+  return (op.graphqlArgs || []).map((arg) => {
+    const spec: ArgSpec = fieldSpecOf(arg);
+    const description = arg.description?.trim();
+    if (description) spec.description = truncateChars(description, 160);
+
+    const underlying = underlyingNamedType(arg.type);
+    if (underlying.kind === 'ENUM' && enumValuesMap[underlying.name]?.length) {
+      spec.enumValues = enumValuesMap[underlying.name];
+    } else if (
+      underlying.kind === 'INPUT_OBJECT' &&
+      inputTypesMap[underlying.name]?.length
+    ) {
+      const inputFields = inputTypesMap[underlying.name];
+      const specs: Array<ArgFieldSpec | string> = inputFields
+        .slice(0, MAX_INPUT_OBJECT_FIELDS)
+        .map(fieldSpecOf);
+      if (inputFields.length > MAX_INPUT_OBJECT_FIELDS) {
+        specs.push(`…and ${inputFields.length - MAX_INPUT_OBJECT_FIELDS} more`);
+      }
+      spec.fields = specs;
+    }
+    return spec;
+  });
 }
 
 // erxes operation names follow regular verbs: mutations end in Add / Edit /
@@ -174,10 +241,38 @@ function scoreOperation(op: OperationMeta, tokens: WeightedToken[]): number {
   return score;
 }
 
-// How many top-ranked search results carry their full selectable-field menu.
-// Beyond this they stay lean: the agent executes one op, so paying the menu
-// cost for every hit is wasteful.
-const FIELD_MENU_RESULTS = 5;
+const AUDIT_ERROR_MAX = 500;
+
+/**
+ * Audit-row error text for a failed mutation: `error`, then `instruction`,
+ * else compact JSON — so structured failures are never logged as ''.
+ */
+export function auditErrorMessage(result: unknown): string {
+  if (!result || typeof result !== 'object') return '';
+  const record = result as Record<string, unknown>;
+  const error = typeof record.error === 'string' ? record.error.trim() : '';
+  if (error) return error.slice(0, AUDIT_ERROR_MAX);
+  const instruction =
+    typeof record.instruction === 'string' ? record.instruction.trim() : '';
+  if (instruction) return instruction.slice(0, AUDIT_ERROR_MAX);
+  try {
+    return JSON.stringify(result).slice(0, AUDIT_ERROR_MAX);
+  } catch {
+    return String(result).slice(0, AUDIT_ERROR_MAX);
+  }
+}
+
+/** Top few registry operation names closest to an unknown name (same scorer). */
+function suggestOperations(operation: string, pool: OperationMeta[]): string[] {
+  const tokens = buildQueryTokens(nameParts(operation).join(' '));
+  if (!tokens.length) return [];
+  return pool
+    .map((op) => ({ op, score: scoreOperation(op, tokens) }))
+    .filter((entry) => entry.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 5)
+    .map((entry) => entry.op.operation);
+}
 
 /**
  * Builds the two meta-tools that replace per-operation tool binding:
@@ -247,24 +342,40 @@ export function buildErxesMetaTools(params: {
 
       return Promise.resolve({
         total: ranked.length,
-        // The top results carry their selectable-field menu so the agent can
-        // choose a response shape (the execute tool's "fields") in this same
-        // round-trip; lower-ranked hits stay lean to keep the payload small.
-        results: ranked.map((op, index) => {
+        // Every result carries its selectable-field menu so the agent can choose
+        // a response shape (the execute tool's "fields") for whichever op it runs
+        // in this same round-trip. The menu is already bounded (leaf scalars plus
+        // a capped set of nested objects), so the payload stays small.
+        results: ranked.map((op) => {
+          // Merge the static census: mark server-required args, add code-only
+          // enum tokens (schema enums already win inside applyStaticHints), and
+          // collect cross-field/pagination rules as a compact `constraints`
+          // array. Advisory only — the server stays the enforcer.
+          const hint = getStaticOperationHints(op.operation);
+          const args = hint
+            ? applyStaticHints(argSignature(op, registry), hint)
+            : argSignature(op, registry);
+          const constraints = [
+            ...(hint?.rules ?? []),
+            ...paginationConvention(args),
+          ];
           const base = {
             operation: op.operation,
             type: op.operationType,
             plugin: op.plugin,
             module: op.module,
             description: op.description,
-            args: argSignature(op),
+            args,
           };
-          if (index >= FIELD_MENU_RESULTS) return base;
           const fields = describeSelectableFields(
             op.returnType,
             registry.objectFieldsMap,
           );
-          return fields ? { ...base, fields } : base;
+          return {
+            ...base,
+            ...(fields ? { fields } : {}),
+            ...(constraints.length ? { constraints } : {}),
+          };
         }),
         note: ranked.length
           ? 'Call execute_erxes_operation with one of these "operation" names and an "args" object built from its arguments. Optionally pass "fields" (names from a result\'s "fields" menu, dotted for one level of nesting, e.g. ["_id","name","customer.name"]) to choose exactly what the response returns.'
@@ -333,7 +444,10 @@ export function buildErxesMetaTools(params: {
       if (!op) {
         return {
           success: false,
-          error: `Unknown operation "${operation}". Call search_erxes_operations to find the correct name.`,
+          error: `Unknown operation "${operation}"`,
+          suggestions: suggestOperations(operation, allowedList()),
+          instruction:
+            'Use one of the suggested operations or call search_erxes_operations first.',
         };
       }
       if (!isOperationAllowed(op, policy)) {
@@ -385,8 +499,7 @@ export function buildErxesMetaTools(params: {
         op,
         callArgs,
         settings,
-        registry.inputTypesMap,
-        registry.objectFieldsMap,
+        registry,
         processId,
         fields?.length ? fields : undefined,
       );
@@ -405,9 +518,7 @@ export function buildErxesMetaTools(params: {
           // Audit records the secret-redacted args (never plaintext credentials).
           args: redactSecrets(callArgs),
           status: failed ? 'failed' : 'success',
-          error: failed
-            ? String((result as { error?: unknown }).error ?? '')
-            : undefined,
+          error: failed ? auditErrorMessage(result) : undefined,
           processId,
         });
       }

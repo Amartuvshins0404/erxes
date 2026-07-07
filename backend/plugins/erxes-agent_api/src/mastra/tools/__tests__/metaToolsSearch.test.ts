@@ -48,6 +48,7 @@ const mkRegistry = (
     list,
     inputTypesMap: {},
     objectFieldsMap,
+    enumValuesMap: {},
   };
 };
 
@@ -98,7 +99,7 @@ describe('search_erxes_operations — ranking', () => {
 });
 
 describe('search_erxes_operations — field menu', () => {
-  it('attaches the selectable-field menu to the top 5 results only', async () => {
+  it('attaches the selectable-field menu to every result, not just the top 5', async () => {
     const dealOps: Array<Partial<OperationMeta>> = [
       'deals',
       'dealsAdd',
@@ -114,8 +115,8 @@ describe('search_erxes_operations — field menu', () => {
 
     expect(res.results).toHaveLength(6);
     const withMenu = res.results.filter((r) => r.fields);
-    expect(withMenu).toHaveLength(5);
-    expect(res.results[5].fields).toBeUndefined();
+    expect(withMenu).toHaveLength(6);
+    expect(res.results[5].fields?.type).toBe('Deal');
     expect(res.results[0].fields?.type).toBe('Deal');
   });
 });
@@ -142,14 +143,14 @@ describe('execute_erxes_operation — fields input', () => {
     expect(schema.parse({ operation: 'deals' }).fields).toBeUndefined();
   });
 
-  it('passes requested fields through to the executor (7th arg)', async () => {
+  it('passes requested fields through to the executor (6th arg)', async () => {
     await tool().execute({ operation: 'deals', fields: ['name', 'amount'] });
-    expect(mockExecute.mock.calls[0][6]).toEqual(['name', 'amount']);
+    expect(mockExecute.mock.calls[0][5]).toEqual(['name', 'amount']);
   });
 
   it('passes undefined when no fields are requested', async () => {
     await tool().execute({ operation: 'deals' });
-    expect(mockExecute.mock.calls[0][6]).toBeUndefined();
+    expect(mockExecute.mock.calls[0][5]).toBeUndefined();
   });
 });
 

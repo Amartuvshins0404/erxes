@@ -1,12 +1,12 @@
 import { createTTLCache } from '~/utils/ttlCache';
 import {
   fetchAvailableErxesTools,
-  fetchInputTypesMap,
+  fetchInputSchemaMaps,
   fetchObjectFieldsMap,
   type ErxesToolSettings,
   type GqlArgDef,
-  type GqlFieldDef,
   type GqlTypeRef,
+  type SchemaMaps,
 } from './erxesTools';
 import { isSecurityBlockedOperation } from './securityGuard';
 
@@ -25,11 +25,9 @@ export interface OperationMeta {
 // introspection. `operations` is a name → meta lookup for O(1) execute resolution;
 // `list` is the same set for searching. The two type maps power argument-schema
 // building (inputTypesMap) and response-field selection (objectFieldsMap).
-export interface OperationRegistry {
+export interface OperationRegistry extends SchemaMaps {
   operations: Map<string, OperationMeta>;
   list: OperationMeta[];
-  inputTypesMap: Record<string, GqlArgDef[]>;
-  objectFieldsMap: Record<string, GqlFieldDef[]>;
 }
 
 // Schema introspection is identical for every user (it's the gateway's shape,
@@ -55,8 +53,7 @@ function cacheKey(settings: ErxesToolSettings | null | undefined): string {
 /** Assemble the registry struct (name → meta map + search list + type maps). */
 function buildRegistry(
   operations: OperationMeta[],
-  inputTypesMap: Record<string, GqlArgDef[]>,
-  objectFieldsMap: Record<string, GqlFieldDef[]>,
+  schemaMaps: SchemaMaps,
 ): OperationRegistry {
   // Strip security-blocked operations (e.g. `configs`, which dumps the whole
   // secret store) before they ever enter the registry, so NO discovery surface
@@ -68,7 +65,7 @@ function buildRegistry(
   );
   const map = new Map<string, OperationMeta>();
   for (const op of visible) map.set(op.operation, op);
-  return { operations: map, list: visible, inputTypesMap, objectFieldsMap };
+  return { operations: map, list: visible, ...schemaMaps };
 }
 
 /**
@@ -90,9 +87,9 @@ export async function getOperationRegistry(
   const previous = lastGood.get(key);
 
   try {
-    const [operations, inputTypesMap, objectFieldsMap] = await Promise.all([
+    const [operations, inputSchemaMaps, objectFieldsMap] = await Promise.all([
       fetchAvailableErxesTools(settings),
-      fetchInputTypesMap(settings),
+      fetchInputSchemaMaps(settings),
       fetchObjectFieldsMap(settings),
     ]);
 
@@ -101,13 +98,20 @@ export async function getOperationRegistry(
       return previous;
     }
 
-    const reg = buildRegistry(operations, inputTypesMap, objectFieldsMap);
+    const reg = buildRegistry(operations, {
+      ...inputSchemaMaps,
+      objectFieldsMap,
+    });
     cache.set(key, reg);
     lastGood.set(key, reg);
     return reg;
   } catch {
     if (previous) return previous;
-    return buildRegistry([], {}, {});
+    return buildRegistry([], {
+      inputTypesMap: {},
+      objectFieldsMap: {},
+      enumValuesMap: {},
+    });
   }
 }
 

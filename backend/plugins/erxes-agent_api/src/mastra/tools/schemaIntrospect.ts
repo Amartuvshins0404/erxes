@@ -32,6 +32,18 @@ export interface GqlFieldDef {
 }
 
 /**
+ * The three schema-derived lookup maps every arg-schema / selection builder
+ * consumes, passed as ONE keyed object so adding a map can never silently
+ * shift positional arguments at a call site. OperationRegistry extends this,
+ * so the registry itself can be passed wherever SchemaMaps is expected.
+ */
+export interface SchemaMaps {
+  inputTypesMap: Record<string, GqlArgDef[]>;
+  objectFieldsMap: Record<string, GqlFieldDef[]>;
+  enumValuesMap: Record<string, string[]>;
+}
+
+/**
  * The innermost named type reached by stripping all NON_NULL/LIST wrappers,
  * plus whether any LIST wrapper was crossed. `node` is the underlying type-ref
  * (falsy when the wrapper chain bottoms out without a named type). This is the
@@ -92,12 +104,32 @@ export function graphqlTypeToString(
   return type.name || 'String';
 }
 
-// inputTypesMap: name → inputFields[], populated via fetchInputTypesMap().
-// Passed through the Zod builders so INPUT_OBJECT types get real schemas
-// instead of z.unknown(), giving the LLM correct field names up front.
+// An ENUM arg with known values becomes a real z.enum([...]) so the model's
+// invented tokens ("DESC", "ALL") are rejected before they reach the gateway.
+// LLMs frequently vary the casing (asc/ASC/Asc), so a preprocess normalizes a
+// case-insensitive match back to the canonical value — but only after an exact
+// match misses, so enums whose members differ only by case never get remapped.
+function buildEnumZod(values: string[]): z.ZodTypeAny {
+  const canonical = new Map(values.map((value) => [value.toLowerCase(), value]));
+  const normalize = (val: unknown): unknown => {
+    if (typeof val !== 'string') return val;
+    if (values.includes(val)) return val;
+    return canonical.get(val.toLowerCase()) ?? val;
+  };
+  return z.preprocess(
+    normalize,
+    z.enum(values as [string, ...string[]]).optional(),
+  );
+}
+
+// inputTypesMap: name → inputFields[] and enumValuesMap: enum type name →
+// value names, both populated in one pass via fetchInputSchemaMaps().
+// Passed through the Zod builders so INPUT_OBJECT/ENUM types get real schemas
+// instead of z.unknown(), giving the LLM correct field names / choices up front.
 function graphqlTypeToZod(
   type: GqlTypeRef | null | undefined,
   inputTypesMap?: Record<string, GqlArgDef[]>,
+  enumValuesMap?: Record<string, string[]>,
 ): z.ZodTypeAny {
   if (!type) return z.unknown().optional();
   const name = type.name || '';
@@ -106,17 +138,26 @@ function graphqlTypeToZod(
   if (kind === 'LIST') {
     return z.preprocess(
       parseJsonPreprocess,
-      z.array(graphqlTypeToZod(type.ofType, inputTypesMap)).optional(),
+      z
+        .array(graphqlTypeToZod(type.ofType, inputTypesMap, enumValuesMap))
+        .optional(),
     );
   }
   if (kind === 'NON_NULL') {
-    return graphqlTypeToZod(type.ofType, inputTypesMap);
+    return graphqlTypeToZod(type.ofType, inputTypesMap, enumValuesMap);
+  }
+  if (kind === 'ENUM' && enumValuesMap?.[name]?.length) {
+    return buildEnumZod(enumValuesMap[name]);
   }
   if (kind === 'INPUT_OBJECT' && inputTypesMap?.[name]) {
     const fields = inputTypesMap[name];
     const shape: Record<string, z.ZodTypeAny> = {};
     for (const field of fields) {
-      shape[field.name] = graphqlTypeToZod(field.type, inputTypesMap);
+      shape[field.name] = graphqlTypeToZod(
+        field.type,
+        inputTypesMap,
+        enumValuesMap,
+      );
     }
     // Preprocess so objects serialised as strings by the LLM are parsed first.
     return z.preprocess(parseJsonPreprocess, z.object(shape).optional());
@@ -169,12 +210,57 @@ function graphqlTypeToZod(
 export function buildZodSchemaFromArgs(
   args: GqlArgDef[],
   inputTypesMap?: Record<string, GqlArgDef[]>,
+  enumValuesMap?: Record<string, string[]>,
 ): z.ZodObject<Record<string, z.ZodTypeAny>> {
   const shape: Record<string, z.ZodTypeAny> = {};
   for (const arg of args || []) {
-    shape[arg.name] = graphqlTypeToZod(arg.type, inputTypesMap);
+    shape[arg.name] = graphqlTypeToZod(arg.type, inputTypesMap, enumValuesMap);
   }
   return z.object(shape);
+}
+
+/**
+ * Coerce each top-level arg against its OWN schema, keeping every value that
+ * parses and passing the rest through untouched. This is the per-field
+ * counterpart to a single `schema.safeParse(args)`: one malformed sibling (e.g.
+ * a bad enum token) no longer discards the coercion of every other field, which
+ * previously shipped an entire args object raw and crashed server resolvers.
+ * Args with no matching schema entry (unknown keys) pass through unchanged.
+ */
+export function coercePerArg(
+  schema: z.ZodObject<Record<string, z.ZodTypeAny>>,
+  rawArgs: Record<string, unknown>,
+): Record<string, unknown> {
+  const shape = schema.shape;
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(rawArgs)) {
+    const argSchema = shape[key];
+    if (!argSchema) {
+      out[key] = value;
+      continue;
+    }
+    const parsed = argSchema.safeParse(value);
+    out[key] = parsed.success ? parsed.data : value;
+  }
+  return out;
+}
+
+/**
+ * True when the value itself is required — strict GraphQL semantics: the
+ * type's OUTERMOST kind is NON_NULL. `X!`, `[X]!` and `[X!]!` are required;
+ * `[X!]` is not (the list may be omitted even though its items can't be null).
+ */
+export function isRequiredType(type: GqlTypeRef | null | undefined): boolean {
+  return type?.kind === 'NON_NULL';
+}
+
+/** The innermost named type (kind + name) after stripping NON_NULL/LIST wrappers. */
+export function underlyingNamedType(type: GqlTypeRef | null | undefined): {
+  kind: string;
+  name: string;
+} {
+  const { kind, name } = unwrapType(type);
+  return { kind, name };
 }
 
 /** Unwrap NON_NULL/LIST wrappers to the underlying return-type kind. */
@@ -389,6 +475,7 @@ export function describeSelectableFields(
   const baseFields = objectFieldsMap[baseTypeName];
   if (!baseFields || !baseFields.length) return undefined;
 
+  const MAX_LEAF_FIELDS = 24;
   const MAX_NESTED_OBJECTS = 8;
   const MAX_CHILDREN = 6;
   const fields: string[] = [];
@@ -398,7 +485,7 @@ export function describeSelectableFields(
   for (const field of baseFields) {
     const named = namedTypeOf(field.type);
     if (LEAF_KINDS.has(named.kind)) {
-      fields.push(field.name);
+      if (fields.length < MAX_LEAF_FIELDS) fields.push(field.name);
     } else if (named.kind === 'OBJECT' && objectCount < MAX_NESTED_OBJECTS) {
       const children = (objectFieldsMap[named.name] || [])
         .filter((child) => LEAF_KINDS.has(namedTypeOf(child.type).kind))

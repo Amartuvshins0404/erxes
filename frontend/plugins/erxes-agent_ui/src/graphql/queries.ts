@@ -297,27 +297,6 @@ export const MASTRA_SETTINGS = gql`
         enabled
       }
       advancedMemory
-      advancedMemoryStatus {
-        enabled
-        embedder
-        embedderModel
-        qdrantUrl
-        qdrantReachable
-        collection
-      }
-      knowledgeStatus {
-        enabled
-        embedder
-        embedderModel
-        qdrantUrl
-        qdrantReachable
-        collection
-        enabledTypes
-        lastSweepAt
-        pointCount
-        types
-        lastError
-      }
     }
   }
 `;
@@ -398,20 +377,6 @@ export const MASTRA_LEARNINGS = gql`
 export const MASTRA_LEARNING_STATS = gql`
   query MastraLearningStats {
     mastraLearningStats
-  }
-`;
-
-export const MASTRA_LEARNING_STATUS = gql`
-  query MastraLearningStatus {
-    mastraLearningStatus {
-      enabled
-      embedder
-      embedderModel
-      qdrantUrl
-      collection
-      autoPromoteMinSources
-      autoPromoteMinConfidence
-    }
   }
 `;
 

@@ -51,26 +51,6 @@ export interface IAttachmentStorage {
   enabled?: boolean | null;
 }
 
-export interface IMemoryStatusView {
-  embedder?: string;
-  embedderModel?: string;
-  qdrantUrl?: string;
-  qdrantReachable?: boolean | null;
-  collection?: string;
-}
-
-export interface IKnowledgeStatusView extends IMemoryStatusView {
-  enabled?: boolean;
-  enabledTypes?: string[];
-  lastSweepAt?: string | null;
-  pointCount?: number | null;
-  types?: Record<
-    string,
-    { count: number; points: number; error?: string }
-  > | null;
-  lastError?: string | null;
-}
-
 export interface IMastraSettings {
   _id?: string;
   erxesApiUrl?: string | null;
@@ -80,8 +60,6 @@ export interface IMastraSettings {
   defaultAgentQuota?: number | null;
   attachmentStorage?: IAttachmentStorage | null;
   advancedMemory?: boolean | null;
-  advancedMemoryStatus?: IMemoryStatusView | null;
-  knowledgeStatus?: IKnowledgeStatusView | null;
 }
 
 export interface IMastraVoiceConfigStatus {

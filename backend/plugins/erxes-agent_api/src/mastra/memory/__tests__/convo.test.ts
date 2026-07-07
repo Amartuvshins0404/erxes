@@ -6,16 +6,16 @@ describe('convo assembly', () => {
     { role: 'assistant', content: 'hello' },
   ];
 
-  it('AM-CONV-1: order is [wm?, recall?, ...history, user] with user last', () => {
+  it('AM-CONV-1: order is [wm?, digest?, ...history, user] with user last', () => {
     const convo = augmentConvo({
       recentHistory: history,
       userMessage: 'now',
-      recallBlock: 'RECALL',
+      learnedDigestBlock: 'DIGEST',
       workingMemoryBlock: 'WM',
     });
     expect(convo.map((m) => m.content)).toEqual([
       'WM',
-      'RECALL',
+      'DIGEST',
       'hi',
       'hello',
       'now',
@@ -27,11 +27,11 @@ describe('convo assembly', () => {
     const convo = augmentConvo({
       recentHistory: [],
       userMessage: 'x',
-      recallBlock: 'RECALL',
+      learnedDigestBlock: 'DIGEST',
       workingMemoryBlock: 'WM',
     });
     const injected = convo.filter(
-      (m) => m.content === 'WM' || m.content === 'RECALL',
+      (m) => m.content === 'WM' || m.content === 'DIGEST',
     );
     expect(injected.every((m) => m.role === 'system')).toBe(true);
     // no tool-call frames anywhere

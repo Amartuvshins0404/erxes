@@ -66,10 +66,6 @@ export const BUILTIN_TOOLS: { key: string; description: string }[] = [
     description:
       'Remove the background from a photo (transparent PNG, e.g. product images)',
   },
-  {
-    key: 'companyKnowledge',
-    description: 'Search indexed company knowledge',
-  },
 ];
 
 /**

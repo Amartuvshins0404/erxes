@@ -2,7 +2,7 @@
  * Mastra Studio bridge entry.
  *
  * Mirrors erxes-agent's real agents + their NATIVE Mastra Memory (Mongo
- * `erxes_mastra_memory` + Qdrant) into Mastra Studio, by reusing the production
+ * `erxes_mastra_memory`) into Mastra Studio, by reusing the production
  * runtime (getOrCreateAgent + getMastraMemory). No schema translation — it is
  * Mastra-native end to end.
  *

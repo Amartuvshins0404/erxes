@@ -364,7 +364,6 @@ router.post('/bot/:conversationId', llmRouteLimiter, async (req, res) => {
     const convo = augmentConvo({
       recentHistory: [],
       userMessage: userText,
-      recallBlock: null,
       workingMemoryBlock: null,
       learnedDigestBlock: digest?.block,
     });

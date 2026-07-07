@@ -24,16 +24,6 @@ export const types = `
     totalCount: Int
   }
 
-  type MastraLearningStatus {
-    enabled: Boolean
-    embedder: String
-    embedderModel: String
-    qdrantUrl: String
-    collection: String
-    autoPromoteMinSources: Int
-    autoPromoteMinConfidence: Float
-  }
-
   input MastraLearningInput {
     statement: String!
     type: String!
@@ -46,7 +36,6 @@ export const queries = `
   mastraLearnings(status: String, type: String, agentId: String, searchValue: String, page: Int, perPage: Int): MastraLearningListResponse
   mastraLearning(_id: String!): MastraLearning
   mastraLearningStats: JSON
-  mastraLearningStatus: MastraLearningStatus
   mastraMessageFeedbacks(threadId: String!): JSON
 `;
 

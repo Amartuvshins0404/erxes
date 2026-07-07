@@ -1,10 +1,8 @@
 import {
   isLearningEnabled,
-  learningCollectionName,
   resolveLearningTuning,
   learningTenant,
   hashSource,
-  computeLearningStatus,
 } from '../config';
 
 describe('isLearningEnabled', () => {
@@ -17,20 +15,11 @@ describe('isLearningEnabled', () => {
   });
 });
 
-describe('learningCollectionName', () => {
-  it('encodes model + dimension, separate from memory/knowledge collections', () => {
-    expect(learningCollectionName('bge-small-en-v1.5', 384)).toBe(
-      'mastra_learnings_bge_small_en_v1_5_384',
-    );
-  });
-});
-
 describe('resolveLearningTuning', () => {
   it('has safe defaults', () => {
     const tuning = resolveLearningTuning({});
     expect(tuning.autoPromoteMinSources).toBe(3);
     expect(tuning.autoPromoteMinConfidence).toBe(0.75);
-    expect(tuning.mergeScore).toBe(0.9);
     expect(tuning.idleMinutes).toBe(30);
     expect(tuning.feedbackDownDelta).toBeLessThan(0);
   });
@@ -72,20 +61,5 @@ describe('hashSource', () => {
     expect(hashSource('user-123', {})).not.toBe(
       hashSource('user-123', { ERXES_AGENT_LEARNING_HASH_SECRET: 'other' }),
     );
-  });
-});
-
-describe('computeLearningStatus', () => {
-  it('is all-null when disabled', () => {
-    const status = computeLearningStatus({});
-    expect(status.enabled).toBe(false);
-    expect(status.collection).toBeNull();
-  });
-
-  it('surfaces collection + promotion floors when enabled', () => {
-    const status = computeLearningStatus({ ERXES_AGENT_LEARNING: 'enable' });
-    expect(status.enabled).toBe(true);
-    expect(status.collection).toMatch(/^mastra_learnings_/);
-    expect(status.autoPromoteMinSources).toBe(3);
   });
 });

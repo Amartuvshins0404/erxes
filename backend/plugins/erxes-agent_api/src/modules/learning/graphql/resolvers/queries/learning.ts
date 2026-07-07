@@ -1,5 +1,4 @@
 import { IContext } from '~/connectionResolvers';
-import { computeLearningStatus } from '~/mastra/learning/config';
 import { MastraLearningStatus } from '@/learning/@types/learning';
 import { assertThreadOwned } from '@/session/nativeStore';
 import { requireUserId } from '@/_shared/auth';
@@ -58,16 +57,6 @@ export const learningQueries = {
     await checkPermission('learningView');
     requireUserId(user);
     return models.MastraLearning.getStats();
-  },
-
-  mastraLearningStatus: async (
-    _: unknown,
-    __: unknown,
-    { user, checkPermission }: IContext,
-  ) => {
-    await checkPermission('learningView');
-    requireUserId(user);
-    return computeLearningStatus();
   },
 
   // The caller's own votes for a thread, keyed by messageId — drives the

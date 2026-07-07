@@ -1,13 +1,5 @@
 import { IContext } from '~/connectionResolvers';
-import { computeAdvancedMemoryStatus } from '~/mastra/memory/config';
-import { refreshMemoryHealth } from '~/mastra/memory';
-import {
-  computeKnowledgeStatus,
-  isKnowledgeEnabled,
-  enabledKnowledgeTypes,
-} from '~/mastra/knowledge/config';
-import { ALL_KNOWLEDGE_TYPE_NAMES } from '~/mastra/knowledge/contentTypes';
-import { health as qdrantHealth } from '~/mastra/memory/vectorStore';
+import { isAdvancedMemoryEnabled } from '~/mastra/memory/config';
 import { getStorageStatus } from '~/mastra/files/storage';
 import { resolveVoiceStatusForTenant } from '~/mastra/voice/resolveConfig';
 import { IModels } from '~/connectionResolvers';
@@ -69,35 +61,11 @@ export const settingsQueries = {
     const doc = await models.MastraSettings.getSettings();
     const obj: IMastraSettings = doc?.toObject ? doc.toObject() : doc;
 
-    // Read-only, env-derived status. Re-ping Qdrant live (2s-timeout, no-op when
-    // disabled) so the connectivity dot reflects current state, not just boot.
-    const reachable = await refreshMemoryHealth();
-    const status = computeAdvancedMemoryStatus(process.env, { reachable });
-
-    // Company knowledge has its own flag, so it pings Qdrant independently of
-    // the memory feature. Sweep counters come from the last reconciliation run.
-    const knowledgeReachable = isKnowledgeEnabled()
-      ? await qdrantHealth()
-      : null;
-    const knowledge = computeKnowledgeStatus(process.env, {
-      reachable: knowledgeReachable,
-    });
-
     return {
       ...obj,
       attachmentStorage: await attachmentStorageStatus(models, subdomain),
-      advancedMemory: status.enabled,
-      advancedMemoryStatus: status,
-      knowledgeStatus: {
-        ...knowledge,
-        enabledTypes: isKnowledgeEnabled()
-          ? enabledKnowledgeTypes(ALL_KNOWLEDGE_TYPE_NAMES)
-          : [],
-        lastSweepAt: obj?.knowledgeSyncStatus?.lastSweepAt ?? null,
-        pointCount: obj?.knowledgeSyncStatus?.pointCount ?? null,
-        types: obj?.knowledgeSyncStatus?.types ?? null,
-        lastError: obj?.knowledgeSyncStatus?.lastError ?? null,
-      },
+      // Read-only, env-derived flag surfaced for display only.
+      advancedMemory: isAdvancedMemoryEnabled(),
     };
   },
 };

@@ -6,10 +6,6 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useGeneralSettings } from './hooks/useGeneralSettings';
 import {
-  AdvancedMemoryCard,
-  CompanyKnowledgeCard,
-} from './components/MemoryStatusCards';
-import {
   GENERAL_SETTINGS_DEFAULTS,
   GeneralSettingsValues,
   generalSettingsSchema,
@@ -47,11 +43,6 @@ export const GeneralSettingsPage = () => {
       });
     }
   }, [settings, form]);
-
-  // Read-only feature statuses — derived from server env vars, display only.
-  const advancedMemory = Boolean(settings?.advancedMemory);
-  const memStatus = settings?.advancedMemoryStatus;
-  const knowledgeStatus = settings?.knowledgeStatus;
 
   // Detected upload storage (configured in core Settings → File upload).
   const attachmentStorage = settings?.attachmentStorage;
@@ -250,10 +241,6 @@ export const GeneralSettingsPage = () => {
             </Button>
           </form>
         </Form>
-
-        <AdvancedMemoryCard enabled={advancedMemory} status={memStatus} />
-
-        <CompanyKnowledgeCard status={knowledgeStatus} />
 
         <div className="rounded-lg border bg-muted/50 p-4 text-sm space-y-2">
           <p className="font-semibold">Bot Endpoint Setup</p>

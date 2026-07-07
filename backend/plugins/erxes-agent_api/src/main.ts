@@ -63,24 +63,6 @@ startPlugin({
       }
     }
 
-    // Advanced memory is on by default (chat persistence rides on it); ping
-    // Qdrant and ensure the collection exists. Loaded lazily, and skipped only
-    // when explicitly disabled via ERXES_AGENT_MEMORY=disable.
-    if ((process.env.ERXES_AGENT_MEMORY ?? '').trim() !== 'disable') {
-      const { initAdvancedMemory } = await import('~/mastra/memory');
-      await initAdvancedMemory();
-    }
-
-    // Company knowledge RAG (opt-in via ERXES_AGENT_KNOWLEDGE=enable): start the
-    // reconciliation sweep scheduler + worker. Same lazy-load contract.
-    if ((process.env.ERXES_AGENT_KNOWLEDGE ?? '').trim() === 'enable') {
-      const [{ initKnowledgeSync }, { redis }] = await Promise.all([
-        import('~/mastra/knowledge/worker'),
-        import('erxes-api-shared/utils'),
-      ]);
-      initKnowledgeSync(redis);
-    }
-
     // Agent learning (opt-in via ERXES_AGENT_LEARNING=enable): distillation +
     // hygiene sweep scheduler + worker. Same lazy-load contract.
     if ((process.env.ERXES_AGENT_LEARNING ?? '').trim() === 'enable') {

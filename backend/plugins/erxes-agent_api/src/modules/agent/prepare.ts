@@ -4,10 +4,7 @@ import { ExpectedError } from 'erxes-api-shared/utils';
 import { isAgentAdmin, canUserAccessAgent, getUserUnitIds } from '@/agent/utils';
 import { IModels } from '~/connectionResolvers';
 import { getOrCreateAgent } from '~/mastra/agentRuntime';
-import {
-  isAdvancedMemoryEnabled,
-  resolveRecallTuning,
-} from '~/mastra/memory/config';
+import { isAdvancedMemoryEnabled } from '~/mastra/memory/config';
 import { scopedResource } from '~/mastra/memory/mastraMemory';
 import { deriveResourceId, augmentConvo, MemoryContext } from '~/mastra/memory';
 import { readLearnedDigest } from '~/mastra/learning/digest';
@@ -17,7 +14,6 @@ import { IMastraChatAttachment } from '@/session/@types/session';
 import {
   ensureThreadRegistered,
   getNativeMemory,
-  resourceHasThreads,
 } from '@/session/nativeStore';
 import { buildActivatedSkillsBlock } from '@/skills/service/skillsService';
 import { IMastraAgentDocument } from '@/agent/@types/agent';
@@ -184,10 +180,10 @@ function resolveTurnMemory(args: {
   };
 
   // Mastra Memory (attached to the agent in getOrCreateAgent) is the ONLY chat
-  // store: it persists the turn, replays recent history, and runs semantic
-  // recall + working memory via the per-turn binding below. An unknown tenant
-  // does NOT skip persistence — scopedResource defaults an empty subdomain to
-  // the "os" scope so the thread is still persisted and listable.
+  // store: it persists the turn, replays recent history, and runs working
+  // memory via the per-turn binding below. An unknown tenant does NOT skip
+  // persistence — scopedResource defaults an empty subdomain to the "os" scope
+  // so the thread is still persisted and listable.
   const memoryBinding: MemoryBinding | undefined = useMemory
     ? { thread: sessionId, resource: scopedResource(subdomain, resourceId) }
     : undefined;
@@ -203,13 +199,9 @@ function resolveTurnMemory(args: {
   };
 }
 
-// Build the agent, read the thread (ownership + thread-history), and — under
-// resource-scoped recall — probe whether the resource owns any prior thread, all
-// concurrently. None needs another's result, so they overlap instead of stacking
-// round trips. The resource probe is issued speculatively (its result is only
-// consulted when the thread itself turns out to be new); it rides alongside the
-// ownership read, so it adds no wall-clock on the common path. Enforces the
-// ownership gate and decides the scope-aware recall skip.
+// Build the agent and read the thread (ownership + thread-history)
+// concurrently. Neither needs the other's result, so they overlap instead of
+// stacking round trips. Enforces the ownership gate.
 async function buildAgentAndGateMemory(args: {
   agentConfig: IMastraAgentDocument;
   models: IModels;
@@ -233,24 +225,13 @@ async function buildAgentAndGateMemory(args: {
     memoryBinding,
   } = args;
 
-  // What the semantic recall is scoped to (env-driven, default 'resource'). This
-  // decides what "nothing to recall" means for the first-turn skip below.
-  const recallResource = memoryBinding?.resource;
-  const recallScope = resolveRecallTuning().scope;
-
   const needsThreadRead = Boolean(
     identity.kind === 'user' &&
       memoryBinding &&
       typeof threadId === 'string' &&
       threadId,
   );
-  const needsResourceProbe = Boolean(
-    identity.kind === 'user' &&
-      memoryBinding &&
-      recallScope === 'resource' &&
-      recallResource,
-  );
-  const [{ agent, tools }, priorThread, resourceHadThreads] = await Promise.all([
+  const [{ agent, tools }, priorThread] = await Promise.all([
     getOrCreateAgent(agentConfig, models, subdomain, {
       settings,
       providers,
@@ -260,12 +241,6 @@ async function buildAgentAndGateMemory(args: {
           m.getThreadById({ threadId: sessionId }),
         )
       : Promise.resolve(null),
-    needsResourceProbe && recallResource
-      ? // Best-effort: this is only a recall optimization, so a failure must degrade
-        // to the safe default (null → "history might exist" → recall stays on), never
-        // abort the turn via the Promise.all.
-        resourceHasThreads(subdomain, recallResource).catch(() => null)
-      : Promise.resolve<boolean | null>(null),
   ]);
 
   // Ownership gate: a CONTINUED thread must belong to this caller. getThreadById
@@ -282,26 +257,7 @@ async function buildAgentAndGateMemory(args: {
     throw new ExpectedError('Thread not found');
   }
 
-  // Skip semantic recall only when it can return NOTHING — the embed + Qdrant
-  // round trip inside agent.stream() is otherwise pure latency. "Nothing to
-  // recall" is scope-aware (the critical correctness point):
-  //   • thread scope  → recall sees only THIS thread, so skip when it is new
-  //     (priorThread === null, i.e. owned thread does not exist yet).
-  //   • resource scope → recall spans every thread of the resource, so a new
-  //     thread can still recall from the user's other threads; only a resource
-  //     with no prior thread (resourceHadThreads === false) has nothing.
-  // A continued thread (priorThread present) always keeps recall on. Non-user
-  // identities keep their existing always-recall behaviour. The skip is a
-  // per-call deep-merge of semanticRecall:false, so working memory, recent
-  // history, and native titling are untouched.
-  const recallCanReturnHistory =
-    identity.kind !== 'user' ||
-    !memoryBinding ||
-    !!priorThread ||
-    (recallScope === 'resource' && resourceHadThreads !== false);
-  const skipSemanticRecall = Boolean(memoryBinding && !recallCanReturnHistory);
-
-  return { agent, tools, skipSemanticRecall };
+  return { agent, tools };
 }
 
 // Register the thread + its agent binding NOW, before the model streams, so the
@@ -358,7 +314,6 @@ async function buildTurnConvo(args: {
   const convo: TurnMessage[] = augmentConvo({
     recentHistory: [],
     userMessage: message,
-    recallBlock: null,
     workingMemoryBlock: null,
     learnedDigestBlock: digest?.block,
   });
@@ -462,7 +417,7 @@ export async function prepareTurn(
     sessionId,
   });
 
-  const { agent, tools, skipSemanticRecall } = await buildAgentAndGateMemory({
+  const { agent, tools } = await buildAgentAndGateMemory({
     agentConfig,
     models,
     subdomain,
@@ -473,9 +428,6 @@ export async function prepareTurn(
     sessionId,
     memoryBinding,
   });
-  if (memoryBinding && skipSemanticRecall) {
-    memoryBinding.options = { semanticRecall: false };
-  }
 
   await preRegisterThread({
     identity,

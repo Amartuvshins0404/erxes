@@ -1,5 +1,4 @@
 import { buildDigestBlock, DigestEntry } from '../digest';
-import { buildLearningFilter } from '../store';
 
 describe('buildDigestBlock', () => {
   const entry = (overrides: Partial<DigestEntry>): DigestEntry => ({
@@ -59,28 +58,5 @@ describe('buildDigestBlock', () => {
     );
     expect(digest?.block).toContain('- [pitfall] avoid X');
     expect(digest?.block).toContain('no personal');
-  });
-});
-
-describe('buildLearningFilter (tenant isolation)', () => {
-  it('always scopes to the subdomain', () => {
-    const filter = buildLearningFilter({
-      subdomain: 'acme',
-      statuses: ['approved'],
-    });
-    expect(filter.must).toContainEqual({
-      key: 'subdomain',
-      match: { value: 'acme' },
-    });
-    expect(filter.must).toContainEqual({
-      key: 'status',
-      match: { any: ['approved'] },
-    });
-  });
-
-  it('refuses to build a filter without a subdomain (fail-closed)', () => {
-    expect(() => buildLearningFilter({ subdomain: '' })).toThrow(
-      /tenant isolation/,
-    );
   });
 });

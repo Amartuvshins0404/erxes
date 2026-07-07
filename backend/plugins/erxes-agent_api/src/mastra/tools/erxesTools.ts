@@ -24,6 +24,12 @@ import {
 } from './serverErrorClassifier';
 import { redactSecrets, REDACTED } from './secretRedaction';
 import { scrubArgs } from './argScrub';
+import {
+  findEntityKeyInError,
+  lookupCandidates,
+  resolveIdArgs,
+  type EntityResolverDeps,
+} from './entityResolver';
 
 // Re-export the introspection + humanisation surface so existing importers
 // (metaTools, operationRegistry, tests) keep their `from './erxesTools'` paths.
@@ -98,106 +104,42 @@ async function gqlCall<TData = Record<string, unknown>>(
   }
 }
 
-/** Minimal `{ _id, name }` record shape returned by board/pipeline/stage queries. */
-interface IdNameRecord {
-  _id: string;
-  name?: string;
-}
-
-/** One auto-resolved entity option offered back to the model. */
-interface ResolvedEntityOption {
-  stageId?: string;
-  stageName?: string;
-  name?: string;
-}
-
 /**
- * Returns a deduplicated list of { stageId, stageName } across all boards/pipelines.
- * Only stageName is exposed to the LLM — the raw ObjectId is resolved internally.
+ * Gateway access the entity resolver needs, bound to this request's auth. Every
+ * candidate lookup runs through the same `gqlCall` (Bearer + tenant hostname)
+ * the operation itself uses. The cache scope carries subdomain AND userId —
+ * entity visibility (pipelines, stages, customers) is per-user, so cached rows
+ * must never cross users.
  */
-async function resolveAvailableStages(
+function makeResolverDeps(
   apiUrl: string,
   authHeaders: Record<string, string>,
-): Promise<ResolvedEntityOption[]> {
-  const boardsData = await gqlCall<{ salesBoards?: IdNameRecord[] }>(
-    apiUrl,
-    authHeaders,
-    '{ salesBoards { _id name } }',
-  );
-  const boards = boardsData?.salesBoards ?? [];
-  const seen = new Set<string>();
-  const stages: ResolvedEntityOption[] = [];
-
-  for (const board of boards.slice(0, 5)) {
-    const pipData = await gqlCall<{
-      salesPipelines?: { list?: IdNameRecord[] };
-    }>(
-      apiUrl,
-      authHeaders,
-      `{ salesPipelines(boardId: "${board._id}") { list { _id name } } }`,
-    );
-    const pipelines = pipData?.salesPipelines?.list ?? [];
-
-    for (const pipeline of pipelines.slice(0, 5)) {
-      const stData = await gqlCall<{ salesStages?: IdNameRecord[] }>(
-        apiUrl,
-        authHeaders,
-        `{ salesStages(pipelineId: "${pipeline._id}") { _id name } }`,
-      );
-      for (const stage of stData?.salesStages ?? []) {
-        if (seen.has(stage._id)) continue;
-        seen.add(stage._id);
-        stages.push({ stageId: stage._id, stageName: stage.name });
-      }
-    }
-  }
-  return stages;
+): EntityResolverDeps {
+  const auth = getCurrentAuth();
+  return {
+    runQuery: (query) => gqlCall(apiUrl, authHeaders, query),
+    scope: `${auth?.subdomain || ''}::${auth?.userId || ''}`,
+  };
 }
 
-// Entity → auto-resolver function.  Add new entities here as needed.
-type EntityResolver = (
-  apiUrl: string,
-  headers: Record<string, string>,
-) => Promise<ResolvedEntityOption[]>;
-const ENTITY_RESOLVERS: Record<
-  string,
-  { key: string; resolver: EntityResolver }
-> = {
-  stage: { key: 'availableStages', resolver: resolveAvailableStages },
-};
-
 /**
- * Map an actionable "not found"/validation error onto a structured failure
- * payload that carries real, currently-available entity options.
+ * Map a server-side "<Entity> not found" error onto a structured failure that
+ * carries the real candidates for that entity, so the model can retry with an
+ * exact id. Unmapped entities keep the plain sanitized error.
  */
 async function buildNotFoundResult(
   rawMessage: string,
-  apiUrl: string,
-  authHeaders: Record<string, string>,
+  deps: EntityResolverDeps,
 ): Promise<Record<string, unknown>> {
-  const lower = rawMessage.toLowerCase();
-  for (const [entity, { resolver }] of Object.entries(ENTITY_RESOLVERS)) {
-    const mentionsEntity = lower.includes(entity);
-    // Catch all actionable errors: "not found", "not provided" (GraphQL required-field
-    // validation), "invalid", and "required" — not just the "not found" case.
-    const isActionable =
-      lower.includes('not found') ||
-      lower.includes('not provided') ||
-      lower.includes('invalid') ||
-      lower.includes('required');
-    if (mentionsEntity && isActionable) {
-      const items = await resolver(apiUrl, authHeaders);
-      const names = items
-        .map((item) => item.stageName ?? item.name)
-        .filter(Boolean);
+  const entity = findEntityKeyInError(rawMessage);
+  if (entity) {
+    const candidates = await lookupCandidates(entity, deps);
+    if (candidates.length) {
       return {
         success: false,
-        availableStages: names,
-        instruction: names.length
-          ? `Call dealsAdd immediately with: { stageId: "${
-              names[0]
-            }", name: "deal name" }. Available stages: ${names.join(', ')}.`
-          : `No ${entity}s found. Make sure the erxes sales plugin is configured and has at least one board with a pipeline and stage.`,
+        ...sanitizeServerError(rawMessage),
+        candidates,
+        instruction: `The ${entity} you specified was not found. Retry this operation with the exact "id" value of the intended ${entity} from the candidates list — never a name.`,
       };
     }
   }
@@ -209,13 +151,10 @@ async function buildNotFoundResult(
 export interface ErxesOperationRef {
   operation: string;
   operationType: 'query' | 'mutation';
+  plugin: string;
   graphqlArgs?: GqlArgDef[];
   returnType?: GqlTypeRef | null;
 }
-
-/** True when the string looks like a 24-hex-char MongoDB ObjectId. */
-const isValidObjectId = (value?: string): boolean =>
-  /^[a-f0-9]{24}$/i.test(value ?? '');
 
 /**
  * Auth headers for gateway calls: the calling user's login token as a Bearer,
@@ -247,78 +186,6 @@ export function buildAuthHeaders(
     authHeaders['x-erxes-process-id'] = processId;
   }
   return authHeaders;
-}
-
-/** Outcome of the dealsAdd stage pre-flight: updated args, or a structured failure. */
-type StagePreflight =
-  | { ok: true; args: Record<string, unknown> }
-  | { ok: false; failure: Record<string, unknown> };
-
-/**
- * dealsAdd pre-flight. LLMs naturally express intent with stage NAMES (e.g.
- * "Test for Ai"), not MongoDB ObjectIds — auto-resolve any name sent as
- * stageId → real ObjectId transparently, so the LLM never has to know or
- * remember the raw database ID.
- */
-async function resolveDealsAddStageArg(
-  initialArgs: Record<string, unknown>,
-  apiUrl: string,
-  authHeaders: Record<string, string>,
-): Promise<StagePreflight> {
-  let resolvedArgs = initialArgs;
-  // dealsAdd takes flat top-level args: dealsAdd(name, stageId, ...) — no doc wrapper.
-  // Strip surrounding quotes LLMs sometimes add: '"Test for Ai"' → 'Test for Ai'
-  const rawStageId = resolvedArgs.stageId;
-  let stageId =
-    typeof rawStageId === 'string'
-      ? rawStageId.replace(/^["']|["']$/g, '').trim()
-      : undefined;
-
-  if (isValidObjectId(stageId)) return { ok: true, args: resolvedArgs };
-
-  const stages = await resolveAvailableStages(apiUrl, authHeaders);
-
-  if (stageId) {
-    // Fuzzy-match the name the LLM sent against real stage names.
-    const needle = stageId.toLowerCase().trim();
-    const match =
-      stages.find(
-        (stage) => (stage.stageName || '').toLowerCase() === needle,
-      ) ||
-      stages.find((stage) =>
-        (stage.stageName || '').toLowerCase().includes(needle),
-      );
-    if (match) {
-      resolvedArgs = { ...resolvedArgs, stageId: match.stageId };
-      stageId = match.stageId;
-    }
-  }
-
-  // If only one stage exists, pick it automatically — no need to ask.
-  if (!isValidObjectId(stageId) && stages.length === 1) {
-    resolvedArgs = { ...resolvedArgs, stageId: stages[0].stageId };
-    stageId = stages[0].stageId;
-  }
-
-  if (!isValidObjectId(stageId)) {
-    const stageNames = stages.map((stage) => stage.stageName);
-    return {
-      ok: false,
-      failure: {
-        success: false,
-        availableStages: stageNames,
-        instruction: stages.length
-          ? `Call dealsAdd immediately with: { stageId: "${
-              stageNames[0] ?? 'stage name'
-            }", name: "deal name" }. Available stages: ${stageNames.join(
-              ', ',
-            )}.`
-          : 'No stages exist. Tell the user to create a Board with a Pipeline and Stage in erxes Sales first.',
-      },
-    };
-  }
-
-  return { ok: true, args: resolvedArgs };
 }
 
 /** Joins GraphQL error messages into one semicolon-separated string. */
@@ -378,7 +245,7 @@ function secretRefRefusedResult() {
  * This is the shared execution core behind the `execute_erxes_operation`
  * meta-tool. It owns everything that used to live in the per-operation tool:
  *   • coercing LLM-supplied args through the operation's Zod schema,
- *   • the dealsAdd stage-NAME → ObjectId pre-flight,
+ *   • resolving entity NAMES in *Id/*Ids args → real ids (membership-based),
  *   • building a valid GraphQL operation + response selection,
  *   • turning "not found"/validation errors into actionable instructions.
  *
@@ -431,20 +298,19 @@ export async function executeErxesOperation(
       return secretRefRefusedResult();
     }
 
-    // Auth must be resolved first — needed for any pre-flight stage lookups.
+    // Auth must be resolved first — needed for the entity-resolver lookups.
     const authHeaders = buildAuthHeaders(token, processId);
+    const resolverDeps = makeResolverDeps(apiUrl, authHeaders);
 
-    if (erxesOperation === 'dealsAdd') {
-      const preflight = await resolveDealsAddStageArg(
-        resolvedArgs,
-        apiUrl,
-        authHeaders,
-      );
-      if (!preflight.ok) return preflight.failure;
-      resolvedArgs = preflight.args;
-    }
+    const idResolution = await resolveIdArgs(
+      resolvedArgs,
+      resolverDeps,
+      op.plugin,
+    );
+    if (!idResolution.ok) return idResolution.failure;
+    resolvedArgs = idResolution.args;
 
-    // Build the GraphQL operation after stageId has been resolved. Choose a
+    // Build the GraphQL operation after ids have been resolved. Choose a
     // VALID response selection derived from the schema (so types without a
     // `name` field, like User, still produce a runnable query).
     const finalResponseFields = chooseResponseFields(
@@ -488,7 +354,7 @@ export async function executeErxesOperation(
     }
 
     if (data?.errors) {
-      return buildNotFoundResult(joinErrors(data.errors), apiUrl, authHeaders);
+      return buildNotFoundResult(joinErrors(data.errors), resolverDeps);
     }
     // Redact secret VALUES (storage/SES/Cloudflare keys, ERP tokens, integration
     // passwords) before the result reaches the model. Reads like `configs`

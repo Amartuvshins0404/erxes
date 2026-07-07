@@ -4,15 +4,7 @@ import {
   MastraLearningStatus,
   MastraLearningType,
 } from '@/learning/@types/learning';
-import {
-  learningTenant,
-  resolveLearningTuning,
-} from '~/mastra/learning/config';
-import {
-  syncLearningVectorSafe,
-  setLearningVectorStatusSafe,
-  deleteLearningVectorSafe,
-} from '~/mastra/learning/store';
+import { resolveLearningTuning } from '~/mastra/learning/config';
 import { findOwnedAssistantMessage } from '@/session/nativeStore';
 import { pushUserScore } from '~/mastra/scoring/langfuseClient';
 import { requireUserId } from '@/_shared/auth';
@@ -38,46 +30,39 @@ export const learningMutations = {
   mastraLearningAdd: async (
     _: unknown,
     { doc }: { doc: IMastraLearningInput },
-    { models, user, subdomain, checkPermission }: IContext,
+    { models, user, checkPermission }: IContext,
   ) => {
     await checkPermission('learningCreate');
     const userId = requireUserId(user);
-    const learning = await models.MastraLearning.createLearning({
+    return models.MastraLearning.createLearning({
       ...doc,
       status: 'approved',
       confidence: 0.9,
       createdBy: userId,
       reviewedByUserId: userId,
     });
-    await syncLearningVectorSafe(learningTenant(subdomain), learning);
-    return learning;
   },
 
   mastraLearningEdit: async (
     _: unknown,
     { _id, doc }: { _id: string; doc: IMastraLearningInput },
-    { models, user, subdomain, checkPermission }: IContext,
+    { models, user, checkPermission }: IContext,
   ) => {
     await checkPermission('learningEdit');
     requireUserId(user);
-    const learning = await models.MastraLearning.updateLearning(_id, doc);
-    // Statement may have changed — re-embed.
-    await syncLearningVectorSafe(learningTenant(subdomain), learning);
-    return learning;
+    return models.MastraLearning.updateLearning(_id, doc);
   },
 
   mastraLearningSetStatus: async (
     _: unknown,
     { _id, status }: { _id: string; status: string },
-    { models, user, subdomain, checkPermission }: IContext,
+    { models, user, checkPermission }: IContext,
   ) => {
     await checkPermission('learningEdit');
     const userId = requireUserId(user);
     const next = STATUSES.find((s) => s === status);
     if (!next) throw new ExpectedError(`Invalid status "${status}"`);
-    const learning = await models.MastraLearning.setStatus(_id, next, userId);
-    await setLearningVectorStatusSafe(learningTenant(subdomain), _id, next);
-    return learning;
+    return models.MastraLearning.setStatus(_id, next, userId);
   },
 
   mastraLearningPin: async (
@@ -93,12 +78,11 @@ export const learningMutations = {
   mastraLearningRemove: async (
     _: unknown,
     { _id }: { _id: string },
-    { models, user, subdomain, checkPermission }: IContext,
+    { models, user, checkPermission }: IContext,
   ) => {
     await checkPermission('learningRemove');
     requireUserId(user);
     await models.MastraLearning.deleteOne({ _id });
-    await deleteLearningVectorSafe(learningTenant(subdomain), _id);
     return { ok: true };
   },
 

@@ -1,32 +1,4 @@
 export const types = `
-  type MastraMemoryStatus {
-    enabled: Boolean
-    embedder: String
-    embedderModel: String
-    qdrantUrl: String
-    qdrantReachable: Boolean
-    collection: String
-  }
-
-  type MastraKnowledgeStatus {
-    enabled: Boolean
-    embedder: String
-    embedderModel: String
-    qdrantUrl: String
-    qdrantReachable: Boolean
-    collection: String
-    enabledTypes: [String]
-    lastSweepAt: Date
-    pointCount: Int
-    types: JSON
-    lastError: String
-  }
-
-  type MastraKnowledgeSyncResult {
-    ok: Boolean
-    queued: Boolean
-  }
-
   # Where chat attachments land: the instance's existing upload storage,
   # detected from core's file-upload configs. enabled = configured AND the
   # plugin-level toggle is on — when false the chat stays text-only.
@@ -55,10 +27,6 @@ export const types = `
     # Read-only: the "Advanced memory feature" is controlled by the
     # ERXES_AGENT_MEMORY env var, not by app data. Surfaced for display only.
     advancedMemory: Boolean
-    advancedMemoryStatus: MastraMemoryStatus
-
-    # Read-only: company knowledge RAG, controlled by ERXES_AGENT_KNOWLEDGE.
-    knowledgeStatus: MastraKnowledgeStatus
   }
 
   input MastraSettingsInput {
@@ -84,6 +52,5 @@ export const queries = `
 
 export const mutations = `
   mastraSettingsSave(doc: MastraSettingsInput!): MastraSettings
-  mastraKnowledgeSync: MastraKnowledgeSyncResult
   mastraUserAgentQuotaSet(userId: String!, quota: Int): MastraUserSettings
 `;

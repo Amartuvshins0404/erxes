@@ -19,7 +19,7 @@ interface RequestAuth {
    *  the Preview file list. */
   threadId?: string;
   agentId?: string;
-  /** Tenant of the request — required by tools that query tenant-partitioned stores (Qdrant). */
+  /** Tenant of the request — required by tools that query tenant-partitioned stores. */
   subdomain?: string;
   /** Unique id for THIS turn — artifacts created in the turn share it, so they
    *  can be grouped per chat instance and linked to the assistant message. */

@@ -210,11 +210,9 @@ export async function patchNativeTurn(params: {
   }
 
   // Patch via the STORAGE domain (patchNativeMessages), not Memory.updateMessages:
-  // the latter re-embeds the message and rewrites its Qdrant vectors whenever
-  // semantic recall is on (always, here). For a metadata-only patch that is pure
-  // waste (content.content is unchanged) and fragile — a single embed/Qdrant
-  // hiccup throws and loses the patch. patchNativeMessages is a plain Mongo
-  // write: no embeddings, no vector I/O, and best-effort.
+  // for a metadata-only patch the store write is a plain Mongo update
+  // (content.content is unchanged), and best-effort — a write hiccup never loses
+  // the rest of the turn's work.
   if (wantUser) {
     const userMsg = recent.find(
       (m) => m.role === 'user' && isFromTurn(m, turnStartedAt),

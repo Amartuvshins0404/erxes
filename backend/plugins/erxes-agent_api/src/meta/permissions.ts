@@ -115,7 +115,7 @@ const SPECS: Spec[] = [
   },
   {
     name: 'settings',
-    description: 'Agent plugin settings & company knowledge',
+    description: 'Agent plugin settings',
     actions: [
       action(
         'settingsView',
@@ -123,11 +123,6 @@ const SPECS: Spec[] = [
         'Read plugin settings and derived feature status',
       ),
       action('settingsManage', 'Manage settings', 'Save plugin-wide agent settings'),
-      action(
-        'settingsKnowledgeSync',
-        'Sync company knowledge',
-        'Force a Company Knowledge reindex',
-      ),
     ],
   },
   {

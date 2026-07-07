@@ -3,7 +3,7 @@
  *
  * Reuses the production builder `getOrCreateAgent(cfg, models, subdomain)`.
  * Passing the subdomain makes the builder attach the NATIVE Mastra Memory
- * (semantic recall + working memory on Mongo `erxes_mastra_memory` + Qdrant, via
+ * (recent-history replay + working memory on Mongo `erxes_mastra_memory`, via
  * getMastraMemory) whenever ERXES_AGENT_MEMORY=enable and the agent's
  * memoryEnabled !== false — so Studio lists each real agent AND its per-agent
  * history tab lights up, with zero schema translation. Resilient per-agent: a

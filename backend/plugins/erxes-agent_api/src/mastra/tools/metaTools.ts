@@ -274,39 +274,6 @@ function suggestOperations(operation: string, pool: OperationMeta[]): string[] {
     .map((entry) => entry.op.operation);
 }
 
-const AUDIT_ERROR_MAX = 500;
-
-/**
- * Audit-row error text for a failed mutation: `error`, then `instruction`,
- * else compact JSON — so structured failures are never logged as ''.
- */
-export function auditErrorMessage(result: unknown): string {
-  if (!result || typeof result !== 'object') return '';
-  const record = result as Record<string, unknown>;
-  const error = typeof record.error === 'string' ? record.error.trim() : '';
-  if (error) return error.slice(0, AUDIT_ERROR_MAX);
-  const instruction =
-    typeof record.instruction === 'string' ? record.instruction.trim() : '';
-  if (instruction) return instruction.slice(0, AUDIT_ERROR_MAX);
-  try {
-    return JSON.stringify(result).slice(0, AUDIT_ERROR_MAX);
-  } catch {
-    return String(result).slice(0, AUDIT_ERROR_MAX);
-  }
-}
-
-/** Top few registry operation names closest to an unknown name (same scorer). */
-function suggestOperations(operation: string, pool: OperationMeta[]): string[] {
-  const tokens = buildQueryTokens(nameParts(operation).join(' '));
-  if (!tokens.length) return [];
-  return pool
-    .map((op) => ({ op, score: scoreOperation(op, tokens) }))
-    .filter((entry) => entry.score > 0)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 5)
-    .map((entry) => entry.op.operation);
-}
-
 /**
  * Builds the two meta-tools that replace per-operation tool binding:
  *

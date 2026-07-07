@@ -391,6 +391,7 @@ describe('buildErxesMetaTools / list_config_keys', () => {
     list: [dummyOp],
     inputTypesMap: {},
     objectFieldsMap: {},
+    enumValuesMap: {},
   });
 
   const build = (mode: 'all' | 'custom') =>

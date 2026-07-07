@@ -99,6 +99,7 @@ describe('list_config_keys discovery tool', () => {
       list,
       inputTypesMap: {},
       objectFieldsMap: {},
+      enumValuesMap: {},
     };
   };
 

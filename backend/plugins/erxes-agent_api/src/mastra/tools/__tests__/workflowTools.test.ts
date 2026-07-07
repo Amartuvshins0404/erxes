@@ -117,6 +117,7 @@ jest.mock('../operationRegistry', () => ({
       list: ops,
       inputTypesMap: {},
       objectFieldsMap: {},
+      enumValuesMap: {},
     });
   }),
 }));

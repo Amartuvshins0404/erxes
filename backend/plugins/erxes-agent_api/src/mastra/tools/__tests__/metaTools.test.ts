@@ -36,6 +36,7 @@ const mkRegistry = (ops: Array<Partial<OperationMeta>>): OperationRegistry => {
     list,
     inputTypesMap: {},
     objectFieldsMap: {},
+    enumValuesMap: {},
   };
 };
 
@@ -121,8 +122,8 @@ describe('execute_erxes_operation guard + audit', () => {
     await tool.execute({ operation: 'customersRemove', args: {} });
 
     expect(mockExecute).toHaveBeenCalledTimes(1);
-    // The processId is the 6th arg to executeErxesOperation and is recorded.
-    const sentProcessId = mockExecute.mock.calls[0][5] as string;
+    // The processId is the 5th arg to executeErxesOperation and is recorded.
+    const sentProcessId = mockExecute.mock.calls[0][4] as string;
     expect(sentProcessId).toMatch(/^agt_/);
     expect(calls[0]).toMatchObject({
       operation: 'customersRemove',
@@ -161,7 +162,7 @@ describe('execute_erxes_operation guard + audit', () => {
 
     expect(mockExecute).toHaveBeenCalledTimes(1);
     // Reads get no correlation id (nothing to revert).
-    expect(mockExecute.mock.calls[0][5]).toBeUndefined();
+    expect(mockExecute.mock.calls[0][4]).toBeUndefined();
     expect(calls).toHaveLength(0);
   });
 });

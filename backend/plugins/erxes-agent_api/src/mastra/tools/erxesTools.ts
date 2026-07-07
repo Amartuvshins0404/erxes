@@ -5,11 +5,13 @@ import {
   buildGraphqlOperation,
   buildZodSchemaFromArgs,
   chooseResponseFields,
+  coercePerArg,
   graphqlTypeToString,
   withNeutralDefaults,
   type GqlArgDef,
   type GqlFieldDef,
   type GqlTypeRef,
+  type SchemaMaps,
 } from './schemaIntrospect';
 import {
   deriveModule,
@@ -33,7 +35,7 @@ import {
 
 // Re-export the introspection + humanisation surface so existing importers
 // (metaTools, operationRegistry, tests) keep their `from './erxesTools'` paths.
-export type { GqlArgDef, GqlFieldDef, GqlTypeRef };
+export type { GqlArgDef, GqlFieldDef, GqlTypeRef, SchemaMaps };
 export { graphqlTypeToString, sanitizeServerError };
 
 /** Connection settings for reaching the erxes gateway (API URL + app token). */
@@ -54,6 +56,7 @@ interface IntrospectedNamedType {
   kind: string;
   inputFields?: GqlArgDef[] | null;
   fields?: GqlFieldDef[] | null;
+  enumValues?: Array<{ name: string }> | null;
 }
 
 // The gateway's userMiddleware only accepts `Authorization: Bearer <token>`
@@ -256,8 +259,7 @@ export async function executeErxesOperation(
   op: ErxesOperationRef,
   rawArgs: Record<string, unknown>,
   settings: ErxesToolSettings | null,
-  inputTypesMap?: Record<string, GqlArgDef[]>,
-  objectFieldsMap?: Record<string, GqlFieldDef[]>,
+  schemaMaps?: Partial<SchemaMaps>,
   processId?: string,
   requestedFields?: string[],
 ): Promise<unknown> {
@@ -274,13 +276,19 @@ export async function executeErxesOperation(
 
     // Coerce the model's args through the per-operation Zod schema (numbers sent
     // as strings, JSON-as-string arrays/objects, date normalisation, …). The
-    // execute meta-tool passes a plain object, so this is where validation runs;
-    // on failure we fall back to the raw args so a usable call still goes out.
-    const inputSchema = buildZodSchemaFromArgs(args, inputTypesMap);
-    const parsed = inputSchema.safeParse(rawArgs || {});
-    let resolvedArgs: Record<string, unknown> = parsed.success
-      ? { ...(parsed.data as Record<string, unknown>) }
-      : { ...(rawArgs || {}) };
+    // execute meta-tool passes a plain object, so this is where validation runs.
+    // Coercion is per-arg: each field is parsed against its own schema and kept
+    // when it validates, otherwise passed through raw — so one bad sibling no
+    // longer discards the coercion of every other field.
+    const inputSchema = buildZodSchemaFromArgs(
+      args,
+      schemaMaps?.inputTypesMap,
+      schemaMaps?.enumValuesMap,
+    );
+    let resolvedArgs: Record<string, unknown> = coercePerArg(
+      inputSchema,
+      rawArgs || {},
+    );
 
     // Strip high-risk keys the agent must never set (e.g. usersEdit password /
     // email / groupIds, usersInvite permissionGroupIds) before the args become a
@@ -316,7 +324,7 @@ export async function executeErxesOperation(
     const finalResponseFields = chooseResponseFields(
       erxesOperation,
       op.returnType,
-      objectFieldsMap,
+      schemaMaps?.objectFieldsMap,
       requestedFields,
     );
 
@@ -373,17 +381,20 @@ export async function executeErxesOperation(
   }
 }
 
+// The type { name kind ofType … } sub-selection shared by every named-type
+// introspection query.
+const TYPE_REF_SELECTION =
+  'type { name kind ofType { name kind ofType { name kind ofType { name kind } } } }';
+
 /**
- * Walk `__schema { types }` once and project each named type onto a map keyed by
- * type name. `selector` is the introspection sub-selection (inputFields / fields),
- * `pick` returns the field list to store for a matching type (or undefined to
- * skip it). The shared core behind fetchInputTypesMap / fetchObjectFieldsMap.
+ * Fetch `__schema { types }` with the given per-type sub-selection. The shared
+ * scaffold behind fetchInputSchemaMaps / fetchObjectFieldsMap — one round-trip
+ * per call, and any failure degrades to an empty list rather than throwing.
  */
-async function introspectNamedTypes<TField>(
+async function introspectSchemaTypes(
   settings: ErxesToolSettings | null,
-  selector: string,
-  pick: (namedType: IntrospectedNamedType) => TField[] | null | undefined,
-): Promise<Record<string, TField[]>> {
+  selection: string,
+): Promise<IntrospectedNamedType[]> {
   const apiUrl = settings?.erxesApiUrl || 'http://localhost:4000';
   const token = settings?.erxesApiToken || '';
 
@@ -392,10 +403,7 @@ async function introspectNamedTypes<TField>(
       types {
         name
         kind
-        ${selector} {
-          name
-          type { name kind ofType { name kind ofType { name kind ofType { name kind } } } }
-        }
+        ${selection}
       }
     }
   }`;
@@ -404,28 +412,58 @@ async function introspectNamedTypes<TField>(
     const data = await gqlFetch<{
       data?: { __schema?: { types?: IntrospectedNamedType[] } };
     }>(apiUrl, token ? { Authorization: asBearer(token) } : {}, { query });
-    const types = data?.data?.__schema?.types || [];
-    const map: Record<string, TField[]> = {};
-    for (const namedType of types) {
-      const fields = pick(namedType);
-      if (fields?.length) map[namedType.name] = fields;
-    }
-    return map;
+    return data?.data?.__schema?.types || [];
   } catch {
-    return {};
+    return [];
   }
 }
 
+/** Project named types onto a name-keyed map, skipping empty picks. */
+function mapNamedTypes<TField>(
+  types: IntrospectedNamedType[],
+  pick: (namedType: IntrospectedNamedType) => TField[] | null | undefined,
+): Record<string, TField[]> {
+  const map: Record<string, TField[]> = {};
+  for (const namedType of types) {
+    const fields = pick(namedType);
+    if (fields?.length) map[namedType.name] = fields;
+  }
+  return map;
+}
+
+/** The two input-side maps the Zod builders consume, fetched in one pass. */
+export interface InputSchemaMaps {
+  inputTypesMap: Record<string, GqlArgDef[]>;
+  enumValuesMap: Record<string, string[]>;
+}
+
 /**
- * Fetches all INPUT_OBJECT type definitions so graphqlTypeToZod can build real
- * Zod schemas for them instead of falling back to z.any().
+ * Fetches all INPUT_OBJECT field definitions AND every ENUM's value names in a
+ * single `__schema { types }` round-trip, so graphqlTypeToZod builds real
+ * object/enum schemas (and argSignature surfaces field breakdowns + allowed
+ * values) instead of falling back to z.unknown(). A failed introspection
+ * degrades to empty maps — it never fails the registry build.
  */
-export function fetchInputTypesMap(
+export async function fetchInputSchemaMaps(
   settings: ErxesToolSettings | null,
-): Promise<Record<string, GqlArgDef[]>> {
-  return introspectNamedTypes(settings, 'inputFields', (namedType) =>
-    namedType.kind === 'INPUT_OBJECT' ? namedType.inputFields : undefined,
+): Promise<InputSchemaMaps> {
+  const types = await introspectSchemaTypes(
+    settings,
+    `inputFields { name ${TYPE_REF_SELECTION} }
+        enumValues(includeDeprecated: false) { name }`,
   );
+  return {
+    inputTypesMap: mapNamedTypes(types, (namedType) =>
+      namedType.kind === 'INPUT_OBJECT' ? namedType.inputFields : undefined,
+    ),
+    enumValuesMap: mapNamedTypes(types, (namedType) =>
+      namedType.kind === 'ENUM'
+        ? (namedType.enumValues || [])
+            .map((value) => value.name)
+            .filter(Boolean)
+        : undefined,
+    ),
+  };
 }
 
 // ─── Plugin ownership via live subgraph introspection ────────────────────────
@@ -492,10 +530,14 @@ async function fetchPluginMap(token: string): Promise<Map<string, string>> {
  * Introspect all OBJECT types → their fields, so chooseResponseFields can build
  * a valid selection set for any return type (replacing the naive `_id name`).
  */
-export function fetchObjectFieldsMap(
+export async function fetchObjectFieldsMap(
   settings: ErxesToolSettings | null,
 ): Promise<Record<string, GqlFieldDef[]>> {
-  return introspectNamedTypes(settings, 'fields', (namedType) =>
+  const types = await introspectSchemaTypes(
+    settings,
+    `fields { name ${TYPE_REF_SELECTION} }`,
+  );
+  return mapNamedTypes(types, (namedType) =>
     namedType.kind === 'OBJECT' && !String(namedType.name).startsWith('__')
       ? namedType.fields
       : undefined,

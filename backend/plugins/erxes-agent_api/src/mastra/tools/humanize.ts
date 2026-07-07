@@ -19,6 +19,14 @@ export function truncateWords(text: string, maxWords = 15): string {
     : `${words.slice(0, maxWords).join(' ')}...`;
 }
 
+/** Clip text to at most maxChars characters, appending an ellipsis when cut. */
+export function truncateChars(text: string, maxChars = 160): string {
+  const trimmed = (text || '').trim();
+  return trimmed.length <= maxChars
+    ? trimmed
+    : `${trimmed.slice(0, maxChars).trimEnd()}...`;
+}
+
 // erxes' GraphQL schema carries no field descriptions, so operation names are
 // all we have. Turn a camelCase operation into a readable action phrase so both
 // the UI picker and the agent see "Create a deal" instead of "mutation dealsAdd".

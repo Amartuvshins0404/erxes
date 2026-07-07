@@ -230,8 +230,7 @@ export async function buildRunDeps(
         meta,
         args || {},
         settings,
-        registry.inputTypesMap,
-        registry.objectFieldsMap,
+        registry,
         processId,
       );
 

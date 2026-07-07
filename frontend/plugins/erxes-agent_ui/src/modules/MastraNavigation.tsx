@@ -1,7 +1,6 @@
 import { IconRobot, IconMessageCircle } from '@tabler/icons-react';
 import { NavigationMenuLinkItem } from 'erxes-ui';
 import { useHasAnyActivity } from '~/modules/chat/hooks/useChatView';
-import { FavoriteAgentItems } from '~/modules/navigation/components/FavoriteAgentItems';
 
 const ChatNavItem = () => {
   // Show dot when any agent is thinking or has an unread AI reply
@@ -33,7 +32,6 @@ export const MastraNavigation = () => {
         icon={IconRobot}
         path="erxes-agent/agents"
       />
-      <FavoriteAgentItems />
     </>
   );
 };

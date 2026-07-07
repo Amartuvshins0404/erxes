@@ -572,6 +572,7 @@ export const ChatPage = () => {
         <ChatPageHeader
           hasAgent={!!selectedAgent}
           agentName={selectedAgent?.name}
+          agentId={selectedAgent?._id}
           asDrawer={asDrawer}
           onToggleSidebar={() => setSidebarOpen((v) => !v)}
           chatMode={chatMode}

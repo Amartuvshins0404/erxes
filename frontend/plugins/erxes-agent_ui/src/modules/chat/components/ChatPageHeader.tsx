@@ -9,12 +9,14 @@ import { Breadcrumb, Button } from 'erxes-ui';
 import { PageHeader } from 'ui-modules';
 import type { ChatMode } from '~/modules/chat/lib/chatMode';
 import { previewStore } from '~/modules/chat/preview/previewStore';
+import { AgentFavoriteToggle } from '~/modules/navigation/components/AgentFavoriteToggle';
 
 // Chat page top bar: breadcrumb + (when an agent is picked and in chat mode) the
 // Files / Make skill / New chat actions. Rendered only outside voice mode.
 export const ChatPageHeader = ({
   hasAgent,
   agentName,
+  agentId,
   asDrawer,
   onToggleSidebar,
   chatMode,
@@ -27,6 +29,7 @@ export const ChatPageHeader = ({
 }: {
   hasAgent: boolean;
   agentName?: string;
+  agentId?: string;
   asDrawer: boolean;
   onToggleSidebar: () => void;
   chatMode: ChatMode;
@@ -70,6 +73,7 @@ export const ChatPageHeader = ({
             )}
           </Breadcrumb.List>
         </Breadcrumb>
+        {hasAgent && agentId && <AgentFavoriteToggle agentId={agentId} />}
       </PageHeader.Start>
       {hasAgent && chatMode === 'chat' && (
         <PageHeader.End>

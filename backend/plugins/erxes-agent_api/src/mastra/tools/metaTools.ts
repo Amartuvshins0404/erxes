@@ -15,6 +15,11 @@ import {
   type SchemaMaps,
 } from './schemaIntrospect';
 import { truncateChars } from './humanize';
+import {
+  getStaticOperationHints,
+  applyStaticHints,
+  paginationConvention,
+} from './operationHints';
 import { OperationMeta, OperationRegistry } from './operationRegistry';
 import { ToolPolicy, isOperationAllowed } from './scope';
 import {
@@ -60,10 +65,15 @@ function coerceFields(val: unknown): string[] {
 
 // One field of an INPUT_OBJECT arg, broken out so the model sees the object's
 // shape (names + types + which are required) instead of a bare type name.
-interface ArgFieldSpec {
+// `enumValues` and `requiredNote` are set from the static operation-hints seed
+// (see operationHints.ts) when a constraint is enforced in server code but
+// absent from the GraphQL schema.
+export interface ArgFieldSpec {
   name: string;
   type: string;
   required: boolean;
+  enumValues?: string[];
+  requiredNote?: string;
 }
 
 // A model-readable arg signature: the type string, required flag (strict
@@ -71,9 +81,8 @@ interface ArgFieldSpec {
 // enum choices, the INPUT_OBJECT field breakdown, and a short description.
 // The breakdown is capped; when cut, its last entry is an "…and N more"
 // marker string so the model knows the shape is truncated.
-interface ArgSpec extends ArgFieldSpec {
+export interface ArgSpec extends ArgFieldSpec {
   description?: string;
-  enumValues?: string[];
   fields?: Array<ArgFieldSpec | string>;
 }
 
@@ -371,19 +380,35 @@ export function buildErxesMetaTools(params: {
         // in this same round-trip. The menu is already bounded (leaf scalars plus
         // a capped set of nested objects), so the payload stays small.
         results: ranked.map((op) => {
+          // Merge the static census: mark server-required args, add code-only
+          // enum tokens (schema enums already win inside applyStaticHints), and
+          // collect cross-field/pagination rules as a compact `constraints`
+          // array. Advisory only — the server stays the enforcer.
+          const hint = getStaticOperationHints(op.operation);
+          const args = hint
+            ? applyStaticHints(argSignature(op, registry), hint)
+            : argSignature(op, registry);
+          const constraints = [
+            ...(hint?.rules ?? []),
+            ...paginationConvention(args),
+          ];
           const base = {
             operation: op.operation,
             type: op.operationType,
             plugin: op.plugin,
             module: op.module,
             description: op.description,
-            args: argSignature(op, registry),
+            args,
           };
           const fields = describeSelectableFields(
             op.returnType,
             registry.objectFieldsMap,
           );
-          return fields ? { ...base, fields } : base;
+          return {
+            ...base,
+            ...(fields ? { fields } : {}),
+            ...(constraints.length ? { constraints } : {}),
+          };
         }),
         note: ranked.length
           ? 'Call execute_erxes_operation with one of these "operation" names and an "args" object built from its arguments. Optionally pass "fields" (names from a result\'s "fields" menu, dotted for one level of nesting, e.g. ["_id","name","customer.name"]) to choose exactly what the response returns.'

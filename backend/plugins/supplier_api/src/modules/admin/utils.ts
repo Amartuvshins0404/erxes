@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import { Resolver } from 'erxes-api-shared/core-types';
+import { getEnv, getSaasOrganizationDetail } from 'erxes-api-shared/utils';
 
 export type ConsumerPlatform = 'mushop' | 'blockadmin';
 
@@ -20,7 +21,6 @@ interface SendMessagePayload {
   subdomain: string;
   path: string;
   payload: IPayload;
-  // when specified, only sends to that platform; otherwise fans out to all
   platform?: ConsumerPlatform;
 }
 
@@ -28,6 +28,7 @@ interface ConsumerConfig {
   name: ConsumerPlatform;
   url: string;
   secret: string;
+  bundleEnv: string;
 }
 
 const getConsumers = (): ConsumerConfig[] => {
@@ -41,18 +42,16 @@ const getConsumers = (): ConsumerConfig[] => {
       name: 'mushop',
       url: process.env.MUSHOP_API_URL,
       secret: (process.env.MUSHOP_SECRET || process.env.MUSHOP_PUBLIC_API_KEY)!,
+      bundleEnv: 'MUSHOP_SUPPLIER_BUNDLE_TYPE',
     });
   }
 
-  if (
-    process.env.BLOCKADMIN_API_URL &&
-    (process.env.BLOCKADMIN_SECRET || process.env.BLOCKADMIN_PUBLIC_API_KEY)
-  ) {
+  if (process.env.BLOCKADMIN_API_URL && process.env.BLOCK_ADMIN_SECRET) {
     consumers.push({
       name: 'blockadmin',
       url: process.env.BLOCKADMIN_API_URL,
-      secret: (process.env.BLOCKADMIN_SECRET ||
-        process.env.BLOCKADMIN_PUBLIC_API_KEY)!,
+      secret: process.env.BLOCK_ADMIN_SECRET,
+      bundleEnv: 'BLOCKADMIN_SUPPLIER_BUNDLE_TYPE',
     });
   }
 
@@ -94,6 +93,20 @@ const sendToConsumer = async (
   }
 };
 
+const getBundleTargets = async (
+  subdomain: string,
+  consumers: ConsumerConfig[],
+): Promise<ConsumerConfig[]> => {
+  const organization = (await getSaasOrganizationDetail({ subdomain })) as
+    | { bundle?: { type?: string } }
+    | undefined;
+
+  const bundleType = organization?.bundle?.type;
+  if (!bundleType) return [];
+
+  return consumers.filter((c) => getEnv({ name: c.bundleEnv }) === bundleType);
+};
+
 export const sendMessage = async ({
   subdomain,
   path,
@@ -111,7 +124,7 @@ export const sendMessage = async ({
 
   const targets = platform
     ? consumers.filter((c) => c.name === platform)
-    : consumers;
+    : await getBundleTargets(subdomain, consumers);
 
   await Promise.all(
     targets.map((consumer) =>

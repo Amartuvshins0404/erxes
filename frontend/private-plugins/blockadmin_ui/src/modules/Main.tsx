@@ -62,6 +62,24 @@ const AdminListingDetailPage = lazy(() =>
   })),
 );
 
+const SuppliersPage = lazy(() =>
+  import('@/supplier/profile/pages/SuppliersPage').then((module) => ({
+    default: module.SuppliersPage,
+  })),
+);
+
+const ProductsPage = lazy(() =>
+  import('@/supplier/product/pages/ProductsPage').then((module) => ({
+    default: module.ProductsPage,
+  })),
+);
+
+const MembersPage = lazy(() =>
+  import('@/membership/pages/MembersPage').then((module) => ({
+    default: module.MembersPage,
+  })),
+);
+
 const Main = () => {
   return (
     <Suspense fallback={<div />}>
@@ -91,6 +109,14 @@ const Main = () => {
             <Route path=":id" element={<SubmissionsPage />} />
           </Route>
         </Route>
+
+        <Route path="/supplier">
+          <Route index element={<Navigate to="profile" replace />} />
+          <Route path="profile" element={<SuppliersPage />} />
+          <Route path="products" element={<ProductsPage />} />
+        </Route>
+
+        <Route path="/membership" element={<MembersPage />} />
 
         <Route path="/stacking-plan" element={<StackingPlanPage />} />
       </Routes>

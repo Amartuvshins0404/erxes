@@ -1,6 +1,6 @@
 import { supplierMutations } from '@/supplier/graphql/resolvers/mutations/supplier';
 import { collectiveMutations } from '@/collective/graphql/resolvers/mutations/collective';
-import { collectiveOnly, supplierOnly } from '@/collective/utils/isCollective';
+import { collectiveOnly, supplierOnly } from '@/collective/utils/bundleGuard';
 
 export const mutations = {
   ...supplierOnly(supplierMutations),

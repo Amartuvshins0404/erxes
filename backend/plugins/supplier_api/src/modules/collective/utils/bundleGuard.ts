@@ -2,15 +2,19 @@ import { getEnv, getSaasOrganizationDetail } from 'erxes-api-shared/utils';
 
 export const isValid = async (
   subdomain: string,
-  bundleType: string,
+  bundleType: string | string[],
 ): Promise<boolean> => {
-  const bundle = getEnv({ name: bundleType });
+  const names = Array.isArray(bundleType) ? bundleType : [bundleType];
+
+  const accepted = names.map((name) => getEnv({ name })).filter(Boolean);
 
   const organization = (await getSaasOrganizationDetail({ subdomain })) as
     | { bundle?: { type?: string } }
     | undefined;
 
-  return organization?.bundle?.type === bundle;
+  const orgBundle = organization?.bundle?.type;
+
+  return !!orgBundle && accepted.includes(orgBundle);
 };
 
 type ResolverFn = (root: any, args: any, context: any, info: any) => any;
@@ -53,6 +57,7 @@ export const supplierOnly = <T extends Record<string, ResolverFn>>(
 ): T =>
   guardResolvers(
     resolvers,
-    async (subdomain) => await isValid(subdomain, 'SUPPLIER_BUNDLE_TYPE'),
+    async (subdomain) =>
+      await isValid(subdomain, ['MUSHOP_SUPPLIER_BUNDLE_TYPE','BLOCKADMIN_SUPPLIER_BUNDLE_TYPE']),
     'This operation is only available for supplier organizations',
   );

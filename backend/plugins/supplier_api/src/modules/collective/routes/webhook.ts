@@ -7,7 +7,7 @@ import {
   sendWorkerQueue,
 } from 'erxes-api-shared/utils';
 import { splitType } from 'erxes-api-shared/core-modules';
-import { isValid } from '@/collective/utils/isCollective';
+import { isValid } from '@/collective/utils/bundleGuard';
 import { sendMessage } from '~/modules/admin/utils';
 import { generateModels } from '~/connectionResolvers';
 

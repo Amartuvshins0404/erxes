@@ -14,10 +14,6 @@ export const supplierMutations = {
 
     const supplier = await models.Supplier.updateSupplier(user._id, input);
 
-    // When the supplier (re)selects the POS they expose to mushop, enqueue a
-    // durable job to push that POS's existing catalog so it shows up in mushop
-    // without any manual trigger. Enqueue-and-forget — the profile save
-    // shouldn't block on it, and the job survives restarts / retries.
     if (supplier?.posToken && supplier.posToken !== previousPosToken) {
       enqueuePosBackfill(subdomain, supplier.posToken).catch((e) =>
         console.error('Failed to enqueue POS backfill:', e),
@@ -50,12 +46,7 @@ export const supplierMutations = {
         console.error('Failed to sync supplier code from mushop:', e);
       }
 
-      await sendMessage({
-        subdomain,
-        path: 'updateSupplier',
-        payload,
-        platform: 'blockadmin',
-      });
+      await sendMessage({ subdomain, path: 'updateSupplier', payload });
     }
 
     return supplier;

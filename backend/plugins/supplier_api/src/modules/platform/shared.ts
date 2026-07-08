@@ -34,24 +34,21 @@ interface ConsumerConfig {
 const getConsumers = (): ConsumerConfig[] => {
   const consumers: ConsumerConfig[] = [];
 
-  if (
-    process.env.MUSHOP_API_URL &&
-    (process.env.MUSHOP_SECRET || process.env.MUSHOP_PUBLIC_API_KEY)
-  ) {
+  if (process.env.MUSHOP_API_URL && process.env.MUSHOP_SECRET) {
     consumers.push({
       name: 'mushop',
       url: process.env.MUSHOP_API_URL,
-      secret: (process.env.MUSHOP_SECRET || process.env.MUSHOP_PUBLIC_API_KEY)!,
+      secret: process.env.MUSHOP_SECRET,
       bundleEnv: 'MUSHOP_SUPPLIER_BUNDLE_TYPE',
     });
   }
 
-  if (process.env.BLOCKADMIN_API_URL && process.env.BLOCK_ADMIN_SECRET) {
+  if (process.env.BLOCK_ADMIN_API_URL && process.env.BLOCK_ADMIN_SECRET) {
     consumers.push({
       name: 'blockadmin',
-      url: process.env.BLOCKADMIN_API_URL,
+      url: process.env.BLOCK_ADMIN_API_URL,
       secret: process.env.BLOCK_ADMIN_SECRET,
-      bundleEnv: 'BLOCKADMIN_SUPPLIER_BUNDLE_TYPE',
+      bundleEnv: 'BLOCK_ADMIN_SUPPLIER_BUNDLE_TYPE',
     });
   }
 
@@ -124,7 +121,7 @@ export const sendMessage = async ({
 
   if (!consumers.length) {
     console.error(
-      'No consumers configured (MUSHOP_API_URL / BLOCKADMIN_API_URL)',
+      'No consumers configured (MUSHOP_API_URL / BLOCK_ADMIN_API_URL)',
     );
     return;
   }

@@ -58,6 +58,6 @@ export const supplierOnly = <T extends Record<string, ResolverFn>>(
   guardResolvers(
     resolvers,
     async (subdomain) =>
-      await isValid(subdomain, ['MUSHOP_SUPPLIER_BUNDLE_TYPE','BLOCKADMIN_SUPPLIER_BUNDLE_TYPE']),
+      await isValid(subdomain, ['MUSHOP_SUPPLIER_BUNDLE_TYPE','BLOCK_ADMIN_SUPPLIER_BUNDLE_TYPE']),
     'This operation is only available for supplier organizations',
   );

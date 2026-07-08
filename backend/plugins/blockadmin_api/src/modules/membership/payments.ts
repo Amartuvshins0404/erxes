@@ -72,11 +72,17 @@ export const handleMembershipPayment = async (
     return;
   }
 
-  const planId = data.data?.planId || process.env.BLOCKADMIN_MEMBERSHIP_PLAN_ID;
+  let planId = data.data?.planId;
+
+  if (!planId) {
+    const plan = await models.MembershipPlan.findOne().lean();
+
+    planId = plan?._id;
+  }
 
   if (!planId) {
     console.error(
-      `[blockadmin:payments] Invoice ${data._id} missing planId — cannot determine membership duration`,
+      `[blockadmin:payments] Invoice ${data._id} could not be resolved to a plan`,
     );
 
     return;

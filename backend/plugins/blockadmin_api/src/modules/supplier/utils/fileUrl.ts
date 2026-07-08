@@ -14,7 +14,7 @@ export const toFileUrl = (
     return `http://localhost:4000/read-file?key=${key}`;
   }
 
-  const DOMAIN = getEnv({ name: 'SUPPLIER_DOMAIN', subdomain });
+  const DOMAIN = getEnv({ name: 'SUPPLIER_API_URL', subdomain });
 
   if (!DOMAIN) return null;
 

@@ -414,19 +414,19 @@ router.post('/collective-push', async (req: Request, res: Response) => {
 
     const categories = Array.from(categoryById.values());
 
-    const { SUPPLIER_API_URL, MUSHOP_SECRET } = process.env;
+    const { DOMAIN, MUSHOP_SECRET } = process.env;
 
-    if (!SUPPLIER_API_URL || !MUSHOP_SECRET) {
+    if (!DOMAIN || !MUSHOP_SECRET) {
       return res
         .status(500)
-        .json({ error: 'SUPPLIER_API_URL or MUSHOP_SECRET is not configured' });
+        .json({ error: 'DOMAIN or MUSHOP_SECRET is not configured' });
     }
 
     const baseUrl = isDev
-      ? SUPPLIER_API_URL
-      : SUPPLIER_API_URL.replace('<subdomain>', targetSubdomain);
+      ? DOMAIN
+      : DOMAIN.replace('<subdomain>', targetSubdomain);
 
-    const endpoint = `${baseUrl}/pl:supplier/webhook/mushop/collective`;
+    const endpoint = `${baseUrl}/gateway/pl:supplier/webhook/mushop/collective`;
 
     const body = JSON.stringify({
       subdomain: targetSubdomain,
@@ -640,19 +640,19 @@ router.post('/collective-purge-push', async (req: Request, res: Response) => {
       .map((p) => p?._id)
       .filter((id): id is string => !!id);
 
-    const { SUPPLIER_API_URL, MUSHOP_SECRET } = process.env;
+    const { DOMAIN, MUSHOP_SECRET } = process.env;
 
-    if (!SUPPLIER_API_URL || !MUSHOP_SECRET) {
+    if (!DOMAIN || !MUSHOP_SECRET) {
       return res
         .status(500)
-        .json({ error: 'SUPPLIER_API_URL or MUSHOP_SECRET is not configured' });
+        .json({ error: 'DOMAIN or MUSHOP_SECRET is not configured' });
     }
 
     const baseUrl = isDev
-      ? SUPPLIER_API_URL
-      : SUPPLIER_API_URL.replace('<subdomain>', targetSubdomain);
+      ? DOMAIN
+      : DOMAIN.replace('<subdomain>', targetSubdomain);
 
-    const endpoint = `${baseUrl}/pl:supplier/webhook/mushop/collective-purge`;
+    const endpoint = `${baseUrl}/gateway/pl:supplier/webhook/mushop/collective-purge`;
 
     const body = JSON.stringify({
       subdomain: targetSubdomain,

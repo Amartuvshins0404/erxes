@@ -1,6 +1,6 @@
 import { getEnv, sendTRPCMessage } from 'erxes-api-shared/utils';
 import { generateModels } from '~/connectionResolvers';
-import { sendMessage } from '~/modules/admin/utils';
+import { sendMessage } from '~/modules/platform/shared';
 
 const NODE_ENV = getEnv({ name: 'NODE_ENV', defaultValue: 'development' });
 
@@ -132,7 +132,7 @@ export const getPosCategoryIds = async (
   }
 };
 
-export const backfillPosToMushop = async (
+export const backfillPosCatalog = async (
   subdomain: string,
   posToken: string,
 ): Promise<void> => {
@@ -187,7 +187,6 @@ export const backfillPosToMushop = async (
         sendMessage({
           subdomain,
           path: 'syncProductCategory',
-          platform: 'mushop',
           payload: {
             entityId: category._id,
             data: {
@@ -206,7 +205,6 @@ export const backfillPosToMushop = async (
       sendMessage({
         subdomain,
         path: 'syncProduct',
-        platform: 'mushop',
         payload: buildProductSyncPayload(
           product,
           categoryById.get(product.categoryId) ?? null,
@@ -216,7 +214,7 @@ export const backfillPosToMushop = async (
       }),
     );
   } catch (e) {
-    console.error('backfillPosToMushop error:', e);
+    console.error('backfillPosCatalog error:', e);
   }
 };
 

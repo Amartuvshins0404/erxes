@@ -107,6 +107,13 @@ const getBundleTargets = async (
   return consumers.filter((c) => getEnv({ name: c.bundleEnv }) === bundleType);
 };
 
+export const getTargetPlatform = async (
+  subdomain: string,
+): Promise<ConsumerPlatform | null> => {
+  const targets = await getBundleTargets(subdomain, getConsumers());
+  return targets[0]?.name ?? null;
+};
+
 export const sendMessage = async ({
   subdomain,
   path,

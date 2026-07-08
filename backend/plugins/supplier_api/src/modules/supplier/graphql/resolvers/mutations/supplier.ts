@@ -1,6 +1,10 @@
 import { IContext } from '~/connectionResolvers';
 import { ISupplier } from '@/supplier/@types/supplier';
-import { requestMessage, sendMessage } from '~/modules/admin/utils';
+import {
+  getTargetPlatform,
+  requestMessage,
+  sendMessage,
+} from '~/modules/platform/shared';
 import { enqueuePosBackfill } from '~/workers/backfill';
 
 export const supplierMutations = {
@@ -26,24 +30,28 @@ export const supplierMutations = {
         data: { input, userId: user._id },
       };
 
-      try {
-        const res = await requestMessage<{ code?: string }>({
-          subdomain,
-          path: 'updateSupplier',
-          payload,
-          platform: 'mushop',
-        });
+      const platform = await getTargetPlatform(subdomain);
 
-        if (res?.code && !supplier.code) {
-          const withCode = await models.Supplier.findOneAndUpdate(
-            { _id: supplier._id },
-            { $set: { code: res.code } },
-            { new: true },
-          );
-          if (withCode) return withCode;
+      if (platform) {
+        try {
+          const res = await requestMessage<{ code?: string }>({
+            subdomain,
+            path: 'updateSupplier',
+            payload,
+            platform,
+          });
+
+          if (res?.code && !supplier.code) {
+            const withCode = await models.Supplier.findOneAndUpdate(
+              { _id: supplier._id },
+              { $set: { code: res.code } },
+              { new: true },
+            );
+            if (withCode) return withCode;
+          }
+        } catch (e) {
+          console.error(`Failed to sync supplier code from ${platform}:`, e);
         }
-      } catch (e) {
-        console.error('Failed to sync supplier code from mushop:', e);
       }
 
       await sendMessage({ subdomain, path: 'updateSupplier', payload });

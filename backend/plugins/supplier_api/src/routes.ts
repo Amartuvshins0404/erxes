@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { validationMiddleware } from '~/middlewares/validationMiddleware';
-import { router as platformWebhookRouter } from '@/platform/routes/webhook';
+import { router as platformWebhookRouter } from '@/supplier/routes/webhook';
 import { router as collectiveWebhookRouter } from '@/collective/routes/webhook';
 
 const router: Router = Router();

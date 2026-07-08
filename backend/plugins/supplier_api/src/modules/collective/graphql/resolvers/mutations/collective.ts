@@ -1,6 +1,6 @@
 import { IContext } from '~/connectionResolvers';
 import { ICollective } from '@/collective/@types/collective';
-import { requestMessage, sendMessage } from '~/modules/admin/utils';
+import { requestMessage, sendMessage } from '~/modules/platform/shared';
 
 export interface ICollectivePackageInput {
   name: string;

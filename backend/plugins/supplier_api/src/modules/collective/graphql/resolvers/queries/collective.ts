@@ -1,6 +1,6 @@
 import { markResolvers } from 'erxes-api-shared/utils';
 import { IContext } from '~/connectionResolvers';
-import { requestMessage } from '~/modules/admin/utils';
+import { requestMessage } from '~/modules/platform/shared';
 
 export const collectiveQueries = {
   getCollective: async (_root: undefined, _args: any, { models }: IContext) => {

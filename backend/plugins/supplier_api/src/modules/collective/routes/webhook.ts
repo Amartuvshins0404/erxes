@@ -8,7 +8,7 @@ import {
 } from 'erxes-api-shared/utils';
 import { splitType } from 'erxes-api-shared/core-modules';
 import { isValid } from '@/collective/utils/bundleGuard';
-import { sendMessage } from '~/modules/admin/utils';
+import { sendMessage } from '~/modules/platform/shared';
 import { generateModels } from '~/connectionResolvers';
 
 const COLLECTIVE_BUNDLE_TYPE = 'COLLECTIVE_BUNDLE_TYPE';
@@ -107,8 +107,6 @@ router.post('/collective', async (req: Request, res: Response) => {
     }
 
     const supplierLabel = supplierName || `Supplier ${supplierId}`;
-    // The supplier's unique, human-readable code drives all replicated codes
-    // (company / categories / products). Falls back to the id if absent.
     const supplierKey = supplierCode || supplierId;
 
     const companyId = deterministicObjectId(

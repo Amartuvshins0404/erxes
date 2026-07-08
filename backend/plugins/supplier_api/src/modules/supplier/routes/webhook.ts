@@ -1,15 +1,12 @@
 import { Router, Request, Response } from 'express';
 import { generateModels, IModels } from '~/connectionResolvers';
-import { ConsumerPlatform } from '~/modules/admin/utils';
+import { ConsumerPlatform } from '~/modules/platform/shared';
 import { SUPPLIER_VERIFICATION_STATUS } from '~/constants';
 
 const router: Router = Router();
 
 const ALLOWED_PLATFORMS: ConsumerPlatform[] = ['mushop', 'blockadmin'];
 
-// Routes are mounted at /webhook/:platform/...
-// e.g. POST /webhook/mushop/supplier
-//      POST /webhook/blockadmin/supplier
 
 interface PlatformWebhookCtx<TData = any> {
   platform: ConsumerPlatform;

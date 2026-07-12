@@ -183,7 +183,6 @@ When `ERXES_AGENT_NATIVE_CHAT_STORE=enable`:
 | `titler.ts` | LLM-call path removed; only the manual-precedence guard remains (§5) |
 | `learning/worker.ts` | idle/undistilled query + cursor against native threads (`metadata.distilledMessageCount`); messages via native list |
 | feedback (`mastraMessageFeedback`) | keys off the native message id; ownership via `resourceId` |
-| `schedules/runner.ts` | schedule output threads via the native store |
 | `session/db/*` custom models | removed in the final cleanup phase |
 
 ---

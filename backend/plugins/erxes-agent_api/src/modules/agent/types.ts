@@ -35,10 +35,9 @@ export interface TurnAuthCtx {
   turnStartedAt?: Date;
   turnPrompt?: string;
   resourceId?: string;
-  // True for unattended background runs (scheduled agent / frontline bot) whose
-  // BackgroundAuthCtx is passed here as the turn's auth context. Type-tracked so
-  // a future spread/rebuild of this ctx can't silently drop the flag the
-  // destructive-op defense-in-depth reads (getCurrentAuth().background).
+  // True for unattended frontline-bot execution. Workflow execution carries
+  // the same flag through BackgroundAuthCtx so destructive operations remain
+  // gated without live approval.
   background?: boolean;
 }
 

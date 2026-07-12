@@ -23,7 +23,6 @@ export interface IMastraAgentRow {
   isOwnAgent?: boolean;
   createdAt: string;
   workflowsCount?: number;
-  schedulesCount?: number;
 }
 
 interface IMastraAgentsMainResponse {

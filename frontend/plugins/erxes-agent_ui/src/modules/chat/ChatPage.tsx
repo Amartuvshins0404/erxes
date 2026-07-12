@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useApolloClient } from '@apollo/client';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { IconArrowDown } from '@tabler/icons-react';
-import { ChatAttachment, ApprovedOp, ReasoningEffort } from '~/modules/chat/types';
+import type { ChatAttachment, ApprovedOp, ReasoningEffort } from '~/modules/chat/types';
 import { chatStore } from '~/modules/chat/store/chatStore';
 import {
   useChatAgents,
@@ -19,12 +19,12 @@ import { useSessionBootstrap } from '~/modules/chat/hooks/useSessionBootstrap';
 import { withThreadParam } from '~/modules/chat/lib/threadParam';
 import {
   readChatMode,
-  readScheduleParam,
+  readWorkflowParam,
   withChatMode,
-  withScheduleParam,
+  withWorkflowParam,
   type ChatMode,
 } from '~/modules/chat/lib/chatMode';
-import { useSchedules } from '~/pages/schedules/hooks/useSchedules';
+import { useWorkflows } from '~/pages/workflows/hooks/useWorkflows';
 import { useIsNarrow } from '~/modules/chat/hooks/useIsNarrow';
 import { ChatPageHeader } from '~/modules/chat/components/ChatPageHeader';
 import { ChatSidePanel } from '~/modules/chat/components/ChatSidePanel';
@@ -36,7 +36,7 @@ import {
   SelectAgentEmpty,
   SkillDraftBanner,
 } from '~/modules/chat/components/ChatNotices';
-import { ScheduleTranscriptView } from '~/modules/chat/components/ScheduleTranscriptView';
+import { WorkflowChatView } from '~/modules/chat/components/WorkflowChatView';
 import { MessageList } from '~/modules/chat/components/MessageList';
 import { Composer } from '~/modules/chat/components/Composer';
 import { ApprovalBar } from '~/modules/chat/components/ApprovalBar';
@@ -77,18 +77,19 @@ export const ChatPage = () => {
       setSearchParams((prev) => withThreadParam(prev, threadId), { replace }),
     [setSearchParams],
   );
-  // Sessions sidebar mode (Chat | Scheduled), addressable via ?mode= exactly as
-  // the active conversation is via ?thread= — reload/deep-link restores it.
+  // Chat | Workflow is deep-linkable alongside the active thread.
   const chatMode = readChatMode(searchParams);
-  const scheduleParam = readScheduleParam(searchParams);
+  const workflowParam = readWorkflowParam(searchParams);
   const setChatMode = useCallback(
     (mode: ChatMode) =>
       setSearchParams((prev) => withChatMode(prev, mode), { replace: false }),
     [setSearchParams],
   );
-  const setScheduleParam = useCallback(
-    (scheduleId: string | undefined, replace = false) =>
-      setSearchParams((prev) => withScheduleParam(prev, scheduleId), { replace }),
+  const setWorkflowParam = useCallback(
+    (workflowId: string | undefined, replace = false) =>
+      setSearchParams((prev) => withWorkflowParam(prev, workflowId), {
+        replace,
+      }),
     [setSearchParams],
   );
   const [railOpen, setRailOpen] = useState(!agentId);
@@ -105,8 +106,7 @@ export const ChatPage = () => {
   const attachmentsEnabled = useAttachmentsEnabled();
   const voiceEnabled = useVoiceEnabled();
 
-  // The route is keyed by the agent record _id, but inbound links (e.g.
-  // Schedules → View output) may carry the agent slug — accept both.
+  // The route accepts either the agent record id or business agentId.
   const selectedAgent = useMemo(
     () =>
       agentId
@@ -157,41 +157,42 @@ export const ChatPage = () => {
   const { renameThread } = useRenameMastraThread();
   const { removeThread } = useRemoveMastraThread(selectedAgent?.agentId);
 
-  // Scheduled mode: the selected agent's schedules become the "sessions". Fetched
-  // by the agent's business id (mastraSchedules(agentId)); selecting one loads its
-  // transcript into the shared message view.
+  // Workflow mode lists only definitions owned by the selected agent.
   const {
-    schedules,
-    loading: schedulesLoading,
-    error: schedulesError,
-    refetch: refetchSchedules,
-  } = useSchedules(
-    selectedAgent?.agentId,
-    // Only fetch (and only trip the schedulesView permission check) once the
-    // sidebar is actually in Scheduled mode — a pure chat user never hits it.
-    chatMode !== 'scheduled',
+    workflows,
+    loading: workflowsLoading,
+    error: workflowsError,
+    refetch: refetchWorkflows,
+  } = useWorkflows(selectedAgent?.agentId, chatMode !== 'workflow');
+  const retryWorkflows = useCallback(() => {
+    void refetchWorkflows().catch(() => undefined);
+  }, [refetchWorkflows]);
+  const selectedWorkflow = useMemo(
+    () => workflows.find(({ _id }) => _id === workflowParam) ?? null,
+    [workflows, workflowParam],
   );
-  const retrySchedules = useCallback(() => {
-    void refetchSchedules().catch(() => undefined);
-  }, [refetchSchedules]);
-  const selectedSchedule = useMemo(
-    () => schedules.find((s) => s._id === scheduleParam) ?? null,
-    [schedules, scheduleParam],
-  );
-  const handleSelectSchedule = useCallback(
-    (scheduleId: string) => {
+  const handleSelectWorkflow = useCallback(
+    (workflowId: string) => {
       setSidebarOpen(false);
-      setScheduleParam(scheduleId);
+      setWorkflowParam(workflowId);
     },
-    [setScheduleParam],
+    [setWorkflowParam],
   );
-  // Auto-open the first schedule when entering Scheduled mode with none selected,
-  // so the view isn't an empty pane. `replace` keeps it out of the Back history.
   useEffect(() => {
-    if (chatMode !== 'scheduled') return;
-    if (scheduleParam || schedulesLoading || schedules.length === 0) return;
-    setScheduleParam(schedules[0]._id, true);
-  }, [chatMode, scheduleParam, schedulesLoading, schedules, setScheduleParam]);
+    if (chatMode !== 'workflow' || workflowsLoading || selectedWorkflow) return;
+    if (workflows.length === 0) {
+      if (workflowParam) setWorkflowParam(undefined, true);
+      return;
+    }
+    setWorkflowParam(workflows[0]._id, true);
+  }, [
+    chatMode,
+    workflowsLoading,
+    selectedWorkflow,
+    workflows,
+    workflowParam,
+    setWorkflowParam,
+  ]);
 
   const [input, setInput] = useState('');
   const [showScrollDown, setShowScrollDown] = useState(false);
@@ -614,12 +615,12 @@ export const ChatPage = () => {
             onRailOpen={handleRailOpen}
             sessionsError={!!threadsError}
             onRetrySessions={retrySessions}
-            schedules={schedules}
-            schedulesLoading={schedulesLoading}
-            schedulesError={!!schedulesError}
-            onRetrySchedules={retrySchedules}
-            scheduleParam={scheduleParam}
-            onSelectSchedule={handleSelectSchedule}
+            workflows={workflows}
+            workflowsLoading={workflowsLoading}
+            workflowsError={!!workflowsError}
+            onRetryWorkflows={retryWorkflows}
+            workflowParam={workflowParam}
+            onSelectWorkflow={handleSelectWorkflow}
           />
         )}
 
@@ -637,12 +638,8 @@ export const ChatPage = () => {
 
           {!selectedAgent ? (
             <SelectAgentEmpty />
-          ) : chatMode === 'scheduled' ? (
-            <ScheduleTranscriptView
-              agent={selectedAgent}
-              scheduleId={scheduleParam}
-              scheduleName={selectedSchedule?.name}
-            />
+          ) : chatMode === 'workflow' ? (
+            <WorkflowChatView workflow={selectedWorkflow} />
           ) : (
             <>
               <MessageList

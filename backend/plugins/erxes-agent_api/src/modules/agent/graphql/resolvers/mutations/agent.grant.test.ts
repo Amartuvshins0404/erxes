@@ -372,9 +372,8 @@ describe('mastraAgentUpdate grant assignment authorization', () => {
   });
 });
 
-// agentId immutability (defense-in-depth on Finding #1). agentId is the stable
-// business key schedules/workflows/learnings are scoped by, and was the spoof
-// vector. The UI freezes it after create; changing it via raw API is rejected.
+// agentId immutability: the stable workflow/learning ownership key cannot be
+// changed through the raw API.
 describe('mastraAgentUpdate agentId immutability', () => {
   it('rejects changing agentId to a different value (no update)', async () => {
     const { ctx, updateAgent } = makeCtx(

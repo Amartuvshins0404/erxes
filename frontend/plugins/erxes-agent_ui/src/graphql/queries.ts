@@ -35,6 +35,7 @@ export const WORKFLOW_FIELDS = gql`
     _id
     name
     description
+    agentId
     definition
     version
     isEnabled
@@ -43,27 +44,6 @@ export const WORKFLOW_FIELDS = gql`
   }
 `;
 
-export const SCHEDULE_FIELDS = gql`
-  fragment ScheduleFields on MastraSchedule {
-    _id
-    name
-    description
-    agentId
-    cron
-    timezone
-    prompt
-    isEnabled
-    threadId
-    lastRunAt
-    lastStatus
-    lastError
-    lastReply
-    lastDurationMs
-    runCount
-    createdAt
-    updatedAt
-  }
-`;
 
 export const MASTRA_AGENTS = gql`
   query MastraAgents {
@@ -100,7 +80,6 @@ export const MASTRA_AGENTS_MAIN = gql`
         isOwnAgent
         createdAt
         workflowsCount
-        schedulesCount
       }
       totalCount
     }
@@ -151,23 +130,6 @@ export const MASTRA_THREAD_ARTIFACTS = gql`
   }
 `;
 
-// Read-only transcript of a schedule's background run thread. Same MastraMessage
-// shape as mastraThreadMessages, but authorized by AGENT ACCESS (not thread
-// ownership) and read under the schedule's own principal — so a human who can
-// see the agent can read its scheduled runs.
-export const MASTRA_SCHEDULE_TRANSCRIPT = gql`
-  query MastraScheduleTranscript($scheduleId: String!) {
-    mastraScheduleTranscript(scheduleId: $scheduleId) {
-      _id
-      role
-      content
-      parts
-      meta
-      attachments
-      createdAt
-    }
-  }
-`;
 
 export const MASTRA_ATTACHMENT_STORAGE_STATUS = gql`
   query MastraAttachmentStorageStatus {
@@ -405,23 +367,6 @@ export const MASTRA_WORKFLOW = gql`
   ${WORKFLOW_FIELDS}
 `;
 
-export const MASTRA_SCHEDULES = gql`
-  query MastraSchedules($agentId: String) {
-    mastraSchedules(agentId: $agentId) {
-      ...ScheduleFields
-    }
-  }
-  ${SCHEDULE_FIELDS}
-`;
-
-export const MASTRA_SCHEDULE = gql`
-  query MastraSchedule($_id: String!) {
-    mastraSchedule(_id: $_id) {
-      ...ScheduleFields
-    }
-  }
-  ${SCHEDULE_FIELDS}
-`;
 
 export const MASTRA_WORKFLOW_RUNS = gql`
   query MastraWorkflowRuns($workflowId: String!, $page: Int, $perPage: Int) {

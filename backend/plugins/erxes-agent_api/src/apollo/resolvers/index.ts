@@ -3,7 +3,6 @@ import { queries } from './queries';
 import { mutations } from './mutations';
 import { agentCustomResolvers } from '@/agent/graphql/resolvers/queries/agent';
 import { learningCustomResolvers } from '@/learning/graphql/resolvers/queries/learning';
-import { scheduleCustomResolvers } from '@/schedule/graphql/resolvers/queries/schedule';
 import { skillCustomResolvers } from '@/skills/graphql/resolvers/queries/skills';
 
 export const resolvers = {
@@ -12,6 +11,5 @@ export const resolvers = {
   ...apolloCustomScalars,
   ...agentCustomResolvers,
   ...learningCustomResolvers,
-  ...scheduleCustomResolvers,
   ...skillCustomResolvers,
 };

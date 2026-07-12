@@ -1,8 +1,7 @@
 import { cloneElement, isValidElement, useId } from 'react';
 import { Card, Label } from 'erxes-ui';
 
-// Shared scaffolding for the plugin's create/edit pages (agents, workflows,
-// schedules) so each page lays out fields the same way.
+// Shared scaffolding for plugin create/edit pages.
 
 /** Card wrapper for one group of related form fields. */
 export const FormSection = ({

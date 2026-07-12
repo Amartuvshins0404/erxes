@@ -47,8 +47,7 @@ export const agentSchema = new Schema(
     temperature: { type: Number, min: 0, max: 2, label: 'Temperature' },
     isEnabled: { type: Boolean, default: true },
     createdBy: { type: String, label: 'Created By' },
-    // Background-run principal (Phase 3): bounded user whose gateway permissions
-    // background runs (bot/schedule) act under. Unset → defaults to createdBy.
+    // Permission group used by unattended workflow/bot service-user execution.
     ownerUserId: { type: String, label: 'Owner User' },
     // Agent-as-principal (step 21). serviceUserId: the agent's dedicated core
     // service user (passwordless, role:'system'), provisioned lazily by

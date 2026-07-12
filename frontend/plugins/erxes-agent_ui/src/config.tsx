@@ -1,11 +1,6 @@
-import {
-  IconBook2,
-  IconCalendarTime,
-  IconRobot,
-  IconSitemap,
-} from '@tabler/icons-react';
+import { IconBook2, IconRobot, IconSitemap } from '@tabler/icons-react';
 import { lazy, Suspense } from 'react';
-import { IUIConfig } from 'erxes-ui';
+import type { IUIConfig } from 'erxes-ui';
 
 const MastraSettingsNavigation = lazy(() =>
   import('@/MastraSettingsNavigation').then((module) => ({
@@ -61,11 +56,6 @@ export const CONFIG: IUIConfig = {
       // (the "Run agent workflow" action config UI) instead of showing the
       // "Plugin disabled" fallback.
       hasAutomation: true,
-    },
-    {
-      name: 'schedules',
-      icon: IconCalendarTime,
-      path: 'erxes-agent/schedules',
     },
   ],
 };

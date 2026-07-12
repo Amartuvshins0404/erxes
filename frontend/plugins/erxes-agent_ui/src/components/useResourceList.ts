@@ -1,11 +1,7 @@
 import { DocumentNode, OperationVariables } from '@apollo/client';
 import { useAuthedListQuery } from '~/hooks/useAuthedListQuery';
 
-// Network-only list fetch shared by the schedules and workflows index pages, so
-// the table reflects edits. `selector` pulls the row array out of the response.
-// `variables` scopes the query (e.g. per-agent lists pass an agentId filter).
-// Goes through `useAuthedListQuery` so the fetch waits for auth hydration and
-// surfaces `error` for a retry state (see PR #278).
+// Network-only resource list fetch with optional variables and lazy skip.
 export const useResourceList = <TData, TItem>(
   query: DocumentNode,
   selector: (data?: TData) => TItem[],

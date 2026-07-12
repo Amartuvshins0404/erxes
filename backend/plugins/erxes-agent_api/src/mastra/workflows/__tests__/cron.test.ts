@@ -11,6 +11,10 @@ describe('validateCron', () => {
     expect(validateCron('30 0 9 * * *')).toBe('30 0 9 * * *');
   });
 
+  it('accepts 7-field expressions supported by Mastra', () => {
+    expect(validateCron('0 30 9 * * * *')).toBe('0 30 9 * * * *');
+  });
+
   it('rejects empty and non-string input', () => {
     expect(() => validateCron('')).toThrow('required');
     expect(() => validateCron('   ')).toThrow('required');
@@ -19,8 +23,10 @@ describe('validateCron', () => {
   });
 
   it('rejects wrong field counts', () => {
-    expect(() => validateCron('0 9 * *')).toThrow('5 or 6 fields');
-    expect(() => validateCron('0 9 * * * * *')).toThrow('5 or 6 fields');
+    expect(() => validateCron('0 9 * *')).toThrow('5, 6, or 7 fields');
+    expect(() => validateCron('0 9 * * * * * *')).toThrow(
+      '5, 6, or 7 fields',
+    );
   });
 
   it('rejects fields with cron-unsafe characters', () => {

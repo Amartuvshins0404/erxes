@@ -243,12 +243,8 @@ async function buildAgentAndGateMemory(args: {
       : Promise.resolve(null),
   ]);
 
-  // Ownership gate: a CONTINUED thread must belong to this caller. getThreadById
-  // without a resource returns the thread whatever its owner; if it exists under
-  // a different resource it is someone else's session — reported as "not found"
-  // (no existence leak). Only in-app users own threads; bot/schedule resources
-  // are synthetic and self-scoped, so the gate is a no-op for them. (Building the
-  // agent for a thread that fails this check is harmless — the agent is cached.)
+  // Continued threads must belong to the caller. A thread under another
+  // resource is reported as not found; bot resources are synthetic/self-scoped.
   if (
     priorThread &&
     memoryBinding &&
@@ -260,14 +256,8 @@ async function buildAgentAndGateMemory(args: {
   return { agent, tools };
 }
 
-// Register the thread + its agent binding NOW, before the model streams, so the
-// session is listable the moment the turn starts — not only after it finishes.
-// This is what lets a refresh WHILE the agent is still running keep the session:
-// the sidebar query (listOwnedThreads → metadata.agentId) finds it, and reopening
-// it hydrates the persisted turn. patchNativeTurn re-stamps the same binding at
-// turn-end. In-app chat only (bot/schedule threads are not user-listable, and
-// their binding stamp at turn-end suffices). Best-effort: never block the turn on
-// a store hiccup (the end-of-turn stamp is the backstop).
+// Register before execution so a refresh can restore an in-flight session.
+// Best-effort: persistence failures must not block the turn.
 async function preRegisterThread(args: {
   identity: TurnIdentity;
   memoryBinding: MemoryBinding | undefined;
@@ -446,8 +436,7 @@ export async function prepareTurn(
     settings,
   });
 
-  // Only an in-app user can slash-activate skills (bot/schedule turns carry no
-  // composer). The user's id resolves their own reachable skills below.
+  // Only an in-app user can slash-activate skills; bot turns have no composer.
   const userId = identity.kind === 'user' ? identity.user?._id : undefined;
 
   const activated = await activateTurnSkills({
@@ -459,8 +448,8 @@ export async function prepareTurn(
 
   const authCtx = {
     userHeader,
-    // Interactive turns forward the user's own login token; bot/schedule turns
-    // (no login token) fall back to the configured app token.
+    // Interactive turns forward the user's login token; bot turns without one
+    // fall back to the configured app token.
     token: token ?? settings?.erxesApiToken,
     userId,
     threadId: sessionId,

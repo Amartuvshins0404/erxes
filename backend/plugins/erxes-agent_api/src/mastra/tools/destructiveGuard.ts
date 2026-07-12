@@ -40,12 +40,9 @@ export function resolveDestructiveOpsPolicy(
 
 /**
  * Whether a destructive mutation may run WITHOUT a per-op approval. True only
- * when the config grants 'allow' AND the run is attended. A background run (a
- * scheduled agent, the frontline bot, or an automation-triggered workflow) is
- * unattended and can never carry an approval, so destructive ops are ALWAYS
- * gated there regardless of the config — unattended deletes/merges must be
- * impossible. This is the single defense-in-depth rule both the chat/schedule
- * meta-tool gate and the workflow-runtime gate consult.
+ * when the config grants 'allow' AND the run is attended. Unattended workflow
+ * and frontline-bot runs can never carry approval, so destructive operations
+ * remain gated regardless of configuration.
  */
 export function destructiveOpsPreapproved(
   policy: DestructiveOpsPolicy,

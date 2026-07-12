@@ -389,8 +389,8 @@ export async function runWorkflow(args: {
  * Background (schedule- or automation-triggered) workflow entry point. Unlike a
  * manual run — which executes AS the requesting user (the mutation wraps it in
  * runWithAuth) — a background run has no user session, so it runs as the
- * workflow's OWNING AGENT (step 24): its principal is minted from that agent's
- * config, exactly as scheduled agent runs are.
+ * workflow's OWNING AGENT: its service-user principal is minted from that
+ * agent's configuration.
  *
  * A workflow with no owning agent (or one pointing at a deleted agent) has no
  * identity to run under, so it fails CLOSED — records a failed run and does NOT

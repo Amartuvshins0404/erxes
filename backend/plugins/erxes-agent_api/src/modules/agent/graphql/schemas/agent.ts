@@ -27,7 +27,6 @@ export const types = `
     createdAt: Date
     updatedAt: Date
     workflowsCount: Int
-    schedulesCount: Int
   }
 
   input MastraAgentInput {

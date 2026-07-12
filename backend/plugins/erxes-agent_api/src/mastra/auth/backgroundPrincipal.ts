@@ -1,13 +1,12 @@
 // ---------------------------------------------------------------------------
 // Background principal resolution — the single fail-closed entry point every
-// unattended run (scheduled agent, frontline bot, scheduled/automation-triggered
-// workflow) MUST go through before touching the gateway.
+// unattended run (frontline bot or scheduled/automation-triggered workflow)
+// MUST go through before touching the gateway.
 //
 // Background runs have no chatting user, so historically they fell back to the
 // admin app token — a privileged, identity-less principal. Combined with the
-// default tool policy (mode:'all'), that let a saved schedule/workflow — or any
-// untrusted text it ingests (prompt injection) — drive any mutation in any
-// plugin on a cron, as admin.
+// default tool policy (mode:'all'), that let a saved workflow — or any untrusted
+// text it ingests (prompt injection) — drive any mutation on a cron, as admin.
 //
 // Since step 22 each agent is its own principal: this resolver ensures the
 // agent's dedicated SERVICE USER exists, keeps its permission grant in sync, and
@@ -52,11 +51,10 @@ export type BackgroundPrincipalResult =
   | { ok: false; error: string };
 
 /**
- * The agent config a background run resolves its principal from. Every
- * background run (scheduled agent, frontline bot, and — since step 24 —
- * workflows, which carry a required `agentId`) resolves from an OWNING AGENT's
- * config. The resolver reads/persists the service-user lifecycle fields, so it
- * needs the full ServiceUserAgentConfig slice.
+ * Background workflows and frontline bots resolve from an OWNING AGENT's
+ * config via the workflow's required `agentId`. The resolver reads/persists the
+ * service-user lifecycle fields, so it needs the full ServiceUserAgentConfig
+ * slice.
  */
 export type OwnerSource = ServiceUserAgentConfig | null | undefined;
 
@@ -204,7 +202,7 @@ export async function resolveBackgroundPrincipal(opts: {
 export function backgroundRunEnableError(opts: {
   /** True when the config requests destructiveOps: 'allow'. */
   destructiveAllow: boolean;
-  /** 'schedule' | 'workflow' — used verbatim in the error message. */
+  /** Human-readable subject used verbatim in the error message. */
   subject: string;
   /** The erxes App token from Agent settings (settings.erxesApiToken). */
   appToken: string | undefined;
@@ -220,20 +218,10 @@ export function backgroundRunEnableError(opts: {
 }
 
 /**
- * A schedule-triggered workflow runs unattended on a cron, so — like an agent
- * schedule — it may only be ENABLED when the secure path is configured (the
- * erxes app token) and it does not run destructive ops without asking. Since
- * step 24 the preconditions resolve from the workflow's OWNING AGENT's config,
- * exactly as assertScheduleEnablable does for schedules: the destructive gate
- * reads the agent's destructiveOps (NOT the workflow creator or the definition).
- * A workflow with no owning agent (or one pointing at a missing OR DISABLED
- * agent) cannot be enabled at all: a disabled agent is the kill switch, and
- * without a live identity it can never mint a background token. Only 'schedule'
- * triggers are gated here; other triggers (manual/automation/webhook) either run
- * as a user or fail closed at runtime via runBackgroundWorkflow. Throws
- * ExpectedError on refusal so both the GraphQL mutations and the agent-facing
- * builder tools share one enable-time check (the tools convert the throw into
- * their structured failure result).
+ * Schedule-triggered workflows run unattended. Enabling therefore requires an
+ * enabled owning agent, the app token used to mint its service-user token, and
+ * a non-destructive unattended policy. Other triggers are validated by their
+ * own entry points and still fail closed in runBackgroundWorkflow.
  */
 export const assertWorkflowSchedulable = async (opts: {
   models: IModels;
@@ -247,9 +235,7 @@ export const assertWorkflowSchedulable = async (opts: {
       'Cannot enable this workflow: it has no owning agent — assign one before enabling.',
     );
   }
-  // Enable requires an ENABLED owning agent — a disabled agent is the kill
-  // switch (schedules gate on isEnabled too), so it must stop the workflows it
-  // owns from being armed, not just its own runs.
+  // A disabled owning agent is the background-execution kill switch.
   const agent = await opts.models.MastraAgent.findOne({
     agentId,
     isEnabled: true,

@@ -136,18 +136,6 @@ const SPECS: Spec[] = [
     extra: [action('workflowsRun', 'Run workflow', 'Manually execute a workflow')],
   },
   {
-    name: 'schedule',
-    description: 'Scheduled agent runs',
-    prefix: 'schedules',
-    noun: 'schedule',
-    view: 'List and read scheduled agent runs',
-    viewAlways: true,
-    edit: 'Update a schedule or enable/disable it',
-    extra: [
-      action('schedulesRun', 'Run schedule', 'Manually trigger a scheduled run now'),
-    ],
-  },
-  {
     name: 'learning',
     description: 'Agent learning & knowledge curation',
     prefix: 'learning',
@@ -226,7 +214,6 @@ export const permissions: IPermissionConfig = {
         grant('agent', ['agentsView', 'agentsChat', 'agentsCreate', 'agentsEdit', 'agentsRemove']),
         grant('provider', ['providersView']),
         grant('workflow', ['workflowsView', 'workflowsRun']),
-        grant('schedule', ['schedulesView']),
         grant('learning', ['learningView']),
         grant('skills', [
           'skillsView',
@@ -243,7 +230,6 @@ export const permissions: IPermissionConfig = {
       permissions: [
         grant('agent', ['agentsView']),
         grant('workflow', ['workflowsView']),
-        grant('schedule', ['schedulesView']),
         grant('learning', ['learningView']),
         grant('skills', ['skillsView']),
       ],

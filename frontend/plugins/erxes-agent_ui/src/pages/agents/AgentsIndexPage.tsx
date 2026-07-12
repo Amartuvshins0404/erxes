@@ -10,7 +10,6 @@ import {
   IconBook2,
   IconBuilding,
   IconBuildingCommunity,
-  IconCalendarTime,
   IconCpu,
   IconTool,
   IconCalendar,
@@ -72,11 +71,7 @@ const isConsoleShell = (basePath: string) => !basePath.startsWith('/settings');
 const agentOpenPath = (basePath: string, id: string) =>
   isConsoleShell(basePath) ? `${basePath}/${id}` : `${basePath}/edit/${id}`;
 
-/**
- * Deep-link to one of the agent workspace tabs (workflows/schedules/skills).
- * Only the console shell has the tabbed detail route; under Settings there is no
- * detail view, so every chip just opens the edit form.
- */
+/** Deep-link to an agent workspace tab when the console shell provides one. */
 const agentTabPath = (basePath: string, id: string, tab: string) =>
   isConsoleShell(basePath) ? `${basePath}/${id}/${tab}` : `${basePath}/edit/${id}`;
 
@@ -114,12 +109,7 @@ const CreateAgentButton = ({ children }: { children: React.ReactNode }) => {
   );
 };
 
-// ─── Resource summary chips ─────────────────────────────────────────────────
-//
-// A compact per-agent count of its workflows / schedules / skills using the same
-// tabler glyphs as the workspace tabs. Each chip deep-links to that agent's tab;
-// zero counts render muted (not hidden) so the affordance stays discoverable.
-// stopPropagation so a chip click navigates without also toggling row selection.
+// Compact per-agent workflow/skill counts link to their workspace tabs.
 
 const AgentResourcesCell = ({
   agent,
@@ -130,7 +120,6 @@ const AgentResourcesCell = ({
 }) => {
   const chips = [
     { icon: IconSitemap, count: agent.workflowsCount ?? 0, tab: 'workflows', label: 'workflows' },
-    { icon: IconCalendarTime, count: agent.schedulesCount ?? 0, tab: 'schedules', label: 'schedules' },
     { icon: IconBook2, count: agent.skills?.length ?? 0, tab: 'skills', label: 'skills' },
   ] as const;
 

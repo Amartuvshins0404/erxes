@@ -1,26 +1,27 @@
 import { ExpectedError } from 'erxes-api-shared/utils';
-import { IContext, IModels } from '~/connectionResolvers';
-import { validateDefinition, WorkflowDefinition } from '~/mastra/workflows/dsl';
+import type { IContext, IModels } from '~/connectionResolvers';
+import { validateDefinition } from '~/mastra/workflows/dsl';
+import type { WorkflowDefinition } from '~/mastra/workflows/dsl';
 import { buildManualEnvelope } from '~/mastra/workflows/envelope';
 import { runWorkflow } from '~/mastra/workflows/runtime';
 import { getOperationRegistry } from '~/mastra/tools/operationRegistry';
 import { runWithAuth } from '~/mastra/requestContext';
 import { assertWorkflowSchedulable } from '~/mastra/auth/backgroundPrincipal';
-import { IMastraWorkflow } from '@/workflow/@types/workflow';
+import type { IMastraWorkflow } from '@/workflow/@types/workflow';
 import { requireUserId } from '@/_shared/auth';
+import { syncTenantSchedules } from '~/mastra/scheduleSync';
 
 // The owning agent is the workflow's identity anchor (its background principal
-// and enable preconditions resolve from this agent). New workflows MUST name an
-// existing one; validated here by the same business agentId schedules use.
+// and enable preconditions resolve from this agent). New workflows must name an
+// existing enabled agent.
 const assertOwningAgentExists = async (models: IModels, agentId: unknown) => {
   if (typeof agentId !== 'string' || !agentId.trim()) {
     throw new ExpectedError(
       'A workflow must have an owning agent — set agentId to an existing agent.',
     );
   }
-  // Only an ENABLED agent may own a workflow: a disabled agent is the kill
-  // switch (schedules gate on isEnabled too), so it can't be handed new
-  // workflows to drive in the background.
+  // Only an enabled agent may own a workflow; disabling it is the background
+  // execution kill switch.
   const agent = await models.MastraAgent.findOne({
     agentId: agentId.trim(),
     isEnabled: true,
@@ -51,7 +52,7 @@ export const workflowMutations = {
   mastraWorkflowCreate: async (
     _parent: undefined,
     { doc }: { doc: IMastraWorkflow },
-    { models, user, checkPermission }: IContext,
+    { models, subdomain, user, checkPermission }: IContext,
   ) => {
     await checkPermission('workflowsCreate');
     const userId = requireUserId(user);
@@ -67,16 +68,18 @@ export const workflowMutations = {
         definition: doc.definition,
       });
     }
-    return models.MastraWorkflow.createWorkflow({
+    const created = await models.MastraWorkflow.createWorkflow({
       ...doc,
       createdByUserId: userId,
     });
+    await syncTenantSchedules(models, subdomain);
+    return created;
   },
 
   mastraWorkflowUpdate: async (
     _parent: undefined,
     { _id, doc }: { _id: string; doc: Partial<IMastraWorkflow> },
-    { models, user, checkPermission }: IContext,
+    { models, subdomain, user, checkPermission }: IContext,
   ) => {
     await checkPermission('workflowsEdit');
     requireUserId(user);
@@ -99,23 +102,27 @@ export const workflowMutations = {
         definition: (doc.definition ?? existing.definition) as WorkflowDefinition,
       });
     }
-    return models.MastraWorkflow.updateWorkflow(_id, doc);
+    const updated = await models.MastraWorkflow.updateWorkflow(_id, doc);
+    await syncTenantSchedules(models, subdomain);
+    return updated;
   },
 
   mastraWorkflowRemove: async (
     _parent: undefined,
     { _id }: { _id: string },
-    { models, user, checkPermission }: IContext,
+    { models, subdomain, user, checkPermission }: IContext,
   ) => {
     await checkPermission('workflowsRemove');
     requireUserId(user);
-    return models.MastraWorkflow.removeWorkflow(_id);
+    const removed = await models.MastraWorkflow.removeWorkflow(_id);
+    await syncTenantSchedules(models, subdomain);
+    return removed;
   },
 
   mastraWorkflowSetEnabled: async (
     _parent: undefined,
     { _id, isEnabled }: { _id: string; isEnabled: boolean },
-    { models, user, checkPermission }: IContext,
+    { models, subdomain, user, checkPermission }: IContext,
   ) => {
     await checkPermission('workflowsEdit');
     requireUserId(user);
@@ -129,7 +136,9 @@ export const workflowMutations = {
         definition: workflow.definition,
       });
     }
-    return models.MastraWorkflow.setEnabled(_id, isEnabled);
+    const updated = await models.MastraWorkflow.setEnabled(_id, isEnabled);
+    await syncTenantSchedules(models, subdomain);
+    return updated;
   },
 
   // Dry validation for the master agent's draft loop — returns structured

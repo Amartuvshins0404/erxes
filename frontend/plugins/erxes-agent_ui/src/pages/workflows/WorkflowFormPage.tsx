@@ -7,25 +7,30 @@ import {
 } from 'react-router-dom';
 import {
   IconArrowLeft,
+  IconBraces,
   IconCircleCheck,
+  IconCode,
+  IconEye,
   IconInfoCircle,
   IconSitemap,
+  IconWand,
 } from '@tabler/icons-react';
 import {
   Alert,
+  Badge,
   Breadcrumb,
   Button,
+  Card,
   Form,
   Input,
-  Label,
   Separator,
   Switch,
+  Tabs,
   Textarea,
   toast,
 } from 'erxes-ui';
 import { PageHeader } from 'ui-modules';
 import { FormSection } from '~/components/FormLayout';
-import { ResourceFormLayout } from '~/components/ResourceFormLayout';
 import { useResourceForm } from '~/components/useResourceForm';
 import { WorkflowGraph } from './graph/WorkflowGraph';
 import { useWorkflow } from './hooks/useWorkflow';
@@ -66,15 +71,13 @@ export const WorkflowFormPage = () => {
   const [searchParams] = useSearchParams();
   const isEdit = !!id;
 
-  // Every workflow is owned by an agent (step 24). When the form is opened from
-  // an agent's Workflows tab the owning agentId rides in on the query string;
-  // it's sent on create so the now-required owner is set (the old standalone
-  // create form omitted it and failed at the boundary).
+  // New workflows opened from an agent workspace inherit that business agentId.
   const presetAgentId = searchParams.get('agentId') || undefined;
 
   const [validation, setValidation] = useState<IWorkflowValidation | null>(
     null,
   );
+  const [editorView, setEditorView] = useState<'code' | 'preview'>('code');
 
   const { workflow } = useWorkflow(id, !isEdit);
 
@@ -128,6 +131,16 @@ export const WorkflowFormPage = () => {
     validate(definition);
   };
 
+  const handleFormat = () => {
+    if (!previewDefinition) return;
+    form.setValue(
+      'definitionText',
+      JSON.stringify(previewDefinition, null, 2),
+      { shouldDirty: true, shouldValidate: true },
+    );
+    setValidation(null);
+  };
+
   const onSubmit = (values: WorkflowFormValues) => {
     const definition = parseDefinition(values.definitionText);
     if (!definition) {
@@ -153,9 +166,10 @@ export const WorkflowFormPage = () => {
 
   const isSaving = creating || updating;
   const name = form.watch('name');
+  const isEnabled = form.watch('isEnabled');
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex h-full flex-col">
       <PageHeader>
         <PageHeader.Start>
           <Breadcrumb>
@@ -170,13 +184,16 @@ export const WorkflowFormPage = () => {
               </Breadcrumb.Item>
               <Breadcrumb.Separator />
               <Breadcrumb.Item>
-                <span className="text-muted-foreground">
-                  {isEdit ? 'Edit Workflow' : 'New Workflow'}
+                <span className="max-w-48 truncate text-muted-foreground">
+                  {isEdit ? workflow?.name || 'Edit workflow' : 'New workflow'}
                 </span>
               </Breadcrumb.Item>
             </Breadcrumb.List>
           </Breadcrumb>
           <Separator.Inline />
+          <Badge variant={isEnabled ? 'success' : 'secondary'}>
+            {isEnabled ? 'Enabled' : 'Disabled'}
+          </Badge>
         </PageHeader.Start>
         <PageHeader.End>
           <Button variant="outline" asChild>
@@ -189,166 +206,302 @@ export const WorkflowFormPage = () => {
             form="workflow-form"
             disabled={isSaving || !name}
           >
-            {isSaving ? 'Saving…' : isEdit ? 'Save Changes' : 'Create Workflow'}
+            {isSaving ? 'Saving…' : isEdit ? 'Save changes' : 'Create workflow'}
           </Button>
         </PageHeader.End>
       </PageHeader>
 
-      <div className="flex-1 overflow-auto p-4">
+      <div className="flex-1 overflow-auto bg-muted/20">
         <Form {...form}>
           <form
             id="workflow-form"
             onSubmit={form.handleSubmit(onSubmit)}
-            className="max-w-2xl mx-auto space-y-4"
+            className="mx-auto grid w-full max-w-7xl gap-4 p-4 lg:p-6 xl:grid-cols-[minmax(0,1fr)_21rem]"
           >
-            <FormSection title="Basic Info">
-              <Form.Field
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <Form.Item>
-                    <Form.Label>Name</Form.Label>
-                    <Form.Control>
-                      <Input {...field} placeholder="Daily lead follow-up" />
-                    </Form.Control>
-                    <Form.Message />
-                  </Form.Item>
-                )}
-              />
-
-              <Form.Field
-                control={form.control}
-                name="description"
-                render={({ field }) => (
-                  <Form.Item>
-                    <Form.Label>Description</Form.Label>
-                    <Form.Control>
-                      <Input {...field} placeholder="What this workflow does" />
-                    </Form.Control>
-                    <Form.Message />
-                  </Form.Item>
-                )}
-              />
-
-              <Form.Field
-                control={form.control}
-                name="isEnabled"
-                render={({ field }) => (
-                  <Form.Item className="flex items-center justify-between gap-4 space-y-0">
-                    <div>
-                      <Form.Label>Enabled</Form.Label>
-                      <Form.Description className="mt-0.5">
-                        Disabled workflows ignore schedule/automation triggers.
-                        Manual runs always work.
-                      </Form.Description>
-                    </div>
-                    <Form.Control>
-                      <Switch
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                    </Form.Control>
-                  </Form.Item>
-                )}
-              />
-            </FormSection>
-
-            <FormSection
-              title="Definition"
-              description="The workflow DSL as JSON. Most workflows are authored by agents in Chat — edit here only when you need manual control."
-            >
-              <Alert>
-                <IconInfoCircle className="size-4" />
-                <Alert.Title>Format</Alert.Title>
-                <Alert.Description>
-                  Steps: <code className="font-mono">operation</code>,{' '}
-                  <code className="font-mono">agent</code>,{' '}
-                  <code className="font-mono">branch</code>,{' '}
-                  <code className="font-mono">parallel</code>,{' '}
-                  <code className="font-mono">end</code>. Reference earlier data
-                  with{' '}
-                  <code className="font-mono">{'{{trigger.payload.x}}'}</code>{' '}
-                  and{' '}
-                  <code className="font-mono">{'{{steps.<id>.output.x}}'}</code>
-                  . Validate before saving — invalid definitions are rejected.
-                </Alert.Description>
-              </Alert>
-
-              <Form.Field
-                control={form.control}
-                name="definitionText"
-                render={({ field }) => (
-                  <Form.Item>
-                    <Form.Control>
-                      <Textarea
-                        value={field.value}
-                        onChange={(e) => {
-                          field.onChange(e.target.value);
-                          setValidation(null);
-                        }}
-                        onBlur={field.onBlur}
-                        rows={20}
-                        className="font-mono text-xs"
-                        spellCheck={false}
-                      />
-                    </Form.Control>
-                    <Form.Message />
-                  </Form.Item>
-                )}
-              />
-
-              <div className="flex items-center gap-3">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleValidate}
-                  disabled={validating}
-                >
-                  {validating ? 'Validating…' : 'Validate'}
-                </Button>
-                {validation?.ok && (
-                  <span className="flex items-center gap-1.5 text-sm text-success">
-                    <IconCircleCheck className="size-4" /> Definition is valid
-                  </span>
-                )}
-              </div>
-
-              {previewDefinition && (
-                <div className="space-y-1.5">
-                  <Label className="font-medium">Preview</Label>
-                  <WorkflowGraph
-                    definition={previewDefinition}
-                    className="h-80 rounded-md border border-border/60 bg-muted/20"
-                  />
+            <Card className="min-w-0 overflow-hidden shadow-none">
+              <Card.Header className="flex-row items-start justify-between gap-4 border-b pb-4">
+                <div className="space-y-1">
+                  <Card.Title className="text-base">
+                    Workflow builder
+                  </Card.Title>
+                  <Card.Description>
+                    Edit the definition as JSON or inspect its visual flow.
+                  </Card.Description>
                 </div>
-              )}
+                <Badge
+                  variant={
+                    validation?.ok
+                      ? 'success'
+                      : previewDefinition
+                      ? 'secondary'
+                      : 'destructive'
+                  }
+                  className="shrink-0"
+                >
+                  {validation?.ok
+                    ? 'Validated'
+                    : previewDefinition
+                    ? 'Valid JSON'
+                    : 'Invalid JSON'}
+                </Badge>
+              </Card.Header>
 
-              {validation && !validation.ok && (
-                <Alert variant="destructive">
-                  <Alert.Title>
-                    {validation.errors?.length || 0} validation error
-                    {(validation.errors?.length || 0) !== 1 ? 's' : ''}
-                  </Alert.Title>
-                  <Alert.Description>
-                    <ul className="space-y-1 mt-1">
-                      {(validation.errors || []).map((err) => (
-                        <li
-                          key={`${err.path ?? ''}|${err.message}`}
-                          className="text-sm"
+              <Card.Content className="p-0">
+                <Tabs
+                  value={editorView}
+                  onValueChange={(value) =>
+                    setEditorView(value === 'preview' ? 'preview' : 'code')
+                  }
+                >
+                  <div className="flex items-center justify-between gap-3 border-b px-4 py-2">
+                    <Tabs.List>
+                      <Tabs.Trigger value="code">
+                        <IconCode className="mr-1.5 size-4" />
+                        Code
+                      </Tabs.Trigger>
+                      <Tabs.Trigger value="preview">
+                        <IconEye className="mr-1.5 size-4" />
+                        Preview
+                      </Tabs.Trigger>
+                    </Tabs.List>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={handleFormat}
+                      disabled={!previewDefinition}
+                    >
+                      <IconWand />
+                      Format JSON
+                    </Button>
+                  </div>
+
+                  <Tabs.Content value="code" className="m-0">
+                    <Form.Field
+                      control={form.control}
+                      name="definitionText"
+                      render={({ field }) => (
+                        <Form.Item className="space-y-0">
+                          <Form.Control>
+                            <Textarea
+                              aria-label="Workflow definition"
+                              value={field.value}
+                              onChange={(event) => {
+                                field.onChange(event.target.value);
+                                setValidation(null);
+                              }}
+                              onBlur={field.onBlur}
+                              className="min-h-[28rem] resize-y rounded-none border-0 bg-transparent px-4 py-4 font-mono text-xs leading-5 focus-visible:ring-0 sm:min-h-[36rem] sm:px-5"
+                              spellCheck={false}
+                            />
+                          </Form.Control>
+                          <Form.Message className="px-5 pb-3" />
+                        </Form.Item>
+                      )}
+                    />
+
+                    <div className="flex flex-wrap items-center gap-3 border-t bg-muted/20 px-4 py-3">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleValidate}
+                        disabled={validating}
+                      >
+                        <IconCircleCheck />
+                        {validating ? 'Validating…' : 'Validate definition'}
+                      </Button>
+                      {validation?.ok ? (
+                        <span className="flex items-center gap-1.5 text-sm text-success">
+                          <IconCircleCheck className="size-4" />
+                          Ready to save
+                        </span>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">
+                          Validation checks step references, policies, and
+                          limits.
+                        </span>
+                      )}
+                    </div>
+
+                    {validation && !validation.ok && (
+                      <div className="border-t p-4">
+                        <Alert variant="destructive">
+                          <Alert.Title>
+                            {validation.errors?.length || 0} validation error
+                            {(validation.errors?.length || 0) !== 1 ? 's' : ''}
+                          </Alert.Title>
+                          <Alert.Description>
+                            <ul className="mt-1 space-y-1">
+                              {(validation.errors || []).map((error) => (
+                                <li
+                                  key={`${error.path ?? ''}|${error.message}`}
+                                  className="text-sm"
+                                >
+                                  {error.path && (
+                                    <code className="mr-1.5 font-mono text-xs">
+                                      {error.path}
+                                    </code>
+                                  )}
+                                  {error.message}
+                                </li>
+                              ))}
+                            </ul>
+                          </Alert.Description>
+                        </Alert>
+                      </div>
+                    )}
+                  </Tabs.Content>
+
+                  <Tabs.Content value="preview" className="m-0">
+                    {previewDefinition ? (
+                      <WorkflowGraph
+                        definition={previewDefinition}
+                        className="h-[30rem] border-0 bg-muted/10 sm:h-[42rem]"
+                      />
+                    ) : (
+                      <div className="flex h-[30rem] flex-col items-center justify-center gap-2 px-6 text-center sm:h-[42rem]">
+                        <div className="rounded-full bg-destructive/10 p-3 text-destructive">
+                          <IconBraces className="size-6" />
+                        </div>
+                        <p className="font-medium">Preview unavailable</p>
+                        <p className="max-w-sm text-sm text-muted-foreground">
+                          Fix the JSON syntax in the Code tab to restore the
+                          workflow diagram.
+                        </p>
+                      </div>
+                    )}
+                  </Tabs.Content>
+                </Tabs>
+              </Card.Content>
+            </Card>
+
+            <aside className="space-y-4 self-start xl:sticky xl:top-4">
+              <FormSection
+                title="Workflow details"
+                description="Give teammates enough context to recognize this workflow."
+              >
+                <Form.Field
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <Form.Item>
+                      <Form.Label>Name</Form.Label>
+                      <Form.Control>
+                        <Input {...field} placeholder="Daily lead follow-up" />
+                      </Form.Control>
+                      <Form.Message />
+                    </Form.Item>
+                  )}
+                />
+
+                <Form.Field
+                  control={form.control}
+                  name="description"
+                  render={({ field }) => (
+                    <Form.Item>
+                      <Form.Label>Description</Form.Label>
+                      <Form.Control>
+                        <Textarea
+                          {...field}
+                          rows={3}
+                          placeholder="What this workflow does"
+                        />
+                      </Form.Control>
+                      <Form.Message />
+                    </Form.Item>
+                  )}
+                />
+              </FormSection>
+
+              <FormSection title="Activation">
+                <Form.Field
+                  control={form.control}
+                  name="isEnabled"
+                  render={({ field }) => (
+                    <Form.Item className="flex items-start justify-between gap-4 space-y-0">
+                      <div className="space-y-1">
+                        <Form.Label>Enable workflow</Form.Label>
+                        <Form.Description>
+                          Scheduled and automated triggers run only while
+                          enabled. Manual runs remain available.
+                        </Form.Description>
+                      </div>
+                      <Form.Control>
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                          className="mt-0.5 shrink-0"
+                        />
+                      </Form.Control>
+                    </Form.Item>
+                  )}
+                />
+              </FormSection>
+
+              <FormSection
+                title="Definition guide"
+                description="Quick reference for the workflow DSL."
+              >
+                <div>
+                  <p className="mb-2 text-xs font-medium text-muted-foreground">
+                    STEP TYPES
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {['operation', 'agent', 'branch', 'parallel', 'end'].map(
+                      (type) => (
+                        <Badge
+                          key={type}
+                          variant="secondary"
+                          className="font-mono font-normal"
                         >
-                          {err.path && (
-                            <code className="font-mono text-xs mr-1.5">
-                              {err.path}
-                            </code>
-                          )}
-                          {err.message}
-                        </li>
-                      ))}
-                    </ul>
-                  </Alert.Description>
-                </Alert>
-              )}
-            </FormSection>
+                          {type}
+                        </Badge>
+                      ),
+                    )}
+                  </div>
+                </div>
+
+                <Separator />
+
+                <div className="space-y-2">
+                  <div className="flex items-start gap-2">
+                    <IconInfoCircle className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                    <p className="text-xs leading-5 text-muted-foreground">
+                      Reference trigger data with
+                      <code className="mx-1 rounded bg-muted px-1 py-0.5 font-mono">
+                        {'{{trigger.payload.x}}'}
+                      </code>
+                    </p>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <IconInfoCircle className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                    <p className="text-xs leading-5 text-muted-foreground">
+                      Reference earlier outputs with
+                      <code className="mx-1 rounded bg-muted px-1 py-0.5 font-mono">
+                        {'{{steps.<id>.output.x}}'}
+                      </code>
+                    </p>
+                  </div>
+                </div>
+              </FormSection>
+
+              <div className="flex gap-2 sm:hidden">
+                <Button
+                  type="submit"
+                  className="flex-1"
+                  disabled={isSaving || !name}
+                >
+                  {isSaving
+                    ? 'Saving…'
+                    : isEdit
+                    ? 'Save changes'
+                    : 'Create workflow'}
+                </Button>
+                <Button type="button" variant="outline" asChild>
+                  <Link to="/erxes-agent/workflows">Cancel</Link>
+                </Button>
+              </div>
+            </aside>
           </form>
         </Form>
       </div>

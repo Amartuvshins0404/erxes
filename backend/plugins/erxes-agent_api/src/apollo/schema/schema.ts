@@ -34,11 +34,6 @@ import {
   mutations as learningMutations,
 } from '@/learning/graphql/schemas/learning';
 import {
-  types as scheduleTypes,
-  queries as scheduleQueries,
-  mutations as scheduleMutations,
-} from '@/schedule/graphql/schemas/schedule';
-import {
   types as skillTypes,
   queries as skillQueriesSchema,
   mutations as skillMutationsSchema,
@@ -57,7 +52,6 @@ export const types = `
   ${sessionTypes}
   ${workflowTypes}
   ${learningTypes}
-  ${scheduleTypes}
   ${skillTypes}
   ${voiceTypes}
 `;
@@ -70,7 +64,6 @@ export const queries = `
   ${sessionQueries}
   ${workflowQueries}
   ${learningQueries}
-  ${scheduleQueries}
   ${skillQueriesSchema}
   ${voiceQueriesSchema}
 `;
@@ -83,7 +76,6 @@ export const mutations = `
   ${sessionMutations}
   ${workflowMutations}
   ${learningMutations}
-  ${scheduleMutations}
   ${skillMutationsSchema}
   ${voiceMutationsSchema}
 `;

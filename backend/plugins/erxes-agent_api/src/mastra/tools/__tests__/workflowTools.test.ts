@@ -485,8 +485,7 @@ describe('schedule-enable gate (agent builder tools)', () => {
     });
 
     it("refuses to enable when the OWNING AGENT is destructiveOps \"allow\"", async () => {
-      // app token present; the refusal now comes from the agent's destructiveOps,
-      // not the definition's — consistent with schedules.
+      // Refusal comes from the owning agent's destructiveOps policy.
       mockGetSettings.mockResolvedValue({
         erxesApiUrl: 'https://gw',
         erxesApiToken: APP_TOKEN,

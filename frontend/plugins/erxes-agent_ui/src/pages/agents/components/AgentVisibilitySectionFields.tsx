@@ -1,117 +1,182 @@
 import { useQuery } from '@apollo/client';
-import { Form, Select } from 'erxes-ui';
+import { Form, RadioGroup, Select } from 'erxes-ui';
+import { useTranslation } from 'react-i18next';
 import { UseFormReturn } from 'react-hook-form';
 import { FormSection } from '~/components/FormLayout';
-import { AGENT_FORM_BRANCHES, AGENT_FORM_DEPARTMENTS, AGENT_FORM_UNITS } from '~/graphql/queries';
+import {
+  AGENT_FORM_BRANCHES,
+  AGENT_FORM_DEPARTMENTS,
+  AGENT_FORM_UNITS,
+} from '~/graphql/queries';
 import { AgentFormValues } from '../validations';
 
-interface INamedItem { _id: string; title?: string | null }
-interface IUnit extends INamedItem { departmentId?: string | null }
+interface INamedItem {
+  _id: string;
+  title?: string | null;
+}
+
+interface IUnit extends INamedItem {
+  departmentId?: string | null;
+}
 
 export const AgentVisibilitySectionFields = ({
   form,
+  step,
 }: {
   form: UseFormReturn<AgentFormValues>;
+  step: number;
 }) => {
-  const visibility   = form.watch('visibility');
-  const teamId       = form.watch('teamId');
+  const { t } = useTranslation('mastra');
+  const visibility = form.watch('visibility');
+  const teamId = form.watch('teamId');
   const departmentId = form.watch('departmentId');
 
   const isScoped =
-    visibility === 'team' || visibility === 'department' || visibility === 'unit';
+    visibility === 'team' ||
+    visibility === 'department' ||
+    visibility === 'unit';
 
   const { data: branchData } = useQuery<{ branches: INamedItem[] }>(
     AGENT_FORM_BRANCHES,
     { skip: !isScoped },
   );
-  const { data: deptData } = useQuery<{ departments: INamedItem[] }>(
-    AGENT_FORM_DEPARTMENTS,
-    { skip: !isScoped },
-  );
-  const { data: unitData } = useQuery<{ units: IUnit[] }>(
-    AGENT_FORM_UNITS,
-    { skip: !isScoped },
-  );
+  const { data: departmentData } = useQuery<{
+    departments: INamedItem[];
+  }>(AGENT_FORM_DEPARTMENTS, { skip: !isScoped });
+  const { data: unitData } = useQuery<{ units: IUnit[] }>(AGENT_FORM_UNITS, {
+    skip: !isScoped,
+  });
 
-  const branches    = branchData?.branches ?? [];
-  const departments = deptData?.departments ?? [];
-  const units = (unitData?.units ?? []).filter((u) => u.departmentId === departmentId);
+  const branches = branchData?.branches ?? [];
+  const departments = departmentData?.departments ?? [];
+  const units = (unitData?.units ?? []).filter(
+    (unit) => unit.departmentId === departmentId,
+  );
 
   return (
     <FormSection
-      title="Visibility"
-      description="Control who can see and chat with this agent."
+      step={step}
+      title={t('agent-settings-visibility-title')}
+      description={t('agent-settings-visibility-description')}
     >
-      {/* ── Scope type ───────────────────────────────────────────────
-          Three modes: Private, Org-wide, or Scoped (cascade).
-          Switching to/from Scoped resets all cascade selections.     */}
       <Form.Field
         control={form.control}
         name="visibility"
-        render={({ field }) => (
-          <Form.Item>
-            <Form.Label>Access scope</Form.Label>
-            <Select
-              value={isScoped ? 'scoped' : field.value}
-              onValueChange={(v) => {
-                if (v === 'private' || v === 'org') {
-                  field.onChange(v);
-                  form.setValue('teamId', undefined);
-                  form.setValue('departmentId', undefined);
-                  form.setValue('unitId', undefined);
-                } else {
-                  // Enter cascade — default to branch-only scope until
-                  // the user picks deeper selections below.
-                  field.onChange('team');
-                  form.setValue('teamId', undefined);
-                  form.setValue('departmentId', undefined);
-                  form.setValue('unitId', undefined);
-                }
-              }}
-            >
+        render={({ field }) => {
+          const selectedScope = isScoped ? 'scoped' : field.value;
+
+          return (
+            <Form.Item>
+              <Form.Label>
+                {t('agent-settings-visibility-label')}
+              </Form.Label>
+              <Form.Description>
+                {t('agent-settings-visibility-help')}
+              </Form.Description>
               <Form.Control>
-                <Select.Trigger>
-                  <Select.Value />
-                </Select.Trigger>
+                <RadioGroup
+                  value={selectedScope}
+                  onValueChange={(value) => {
+                    if (value === 'private' || value === 'org') {
+                      field.onChange(value);
+                      form.setValue('teamId', undefined);
+                      form.setValue('departmentId', undefined);
+                      form.setValue('unitId', undefined);
+                      return;
+                    }
+
+                    field.onChange('team');
+                    form.setValue('teamId', undefined);
+                    form.setValue('departmentId', undefined);
+                    form.setValue('unitId', undefined);
+                  }}
+                  className="grid gap-3 pt-1 md:grid-cols-3"
+                >
+                  <label
+                    className={`flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors ${
+                      selectedScope === 'private'
+                        ? 'border-primary bg-primary/5'
+                        : 'hover:bg-muted/40'
+                    }`}
+                  >
+                    <RadioGroup.Item value="private" />
+                    <span className="min-w-0 space-y-1">
+                      <span className="block text-sm font-medium">
+                        {t('agent-settings-private')}
+                      </span>
+                      <span className="block text-xs text-muted-foreground">
+                        {t('agent-settings-private-description')}
+                      </span>
+                    </span>
+                  </label>
+
+                  <label
+                    className={`flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors ${
+                      selectedScope === 'scoped'
+                        ? 'border-primary bg-primary/5'
+                        : 'hover:bg-muted/40'
+                    }`}
+                  >
+                    <RadioGroup.Item value="scoped" />
+                    <span className="min-w-0 space-y-1">
+                      <span className="block text-sm font-medium">
+                        {t('agent-settings-specific-people')}
+                      </span>
+                      <span className="block text-xs text-muted-foreground">
+                        {t('agent-settings-specific-people-description')}
+                      </span>
+                    </span>
+                  </label>
+
+                  <label
+                    className={`flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors ${
+                      selectedScope === 'org'
+                        ? 'border-primary bg-primary/5'
+                        : 'hover:bg-muted/40'
+                    }`}
+                  >
+                    <RadioGroup.Item value="org" />
+                    <span className="min-w-0 space-y-1">
+                      <span className="block text-sm font-medium">
+                        {t('agent-settings-everyone')}
+                      </span>
+                      <span className="block text-xs text-muted-foreground">
+                        {t('agent-settings-everyone-description')}
+                      </span>
+                    </span>
+                  </label>
+                </RadioGroup>
               </Form.Control>
-              <Select.Content>
-                <Select.Item value="private">Private — only you</Select.Item>
-                <Select.Item value="scoped">Scoped — branch / department / team</Select.Item>
-                <Select.Item value="org">Org-wide — everyone</Select.Item>
-              </Select.Content>
-            </Select>
-            <Form.Description>
-              Private: only the creator. Scoped: members of the chosen branch, department, or team + the creator. Org-wide: any user with chat access.
-            </Form.Description>
-            <Form.Message />
-          </Form.Item>
-        )}
+              <Form.Message />
+            </Form.Item>
+          );
+        }}
       />
 
-      {/* ── Cascade: Branch → Department → Team ─────────────────────
-          Each step unlocks the next. The deepest selection sets the
-          backend visibility level automatically:
-            branch only          → visibility = 'team'
-            branch + dept        → visibility = 'department'
-            branch + dept + team → visibility = 'unit'              */}
       {isScoped && (
-        <>
-          {/* Step 1 — Branch (required) */}
+        <div className="space-y-4 rounded-lg border bg-muted/20 p-4">
+          <div>
+            <p className="text-sm font-medium">
+              {t('agent-settings-audience-title')}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {t('agent-settings-audience-description')}
+            </p>
+          </div>
+
           <Form.Field
             control={form.control}
             name="teamId"
             render={({ field }) => (
               <Form.Item>
                 <Form.Label>
-                  Branch <span className="text-destructive">*</span>
+                  {t('agent-settings-branch-required')}
                 </Form.Label>
                 <Select
                   value={field.value ?? ''}
-                  onValueChange={(v) => {
-                    const branchId = v || undefined;
+                  onValueChange={(value) => {
+                    const branchId = value || undefined;
                     field.onChange(branchId);
-                    // Changing the branch resets deeper selections and
-                    // reverts to branch-only scope.
                     form.setValue('departmentId', undefined);
                     form.setValue('unitId', undefined);
                     form.setValue('visibility', 'team');
@@ -119,13 +184,15 @@ export const AgentVisibilitySectionFields = ({
                 >
                   <Form.Control>
                     <Select.Trigger>
-                      <Select.Value placeholder="Select a branch…" />
+                      <Select.Value
+                        placeholder={t('agent-settings-select-branch')}
+                      />
                     </Select.Trigger>
                   </Form.Control>
                   <Select.Content>
-                    {branches.map((b) => (
-                      <Select.Item key={b._id} value={b._id}>
-                        {b.title ?? b._id}
+                    {branches.map((branch) => (
+                      <Select.Item key={branch._id} value={branch._id}>
+                        {branch.title ?? branch._id}
                       </Select.Item>
                     ))}
                   </Select.Content>
@@ -135,93 +202,108 @@ export const AgentVisibilitySectionFields = ({
             )}
           />
 
-          {/* Step 2 — Department (optional, unlocks after branch) */}
-          <Form.Field
-            control={form.control}
-            name="departmentId"
-            render={({ field }) => (
-              <Form.Item>
-                <Form.Label className={!teamId ? 'opacity-50' : ''}>
-                  Department
-                  <span className="ml-1 text-xs text-muted-foreground">(optional)</span>
-                </Form.Label>
-                <Select
-                  value={field.value ?? ''}
-                  disabled={!teamId}
-                  onValueChange={(v) => {
-                    const deptId = v || undefined;
-                    field.onChange(deptId);
-                    // Changing dept resets the team selection.
-                    form.setValue('unitId', undefined);
-                    form.setValue('visibility', deptId ? 'department' : 'team');
-                  }}
-                >
-                  <Form.Control>
-                    <Select.Trigger>
-                      <Select.Value
-                        placeholder={teamId ? 'Select a department…' : 'Select a branch first'}
-                      />
-                    </Select.Trigger>
-                  </Form.Control>
-                  <Select.Content>
-                    {departments.map((d) => (
-                      <Select.Item key={d._id} value={d._id}>
-                        {d.title ?? d._id}
-                      </Select.Item>
-                    ))}
-                  </Select.Content>
-                </Select>
-                <Form.Message />
-              </Form.Item>
-            )}
-          />
-
-          {/* Step 3 — Team / Unit (optional, unlocks after department,
-                      filtered client-side by departmentId) */}
-          <Form.Field
-            control={form.control}
-            name="unitId"
-            render={({ field }) => (
-              <Form.Item>
-                <Form.Label className={!departmentId ? 'opacity-50' : ''}>
-                  Team
-                  <span className="ml-1 text-xs text-muted-foreground">(optional)</span>
-                </Form.Label>
-                <Select
-                  value={field.value ?? ''}
-                  disabled={!departmentId}
-                  onValueChange={(v) => {
-                    const unitId = v || undefined;
-                    field.onChange(unitId);
-                    form.setValue('visibility', unitId ? 'unit' : 'department');
-                  }}
-                >
-                  <Form.Control>
-                    <Select.Trigger>
-                      <Select.Value
-                        placeholder={departmentId ? 'Select a team…' : 'Select a department first'}
-                      />
-                    </Select.Trigger>
-                  </Form.Control>
-                  <Select.Content>
-                    {units.length === 0 ? (
-                      <div className="px-3 py-2 text-sm text-muted-foreground">
-                        No teams in this department
-                      </div>
-                    ) : (
-                      units.map((u) => (
-                        <Select.Item key={u._id} value={u._id}>
-                          {u.title ?? u._id}
+          <div className="grid gap-4 md:grid-cols-2">
+            <Form.Field
+              control={form.control}
+              name="departmentId"
+              render={({ field }) => (
+                <Form.Item>
+                  <Form.Label className={!teamId ? 'opacity-50' : ''}>
+                    {t('agent-settings-department-optional')}
+                  </Form.Label>
+                  <Select
+                    value={field.value ?? ''}
+                    disabled={!teamId}
+                    onValueChange={(value) => {
+                      const selectedDepartmentId = value || undefined;
+                      field.onChange(selectedDepartmentId);
+                      form.setValue('unitId', undefined);
+                      form.setValue(
+                        'visibility',
+                        selectedDepartmentId ? 'department' : 'team',
+                      );
+                    }}
+                  >
+                    <Form.Control>
+                      <Select.Trigger>
+                        <Select.Value
+                          placeholder={
+                            teamId
+                              ? t('agent-settings-select-department')
+                              : t('agent-settings-select-branch-first')
+                          }
+                        />
+                      </Select.Trigger>
+                    </Form.Control>
+                    <Select.Content>
+                      {departments.map((department) => (
+                        <Select.Item
+                          key={department._id}
+                          value={department._id}
+                        >
+                          {department.title ?? department._id}
                         </Select.Item>
-                      ))
-                    )}
-                  </Select.Content>
-                </Select>
-                <Form.Message />
-              </Form.Item>
-            )}
-          />
-        </>
+                      ))}
+                    </Select.Content>
+                  </Select>
+                  <Form.Message />
+                </Form.Item>
+              )}
+            />
+
+            <Form.Field
+              control={form.control}
+              name="unitId"
+              render={({ field }) => (
+                <Form.Item>
+                  <Form.Label
+                    className={!departmentId ? 'opacity-50' : ''}
+                  >
+                    {t('agent-settings-team-optional')}
+                  </Form.Label>
+                  <Select
+                    value={field.value ?? ''}
+                    disabled={!departmentId}
+                    onValueChange={(value) => {
+                      const unitId = value || undefined;
+                      field.onChange(unitId);
+                      form.setValue(
+                        'visibility',
+                        unitId ? 'unit' : 'department',
+                      );
+                    }}
+                  >
+                    <Form.Control>
+                      <Select.Trigger>
+                        <Select.Value
+                          placeholder={
+                            departmentId
+                              ? t('agent-settings-select-team')
+                              : t('agent-settings-select-department-first')
+                          }
+                        />
+                      </Select.Trigger>
+                    </Form.Control>
+                    <Select.Content>
+                      {units.length === 0 ? (
+                        <div className="px-3 py-2 text-sm text-muted-foreground">
+                          {t('agent-settings-no-teams')}
+                        </div>
+                      ) : (
+                        units.map((unit) => (
+                          <Select.Item key={unit._id} value={unit._id}>
+                            {unit.title ?? unit._id}
+                          </Select.Item>
+                        ))
+                      )}
+                    </Select.Content>
+                  </Select>
+                  <Form.Message />
+                </Form.Item>
+              )}
+            />
+          </div>
+        </div>
       )}
     </FormSection>
   );

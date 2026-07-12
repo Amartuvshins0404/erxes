@@ -110,8 +110,7 @@ describe('mastraWorkflowCreate ownership', () => {
   });
 
   it('rejects creating a workflow whose owning agent is DISABLED (kill switch)', async () => {
-    // The agent exists but isEnabled:false — a disabled agent must not be handed
-    // new workflows to drive, exactly as schedules refuse a disabled agent.
+    // A disabled agent cannot own a new background-capable workflow.
     const { ctx, createWorkflow } = makeCtx({
       agentId: 'off',
       isEnabled: false,

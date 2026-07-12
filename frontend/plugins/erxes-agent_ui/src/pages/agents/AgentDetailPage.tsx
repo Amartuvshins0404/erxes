@@ -11,7 +11,6 @@ import {
 import {
   IconBook2,
   IconBulb,
-  IconCalendarTime,
   IconRobot,
   IconSettings,
   IconShieldLock,
@@ -30,17 +29,11 @@ import { useAgentsBasePath } from './hooks/useAgentsBasePath';
 import { AgentSkillsTab } from './components/AgentSkillsTab';
 import { AgentAccessTab } from './components/AgentAccessTab';
 
-// The tab pages are the existing resource index pages, reused in `embedded`
-// mode and scoped to this agent's business agentId (workflows/schedules/
-// learnings) — plus the shared agent edit form for Settings.
+// Existing resource pages are embedded and scoped to this agent's business
+// agentId, alongside skills, access, learnings, and settings.
 const WorkflowsIndexPage = lazy(() =>
   import('~/pages/workflows/WorkflowsIndexPage').then((m) => ({
     default: m.WorkflowsIndexPage,
-  })),
-);
-const SchedulesIndexPage = lazy(() =>
-  import('~/pages/schedules/SchedulesIndexPage').then((m) => ({
-    default: m.SchedulesIndexPage,
   })),
 );
 const LearningsIndexPage = lazy(() =>
@@ -54,7 +47,6 @@ const AgentFormPage = lazy(() =>
 
 const TABS = [
   { value: 'workflows', label: 'Workflows', icon: IconSitemap },
-  { value: 'schedules', label: 'Schedules', icon: IconCalendarTime },
   { value: 'skills', label: 'Skills', icon: IconBook2 },
   { value: 'learnings', label: 'Learnings', icon: IconBulb },
   { value: 'access', label: 'Access', icon: IconShieldLock },
@@ -66,11 +58,7 @@ type TabValue = (typeof TABS)[number]['value'];
 const isTab = (value: string): value is TabValue =>
   TABS.some((t) => t.value === value);
 
-/**
- * Per-agent workspace: one agent selected from the Agents list, its workflows,
- * schedules, skills, learnings and settings grouped behind tabs. Each tab is the
- * existing resource view, scoped to this agent (see step 25 — per-agent UI).
- */
+/** Per-agent workspace with every resource scoped to the selected agent. */
 export const AgentDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -155,12 +143,6 @@ export const AgentDetailPage = () => {
               path="workflows"
               element={
                 <WorkflowsIndexPage agentId={agent.agentId} embedded />
-              }
-            />
-            <Route
-              path="schedules"
-              element={
-                <SchedulesIndexPage agentId={agent.agentId} embedded />
               }
             />
             <Route

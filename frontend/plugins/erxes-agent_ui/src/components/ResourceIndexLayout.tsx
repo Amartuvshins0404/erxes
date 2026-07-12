@@ -60,9 +60,7 @@ interface ResourceIndexLayoutProps<T> {
   embedded?: boolean;
 }
 
-// Shared shell for the plugin's resource index pages (agents, schedules,
-// workflows, learnings): breadcrumb header with an optional new-button / extras,
-// an empty-state, and the record table with its loading-skeleton switch.
+// Shared index shell: actions, empty state, table, and loading skeleton.
 export const ResourceIndexLayout = <T,>({
   icon: Icon,
   title,

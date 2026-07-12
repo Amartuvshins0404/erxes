@@ -1,16 +1,13 @@
 import { memo } from 'react';
-import { IconCalendarClock, IconMessageCircle } from '@tabler/icons-react';
+import { IconMessageCircle, IconSitemap } from '@tabler/icons-react';
 import { cn } from 'erxes-ui';
-import { ChatMode } from '~/modules/chat/lib/chatMode';
+import type { ChatMode } from '~/modules/chat/lib/chatMode';
 
-// Segmented [ Chat | Scheduled ] control at the top of the sessions sidebar.
-// Chat = the human's own conversations (today's behavior); Scheduled = the
-// selected agent's schedule run transcripts (read-only). Built as a list of
-// options so a future `Triggered` mode is one array entry, not a redesign.
+// Segmented Chat | Workflow control for the selected agent.
 const MODES: { mode: ChatMode; label: string; icon: typeof IconMessageCircle }[] =
   [
     { mode: 'chat', label: 'Chat', icon: IconMessageCircle },
-    { mode: 'scheduled', label: 'Scheduled', icon: IconCalendarClock },
+    { mode: 'workflow', label: 'Workflow', icon: IconSitemap },
   ];
 
 export const SessionModeToggle = memo(

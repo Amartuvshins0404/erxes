@@ -7,6 +7,8 @@ import { router } from './routes';
 import { appRouter } from '~/trpc/init-trpc';
 import { automations } from '~/meta/automations';
 import { permissions } from '~/meta/permissions';
+import { initMastraScheduler } from '~/mastra/scheduler';
+import { backfillWorkflowAgents } from '~/mastra/workflows/agentBackfill';
 
 startPlugin({
   name: 'erxes-agent',
@@ -80,31 +82,10 @@ startPlugin({
     // or a whole tenant failing) is simply retried on the next boot — it is not
     // a hard, exactly-once guarantee that every unassignable workflow is disabled
     // before anything else runs.
-    {
-      const { backfillWorkflowAgents } = await import(
-        '~/mastra/workflows/agentBackfill'
-      );
-      await backfillWorkflowAgents();
-    }
+    await backfillWorkflowAgents();
 
-    // Workflow schedule trigger: reconcile BullMQ job schedulers with enabled
-    // schedule-workflows (boot kick + every 5 minutes).
-    {
-      const [{ initWorkflowSchedules }, { redis }] = await Promise.all([
-        import('~/mastra/workflows/scheduler'),
-        import('erxes-api-shared/utils'),
-      ]);
-      await initWorkflowSchedules(redis);
-    }
-
-    // Agent schedules: reconcile BullMQ job schedulers with enabled
-    // MastraSchedule documents (boot kick + every 5 minutes).
-    {
-      const [{ initAgentSchedules }, { redis }] = await Promise.all([
-        import('~/mastra/schedules/scheduler'),
-        import('erxes-api-shared/utils'),
-      ]);
-      await initAgentSchedules(redis);
-    }
+    // Mastra owns recurrence, claiming, dispatch, and trigger history for
+    // schedule-triggered workflow definitions.
+    await initMastraScheduler();
   },
 });

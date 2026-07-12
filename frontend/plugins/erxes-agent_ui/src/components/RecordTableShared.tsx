@@ -20,9 +20,7 @@ import {
 import { PermissionButton } from './PermissionButton';
 import { SortState } from './useTableSort';
 
-// Bits shared by the plugin's record tables (agents, workflows, schedules)
-// so the row menus, identity cells, badges and status columns stay identical
-// across the lists.
+// Shared record-table cells and columns for plugin resources.
 
 // ─── Identity cell ──────────────────────────────────────────────────────────────
 //

@@ -467,7 +467,7 @@ export function buildErxesMetaTools(params: {
       // hard-refuses. Enforced here, beside the policy check, so the boundary
       // holds even if the model guesses a name.
       //
-      // Defense-in-depth: a background run (scheduled agent / bot) is unattended,
+      // Defense-in-depth: a background workflow/bot is unattended,
       // so it can never carry an approval — force 'ask' regardless of the agent's
       // destructiveOps, making destructive ops impossible without a human even if
       // the agent is configured 'allow'.

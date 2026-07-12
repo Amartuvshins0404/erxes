@@ -17,6 +17,7 @@ import { buildManualEnvelope } from '../workflows/envelope';
 import { runWorkflow } from '../workflows/runtime';
 import { assertWorkflowSchedulable } from '../auth/backgroundPrincipal';
 import { getOperationRegistry, OperationRegistry } from './operationRegistry';
+import { syncTenantSchedules } from '../scheduleSync';
 
 /**
  * Builder tools — what turns a chat agent into the workflow MASTER AGENT
@@ -109,9 +110,8 @@ function currentAgentId(): string | undefined {
 }
 
 /**
- * The referenced agent must exist AND be enabled before a workflow can be owned
- * by it: a disabled agent is the kill switch (schedules gate on isEnabled too),
- * so ownership can't be handed to one — its background runs would be refused.
+ * The referenced owning agent must exist and be enabled; disabling it is the
+ * background workflow kill switch.
  */
 async function assertAgentExists(
   models: Awaited<ReturnType<typeof getModels>>,
@@ -517,6 +517,7 @@ export const workflowSaveTool = tool({
           isEnabled: Boolean(enable),
           createdByUserId: currentUserId(),
         });
+        await syncTenantSchedules(models, tenant());
         return { success: true, workflowId: doc._id, version: doc.version };
       } catch (e) {
         return fail(e);
@@ -605,6 +606,7 @@ export const workflowUpdateTool = tool({
           workflowId,
           patch,
         );
+        await syncTenantSchedules(models, tenant());
         return { success: true, version: doc.version };
       } catch (e) {
         return fail(e);

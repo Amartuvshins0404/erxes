@@ -1,16 +1,15 @@
 import { cn } from 'erxes-ui';
-import { IChatAgent } from '~/modules/chat/hooks/useChatAgents';
-import { IMastraThread } from '~/modules/chat/types';
+import type { IChatAgent } from '~/modules/chat/hooks/useChatAgents';
+import type { IMastraThread } from '~/modules/chat/types';
 import type { ChatMode } from '~/modules/chat/lib/chatMode';
-import { ISchedule } from '~/pages/schedules/types';
+import type { IWorkflow } from '~/pages/workflows/types';
 import { AgentRail } from '~/modules/chat/components/AgentRail';
 import { SessionList } from '~/modules/chat/components/SessionList';
 import { SessionModeToggle } from '~/modules/chat/components/SessionModeToggle';
-import { ScheduleSessionList } from '~/modules/chat/components/ScheduleSessionList';
+import { WorkflowSessionList } from '~/modules/chat/components/WorkflowSessionList';
 
-// Side panel: the AgentRail ↔ SessionList/ScheduleSessionList slide. Hidden in
-// voice mode (the parent gates on that); on narrow screens it becomes an
-// off-canvas drawer over the chat.
+// Side panel: the AgentRail ↔ Chat/Workflow lists slide. On narrow screens it
+// becomes an off-canvas drawer over the chat.
 export const ChatSidePanel = ({
   asDrawer,
   sidebarOpen,
@@ -37,12 +36,12 @@ export const ChatSidePanel = ({
   onRailOpen,
   sessionsError,
   onRetrySessions,
-  schedules,
-  schedulesLoading,
-  schedulesError,
-  onRetrySchedules,
-  scheduleParam,
-  onSelectSchedule,
+  workflows,
+  workflowsLoading,
+  workflowsError,
+  onRetryWorkflows,
+  workflowParam,
+  onSelectWorkflow,
 }: {
   asDrawer: boolean;
   sidebarOpen: boolean;
@@ -72,12 +71,12 @@ export const ChatSidePanel = ({
   onRailOpen: () => void;
   sessionsError?: boolean;
   onRetrySessions?: () => void;
-  schedules: ISchedule[];
-  schedulesLoading: boolean;
-  schedulesError?: boolean;
-  onRetrySchedules?: () => void;
-  scheduleParam?: string;
-  onSelectSchedule: (scheduleId: string) => void;
+  workflows: IWorkflow[];
+  workflowsLoading: boolean;
+  workflowsError?: boolean;
+  onRetryWorkflows?: () => void;
+  workflowParam?: string;
+  onSelectWorkflow: (workflowId: string) => void;
 }) => {
   return (
     <>
@@ -141,14 +140,14 @@ export const ChatSidePanel = ({
                     onRetry={onRetrySessions}
                   />
                 ) : (
-                  <ScheduleSessionList
-                    schedules={schedules}
-                    loading={schedulesLoading}
-                    activeScheduleId={scheduleParam}
-                    onSelect={onSelectSchedule}
+                  <WorkflowSessionList
+                    workflows={workflows}
+                    loading={workflowsLoading}
+                    activeWorkflowId={workflowParam}
+                    onSelect={onSelectWorkflow}
                     onBack={onRailOpen}
-                    hasError={schedulesError}
-                    onRetry={onRetrySchedules}
+                    hasError={workflowsError}
+                    onRetry={onRetryWorkflows}
                   />
                 )}
               </div>

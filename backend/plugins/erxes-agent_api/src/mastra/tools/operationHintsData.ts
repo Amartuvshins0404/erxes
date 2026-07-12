@@ -218,9 +218,6 @@ export const OPERATION_HINTS: Record<string, OperationHint> = {
       'plugin must be a clawhub:<id> or pinned npm identifier; an unpinned plugin also needs a version arg, and an inline pin and a version arg cannot both be set',
     ],
   },
-  mastraScheduleUpdate: {
-    rules: ['doc.agentId, when provided, must be a non-empty string'],
-  },
   setOpencodeApiKey: {
     rules: [
       'input.apiKey must be non-empty after trimming',

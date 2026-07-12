@@ -60,17 +60,6 @@ const SkillFormPage = lazy(() =>
   })),
 );
 
-const SchedulesIndexPage = lazy(() =>
-  import('~/pages/schedules/SchedulesIndexPage').then((m) => ({
-    default: m.SchedulesIndexPage,
-  })),
-);
-
-const ScheduleFormPage = lazy(() =>
-  import('~/pages/schedules/ScheduleFormPage').then((m) => ({
-    default: m.ScheduleFormPage,
-  })),
-);
 
 const MastraMain = () => {
   return (
@@ -80,9 +69,8 @@ const MastraMain = () => {
       <Route path="/agents" element={<AgentsIndexPage />} />
       <Route path="/agents/new" element={<AgentFormPage />} />
       <Route path="/agents/edit/:id" element={<AgentFormPage />} />
-      {/* Per-agent workspace: workflows / schedules / skills / learnings /
-          settings tabs, each scoped to the selected agent. The nested `*`
-          lets AgentDetailPage own the tab sub-routes. */}
+      {/* Per-agent workspace tabs, each scoped to the selected agent. The
+          nested `*` lets AgentDetailPage own its tab sub-routes. */}
       <Route path="/agents/:id/*" element={<AgentDetailPage />} />
       <Route path="/workflows" element={<WorkflowsIndexPage />} />
       <Route path="/workflows/new" element={<WorkflowFormPage />} />
@@ -92,9 +80,6 @@ const MastraMain = () => {
       <Route path="/skills/new" element={<SkillFormPage />} />
       <Route path="/skills/edit/:id" element={<SkillFormPage />} />
       <Route path="/learnings" element={<LearningsIndexPage />} />
-      <Route path="/schedules" element={<SchedulesIndexPage />} />
-      <Route path="/schedules/new" element={<ScheduleFormPage />} />
-      <Route path="/schedules/edit/:id" element={<ScheduleFormPage />} />
     </PluginRoutesShell>
   );
 };

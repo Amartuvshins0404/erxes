@@ -32,7 +32,7 @@ export interface ProviderDocLike {
 export const PROVIDER_PRESETS: Array<{
   provider: string;
   label: string;
-  envKey: string;
+  envKey?: string;
   baseUrl?: string;
   modelsEndpoint?: string;
   // How the model-listing endpoint authenticates. Default: 'bearer'
@@ -121,7 +121,6 @@ export const PROVIDER_PRESETS: Array<{
     // is NOT gated.)
     provider: 'kimi-for-coding',
     label: 'Kimi For Coding',
-    envKey: 'KIMI_API_KEY',
     baseUrl: 'https://api.kimi.com/coding/v1',
     isOpenAICompatible: true,
     headers: { 'User-Agent': 'claude-cli/1.0.65 (external, cli)' },
@@ -248,9 +247,13 @@ export function buildModel(
   );
   const preset = PROVIDER_PRESETS.find((p) => p.provider === providerName);
 
-  // Resolve API key: DB record first, then env var (DB envKey, then preset envKey)
+  // Kimi For Coding is BYOK-only: scheduled runs reuse the user-supplied key
+  // persisted in provider settings and must never fall back to a server env key.
   const envKey = stored?.envKey || preset?.envKey;
-  const apiKey = stored?.apiKey || (envKey ? process.env[envKey] : undefined);
+  const apiKey =
+    providerName === 'kimi-for-coding'
+      ? stored?.apiKey
+      : stored?.apiKey || (envKey ? process.env[envKey] : undefined);
 
   // Preset is authoritative for isOpenAICompatible on known providers.
   // `||` (not `??`) so that a Mongoose default: false on a DB doc inserted

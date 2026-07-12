@@ -121,8 +121,8 @@ export const agentMutations = {
       throw new ExpectedError('Users may only create private agents');
     }
 
-    // The owner is the principal background runs (bot/schedule) mint a gateway
-    // token for (Phase 3). Assigning it to another user = acting as that user,
+    // The owner is the principal unattended workflow/bot runs mint a gateway
+    // token for. Assigning it to another user means acting as that user,
     // and an isOwner target bypasses every permission check, so only an org
     // owner may name an owner other than themselves; otherwise an agent-admin
     // (or any user) could bind the agent to an org owner and escalate to
@@ -185,12 +185,8 @@ export const agentMutations = {
       ? await models.MastraAgent.findOne({ _id })
       : null;
 
-    // agentId immutability (defense-in-depth). agentId is the stable business key
-    // that schedules/workflows/learnings are scoped by — mutating it strands them
-    // AND was the spoof vector behind Finding #1 (a caller-settable, reusable key
-    // that a name-based grant exemption trusted). The UI freezes it after create
-    // and there is no rename flow, so reject an attempt to change it rather than
-    // silently strand the scoped records.
+    // agentId is the stable workflow/learning ownership key; mutating it would
+    // strand resources and permit identity spoofing.
     if (
       doc.agentId !== undefined &&
       agentConfig &&

@@ -5,6 +5,7 @@ import { parseExpr, exprRefs } from './expr';
 import type { OperationRegistry } from '../tools/operationRegistry';
 import { isOperationAllowed, ToolPolicy } from '../tools/scope';
 import { isDestructiveOperation } from '../tools/destructiveGuard';
+import { validateCron, validateTimezone } from './cron';
 
 /**
  * The workflow definition DSL — the declarative JSON document the master agent
@@ -269,23 +270,23 @@ function checkStepCap(def: WorkflowDefinition): ValidationIssue[] {
   return [];
 }
 
-/** Cron pass: a schedule trigger needs a 5- or 6-field cron expression. */
+/** Mastra scheduler validation for schedule-trigger timing. */
 function checkCron(def: WorkflowDefinition): ValidationIssue[] {
   if (def.trigger.type !== 'schedule') return [];
-  const cron: unknown = def.trigger.config?.cron;
-  if (
-    typeof cron !== 'string' ||
-    !/^\S+\s+\S+\s+\S+\s+\S+\s+\S+(\s+\S+)?$/.test(cron.trim())
-  ) {
+  try {
+    validateCron(def.trigger.config?.cron);
+    validateTimezone(def.trigger.config?.timezone);
+    return [];
+  } catch (error) {
     return [
       {
-        path: 'trigger.config.cron',
-        message:
-          'schedule trigger requires config.cron — a 5- or 6-field cron expression (UTC)',
+        path: 'trigger.config',
+        message: `schedule trigger requires config.cron with valid timing: ${
+          error instanceof Error ? error.message : 'invalid schedule timing'
+        }`,
       },
     ];
   }
-  return [];
 }
 
 /** `end` is top-level-only and must be the last step. */

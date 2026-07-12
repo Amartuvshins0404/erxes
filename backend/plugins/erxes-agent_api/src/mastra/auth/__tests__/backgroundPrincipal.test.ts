@@ -217,19 +217,19 @@ describe('backgroundRunEnableError', () => {
   it('rejects when the erxes app token is unset (service-user text, no owner mention)', () => {
     const error = backgroundRunEnableError({
       destructiveAllow: false,
-      subject: 'schedule',
+      subject: 'workflow',
       appToken: undefined,
     });
     expect(error).toMatch(/service user/i);
     expect(error).toMatch(/erxes app token/i);
     expect(error).toMatch(/Agent settings/i);
-    expect(error).toMatch(/schedule/);
+    expect(error).toMatch(/workflow/);
   });
 
   it("rejects destructiveOps: 'allow' outright", () => {
     const error = backgroundRunEnableError({
       destructiveAllow: true,
-      subject: 'schedule',
+      subject: 'workflow',
       appToken: APP_TOKEN,
     });
     expect(error).toMatch(/destructiveOps/);
@@ -238,7 +238,7 @@ describe('backgroundRunEnableError', () => {
   it('allows enabling with ONLY the app token present — no human owner required', () => {
     const error = backgroundRunEnableError({
       destructiveAllow: false,
-      subject: 'schedule',
+      subject: 'workflow',
       appToken: APP_TOKEN,
     });
     expect(error).toBeNull();

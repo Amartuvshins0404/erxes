@@ -3,8 +3,8 @@ import { sendTRPCMessage } from 'erxes-api-shared/utils';
 // ---------------------------------------------------------------------------
 // Run-token minting (agent-principal identity swap — step 22).
 //
-// Background runs (frontline bot, scheduled agent runs, scheduled/automation
-// workflows) have no chatting user. They mint a short-lived gateway token for
+// Background runs (frontline bots and scheduled/automation workflows) have no
+// chatting user. They mint a short-lived gateway token for
 // the AGENT'S SERVICE USER — a passwordless, non-owner, role:'system' core user
 // (see servicePrincipal.ts) — via core's `users.issueRunToken` mutation. That
 // endpoint authenticates the CLIENT with the erxes App token (already stored in

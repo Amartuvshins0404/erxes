@@ -4,7 +4,6 @@ import { settingsMutations } from '@/settings/graphql/resolvers/mutations/settin
 import { sessionMutations } from '@/session/graphql/resolvers/mutations/session';
 import { workflowMutations } from '@/workflow/graphql/resolvers/mutations/workflow';
 import { learningMutations } from '@/learning/graphql/resolvers/mutations/learning';
-import { scheduleMutations } from '@/schedule/graphql/resolvers/mutations/schedule';
 import { skillMutations } from '@/skills/graphql/resolvers/mutations/skills';
 import { voiceMutations } from '@/voice/graphql/resolvers/mutations/voice';
 
@@ -15,7 +14,6 @@ export const mutations = {
   ...sessionMutations,
   ...workflowMutations,
   ...learningMutations,
-  ...scheduleMutations,
   ...skillMutations,
   ...voiceMutations,
 };

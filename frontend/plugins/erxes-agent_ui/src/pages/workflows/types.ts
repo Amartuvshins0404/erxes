@@ -27,6 +27,7 @@ export interface IWorkflow {
   _id: string;
   name: string;
   description?: string;
+  agentId: string;
   definition: IWorkflowDefinition;
   version: number;
   isEnabled: boolean;

@@ -35,9 +35,7 @@ interface ResourceFormLayoutProps<T extends FieldValues> {
   children: ReactNode;
 }
 
-// Shared scaffolding for the plugin's create/edit pages (agents, schedules,
-// workflows): breadcrumb header with a back + submit button, a scroll container,
-// and the form element wired to the passed react-hook-form instance.
+// Shared create/edit shell: breadcrumb actions, scroll container, and form.
 export const ResourceFormLayout = <T extends FieldValues>({
   icon: Icon,
   title,

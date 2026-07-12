@@ -20,9 +20,8 @@ const ChatNavItem = () => {
   );
 };
 
-// Top-level nav is deliberately just Chat + Agents. Workflows, Schedules,
-// Skills and Learnings are no longer global views — they live per-agent inside
-// the agent detail page (see AgentDetailPage), scoped to the selected agent.
+// Top-level navigation stays Chat + Agents; agent resources live in the
+// per-agent workspace.
 export const MastraNavigation = () => {
   return (
     <>

@@ -8,8 +8,10 @@ import {
   Popover,
   ScrollArea,
   Sheet,
+  Sidebar,
   Spinner,
   Table,
+  Tabs,
   useConfirm,
   useQueryState,
 } from 'erxes-ui';
@@ -223,6 +225,34 @@ const StatusEditor = ({
   );
 };
 
+const MemberSidebar = () => {
+  const { t } = useTranslation('blockadmin');
+  const [selectedTab, setSelectedTab] = useQueryState<string>('tab');
+
+  return (
+    <Sidebar.Content>
+      <Sidebar.Group>
+        <Sidebar.GroupContent className="mt-2">
+          <Sidebar.Menu>
+            {['overview'].map((tab) => (
+              <Sidebar.MenuItem key={tab}>
+                <Sidebar.MenuButton
+                  isActive={
+                    selectedTab === tab || (tab === 'overview' && !selectedTab)
+                  }
+                  onClick={() => setSelectedTab(tab)}
+                >
+                  {t(tab.charAt(0).toUpperCase() + tab.slice(1))}
+                </Sidebar.MenuButton>
+              </Sidebar.MenuItem>
+            ))}
+          </Sidebar.Menu>
+        </Sidebar.GroupContent>
+      </Sidebar.Group>
+    </Sidebar.Content>
+  );
+};
+
 const MemberInfo = ({ member }: { member: IMember }) => {
   const { t } = useTranslation('blockadmin');
   const {
@@ -238,72 +268,92 @@ const MemberInfo = ({ member }: { member: IMember }) => {
     createdAt,
   } = member;
 
+  const [selectedTab] = useQueryState<string>('tab');
+
   return (
-    <ScrollArea className="h-full">
-      <div className="p-4">
-        <InfoCard title={t('Membership')}>
-          <InfoCard.Content className="shadow-none p-0 overflow-hidden">
-            <Table>
-              <Table.Body className="bt:[&_td]:px-2 bt:[&_tr:first-child_td]:border-t bt:[&_td]:h-10">
-                <Row
-                  label={t('Customer')}
-                  value={
-                    <CustomersInline
-                      customerIds={[customerId]}
-                      customers={customer ? [customer] : undefined}
-                      placeholder="—"
-                    />
-                  }
-                />
-                <Table.Row>
-                  <Table.Cell className="bg-sidebar p-2 w-44 h-auto min-h-10 text-muted-foreground">
-                    {t('Status')}
-                  </Table.Cell>
-                  <Table.Cell className="p-1 px-2 h-auto min-h-10">
-                    <StatusEditor _id={_id} status={status} />
-                  </Table.Cell>
-                </Table.Row>
-                <Row
-                  label={t('Plan')}
-                  value={
-                    plan
-                      ? `${plan.name} · ${
-                          plan.durationMonths
-                        } ${t('months')} · ${plan.price.toLocaleString()} ${
-                          plan.currency
-                        }`
-                      : '-'
-                  }
-                />
-                <Row
-                  label={t('Period')}
-                  value={
-                    <EndDateEditor
-                      _id={_id}
-                      startDate={startDate}
-                      endDate={endDate}
-                    />
-                  }
-                />
-                <Row
-                  label={t('Time Left')}
-                  value={daysRemaining(t, endDate)}
-                />
-                <Row
-                  label={t('Amount')}
-                  value={
-                    amount != null
-                      ? `${amount.toLocaleString()} ${currency || 'MNT'}`
-                      : undefined
-                  }
-                />
-                <Row label={t('Created')} value={formatDate(createdAt)} />
-              </Table.Body>
-            </Table>
-          </InfoCard.Content>
-        </InfoCard>
+    <>
+      <FocusSheet.SideBar>
+        <MemberSidebar />
+      </FocusSheet.SideBar>
+
+      <div className="flex flex-1 overflow-hidden">
+        <Tabs
+          value={selectedTab ?? 'overview'}
+          className="flex flex-col flex-1 overflow-hidden"
+        >
+          <Tabs.Content
+            value="overview"
+            className="flex-1 mt-0 overflow-hidden"
+          >
+            <ScrollArea className="h-full">
+              <div className="p-4">
+                <InfoCard title={t('Membership')}>
+                  <InfoCard.Content className="shadow-none p-0 overflow-hidden">
+                    <Table>
+                      <Table.Body className="bt:[&_td]:px-2 bt:[&_tr:first-child_td]:border-t bt:[&_td]:h-10">
+                        <Row
+                          label={t('Customer')}
+                          value={
+                            <CustomersInline
+                              customerIds={[customerId]}
+                              customers={customer ? [customer] : undefined}
+                              placeholder="—"
+                            />
+                          }
+                        />
+                        <Table.Row>
+                          <Table.Cell className="bg-sidebar p-2 w-44 h-auto min-h-10 text-muted-foreground">
+                            {t('Status')}
+                          </Table.Cell>
+                          <Table.Cell className="p-1 px-2 h-auto min-h-10">
+                            <StatusEditor _id={_id} status={status} />
+                          </Table.Cell>
+                        </Table.Row>
+                        <Row
+                          label={t('Plan')}
+                          value={
+                            plan
+                              ? `${plan.name} · ${
+                                  plan.durationMonths
+                                } ${t('months')} · ${plan.price.toLocaleString()} ${
+                                  plan.currency
+                                }`
+                              : '-'
+                          }
+                        />
+                        <Row
+                          label={t('Period')}
+                          value={
+                            <EndDateEditor
+                              _id={_id}
+                              startDate={startDate}
+                              endDate={endDate}
+                            />
+                          }
+                        />
+                        <Row
+                          label={t('Time Left')}
+                          value={daysRemaining(t, endDate)}
+                        />
+                        <Row
+                          label={t('Amount')}
+                          value={
+                            amount != null
+                              ? `${amount.toLocaleString()} ${currency || 'MNT'}`
+                              : undefined
+                          }
+                        />
+                        <Row label={t('Created')} value={formatDate(createdAt)} />
+                      </Table.Body>
+                    </Table>
+                  </InfoCard.Content>
+                </InfoCard>
+              </div>
+            </ScrollArea>
+          </Tabs.Content>
+        </Tabs>
       </div>
-    </ScrollArea>
+    </>
   );
 };
 
@@ -318,7 +368,7 @@ export const MemberDetailSheet = () => {
       open={!!activeMemberId}
       onOpenChange={() => setActiveMemberId(null)}
     >
-      <FocusSheet.View className="sm:max-w-3xl">
+      <FocusSheet.View className="sm:max-w-5xl">
         <FocusSheet.Header title={t('Membership Detail')} />
         <FocusSheet.Content className="flex flex-auto p-0 overflow-hidden">
           {loading && (

@@ -1,4 +1,3 @@
-import { IconGift } from '@tabler/icons-react';
 import { Button, Sheet, Spinner } from 'erxes-ui';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -36,9 +35,8 @@ export const GrantMembershipSheet = () => {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <Sheet.Trigger asChild>
-        <Button>
-          <IconGift />
-          {t('Grant membership')}
+        <Button variant="outline" size="sm">
+          {t('Add Membership')}
         </Button>
       </Sheet.Trigger>
       <Sheet.View
@@ -49,7 +47,7 @@ export const GrantMembershipSheet = () => {
         }
       >
         <Sheet.Header>
-          <Sheet.Title>{t('Grant membership')}</Sheet.Title>
+          <Sheet.Title>{t('Add Membership')}</Sheet.Title>
           <Sheet.Close />
         </Sheet.Header>
 

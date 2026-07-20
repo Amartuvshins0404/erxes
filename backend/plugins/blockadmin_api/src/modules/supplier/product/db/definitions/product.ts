@@ -59,3 +59,5 @@ export const baProductSchema = schemaWrapper(
     },
   ),
 );
+
+baProductSchema.add({ entityId: { type: String, required: true, index: true } });

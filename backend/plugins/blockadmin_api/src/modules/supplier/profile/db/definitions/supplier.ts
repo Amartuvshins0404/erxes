@@ -73,3 +73,5 @@ export const supplierSchema = schemaWrapper(
     },
   ),
 );
+
+supplierSchema.add({ entityId: { type: String, required: true, index: true } });

@@ -1,125 +1,89 @@
 import { IconGift } from '@tabler/icons-react';
-import { Button, Input, Label, Select, Sheet, toast } from 'erxes-ui';
+import { Button, Sheet, Spinner } from 'erxes-ui';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { SelectCustomer } from 'ui-modules';
-import { useGrantMembership } from '../hooks/useMemberActions';
-import { usePlans } from '../hooks/usePlans';
+import { useGrantSheetState } from '../hooks/useGrantSheetState';
+import { DetailsCard } from './grant/DetailsCard';
+import { InvoiceCard } from './grant/InvoiceCard';
+import { PaymentForm } from './grant/PaymentForm';
+import { PaymentMirrorCard } from './grant/PaymentMirrorCard';
+import { SummaryCard } from './grant/SummaryCard';
 
 export const GrantMembershipSheet = () => {
   const { t } = useTranslation('blockadmin');
   const [open, setOpen] = useState(false);
-  const [customerId, setCustomerId] = useState('');
-  const [planId, setPlanId] = useState('');
-  const [amount, setAmount] = useState('');
+  const state = useGrantSheetState(open);
+  const {
+    customerId,
+    planId,
+    showPreview,
+    isExtending,
+    granting,
+    submit,
+    reset,
+  } = state;
 
-  const { plans, loading: plansLoading } = usePlans(true);
-  const { handleGrant, loading } = useGrantMembership();
-
-  const reset = () => {
-    setCustomerId('');
-    setPlanId('');
-    setAmount('');
+  const onOpenChange = (next: boolean) => {
+    setOpen(next);
+    if (!next) reset();
   };
 
   const onSubmit = async () => {
-    if (!customerId || !planId) return;
-    try {
-      await handleGrant(
-        customerId,
-        planId,
-        undefined,
-        amount ? Number(amount) : undefined,
-      );
-      toast({ title: t('Membership granted') });
-      reset();
-      setOpen(false);
-    } catch (e: any) {
-      toast({
-        title: t('Error'),
-        description: e.message,
-        variant: 'destructive',
-      });
-    }
+    await submit();
+    onOpenChange(false);
   };
 
   return (
-    <Sheet
-      open={open}
-      onOpenChange={(o) => {
-        setOpen(o);
-        if (!o) reset();
-      }}
-    >
+    <Sheet open={open} onOpenChange={onOpenChange}>
       <Sheet.Trigger asChild>
         <Button>
           <IconGift />
           {t('Grant membership')}
         </Button>
       </Sheet.Trigger>
-      <Sheet.View className="p-0 sm:max-w-md">
+      <Sheet.View
+        className={
+          showPreview
+            ? 'p-0 md:w-[calc(100vw-theme(spacing.4))] sm:max-w-3xl'
+            : 'p-0 md:w-[calc(100vw-theme(spacing.4))] sm:max-w-md'
+        }
+      >
         <Sheet.Header>
           <Sheet.Title>{t('Grant membership')}</Sheet.Title>
+          <Sheet.Close />
         </Sheet.Header>
-        <Sheet.Content className="flex flex-col gap-4 p-4">
-          <div className="space-y-1.5">
-            <Label className="font-medium text-sm">{t('Customer')}</Label>
-            <SelectCustomer
-              mode="single"
-              value={customerId}
-              onValueChange={(v) =>
-                setCustomerId(Array.isArray(v) ? v[0] || '' : v)
-              }
-            />
+
+        <Sheet.Content
+          className={
+            showPreview
+              ? 'flex-1 min-h-0 overflow-auto px-5 py-4 grid grid-cols-1 md:grid-cols-2 gap-4 content-start'
+              : 'flex-1 min-h-0 overflow-auto px-5 py-4 flex flex-col gap-4'
+          }
+        >
+          <div className="flex flex-col gap-4">
+            <DetailsCard {...state} />
+            <PaymentForm {...state} />
           </div>
 
-          <div className="space-y-1.5">
-            <Label className="font-medium text-sm">{t('Plan')}</Label>
-            <Select value={planId} onValueChange={setPlanId}>
-              <Select.Trigger className="w-full">
-                <Select.Value
-                  placeholder={
-                    plansLoading ? t('Loading plans…') : t('Select a plan')
-                  }
-                />
-              </Select.Trigger>
-              <Select.Content>
-                {plans.map((plan) => (
-                  <Select.Item key={plan._id} value={plan._id}>
-                    {plan.name} · {plan.durationMonths ?? '-'} {t('months')} ·{' '}
-                    {plan.price.toLocaleString()} {plan.currency || 'MNT'}
-                  </Select.Item>
-                ))}
-                {!plansLoading && plans.length === 0 && (
-                  <div className="px-2 py-1.5 text-muted-foreground text-sm">
-                    {t('No active plans')}
-                  </div>
-                )}
-              </Select.Content>
-            </Select>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label className="font-medium text-sm">
-              {t('Amount (optional)')}
-            </Label>
-            <Input
-              type="number"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              placeholder={t('Defaults to plan price')}
-            />
-          </div>
+          {showPreview && (
+            <div className="flex flex-col gap-4">
+              <SummaryCard {...state} />
+              <PaymentMirrorCard {...state} />
+              <InvoiceCard {...state} />
+            </div>
+          )}
         </Sheet.Content>
-        <Sheet.Footer className="border-t p-4">
+
+        <Sheet.Footer>
           <Sheet.Close asChild>
             <Button variant="secondary">{t('Cancel')}</Button>
           </Sheet.Close>
           <Button
-            disabled={!customerId || !planId || loading}
             onClick={onSubmit}
+            disabled={!customerId || !planId || granting}
           >
-            {t('Grant')}
+            {granting && <Spinner />}
+            {isExtending ? t('Extend') : t('Create')}
           </Button>
         </Sheet.Footer>
       </Sheet.View>

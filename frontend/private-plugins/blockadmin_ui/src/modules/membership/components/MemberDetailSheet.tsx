@@ -1,26 +1,35 @@
 import {
   Badge,
   Button,
+  Calendar,
+  Command,
   FocusSheet,
   InfoCard,
-  Input,
+  Popover,
   ScrollArea,
   Sheet,
   Spinner,
   Table,
+  useConfirm,
   useQueryState,
 } from 'erxes-ui';
 import { useState } from 'react';
+import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import { CustomersInline } from 'ui-modules';
 import { useMemberDetail } from '../hooks/useMemberDetail';
 import {
-  useCancelMembership,
   useUpdateMembershipEndDate,
   useUpdateMembershipStatus,
 } from '../hooks/useMemberActions';
 import { IMember } from '../types';
 import { SelectMemberStatus } from './SelectMemberStatus';
+
+const STATUS_OPTIONS: { value: string; label: string }[] = [
+  { value: 'active', label: 'Active' },
+  { value: 'expired', label: 'Expired' },
+  { value: 'cancelled', label: 'Cancelled' },
+];
 
 const Row = ({
   label,
@@ -30,27 +39,192 @@ const Row = ({
   value?: string | number | null | React.ReactNode;
 }) => (
   <Table.Row>
-    <Table.Cell className="bg-sidebar p-2 w-40 h-auto min-h-10 text-muted-foreground">
+    <Table.Cell className="bg-sidebar p-2 w-44 h-auto min-h-10 text-muted-foreground">
       {label}
     </Table.Cell>
-    <Table.Cell className="p-2 h-auto min-h-10 whitespace-normal">
+    <Table.Cell className="p-2 h-auto min-h-10 break-all whitespace-normal">
       {value ?? '-'}
     </Table.Cell>
   </Table.Row>
 );
 
-const formatDate = (d?: string) =>
-  d ? new Date(d).toLocaleDateString() : undefined;
+const formatDate = (dateStr?: string) => {
+  if (!dateStr) return '-';
+  return new Date(dateStr).toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+};
+
+const daysRemaining = (t: TFunction, endDate?: string) => {
+  if (!endDate) return null;
+  const diff = Math.ceil(
+    (new Date(endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24),
+  );
+  if (diff < 0) return t('Expired');
+  if (diff === 0) return t('Expires today');
+  return t('{{count}} days remaining', { count: diff });
+};
+
+const EndDateEditor = ({
+  _id,
+  startDate,
+  endDate,
+}: {
+  _id: string;
+  startDate?: string;
+  endDate?: string;
+}) => {
+  const { t } = useTranslation('blockadmin');
+  const [open, setOpen] = useState(false);
+  const { updateEndDate, loading } = useUpdateMembershipEndDate();
+  const { confirm } = useConfirm();
+
+  const currentEnd = endDate ? new Date(endDate) : undefined;
+
+  let minDate: Date | undefined;
+  let startMonth: Date | undefined;
+
+  if (startDate) {
+    minDate = new Date(startDate);
+    minDate.setDate(minDate.getDate() + 1);
+
+    const s = new Date(startDate);
+    startMonth = new Date(s.getFullYear(), s.getMonth(), 1);
+  }
+
+  const handleSelect = (date?: Date) => {
+    if (!date) return;
+
+    if (currentEnd && date.toDateString() === currentEnd.toDateString()) {
+      setOpen(false);
+      return;
+    }
+
+    setOpen(false);
+
+    const oldLabel = formatDate(endDate);
+    const newLabel = formatDate(date.toISOString());
+
+    confirm({
+      message: t('Change membership end date?'),
+      options: {
+        description: t(
+          "This membership will end on {{newLabel}} instead of {{oldLabel}}. The customer's access period will change accordingly.",
+          { newLabel, oldLabel },
+        ),
+        confirmationValue: 'update',
+        okLabel: t('Update'),
+      },
+    }).then(() => {
+      updateEndDate(_id, date);
+    });
+  };
+
+  return (
+    <span className="inline-flex items-center gap-1">
+      <span>{startDate ? formatDate(startDate) : '-'}</span>
+      <span className="text-muted-foreground">→</span>
+      <Popover open={open} onOpenChange={setOpen}>
+        <Popover.Trigger asChild>
+          <button
+            type="button"
+            disabled={loading}
+            className="inline-flex items-center gap-1 hover:bg-accent disabled:opacity-50 -mx-1 px-1 rounded hover:text-accent-foreground cursor-pointer"
+          >
+            {formatDate(endDate)}
+          </button>
+        </Popover.Trigger>
+        <Popover.Content className="p-0 w-auto" align="end">
+          <Calendar
+            mode="single"
+            selected={currentEnd}
+            defaultMonth={currentEnd}
+            startMonth={startMonth}
+            onSelect={handleSelect}
+            disabled={minDate ? { before: minDate } : undefined}
+          />
+        </Popover.Content>
+      </Popover>
+    </span>
+  );
+};
+
+const StatusEditor = ({
+  _id,
+  status,
+}: {
+  _id: string;
+  status?: string;
+}) => {
+  const { t } = useTranslation('blockadmin');
+  const [open, setOpen] = useState(false);
+  const { updateStatus, loading } = useUpdateMembershipStatus();
+  const { confirm } = useConfirm();
+
+  const badge = (
+    <Badge variant={SelectMemberStatus.statusVariant(status)}>
+      {status || '-'}
+    </Badge>
+  );
+
+  const handleSelect = (next: string) => {
+    setOpen(false);
+
+    if (next === status) return;
+
+    const rawLabel = STATUS_OPTIONS.find((o) => o.value === next)?.label;
+    const nextLabel = rawLabel ? t(rawLabel) : next;
+
+    confirm({
+      message: t('Change membership status?'),
+      options: {
+        description: t('Status will change from "{{from}}" to "{{to}}".', {
+          from: status || '-',
+          to: nextLabel,
+        }),
+        confirmationValue: 'update',
+        okLabel: t('Update'),
+      },
+    }).then(() => {
+      updateStatus(_id, next);
+    });
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <Popover.Trigger asChild>
+        <button
+          type="button"
+          disabled={loading}
+          className="inline-flex items-center gap-1 rounded disabled:opacity-50 cursor-pointer"
+        >
+          {badge}
+          {loading && <Spinner size="sm" />}
+        </button>
+      </Popover.Trigger>
+      <Popover.Content className="p-0 w-44" align="start">
+        <Command>
+          <Command.List>
+            {STATUS_OPTIONS.map((o) => (
+              <Command.Item
+                key={o.value}
+                value={o.value}
+                onSelect={() => handleSelect(o.value)}
+              >
+                {t(o.label)}
+              </Command.Item>
+            ))}
+          </Command.List>
+        </Command>
+      </Popover.Content>
+    </Popover>
+  );
+};
 
 const MemberInfo = ({ member }: { member: IMember }) => {
   const { t } = useTranslation('blockadmin');
-  const { handleCancel, loading: cancelling } = useCancelMembership();
-  const { updateStatus } = useUpdateMembershipStatus();
-  const { updateEndDate } = useUpdateMembershipEndDate();
-  const [endDate, setEndDate] = useState(
-    member.endDate ? member.endDate.slice(0, 10) : '',
-  );
-
   const {
     _id,
     customerId,
@@ -58,91 +232,78 @@ const MemberInfo = ({ member }: { member: IMember }) => {
     plan,
     status,
     startDate,
+    endDate,
     amount,
     currency,
+    createdAt,
   } = member;
 
   return (
-    <div className="flex flex-col gap-4 p-4">
-      <InfoCard title={t('General')}>
-        <InfoCard.Content className="shadow-none p-0 overflow-hidden">
-          <Table>
-            <Table.Body className="bt:[&_td]:px-2 bt:[&_tr:first-child_td]:border-t bt:[&_td]:h-10">
-              <Row
-                label={t('Customer')}
-                value={
-                  <CustomersInline
-                    customerIds={[customerId]}
-                    customers={customer ? [customer] : undefined}
-                    placeholder="—"
-                  />
-                }
-              />
-              <Row label={t('Plan')} value={plan?.name} />
-              <Table.Row>
-                <Table.Cell className="bg-sidebar p-2 w-40 h-auto min-h-10 text-muted-foreground">
-                  {t('Status')}
-                </Table.Cell>
-                <Table.Cell className="p-2 h-auto min-h-10 whitespace-normal">
-                  <Badge variant={SelectMemberStatus.statusVariant(status)}>
-                    {status || '-'}
-                  </Badge>
-                </Table.Cell>
-              </Table.Row>
-              <Row
-                label={t('Amount')}
-                value={
-                  amount != null
-                    ? `${amount.toLocaleString()} ${currency || 'MNT'}`
-                    : undefined
-                }
-              />
-              <Row label={t('Start Date')} value={formatDate(startDate)} />
-            </Table.Body>
-          </Table>
-        </InfoCard.Content>
-      </InfoCard>
-
-      <InfoCard title={t('Manage')}>
-        <InfoCard.Content className="flex flex-col gap-3 p-3">
-          <div className="flex items-center gap-2">
-            <Input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className="max-w-44"
-            />
-            <Button
-              variant="secondary"
-              disabled={!endDate}
-              onClick={() => updateEndDate(_id, new Date(endDate))}
-            >
-              {t('Update end date')}
-            </Button>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {status !== 'active' && (
-              <Button
-                variant="secondary"
-                onClick={() => updateStatus(_id, 'active')}
-              >
-                {t('Activate')}
-              </Button>
-            )}
-            {status === 'active' && (
-              <Button
-                variant="destructive"
-                disabled={cancelling}
-                onClick={() => handleCancel(_id)}
-              >
-                {t('Cancel membership')}
-              </Button>
-            )}
-          </div>
-        </InfoCard.Content>
-      </InfoCard>
-    </div>
+    <ScrollArea className="h-full">
+      <div className="p-4">
+        <InfoCard title={t('Membership')}>
+          <InfoCard.Content className="shadow-none p-0 overflow-hidden">
+            <Table>
+              <Table.Body className="bt:[&_td]:px-2 bt:[&_tr:first-child_td]:border-t bt:[&_td]:h-10">
+                <Row
+                  label={t('Customer')}
+                  value={
+                    <CustomersInline
+                      customerIds={[customerId]}
+                      customers={customer ? [customer] : undefined}
+                      placeholder="—"
+                    />
+                  }
+                />
+                <Table.Row>
+                  <Table.Cell className="bg-sidebar p-2 w-44 h-auto min-h-10 text-muted-foreground">
+                    {t('Status')}
+                  </Table.Cell>
+                  <Table.Cell className="p-1 px-2 h-auto min-h-10">
+                    <StatusEditor _id={_id} status={status} />
+                  </Table.Cell>
+                </Table.Row>
+                <Row
+                  label={t('Plan')}
+                  value={
+                    plan
+                      ? `${plan.name} · ${
+                          plan.durationMonths
+                        } ${t('months')} · ${plan.price.toLocaleString()} ${
+                          plan.currency
+                        }`
+                      : '-'
+                  }
+                />
+                <Row
+                  label={t('Period')}
+                  value={
+                    <EndDateEditor
+                      _id={_id}
+                      startDate={startDate}
+                      endDate={endDate}
+                    />
+                  }
+                />
+                <Row
+                  label={t('Time Left')}
+                  value={daysRemaining(t, endDate)}
+                />
+                <Row
+                  label={t('Amount')}
+                  value={
+                    amount != null
+                      ? `${amount.toLocaleString()} ${currency || 'MNT'}`
+                      : undefined
+                  }
+                />
+                <Row label={t('Created')} value={formatDate(createdAt)} />
+              </Table.Body>
+            </Table>
+          </InfoCard.Content>
+        </InfoCard>
+      </div>
+    </ScrollArea>
   );
 };
 
@@ -157,29 +318,26 @@ export const MemberDetailSheet = () => {
       open={!!activeMemberId}
       onOpenChange={() => setActiveMemberId(null)}
     >
-      <FocusSheet.View className="w-[50%] md:w-[50%]">
+      <FocusSheet.View className="sm:max-w-3xl">
         <FocusSheet.Header title={t('Membership Detail')} />
-        <FocusSheet.Content className="flex flex-col flex-auto min-h-0 overflow-hidden">
-          <ScrollArea className="flex-1 min-h-0">
-            {loading && (
-              <div className="p-4">
-                <Spinner />
-              </div>
-            )}
-            {!loading && member && <MemberInfo member={member} />}
-            {!loading && !member && (
-              <div className="p-4">{t('Membership not found')}</div>
-            )}
-          </ScrollArea>
-
-          <Sheet.Footer className="flex-none border-t">
-            <Sheet.Close asChild>
-              <Button variant="secondary" className="bg-border">
-                {t('Close')}
-              </Button>
-            </Sheet.Close>
-          </Sheet.Footer>
+        <FocusSheet.Content className="flex flex-auto p-0 overflow-hidden">
+          {loading && (
+            <div className="flex flex-1 justify-center items-center">
+              <Spinner />
+            </div>
+          )}
+          {!loading && member && <MemberInfo member={member} />}
+          {!loading && !member && (
+            <div className="p-4">{t('Membership not found')}</div>
+          )}
         </FocusSheet.Content>
+        <Sheet.Footer className="flex-none">
+          <Sheet.Close asChild>
+            <Button variant="secondary" className="bg-border">
+              {t('Close')}
+            </Button>
+          </Sheet.Close>
+        </Sheet.Footer>
       </FocusSheet.View>
     </FocusSheet>
   );

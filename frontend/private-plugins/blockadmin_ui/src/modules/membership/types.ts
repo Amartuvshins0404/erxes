@@ -29,8 +29,16 @@ export interface IMember {
     primaryPhone?: string;
     avatar?: string;
   };
+  pausedDaysRemaining?: number;
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface IPaymentMethod {
+  _id: string;
+  name: string;
+  kind: string;
+  status?: string;
 }
 
 export interface IMemberList {

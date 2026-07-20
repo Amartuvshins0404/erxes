@@ -9,6 +9,8 @@ export interface IAgentServer {
 
   agentId: string;
   serverId: string;
+  provider?: string;
+  providerModel?: string;
   transferredFromSubdomain?: string;
   transferredAt?: Date;
 

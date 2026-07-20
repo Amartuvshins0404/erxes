@@ -53,7 +53,8 @@ interface ManagedDeployPayload {
   assistantId: string;
   serverName: string;
   provider: string;
-  kimiApiKey: string;
+  model: string;
+  apiKey: string;
   description?: string;
   systemPrompt?: string;
 }

@@ -1,5 +1,6 @@
 import { sendTRPCMessage } from 'erxes-api-shared/utils';
 import { IContext } from '~/connectionResolvers';
+import { linkRelation } from '~/utils/relation';
 
 const baCancelMembership = async (
   _root,
@@ -61,22 +62,38 @@ const baGrantMembership = async (
 
   const existing = await models.Membership.getActiveMembership(customerId);
 
-  if (existing) {
-    return models.Membership.renewMembership(existing._id, {
-      planId,
-      invoiceId,
-      amount,
-      currency,
+  const membership = existing
+    ? await models.Membership.renewMembership(existing._id, {
+        planId,
+        invoiceId,
+        amount,
+        currency,
+      })
+    : await models.Membership.createMembership({
+        customerId,
+        planId,
+        invoiceId,
+        amount,
+        currency,
+      });
+
+  if (membership) {
+    await linkRelation({
+      subdomain,
+      main: {
+        contentType: 'blockadmin:membership',
+        contentId: membership._id,
+      },
+      related: [
+        { contentType: 'core:customer', contentId: customerId },
+        ...(invoiceId
+          ? [{ contentType: 'payment:invoice', contentId: invoiceId }]
+          : []),
+      ],
     });
   }
 
-  return models.Membership.createMembership({
-    customerId,
-    planId,
-    invoiceId,
-    amount,
-    currency,
-  });
+  return membership;
 };
 
 const baUpdateMembershipEndDate = async (

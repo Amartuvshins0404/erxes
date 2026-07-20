@@ -18,7 +18,7 @@ import {
 import { useState } from 'react';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
-import { CustomersInline } from 'ui-modules';
+import { CustomersInline, RelationWidgetSideTabs } from 'ui-modules';
 import { useMemberDetail } from '../hooks/useMemberDetail';
 import {
   useUpdateMembershipEndDate,
@@ -352,6 +352,12 @@ const MemberInfo = ({ member }: { member: IMember }) => {
             </ScrollArea>
           </Tabs.Content>
         </Tabs>
+
+        <RelationWidgetSideTabs
+          contentId={_id}
+          contentType="blockadmin:membership"
+          access={{ customer: 'read' }}
+        />
       </div>
     </>
   );

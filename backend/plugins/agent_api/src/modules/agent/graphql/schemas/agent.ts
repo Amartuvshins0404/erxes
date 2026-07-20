@@ -24,6 +24,8 @@ export const types = `
 
     agentId: String
     serverId: String
+    provider: String
+    model: String
     status: AgentDeploymentStatus!
     provisioning: AgentProvisioningProgress
     transferredFromSubdomain: String
@@ -56,7 +58,9 @@ export const types = `
 
   input DeployManagedAgentInput {
     provider: String
-    kimiApiKey: String!
+    model: String
+    apiKey: String
+    kimiApiKey: String
     description: String
     systemPrompt: String
   }

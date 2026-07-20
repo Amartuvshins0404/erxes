@@ -10,6 +10,8 @@ export const GET_AGENT = gql`
       token
       agentId
       serverId
+      provider
+      model
       createdAt
       updatedAt
       status

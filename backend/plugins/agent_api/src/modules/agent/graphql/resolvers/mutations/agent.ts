@@ -1,5 +1,6 @@
 import { IContext } from '~/connectionResolvers';
 import { SERVER_STATUSES } from '~/modules/agent/constants';
+import { resolveManagedLlmConnection } from '~/modules/agent/managedLlmProviders';
 import { assertIdentifierManageAccess } from '~/modules/assistantOrg/permissions';
 import { ensureLegacyIdentifierLinks } from '~/modules/assistantOrg/utils';
 import {
@@ -98,8 +99,9 @@ const runManagedDeployment = async ({
   };
   serverMongoId: string;
   input: {
-    kimiApiKey: string;
-    provider?: string;
+    apiKey: string;
+    provider: string;
+    model: string;
     description?: string;
     systemPrompt?: string;
   };
@@ -118,8 +120,14 @@ const runManagedDeployment = async ({
   // Pre-compute the K8s namespace name so frontend polls during deployment
   // hit the right endpoint. Format mirrors the deployer's sanitizeId logic.
   const sanitizeId = (v: string) =>
-    v.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/^-+|-+$/g, '').slice(0, 20);
-  const expectedServerName = `assistant-${sanitizeId(subdomain)}-${sanitizeId(identifier.slug)}`;
+    v
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 20);
+  const expectedServerName = `assistant-${sanitizeId(subdomain)}-${sanitizeId(
+    identifier.slug,
+  )}`;
 
   try {
     await models.AgentServer.findOneAndUpdate(
@@ -127,6 +135,8 @@ const runManagedDeployment = async ({
       {
         $set: {
           status: SERVER_STATUSES.PENDING,
+          provider: input.provider,
+          providerModel: input.model,
           name: expectedServerName,
           url: `https://${expectedServerName}.assistant.erxes.io`,
           ...provisioningSet('server_lookup'),
@@ -139,8 +149,9 @@ const runManagedDeployment = async ({
       orgId: subdomain,
       assistantId: identifier.slug,
       serverName: expectedServerName,
-      provider: input.provider?.trim() || 'kimi',
-      kimiApiKey: input.kimiApiKey.trim(),
+      provider: input.provider,
+      model: input.model,
+      apiKey: input.apiKey,
       description,
       systemPrompt,
     });
@@ -255,9 +266,10 @@ export const agentMutations = {
         url: server.serverUrl,
         token: server.gatewayToken,
         serverId: server.serverId,
-        status: server.status === 'approved'
-          ? SERVER_STATUSES.APPROVED
-          : SERVER_STATUSES.DEPLOYING,
+        status:
+          server.status === 'approved'
+            ? SERVER_STATUSES.APPROVED
+            : SERVER_STATUSES.DEPLOYING,
       });
     } catch (error) {
       await models.AgentServer.deleteOne({ identifierId });
@@ -275,23 +287,33 @@ export const agentMutations = {
     }: {
       identifierId: string;
       input: {
-        kimiApiKey: string;
+        apiKey?: string;
+        kimiApiKey?: string;
         provider?: string;
+        model?: string;
         description?: string;
         systemPrompt?: string;
       };
     },
     { models, subdomain, user }: IContext,
   ) => {
-    const { kimiApiKey } = input || {};
+    const apiKey = input?.apiKey?.trim() || input?.kimiApiKey?.trim();
 
-    if (!kimiApiKey?.trim()) {
-      throw new Error('kimiApiKey is required');
+    if (!apiKey) {
+      throw new Error('apiKey is required');
     }
 
-    if (input.provider?.trim() && input.provider.trim() !== 'kimi') {
-      throw new Error('Only the Kimi provider is supported for AI Assistants');
-    }
+    const connection = resolveManagedLlmConnection(
+      input?.provider,
+      input?.model,
+    );
+    const managedInput = {
+      apiKey,
+      provider: connection.provider,
+      model: connection.model,
+      description: input?.description,
+      systemPrompt: input?.systemPrompt,
+    };
 
     await ensureLegacyIdentifierLinks(models);
     const identifier = await assertIdentifierManageAccess(
@@ -320,6 +342,8 @@ export const agentMutations = {
           {
             $set: {
               agentId: identifier.slug,
+              provider: connection.provider,
+              providerModel: connection.model,
               status: SERVER_STATUSES.PENDING,
               provisioning: {
                 ...provisioningUpdate('preparing'),
@@ -340,7 +364,7 @@ export const agentMutations = {
           subdomain,
           identifier,
           serverMongoId: String(pendingServer._id),
-          input,
+          input: managedInput,
         });
 
         return {
@@ -349,7 +373,10 @@ export const agentMutations = {
         };
       }
 
-      return { ...agentServer.toObject(), identifierId: agentServer.identifierId };
+      return {
+        ...agentServer.toObject(),
+        identifierId: agentServer.identifierId,
+      };
     }
 
     const serverName = identifier.slug;
@@ -361,6 +388,8 @@ export const agentMutations = {
       url: '',
       token: '',
       serverId: '',
+      provider: connection.provider,
+      providerModel: connection.model,
       status: SERVER_STATUSES.PENDING,
       provisioning: {
         ...provisioningUpdate('preparing'),
@@ -373,7 +402,7 @@ export const agentMutations = {
       subdomain,
       identifier,
       serverMongoId: String(createdServer._id),
-      input,
+      input: managedInput,
     });
 
     return {

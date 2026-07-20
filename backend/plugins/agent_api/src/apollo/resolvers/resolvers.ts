@@ -2,6 +2,9 @@ import { IContext } from '~/connectionResolvers';
 import { SERVER_STATUSES } from '~/modules/agent/constants';
 
 export const customResolvers = {
+  AgentServer: {
+    model: (server: { providerModel?: string }) => server.providerModel || null,
+  },
   Identifier: {
     server: async (
       identifier: { _id: string },

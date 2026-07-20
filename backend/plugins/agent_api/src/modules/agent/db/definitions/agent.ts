@@ -14,6 +14,8 @@ export const agentServerSchema = schemaWrapper(
 
       agentId: { type: String, label: 'Agent name' },
       serverId: { type: String, label: 'Server ID' },
+      provider: { type: String, label: 'LLM provider' },
+      providerModel: { type: String, label: 'LLM model' },
       transferredFromSubdomain: {
         type: String,
         label: 'Transferred from subdomain',

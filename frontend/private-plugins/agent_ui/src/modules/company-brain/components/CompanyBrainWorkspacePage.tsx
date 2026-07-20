@@ -30,10 +30,11 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { LlmProviderApiKeyFields, MembersInline, PageHeader } from 'ui-modules';
+import { MembersInline, PageHeader } from 'ui-modules';
 import { z } from 'zod';
 import { AssistantBillingSheet } from '~/modules/company-brain/components/AssistantBillingSheet';
 import { AssistantPaymentAlertDialog } from '~/modules/company-brain/components/AssistantPaymentAlertDialog';
+import { LlmProviderApiKeyFields } from '~/modules/company-brain/components/LlmProviderApiKeyFields';
 import { AssistantOrgManageSheet } from '~/modules/assistant-orgs/components/AssistantOrgManageSheet';
 import { useAgentAssistantLimit } from '~/modules/assistant-orgs/hooks/useAgentAssistantLimit';
 import { useCreateIdentifier } from '~/modules/assistant-orgs/hooks/useCreateAssistantOrg';

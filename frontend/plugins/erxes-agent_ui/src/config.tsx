@@ -20,7 +20,6 @@ export const CONFIG: IUIConfig = {
   name: 'erxes_agent',
   permissionName: 'erxes-agent',
   path: 'erxes-agent',
-  i18nNamespace: 'mastra',
   settingsNavigation: () => (
     <Suspense fallback={<div />}>
       <MastraSettingsNavigation />

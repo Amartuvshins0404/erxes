@@ -42,7 +42,7 @@ export const LOCKED_MODULES: LockedModule[] = [
   {
     name: 'Supermemory Engine',
     description:
-      'Persistent memory and context layer for any AI assistant or agent.',
+      'Persistent memory and context layer for any AI assistant or agent,',
     path: 'supermemory',
     icon: IconBrain,
   },

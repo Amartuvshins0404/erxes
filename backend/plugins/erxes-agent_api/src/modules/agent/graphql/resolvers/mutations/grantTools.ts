@@ -21,6 +21,11 @@ const builtinEntries = (): string[] =>
  * names (fail-closed — see actionsToAllowedTools), verify the safety invariant,
  * then append the (non-gated) builtins.
  *
+ * Refresh the live registry when access is saved so newly available plugin
+ * operations are included immediately instead of waiting for the registry TTL.
+ * Preserve operations derived from the current registry if the refresh has
+ * incomplete subgraph attribution, so a transient failure cannot narrow a
+ * previously valid grant.
  * Registry unavailable / empty (a transient introspection blip that even
  * `getOperationRegistry`'s last-good tier can't cover) → no erxes ops resolve,
  * so the agent gets builtins only until the next save re-derives. Fail-closed:
@@ -31,12 +36,29 @@ export async function deriveGrantAllowedTools(
   groupPermissions: GroupPermission[],
 ): Promise<string[]> {
   const settings = await models.MastraSettings.getSettings();
-  const registry = await getOperationRegistry(settings);
+  const currentRegistry = await getOperationRegistry(settings);
+  const refreshedRegistry = await getOperationRegistry(settings, { force: true });
 
-  const opTools = actionsToAllowedTools(groupPermissions, registry);
-  // Defense-in-depth: throws if the mapper ever emits an op not covered by a
-  // granted action, so a regression fails loudly instead of over-granting.
-  assertAllowedToolsInvariant(opTools, groupPermissions, registry);
+  const currentTools = actionsToAllowedTools(groupPermissions, currentRegistry);
+  const refreshedTools = actionsToAllowedTools(
+    groupPermissions,
+    refreshedRegistry,
+  );
+  // Defense-in-depth: verify each result against the registry that produced it
+  // before combining them, so every emitted operation remains grant-covered.
+  assertAllowedToolsInvariant(
+    currentTools,
+    groupPermissions,
+    currentRegistry,
+  );
+  assertAllowedToolsInvariant(
+    refreshedTools,
+    groupPermissions,
+    refreshedRegistry,
+  );
 
-  return [...opTools, ...builtinEntries()];
+  return [
+    ...new Set([...currentTools, ...refreshedTools]),
+    ...builtinEntries(),
+  ];
 }

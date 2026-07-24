@@ -19,14 +19,19 @@ import type { OperationMeta } from '../operationRegistry';
 
 const asMock = (fn: unknown) => fn as jest.Mock;
 
-const meta = (operation: string): OperationMeta =>
+const meta = (
+  operation: string,
+  pluginAttribution?: OperationMeta['pluginAttribution'],
+  plugin = 'core',
+): OperationMeta =>
   ({
     operation,
     operationType: 'query',
-    plugin: 'core',
+    plugin,
     module: 'settings',
     description: '',
     graphqlArgs: [],
+    pluginAttribution,
   }) as OperationMeta;
 
 describe('getOperationRegistry — security strip', () => {
@@ -37,6 +42,40 @@ describe('getOperationRegistry — security strip', () => {
       enumValuesMap: {},
     });
     asMock(erxesTools.fetchObjectFieldsMap).mockResolvedValue({});
+  });
+
+  it('preserves a better-attributed registry after a partial forced refresh', async () => {
+    const settings = {
+      erxesApiUrl: 'http://test',
+      erxesApiToken: 'attribution-fallback',
+    };
+    asMock(erxesTools.fetchAvailableErxesTools)
+      .mockResolvedValueOnce([
+        meta('conversations', 'subgraph', 'frontline'),
+      ])
+      .mockResolvedValueOnce([
+        meta('conversations', 'fallback', 'conversations'),
+        meta('automations', 'subgraph', 'core'),
+      ]);
+
+    const current = await getOperationRegistry(settings);
+    const refreshed = await getOperationRegistry(settings, { force: true });
+    const cached = await getOperationRegistry(settings);
+
+    expect(refreshed).not.toBe(current);
+    expect(cached).toBe(refreshed);
+    expect(cached.list).toEqual([
+      expect.objectContaining({
+        operation: 'conversations',
+        plugin: 'frontline',
+        pluginAttribution: 'subgraph',
+      }),
+      expect.objectContaining({
+        operation: 'automations',
+        plugin: 'core',
+        pluginAttribution: 'subgraph',
+      }),
+    ]);
   });
 
   it('strips security-blocked ops from both the list and the name map', async () => {

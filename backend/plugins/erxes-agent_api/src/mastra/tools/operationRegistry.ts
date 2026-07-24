@@ -18,6 +18,7 @@ export interface OperationMeta {
   module: string;
   description: string;
   graphqlArgs: GqlArgDef[];
+  pluginAttribution?: 'subgraph' | 'fallback';
   returnType?: GqlTypeRef | null;
 }
 
@@ -68,6 +69,31 @@ function buildRegistry(
   return { operations: map, list: visible, ...schemaMaps };
 }
 
+const preserveSubgraphAttribution = (
+  previous: OperationRegistry,
+  refreshed: OperationRegistry,
+): OperationRegistry => {
+  const list = refreshed.list.map((operation) => {
+    const previousOperation = previous.operations.get(operation.operation);
+    if (
+      operation.pluginAttribution === 'fallback' &&
+      previousOperation?.pluginAttribution === 'subgraph'
+    ) {
+      return {
+        ...operation,
+        plugin: previousOperation.plugin,
+        pluginAttribution: previousOperation.pluginAttribution,
+      };
+    }
+    return operation;
+  });
+  return {
+    ...refreshed,
+    list,
+    operations: new Map(list.map((operation) => [operation.operation, operation])),
+  };
+};
+
 /**
  * Returns the cached operation registry for these settings, refreshing it from
  * a live schema introspection when stale (or absent).
@@ -98,10 +124,17 @@ export async function getOperationRegistry(
       return previous;
     }
 
-    const reg = buildRegistry(operations, {
+    const builtRegistry = buildRegistry(operations, {
       ...inputSchemaMaps,
       objectFieldsMap,
     });
+    // A forced refresh can encounter a transiently unreachable subgraph while
+    // the gateway schema still returns its operations. Preserve known subgraph
+    // ownership per operation while accepting new operations and fresh schemas.
+    const reg =
+      opts.force && previous
+        ? preserveSubgraphAttribution(previous, builtRegistry)
+        : builtRegistry;
     cache.set(key, reg);
     lastGood.set(key, reg);
     return reg;

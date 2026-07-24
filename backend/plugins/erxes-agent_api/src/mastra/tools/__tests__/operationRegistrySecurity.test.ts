@@ -19,7 +19,10 @@ import type { OperationMeta } from '../operationRegistry';
 
 const asMock = (fn: unknown) => fn as jest.Mock;
 
-const meta = (operation: string): OperationMeta =>
+const meta = (
+  operation: string,
+  pluginAttribution?: OperationMeta['pluginAttribution'],
+): OperationMeta =>
   ({
     operation,
     operationType: 'query',
@@ -27,6 +30,7 @@ const meta = (operation: string): OperationMeta =>
     module: 'settings',
     description: '',
     graphqlArgs: [],
+    pluginAttribution,
   }) as OperationMeta;
 
 describe('getOperationRegistry — security strip', () => {
@@ -37,6 +41,24 @@ describe('getOperationRegistry — security strip', () => {
       enumValuesMap: {},
     });
     asMock(erxesTools.fetchObjectFieldsMap).mockResolvedValue({});
+  });
+
+  it('preserves a better-attributed registry after a partial forced refresh', async () => {
+    const settings = {
+      erxesApiUrl: 'http://test',
+      erxesApiToken: 'attribution-fallback',
+    };
+    asMock(erxesTools.fetchAvailableErxesTools)
+      .mockResolvedValueOnce([meta('conversations', 'subgraph')])
+      .mockResolvedValueOnce([meta('conversations', 'fallback')]);
+
+    const current = await getOperationRegistry(settings);
+    const refreshed = await getOperationRegistry(settings, { force: true });
+    const cached = await getOperationRegistry(settings);
+
+    expect(refreshed).toBe(current);
+    expect(cached).toBe(current);
+    expect(cached.list[0].pluginAttribution).toBe('subgraph');
   });
 
   it('strips security-blocked ops from both the list and the name map', async () => {

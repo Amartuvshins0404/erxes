@@ -636,11 +636,13 @@ export async function fetchAvailableErxesTools(
       // Always skip internal and ClientPortal operations
       if (SKIP_RE.test(field.name)) continue;
 
-      const plugin = pluginMap.get(field.name) ?? detectPlugin(field.name);
+      const attributedPlugin = pluginMap.get(field.name);
+      const plugin = attributedPlugin ?? detectPlugin(field.name);
       if (!plugin) continue;
 
       tools.push({
         plugin,
+        pluginAttribution: attributedPlugin ? 'subgraph' : 'fallback',
         module: deriveModule(field.name),
         operation: field.name,
         operationType: opType,

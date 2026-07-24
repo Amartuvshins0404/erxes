@@ -18,6 +18,7 @@ export interface OperationMeta {
   module: string;
   description: string;
   graphqlArgs: GqlArgDef[];
+  pluginAttribution?: 'subgraph' | 'fallback';
   returnType?: GqlTypeRef | null;
 }
 
@@ -68,6 +69,10 @@ function buildRegistry(
   return { operations: map, list: visible, ...schemaMaps };
 }
 
+const attributedOperationCount = (registry: OperationRegistry) =>
+  registry.list.filter((operation) => operation.pluginAttribution === 'subgraph')
+    .length;
+
 /**
  * Returns the cached operation registry for these settings, refreshing it from
  * a live schema introspection when stale (or absent).
@@ -102,6 +107,17 @@ export async function getOperationRegistry(
       ...inputSchemaMaps,
       objectFieldsMap,
     });
+    // A forced refresh can encounter a transiently unreachable subgraph while
+    // the gateway schema still returns its operations. Keep the complete
+    // current registry instead of replacing its ownership with name-prefix
+    // fallbacks; a later refresh can retry safely.
+    if (
+      opts.force &&
+      previous &&
+      attributedOperationCount(reg) < attributedOperationCount(previous)
+    ) {
+      return previous;
+    }
     cache.set(key, reg);
     lastGood.set(key, reg);
     return reg;

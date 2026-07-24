@@ -79,6 +79,7 @@ describe('fetchAvailableErxesTools plugin discovery', () => {
       expect.objectContaining({
         operation: 'conversations',
         plugin: 'frontline',
+        pluginAttribution: 'subgraph',
       }),
     ]);
     expect(getPluginAddress).toHaveBeenCalledWith('frontline');

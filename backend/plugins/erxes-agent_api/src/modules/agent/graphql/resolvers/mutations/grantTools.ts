@@ -21,6 +21,8 @@ const builtinEntries = (): string[] =>
  * names (fail-closed — see actionsToAllowedTools), verify the safety invariant,
  * then append the (non-gated) builtins.
  *
+ * Force a live registry refresh when access is saved so newly available plugin
+ * operations are included immediately instead of waiting for the registry TTL.
  * Registry unavailable / empty (a transient introspection blip that even
  * `getOperationRegistry`'s last-good tier can't cover) → no erxes ops resolve,
  * so the agent gets builtins only until the next save re-derives. Fail-closed:
@@ -31,7 +33,7 @@ export async function deriveGrantAllowedTools(
   groupPermissions: GroupPermission[],
 ): Promise<string[]> {
   const settings = await models.MastraSettings.getSettings();
-  const registry = await getOperationRegistry(settings);
+  const registry = await getOperationRegistry(settings, { force: true });
 
   const opTools = actionsToAllowedTools(groupPermissions, registry);
   // Defense-in-depth: throws if the mapper ever emits an op not covered by a

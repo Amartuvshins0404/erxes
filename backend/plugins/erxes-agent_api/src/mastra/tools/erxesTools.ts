@@ -1,4 +1,8 @@
-import { getPlugins, getPluginAddress } from 'erxes-api-shared/utils';
+import {
+  getActivePlugins,
+  getPlugins,
+  getPluginAddress,
+} from 'erxes-api-shared/utils';
 import { getCurrentAuth } from '../requestContext';
 import type { OperationMeta } from './operationRegistry';
 import {
@@ -469,7 +473,8 @@ export async function fetchInputSchemaMaps(
 // ─── Plugin ownership via live subgraph introspection ────────────────────────
 //
 // Source of truth for "which plugin owns this operation": introspect each
-// ENABLED plugin's own subgraph (discovered through erxes service discovery)
+// configured or gateway-active plugin's own subgraph (discovered through erxes
+// service discovery)
 // and record every Query/Mutation field it declares. This:
 //   • only ever sees enabled/running plugins (disabled ones aren't registered),
 //   • re-derives from the live schema on every call (auto-adapts to changes),
@@ -484,7 +489,14 @@ async function fetchPluginMap(token: string): Promise<Map<string, string>> {
 
   let plugins: string[] = [];
   try {
-    plugins = await getPlugins(); // ['core', ...ENABLED_PLUGINS, ...only-api]
+    const [configuredPlugins, activePlugins] = await Promise.all([
+      getPlugins(),
+      getActivePlugins(),
+    ]);
+    // Plugin workloads can have a narrower ENABLED_PLUGINS value than the
+    // gateway. Include the gateway's Redis-backed active list so ownership does
+    // not fall back to operation-name prefixes for those subgraphs.
+    plugins = [...new Set([...configuredPlugins, ...activePlugins])];
   } catch {
     return map;
   }

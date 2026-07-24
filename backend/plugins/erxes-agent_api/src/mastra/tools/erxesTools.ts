@@ -491,7 +491,7 @@ async function fetchPluginMap(token: string): Promise<Map<string, string>> {
   try {
     const [configuredPlugins, activePlugins] = await Promise.all([
       getPlugins(),
-      getActivePlugins(),
+      getActivePlugins().catch(() => []),
     ]);
     // Plugin workloads can have a narrower ENABLED_PLUGINS value than the
     // gateway. Include the gateway's Redis-backed active list so ownership does

@@ -117,7 +117,8 @@ export const resolveManagedLlmConnection = (
   if (
     normalizedModel.length > 512 ||
     hasControlCharacters(normalizedModel) ||
-    !normalizedModel.startsWith(`${validProvider}/`)
+    !normalizedModel.startsWith(`${validProvider}/`) ||
+    normalizedModel.length === validProvider.length + 1
   ) {
     throw new Error('Model must belong to the selected LLM provider');
   }

@@ -24,6 +24,10 @@ test('resolveManagedLlmConnection rejects a model from another provider', () => 
     () => resolveManagedLlmConnection('openai', 'anthropic/claude-opus-4-6'),
     /selected LLM provider/,
   );
+  assert.throws(
+    () => resolveManagedLlmConnection('openai', 'openai/'),
+    /selected LLM provider/,
+  );
 });
 
 test('fetchManagedLlmModels loads, prefixes, de-duplicates, and sorts live models', async () => {

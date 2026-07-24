@@ -961,8 +961,6 @@ export const agentMutations = {
         { _id: server._id },
         {
           $set: {
-            provider: connection.provider,
-            providerModel: connection.model,
             updatedAt: new Date(),
           },
         },

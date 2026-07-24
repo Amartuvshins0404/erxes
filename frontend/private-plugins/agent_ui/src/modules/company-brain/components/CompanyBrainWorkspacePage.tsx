@@ -2,10 +2,6 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import {
   IconArrowRight,
   IconBrandDiscord,
-  IconBrandGoogle,
-  IconBrandOpenai,
-  IconBrandX,
-  IconBrain,
   IconCheck,
   IconCode,
   IconLink,
@@ -54,64 +50,12 @@ import { OPENCODE_PROVIDER_OPTIONS } from '~/modules/opencode/constants';
 import { useOpencodeDeploy } from '~/modules/opencode/deploy/hooks/useOpencodeDeploy';
 import { useOpencodeTransfer } from '~/modules/opencode/deploy/hooks/useOpencodeTransfer';
 import { useOpencode } from '~/modules/opencode/main/hooks/useOpencode';
+import {
+  ASSISTANT_PROVIDER_OPTIONS,
+  getManagedAssistantModel,
+} from '~/modules/company-brain/llmProviders';
 import { useManagedDiscordSetup } from '../hooks/useManagedDiscordSetup';
 
-const ASSISTANT_PROVIDER_OPTIONS = [
-  {
-    value: 'kimi',
-    label: 'Kimi For Coding',
-    defaultModel: 'kimi/kimi-for-coding',
-    icon: IconSparkles,
-  },
-  {
-    value: 'moonshot',
-    label: 'Moonshot Kimi',
-    defaultModel: 'moonshot/kimi-k2.6',
-    icon: IconSparkles,
-  },
-  {
-    value: 'openai',
-    label: 'OpenAI',
-    defaultModel: 'openai/gpt-5.6',
-    icon: IconBrandOpenai,
-  },
-  {
-    value: 'anthropic',
-    label: 'Anthropic Claude',
-    defaultModel: 'anthropic/claude-opus-4-6',
-    icon: IconBrain,
-  },
-  {
-    value: 'google',
-    label: 'Google Gemini',
-    defaultModel: 'google/gemini-3.1-pro-preview',
-    icon: IconBrandGoogle,
-  },
-  {
-    value: 'openrouter',
-    label: 'OpenRouter',
-    defaultModel: 'openrouter/auto',
-    icon: IconCode,
-  },
-  {
-    value: 'deepseek',
-    label: 'DeepSeek',
-    defaultModel: 'deepseek/deepseek-v4-flash',
-    icon: IconBrain,
-  },
-  {
-    value: 'xai',
-    label: 'xAI Grok',
-    defaultModel: 'xai/grok-4.3',
-    icon: IconBrandX,
-  },
-  {
-    value: 'zai',
-    label: 'GLM (Z.AI)',
-    defaultModel: 'zai/glm-5.2',
-    icon: IconBrain,
-  },
-] as const;
 const MANUAL_REFRESH_THROTTLE_MS = 1_500;
 
 const workspaceFormSchema = z.object({
@@ -171,14 +115,6 @@ const getProviderLabel = (provider?: string | null) => {
   ].find(({ value }) => value === normalized);
 
   return option?.label || provider;
-};
-
-const getManagedAssistantModel = (provider?: string | null) => {
-  const normalizedProvider = provider?.trim().toLowerCase() || 'kimi';
-  return (
-    ASSISTANT_PROVIDER_OPTIONS.find(({ value }) => value === normalizedProvider)
-      ?.defaultModel || ASSISTANT_PROVIDER_OPTIONS[0].defaultModel
-  );
 };
 
 const InvitedMembersRow = ({ memberIds }: { memberIds?: string[] | null }) => {
@@ -2144,9 +2080,13 @@ export const CompanyBrainWorkspacePage = ({
                       control={form.control}
                       providerName="provider"
                       apiKeyName="apiToken"
+                      modelName="model"
                       providerOptions={ASSISTANT_PROVIDER_OPTIONS}
                       apiKeyPlaceholder="Paste your provider API key"
                       onProviderChange={(provider) => {
+                        form.setValue('apiToken', '', {
+                          shouldDirty: true,
+                        });
                         form.setValue(
                           'model',
                           getManagedAssistantModel(provider),

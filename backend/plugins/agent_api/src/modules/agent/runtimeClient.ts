@@ -451,7 +451,12 @@ export async function callManagedRuntimeOperation({
     });
 
     if (result.ok && setupSync && identifier && server?.name) {
-      notifyDeployerSetupSync(server.name, setupSync.action, setupSync.type, identifier).catch(() => {});
+      notifyDeployerSetupSync(
+        server.name,
+        setupSync.action,
+        setupSync.type,
+        identifier,
+      ).catch(() => undefined);
     }
 
     return result;

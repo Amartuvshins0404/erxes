@@ -1,6 +1,9 @@
 import { IContext } from '~/connectionResolvers';
 import { SERVER_STATUSES } from '~/modules/agent/constants';
-import { resolveManagedLlmConnection } from '~/modules/agent/managedLlmProviders';
+import {
+  MANAGED_LLM_PROVIDERS,
+  resolveManagedLlmConnection,
+} from '~/modules/agent/managedLlmProviders';
 import { assertIdentifierManageAccess } from '~/modules/assistantOrg/permissions';
 import { ensureLegacyIdentifierLinks } from '~/modules/assistantOrg/utils';
 import {
@@ -301,6 +304,10 @@ export const agentMutations = {
 
     if (!apiKey) {
       throw new Error('apiKey is required');
+    }
+
+    if (apiKey.length > 4096) {
+      throw new Error('apiKey is too long');
     }
 
     const connection = resolveManagedLlmConnection(
@@ -879,6 +886,151 @@ export const agentMutations = {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       throw new Error(message);
+    }
+  },
+
+  setAgentLlmConnection: async (
+    _root: undefined,
+    {
+      identifierId,
+      input,
+    }: {
+      identifierId: string;
+      input: { provider: string; model: string; apiKey: string };
+    },
+    { models, subdomain, user }: IContext,
+  ) => {
+    const apiKey = input?.apiKey?.trim();
+
+    if (!apiKey) {
+      throw new Error('apiKey is required');
+    }
+
+    if (apiKey.length > 4096) {
+      throw new Error('apiKey is too long');
+    }
+
+    const connection = resolveManagedLlmConnection(
+      input?.provider,
+      input?.model,
+    );
+
+    await ensureLegacyIdentifierLinks(models);
+    const identifier = await assertIdentifierManageAccess(
+      models,
+      identifierId,
+      user,
+    );
+
+    if (identifier.kind && identifier.kind !== 'assistant') {
+      throw new Error('This identifier is not an AI Assistant');
+    }
+
+    const server = await models.AgentServer.findOne({ identifierId });
+
+    if (!server) {
+      throw new Error('Assistant server not found');
+    }
+
+    const isManagedAssistant = Boolean(
+      server.provider ||
+        server.providerModel ||
+        server.provisioning?.stage ||
+        server.provisioning?.startedAt,
+    );
+
+    if (!isManagedAssistant) {
+      if (
+        connection.provider !== 'kimi' ||
+        connection.model !== MANAGED_LLM_PROVIDERS.kimi.defaultModel
+      ) {
+        throw new Error(
+          'Legacy assistants only support the Kimi For Coding connection',
+        );
+      }
+
+      try {
+        await setKimiApiKey(server.name, apiKey);
+      } catch {
+        throw new Error(
+          'Could not apply the Kimi connection. Verify the API key and try again.',
+        );
+      }
+
+      const updatedLegacyServer = await models.AgentServer.findOneAndUpdate(
+        { _id: server._id },
+        {
+          $set: {
+            provider: connection.provider,
+            providerModel: connection.model,
+            updatedAt: new Date(),
+          },
+        },
+        { new: true },
+      );
+
+      if (!updatedLegacyServer) {
+        throw new Error('Assistant server not found');
+      }
+
+      return {
+        ...updatedLegacyServer.toObject(),
+        identifierId: updatedLegacyServer.identifierId,
+      };
+    }
+
+    if (!server.name?.trim()) {
+      throw new Error('Managed assistant server name is not configured');
+    }
+
+    if (managedDeploymentsInProgress.has(identifierId)) {
+      throw new Error('Managed assistant deployment is already running');
+    }
+
+    managedDeploymentsInProgress.add(identifierId);
+
+    try {
+      const deployed = await deployManagedServer({
+        orgId: subdomain,
+        assistantId: identifier.slug,
+        serverName: server.name,
+        provider: connection.provider,
+        model: connection.model,
+        apiKey,
+      });
+
+      const updatedServer = await models.AgentServer.findOneAndUpdate(
+        { _id: server._id },
+        {
+          $set: {
+            name: deployed.serverName,
+            url: deployed.url,
+            token: deployed.gatewayToken,
+            serverId: String(deployed.serverId),
+            provider: connection.provider,
+            providerModel: connection.model,
+            status: SERVER_STATUSES.APPROVED,
+            ...provisioningSet('approved'),
+            updatedAt: new Date(),
+          },
+        },
+        { new: true },
+      );
+
+      if (!updatedServer) {
+        throw new Error('Assistant server record disappeared during update');
+      }
+
+      return {
+        ...updatedServer.toObject(),
+        identifierId: updatedServer.identifierId,
+      };
+    } catch {
+      throw new Error(
+        'Could not apply the AI connection. Verify the API key and selected model, then try again.',
+      );
+    } finally {
+      managedDeploymentsInProgress.delete(identifierId);
     }
   },
 

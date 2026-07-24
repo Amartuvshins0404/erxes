@@ -3,7 +3,7 @@ import { AgentTransferCredentialsDialog } from '../deploy/components/AgentTransf
 import { useAgent } from './hooks/useAgent';
 import { useFixAndRestart } from '../detail/hooks/useFixAndRestart';
 import { useKimiKeyStatus } from '../detail/hooks/useKimiKey';
-import { Card, Spinner } from 'erxes-ui';
+import { Button, Card, Spinner } from 'erxes-ui';
 import {
   IconKey,
   IconLibrary,
@@ -15,9 +15,10 @@ import { useToast } from 'erxes-ui';
 import { AddAgentTrigger } from '../detail/components/AddAgent';
 import { RestartServerDialog } from '../detail/components/RestartServerDialog';
 import { RestartingOverlay } from '../detail/components/RestartingOverlay';
-import { KimiKeyDialog } from '../detail/components/KimiKeyDialog';
+import { LlmConnectionDialog } from '../detail/components/LlmConnectionDialog';
 import { DestroyServerDialog } from '../deploy/components/DestroyServerDialog';
 import { useAgentDestroy } from '../deploy/hooks/useAgentDestroy';
+import { isManagedAssistantAgent } from '../deploy/utils/isManagedAssistantAgent';
 import { useState, useCallback } from 'react';
 import { SERVER_STATUSES } from '../deploy/constants';
 import { useCurrentIdentifierId } from '../assistant-orgs/hooks/useAssistantOrg';
@@ -42,10 +43,14 @@ export const AgentMain = () => {
   const runtimeUrl = agent?.url?.trim().replace(/\/+$/, '');
   const isApproved =
     !!agent && agent.status === SERVER_STATUSES.APPROVED && !!runtimeUrl;
-  const { hasKey, refetch: refetchKimiKey } = useKimiKeyStatus(!isApproved);
-  const [kimiKeyManualOpen, setKimiKeyManualOpen] = useState(false);
-  const kimiKeyForced = isApproved && hasKey === false;
-  const kimiKeyOpen = kimiKeyForced || kimiKeyManualOpen;
+  const shouldCheckKimiKey =
+    isApproved && (!agent?.provider || agent.provider === 'kimi');
+  const { hasKey, refetch: refetchKimiKey } = useKimiKeyStatus(
+    !shouldCheckKimiKey,
+  );
+  const [llmConnectionManualOpen, setLlmConnectionManualOpen] = useState(false);
+  const llmConnectionForced = shouldCheckKimiKey && hasKey === false;
+  const llmConnectionOpen = llmConnectionForced || llmConnectionManualOpen;
 
   if (loading) {
     return <Spinner />;
@@ -83,48 +88,64 @@ export const AgentMain = () => {
       <RestartingOverlay visible={restarting} />
       <div className="flex items-center justify-start px-4 py-2 border-b">
         <div className="flex items-center gap-2">
-          <button
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
             onClick={() => setRestartOpen(true)}
             disabled={restarting}
-            className="p-1.5 rounded hover:bg-muted transition-colors disabled:opacity-50"
+            aria-label="Restart"
             title="Restart"
           >
             <IconRefresh
               className={`size-4 ${restarting ? 'animate-spin' : ''}`}
             />
-          </button>
+          </Button>
           <AddAgentTrigger onSuccess={refreshIframe} />
-          <button
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
             onClick={() =>
               navigate(`/agent/templates?assistantId=${identifierId}`)
             }
-            className="p-1.5 rounded hover:bg-muted transition-colors"
+            aria-label="AI Assistant Templates"
             title="AI Assistant Templates"
           >
             <IconLibrary className="size-4" />
-          </button>
-          <button
-            onClick={() => setKimiKeyManualOpen(true)}
-            className="p-1.5 rounded hover:bg-muted transition-colors"
-            title="Change Kimi API key"
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={() => setLlmConnectionManualOpen(true)}
+            aria-label="Change AI provider, model, or API key"
+            title="Change AI provider, model, or API key"
           >
             <IconKey className="size-4" />
-          </button>
-          <button
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
             onClick={() => setTransferOpen(true)}
-            className="p-1.5 rounded hover:bg-muted transition-colors"
+            aria-label="Transfer credentials"
             title="Transfer credentials"
           >
             <IconTransfer className="size-4" />
-          </button>
-          <button
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
             onClick={() => setDestroyOpen(true)}
             disabled={destroying || deletingIdentifier}
-            className="p-1.5 rounded text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50"
+            className="text-destructive hover:bg-destructive/10"
+            aria-label="Destroy server"
             title="Destroy server"
           >
             <IconTrash className="size-4" />
-          </button>
+          </Button>
         </div>
       </div>
       <iframe
@@ -149,10 +170,11 @@ export const AgentMain = () => {
             await deleteIdentifier(identifierId);
             toast({ variant: 'success', title: 'AI Assistant deleted' });
             navigate('/agent/assistant');
-          } catch (error: any) {
+          } catch (error: unknown) {
             toast({
               title: 'Destroy failed',
-              description: error?.message,
+              description:
+                error instanceof Error ? error.message : String(error),
               variant: 'destructive',
             });
           }
@@ -163,14 +185,23 @@ export const AgentMain = () => {
         open={transferOpen}
         onOpenChange={setTransferOpen}
       />
-      <KimiKeyDialog
-        open={kimiKeyOpen}
-        onSuccess={() => {
-          setKimiKeyManualOpen(false);
-          refetchKimiKey();
+      <LlmConnectionDialog
+        open={llmConnectionOpen}
+        currentProvider={agent.provider}
+        currentModel={agent.model}
+        managed={isManagedAssistantAgent(agent)}
+        onSuccess={(provider) => {
+          setLlmConnectionManualOpen(false);
+          if (provider === 'kimi') {
+            refetchKimiKey();
+          }
           refreshIframe();
         }}
-        onCancel={kimiKeyForced ? undefined : () => setKimiKeyManualOpen(false)}
+        onCancel={
+          llmConnectionForced
+            ? undefined
+            : () => setLlmConnectionManualOpen(false)
+        }
       />
     </div>
   );

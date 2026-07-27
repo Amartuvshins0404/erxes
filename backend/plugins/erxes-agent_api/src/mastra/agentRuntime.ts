@@ -1,4 +1,5 @@
 import { Agent } from '@mastra/core/agent';
+import { ToolSearchProcessor } from '@mastra/core/processors';
 import type { ToolsInput } from '@mastra/core/agent';
 import type { IModels } from '~/connectionResolvers';
 import type { IMastraAgentDocument } from '@/agent/@types/agent';
@@ -6,7 +7,11 @@ import { BUILTIN_TOOLS } from './tools/builtins';
 import { buildModel } from './providers';
 import { buildSystemPrompt, ToolInfo } from './instructions/routing';
 import { getOperationRegistry } from './tools/operationRegistry';
-import { buildErxesMetaTools } from './tools/metaTools';
+import { buildErxesSupportTools } from './tools/metaTools';
+import {
+  buildErxesOperationTools,
+  type ErxesOperationTools,
+} from './tools/operationTools';
 import {
   resolveToolPolicy,
   isBuiltinAllowed,
@@ -37,8 +42,8 @@ const agentCache = new Map<string, Agent>();
 // when a model outputs function calls as plain text instead of tool_calls.
 const toolsCache = new Map<string, ToolsInput>();
 
-// Increment this whenever routing.ts, the meta-tools, or provider logic changes.
-const ROUTING_VERSION = 31;
+// Increment this whenever routing, operation discovery, or provider logic changes.
+const ROUTING_VERSION = 32;
 
 export interface AgentWithTools {
   agent: Agent;
@@ -91,10 +96,9 @@ function buildAgentCacheKey(params: {
 }
 
 /**
- * Assemble the agent's tool map: erxes meta-tools (only when the policy grants
- * an operation), policy-filtered builtins, the always-on fileReader, and — for
- * skills-enabled agents — the make_skill tool. Also returns the ToolInfo list
- * that grounds the system prompt.
+ * Assemble directly-bound support/builtin tools plus the policy-filtered erxes
+ * operation catalog searched by ToolSearchProcessor. Also returns the ToolInfo
+ * list that grounds the system prompt.
  */
 function assembleAgentTools(params: {
   agentConfig: IMastraAgentDocument;
@@ -105,7 +109,11 @@ function assembleAgentTools(params: {
   policy: ToolPolicy;
   destructiveOps: DestructiveOpsPolicy;
   hasErxes: boolean;
-}): { tools: ToolsInput; builtinInfos: ToolInfo[] } {
+}): {
+  tools: ToolsInput;
+  operationTools: ErxesOperationTools;
+  builtinInfos: ToolInfo[];
+} {
   const {
     agentConfig,
     models,
@@ -120,8 +128,6 @@ function assembleAgentTools(params: {
   const tools: ToolsInput = {};
   const builtinInfos: ToolInfo[] = [];
 
-  // erxes search/execute meta-tools — bound only when the policy grants at least
-  // one operation (an all-builtins-only restricted agent skips them).
   // Per-agent audit sink: every mutation the agent runs (or is blocked from)
   // is recorded against this agent. Fire-and-forget inside writeAgentAction.
   const recordAction = (entry: AgentActionInput) =>
@@ -131,15 +137,22 @@ function assembleAgentTools(params: {
       agentId: agentConfig.agentId,
     });
 
-  if (hasErxes) {
-    Object.assign(
-      tools,
-      buildErxesMetaTools({
+  const operationTools = hasErxes
+    ? buildErxesOperationTools({
         registry,
         settings,
         policy,
         destructiveOps,
         recordAction,
+      })
+    : {};
+
+  if (hasErxes) {
+    Object.assign(
+      tools,
+      buildErxesSupportTools({
+        policy,
+        destructiveOps,
       }),
     );
   }
@@ -185,7 +198,7 @@ function assembleAgentTools(params: {
     });
   }
 
-  return { tools, builtinInfos };
+  return { tools, operationTools, builtinInfos };
 }
 
 /**
@@ -198,11 +211,12 @@ function assembleAgentTools(params: {
 function resolveMaxSteps(
   agentConfig: IMastraAgentDocument,
   toolNames: string[],
+  hasErxes: boolean,
 ): number {
   const configuredSteps = agentConfig.maxSteps || 8;
   const hasWorkflowTools = toolNames.some((k) => k.startsWith('workflow'));
   const stepFloor = hasWorkflowTools ? 32 : 8;
-  return toolNames.length
+  return toolNames.length || hasErxes
     ? Math.max(configuredSteps, stepFloor)
     : configuredSteps;
 }
@@ -268,16 +282,14 @@ export async function getOrCreateAgent(
         ]);
 
   // The agent's reach: 'all' (every erxes operation + builtin) by default, or a
-  // restricted allowlist. The two meta-tools enforce this at execution time.
+  // restricted allowlist. Discovery filters it and direct tools re-check it.
   const policy = resolveToolPolicy(agentConfig);
 
-  // Consent for irreversible deletes/merges. Defaults to 'block' (incl. legacy
-  // agents with no field persisted) so the AI cannot remove data by mistake;
-  // the execute meta-tool refuses destructive ops unless this is 'allow'.
+  // Consent for irreversible deletes/merges. Defaults to 'block' (including
+  // legacy agents with no persisted field); direct operation tools enforce it.
   const destructiveOps = resolveDestructiveOpsPolicy(agentConfig);
 
-  // The live, cached schema registry powers search + execute. No per-operation
-  // tool docs are bound any more — capabilities are derived from the gateway.
+  // The live, cached schema registry powers typed operation discovery.
   const registry = await getOperationRegistry(settings);
 
   // The installed-services inventory both grounds the system prompt AND keys
@@ -317,7 +329,7 @@ export async function getOrCreateAgent(
   const model = buildModel(agentConfig.provider, agentConfig.model, providers);
 
   const hasErxes = hasAnyOperation(registry.list, policy);
-  const { tools, builtinInfos } = assembleAgentTools({
+  const { tools, operationTools, builtinInfos } = assembleAgentTools({
     agentConfig,
     models,
     providers,
@@ -339,7 +351,7 @@ export async function getOrCreateAgent(
     builtins: builtinInfos,
   });
 
-  const maxSteps = resolveMaxSteps(agentConfig, toolNames);
+  const maxSteps = resolveMaxSteps(agentConfig, toolNames, hasErxes);
 
   // Configured sampling temperature. Unset → provider/SDK default (the legacy
   // loop hardcodes 0, which models like Kimi thinking — "only 1 is allowed" —
@@ -368,15 +380,27 @@ export async function getOrCreateAgent(
     ? getSkillsWorkspace(subdomain || 'os', agentConfig.skills)
     : undefined;
 
+  const inputProcessors = [
+    ...(hasErxes
+      ? [
+          new ToolSearchProcessor({
+            tools: operationTools,
+            search: { topK: 3, minScore: 0.1, autoLoad: true },
+            storage: 'context',
+          }),
+        ]
+      : []),
+    ...(memory ? [new ToolCallSignalFilter()] : []),
+  ];
+
   const agent = new Agent({
     id: agentConfig.agentId,
     name: agentConfig.name,
     instructions: systemPrompt,
     model,
     tools: toolNames.length ? tools : undefined,
-    ...(memory
-      ? { memory, inputProcessors: [new ToolCallSignalFilter()] }
-      : {}),
+    ...(memory ? { memory } : {}),
+    ...(inputProcessors.length ? { inputProcessors } : {}),
     ...(scorers ? { scorers } : {}),
     ...(skillsWorkspace ? { workspace: skillsWorkspace } : {}),
     // generate()/stream() read defaultOptions. Temperature is only set when the
@@ -392,9 +416,10 @@ export async function getOrCreateAgent(
     await wireAgentObservability({ agent, subdomain, scorers });
   }
 
+  const executableTools = { ...tools, ...operationTools };
   agentCache.set(cacheKey, agent);
-  toolsCache.set(cacheKey, tools);
-  return { agent, tools };
+  toolsCache.set(cacheKey, executableTools);
+  return { agent, tools: executableTools };
 }
 
 /** Drop every cached agent built from the given stored config id. */

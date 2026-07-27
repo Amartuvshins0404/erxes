@@ -144,7 +144,13 @@ function graphqlTypeToZod(
     );
   }
   if (kind === 'NON_NULL') {
-    return graphqlTypeToZod(type.ofType, inputTypesMap, enumValuesMap);
+    return graphqlTypeToZod(
+      type.ofType,
+      inputTypesMap,
+      enumValuesMap,
+    ).refine((value) => value !== undefined && value !== null, {
+      message: 'Required by the GraphQL schema.',
+    });
   }
   if (kind === 'ENUM' && enumValuesMap?.[name]?.length) {
     return buildEnumZod(enumValuesMap[name]);

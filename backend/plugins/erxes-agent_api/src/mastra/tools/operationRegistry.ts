@@ -33,9 +33,8 @@ export interface OperationRegistry extends SchemaMaps {
 
 // Schema introspection is identical for every user (it's the gateway's shape,
 // not tenant data), so the registry is cached per API URL + app token with a
-// short TTL. This replaces the old per-operation MastraTool collection: the
-// agent's capabilities are now always derived from the live schema, no manual
-// "sync" step required.
+// short TTL. Tool factories derive a fresh, policy-scoped searchable surface
+// from this registry whenever an agent is built; no manual sync step exists.
 const TTL_MS = 15 * 60 * 1000;
 const cache = createTTLCache<OperationRegistry>(TTL_MS);
 

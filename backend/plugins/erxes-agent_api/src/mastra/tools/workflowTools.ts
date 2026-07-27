@@ -23,7 +23,7 @@ import { syncTenantSchedules } from '../scheduleSync';
  * Builder tools — what turns a chat agent into the workflow MASTER AGENT
  * (docs/WORKFLOW-SPEC.md §5). The loop they enable, entirely in conversation:
  *
- *   workflowGuide → search_erxes_operations → workflowValidate (iterate on
+ *   workflowGuide → search_tools → workflowValidate (iterate on
  *   structured errors) → workflowSimulate (dry trace) → workflowSave →
  *   workflowRunNow / workflowRuns.
  *
@@ -196,7 +196,7 @@ A workflow is a JSON document:
 
 STEP TYPES (max 30 steps total, ids unique, letters/digits/_/-):
 - { "id", "type": "operation", "operation": "<exact erxes operation name>", "args": { ... } }
-  Runs one erxes operation. Discover names/args with search_erxes_operations.
+  Runs one erxes operation. Discover exact names and arguments with search_tools.
 - { "id", "type": "agent", "agentRef": "<bindings key>", "prompt": "...", "outputSchema": { "field": "string|number|boolean|enum:a,b,c" } }
   One LLM judgment call. Append '?' for optional fields. Use an enum field for
   anything a branch will route on.

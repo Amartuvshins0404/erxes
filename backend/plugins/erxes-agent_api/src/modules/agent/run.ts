@@ -166,8 +166,8 @@ export async function synthesizeFromToolResults(params: {
 }): Promise<string> {
   const { agent, message, authCtx, toolResults } = params;
 
-  // search_erxes_operations is navigational; only execute (action) results
-  // decide whether the turn produced something real to report.
+  // Catalog navigation is not an action result; only direct operation/builtin
+  // results decide whether the turn produced something real to report.
   const actionResults = toolResults.filter((tr) => !isSearchResult(tr));
   const hasRealResult = actionResults.some((tr) =>
     isRealToolData(tr.result ?? tr),
@@ -178,8 +178,7 @@ export async function synthesizeFromToolResults(params: {
     return fallback || 'Something went wrong. Please try again.';
   }
 
-  // All tool calls succeeded — synthesise a human-readable summary from the
-  // action results (the search listing would only distract the model).
+  // All tool calls succeeded — synthesise from action results only.
   const toolContext = actionResults
     .map((tr) => {
       const name = tr.toolName || tr.name || 'tool';

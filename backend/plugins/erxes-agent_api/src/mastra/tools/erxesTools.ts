@@ -249,8 +249,7 @@ function secretRefRefusedResult() {
  * Runs a single erxes GraphQL operation by name on the user's behalf and returns
  * its result (or a structured { success:false, … } payload the model can act on).
  *
- * This is the shared execution core behind the `execute_erxes_operation`
- * meta-tool. It owns everything that used to live in the per-operation tool:
+ * This is the shared execution core behind every exact operation tool. It owns:
  *   • coercing LLM-supplied args through the operation's Zod schema,
  *   • resolving entity NAMES in *Id/*Ids args → real ids (membership-based),
  *   • building a valid GraphQL operation + response selection,

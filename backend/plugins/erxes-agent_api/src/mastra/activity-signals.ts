@@ -31,10 +31,8 @@ const clip = (text: string) =>
 const phrase = (verb: string, subject?: string) =>
   clip(subject ? `${verb} ${subject}` : verb);
 
-// Tool names arrive in mixed casing: builtins use camelCase keys (`webSearch`),
-// meta tools use snake_case ids (`execute_erxes_operation`). Normalize to a
-// separator-less lowercase form so a known tool is always recognised (otherwise
-// it falls through to an avoidable LLM summarization for its status line).
+// Tool names mix camelCase operation/builtin keys with snake_case support ids.
+// Normalize separators so known tools are recognized before status synthesis.
 const norm = (toolName: string): string =>
   toolName.toLowerCase().replace(/[-_\s]/g, '');
 

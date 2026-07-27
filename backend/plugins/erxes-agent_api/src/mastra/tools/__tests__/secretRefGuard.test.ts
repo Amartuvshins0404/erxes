@@ -21,8 +21,7 @@ jest.mock('erxes-api-shared/utils', () => ({
 
 import { executeErxesOperation } from '../erxesTools';
 import { REDACTED } from '../secretRedaction';
-import { buildErxesMetaTools } from '../metaTools';
-import type { OperationRegistry, OperationMeta } from '../operationRegistry';
+import { buildErxesSupportTools } from '../metaTools';
 
 // A gateway that fails fast (ECONNREFUSED) — reached ONLY when the guard lets a
 // call through, so a non-refusal result proves the guard did not fire.
@@ -82,34 +81,11 @@ describe('secret-reference reject-guard', () => {
 });
 
 describe('list_config_keys discovery tool', () => {
-  const mkRegistry = (): OperationRegistry => {
-    const list = [
-      {
-        operation: 'customers',
-        operationType: 'query',
-        plugin: 'core',
-        module: 'customers',
-        description: '',
-        graphqlArgs: [],
-        returnType: null,
-      } as OperationMeta,
-    ];
-    return {
-      operations: new Map(list.map((o) => [o.operation, o])),
-      list,
-      inputTypesMap: {},
-      objectFieldsMap: {},
-      enumValuesMap: {},
-    };
-  };
-
   const buildTools = (mode: 'all' | 'custom' = 'all') =>
-    buildErxesMetaTools({
-      registry: mkRegistry(),
-      settings: {},
+    buildErxesSupportTools({
       policy: { mode, allowed: [] },
-      destructiveOps: 'allow',
-    }) as any;
+      destructiveOps: 'ask',
+    });
 
   beforeEach(() => mockSendTRPC.mockReset());
 
@@ -151,7 +127,6 @@ describe('list_config_keys discovery tool', () => {
 
   it('is NOT bound for a restricted (mode:custom) agent', () => {
     expect(buildTools('custom').list_config_keys).toBeUndefined();
-    // The core meta-tools stay available regardless of scope.
-    expect(buildTools('custom').execute_erxes_operation).toBeDefined();
+    expect(buildTools('custom').request_approval).toBeDefined();
   });
 });

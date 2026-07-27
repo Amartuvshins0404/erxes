@@ -5,8 +5,8 @@ import { buildSnapshotMetadata } from '@/skills/store/skillContent';
 
 // Global default skills, seeded per subdomain on first skills access. They teach
 // an agent how to interact with the erxes API — derived from this plugin's real
-// tool conventions (the search_erxes_operations / execute_erxes_operation
-// meta-tools and the destructive-ops approval flow). Seeded as
+// tool conventions (ToolSearchProcessor discovery, exact operation tools, and
+// the destructive-ops approval flow). Seeded as
 // visibility:public, authorId=<subdomain>::system, status:published, and NOT
 // user-invocable (they are background guidance the SkillsProcessor surfaces, not
 // /slash commands). Idempotent: only inserted when absent by name.
@@ -25,15 +25,14 @@ export const SEED_SKILLS: ISkillContent[] = [
       'up front — discover the exact one each time.',
       '',
       '## The two-step loop',
-      '1. **Discover** — call `search_erxes_operations` FIRST with a natural-language',
-      '   query (e.g. "create deal", "list companies by name"). It returns ranked',
-      '   operations with their exact `name`, `operationType` (query/mutation), and',
-      '   the arguments + selectable fields for the top matches.',
-      '2. **Execute** — call `execute_erxes_operation` with the EXACT `name` from the',
-      '   search result and the arguments it listed. Never invent operation names.',
+      '1. **Discover** — call `search_tools` FIRST with a natural-language query',
+      '   (e.g. "create deal", "list companies by name"). The best matching exact',
+      '   operation tools are loaded automatically for the next step.',
+      '2. **Execute** — call one returned operation directly. Its schema gives the',
+      '   required arguments, nested fields, enum values, and response-field menu.',
+      '   Pass arguments directly; never use a generic operation/args wrapper.',
       '',
-      'Done when you have run the exact named operation the search returned — never',
-      'a guessed name.',
+      'Done when the exact discovered operation succeeds — never call a guessed name.',
       '',
       '## Naming conventions',
       '- Mutations end in a verb: `...Add` (create), `...Edit` (update),',

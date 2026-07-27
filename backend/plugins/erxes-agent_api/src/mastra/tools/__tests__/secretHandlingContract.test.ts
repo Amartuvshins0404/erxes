@@ -29,7 +29,7 @@ import {
   REDACTED,
 } from '../secretRedaction';
 import { executeErxesOperation } from '../erxesTools';
-import { buildErxesMetaTools } from '../metaTools';
+import { buildErxesSupportTools } from '../metaTools';
 import { sendTRPCMessage } from 'erxes-api-shared/utils';
 
 const mockSend = sendTRPCMessage as unknown as jest.Mock;
@@ -372,49 +372,23 @@ describe('executeErxesOperation — secret-reference reject-guard', () => {
 });
 
 // -----------------------------------------------------------------------------
-// SECTION 5: buildErxesMetaTools / list_config_keys.
+// SECTION 5: names-only configuration support tool.
 //   - list_config_keys returns NAMES only; PRESENT for mode 'all', ABSENT for 'custom'.
-//   - core meta-tools present in both modes.
-//   - core-failure (null/reject) => failure, NOT "nothing configured".
+//   - support failure is explicit, never misreported as an empty config set.
 // -----------------------------------------------------------------------------
-describe('buildErxesMetaTools / list_config_keys', () => {
-  const dummyOp = {
-    operation: 'usersMain',
-    operationType: 'query' as const,
-    name: 'usersMain',
-    description: 'dummy op',
-    graphqlArgs: [],
-    returnType: { kind: 'SCALAR', name: 'JSON' },
-  };
-  const makeRegistry = () => ({
-    operations: new Map<string, any>([[dummyOp.operation, dummyOp]]),
-    list: [dummyOp],
-    inputTypesMap: {},
-    objectFieldsMap: {},
-    enumValuesMap: {},
-  });
-
+describe('buildErxesSupportTools / list_config_keys', () => {
   const build = (mode: 'all' | 'custom') =>
-    buildErxesMetaTools({
-      registry: makeRegistry(),
-      settings: SETTINGS,
-      policy: { mode, allowed: mode === 'custom' ? [dummyOp.operation] : [] },
-      destructiveOps: new Set<string>(),
-      recordAction: jest.fn(),
-    } as any);
-
+    buildErxesSupportTools({
+      policy: { mode, allowed: [] },
+      destructiveOps: 'ask',
+    });
   beforeEach(() => {
     mockSend.mockReset();
   });
 
-  it('exposes core meta-tools in BOTH policy modes', () => {
-    const all: any = build('all');
-    const custom: any = build('custom');
-    expect(typeof all.execute_erxes_operation).toBeDefined();
-    expect(all.execute_erxes_operation).toBeTruthy();
-    expect(all.search_erxes_operations).toBeTruthy();
-    expect(custom.execute_erxes_operation).toBeTruthy();
-    expect(custom.search_erxes_operations).toBeTruthy();
+  it('keeps approval support in both policy modes', () => {
+    expect(build('all').request_approval).toBeTruthy();
+    expect(build('custom').request_approval).toBeTruthy();
   });
 
   it('list_config_keys PRESENT for mode "all", ABSENT for mode "custom"', () => {

@@ -2,8 +2,8 @@ import { Resolver } from 'erxes-api-shared/core-types';
 import { markResolvers } from 'erxes-api-shared/utils';
 import { IContext } from '~/connectionResolvers';
 
-export const associationQueries: Record<string, Resolver> = {
-  async mtoAssociations(
+export const categoryQueries: Record<string, Resolver> = {
+  async mtoCategories(
     _root: undefined,
     {
       isActive,
@@ -42,19 +42,19 @@ export const associationQueries: Record<string, Resolver> = {
       ];
     }
 
-    return models.Association.find(filter).sort({ createdAt: 1 });
+    return models.Category.find(filter).sort({ createdAt: 1 });
   },
 
-  async mtoAssociation(
+  async mtoCategory(
     _root: undefined,
     { _id }: { _id: string },
     { models }: IContext,
   ) {
-    return models.Association.findOne({ _id });
+    return models.Category.findOne({ _id });
   },
 };
 
-markResolvers(associationQueries, {
+markResolvers(categoryQueries, {
   wrapperConfig: {
     skipPermission: true,
   },

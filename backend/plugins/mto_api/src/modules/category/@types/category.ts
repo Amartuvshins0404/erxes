@@ -6,7 +6,7 @@ export enum CategoryLevel {
   SUB = 'sub',
 }
 
-export interface IAssociation {
+export interface ICategory {
   name: IMultilingualString;
   logo?: string;
   level?: CategoryLevel;
@@ -16,7 +16,7 @@ export interface IAssociation {
   modifiedAt?: Date;
 }
 
-export interface IAssociationDocument extends Document, IAssociation {
+export interface ICategoryDocument extends Document, ICategory {
   _id: string;
   createdAt: Date;
   modifiedAt: Date;

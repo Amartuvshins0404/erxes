@@ -1,5 +1,4 @@
 import {
-  IconTags,
   IconClipboardList,
   IconForms,
   IconCalendarEvent,
@@ -20,7 +19,7 @@ export function IndexPage() {
           <div className="flex flex-col gap-4">
             <h1 className="text-2xl font-bold">Mto</h1>
             <div className="flex flex-wrap gap-4">
-<Button asChild>
+              <Button asChild>
                 <Link to="/mto/registration">
                   <IconClipboardList />
                   Registration
@@ -31,14 +30,6 @@ export function IndexPage() {
                   <Link to="/mto/fillform">
                     <IconForms />
                     FillForm
-                  </Link>
-                </Button>
-              )}
-              {!isSlaveMode && (
-                <Button asChild>
-                  <Link to="/mto/associations">
-                    <IconTags />
-                    Associations
                   </Link>
                 </Button>
               )}

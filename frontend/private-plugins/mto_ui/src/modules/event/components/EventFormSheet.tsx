@@ -82,7 +82,7 @@ export function EventFormSheet({
   const {
     loading: categoriesLoading,
     mainCategories,
-    getAssociationLabel,
+    getCategoryLabel,
   } = useEventCategoryOptions();
 
   const loading = creating || updating;
@@ -306,7 +306,7 @@ export function EventFormSheet({
                 label="Categories"
                 options={mainCategories}
                 selectedIds={form.categoryIds}
-                getLabel={getAssociationLabel}
+                getLabel={getCategoryLabel}
                 placeholder="Select categories"
                 onChange={(categoryIds) => setForm({ ...form, categoryIds })}
               />

@@ -1,11 +1,11 @@
 import providerCustomResolvers from '@/provider/graphql/resolvers/customResolvers/provider';
-import associationCustomResolvers from '@/association/graphql/resolvers/customResolvers/association';
+import { categoryCustomResolvers } from '@/category/graphql/resolvers/customResolvers/category';
 import eventCustomResolvers from '@/event/graphql/resolvers/customResolvers/event';
 import registrationApplicationCustomResolvers from '@/registration/graphql/resolvers/customResolvers/registrationApplication';
 
 export const customResolvers = {
   ...providerCustomResolvers,
-  ...associationCustomResolvers,
+  ...categoryCustomResolvers,
   ...eventCustomResolvers,
   ...registrationApplicationCustomResolvers,
 };

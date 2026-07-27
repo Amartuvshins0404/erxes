@@ -11,12 +11,6 @@ const IndexPage = lazy(() =>
   })),
 );
 
-const AssociationsPage = lazy(() =>
-  import('~/pages/AssociationsPage').then((module) => ({
-    default: module.AssociationsPage,
-  })),
-);
-
 const EventsPage = lazy(() =>
   import('~/pages/EventsPage').then((module) => ({
     default: module.EventsPage,
@@ -71,9 +65,6 @@ const MtoMain = () => {
     <Suspense fallback={<div />}>
       <Routes>
         <Route path="/" element={<IndexPage />} />
-        {!isSlaveMode && (
-          <Route path="/associations" element={<AssociationsPage />} />
-        )}
         {!isSlaveMode && <Route path="/events" element={<EventsPage />} />}
         {!isSlaveMode && (
           <Route path="/categories" element={<CategoriesPage />} />

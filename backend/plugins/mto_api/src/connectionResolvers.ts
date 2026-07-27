@@ -18,12 +18,12 @@ import {
   loadSystemConfigClass,
 } from '@/config/db/models/Config';
 
-// Association
-import { IAssociationDocument } from '@/association/@types/association';
+// Category
+import { ICategoryDocument } from '@/category/@types/category';
 import {
-  IAssociationModel,
-  loadAssociationClass,
-} from '@/association/db/models/Association';
+  ICategoryModel,
+  loadCategoryClass,
+} from '@/category/db/models/Category';
 
 // Event
 import { IEventDocument } from '@/event/@types/event';
@@ -44,7 +44,7 @@ import {
 export interface IModels {
   Provider: IProviderModel;
   SystemConfig: ISystemConfigModel;
-  Association: IAssociationModel;
+  Category: ICategoryModel;
   Event: IEventModel;
   RegistrationApplication: IRegistrationApplicationModel;
   RegistrationFormSchema: IRegistrationFormSchemaModel;
@@ -72,9 +72,9 @@ export const loadClasses = (db: mongoose.Connection): IModels => {
     loadSystemConfigClass(models),
   );
 
-  models.Association = db.model<IAssociationDocument, IAssociationModel>(
+  models.Category = db.model<ICategoryDocument, ICategoryModel>(
     'mto_categories',
-    loadAssociationClass(models),
+    loadCategoryClass(models),
   );
 
   models.Event = db.model<IEventDocument, IEventModel>(

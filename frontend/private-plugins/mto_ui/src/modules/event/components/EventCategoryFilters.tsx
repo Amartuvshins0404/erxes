@@ -12,7 +12,7 @@ export function EventCategoryFilters({
   filters,
   onFiltersChange,
 }: EventCategoryFiltersProps) {
-  const { mainCategories, getAssociationLabel } = useEventCategoryOptions();
+  const { mainCategories, getCategoryLabel } = useEventCategoryOptions();
 
   return (
     <FilterField label="Category">
@@ -32,7 +32,7 @@ export function EventCategoryFilters({
           <Select.Item value="__all__">All</Select.Item>
           {mainCategories.map((category) => (
             <Select.Item key={category._id} value={category._id}>
-              {getAssociationLabel(category)}
+              {getCategoryLabel(category)}
             </Select.Item>
           ))}
         </Select.Content>

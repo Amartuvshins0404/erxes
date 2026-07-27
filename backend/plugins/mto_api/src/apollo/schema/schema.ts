@@ -5,10 +5,10 @@ import {
 } from '@/provider/graphql/schemas/provider';
 
 import {
-  types as AssociationTypes,
-  queries as AssociationQueries,
-  mutations as AssociationMutations,
-} from '@/association/graphql/schemas/association';
+  types as CategoryTypes,
+  queries as CategoryQueries,
+  mutations as CategoryMutations,
+} from '@/category/graphql/schemas/category';
 
 import {
   types as ConfigTypes,
@@ -33,24 +33,24 @@ import { TypeExtensions } from './extensions';
 export const types = `
   ${TypeExtensions}
   ${ProviderTypes}
+  ${CategoryTypes}
   ${ConfigTypes}
-  ${AssociationTypes}
   ${EventTypes}
   ${RegistrationTypes}
 `;
 
 export const queries = `
   ${ProviderQueries}
+  ${CategoryQueries}
   ${ConfigQueries}
-  ${AssociationQueries}
   ${EventQueries}
   ${RegistrationQueries}
 `;
 
 export const mutations = `
   ${ProviderMutations}
+  ${CategoryMutations}
   ${ConfigMutations}
-  ${AssociationMutations}
   ${EventMutations}
   ${RegistrationMutations}
 `;

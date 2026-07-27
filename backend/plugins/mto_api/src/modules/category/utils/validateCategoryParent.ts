@@ -1,9 +1,9 @@
 import { IModels } from '~/connectionResolvers';
 
-const isTopLevelAssociation = (parentId?: string | null) =>
+const isTopLevelCategory = (parentId?: string | null) =>
   !parentId || String(parentId).trim() === '';
 
-export const validateAssociationParent = async (
+export const validateCategoryParent = async (
   models: IModels,
   parentId?: string,
   selfId?: string,
@@ -16,13 +16,13 @@ export const validateAssociationParent = async (
     throw new Error('Category cannot be its own parent');
   }
 
-  const parent = await models.Association.findOne({ _id: parentId });
+  const parent = await models.Category.findOne({ _id: parentId });
 
   if (!parent) {
     throw new Error('Parent category not found');
   }
 
-  if (!isTopLevelAssociation(parent.parentId)) {
+  if (!isTopLevelCategory(parent.parentId)) {
     throw new Error('Parent category must be a main category');
   }
 };

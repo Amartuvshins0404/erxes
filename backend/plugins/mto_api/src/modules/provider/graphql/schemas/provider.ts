@@ -21,18 +21,6 @@ export const types = `
     mn: String
   }
 
-  type MtoActivityAssociation {
-    _id: String
-    name: MtoMultilingualString
-    logo: String
-    level: String
-    parentId: String
-    parent: MtoActivityAssociation
-    isActive: Boolean
-    createdAt: Date
-    modifiedAt: Date
-  }
-
   type MtoContactInfo {
     phone: String
     email: String
@@ -47,8 +35,8 @@ export const types = `
     description: MtoMultilingualStringOptional
     contactInfo: MtoContactInfo
     facilities: [String]
-    associationIds: [String]
-    associations: [MtoActivityAssociation]
+    categoryIds: [String]
+    categories: [MtoCategory]
     singleProviderLimit: Int
     status: String
     rejectionReason: String
@@ -77,7 +65,7 @@ export const types = `
 const queryParams = `
   searchValue: String,
   status: String,
-  associationId: String,
+  categoryId: String,
   isActive: Boolean,
   hasScheduleFutureOrNow: Boolean,
 `;
@@ -93,7 +81,7 @@ const mutationParams = `
   description: MtoMultilingualStringOptionalInput
   contactInfo: MtoContactInfoInput
   facilities: [String]
-  associationIds: [String]!
+  categoryIds: [String]!
   singleProviderLimit: Int
   isActive: Boolean
   icon: String

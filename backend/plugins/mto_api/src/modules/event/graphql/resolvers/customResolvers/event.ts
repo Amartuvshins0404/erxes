@@ -14,7 +14,7 @@ const eventCustomResolvers = {
         return [];
       }
 
-      return models.Association.find({ _id: { $in: ids } });
+      return models.Category.find({ _id: { $in: ids } });
     },
   },
 };

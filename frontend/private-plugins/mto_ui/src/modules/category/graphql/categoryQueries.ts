@@ -7,7 +7,7 @@ export const MTO_CATEGORIES = gql`
     $onlyTopLevel: Boolean
     $level: String
   ) {
-    mtoAssociations(
+    mtoCategories(
       isActive: $isActive
       parentId: $parentId
       onlyTopLevel: $onlyTopLevel
@@ -30,7 +30,7 @@ export const MTO_CATEGORIES = gql`
 
 export const MTO_CATEGORY = gql`
   query MtoCategory($_id: String!) {
-    mtoAssociation(_id: $_id) {
+    mtoCategory(_id: $_id) {
       _id
       name {
         en

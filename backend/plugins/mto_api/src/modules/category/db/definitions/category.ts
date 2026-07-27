@@ -1,6 +1,6 @@
 import { mongooseStringRandomId } from 'erxes-api-shared/utils';
 import { Schema } from 'mongoose';
-import { CategoryLevel } from '@/association/@types/association';
+import { CategoryLevel } from '@/category/@types/category';
 
 const multilingualStringSchema = new Schema(
   {
@@ -10,7 +10,7 @@ const multilingualStringSchema = new Schema(
   { _id: false },
 );
 
-export const associationSchema = new Schema(
+export const categorySchema = new Schema(
   {
     _id: mongooseStringRandomId,
     createdAt: { type: Date, label: 'Created at', index: true },
@@ -37,5 +37,5 @@ export const associationSchema = new Schema(
   },
 );
 
-associationSchema.index({ parentId: 1 });
-associationSchema.index({ isActive: 1 });
+categorySchema.index({ parentId: 1 });
+categorySchema.index({ isActive: 1 });

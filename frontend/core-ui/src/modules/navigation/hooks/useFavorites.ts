@@ -1,5 +1,4 @@
 import { useQuery } from '@apollo/client';
-import { IconStar } from '@tabler/icons-react';
 import { GET_FAVORITES } from '@/navigation/graphql/queries/getFavorites';
 import { usePluginsModules } from '@/navigation/hooks/usePluginsModules';
 import { getFavoriteLabels } from '@/navigation/utils/getFavoriteLabels';

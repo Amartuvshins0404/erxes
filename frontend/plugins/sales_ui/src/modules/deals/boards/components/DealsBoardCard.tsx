@@ -38,23 +38,32 @@ const CardDetails = ({ deal }: { deal: IDeal }) => {
 
   const productMap = new Map(deal.products?.map((p) => [p._id, p]));
 
-  const filterProducts = (tickUsed: boolean) =>
-    deal.productsData
-      ?.filter((p) => p.tickUsed === tickUsed)
-      .map((p) => {
-        const product = productMap.get(p.productId || '');
-        if (!product) return null;
+  const filterProducts = (tickUsed: boolean) => {
+    const seen = new Set<string>();
+    return (
+      deal.productsData
+        ?.filter((p) => p.tickUsed === tickUsed)
+        .map((p) => {
+          const product = productMap.get(p.productId || '');
+          if (!product) return null;
 
-        return {
-          _id: product._id,
-          product: product.product,
-          name: product.name,
-          quantity: p.quantity,
-          uom: p.uom,
-          unitPrice: p.unitPrice,
-        };
-      })
-      .filter((p): p is NonNullable<typeof p> => p !== null) || [];
+          return {
+            _id: product._id,
+            product: product.product,
+            name: product.name,
+            quantity: p.quantity,
+            uom: p.uom,
+            unitPrice: p.unitPrice,
+          };
+        })
+        .filter((p): p is NonNullable<typeof p> => {
+          if (!p) return false;
+          if (seen.has(p._id)) return false;
+          seen.add(p._id);
+          return true;
+        }) || []
+    );
+  };
 
   const dealProducts = filterProducts(true);
   const excludedProducts = filterProducts(false);
@@ -153,6 +162,7 @@ export const DealsBoardCard = memo(function DealsBoardCard({
   const [currentCompanies, setCurrentCompanies] = useState(
     deal.companies || [],
   );
+  const { t } = useTranslation('sales');
 
   if (!deal) return null;
 
@@ -177,8 +187,6 @@ export const DealsBoardCard = memo(function DealsBoardCard({
   const archivedOnly = searchParams === 'true';
   const isArchived = status === 'archived';
   const showArchivedBadge = archivedOnly || isArchived;
-  const { t } = useTranslation('sales');
-
 
   return (
     <div
@@ -232,7 +240,6 @@ export const DealsBoardCard = memo(function DealsBoardCard({
           <SelectLabels.FilterBar
             filterKey=""
             mode="multiple"
-            label={t('by-label')}
             variant="card"
             targetId={_id}
             initialValue={labels?.map((label) => label._id || '') || []}
@@ -243,7 +250,6 @@ export const DealsBoardCard = memo(function DealsBoardCard({
             mode="multiple"
             label={t('by-tag')}
             variant="card"
-            targetId={_id}
             tagType="sales:deal"
             initialValue={tagIds || []}
             onValueChange={(value) => {

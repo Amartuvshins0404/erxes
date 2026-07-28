@@ -1,6 +1,24 @@
-import { IPermissionConfig } from 'erxes-api-shared/core-types';
+import {
+  IPermissionAction,
+  IPermissionConfig,
+} from 'erxes-api-shared/core-types';
 
-export const permissions: IPermissionConfig = {
+const withAgentCallableMetadata = (
+  config: IPermissionConfig,
+): IPermissionConfig => ({
+  ...config,
+  modules: config.modules.map((module) => ({
+    ...module,
+    actions: module.actions.map(
+      (action): IPermissionAction => ({
+        ...action,
+        agentCallable: action.type !== 'custom' && action.disabled !== true,
+      }),
+    ),
+  })),
+});
+
+export const permissions: IPermissionConfig = withAgentCallableMetadata({
   plugin: 'operation',
 
   modules: [
@@ -569,4 +587,4 @@ export const permissions: IPermissionConfig = {
       ],
     },
   ],
-};
+});

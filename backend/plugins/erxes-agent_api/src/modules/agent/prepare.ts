@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { IUserDocument } from 'erxes-api-shared/core-types';
 import { ExpectedError } from 'erxes-api-shared/utils';
-import { isAgentAdmin, canUserAccessAgent, getUserUnitIds } from '@/agent/utils';
+import { canUserAccessAgent, getUserUnitIds } from '@/agent/utils';
 import { IModels } from '~/connectionResolvers';
 import { getOrCreateAgent } from '~/mastra/agentRuntime';
 import { isAdvancedMemoryEnabled } from '~/mastra/memory/config';
@@ -11,10 +11,7 @@ import { readLearnedDigest } from '~/mastra/learning/digest';
 import { ApprovedOp } from '~/mastra/requestContext';
 import { buildChatUserContent } from '~/mastra/files/chatContent';
 import { IMastraChatAttachment } from '@/session/@types/session';
-import {
-  ensureThreadRegistered,
-  getNativeMemory,
-} from '@/session/nativeStore';
+import { ensureThreadRegistered, getNativeMemory } from '@/session/nativeStore';
 import { buildActivatedSkillsBlock } from '@/skills/service/skillsService';
 import { IMastraAgentDocument } from '@/agent/@types/agent';
 import { IMastraProviderDocument } from '@/provider/@types/provider';
@@ -26,6 +23,8 @@ import {
   TurnIdentity,
   TurnMessage,
 } from '@/agent/types';
+import { requireActionScope } from '@/_shared/authorization';
+import { ERXES_AGENT_ACTIONS } from '~/meta/permissionActions';
 
 // Turn setup: everything a chat turn needs before the model runs — agent +
 // tools, thread ownership check, replayed history, advanced-memory blocks, and
@@ -107,17 +106,26 @@ interface TurnConfig {
 // (bot, schedule) don't need unit membership.
 async function readTurnConfig(
   models: IModels,
+  subdomain: string,
   identity: TurnIdentity,
   agentId: string,
 ): Promise<TurnConfig> {
-  const [agentConfig, settings, providers, unitIds] = await Promise.all([
-    models.MastraAgent.findOne({ agentId, isEnabled: true }),
-    models.MastraSettings.getSettings(),
-    models.MastraProvider.find({ isEnabled: true }),
-    identity.kind === 'user' && identity.user
-      ? getUserUnitIds(models, identity.user._id)
-      : Promise.resolve<string[]>([]),
-  ]);
+  const [agentConfig, settings, providers, unitIds, actionScope] =
+    await Promise.all([
+      models.MastraAgent.findOne({ agentId, isEnabled: true }),
+      models.MastraSettings.getSettings(),
+      models.MastraProvider.find({ isEnabled: true }),
+      identity.kind === 'user' && identity.user
+        ? getUserUnitIds(models, identity.user._id)
+        : Promise.resolve<string[]>([]),
+      identity.kind === 'user' && identity.user
+        ? requireActionScope({
+            subdomain,
+            user: identity.user,
+            action: ERXES_AGENT_ACTIONS.agent.chat,
+          })
+        : Promise.resolve(null),
+    ]);
   if (!agentConfig)
     throw new ExpectedError(`Agent "${agentId}" not found or disabled`);
 
@@ -126,7 +134,7 @@ async function readTurnConfig(
       !canUserAccessAgent(
         agentConfig,
         identity.user._id,
-        isAgentAdmin(identity.user),
+        actionScope ?? 'own',
         identity.user.branchIds ?? [],
         identity.user.departmentIds ?? [],
         unitIds,
@@ -159,7 +167,8 @@ function resolveTurnMemory(args: {
   subdomain: string;
   sessionId: string;
 }): TurnMemory {
-  const { identity, agentConfig, agentId, message, subdomain, sessionId } = args;
+  const { identity, agentConfig, agentId, message, subdomain, sessionId } =
+    args;
 
   const useHistory = agentConfig.memoryEnabled !== false;
   // Advanced memory rides on the agent's own memory toggle.
@@ -384,6 +393,7 @@ export async function prepareTurn(
 
   const { agentConfig, settings, providers } = await readTurnConfig(
     models,
+    subdomain,
     identity,
     agentId,
   );

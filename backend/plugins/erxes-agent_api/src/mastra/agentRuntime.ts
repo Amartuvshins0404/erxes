@@ -13,7 +13,6 @@ import {
   type ErxesOperationTools,
 } from './tools/operationTools';
 import {
-  resolveToolPolicy,
   isBuiltinAllowed,
   hasAnyOperation,
   scopeSummary,
@@ -34,6 +33,7 @@ import { createMakeSkillTool } from '@/skills/tools/makeSkill';
 import type { OperationRegistry } from './tools/operationRegistry';
 import type { IMastraProviderDocument } from '@/provider/@types/provider';
 import type { IMastraSettingsDocument } from '@/settings/@types/settings';
+import { resolveAgentGrantPolicy } from './tools/agentGrantPolicy';
 
 // Cache agents by config ID + updatedAt + routing version.
 const agentCache = new Map<string, Agent>();
@@ -66,18 +66,34 @@ export interface GetOrCreateAgentOptions {
  * mirrors the original key exactly:
  *   • updatedAt + ROUTING_VERSION + inventory fingerprint rebuild on config /
  *     routing / installed-plugin changes.
+ *   • resolved tool-policy mode + exact allowed identities ensure an agent
+ *     cannot reuse stale grants whose inventories have the same count.
  *   • memory joins the subdomain only when advanced memory is on.
  *   • evaluation binds each tenant to its own Langfuse project (per-subdomain
  *     observability host) when on.
  *   • skills key the subdomain + allowlist so a cached agent can't be reused
  *     for another tenant with the wrong skills source.
  */
+/**
+ * Unambiguous, allocation-light identity for the resolved server-side grant.
+ * The resolver produces a stable allowlist order, so preserve it rather than
+ * sorting and allocating a second array on every runtime lookup.
+ */
+function policyCacheTag(policy: ToolPolicy): string {
+  let tag = `${policy.mode.length}:${policy.mode}`;
+  for (const identity of policy.allowed) {
+    tag += `:${identity.length}:${identity}`;
+  }
+  return tag;
+}
+
 function buildAgentCacheKey(params: {
   agentConfig: IMastraAgentDocument;
   subdomain?: string;
   useMemory: boolean;
   evaluationEnabled: boolean;
   inventoryFingerprint: string;
+  policy: ToolPolicy;
 }): string {
   const {
     agentConfig,
@@ -85,14 +101,18 @@ function buildAgentCacheKey(params: {
     useMemory,
     evaluationEnabled,
     inventoryFingerprint,
+    policy,
   } = params;
-
   const evalTag = evaluationEnabled ? subdomain || 'os' : 'off';
   const skillsTag = agentConfig.skills?.length
     ? `${subdomain || 'os'}:${agentConfig.skills.join('|')}`
     : 'off';
 
-  return `${agentConfig._id}:${agentConfig.updatedAt?.getTime?.() ?? 0}:v${ROUTING_VERSION}:${inventoryFingerprint}:mem${useMemory ? subdomain : 'off'}:eval${evalTag}:skills${skillsTag}`;
+  return `${agentConfig._id}:${
+    agentConfig.updatedAt?.getTime?.() ?? 0
+  }:v${ROUTING_VERSION}:${inventoryFingerprint}:policy${policyCacheTag(
+    policy,
+  )}:mem${useMemory ? subdomain : 'off'}:eval${evalTag}:skills${skillsTag}`;
 }
 
 /**
@@ -281,16 +301,19 @@ export async function getOrCreateAgent(
           models.MastraSettings.getSettings(),
         ]);
 
-  // The agent's reach: 'all' (every erxes operation + builtin) by default, or a
-  // restricted allowlist. Discovery filters it and direct tools re-check it.
-  const policy = resolveToolPolicy(agentConfig);
+  // Resolve the live server-side grant on every cache build. Missing groups,
+  // missing tenant context, and core lookup failures all produce zero tools.
+  const registry = await getOperationRegistry(settings);
+  const policy = await resolveAgentGrantPolicy({
+    subdomain,
+    grantGroupId: agentConfig.grantGroupId,
+    registry,
+  });
 
   // Consent for irreversible deletes/merges. Defaults to 'block' (including
   // legacy agents with no persisted field); direct operation tools enforce it.
   const destructiveOps = resolveDestructiveOpsPolicy(agentConfig);
 
-  // The live, cached schema registry powers typed operation discovery.
-  const registry = await getOperationRegistry(settings);
 
   // The installed-services inventory both grounds the system prompt AND keys
   // the cache: enabling/disabling a plugin changes the fingerprint, so the
@@ -308,6 +331,7 @@ export async function getOrCreateAgent(
     useMemory,
     evaluationEnabled,
     inventoryFingerprint: inventory.fingerprint,
+    policy,
   });
 
   const cached = agentCache.get(cacheKey);

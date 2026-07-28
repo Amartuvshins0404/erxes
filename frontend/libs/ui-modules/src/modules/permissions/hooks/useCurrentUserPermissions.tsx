@@ -1,11 +1,14 @@
 import { useQuery } from '@apollo/client';
 import { CURRENT_USER_PERMISSIONS } from '../graphql';
 
+export type PermissionScope = 'own' | 'group' | 'all';
+
 export interface ICurrentUserPermission {
   plugin: string;
   module: string;
   actions: string[];
-  scope: string;
+  scope: PermissionScope;
+  actionScopes: Partial<Record<string, PermissionScope>>;
 }
 
 export interface ICurrentUserPermissionsResult {
@@ -19,7 +22,8 @@ export const useCurrentUserPermissions = () => {
   }>(CURRENT_USER_PERMISSIONS);
   return {
     currentUserPermissions: data?.currentUserPermissions?.permissions ?? [],
-    pluginsWithPermissions: data?.currentUserPermissions?.pluginsWithPermissions ?? [],
+    pluginsWithPermissions:
+      data?.currentUserPermissions?.pluginsWithPermissions ?? [],
     error,
     loading,
   };

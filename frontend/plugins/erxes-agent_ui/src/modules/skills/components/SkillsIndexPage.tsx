@@ -83,20 +83,21 @@ const SkillMoreCell = ({
 }) => {
   const navigate = useNavigate();
   const { confirmRemove } = useConfirmedRemove();
-  const { canEdit, canRemove, canPromote } = useSkillAccess();
+  const { canEdit, canPublish, canRemove, canPromote, canModerate } =
+    useSkillAccess();
   const { remove, publish, promote, demote } = useSkillMutations(refetch);
 
   // isMine is a nullable Boolean — only an explicit `true` is the owner.
   const isOwner = skill.isMine === true;
-  const canPublish = skill.status === 'draft' && isOwner;
+  const canPublishRow = skill.status === 'draft' && isOwner;
   const canPromoteRow =
     skill.status === 'published' &&
     skill.visibility === 'private' &&
     canPromote;
-  // Demote is the escape hatch from a one-way promote: a global skill its
-  // author (or an admin) can pull back to private. Mirrors the backend's
-  // author-or-admin gate on mastraSkillDemote.
-  const canDemoteRow = skill.visibility === 'public' && (isOwner || canPromote);
+  // Demotion/removal of global skills is reserved for the author or moderator.
+  const canDemoteRow =
+    skill.visibility === 'public' && canEdit && (isOwner || canModerate);
+  const canRemoveRow = canRemove && (isOwner || canModerate);
 
   const handleDelete = () =>
     confirmRemove(
@@ -132,13 +133,13 @@ const SkillMoreCell = ({
                 <IconPencil className="size-4" /> Edit
               </PermissionButton>
             </Command.Item>
-            {canPublish && (
+            {canPublishRow && (
               <Command.Item asChild>
                 <PermissionButton
                   variant="ghost"
                   size="sm"
                   className="justify-start w-full h-8"
-                  allowed={canEdit}
+                  allowed={canPublish}
                   onDenied={() => showSkillPermissionError('publish')}
                   onClick={() => publish(skill._id)}
                 >
@@ -175,7 +176,7 @@ const SkillMoreCell = ({
                 variant="ghost"
                 size="sm"
                 className="justify-start w-full h-8 text-destructive"
-                allowed={canRemove && isOwner}
+                allowed={canRemoveRow}
                 onDenied={() => showSkillPermissionError('delete')}
                 onClick={handleDelete}
               >

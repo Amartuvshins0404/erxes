@@ -32,6 +32,18 @@ jest.mock('../../requestContext', () => ({
   getCurrentAuth: () => mockAuth.current,
 }));
 
+const mockGetWorkflowAgentAccess = jest.fn();
+const mockRequireScopedWorkflow = jest.fn();
+const mockRequireScopedWorkflowAgent = jest.fn();
+jest.mock('@/workflow/authorization', () => ({
+  getWorkflowAgentAccess: (...args: unknown[]) =>
+    mockGetWorkflowAgentAccess(...args),
+  requireScopedWorkflow: (...args: unknown[]) =>
+    mockRequireScopedWorkflow(...args),
+  requireScopedWorkflowAgent: (...args: unknown[]) =>
+    mockRequireScopedWorkflowAgent(...args),
+}));
+
 const mockGetSettings = jest.fn(() =>
   Promise.resolve({ erxesApiUrl: 'https://gw' }),
 );
@@ -51,7 +63,6 @@ const mockGetRuns = jest.fn(() => Promise.resolve([]));
 type MockAgent = {
   agentId: string;
   isEnabled?: boolean;
-  ownerUserId?: string;
   createdBy?: string;
   destructiveOps?: 'allow' | 'ask' | 'block';
 } | null;
@@ -60,7 +71,11 @@ type MockAgent = {
 // to null (the kill switch) — a blanket mock would hide that the lookup ever
 // filtered on isEnabled. setAgent defaults a passed agent to enabled unless it
 // explicitly carries isEnabled:false.
-let storedAgent: MockAgent = { agentId: 'agent-self', isEnabled: true, createdBy: 'u1' };
+let storedAgent: MockAgent = {
+  agentId: 'agent-self',
+  isEnabled: true,
+  createdBy: 'u1',
+};
 const setAgent = (a: MockAgent) => {
   storedAgent = a && a.isEnabled === undefined ? { ...a, isEnabled: true } : a;
 };
@@ -79,6 +94,9 @@ const mockUpdateWorkflow = jest.fn(
   (_id: string, patch: Record<string, unknown>) =>
     Promise.resolve({ _id, version: 2, ...patch }),
 );
+const mockSetEnabled = jest.fn((_id: string, isEnabled: boolean) =>
+  Promise.resolve({ _id, version: 2, isEnabled }),
+);
 
 jest.mock('../../../connectionResolvers', () => ({
   generateModels: jest.fn(() =>
@@ -89,6 +107,7 @@ jest.mock('../../../connectionResolvers', () => ({
         getWorkflows: mockGetWorkflows,
         getWorkflow: mockGetWorkflow,
         updateWorkflow: mockUpdateWorkflow,
+        setEnabled: mockSetEnabled,
       },
       MastraAgent: { findOne: mockAgentFindOne },
       MastraWorkflowRun: { getRuns: mockGetRuns },
@@ -130,6 +149,7 @@ import {
   workflowGuideTool,
   workflowRunNowTool,
   workflowListTool,
+  workflowRunsTool,
 } from '../workflowTools';
 
 /** One structured validation error as the tools report it. */
@@ -255,7 +275,9 @@ const scheduleDefinition = (
   policy: { mode: 'all', allowed: [] },
   bindings: {},
   limits: { maxLlmCalls: 10 },
-  steps: [{ id: 'lookup', type: 'operation', operation: 'customers', args: {} }],
+  steps: [
+    { id: 'lookup', type: 'operation', operation: 'customers', args: {} },
+  ],
   ...over,
 });
 
@@ -266,6 +288,29 @@ interface UpdateResult {
   errors?: ToolValidationError[];
   error?: string;
 }
+
+beforeEach(() => {
+  mockGetWorkflowAgentAccess.mockReset();
+  mockRequireScopedWorkflow.mockReset();
+  mockRequireScopedWorkflowAgent.mockReset();
+
+  mockGetWorkflowAgentAccess.mockResolvedValue({
+    scope: 'own',
+    agentIds: ['agent-self'],
+  });
+  mockRequireScopedWorkflow.mockResolvedValue({
+    _id: 'wf-1',
+    version: 1,
+    approvalStatus: 'approved',
+    isEnabled: false,
+    agentId: 'agent-self',
+    definition: definition(),
+  });
+  mockRequireScopedWorkflowAgent.mockResolvedValue({
+    agent: { agentId: 'agent-self', isEnabled: true },
+    scope: 'own',
+  });
+});
 
 describe('team-member gate (anonymous bot path)', () => {
   afterEach(() => {
@@ -304,6 +349,158 @@ describe('team-member gate (anonymous bot path)', () => {
     await expect(asTool(workflowListTool).execute({})).rejects.toThrow(
       /only available to logged-in team members/,
     );
+  });
+});
+
+describe('workflow builtin authorization', () => {
+  beforeEach(() => {
+    mockCreateWorkflow.mockClear();
+    mockGetRuns.mockClear();
+    mockGetWorkflows.mockClear();
+    mockUpdateWorkflow.mockClear();
+    mockGetSettings.mockResolvedValue({ erxesApiUrl: 'https://gw' });
+  });
+
+  it('lists only workflows owned by agents visible to the read action', async () => {
+    mockGetWorkflowAgentAccess.mockResolvedValue({
+      scope: 'own',
+      agentIds: ['agent-self'],
+    });
+
+    await asTool<{ workflows: unknown[] }>(workflowListTool).execute({});
+
+    expect(mockGetWorkflowAgentAccess).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'erxesAgentWorkflowsRead' }),
+    );
+    expect(mockGetWorkflows).toHaveBeenCalledWith({
+      agentIds: ['agent-self'],
+    });
+  });
+
+  it('fails closed instead of listing workflows without read capability', async () => {
+    mockGetWorkflowAgentAccess.mockRejectedValue(
+      new Error('Permission required'),
+    );
+
+    await expect(asTool(workflowListTool).execute({})).rejects.toThrow(
+      /permission required/i,
+    );
+    expect(mockGetWorkflows).not.toHaveBeenCalled();
+  });
+
+  it('does not expose another workflow run history', async () => {
+    mockRequireScopedWorkflow.mockRejectedValue(
+      new Error('Workflow not found'),
+    );
+
+    await expect(
+      asTool(workflowRunsTool).execute({ workflowId: 'other-workflow' }),
+    ).rejects.toThrow(/workflow not found/i);
+    expect(mockRequireScopedWorkflow).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'erxesAgentWorkflowRunsRead',
+        workflowId: 'other-workflow',
+      }),
+    );
+    expect(mockGetRuns).not.toHaveBeenCalled();
+  });
+
+  it('does not save a workflow under an inaccessible agent', async () => {
+    mockRequireScopedWorkflowAgent.mockRejectedValue(
+      new Error('Workflow not found'),
+    );
+
+    const res = await asTool<SaveResult>(workflowSaveTool).execute({
+      name: 'Cross-owner',
+      agentId: 'other-agent',
+      definition: definition(),
+      enable: false,
+    });
+
+    expect(res.success).toBe(false);
+    expect(mockRequireScopedWorkflowAgent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'erxesAgentWorkflowsCreateDraft',
+        agentId: 'other-agent',
+      }),
+    );
+    expect(mockCreateWorkflow).not.toHaveBeenCalled();
+  });
+
+  it('does not update another workflow', async () => {
+    mockRequireScopedWorkflow.mockRejectedValue(
+      new Error('Workflow not found'),
+    );
+
+    const res = await asTool<UpdateResult>(workflowUpdateTool).execute({
+      workflowId: 'other-workflow',
+      name: 'Nope',
+    });
+
+    expect(res.success).toBe(false);
+    expect(mockRequireScopedWorkflow).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'erxesAgentWorkflowsUpdateDraft',
+        workflowId: 'other-workflow',
+      }),
+    );
+    expect(mockUpdateWorkflow).not.toHaveBeenCalled();
+  });
+
+  it('does not run another workflow', async () => {
+    mockRequireScopedWorkflow.mockRejectedValue(
+      new Error('Workflow not found'),
+    );
+
+    const res = await asTool<SaveResult>(workflowRunNowTool).execute({
+      workflowId: 'other-workflow',
+      payload: {},
+    });
+
+    expect(res.success).toBe(false);
+    expect(mockRequireScopedWorkflow).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'erxesAgentWorkflowsRun',
+        workflowId: 'other-workflow',
+      }),
+    );
+  });
+
+  it('does not run a scoped draft workflow', async () => {
+    mockRequireScopedWorkflow.mockResolvedValue({
+      _id: 'wf-1',
+      version: 1,
+      approvalStatus: 'draft',
+      isEnabled: false,
+      agentId: 'agent-self',
+      definition: definition(),
+    });
+
+    const res = await asTool<SaveResult>(workflowRunNowTool).execute({
+      workflowId: 'wf-1',
+      payload: {},
+    });
+
+    expect(res.success).toBe(false);
+    expect(res.error).toMatch(/approved/i);
+  });
+
+  it('requires a workflow draft capability before validating or simulating', async () => {
+    mockGetWorkflowAgentAccess.mockRejectedValue(
+      new Error('Permission required'),
+    );
+
+    await expect(
+      asTool(workflowValidateTool).execute({ definition: definition() }),
+    ).rejects.toThrow(/permission required/i);
+
+    const simulated = await asTool<SimulateResult>(
+      workflowSimulateTool,
+    ).execute({
+      definition: definition(),
+    });
+    expect(simulated.success).toBe(false);
+    expect(simulated.error).toMatch(/permission required/i);
   });
 });
 
@@ -423,7 +620,6 @@ describe('workflowSaveTool', () => {
     const res = await asTool<SaveResult>(workflowSaveTool).execute({
       name: 'Bad',
       definition: def,
-      enable: true,
     });
     expect(res.success).toBe(false);
     expect(mockCreateWorkflow).not.toHaveBeenCalled();
@@ -438,8 +634,9 @@ describe('workflowSaveTool', () => {
     expect(res.success).toBe(true);
     expect(res.workflowId).toBe('wf-1');
     expect(mockCreateWorkflow).toHaveBeenCalledWith(
-      expect.objectContaining({ name: 'Support flow', isEnabled: false }),
+      expect.objectContaining({ name: 'Support flow' }),
     );
+    expect(mockCreateWorkflow.mock.calls[0][0]).not.toHaveProperty('isEnabled');
   });
 });
 
@@ -460,6 +657,7 @@ describe('schedule-enable gate (agent builder tools)', () => {
     mockGetSettings.mockResolvedValue({ erxesApiUrl: 'https://gw' });
     mockCreateWorkflow.mockClear();
     mockUpdateWorkflow.mockClear();
+    mockSetEnabled.mockClear();
     mockGetWorkflow.mockReset();
     // Default owning agent: exists, enabled, destructiveOps gated.
     mockAgentFindOne.mockClear();
@@ -473,70 +671,33 @@ describe('schedule-enable gate (agent builder tools)', () => {
   });
 
   describe('workflowSaveTool', () => {
-    it('refuses to enable a schedule workflow when the app token is unconfigured', async () => {
+    it('refuses to enable a new workflow before human approval', async () => {
       const res = await asTool<SaveResult>(workflowSaveTool).execute({
         name: 'Nightly',
         definition: scheduleDefinition(),
         enable: true,
       });
       expect(res.success).toBe(false);
-      expect(res.error).toMatch(/erxes app token/i);
+      expect(res.error).toMatch(/approve/i);
       expect(mockCreateWorkflow).not.toHaveBeenCalled();
     });
 
-    it("refuses to enable when the OWNING AGENT is destructiveOps \"allow\"", async () => {
-      // Refusal comes from the owning agent's destructiveOps policy.
-      mockGetSettings.mockResolvedValue({
-        erxesApiUrl: 'https://gw',
-        erxesApiToken: APP_TOKEN,
-      });
-      setAgent({
-        agentId: 'agent-self',
-        createdBy: 'u1',
-        destructiveOps: 'allow',
-      });
-      const res = await asTool<SaveResult>(workflowSaveTool).execute({
-        name: 'Nightly',
-        definition: scheduleDefinition(),
-        enable: true,
-      });
-      expect(res.success).toBe(false);
-      expect(res.error).toMatch(/destructiveOps/);
-      expect(mockCreateWorkflow).not.toHaveBeenCalled();
-    });
-
-    it('allows enabling a schedule workflow once app token + owning agent are configured', async () => {
-      mockGetSettings.mockResolvedValue({
-        erxesApiUrl: 'https://gw',
-        erxesApiToken: APP_TOKEN,
-      });
-      const res = await asTool<SaveResult>(workflowSaveTool).execute({
-        name: 'Nightly',
-        definition: scheduleDefinition(),
-        enable: true,
-      });
-      expect(res.success).toBe(true);
-      expect(mockCreateWorkflow).toHaveBeenCalledWith(
-        expect.objectContaining({ isEnabled: true, agentId: 'agent-self' }),
-      );
-    });
-
-    it('lets a schedule workflow be SAVED disabled without the app token (gate is enable-only)', async () => {
+    it('saves a schedule workflow as a disabled draft without an app token', async () => {
       const res = await asTool<SaveResult>(workflowSaveTool).execute({
         name: 'Nightly draft',
         definition: scheduleDefinition(),
         enable: false,
       });
       expect(res.success).toBe(true);
-      expect(mockCreateWorkflow).toHaveBeenCalledWith(
-        expect.objectContaining({ isEnabled: false }),
+      expect(mockCreateWorkflow.mock.calls[0][0]).not.toHaveProperty(
+        'isEnabled',
       );
     });
   });
 
   describe('workflowUpdateTool', () => {
     it('refuses to flip isEnabled on an existing schedule workflow without the app token', async () => {
-      mockGetWorkflow.mockResolvedValue({
+      mockRequireScopedWorkflow.mockResolvedValue({
         _id: 'wf-1',
         isEnabled: false,
         agentId: 'agent-self',
@@ -551,22 +712,38 @@ describe('schedule-enable gate (agent builder tools)', () => {
       expect(mockUpdateWorkflow).not.toHaveBeenCalled();
     });
 
-    it('refuses when an update repoints an already-enabled workflow to a schedule trigger', async () => {
-      // enable is left undefined — the workflow is ALREADY enabled, and this
-      // update swaps a manual trigger for a schedule one, arming the cron.
-      mockGetWorkflow.mockResolvedValue({
+    it('returns edits to draft instead of treating an enabled workflow as still scheduled', async () => {
+      mockRequireScopedWorkflow.mockResolvedValue({
         _id: 'wf-1',
         isEnabled: true,
         agentId: 'agent-self',
-        definition: definition(), // previously a manual workflow
+        definition: definition(),
       });
+      const nextDefinition = scheduleDefinition();
       const res = await asTool<UpdateResult>(workflowUpdateTool).execute({
         workflowId: 'wf-1',
-        definition: scheduleDefinition(),
+        definition: nextDefinition,
+      });
+      expect(res.success).toBe(true);
+      expect(mockUpdateWorkflow).toHaveBeenCalledWith('wf-1', {
+        definition: expect.objectContaining({
+          trigger: nextDefinition.trigger,
+          destructiveOps: 'block',
+        }),
+      });
+      expect(mockSetEnabled).not.toHaveBeenCalled();
+    });
+
+    it('refuses to combine draft edits with enabling', async () => {
+      const res = await asTool<UpdateResult>(workflowUpdateTool).execute({
+        workflowId: 'wf-1',
+        name: 'Edited',
+        enable: true,
       });
       expect(res.success).toBe(false);
-      expect(res.error).toMatch(/erxes app token/i);
+      expect(res.error).toMatch(/approve/i);
       expect(mockUpdateWorkflow).not.toHaveBeenCalled();
+      expect(mockSetEnabled).not.toHaveBeenCalled();
     });
 
     it('allows enabling a schedule workflow update once the app token is configured', async () => {
@@ -574,7 +751,7 @@ describe('schedule-enable gate (agent builder tools)', () => {
         erxesApiUrl: 'https://gw',
         erxesApiToken: APP_TOKEN,
       });
-      mockGetWorkflow.mockResolvedValue({
+      mockRequireScopedWorkflow.mockResolvedValue({
         _id: 'wf-1',
         isEnabled: false,
         agentId: 'agent-self',
@@ -586,23 +763,18 @@ describe('schedule-enable gate (agent builder tools)', () => {
       });
       expect(res.success).toBe(true);
       expect(res.version).toBe(2);
-      expect(mockUpdateWorkflow).toHaveBeenCalledWith(
-        'wf-1',
-        expect.objectContaining({ isEnabled: true }),
-      );
+      expect(mockUpdateWorkflow).not.toHaveBeenCalled();
+      expect(mockSetEnabled).toHaveBeenCalledWith('wf-1', true);
     });
 
-    it('skips the gate (no existing read) when the update explicitly disables', async () => {
+    it('uses the dedicated schedule mutation when the update only disables', async () => {
       const res = await asTool<UpdateResult>(workflowUpdateTool).execute({
         workflowId: 'wf-1',
         enable: false,
       });
       expect(res.success).toBe(true);
-      expect(mockGetWorkflow).not.toHaveBeenCalled();
-      expect(mockUpdateWorkflow).toHaveBeenCalledWith(
-        'wf-1',
-        expect.objectContaining({ isEnabled: false }),
-      );
+      expect(mockUpdateWorkflow).not.toHaveBeenCalled();
+      expect(mockSetEnabled).toHaveBeenCalledWith('wf-1', false);
     });
   });
 });
@@ -645,6 +817,12 @@ describe('workflow ownership (agent builder tools)', () => {
       agentId: 'agent-self',
       isEnabled: true,
     });
+    expect(mockRequireScopedWorkflowAgent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'erxesAgentWorkflowsCreateDraft',
+        agentId: 'agent-self',
+      }),
+    );
     expect(mockCreateWorkflow).toHaveBeenCalledWith(
       expect.objectContaining({ agentId: 'agent-self' }),
     );

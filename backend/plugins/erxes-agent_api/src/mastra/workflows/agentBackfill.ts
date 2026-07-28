@@ -62,7 +62,7 @@ async function agentFromBindings(
   return agent?.agentId || undefined;
 }
 
-/** Rule (b): oldest enabled agent owned or created by the workflow's creator. */
+/** Rule (b): oldest enabled agent owned by the workflow's creator. */
 async function agentFromCreator(
   models: IModels,
   workflow: IMastraWorkflowDocument,
@@ -71,7 +71,7 @@ async function agentFromCreator(
   if (!creator) return undefined;
   const agent = (await models.MastraAgent.findOne({
     isEnabled: true,
-    $or: [{ ownerUserId: creator }, { createdBy: creator }],
+    createdBy: creator,
   }).sort({ createdAt: 1, _id: 1 })) as IMastraAgentDocument | null;
   return agent?.agentId || undefined;
 }
@@ -94,7 +94,10 @@ async function oldestEnabledAgent(
 async function resolveOwningAgent(
   models: IModels,
   workflow: IMastraWorkflowDocument,
-): Promise<{ agentId?: string; rule: 'binding' | 'creator' | 'tenant' | 'none' }> {
+): Promise<{
+  agentId?: string;
+  rule: 'binding' | 'creator' | 'tenant' | 'none';
+}> {
   const fromBinding = await agentFromBindings(models, workflow);
   if (fromBinding) return { agentId: fromBinding, rule: 'binding' };
 
@@ -160,7 +163,9 @@ export async function backfillTenantWorkflows(models: IModels): Promise<void> {
     } catch (e) {
       // eslint-disable-next-line no-console
       console.error(
-        `[erxes-agent:workflows] backfill: workflow ${workflow._id} failed — skipping: ${(e as Error)?.message}`,
+        `[erxes-agent:workflows] backfill: workflow ${
+          workflow._id
+        } failed — skipping: ${(e as Error)?.message}`,
       );
     }
   }

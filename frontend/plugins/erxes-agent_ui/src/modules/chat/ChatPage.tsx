@@ -2,7 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useApolloClient } from '@apollo/client';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { IconArrowDown } from '@tabler/icons-react';
-import type { ChatAttachment, ApprovedOp, ReasoningEffort } from '~/modules/chat/types';
+import type {
+  ChatAttachment,
+  ApprovedOp,
+  ReasoningEffort,
+} from '~/modules/chat/types';
 import { chatStore } from '~/modules/chat/store/chatStore';
 import {
   useChatAgents,
@@ -110,11 +114,15 @@ export const ChatPage = () => {
   const selectedAgent = useMemo(
     () =>
       agentId
-        ? (agents.find((a) => a._id === agentId || a.agentId === agentId) ??
-          null)
+        ? agents.find((a) => a._id === agentId || a.agentId === agentId) ?? null
         : null,
     [agents, agentId],
   );
+
+  const canReadWorkflows =
+    selectedAgent?.capabilities?.canReadWorkflows === true;
+  const activeChatMode: ChatMode =
+    chatMode === 'workflow' && canReadWorkflows ? 'workflow' : 'chat';
 
   const view = useAgentChatView(agentId);
   const {
@@ -163,7 +171,10 @@ export const ChatPage = () => {
     loading: workflowsLoading,
     error: workflowsError,
     refetch: refetchWorkflows,
-  } = useWorkflows(selectedAgent?.agentId, chatMode !== 'workflow');
+  } = useWorkflows(
+    selectedAgent?.agentId,
+    activeChatMode !== 'workflow' || !canReadWorkflows,
+  );
   const retryWorkflows = useCallback(() => {
     void refetchWorkflows().catch(() => undefined);
   }, [refetchWorkflows]);
@@ -179,14 +190,15 @@ export const ChatPage = () => {
     [setWorkflowParam],
   );
   useEffect(() => {
-    if (chatMode !== 'workflow' || workflowsLoading || selectedWorkflow) return;
+    if (activeChatMode !== 'workflow' || workflowsLoading || selectedWorkflow)
+      return;
     if (workflows.length === 0) {
       if (workflowParam) setWorkflowParam(undefined, true);
       return;
     }
     setWorkflowParam(workflows[0]._id, true);
   }, [
-    chatMode,
+    activeChatMode,
     workflowsLoading,
     selectedWorkflow,
     workflows,
@@ -437,7 +449,12 @@ export const ChatPage = () => {
 
   const handleDeny = () => {
     if (chatLoading) return;
-    sendMessage('Cancelled — do not delete or merge anything.', [], undefined, true);
+    sendMessage(
+      'Cancelled — do not delete or merge anything.',
+      [],
+      undefined,
+      true,
+    );
   };
 
   const handleSend = async () => {
@@ -452,7 +469,9 @@ export const ChatPage = () => {
     const message = input.trim();
     // Carry the /slash-activated skill into this turn's request (names only —
     // the server force-loads their instructions). Consumed on send.
-    const activeSkillNames = slash.activeSkill ? [slash.activeSkill] : undefined;
+    const activeSkillNames = slash.activeSkill
+      ? [slash.activeSkill]
+      : undefined;
     // Files are staged, not uploaded, until now — upload them as part of sending.
     // If any upload fails, abort: keep the composer's text + chips so the user
     // can retry (send again) or remove the offending file. Nothing is sent.
@@ -511,7 +530,8 @@ export const ChatPage = () => {
   // Composer callback props, stabilized so the memoized Composer /
   // ReasoningEffortControl don't re-render on every streamed token.
   const handleReasoningEffortChange = useCallback(
-    (effort?: ReasoningEffort) => chatStore.setReasoningEffort(agentId!, effort),
+    (effort?: ReasoningEffort) =>
+      chatStore.setReasoningEffort(agentId!, effort),
     [agentId],
   );
 
@@ -576,7 +596,7 @@ export const ChatPage = () => {
           agentId={selectedAgent?._id}
           asDrawer={asDrawer}
           onToggleSidebar={() => setSidebarOpen((v) => !v)}
-          chatMode={chatMode}
+          chatMode={activeChatMode}
           activeThreadId={activeThreadId}
           isDraft={isDraft}
           onMakeSkill={handleMakeSkill}
@@ -599,7 +619,8 @@ export const ChatPage = () => {
             agentId={agentId}
             onAgentSelect={handleAgentSelect}
             hasAgent={!!selectedAgent}
-            chatMode={chatMode}
+            chatMode={activeChatMode}
+            canReadWorkflows={canReadWorkflows}
             onChatModeChange={setChatMode}
             threads={threads}
             sessionsLoaded={sessionsLoaded}
@@ -638,8 +659,11 @@ export const ChatPage = () => {
 
           {!selectedAgent ? (
             <SelectAgentEmpty />
-          ) : chatMode === 'workflow' ? (
-            <WorkflowChatView workflow={selectedWorkflow} />
+          ) : activeChatMode === 'workflow' ? (
+            <WorkflowChatView
+              workflow={selectedWorkflow}
+              onWorkflowChanged={retryWorkflows}
+            />
           ) : (
             <>
               <MessageList
@@ -748,14 +772,17 @@ export const ChatPage = () => {
         </div>
 
         {/* ── Artifact Preview panel (charts / generated documents) ── */}
-        {previewOpen && selectedAgent && chatMode === 'chat' && !previewFullscreen && (
-          <PreviewResizer
-            splitRef={splitRef}
-            sideCollapsed={sideCollapsed}
-            onSideCollapsedChange={setSideCollapsed}
-          />
-        )}
-        {previewOpen && selectedAgent && chatMode === 'chat' && (
+        {previewOpen &&
+          selectedAgent &&
+          activeChatMode === 'chat' &&
+          !previewFullscreen && (
+            <PreviewResizer
+              splitRef={splitRef}
+              sideCollapsed={sideCollapsed}
+              onSideCollapsedChange={setSideCollapsed}
+            />
+          )}
+        {previewOpen && selectedAgent && activeChatMode === 'chat' && (
           <PreviewPanel threadId={activeThreadId} />
         )}
       </div>

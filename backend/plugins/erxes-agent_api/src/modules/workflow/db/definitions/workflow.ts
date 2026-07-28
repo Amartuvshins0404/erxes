@@ -18,6 +18,15 @@ export const workflowSchema = new Schema(
     // Disabled by default: a workflow only reacts to triggers after an explicit
     // enable (manual runs are allowed regardless, for testing).
     isEnabled: { type: Boolean, default: false, label: 'Enabled' },
+    approvalStatus: {
+      type: String,
+      enum: ['draft', 'approved'],
+      default: 'draft',
+      index: true,
+      label: 'Approval status',
+    },
+    approvedByUserId: { type: String, label: 'Approved by' },
+    approvedAt: { type: Date, label: 'Approved at' },
     createdByUserId: { type: String, label: 'Created by' },
   },
   { timestamps: true },

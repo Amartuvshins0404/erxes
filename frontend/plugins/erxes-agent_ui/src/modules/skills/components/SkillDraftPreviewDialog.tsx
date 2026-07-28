@@ -7,7 +7,10 @@ import { SkillFormFields } from './SkillFormFields';
 import { useSkill } from '../hooks/useSkill';
 import { useSaveSkill } from '../hooks/useSaveSkill';
 import { useSkillMutations } from '../hooks/useSkillMutations';
-import { showSkillPermissionError, useSkillAccess } from '../hooks/useSkillAccess';
+import {
+  showSkillPermissionError,
+  useSkillAccess,
+} from '../hooks/useSkillAccess';
 import { skillFormToDoc, stringifyMetadata } from '../utils';
 import {
   SKILL_FORM_DEFAULTS,
@@ -32,7 +35,7 @@ export const SkillDraftPreviewDialog = ({
   /** Called after the draft is published/saved so the chat can clear its banner. */
   onDone?: () => void;
 }) => {
-  const { canEdit } = useSkillAccess();
+  const { canEdit, canPublish } = useSkillAccess();
   const { skill, loading } = useSkill(open && skillId ? skillId : undefined);
 
   // Populate the form from the loaded draft the moment it arrives. Feeding the
@@ -98,7 +101,7 @@ export const SkillDraftPreviewDialog = ({
 
   const handlePublish = async () => {
     if (!skillId) return;
-    if (!canEdit) return showSkillPermissionError('publish');
+    if (!canEdit || !canPublish) return showSkillPermissionError('publish');
     const doc = toDoc(form.getValues());
     if (!doc) return;
     try {
@@ -155,7 +158,7 @@ export const SkillDraftPreviewDialog = ({
                   type="button"
                   size="sm"
                   onClick={handlePublish}
-                  disabled={saving || publishing || !canEdit}
+                  disabled={saving || publishing || !canEdit || !canPublish}
                 >
                   <IconRocket className="size-4" /> Publish
                 </Button>

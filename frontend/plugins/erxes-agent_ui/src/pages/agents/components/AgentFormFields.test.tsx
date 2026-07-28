@@ -5,10 +5,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import * as React from 'react';
 import * as ReactHookForm from 'react-hook-form';
 import { AgentFormFields } from './AgentFormFields';
-import {
-  AGENT_FORM_DEFAULTS,
-  type AgentFormValues,
-} from '../validations';
+import { AGENT_FORM_DEFAULTS, type AgentFormValues } from '../validations';
 
 jest.mock('erxes-ui', () => {
   const ReactModule = jest.requireActual<typeof React>('react');
@@ -54,7 +51,10 @@ jest.mock('erxes-ui', () => {
     Content: Container,
   });
 
-  const RadioContext = ReactModule.createContext({
+  const RadioContext = ReactModule.createContext<{
+    value: string;
+    onValueChange: (value: string) => void;
+  }>({
     value: '',
     onValueChange: () => undefined,
   });
@@ -89,7 +89,10 @@ jest.mock('erxes-ui', () => {
     Item: RadioGroupItem,
   });
 
-  const CollapsibleContext = ReactModule.createContext({
+  const CollapsibleContext = ReactModule.createContext<{
+    open: boolean;
+    setOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  }>({
     open: false,
     setOpen: () => undefined,
   });
@@ -183,7 +186,6 @@ jest.mock('react-router-dom', () => ({
   ),
 }));
 
-
 const translations: Record<string, string> = {
   'agent-settings-intro-title': 'Set up how this agent works',
   'agent-settings-selected-tools': 'Only selected operations',
@@ -202,22 +204,13 @@ jest.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string) => translations[key] ?? key,
   }),
-  Trans: ({ i18nKey }: { i18nKey: string }) =>
-    translations[i18nKey] ?? i18nKey,
+  Trans: ({ i18nKey }: { i18nKey: string }) => translations[i18nKey] ?? i18nKey,
 }));
 
 jest.mock('~/components/SelectProviderModel', () => ({
   SelectProvider: () => <div>Provider selector</div>,
   SelectModel: () => <div>Model selector</div>,
   useProviderOptions: () => ({ providers: [{ value: 'test' }] }),
-}));
-
-jest.mock('../hooks/useAvailableErxesTools', () => ({
-  useAvailableErxesTools: () => ({ operations: [], loading: false }),
-}));
-
-jest.mock('./AgentToolPicker', () => ({
-  AgentToolPicker: () => <div>Selected operation picker</div>,
 }));
 
 jest.mock('./AgentVisibilitySectionFields', () => ({
@@ -239,21 +232,11 @@ const TestForm = () => {
 };
 
 describe('AgentFormFields guided settings', () => {
-  it('makes access choices explicit and progressively reveals advanced controls', () => {
+  it('keeps access grants out of the config form and reveals advanced controls', () => {
     render(<TestForm />);
 
     expect(screen.getByText('Set up how this agent works')).toBeTruthy();
-    expect(
-      screen.getByText('This agent has full erxes access'),
-    ).toBeTruthy();
-    expect(screen.queryByText('Selected operation picker')).toBeNull();
-
-    fireEvent.click(screen.getByRole('radio', { name: /Only selected operations/i }));
-
-    expect(screen.getByText('Selected operation picker')).toBeTruthy();
-    expect(
-      screen.queryByText('This agent has full erxes access'),
-    ).toBeNull();
+    expect(screen.queryByText('Only selected operations')).toBeNull();
     expect(screen.queryByText('Show tool activity in chat')).toBeNull();
 
     fireEvent.click(

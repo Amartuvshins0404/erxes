@@ -1,4 +1,5 @@
 import { useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate, Link } from 'react-router-dom';
 import { ColumnDef } from '@tanstack/react-table';
 import {
@@ -7,6 +8,7 @@ import {
   IconSitemap,
   IconAlignLeft,
   IconBolt,
+  IconCircleCheck,
   IconCalendar,
   IconClock,
   IconHandClick,
@@ -40,6 +42,8 @@ import { stepCount, triggerLabel } from './shared';
 import { useWorkflows } from './hooks/useWorkflows';
 import { useWorkflowActions } from './hooks/useWorkflowMutations';
 import { IWorkflow, IWorkflowDefinition } from './types';
+import { ERXES_AGENT_ACTIONS } from '~/permissions';
+import { usePermissionCheck } from 'ui-modules';
 
 type BadgeVariant =
   | 'default'
@@ -83,14 +87,13 @@ const WorkflowMoreCell = ({
   refetch: () => void;
 }) => {
   const navigate = useNavigate();
+  const { t } = useTranslation('mastra');
   const { confirmRemove } = useConfirmedRemove();
-  const { removeWorkflow, setEnabled, runStart } = useWorkflowActions(
-    refetch,
-    () => {
+  const { approveWorkflow, removeWorkflow, setEnabled, runStart } =
+    useWorkflowActions(refetch, () => {
       toast({ title: 'Run started', description: workflow.name });
       navigate(`/erxes-agent/workflows/${workflow._id}`);
-    },
-  );
+    });
 
   const handleRun = () =>
     runStart({ variables: { _id: workflow._id, input: {} } });
@@ -103,42 +106,78 @@ const WorkflowMoreCell = ({
       () => removeWorkflow({ variables: { _id: workflow._id } }),
     );
 
+  const showPermissionDenied = () =>
+    toast({
+      title: 'Permission denied',
+      description: 'You do not have permission to perform this action.',
+      variant: 'destructive',
+    });
+
   return (
     <RowActionsMenu>
-      <Command.Item asChild>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="justify-start w-full h-8"
-          onClick={() => navigate(`/erxes-agent/workflows/${workflow._id}`)}
-        >
-          <IconEye className="size-4" /> View runs
-        </Button>
-      </Command.Item>
-      <Command.Item asChild>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="justify-start w-full h-8"
-          onClick={handleRun}
-        >
-          <IconPlayerPlay className="size-4" /> Run now
-        </Button>
-      </Command.Item>
-      <Command.Item asChild>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="justify-start w-full h-8"
-          onClick={() =>
-            navigate(`/erxes-agent/workflows/edit/${workflow._id}`)
-          }
-        >
-          <IconPencil className="size-4" /> Edit
-        </Button>
-      </Command.Item>
+      {workflow.capabilities.canReadRuns && (
+        <Command.Item asChild>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="justify-start w-full h-8"
+            onClick={() => navigate(`/erxes-agent/workflows/${workflow._id}`)}
+          >
+            <IconEye className="size-4" /> View runs
+          </Button>
+        </Command.Item>
+      )}
+      {workflow.approvalStatus === 'approved' &&
+        workflow.capabilities.canRun && (
+          <Command.Item asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="justify-start w-full h-8"
+              onClick={handleRun}
+            >
+              <IconPlayerPlay className="size-4" /> Run now
+            </Button>
+          </Command.Item>
+        )}
+      {workflow.approvalStatus === 'draft' &&
+        workflow.capabilities.canApprove && (
+          <Command.Item asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="justify-start w-full h-8"
+              onClick={() =>
+                approveWorkflow({ variables: { _id: workflow._id } })
+              }
+            >
+              <IconCircleCheck className="size-4" /> {t('workflow-approve')}
+            </Button>
+          </Command.Item>
+        )}
+      {workflow.capabilities.canUpdate && (
+        <Command.Item asChild>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="justify-start w-full h-8"
+            onClick={() =>
+              navigate(`/erxes-agent/workflows/edit/${workflow._id}`)
+            }
+          >
+            <IconPencil className="size-4" /> Edit
+          </Button>
+        </Command.Item>
+      )}
       <ToggleDeleteMenuItems
         isEnabled={workflow.isEnabled}
+        toggleDisabled={
+          !workflow.capabilities.canSchedule ||
+          workflow.approvalStatus !== 'approved'
+        }
+        deleteDisabled={!workflow.capabilities.canRemove}
+        onToggleDenied={showPermissionDenied}
+        onDeleteDenied={showPermissionDenied}
         onToggle={() =>
           setEnabled({
             variables: {
@@ -304,32 +343,33 @@ export const WorkflowsIndexPage = ({
   embedded?: boolean;
 } = {}) => {
   const { workflows, loading, error, refetch } = useWorkflows(agentId);
+  const { hasActionPermission } = usePermissionCheck();
+  const canCreate =
+    Boolean(agentId) &&
+    hasActionPermission(ERXES_AGENT_ACTIONS.workflow.createDraft);
 
   const newPath = agentId
     ? `/erxes-agent/workflows/new?agentId=${encodeURIComponent(agentId)}`
     : '/erxes-agent/workflows/new';
 
-  const getSortValue = useCallback(
-    (w: IWorkflow, id: string): SortValue => {
-      switch (id) {
-        case 'name':
-          return w.name;
-        case 'trigger':
-          return triggerLabel(w.definition);
-        case 'steps':
-          return stepCount(w.definition);
-        case 'version':
-          return w.version;
-        case 'status':
-          return w.isEnabled;
-        case 'updatedAt':
-          return w.updatedAt;
-        default:
-          return undefined;
-      }
-    },
-    [],
-  );
+  const getSortValue = useCallback((w: IWorkflow, id: string): SortValue => {
+    switch (id) {
+      case 'name':
+        return w.name;
+      case 'trigger':
+        return triggerLabel(w.definition);
+      case 'steps':
+        return stepCount(w.definition);
+      case 'version':
+        return w.version;
+      case 'status':
+        return w.isEnabled;
+      case 'updatedAt':
+        return w.updatedAt;
+      default:
+        return undefined;
+    }
+  }, []);
 
   const { sort, toggle, sorted } = useTableSort(workflows, getSortValue);
 
@@ -354,17 +394,18 @@ export const WorkflowsIndexPage = ({
       data={sorted}
       loading={loading}
       embedded={embedded}
-      newButton={{ to: newPath, label: 'New Workflow' }}
+      newButton={canCreate ? { to: newPath, label: 'New Workflow' } : undefined}
       empty={{
         title: 'No workflows yet',
-        description: 'Ask an agent to build one in Chat, or create one by hand.',
-        action: (
+        description:
+          'Ask an agent to build one in Chat, or create one by hand.',
+        action: canCreate ? (
           <Button asChild>
             <Link to={newPath}>
               <IconPlus /> Create Workflow
             </Link>
           </Button>
-        ),
+        ) : undefined,
       }}
       error={
         error

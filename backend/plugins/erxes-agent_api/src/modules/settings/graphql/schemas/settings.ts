@@ -18,7 +18,7 @@ export const types = `
   type MastraSettings {
     _id: String
     erxesApiUrl: String
-    erxesApiToken: String
+    hasErxesApiToken: Boolean
     defaultAgentId: String
     attachmentsEnabled: Boolean
     attachmentStorage: MastraAttachmentStorageStatus

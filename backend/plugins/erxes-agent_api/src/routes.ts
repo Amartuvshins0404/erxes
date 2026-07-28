@@ -20,12 +20,10 @@ import {
 import { IMastraChatAttachment } from '@/session/@types/session';
 import { attachmentStorageStatus } from '@/settings/graphql/resolvers/queries/settings';
 import { registerVoiceRoutes } from './mastra/voice/routes';
-import {
-  streamAgentTurn,
-  type ChatStreamRequest,
-} from './mastra/streamTurn';
+import { streamAgentTurn, type ChatStreamRequest } from './mastra/streamTurn';
 import { makeIpRateLimiter } from './utils/rateLimit';
 import { registerActiveRun } from './mastra/runRegistry';
+import { ERXES_AGENT_ACTIONS } from './meta/permissionActions';
 
 export const router: Router = Router();
 
@@ -173,7 +171,9 @@ function parseChatStreamBody(raw: unknown): ParseResult {
     return { ok: false, error: 'Invalid attachments payload' };
   }
 
-  const approvedOperations = sanitizeApprovedOperations(body.approvedOperations);
+  const approvedOperations = sanitizeApprovedOperations(
+    body.approvedOperations,
+  );
   if (approvedOperations === null) {
     return { ok: false, error: 'Invalid approvedOperations payload' };
   }
@@ -217,10 +217,10 @@ router.post('/chat/stream', llmRouteLimiter, async (req, res) => {
   const subdomain = getSubdomain(req);
 
   // Streaming chat is the HTTP twin of the mastraAgentChat resolver, so it is
-  // gated by the same `agentsChat` permission. checkPermissionGroup throws on
-  // denial (FORBIDDEN) — translate that into a 403 for the SSE client.
+  // gated by the same chat permission. checkPermissionGroup throws on denial
+  // (FORBIDDEN) — translate that into a 403 for the SSE client.
   try {
-    await checkPermissionGroup(subdomain, user)('agentsChat');
+    await checkPermissionGroup(subdomain, user)(ERXES_AGENT_ACTIONS.agent.chat);
   } catch {
     return res.status(403).json({ error: 'Permission required' });
   }
@@ -265,7 +265,7 @@ router.post('/chat/stream', llmRouteLimiter, async (req, res) => {
   // the key the cancel mutation carries. Unregistered in the run's finally.
   const unregisterRun = threadId
     ? registerActiveRun(subdomain, user._id, threadId, controller)
-    : () => {};
+    : () => undefined;
 
   const stream = createUIMessageStream({
     onError: (err) => {

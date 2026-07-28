@@ -1,6 +1,7 @@
 import { ApolloError } from '@apollo/client';
 import { toast } from 'erxes-ui';
 import { usePermissionCheck } from 'ui-modules';
+import { ERXES_AGENT_ACTIONS } from '~/permissions';
 
 const PERMISSION_DENIED = {
   title: 'Permission denied',
@@ -32,30 +33,81 @@ export const agentMutationError = () => (e: ApolloError) => {
   toast({ title: 'Error', description: e.message, variant: 'destructive' });
 };
 
-/** Permission checks for agent CRUD. canEditAgent / canRemoveAgent are
- *  per-row: admins may touch any agent; regular users only their own. */
+type AgentCapability = 'canReadConfig' | 'canEdit' | 'canRemove' | 'canShare';
+
+type AgentAccessTarget = {
+  isOwnAgent?: boolean | null;
+  capabilities?: Partial<Record<AgentCapability, boolean>> | null;
+};
+
+/** Permission checks for agent CRUD. Action scope controls whether a visible
+ * agent may be changed or only the caller's own agent may be changed. */
 export const useAgentAccess = () => {
-  const { hasActionPermission, isLoaded } = usePermissionCheck();
+  const { getActionScope, hasActionPermission, isLoaded } =
+    usePermissionCheck();
 
-  const isAdmin = hasActionPermission('settingsManage');
-  const canCreate = hasActionPermission('agentsCreate');
-  const canEdit = hasActionPermission('agentsEdit');
-  const canRemove = hasActionPermission('agentsRemove');
+  const canShare = getActionScope(ERXES_AGENT_ACTIONS.agent.share) === 'all';
+  const canReadConfig = hasActionPermission(
+    ERXES_AGENT_ACTIONS.agent.readConfig,
+  );
+  const canCreate = hasActionPermission(ERXES_AGENT_ACTIONS.agent.create);
+  const canEdit = hasActionPermission(ERXES_AGENT_ACTIONS.agent.update);
+  const canRemove = hasActionPermission(ERXES_AGENT_ACTIONS.agent.remove);
 
-  /** Backend sets isOwnAgent per-row so the check is always accurate. */
-  const canEditAgent = (agent: { isOwnAgent?: boolean | null }) =>
-    isAdmin || (canEdit && !!agent.isOwnAgent);
+  const canUseScopedAction = (action: string, agent: AgentAccessTarget) => {
+    const scope = getActionScope(action);
+    return scope === 'all' || scope === 'group' || !!agent.isOwnAgent;
+  };
 
-  const canRemoveAgent = (agent: { isOwnAgent?: boolean | null }) =>
-    isAdmin || (canRemove && !!agent.isOwnAgent);
+  const canUseCapability = (
+    agent: AgentAccessTarget,
+    capability: AgentCapability,
+    action: string,
+    hasPermission: boolean,
+  ) =>
+    agent.capabilities
+      ? agent.capabilities[capability] === true
+      : hasPermission && canUseScopedAction(action, agent);
+
+  const canReadConfigAgent = (agent: AgentAccessTarget) =>
+    canUseCapability(
+      agent,
+      'canReadConfig',
+      ERXES_AGENT_ACTIONS.agent.readConfig,
+      canReadConfig,
+    );
+  const canEditAgent = (agent: AgentAccessTarget) =>
+    canUseCapability(
+      agent,
+      'canEdit',
+      ERXES_AGENT_ACTIONS.agent.update,
+      canEdit,
+    );
+  const canRemoveAgent = (agent: AgentAccessTarget) =>
+    canUseCapability(
+      agent,
+      'canRemove',
+      ERXES_AGENT_ACTIONS.agent.remove,
+      canRemove,
+    );
+  const canShareAgent = (agent: AgentAccessTarget) =>
+    canUseCapability(
+      agent,
+      'canShare',
+      ERXES_AGENT_ACTIONS.agent.share,
+      canShare,
+    );
 
   return {
     isLoaded,
+    canReadConfig,
     canCreate,
     canEdit,
     canRemove,
-    isAdmin,
+    canShare,
     canEditAgent,
+    canReadConfigAgent,
     canRemoveAgent,
+    canShareAgent,
   };
 };

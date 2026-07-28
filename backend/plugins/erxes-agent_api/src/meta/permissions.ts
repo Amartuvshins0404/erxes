@@ -1,237 +1,381 @@
 import {
   IPermissionAction,
   IPermissionConfig,
+  IPermissionGroupPermission,
   IPermissionModule,
   IPermissionScope,
+  PermissionScope,
 } from 'erxes-api-shared/core-types';
-
-// Permission map for the erxes-agent plugin. Every GraphQL mutation/query and
-// the user-facing /chat/stream route is gated by exactly one action below.
-//
-// Action naming: `<module><Verb>`. `View` actions read; `Create/Edit/Remove`
-// write; `Run`/`Chat`/`Sync`/`Manage` are the special verbs. `always: true`
-// means every logged-in user keeps the action regardless of group — used only
-// for non-sensitive reads (it mirrors the convention in the loyalty/sales
-// plugins). Reads that can leak secrets (provider credentials, the settings
-// document with `erxesApiToken`) are NOT `always` and must be granted.
-//
-// The config is data-driven (a `SPECS` table fed through `crud`/`buildModule`)
-// so the standard View/Create/Edit/Remove shape is declared exactly once;
-// agent config is global, so groups use the `all` scope while per-user
-// ownership for chat threads/feedback is enforced in the resolvers.
+import { ERXES_AGENT_ACTIONS } from './permissionActions';
 
 export const PLUGIN = 'erxes-agent';
-export const AGENT_ADMIN_GROUP_ID = `${PLUGIN}:admin`;
-type Scope = IPermissionScope['name'];
 
 const SCOPES: IPermissionScope[] = [
-  { name: 'own', description: 'Records the user created' },
-  { name: 'all', description: 'All records' },
+  { name: 'own', description: 'Records the user owns or created' },
+  {
+    name: 'group',
+    description: 'Records available through their configured audience',
+  },
+  { name: 'all', description: 'All administrable records' },
 ];
 
-/** One action. `always` reads stay available to every logged-in user. */
 const action = (
   name: string,
   title: string,
   description: string,
-  always = false,
-): IPermissionAction => ({ name, title, description, ...(always && { always }) });
+): IPermissionAction => ({
+  name,
+  title,
+  description,
+  agentCallable: false,
+});
 
-/** Standard create/read/update/delete actions — generated in one place. */
-const crud = (
-  prefix: string,
-  noun: string,
-  o: { view: string; viewAlways?: boolean; edit?: string },
-): IPermissionAction[] => [
-  action(`${prefix}View`, `View ${noun}s`, o.view, o.viewAlways),
-  action(`${prefix}Create`, `Create ${noun}`, `Create a new ${noun}`),
-  action(`${prefix}Edit`, `Edit ${noun}`, o.edit ?? `Update a ${noun}`),
-  action(`${prefix}Remove`, `Remove ${noun}`, `Delete a ${noun}`),
-];
-
-/** One module wrapped in the platform-standard scope boilerplate. */
-const buildModule = (
+const permissionModule = (
   name: string,
   description: string,
   actions: IPermissionAction[],
+  scopeField: string | null,
+  ownerFields: string[],
 ): IPermissionModule => ({
   name,
   description,
-  scopeField: null,
-  ownerFields: [],
-  scopes: SCOPES,
   actions,
+  scopeField,
+  ownerFields,
+  scopes: SCOPES,
 });
 
-// A module is either CRUD (generated from prefix/noun, plus any `extra`
-// actions) or fully custom (`actions`) for the non-CRUD modules.
-type Spec = {
-  name: string;
-  description: string;
-  prefix?: string;
-  noun?: string;
-  view?: string;
-  viewAlways?: boolean;
-  edit?: string;
-  extra?: IPermissionAction[];
-  actions?: IPermissionAction[];
-};
-
-const SPECS: Spec[] = [
-  {
-    name: 'agent',
-    description: 'AI agent management & chat',
-    prefix: 'agents',
-    noun: 'agent',
-    view: 'List and read AI agent configurations',
-    extra: [
+const modules: IPermissionModule[] = [
+  permissionModule(
+    'agent',
+    'AI agent configuration, sharing, moderation, and chat',
+    [
       action(
-        'agentsChat',
+        ERXES_AGENT_ACTIONS.agent.readSummary,
+        'View agent summaries',
+        'List safe metadata for agents available to the user',
+      ),
+      action(
+        ERXES_AGENT_ACTIONS.agent.readConfig,
+        'View agent configuration',
+        'Read instructions, tool policy, and other sensitive agent configuration',
+      ),
+      action(
+        ERXES_AGENT_ACTIONS.agent.chat,
         'Chat with agents',
-        'Talk to an agent and manage your own chat threads & message feedback',
+        'Talk to an accessible agent and manage owned chat sessions',
+      ),
+      action(
+        ERXES_AGENT_ACTIONS.agent.create,
+        'Create agents',
+        'Create a new private agent',
+      ),
+      action(
+        ERXES_AGENT_ACTIONS.agent.update,
+        'Update agent configuration',
+        'Update ordinary configuration for an authorized agent',
+      ),
+      action(
+        ERXES_AGENT_ACTIONS.agent.remove,
+        'Remove agents',
+        'Delete an authorized agent',
+      ),
+      action(
+        ERXES_AGENT_ACTIONS.agent.share,
+        'Share agents',
+        'Change an agent audience to team, department, unit, or organization',
+      ),
+      action(
+        ERXES_AGENT_ACTIONS.agent.moderate,
+        'Moderate agents',
+        'Disable or remove shared agents without opening private content',
+      ),
+      action(
+        ERXES_AGENT_ACTIONS.agent.transferOwnership,
+        'Transfer agent ownership',
+        'Assign an agent execution owner to another team member',
       ),
     ],
-  },
-  {
-    name: 'provider',
-    description: 'AI provider credentials (LLM connections)',
-    actions: [
+    'visibility',
+    ['createdBy'],
+  ),
+  permissionModule(
+    'provider',
+    'AI provider catalog and write-only credentials',
+    [
       action(
-        'providersView',
-        'View providers',
-        'List configured providers, the provider catalog and live model lists',
+        ERXES_AGENT_ACTIONS.provider.catalogRead,
+        'View provider catalog',
+        'List provider names and live models without stored configuration',
       ),
       action(
-        'providersManage',
+        ERXES_AGENT_ACTIONS.provider.configRead,
+        'View provider configuration',
+        'Read configured providers with credentials masked',
+      ),
+      action(
+        ERXES_AGENT_ACTIONS.provider.manage,
         'Manage providers',
-        'Create or update provider credentials and API keys',
+        'Create or update provider configuration and write-only credentials',
       ),
       action(
-        'providersRemove',
+        ERXES_AGENT_ACTIONS.provider.remove,
         'Remove providers',
-        'Delete a provider configuration',
+        'Delete provider configuration',
       ),
     ],
-  },
-  {
-    name: 'settings',
-    description: 'Agent plugin settings',
-    actions: [
+    null,
+    [],
+  ),
+  permissionModule(
+    'settings',
+    'Agent plugin status, settings, quotas, and voice configuration',
+    [
       action(
-        'settingsView',
-        'View settings',
-        'Read plugin settings and derived feature status',
+        ERXES_AGENT_ACTIONS.settings.statusRead,
+        'View feature status',
+        'Read secret-free attachment, voice, and feature status',
       ),
-      action('settingsManage', 'Manage settings', 'Save plugin-wide agent settings'),
-    ],
-  },
-  {
-    name: 'workflow',
-    description: 'Agent workflow definitions & runs',
-    prefix: 'workflows',
-    noun: 'workflow',
-    view: 'List workflows, read definitions and run history',
-    viewAlways: true,
-    edit: 'Update a workflow definition or enable/disable it',
-    extra: [action('workflowsRun', 'Run workflow', 'Manually execute a workflow')],
-  },
-  {
-    name: 'learning',
-    description: 'Agent learning & knowledge curation',
-    prefix: 'learning',
-    noun: 'learning',
-    view: 'List learnings, stats and status',
-    viewAlways: true,
-    edit: 'Edit, re-status or pin a learning statement',
-  },
-  {
-    name: 'skills',
-    description: 'Agent skills (reusable SKILL.md know-how)',
-    prefix: 'skills',
-    noun: 'skill',
-    view: 'List and read agent skills and their version history',
-    viewAlways: true,
-    edit: 'Edit, publish or restore a version of your skills',
-    extra: [
       action(
-        'skillsPromote',
-        'Promote skill',
-        'Promote a private skill to a global (public) one',
+        ERXES_AGENT_ACTIONS.settings.manage,
+        'Manage settings',
+        'Update plugin-wide settings with write-only credentials',
+      ),
+      action(
+        ERXES_AGENT_ACTIONS.settings.quotasManage,
+        'Manage agent quotas',
+        'Set organization and per-user agent quotas',
+      ),
+      action(
+        ERXES_AGENT_ACTIONS.settings.voiceManage,
+        'Manage voice configuration',
+        'Update write-only speech provider credentials',
       ),
     ],
-  },
+    null,
+    [],
+  ),
+  permissionModule(
+    'workflow',
+    'Workflow drafts, approvals, schedules, execution, and run history',
+    [
+      action(
+        ERXES_AGENT_ACTIONS.workflow.read,
+        'View workflows',
+        'Read workflows belonging to accessible agents',
+      ),
+      action(
+        ERXES_AGENT_ACTIONS.workflow.createDraft,
+        'Create workflow drafts',
+        'Create a disabled draft for an authorized agent',
+      ),
+      action(
+        ERXES_AGENT_ACTIONS.workflow.updateDraft,
+        'Update workflow drafts',
+        'Edit a workflow definition and return it to draft state',
+      ),
+      action(
+        ERXES_AGENT_ACTIONS.workflow.remove,
+        'Remove workflows',
+        'Delete an authorized workflow',
+      ),
+      action(
+        ERXES_AGENT_ACTIONS.workflow.run,
+        'Run workflows',
+        'Manually execute an approved workflow as the requesting user',
+      ),
+      action(
+        ERXES_AGENT_ACTIONS.workflow.approve,
+        'Approve workflows',
+        'Approve a workflow definition for execution',
+      ),
+      action(
+        ERXES_AGENT_ACTIONS.workflow.schedule,
+        'Manage workflow schedules',
+        'Enable or disable approved background workflows',
+      ),
+      action(
+        ERXES_AGENT_ACTIONS.workflow.runsRead,
+        'View workflow runs',
+        'Read authorized workflow run status and redacted output',
+      ),
+    ],
+    'agentId',
+    ['createdByUserId'],
+  ),
+  permissionModule(
+    'learning',
+    'Published agent knowledge and administrative curation',
+    [
+      action(
+        ERXES_AGENT_ACTIONS.learning.read,
+        'View published learnings',
+        'Read approved learnings belonging to accessible agents',
+      ),
+      action(
+        ERXES_AGENT_ACTIONS.learning.curate,
+        'Curate learnings',
+        'Create, edit, review, re-status, or pin learning statements',
+      ),
+      action(
+        ERXES_AGENT_ACTIONS.learning.remove,
+        'Remove learnings',
+        'Delete learning statements',
+      ),
+    ],
+    'agentId',
+    ['createdBy'],
+  ),
+  permissionModule(
+    'skills',
+    'Private and published reusable agent skills',
+    [
+      action(
+        ERXES_AGENT_ACTIONS.skills.read,
+        'View skills',
+        'Read owned skills and published global skills',
+      ),
+      action(
+        ERXES_AGENT_ACTIONS.skills.create,
+        'Create skills',
+        'Create a private skill',
+      ),
+      action(
+        ERXES_AGENT_ACTIONS.skills.update,
+        'Update skills',
+        'Edit an owned skill',
+      ),
+      action(
+        ERXES_AGENT_ACTIONS.skills.publish,
+        'Publish skills',
+        'Publish or restore a version of an owned private skill',
+      ),
+      action(
+        ERXES_AGENT_ACTIONS.skills.remove,
+        'Remove skills',
+        'Delete an owned private skill',
+      ),
+      action(
+        ERXES_AGENT_ACTIONS.skills.promote,
+        'Promote skills',
+        'Promote an owned published skill to global visibility',
+      ),
+      action(
+        ERXES_AGENT_ACTIONS.skills.moderate,
+        'Moderate global skills',
+        'Demote or remove global skills',
+      ),
+    ],
+    null,
+    ['authorId'],
+  ),
 ];
 
-const modules: IPermissionModule[] = SPECS.map((s) =>
-  buildModule(
-    s.name,
-    s.description,
-    s.actions ?? [
-      ...crud(s.prefix as string, s.noun as string, {
-        view: s.view as string,
-        viewAlways: s.viewAlways,
-        edit: s.edit,
-      }),
-      ...(s.extra ?? []),
-    ],
-  ),
-);
-
-const byName: Record<string, IPermissionModule> = Object.fromEntries(
-  modules.map((m) => [m.name, m]),
-);
-
-/** A group's permission entry — always plugin-scoped; scope defaults to `all`. */
-const grant = (module: string, actions: string[], scope: Scope = 'all') => ({
+const grant = (
+  moduleName: string,
+  actions: string[],
+  scope: PermissionScope,
+): IPermissionGroupPermission => ({
   plugin: PLUGIN,
-  module,
+  module: moduleName,
   actions,
   scope,
 });
 
-/** Every action of a module — used by the admin group. */
-const allOf = (module: string) =>
-  grant(
-    module,
-    byName[module].actions.map((a) => a.name),
-  );
+const allActions = (moduleName: string) =>
+  modules
+    .find((permissionModule) => permissionModule.name === moduleName)
+    ?.actions.map((permissionAction) => permissionAction.name) ?? [];
+
+const ADMIN_AGENT_ACTIONS = allActions('agent').filter(
+  (actionName) => actionName !== ERXES_AGENT_ACTIONS.agent.transferOwnership,
+);
 
 export const permissions: IPermissionConfig = {
   plugin: PLUGIN,
   modules,
   defaultGroups: [
     {
-      id: `${PLUGIN}:admin`,
-      name: 'Agent Admin',
-      description: 'Full access to the AI agent plugin',
-      permissions: modules.map((m) => allOf(m.name)),
+      id: `${PLUGIN}:viewer`,
+      name: 'Agent Viewer',
+      description: 'Safe read-only access to shared agent resources',
+      principalType: 'human',
+      permissions: [
+        grant('agent', [ERXES_AGENT_ACTIONS.agent.readSummary], 'group'),
+        grant('settings', [ERXES_AGENT_ACTIONS.settings.statusRead], 'group'),
+      ],
     },
     {
       id: `${PLUGIN}:user`,
       name: 'Agent User',
-      description: 'Chat with agents, create/edit/remove own private agents, and run existing workflows',
+      description:
+        'Chat with shared agents and manage owned private agents, workflow drafts, and skills',
+      principalType: 'human',
       permissions: [
-        grant('agent', ['agentsView', 'agentsChat', 'agentsCreate', 'agentsEdit', 'agentsRemove']),
-        grant('provider', ['providersView']),
-        grant('workflow', ['workflowsView', 'workflowsRun']),
-        grant('learning', ['learningView']),
-        grant('skills', [
-          'skillsView',
-          'skillsCreate',
-          'skillsEdit',
-          'skillsRemove',
-        ]),
+        grant(
+          'agent',
+          [
+            ERXES_AGENT_ACTIONS.agent.readSummary,
+            ERXES_AGENT_ACTIONS.agent.chat,
+          ],
+          'group',
+        ),
+        grant('agent', [ERXES_AGENT_ACTIONS.agent.readConfig], 'own'),
+        grant(
+          'agent',
+          [
+            ERXES_AGENT_ACTIONS.agent.create,
+            ERXES_AGENT_ACTIONS.agent.update,
+            ERXES_AGENT_ACTIONS.agent.remove,
+          ],
+          'own',
+        ),
+        grant('provider', [ERXES_AGENT_ACTIONS.provider.catalogRead], 'group'),
+        grant('settings', [ERXES_AGENT_ACTIONS.settings.statusRead], 'group'),
+        grant(
+          'workflow',
+          [
+            ERXES_AGENT_ACTIONS.workflow.read,
+            ERXES_AGENT_ACTIONS.workflow.createDraft,
+            ERXES_AGENT_ACTIONS.workflow.updateDraft,
+            ERXES_AGENT_ACTIONS.workflow.remove,
+            ERXES_AGENT_ACTIONS.workflow.run,
+            ERXES_AGENT_ACTIONS.workflow.runsRead,
+          ],
+          'own',
+        ),
+        grant('skills', [ERXES_AGENT_ACTIONS.skills.read], 'group'),
+        grant(
+          'skills',
+          [
+            ERXES_AGENT_ACTIONS.skills.create,
+            ERXES_AGENT_ACTIONS.skills.update,
+            ERXES_AGENT_ACTIONS.skills.publish,
+            ERXES_AGENT_ACTIONS.skills.remove,
+          ],
+          'own',
+        ),
       ],
     },
     {
-      id: `${PLUGIN}:viewer`,
-      name: 'Agent Viewer',
-      description: 'Read-only access to the plugin. Manually assigned by an admin. Can see the plugin in the sidebar but cannot use any agent services (no chat, no create/edit/remove, no run).',
+      id: `${PLUGIN}:admin`,
+      name: 'Agent Admin',
+      description:
+        'Manage all agents, providers, settings, workflows, learnings, skills, and agent grant profiles',
+      principalType: 'human',
       permissions: [
-        grant('agent', ['agentsView']),
-        grant('workflow', ['workflowsView']),
-        grant('learning', ['learningView']),
-        grant('skills', ['skillsView']),
+        grant('agent', ADMIN_AGENT_ACTIONS, 'all'),
+        grant('provider', allActions('provider'), 'all'),
+        grant('settings', allActions('settings'), 'all'),
+        grant('workflow', allActions('workflow'), 'all'),
+        grant('learning', allActions('learning'), 'all'),
+        grant('skills', allActions('skills'), 'all'),
+        {
+          plugin: 'core',
+          module: 'permissions',
+          actions: ['permissionsAgentProfilesManage'],
+          scope: 'all',
+        },
       ],
     },
   ],

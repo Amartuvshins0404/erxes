@@ -3,7 +3,8 @@ import { isAdvancedMemoryEnabled } from '~/mastra/memory/config';
 import { getStorageStatus } from '~/mastra/files/storage';
 import { resolveVoiceStatusForTenant } from '~/mastra/voice/resolveConfig';
 import { IModels } from '~/connectionResolvers';
-import { IMastraSettings } from '@/settings/@types/settings';
+import { toPublicSettings } from '@/settings/utils/publicSettings';
+import { ERXES_AGENT_ACTIONS } from '~/meta/permissionActions';
 
 // configured (core storage) AND the plugin toggle → attachments usable in chat.
 export async function attachmentStorageStatus(
@@ -28,41 +29,41 @@ export const settingsQueries = {
     { userId }: { userId: string },
     { models, checkPermission }: IContext,
   ) => {
-    await checkPermission('settingsManage');
+    await checkPermission(ERXES_AGENT_ACTIONS.settings.quotasManage);
     return models.MastraUserSettings.getUserSettings(userId);
   },
   // Lightweight status for the chat UI: decides whether the attach button shows.
-  mastraAttachmentStorageStatus: (
+  mastraAttachmentStorageStatus: async (
     _parent: undefined,
     _args: undefined,
-    { models, subdomain }: IContext,
+    { models, subdomain, checkPermission }: IContext,
   ) => {
+    await checkPermission(ERXES_AGENT_ACTIONS.settings.statusRead);
     return attachmentStorageStatus(models, subdomain);
   },
 
   // Lightweight status for the chat UI: decides whether the voice mode entry
   // point shows. Per-tenant (the tenant's stored Chimege tokens win over env),
   // no secrets exposed — just the round-trip `enabled` boolean.
-  mastraVoiceStatus: (
+  mastraVoiceStatus: async (
     _parent: undefined,
     _args: undefined,
-    { subdomain }: IContext,
-  ) => resolveVoiceStatusForTenant(subdomain),
+    { subdomain, checkPermission }: IContext,
+  ) => {
+    await checkPermission(ERXES_AGENT_ACTIONS.settings.statusRead);
+    return resolveVoiceStatusForTenant(subdomain);
+  },
 
   mastraSettings: async (
     _parent: undefined,
     _args: undefined,
     { models, subdomain, checkPermission }: IContext,
   ) => {
-    // Settings spread includes secrets (e.g. erxesApiToken) — gate the read.
-    // The lightweight, secret-free mastraAttachmentStorageStatus stays open for
-    // the chat UI.
-    await checkPermission('settingsView');
+    await checkPermission(ERXES_AGENT_ACTIONS.settings.manage);
     const doc = await models.MastraSettings.getSettings();
-    const obj: IMastraSettings = doc?.toObject ? doc.toObject() : doc;
 
     return {
-      ...obj,
+      ...toPublicSettings(doc),
       attachmentStorage: await attachmentStorageStatus(models, subdomain),
       // Read-only, env-derived flag surfaced for display only.
       advancedMemory: isAdvancedMemoryEnabled(),

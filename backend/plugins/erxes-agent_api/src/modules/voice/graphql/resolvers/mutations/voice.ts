@@ -1,12 +1,10 @@
 import { ExpectedError } from 'erxes-api-shared/utils';
 import { IContext } from '~/connectionResolvers';
 import { IMastraVoiceConfig } from '@/voice/@types/voice';
-import {
-  CHIMEGE_VOICE_IDS,
-  CHIMEGE_SAMPLE_RATES,
-} from '~/mastra/voice/voices';
+import { CHIMEGE_VOICE_IDS, CHIMEGE_SAMPLE_RATES } from '~/mastra/voice/voices';
 import { isValidChimegeToken } from '~/mastra/voice/chimegeVoice';
 import { resolveVoiceStatusForTenant } from '~/mastra/voice/resolveConfig';
+import { ERXES_AGENT_ACTIONS } from '~/meta/permissionActions';
 
 // Validate + normalise a bring-your-own-key token in place before it is
 // persisted. Empty/whitespace-only is left untouched: saveVoiceConfig treats a
@@ -38,7 +36,7 @@ export const voiceMutations = {
     { doc }: { doc: IMastraVoiceConfig },
     { models, subdomain, checkPermission }: IContext,
   ) => {
-    await checkPermission('settingsManage');
+    await checkPermission(ERXES_AGENT_ACTIONS.settings.voiceManage);
 
     normalizeVoiceToken(doc, 'sttToken', 'STT');
     normalizeVoiceToken(doc, 'ttsToken', 'TTS');

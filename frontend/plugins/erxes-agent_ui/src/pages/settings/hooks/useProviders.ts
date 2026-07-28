@@ -15,23 +15,34 @@ import {
   IProviderPresetsResponse,
   IProvidersResponse,
 } from '../types';
+import { usePermissionCheck } from 'ui-modules';
+import { ERXES_AGENT_ACTIONS } from '~/permissions';
 
 /** Provider list/presets/catalog plus save & remove mutations for the page. */
 export const useProviders = (onSaved: () => void) => {
-  const { data: providersData, refetch } =
-    useQuery<IProvidersResponse>(MASTRA_PROVIDERS);
+  const { hasActionPermission, isLoaded } = usePermissionCheck();
+  const canReadConfig =
+    isLoaded && hasActionPermission(ERXES_AGENT_ACTIONS.provider.configRead);
+  const canReadCatalog =
+    isLoaded && hasActionPermission(ERXES_AGENT_ACTIONS.provider.catalogRead);
+  const { data: providersData, refetch } = useQuery<IProvidersResponse>(
+    MASTRA_PROVIDERS,
+    { skip: !canReadConfig },
+  );
   const { data: presetsData } = useQuery<IProviderPresetsResponse>(
     MASTRA_PROVIDER_PRESETS,
+    { skip: !canReadConfig },
   );
   const { data: catalogData } = useQuery<IProviderCatalogResponse>(
     MASTRA_PROVIDER_CATALOG,
+    { skip: !canReadCatalog },
   );
 
   const [saveProvider, { loading: saving }] = useMutation(
     MASTRA_PROVIDER_SAVE,
     {
       onCompleted: () => {
-        refetch();
+        if (canReadConfig) void refetch();
         onSaved();
         toast({ title: 'Provider saved' });
       },
@@ -39,7 +50,9 @@ export const useProviders = (onSaved: () => void) => {
     },
   );
   const [removeProvider] = useMutation(MASTRA_PROVIDER_REMOVE, {
-    onCompleted: () => refetch(),
+    onCompleted: () => {
+      if (canReadConfig) void refetch();
+    },
     onError: toastError(),
   });
 

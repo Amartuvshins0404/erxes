@@ -15,12 +15,16 @@ export interface IMastraWorkflow {
   version?: number;
   isEnabled?: boolean;
   createdByUserId?: string;
+  approvalStatus?: 'draft' | 'approved';
+  approvedByUserId?: string | null;
+  approvedAt?: Date | null;
 }
 
 export interface IMastraWorkflowDocument extends IMastraWorkflow, Document {
   _id: string;
   version: number;
   isEnabled: boolean;
+  approvalStatus: 'draft' | 'approved';
   createdAt: Date;
   updatedAt: Date;
 }

@@ -16,7 +16,7 @@
 // security boundary — do not soften it.
 // ---------------------------------------------------------------------------
 
-import { ExpectedError } from 'erxes-api-shared/utils';
+import { ExpectedError, sendTRPCMessage } from 'erxes-api-shared/utils';
 import type { IModels } from '~/connectionResolvers';
 import type { WorkflowDefinition } from '../workflows/dsl';
 import { mintRunToken } from './runToken';
@@ -92,7 +92,10 @@ export async function resolveBackgroundPrincipal(opts: {
 
   const token = appToken?.trim();
   if (!token) {
-    return { ok: false, error: `Background run refused: ${CONFIGURE_APP_TOKEN}` };
+    return {
+      ok: false,
+      error: `Background run refused: ${CONFIGURE_APP_TOKEN}`,
+    };
   }
 
   const agentId = agentConfig?.agentId?.trim();
@@ -131,6 +134,29 @@ export async function resolveBackgroundPrincipal(opts: {
   const desired = agentConfig.grantGroupId?.trim()
     ? [agentConfig.grantGroupId.trim()]
     : [];
+  if (desired.length > 0) {
+    const groups = await sendTRPCMessage({
+      subdomain,
+      pluginName: 'core',
+      module: 'permissionGroups',
+      action: 'find',
+      method: 'query',
+      input: { query: { _id: desired[0] } },
+      defaultValue: [],
+    });
+    if (
+      !Array.isArray(groups) ||
+      groups.length !== 1 ||
+      groups[0]?.principalType !== 'agent'
+    ) {
+      return {
+        ok: false,
+        error:
+          "Background run refused: the agent's permission profile is missing " +
+          'or is not an agent profile.',
+      };
+    }
+  }
   const inSync =
     desired.length === currentGroupIds.length &&
     desired.every((g, i) => g === currentGroupIds[i]);
@@ -164,7 +190,11 @@ export async function resolveBackgroundPrincipal(opts: {
 
   // (4) Mint the run token for the SERVICE USER. Fail closed on any mint failure
   // (service user deactivated, app token revoked, core unreachable).
-  const minted = await mintRunToken({ userId: serviceUserId, subdomain, appToken: token });
+  const minted = await mintRunToken({
+    userId: serviceUserId,
+    subdomain,
+    appToken: token,
+  });
   if (!minted) {
     return {
       ok: false,

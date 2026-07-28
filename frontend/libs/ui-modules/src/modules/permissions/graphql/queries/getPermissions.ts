@@ -77,6 +77,7 @@ export const CURRENT_USER_PERMISSIONS = gql`
         module
         actions
         scope
+        actionScopes
       }
       pluginsWithPermissions
     }

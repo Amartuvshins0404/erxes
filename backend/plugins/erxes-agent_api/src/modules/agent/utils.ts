@@ -1,44 +1,38 @@
 import { FilterQuery } from 'mongoose';
-import { IUserDocument } from 'erxes-api-shared/core-types';
+import { PermissionScope } from 'erxes-api-shared/core-types';
 import { IMastraAgentDocument } from '@/agent/@types/agent';
-import { AGENT_ADMIN_GROUP_ID } from '~/meta/permissions';
 import { IModels } from '~/connectionResolvers';
 
-/** True when the user holds owner or agent-admin role. */
-export const isAgentAdmin = (user: IUserDocument) =>
-  Boolean(
-    user?.isOwner ||
-      (user?.permissionGroupIds ?? []).includes(AGENT_ADMIN_GROUP_ID),
-  );
-
 /**
- * Single source of truth for "can user X read agent Y".
- * Private agents are visible only to their creator — even admins cannot see another
- * user's private agent. Admins can read all shared (team/department/org) agents
- * regardless of team membership. Admin write capability (edit/remove any agent)
- * is enforced separately in mutations by omitting the createdBy ownership filter.
+ * Single source of truth for whether an action scope reaches an agent.
+ * `all` still respects private-user content: it reaches every shared agent plus
+ * the caller's own private agents. Private access requires ownership.
  */
 export const canUserAccessAgent = (
   agent: {
     createdBy?: string;
-    visibility?: string;
-    teamId?: string;
-    departmentId?: string;
-    unitId?: string;
+    visibility?: string | null;
+    teamId?: string | null;
+    departmentId?: string | null;
+    unitId?: string | null;
   },
   userId: string,
-  isAdmin: boolean,
+  scope: PermissionScope,
   teamIds: string[] = [],
   deptIds: string[] = [],
   unitIds: string[] = [],
 ): boolean => {
   if (agent.createdBy === userId) return true;
-  const vis = agent.visibility ?? 'private';
-  if (vis === 'org') return true;
-  if (isAdmin) return vis !== 'private'; // admin reads all shared agents
-  if (vis === 'team') return teamIds.includes(agent.teamId ?? '');
-  if (vis === 'department') return deptIds.includes(agent.departmentId ?? '');
-  if (vis === 'unit') return unitIds.includes(agent.unitId ?? '');
+  if (scope === 'own') return false;
+
+  const visibility = agent.visibility ?? 'private';
+  if (visibility === 'org') return true;
+  if (scope === 'all') return visibility !== 'private';
+  if (visibility === 'team') return teamIds.includes(agent.teamId ?? '');
+  if (visibility === 'department') {
+    return deptIds.includes(agent.departmentId ?? '');
+  }
+  if (visibility === 'unit') return unitIds.includes(agent.unitId ?? '');
   return false;
 };
 
@@ -49,7 +43,10 @@ export const canUserAccessAgent = (
  * Best-effort: returns [] on any error so unit-scoped access degrades to
  * "no access" (same as an empty unitIds list) rather than crashing the turn.
  */
-export async function getUserUnitIds(models: IModels, userId: string): Promise<string[]> {
+export async function getUserUnitIds(
+  models: IModels,
+  userId: string,
+): Promise<string[]> {
   try {
     const db = (
       models.MastraAgent as unknown as { db: { db: import('mongodb').Db } }
@@ -88,20 +85,35 @@ export async function getAgentQuotaStatus(
  */
 export const visibilityFilter = (
   userId: string,
-  isAdmin: boolean,
+  scope: PermissionScope,
   teamIds: string[] = [],
   deptIds: string[] = [],
   unitIds: string[] = [],
-): FilterQuery<IMastraAgentDocument> =>
-  isAdmin
-    ? { $or: [{ createdBy: userId }, { visibility: { $in: ['team', 'department', 'unit', 'org'] } }] }
-    : {
-        $or: [
-          { createdBy: userId },
-          { visibility: 'org' },
-          ...(teamIds.length ? [{ visibility: 'team', teamId: { $in: teamIds } }] : []),
-          ...(deptIds.length ? [{ visibility: 'department', departmentId: { $in: deptIds } }] : []),
-          ...(unitIds.length ? [{ visibility: 'unit', unitId: { $in: unitIds } }] : []),
-        ],
-      };
+): FilterQuery<IMastraAgentDocument> => {
+  if (scope === 'own') return { createdBy: userId };
 
+  if (scope === 'all') {
+    return {
+      $or: [
+        { createdBy: userId },
+        { visibility: { $in: ['team', 'department', 'unit', 'org'] } },
+      ],
+    };
+  }
+
+  return {
+    $or: [
+      { createdBy: userId },
+      { visibility: 'org' },
+      ...(teamIds.length
+        ? [{ visibility: 'team', teamId: { $in: teamIds } }]
+        : []),
+      ...(deptIds.length
+        ? [{ visibility: 'department', departmentId: { $in: deptIds } }]
+        : []),
+      ...(unitIds.length
+        ? [{ visibility: 'unit', unitId: { $in: unitIds } }]
+        : []),
+    ],
+  };
+};

@@ -2,6 +2,7 @@ import { useMutation } from '@apollo/client';
 import { toast } from 'erxes-ui';
 import { MASTRA_WORKFLOWS } from '~/graphql/queries';
 import {
+  MASTRA_WORKFLOW_APPROVE,
   MASTRA_WORKFLOW_CREATE,
   MASTRA_WORKFLOW_REMOVE,
   MASTRA_WORKFLOW_RUN_START,
@@ -79,6 +80,11 @@ export const useWorkflowActions = (
     onError,
   });
 
+  const [approveWorkflow] = useMutation(MASTRA_WORKFLOW_APPROVE, {
+    onCompleted: () => refetch(),
+    onError,
+  });
+
   const [setEnabled] = useMutation(MASTRA_WORKFLOW_SET_ENABLED, {
     onCompleted: () => refetch(),
     onError,
@@ -89,5 +95,5 @@ export const useWorkflowActions = (
     onError,
   });
 
-  return { removeWorkflow, setEnabled, runStart };
+  return { approveWorkflow, removeWorkflow, setEnabled, runStart };
 };

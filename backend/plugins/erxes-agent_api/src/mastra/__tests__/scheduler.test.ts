@@ -65,6 +65,7 @@ describe('Mastra workflow schedule projection', () => {
           {
             _id: 'scheduled-workflow',
             isEnabled: true,
+            approvalStatus: 'approved',
             definition: {
               trigger: {
                 type: 'schedule',
@@ -109,14 +110,12 @@ describe('Mastra workflow schedule projection', () => {
 
   it('recovers when another synchronizer creates the workflow row', async () => {
     mockStore.listSchedules.mockResolvedValue([]);
-    mockStore.getSchedule
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce({
-        id: 'erxes:workflow:9:localhost:workflow-schedule',
-        cron: '0 8 * * *',
-        timezone: 'UTC',
-        status: 'active',
-      });
+    mockStore.getSchedule.mockResolvedValueOnce(null).mockResolvedValueOnce({
+      id: 'erxes:workflow:9:localhost:workflow-schedule',
+      cron: '0 8 * * *',
+      timezone: 'UTC',
+      status: 'active',
+    });
     mockStore.createSchedule.mockRejectedValue(
       new Error('Schedule already exists'),
     );
@@ -126,6 +125,7 @@ describe('Mastra workflow schedule projection', () => {
           {
             _id: 'workflow-schedule',
             isEnabled: true,
+            approvalStatus: 'approved',
             definition: {
               trigger: {
                 type: 'schedule',
@@ -156,6 +156,7 @@ describe('Mastra scheduled workflow dispatch', () => {
     const workflow = {
       _id: 'workflow-schedule',
       isEnabled: true,
+      approvalStatus: 'approved',
       definition: { trigger: { type: 'schedule' } },
     };
     const models = {

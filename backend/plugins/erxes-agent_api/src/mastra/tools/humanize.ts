@@ -107,19 +107,22 @@ const MODULE_LEADING_QUALIFIERS = new Set([
 ]);
 
 // Best-effort "module"/entity grouping for an operation. erxes exposes no
-// per-operation module map, so we derive the entity noun from the operation
-// name (strip a leading filler word: allBrands → brands, currentUser → user,
-// activeExports → exports). Dynamic — no hardcoded module lists.
+// per-operation module map, so derive the entity noun from the operation name:
+// strip a leading qualifier (allBrands → brands) or action verb
+// (createTask → task, updateTask → task). Dynamic — no hardcoded module lists.
 export function deriveModule(operation: string): string {
   const words = splitCamelWords(operation || '');
   if (!words.length) return 'other';
+
+  const first = words[0].toLowerCase();
   if (
     words.length > 1 &&
-    MODULE_LEADING_QUALIFIERS.has(words[0].toLowerCase())
+    (MODULE_LEADING_QUALIFIERS.has(first) || OPERATION_VERBS[first])
   ) {
     return words[1].toLowerCase();
   }
-  return words[0].toLowerCase();
+
+  return first;
 }
 
 // Fallback when the SDL is unavailable: group by the first lowercase word of

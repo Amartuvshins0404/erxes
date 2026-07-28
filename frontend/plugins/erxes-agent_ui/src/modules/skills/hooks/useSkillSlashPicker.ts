@@ -28,10 +28,9 @@ export const useSkillSlashPicker = ({
   setInput,
 }: SlashPickerArgs) => {
   const query = matchSlashQuery(input);
-  // Activating a skill requires skillsEdit; don't open the picker for view-only
-  // users (the backend would reject the activation with a permission error).
-  const { canEdit } = useSkillAccess();
-  const isSlashMode = query !== null && canEdit;
+  // Slash activation requires both skill read and agent chat permissions.
+  const { canActivate } = useSkillAccess();
+  const isSlashMode = query !== null && canActivate;
 
   const { skills, loading } = useInvocableSkills(agentId, !isSlashMode);
   const { activateSkill } = useSkillActivate();

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useApolloClient } from '@apollo/client';
 import { toast } from 'erxes-ui';
-import { usePermissionCheck } from 'ui-modules';
+import { useTranslation } from 'react-i18next';
 import {
   PERMISSION_MODULES,
   PERMISSION_GROUP_DETAIL,
@@ -9,7 +9,7 @@ import {
   PERMISSION_GROUP_ADD,
   PERMISSION_GROUP_EDIT,
 } from '../graphql/access';
-import { MASTRA_AGENT_UPDATE } from '~/graphql/mutations';
+import { MASTRA_AGENT_SET_GRANT } from '~/graphql/mutations';
 import { MASTRA_AGENT } from '~/graphql/queries';
 
 export interface PermissionAction {
@@ -18,10 +18,19 @@ export interface PermissionAction {
   description?: string;
   always?: boolean;
   disabled?: boolean;
+  agentCallable?: boolean;
 }
+type PermissionScopeName = 'own' | 'group' | 'all';
+
+interface PermissionScope {
+  name: PermissionScopeName;
+  description: string;
+}
+
 export interface PermissionModule {
   name: string;
   description?: string;
+  scopes?: PermissionScope[];
   actions: PermissionAction[];
 }
 export interface PermissionModulesByPlugin {
@@ -32,7 +41,7 @@ interface GroupPermission {
   plugin: string;
   module: string;
   actions: string[];
-  scope: string;
+  scope: PermissionScopeName;
 }
 
 /** Key a module by plugin+name (module names are only unique within a plugin). */
@@ -40,6 +49,14 @@ const keyOf = (plugin: string, module: string) => `${plugin} ${module}`;
 
 /** Deterministic name of an agent's own auto-managed grant group. */
 const groupNameFor = (agentId: string) => `agent-grant:${agentId}`;
+
+const defaultScopeFor = (permissionModule: PermissionModule) =>
+  permissionModule.scopes?.find((scope) => scope.name === 'own')?.name ??
+  permissionModule.scopes?.[0]?.name ??
+  'own';
+
+const isPermissionScopeName = (value: string): value is PermissionScopeName =>
+  value === 'own' || value === 'group' || value === 'all';
 
 /** Stable signature of a selection, for dirty detection. */
 const signature = (perms: GroupPermission[]) =>
@@ -58,6 +75,7 @@ const signature = (perms: GroupPermission[]) =>
  */
 const buildPermissions = (
   selection: Map<string, Set<string>>,
+  scopes: Map<string, PermissionScopeName>,
   moduleByKey: Map<string, { plugin: string; module: PermissionModule }>,
 ): GroupPermission[] => {
   const out: GroupPermission[] = [];
@@ -73,7 +91,7 @@ const buildPermissions = (
         plugin: meta.plugin,
         module: meta.module.name,
         actions: [...actions],
-        scope: 'all',
+        scope: scopes.get(k) ?? defaultScopeFor(meta.module),
       });
   }
   return out;
@@ -83,26 +101,24 @@ interface AgentLike {
   _id: string;
   agentId: string;
   grantGroupId?: string | null;
+  capabilities?: { canManageGrant: boolean } | null;
 }
 
 /**
  * Backing state for the agent Access tab: loads the permission catalog + the
  * agent's current grant group, tracks the selected actions, and persists them
  * by writing the agent's dedicated group (create / adopt / edit) then binding it
- * via mastraAgentUpdate — kept idempotent by the deterministic group name so a
+ * via mastraAgentSetGrant — kept idempotent by the deterministic group name so a
  * retried save never proliferates duplicate groups.
  */
 export const useAgentGrant = (agent: AgentLike) => {
   const client = useApolloClient();
-  const { hasActionPermission, isOwner } = usePermissionCheck();
-  // The group mutations are permissionsManage-gated server-side; mirror that in
-  // the UI so a user who can't manage permissions sees a clear disabled state
-  // instead of a failing save.
-  const canManage = isOwner || hasActionPermission('permissionsManage');
+  const canManage = agent.capabilities?.canManageGrant === true;
+  const { t } = useTranslation('mastra');
 
   const { data: modulesData, loading: modulesLoading } = useQuery<{
     permissionModules: PermissionModulesByPlugin[];
-  }>(PERMISSION_MODULES);
+  }>(PERMISSION_MODULES, { skip: !canManage });
 
   const { data: groupData, loading: groupLoading } = useQuery<{
     permissionGroupDetail: {
@@ -111,11 +127,21 @@ export const useAgentGrant = (agent: AgentLike) => {
     } | null;
   }>(PERMISSION_GROUP_DETAIL, {
     variables: { id: agent.grantGroupId },
-    skip: !agent.grantGroupId,
+    skip: !canManage || !agent.grantGroupId,
   });
-
   const plugins = useMemo(
-    () => modulesData?.permissionModules ?? [],
+    () =>
+      (modulesData?.permissionModules ?? []).map((plugin) => ({
+        ...plugin,
+        modules: plugin.modules
+          .map((permissionModule) => ({
+            ...permissionModule,
+            actions: permissionModule.actions.filter(
+              (permissionAction) => permissionAction.agentCallable !== false,
+            ),
+          }))
+          .filter((permissionModule) => permissionModule.actions.length > 0),
+      })),
     [modulesData],
   );
 
@@ -156,10 +182,30 @@ export const useAgentGrant = (agent: AgentLike) => {
     return map;
   }, [modulesLoading, groupLoading, groupData, moduleByKey]);
 
+  const seedScopes = useMemo(() => {
+    const map = new Map<string, PermissionScopeName>();
+    const permissions = groupData?.permissionGroupDetail?.permissions ?? [];
+    for (const permission of permissions) {
+      const key = keyOf(permission.plugin, permission.module);
+      const meta = moduleByKey.get(key);
+      if (!meta || !isPermissionScopeName(permission.scope)) continue;
+      const availableScopes = meta.module.scopes ?? [];
+      if (
+        availableScopes.length === 0 ||
+        availableScopes.some((scope) => scope.name === permission.scope)
+      ) {
+        map.set(key, permission.scope);
+      }
+    }
+    return map;
+  }, [groupData, moduleByKey]);
+
   const [selection, setSelection] = useState<Map<string, Set<string>>>(seed);
+  const [scopes, setScopes] =
+    useState<Map<string, PermissionScopeName>>(seedScopes);
   const [seededFrom, setSeededFrom] = useState(seed);
   const [initialSig, setInitialSig] = useState(() =>
-    signature(buildPermissions(seed, moduleByKey)),
+    signature(buildPermissions(seed, seedScopes, moduleByKey)),
   );
 
   // Re-seed at render time (the recommended prev-value comparison) whenever the
@@ -167,7 +213,8 @@ export const useAgentGrant = (agent: AgentLike) => {
   if (seed !== seededFrom) {
     setSeededFrom(seed);
     setSelection(seed);
-    setInitialSig(signature(buildPermissions(seed, moduleByKey)));
+    setScopes(seedScopes);
+    setInitialSig(signature(buildPermissions(seed, seedScopes, moduleByKey)));
   }
 
   const isModuleOn = (plugin: string, module: string) =>
@@ -201,6 +248,15 @@ export const useAgentGrant = (agent: AgentLike) => {
       next.set(k, names);
       return next;
     });
+    if (on) {
+      setScopes((previous) => {
+        if (previous.has(k)) return previous;
+        const next = new Map(previous);
+        const meta = moduleByKey.get(k);
+        if (meta) next.set(k, defaultScopeFor(meta.module));
+        return next;
+      });
+    }
   };
 
   const toggleAction = (
@@ -224,13 +280,32 @@ export const useAgentGrant = (agent: AgentLike) => {
     });
   };
 
+  const getModuleScope = (plugin: string, module: string) => {
+    const key = keyOf(plugin, module);
+    const meta = moduleByKey.get(key);
+    return scopes.get(key) ?? (meta ? defaultScopeFor(meta.module) : 'own');
+  };
+
+  const setModuleScope = (plugin: string, module: string, scope: string) => {
+    if (!isPermissionScopeName(scope)) return;
+    const key = keyOf(plugin, module);
+    const availableScopes = moduleByKey.get(key)?.module.scopes ?? [];
+    if (
+      availableScopes.length > 0 &&
+      !availableScopes.some((candidate) => candidate.name === scope)
+    ) {
+      return;
+    }
+    setScopes((previous) => new Map(previous).set(key, scope));
+  };
+
   const permissions = useMemo(
-    () => buildPermissions(selection, moduleByKey),
-    [selection, moduleByKey],
+    () => buildPermissions(selection, scopes, moduleByKey),
+    [selection, scopes, moduleByKey],
   );
   const dirty = signature(permissions) !== initialSig;
 
-  const [updateAgent] = useMutation(MASTRA_AGENT_UPDATE);
+  const [setGrant] = useMutation(MASTRA_AGENT_SET_GRANT);
   const [addGroup] = useMutation(PERMISSION_GROUP_ADD);
   const [editGroup] = useMutation(PERMISSION_GROUP_EDIT);
   const [saving, setSaving] = useState(false);
@@ -246,39 +321,57 @@ export const useAgentGrant = (agent: AgentLike) => {
       // so a retry edits the same group instead of proliferating duplicates.
       if (!groupId) {
         const { data } = await client.query<{
-          permissionGroups: { _id: string; name: string }[];
+          permissionGroups: {
+            _id: string;
+            name: string;
+            principalType?: string;
+          }[];
         }>({ query: PERMISSION_GROUPS, fetchPolicy: 'network-only' });
-        groupId = data?.permissionGroups?.find((g) => g.name === name)?._id;
+        groupId = data?.permissionGroups?.find(
+          (group) => group.name === name && group.principalType === 'agent',
+        )?._id;
       }
 
       if (groupId) {
-        await editGroup({ variables: { _id: groupId, name, permissions } });
-      } else {
-        const res = await addGroup({
+        await editGroup({
           variables: {
+            _id: groupId,
             name,
-            description: `Auto-managed grant for agent ${agent.agentId}`,
+            principalType: 'agent',
             permissions,
           },
         });
-        groupId = res.data?.permissionGroupAdd?._id;
+      } else {
+        const result = await addGroup({
+          variables: {
+            name,
+            description: t('agent-access-profile-description', {
+              agentId: agent.agentId,
+            }),
+            principalType: 'agent',
+            permissions,
+          },
+        });
+        groupId = result.data?.permissionGroupAdd?._id;
       }
 
-      if (!groupId) throw new Error('Failed to resolve the grant group');
+      if (!groupId) throw new Error(t('agent-access-profile-error'));
 
-      // Bind the group; the resolver derives the tool filter from it atomically.
-      await updateAgent({
-        variables: { _id: agent._id, doc: { grantGroupId: groupId } },
-        refetchQueries: [{ query: MASTRA_AGENT, variables: { _id: agent._id } }],
+      // Bind the profile after its permission entries have been persisted.
+      await setGrant({
+        variables: { _id: agent._id, grantGroupId: groupId },
+        refetchQueries: [
+          { query: MASTRA_AGENT, variables: { _id: agent._id } },
+        ],
         awaitRefetchQueries: true,
       });
 
       setInitialSig(signature(permissions));
-      toast({ title: 'Access saved' });
-    } catch (e) {
+      toast({ title: t('agent-access-saved') });
+    } catch (error) {
       toast({
-        title: 'Error',
-        description: (e as Error).message,
+        title: t('error'),
+        description: error instanceof Error ? error.message : String(error),
         variant: 'destructive',
       });
     } finally {
@@ -294,6 +387,8 @@ export const useAgentGrant = (agent: AgentLike) => {
     isActionOn,
     toggleModule,
     toggleAction,
+    getModuleScope,
+    setModuleScope,
     dirty,
     saving,
     save,

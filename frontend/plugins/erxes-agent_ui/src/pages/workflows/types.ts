@@ -23,6 +23,15 @@ export interface IWorkflowDefinition {
   [key: string]: unknown;
 }
 
+export interface IWorkflowCapabilities {
+  canUpdate: boolean;
+  canRemove: boolean;
+  canRun: boolean;
+  canApprove: boolean;
+  canSchedule: boolean;
+  canReadRuns: boolean;
+}
+
 export interface IWorkflow {
   _id: string;
   name: string;
@@ -31,6 +40,10 @@ export interface IWorkflow {
   definition: IWorkflowDefinition;
   version: number;
   isEnabled: boolean;
+  approvalStatus: 'draft' | 'approved';
+  approvedByUserId?: string;
+  approvedAt?: string;
+  capabilities: IWorkflowCapabilities;
   createdByUserId?: string;
   createdAt: string;
   updatedAt: string;

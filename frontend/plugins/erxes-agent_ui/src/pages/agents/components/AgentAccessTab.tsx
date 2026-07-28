@@ -1,22 +1,21 @@
 import { useState } from 'react';
-import { IconLock, IconShieldCheck } from '@tabler/icons-react';
-import { Button, Label, Separator, Spinner, Switch } from 'erxes-ui';
+import { IconShieldCheck } from '@tabler/icons-react';
+import { Button, Label, Select, Separator, Spinner, Switch } from 'erxes-ui';
+import { useTranslation } from 'react-i18next';
 import { useAgentGrant } from '../hooks/useAgentGrant';
 
 /**
- * The agent's Access tab — the ONE surface that picks which permission ACTIONS
- * the agent may use. The selection is written verbatim to the agent's dedicated,
- * server-enforced permission group (`agent-grant:<agentId>`); the backend then
- * DERIVES the tool-registry filter from it, so the group and the tool filter
- * stay in sync. Scope is forced to 'all' for v1. Gated on permissionsManage:
- * the underlying group mutations require it, so a user who can't manage
- * permissions sees a read-only, disabled surface.
+ * The agent Access tab is the single surface for choosing which actions the
+ * agent may use. The selection is written to its dedicated, server-enforced
+ * permission profile (`agent-grant:<agentId>`). Each module carries an explicit
+ * own/group/all scope, and runtime tool discovery derives from the same profile.
  */
 export const AgentAccessTab = ({
   agent,
 }: {
   agent: { _id: string; agentId: string; grantGroupId?: string | null };
 }) => {
+  const { t } = useTranslation('mastra');
   const {
     loading,
     canManage,
@@ -25,6 +24,8 @@ export const AgentAccessTab = ({
     isActionOn,
     toggleModule,
     toggleAction,
+    getModuleScope,
+    setModuleScope,
     dirty,
     saving,
     save,
@@ -52,23 +53,14 @@ export const AgentAccessTab = ({
         <div className="flex items-center gap-2 min-w-0">
           <IconShieldCheck className="size-4 text-muted-foreground shrink-0" />
           <p className="text-sm text-muted-foreground truncate">
-            Pick the actions this agent may perform. They are enforced server-side
-            and mirrored into the agent&apos;s tool access.
+            {t('agent-access-description')}
           </p>
         </div>
         <Button onClick={save} disabled={disabled || !dirty}>
           {saving ? <Spinner /> : null}
-          Save access
+          {t('agent-access-save')}
         </Button>
       </div>
-
-      {!canManage && (
-        <div className="flex items-center gap-2 px-4 py-2 text-sm bg-muted/40 text-muted-foreground border-b">
-          <IconLock className="size-4 shrink-0" />
-          You need permission-management access to change an agent&apos;s grant.
-          Showing the current selection read-only.
-        </div>
-      )}
 
       <div className="flex flex-1 min-h-0">
         <div className="w-48 shrink-0 border-r overflow-auto styled-scroll p-2 space-y-1">
@@ -105,13 +97,44 @@ export const AgentAccessTab = ({
                       </p>
                     )}
                   </div>
-                  <Switch
-                    checked={moduleOn}
-                    disabled={disabled}
-                    onCheckedChange={(checked) =>
-                      toggleModule(current.plugin, module.name, checked ?? false)
-                    }
-                  />
+                  <div className="flex items-center gap-2">
+                    {moduleOn && (module.scopes?.length ?? 0) > 0 && (
+                      <Select
+                        value={getModuleScope(current.plugin, module.name)}
+                        disabled={disabled}
+                        onValueChange={(scope) =>
+                          setModuleScope(current.plugin, module.name, scope)
+                        }
+                      >
+                        <Select.Trigger
+                          className="w-32"
+                          aria-label={t('agent-access-scope-label', {
+                            module: module.name,
+                          })}
+                        >
+                          <Select.Value />
+                        </Select.Trigger>
+                        <Select.Content>
+                          {module.scopes?.map((scope) => (
+                            <Select.Item key={scope.name} value={scope.name}>
+                              {t(`agent-access-scope-${scope.name}`)}
+                            </Select.Item>
+                          ))}
+                        </Select.Content>
+                      </Select>
+                    )}
+                    <Switch
+                      checked={moduleOn}
+                      disabled={disabled}
+                      onCheckedChange={(checked) =>
+                        toggleModule(
+                          current.plugin,
+                          module.name,
+                          checked ?? false,
+                        )
+                      }
+                    />
+                  </div>
                 </div>
 
                 {moduleOn && (
@@ -119,7 +142,7 @@ export const AgentAccessTab = ({
                     <Separator />
                     <div className="px-4 py-3 space-y-1">
                       <Label className="text-xs uppercase tracking-wide text-muted-foreground">
-                        Allowed actions
+                        {t('agent-access-actions')}
                       </Label>
                       {module.actions.map((action) => (
                         <div
@@ -137,8 +160,14 @@ export const AgentAccessTab = ({
                             )}
                           </div>
                           <Switch
-                            checked={isActionOn(current.plugin, module.name, action)}
-                            disabled={disabled || action.always || action.disabled}
+                            checked={isActionOn(
+                              current.plugin,
+                              module.name,
+                              action,
+                            )}
+                            disabled={
+                              disabled || action.always || action.disabled
+                            }
                             onCheckedChange={(checked) =>
                               toggleAction(
                                 current.plugin,
@@ -158,7 +187,7 @@ export const AgentAccessTab = ({
           })}
           {current && current.modules.length === 0 && (
             <p className="text-sm text-muted-foreground">
-              This plugin exposes no configurable actions.
+              {t('agent-access-empty')}
             </p>
           )}
         </div>

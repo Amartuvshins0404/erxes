@@ -51,6 +51,18 @@ export interface IAttachmentStorage {
   enabled?: boolean | null;
 }
 
+export interface IMastraVoiceStatus {
+  enabled?: boolean | null;
+}
+
+export interface IAttachmentStorageStatusResponse {
+  mastraAttachmentStorageStatus: IAttachmentStorage | null;
+}
+
+export interface IVoiceStatusResponse {
+  mastraVoiceStatus: IMastraVoiceStatus | null;
+}
+
 export interface IMastraSettings {
   _id?: string;
   erxesApiUrl?: string | null;

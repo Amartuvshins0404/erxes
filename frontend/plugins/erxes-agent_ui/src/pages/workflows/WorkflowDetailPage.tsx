@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useMutation } from '@apollo/client';
 import {
   IconChevronRight,
+  IconCircleCheck,
   IconPencil,
   IconPlayerPlay,
   IconRefresh,
@@ -217,11 +219,13 @@ const RunRow = ({ run }: { run: IWorkflowRun }) => {
 export const WorkflowDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { t } = useTranslation('mastra');
   const [definitionView, setDefinitionView] = useState<'graph' | 'json'>(
     'graph',
   );
 
   const { workflow, refetch: refetchWorkflow } = useWorkflow(id);
+  const canReadRuns = workflow?.capabilities.canReadRuns ?? false;
 
   const {
     runs,
@@ -229,7 +233,7 @@ export const WorkflowDetailPage = () => {
     refetch: refetchRuns,
     startPolling,
     stopPolling,
-  } = useWorkflowRuns(id, RUNS_PER_PAGE);
+  } = useWorkflowRuns(id, RUNS_PER_PAGE, !canReadRuns);
 
   const hasActiveRun = runs.some((r) => r.status === 'running');
   const latestRun = runs[0];
@@ -241,7 +245,7 @@ export const WorkflowDetailPage = () => {
     return () => stopPolling();
   }, [hasActiveRun, startPolling, stopPolling]);
 
-  const { setEnabled } = useWorkflowActions(refetchWorkflow);
+  const { approveWorkflow, setEnabled } = useWorkflowActions(refetchWorkflow);
 
   if (!workflow) {
     return (
@@ -274,16 +278,32 @@ export const WorkflowDetailPage = () => {
           <Separator.Inline />
         </PageHeader.Start>
         <PageHeader.End>
-          <Button
-            variant="outline"
-            onClick={() => navigate(`/erxes-agent/workflows/edit/${id}`)}
-          >
-            <IconPencil /> Edit
-          </Button>
-          <RunNowButton
-            workflowId={workflow._id}
-            onStarted={() => refetchRuns()}
-          />
+          {workflow.capabilities.canUpdate && (
+            <Button
+              variant="outline"
+              onClick={() => navigate(`/erxes-agent/workflows/edit/${id}`)}
+            >
+              <IconPencil /> Edit
+            </Button>
+          )}
+          {workflow.approvalStatus === 'draft' &&
+            workflow.capabilities.canApprove && (
+              <Button
+                variant="outline"
+                onClick={() =>
+                  approveWorkflow({ variables: { _id: workflow._id } })
+                }
+              >
+                <IconCircleCheck /> {t('workflow-approve')}
+              </Button>
+            )}
+          {workflow.approvalStatus === 'approved' &&
+            workflow.capabilities.canRun && (
+              <RunNowButton
+                workflowId={workflow._id}
+                onStarted={() => refetchRuns()}
+              />
+            )}
         </PageHeader.End>
       </PageHeader>
 
@@ -305,9 +325,18 @@ export const WorkflowDetailPage = () => {
                   </Label>
                   <Switch
                     checked={workflow.isEnabled}
-                    onCheckedChange={(v: boolean) =>
+                    disabled={
+                      !workflow.capabilities.canSchedule ||
+                      workflow.approvalStatus !== 'approved'
+                    }
+                    title={
+                      workflow.approvalStatus === 'approved'
+                        ? undefined
+                        : t('workflow-approval-required')
+                    }
+                    onCheckedChange={(isEnabled: boolean) =>
                       setEnabled({
-                        variables: { _id: workflow._id, isEnabled: v },
+                        variables: { _id: workflow._id, isEnabled },
                       })
                     }
                   />
@@ -324,6 +353,15 @@ export const WorkflowDetailPage = () => {
                   {stepCount(workflow.definition) !== 1 ? 's' : ''}
                 </Badge>
                 <Badge variant="secondary">v{workflow.version}</Badge>
+                <Badge
+                  variant={
+                    workflow.approvalStatus === 'approved'
+                      ? 'success'
+                      : 'warning'
+                  }
+                >
+                  {t(`workflow-approval-${workflow.approvalStatus}`)}
+                </Badge>
                 <span className="text-xs text-muted-foreground ml-auto">
                   Updated {formatTimestamp(workflow.updatedAt)}
                 </span>
@@ -371,39 +409,43 @@ export const WorkflowDetailPage = () => {
           </Card>
 
           {/* Runs */}
-          <Card className="shadow-none">
-            <Card.Header className="pb-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <Card.Title className="text-base">Runs</Card.Title>
-                  <Card.Description>
-                    Latest {RUNS_PER_PAGE} runs
-                    {hasActiveRun ? ' — refreshing live' : ''}
-                  </Card.Description>
+          {canReadRuns && (
+            <Card className="shadow-none">
+              <Card.Header className="pb-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Card.Title className="text-base">Runs</Card.Title>
+                    <Card.Description>
+                      Latest {RUNS_PER_PAGE} runs
+                      {hasActiveRun ? ' — refreshing live' : ''}
+                    </Card.Description>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => refetchRuns()}
+                    disabled={runsLoading}
+                  >
+                    <IconRefresh
+                      className={runsLoading ? 'animate-spin' : ''}
+                    />
+                    Refresh
+                  </Button>
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => refetchRuns()}
-                  disabled={runsLoading}
-                >
-                  <IconRefresh className={runsLoading ? 'animate-spin' : ''} />
-                  Refresh
-                </Button>
-              </div>
-            </Card.Header>
-            <Card.Content className="space-y-2">
-              {runs.length === 0 ? (
-                <p className="text-sm text-muted-foreground py-2">
-                  {runsLoading
-                    ? 'Loading runs…'
-                    : 'No runs yet. Use "Run now" to trigger this workflow manually.'}
-                </p>
-              ) : (
-                runs.map((run) => <RunRow key={run._id} run={run} />)
-              )}
-            </Card.Content>
-          </Card>
+              </Card.Header>
+              <Card.Content className="space-y-2">
+                {runs.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-2">
+                    {runsLoading
+                      ? 'Loading runs…'
+                      : 'No runs yet. Use "Run now" to trigger this workflow manually.'}
+                  </p>
+                ) : (
+                  runs.map((run) => <RunRow key={run._id} run={run} />)
+                )}
+              </Card.Content>
+            </Card>
+          )}
         </div>
       </div>
     </div>

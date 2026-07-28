@@ -7,11 +7,8 @@ import {
   IconPlus,
   IconRobot,
   IconAlignLeft,
-  IconBook2,
   IconBuilding,
   IconBuildingCommunity,
-  IconCpu,
-  IconTool,
   IconCalendar,
   IconLock,
   IconEye,
@@ -39,7 +36,6 @@ import {
   AGENT_FORM_UNITS,
 } from '~/graphql/queries';
 import {
-  IconBadge,
   IdentityCell,
   SortableHead,
   enabledStatusColumn,
@@ -73,7 +69,9 @@ const agentOpenPath = (basePath: string, id: string) =>
 
 /** Deep-link to an agent workspace tab when the console shell provides one. */
 const agentTabPath = (basePath: string, id: string, tab: string) =>
-  isConsoleShell(basePath) ? `${basePath}/${id}/${tab}` : `${basePath}/edit/${id}`;
+  isConsoleShell(basePath)
+    ? `${basePath}/${id}/${tab}`
+    : `${basePath}/edit/${id}`;
 
 // Refresh the agent lists after a row mutation without prop-drilling a refetch
 // through the table columns: invalidate every cached instance of both list
@@ -89,13 +87,13 @@ const agentListCacheUpdate = (cache: ApolloCache<unknown>) => {
 const CreateAgentButton = ({ children }: { children: React.ReactNode }) => {
   const navigate = useNavigate();
   const basePath = useAgentsBasePath();
-  const { canCreate, isAdmin } = useAgentAccess();
+  const { canCreate } = useAgentAccess();
 
   const { data: quotaData } = useQuery<{
     mastraMyAgentQuotaStatus: IMastraAgentQuotaStatus;
-  }>(MASTRA_MY_AGENT_QUOTA_STATUS, { skip: !canCreate || isAdmin });
+  }>(MASTRA_MY_AGENT_QUOTA_STATUS, { skip: !canCreate });
 
-  const atQuota = !isAdmin && (quotaData?.mastraMyAgentQuotaStatus?.atQuota ?? false);
+  const atQuota = quotaData?.mastraMyAgentQuotaStatus?.atQuota ?? false;
   const allowed = canCreate && !atQuota;
 
   return (
@@ -119,9 +117,14 @@ const AgentResourcesCell = ({
   basePath: string;
 }) => {
   const chips = [
-    { icon: IconSitemap, count: agent.workflowsCount ?? 0, tab: 'workflows', label: 'workflows' },
-    { icon: IconBook2, count: agent.skills?.length ?? 0, tab: 'skills', label: 'skills' },
-  ] as const;
+    {
+      icon: IconSitemap,
+      count: agent.workflowsCount ?? 0,
+      tab: 'workflows',
+      label: 'workflows',
+      allowed: agent.capabilities?.canReadWorkflows === true,
+    },
+  ].filter(({ allowed }) => allowed);
 
   return (
     <RecordTableInlineCell>
@@ -169,7 +172,8 @@ const AgentNameCell = ({ agent }: { agent: IAgent }) => {
 
 const AgentBulkDeleteCommandBar = () => {
   const { table } = RecordTable.useRecordTable();
-  const selectedRows = table.getFilteredSelectedRowModel().rows as Row<IAgent>[];
+  const selectedRows = table.getFilteredSelectedRowModel()
+    .rows as Row<IAgent>[];
   const { confirmRemove } = useConfirmedRemove();
   const { canRemoveAgent } = useAgentAccess();
 
@@ -185,7 +189,9 @@ const AgentBulkDeleteCommandBar = () => {
     if (!count) return;
     confirmRemove(
       {
-        message: `Delete ${count} agent${count !== 1 ? 's' : ''}? This cannot be undone.`,
+        message: `Delete ${count} agent${
+          count !== 1 ? 's' : ''
+        }? This cannot be undone.`,
       },
       // allSettled so one rejected mutation never blocks the rest: the
       // selection resets regardless, deleted rows drop out, and a single
@@ -201,7 +207,9 @@ const AgentBulkDeleteCommandBar = () => {
         if (failed > 0) {
           toast({
             title: 'Some deletions failed',
-            description: `${failed} of ${count} agent${count !== 1 ? 's' : ''} could not be removed.`,
+            description: `${failed} of ${count} agent${
+              count !== 1 ? 's' : ''
+            } could not be removed.`,
             variant: 'destructive',
           });
         }
@@ -223,7 +231,10 @@ const AgentBulkDeleteCommandBar = () => {
           onClick={handleBulkDelete}
         >
           <IconTrash className="size-4" />
-          Delete{removable.length < selectedRows.length ? ` (${removable.length})` : ''}
+          Delete
+          {removable.length < selectedRows.length
+            ? ` (${removable.length})`
+            : ''}
         </Button>
       </CommandBar.Bar>
     </CommandBar>
@@ -233,11 +244,11 @@ const AgentBulkDeleteCommandBar = () => {
 // ─── Visibility meta + scope-name column ─────────────────────────────────────
 
 const VISIBILITY_META = {
-  org:        { label: 'Org-wide',   variant: 'success'   },
-  team:       { label: 'Branch',     variant: 'secondary' },
+  org: { label: 'Org-wide', variant: 'success' },
+  team: { label: 'Branch', variant: 'secondary' },
   department: { label: 'Department', variant: 'secondary' },
-  unit:       { label: 'Team',       variant: 'secondary' },
-  private:    { label: 'Private',    variant: 'secondary' },
+  unit: { label: 'Team', variant: 'secondary' },
+  private: { label: 'Private', variant: 'secondary' },
 } as const;
 
 const VISIBILITY_ICONS: Record<keyof typeof VISIBILITY_META, Icon> = {
@@ -270,6 +281,7 @@ const buildBaseColumns = (
   sort: SortState,
   onSort: (id: string) => void,
   basePath: string,
+  canOpenAgent: (agent: IAgent) => boolean,
 ): ColumnDef<IAgent>[] => [
   {
     id: 'name',
@@ -293,76 +305,30 @@ const buildBaseColumns = (
     header: () => (
       <RecordTable.InlineHead icon={IconStack2} label="Resources" />
     ),
-    cell: ({ row }) => (
-      <AgentResourcesCell agent={row.original} basePath={basePath} />
-    ),
-    size: 150,
-  },
-  {
-    id: 'model',
-    accessorKey: 'model',
-    header: () => (
-      <SortableHead
-        icon={IconCpu}
-        label="Model"
-        columnId="model"
-        sort={sort}
-        onSort={onSort}
-      />
-    ),
-    cell: ({ row }) => {
-      const { provider, model } = row.original;
-      return (
+    cell: ({ row }) =>
+      canOpenAgent(row.original) ? (
+        <AgentResourcesCell agent={row.original} basePath={basePath} />
+      ) : (
         <RecordTableInlineCell>
-          <div className="text-xs text-muted-foreground">{provider}</div>
-          <div className="font-mono text-xs">{model}</div>
+          <span className="text-muted-foreground">—</span>
         </RecordTableInlineCell>
-      );
-    },
-    size: 200,
-  },
-  {
-    id: 'tools',
-    accessorKey: 'toolPolicy',
-    header: () => (
-      <RecordTable.InlineHead icon={IconTool} label="Tool access" />
-    ),
-    cell: ({ row }) => {
-      const { toolPolicy, allowedTools } = row.original;
-      const isRestricted = toolPolicy === 'custom';
-      const count = allowedTools?.length ?? 0;
-      return (
-        <RecordTableInlineCell>
-          {isRestricted ? (
-            <IconBadge icon={IconTool} variant="secondary">
-              {count > 0
-                ? `${count} rule${count !== 1 ? 's' : ''}`
-                : 'No tools'}
-            </IconBadge>
-          ) : (
-            <IconBadge icon={IconTool} variant="success">
-              All tools
-            </IconBadge>
-          )}
-        </RecordTableInlineCell>
-      );
-    },
-    size: 110,
+      ),
   },
   {
     id: 'visibility',
     accessorKey: 'visibility',
-    header: () => (
-      <RecordTable.InlineHead icon={IconEye} label="Visibility" />
-    ),
+    header: () => <RecordTable.InlineHead icon={IconEye} label="Visibility" />,
     cell: ({ row }) => {
       const { visibility, teamId, departmentId, unitId } = row.original;
       const { label, variant } = VISIBILITY_META[visibility ?? 'private'];
       const scopeId =
-        visibility === 'team' ? teamId
-        : visibility === 'department' ? departmentId
-        : visibility === 'unit' ? unitId
-        : undefined;
+        visibility === 'team'
+          ? teamId
+          : visibility === 'department'
+          ? departmentId
+          : visibility === 'unit'
+          ? unitId
+          : undefined;
       const scopeName = scopeId ? scopeNames[scopeId] : undefined;
       return (
         <RecordTableInlineCell>
@@ -405,9 +371,11 @@ const buildColumns = (
   sort: SortState,
   onSort: (id: string) => void,
   basePath: string,
+  canOpenAgent: (agent: IAgent) => boolean,
+  canRemove: boolean,
 ): ColumnDef<IAgent>[] => [
-  RecordTable.checkboxColumn as ColumnDef<IAgent>,
-  ...buildBaseColumns(scopeNames, sort, onSort, basePath),
+  ...(canRemove ? [RecordTable.checkboxColumn as ColumnDef<IAgent>] : []),
+  ...buildBaseColumns(scopeNames, sort, onSort, basePath, canOpenAgent),
 ];
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -417,51 +385,61 @@ export const AgentsIndexPage = () => {
   const basePath = useAgentsBasePath();
   const { agentsList, loading, error, pageInfo, handleFetchMore, refetch } =
     useMastraAgentList();
+  const { canReadConfig, canReadConfigAgent, canRemove } = useAgentAccess();
 
   // Fetch scope labels for the visibility column (branches, depts, units).
-  const { data: branchData } = useQuery<{ branches: { _id: string; title?: string | null }[] }>(
-    AGENT_FORM_BRANCHES,
-  );
-  const { data: deptData } = useQuery<{ departments: { _id: string; title?: string | null }[] }>(
-    AGENT_FORM_DEPARTMENTS,
-  );
-  const { data: unitData } = useQuery<{ units: { _id: string; title?: string | null }[] }>(
-    AGENT_FORM_UNITS,
-  );
+  const { data: branchData } = useQuery<{
+    branches: { _id: string; title?: string | null }[];
+  }>(AGENT_FORM_BRANCHES, { skip: !canReadConfig });
+  const { data: deptData } = useQuery<{
+    departments: { _id: string; title?: string | null }[];
+  }>(AGENT_FORM_DEPARTMENTS, { skip: !canReadConfig });
+  const { data: unitData } = useQuery<{
+    units: { _id: string; title?: string | null }[];
+  }>(AGENT_FORM_UNITS, { skip: !canReadConfig });
 
   const scopeNames = useMemo<Record<string, string>>(() => {
     const map: Record<string, string> = {};
-    branchData?.branches?.forEach((b) => { if (b.title) map[b._id] = b.title; });
-    deptData?.departments?.forEach((d) => { if (d.title) map[d._id] = d.title; });
-    unitData?.units?.forEach((u) => { if (u.title) map[u._id] = u.title; });
+    branchData?.branches?.forEach((b) => {
+      if (b.title) map[b._id] = b.title;
+    });
+    deptData?.departments?.forEach((d) => {
+      if (d.title) map[d._id] = d.title;
+    });
+    unitData?.units?.forEach((u) => {
+      if (u.title) map[u._id] = u.title;
+    });
     return map;
   }, [branchData, deptData, unitData]);
 
   // Client-side sort over loaded rows. The agent list is offset-paginated, so
   // this orders what's currently loaded (more pages append on scroll).
-  const getSortValue = useCallback(
-    (a: IAgent, id: string): SortValue => {
-      switch (id) {
-        case 'name':
-          return a.name;
-        case 'model':
-          return `${a.provider} ${a.model}`;
-        case 'status':
-          return a.isEnabled;
-        case 'createdAt':
-          return a.createdAt;
-        default:
-          return undefined;
-      }
-    },
-    [],
-  );
+  const getSortValue = useCallback((a: IAgent, id: string): SortValue => {
+    switch (id) {
+      case 'name':
+        return a.name;
+      case 'status':
+        return a.isEnabled;
+      case 'createdAt':
+        return a.createdAt;
+      default:
+        return undefined;
+    }
+  }, []);
 
   const { sort, toggle, sorted } = useTableSort(agentsList, getSortValue);
 
   const columns = useMemo(
-    () => buildColumns(scopeNames, sort, toggle, basePath),
-    [scopeNames, sort, toggle, basePath],
+    () =>
+      buildColumns(
+        scopeNames,
+        sort,
+        toggle,
+        basePath,
+        canReadConfigAgent,
+        canRemove,
+      ),
+    [scopeNames, sort, toggle, basePath, canReadConfigAgent, canRemove],
   );
 
   // Whole-row click opens the agent workspace (console) / edit form (settings).
@@ -469,9 +447,13 @@ export const AgentsIndexPage = () => {
   const groupBy = useMemo<GroupByConfig<IAgent>>(
     () => ({
       ...VISIBILITY_GROUP,
-      onRowClick: (agent) => navigate(agentOpenPath(basePath, agent._id)),
+      onRowClick: (agent) => {
+        if (canReadConfigAgent(agent)) {
+          navigate(agentOpenPath(basePath, agent._id));
+        }
+      },
     }),
-    [navigate, basePath],
+    [navigate, basePath, canReadConfigAgent],
   );
 
   const commandBar = useMemo(() => <AgentBulkDeleteCommandBar />, []);

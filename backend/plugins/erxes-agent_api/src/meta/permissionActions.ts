@@ -1,0 +1,55 @@
+export const ERXES_AGENT_ACTIONS = {
+  agent: {
+    readSummary: 'erxesAgentAgentsReadSummary',
+    readConfig: 'erxesAgentAgentsReadConfig',
+    chat: 'erxesAgentAgentsChat',
+    create: 'erxesAgentAgentsCreate',
+    update: 'erxesAgentAgentsUpdate',
+    remove: 'erxesAgentAgentsRemove',
+    share: 'erxesAgentAgentsShare',
+    moderate: 'erxesAgentAgentsModerate',
+    transferOwnership: 'erxesAgentAgentsTransferOwnership',
+  },
+  provider: {
+    catalogRead: 'erxesAgentProvidersCatalogRead',
+    configRead: 'erxesAgentProvidersConfigRead',
+    manage: 'erxesAgentProvidersManage',
+    remove: 'erxesAgentProvidersRemove',
+  },
+  settings: {
+    statusRead: 'erxesAgentSettingsStatusRead',
+    manage: 'erxesAgentSettingsManage',
+    quotasManage: 'erxesAgentQuotasManage',
+    voiceManage: 'erxesAgentVoiceManage',
+  },
+  workflow: {
+    read: 'erxesAgentWorkflowsRead',
+    createDraft: 'erxesAgentWorkflowsCreateDraft',
+    updateDraft: 'erxesAgentWorkflowsUpdateDraft',
+    remove: 'erxesAgentWorkflowsRemove',
+    run: 'erxesAgentWorkflowsRun',
+    approve: 'erxesAgentWorkflowsApprove',
+    schedule: 'erxesAgentWorkflowsSchedule',
+    runsRead: 'erxesAgentWorkflowRunsRead',
+  },
+  learning: {
+    read: 'erxesAgentLearningRead',
+    curate: 'erxesAgentLearningCurate',
+    remove: 'erxesAgentLearningRemove',
+  },
+  skills: {
+    read: 'erxesAgentSkillsRead',
+    create: 'erxesAgentSkillsCreate',
+    update: 'erxesAgentSkillsUpdate',
+    publish: 'erxesAgentSkillsPublish',
+    remove: 'erxesAgentSkillsRemove',
+    promote: 'erxesAgentSkillsPromote',
+    moderate: 'erxesAgentSkillsModerate',
+  },
+} as const;
+
+type ValueOf<T> = T[keyof T];
+
+export type ErxesAgentPermissionAction = ValueOf<
+  ValueOf<typeof ERXES_AGENT_ACTIONS>
+>;

@@ -24,7 +24,7 @@ export const MASTRA_CHAT_CANCEL = gql`
 `;
 
 export const MASTRA_AGENT_CREATE = gql`
-  mutation MastraAgentCreate($doc: MastraAgentInput!) {
+  mutation MastraAgentCreate($doc: MastraAgentCreateInput!) {
     mastraAgentCreate(doc: $doc) {
       ...AgentFields
     }
@@ -33,8 +33,38 @@ export const MASTRA_AGENT_CREATE = gql`
 `;
 
 export const MASTRA_AGENT_UPDATE = gql`
-  mutation MastraAgentUpdate($_id: String!, $doc: MastraAgentInput!) {
+  mutation MastraAgentUpdate($_id: String!, $doc: MastraAgentConfigInput!) {
     mastraAgentUpdate(_id: $_id, doc: $doc) {
+      ...AgentFields
+    }
+  }
+  ${AGENT_FIELDS}
+`;
+
+export const MASTRA_AGENT_SET_AUDIENCE = gql`
+  mutation MastraAgentSetAudience(
+    $_id: String!
+    $visibility: String!
+    $teamId: String
+    $departmentId: String
+    $unitId: String
+  ) {
+    mastraAgentSetAudience(
+      _id: $_id
+      visibility: $visibility
+      teamId: $teamId
+      departmentId: $departmentId
+      unitId: $unitId
+    ) {
+      ...AgentFields
+    }
+  }
+  ${AGENT_FIELDS}
+`;
+
+export const MASTRA_AGENT_SET_GRANT = gql`
+  mutation MastraAgentSetGrant($_id: String!, $grantGroupId: String) {
+    mastraAgentSetGrant(_id: $_id, grantGroupId: $grantGroupId) {
       ...AgentFields
     }
   }
@@ -192,6 +222,15 @@ export const MASTRA_WORKFLOW_REMOVE = gql`
   }
 `;
 
+export const MASTRA_WORKFLOW_APPROVE = gql`
+  mutation MastraWorkflowApprove($_id: String!) {
+    mastraWorkflowApprove(_id: $_id) {
+      ...WorkflowFields
+    }
+  }
+  ${WORKFLOW_FIELDS}
+`;
+
 export const MASTRA_WORKFLOW_SET_ENABLED = gql`
   mutation MastraWorkflowSetEnabled($_id: String!, $isEnabled: Boolean!) {
     mastraWorkflowSetEnabled(_id: $_id, isEnabled: $isEnabled) {
@@ -206,7 +245,6 @@ export const MASTRA_WORKFLOW_VALIDATE = gql`
     mastraWorkflowValidate(definition: $definition)
   }
 `;
-
 
 export const MASTRA_WORKFLOW_RUN_START = gql`
   mutation MastraWorkflowRunStart($_id: String!, $input: JSON) {

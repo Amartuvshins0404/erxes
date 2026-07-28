@@ -4,6 +4,7 @@ import {
   resolveVoiceStatusForTenant,
 } from '~/mastra/voice/resolveConfig';
 import { CHIMEGE_VOICES } from '~/mastra/voice/voices';
+import { ERXES_AGENT_ACTIONS } from '~/meta/permissionActions';
 
 // Map the internal status to the GraphQL shape, adding the two derived
 // "configured" booleans. Never includes tokens.
@@ -22,10 +23,17 @@ export const voiceQueries = {
     _args: undefined,
     { subdomain, checkPermission }: IContext,
   ) => {
-    await checkPermission('settingsView');
+    await checkPermission(ERXES_AGENT_ACTIONS.settings.voiceManage);
     return toGraphql(await resolveVoiceStatusForTenant(subdomain));
   },
 
   // The full Chimege voice catalog for the settings selector. Not secret.
-  mastraVoiceCatalog: () => CHIMEGE_VOICES,
+  mastraVoiceCatalog: async (
+    _parent: undefined,
+    _args: undefined,
+    { checkPermission }: IContext,
+  ) => {
+    await checkPermission(ERXES_AGENT_ACTIONS.settings.statusRead);
+    return CHIMEGE_VOICES;
+  },
 };

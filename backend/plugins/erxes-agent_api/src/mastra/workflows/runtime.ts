@@ -314,6 +314,10 @@ export async function runWorkflow(args: {
   envelope: TriggerEnvelope;
 }): Promise<IMastraWorkflowRunDocument> {
   const { models, subdomain, workflow, envelope } = args;
+  if (workflow.approvalStatus !== 'approved') {
+    throw new ExpectedError('Workflow must be approved before it can run');
+  }
+
   const definition = workflow.definition;
   const tenant = workflowTenant(subdomain);
   const key = `wf_${workflow._id}_v${workflow.version}`;
@@ -420,6 +424,12 @@ export async function runBackgroundWorkflow(args: {
       finishedAt: new Date(),
     });
 
+  if (!workflow.isEnabled || workflow.approvalStatus !== 'approved') {
+    return failClosed(
+      'This workflow is not both approved and enabled for background execution.',
+    );
+  }
+
   const agentId = workflow.agentId?.trim();
   if (!agentId) {
     return failClosed(
@@ -436,6 +446,11 @@ export async function runBackgroundWorkflow(args: {
   if (!agentConfig) {
     return failClosed(
       `This workflow's owning agent "${agentId}" was not found or is disabled — enable it or reassign the workflow before it can run.`,
+    );
+  }
+  if (agentConfig.destructiveOps === 'allow') {
+    return failClosed(
+      `This workflow's owning agent "${agentId}" allows destructive operations, which are refused for unattended runs.`,
     );
   }
 

@@ -6,7 +6,9 @@
 // The module imports generateModels + erxes-api-shared/utils at load time (used
 // only by the tenant-enumerating backfillWorkflowAgents); stub them so the pure
 // per-tenant logic under test doesn't drag the ESM-shipping module graph in.
-jest.mock('../../../connectionResolvers', () => ({ generateModels: jest.fn() }));
+jest.mock('../../../connectionResolvers', () => ({
+  generateModels: jest.fn(),
+}));
 jest.mock('erxes-api-shared/utils', () => ({
   getEnv: jest.fn(() => ''),
   getSaasOrganizations: jest.fn(() => []),
@@ -19,7 +21,6 @@ interface Agent {
   _id: string;
   agentId: string;
   isEnabled?: boolean;
-  ownerUserId?: string;
   createdBy?: string;
   createdAt?: Date;
 }
@@ -47,6 +48,7 @@ const makeModels = (workflows: Workflow[], agents: Agent[]) => {
 
   const matchesAgent = (a: Agent, q: Record<string, unknown>): boolean => {
     if (q.isEnabled !== undefined && a.isEnabled !== q.isEnabled) return false;
+    if (q.createdBy !== undefined && a.createdBy !== q.createdBy) return false;
     if (q._id !== undefined) {
       if (typeof q._id === 'object') {
         const inList = (q._id as { $in: string[] }).$in;
@@ -218,7 +220,7 @@ describe('backfillTenantWorkflows', () => {
           _id: 'newer',
           agentId: 'agent-new',
           isEnabled: true,
-          ownerUserId: 'u1',
+          createdBy: 'u1',
           createdAt: new Date('2022-01-01'),
         },
         {
@@ -299,7 +301,9 @@ describe('backfillTenantWorkflows', () => {
     );
     expect(updateOne).not.toHaveBeenCalledWith(
       { _id: 'wf-1' },
-      expect.objectContaining({ $set: expect.objectContaining({ agentId: expect.anything() }) }),
+      expect.objectContaining({
+        $set: expect.objectContaining({ agentId: expect.anything() }),
+      }),
     );
   });
 

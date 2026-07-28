@@ -21,6 +21,7 @@ export const ChatSidePanel = ({
   onAgentSelect,
   hasAgent,
   chatMode,
+  canReadWorkflows,
   onChatModeChange,
   threads,
   sessionsLoaded,
@@ -53,6 +54,7 @@ export const ChatSidePanel = ({
   onAgentSelect: (id: string) => void;
   hasAgent: boolean;
   chatMode: ChatMode;
+  canReadWorkflows: boolean;
   onChatModeChange: (mode: ChatMode) => void;
   threads: IMastraThread[];
   sessionsLoaded: boolean;
@@ -117,9 +119,14 @@ export const ChatSidePanel = ({
             }}
           >
             <div className="flex flex-col h-full">
-              <div className="px-2 pt-2">
-                <SessionModeToggle mode={chatMode} onChange={onChatModeChange} />
-              </div>
+              {canReadWorkflows && (
+                <div className="px-2 pt-2">
+                  <SessionModeToggle
+                    mode={chatMode}
+                    onChange={onChatModeChange}
+                  />
+                </div>
+              )}
               <div className="flex-1 min-h-0">
                 {chatMode === 'chat' ? (
                   <SessionList

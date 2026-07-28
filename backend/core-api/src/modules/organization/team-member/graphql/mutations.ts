@@ -14,6 +14,8 @@ import {
 } from 'erxes-api-shared/utils';
 import { IContext, IModels } from '~/connectionResolvers';
 import { saveValidatedToken } from '~/modules/auth/utils';
+import { validatePrincipalGroups } from '~/modules/permissions/principalGroups';
+
 import { sendInvitationEmail } from '../utils';
 import { sendOnboardNotification } from '~/modules/notifications/utils';
 
@@ -312,6 +314,7 @@ export const userMutations: Record<string, Resolver<any, any, IContext>> = {
     if (permissionGroupIds.length > 0) {
       await checkPermission('permissionsManage');
       await validatePermissionGroupIds(models, permissionGroupIds);
+      await validatePrincipalGroups(models, {}, permissionGroupIds);
     }
 
     for (const entry of entries) {

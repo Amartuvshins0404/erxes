@@ -1,5 +1,6 @@
 import './polyfills'; // must stay first — patches globals Mastra needs on Node 18
-import { startPlugin } from 'erxes-api-shared/utils';
+import { redis, startPlugin } from 'erxes-api-shared/utils';
+import { createHash } from 'crypto';
 import { typeDefs } from '~/apollo/typeDefs';
 import { resolvers } from '~/apollo/resolvers';
 import { generateModels } from './connectionResolvers';
@@ -44,34 +45,37 @@ startPlugin({
     // definition has changed since the last startup. Uses SCAN (not KEYS) to
     // avoid blocking Redis on large keyspaces.
     {
-      const [{ redis }, { createHash }] = await Promise.all([
-        import('erxes-api-shared/utils'),
-        import('crypto'),
-      ]);
       const HASH_KEY = 'erxes-agent:permissions_hash';
       const current = createHash('sha256')
         .update(JSON.stringify(permissions))
         .digest('hex');
       const stored = await redis.get(HASH_KEY);
       if (stored !== current) {
-        let cursor = 0;
-        do {
-          const [next, batch] = await redis.scan(cursor, 'MATCH', 'user_actions_*', 'COUNT', 100);
-          cursor = parseInt(next, 10);
-          if (batch.length) await redis.del(...batch);
-        } while (cursor !== 0);
+        for (const pattern of ['user_actions_*', 'user_action_scopes_*']) {
+          let cursor = 0;
+          do {
+            const [next, batch] = await redis.scan(
+              cursor,
+              'MATCH',
+              pattern,
+              'COUNT',
+              100,
+            );
+            cursor = parseInt(next, 10);
+            if (batch.length) await redis.del(...batch);
+          } while (cursor !== 0);
+        }
         await redis.set(HASH_KEY, current);
-        console.log('[erxes-agent] permissions changed — user action cache cleared');
+        console.log(
+          '[erxes-agent] permissions changed — user action cache cleared',
+        );
       }
     }
 
     // Agent learning (opt-in via ERXES_AGENT_LEARNING=enable): distillation +
     // hygiene sweep scheduler + worker. Same lazy-load contract.
     if ((process.env.ERXES_AGENT_LEARNING ?? '').trim() === 'enable') {
-      const [{ initLearningSweep }, { redis }] = await Promise.all([
-        import('~/mastra/learning/worker'),
-        import('erxes-api-shared/utils'),
-      ]);
+      const { initLearningSweep } = await import('~/mastra/learning/worker');
       await initLearningSweep(redis);
     }
 

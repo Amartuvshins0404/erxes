@@ -51,8 +51,10 @@ const CORE_USERS = { pluginName: 'core', module: 'users' } as const;
  * unique per agent. `.local` is accepted by core's domain regex.
  */
 const sanitizeToken = (agentId: string): string =>
-  agentId.toLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') ||
-  'agent';
+  agentId
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'agent';
 
 const syntheticEmail = (agentId: string): string =>
   `agent-${sanitizeToken(agentId)}@agents.local`;
@@ -96,12 +98,12 @@ const createCoreUser = (
   });
 
 /** `users.updateOne` — `{selector, modifier}` passthrough. */
-const updateCoreUser = (
+const updateCoreUser = async (
   subdomain: string,
   selector: Record<string, unknown>,
   modifier: Record<string, unknown>,
-): Promise<unknown> =>
-  sendTRPCMessage({
+): Promise<void> => {
+  const result = await sendTRPCMessage({
     subdomain,
     ...CORE_USERS,
     action: 'updateOne',
@@ -109,6 +111,10 @@ const updateCoreUser = (
     input: { selector, modifier },
     defaultValue: null,
   });
+  if (!result) {
+    throw new Error('Core user update failed');
+  }
+};
 
 /** Force `role:'system'` when it has drifted (create ignores role). */
 const ensureSystemRole = async (
@@ -116,7 +122,11 @@ const ensureSystemRole = async (
   user: CoreUser,
 ): Promise<void> => {
   if (user.role !== 'system') {
-    await updateCoreUser(subdomain, { _id: user._id }, { $set: { role: 'system' } });
+    await updateCoreUser(
+      subdomain,
+      { _id: user._id },
+      { $set: { role: 'system' } },
+    );
   }
 };
 
@@ -126,7 +136,11 @@ const ensureActive = async (
   user: CoreUser,
 ): Promise<void> => {
   if (user.isActive === false) {
-    await updateCoreUser(subdomain, { _id: user._id }, { $set: { isActive: true } });
+    await updateCoreUser(
+      subdomain,
+      { _id: user._id },
+      { $set: { isActive: true } },
+    );
   }
 };
 

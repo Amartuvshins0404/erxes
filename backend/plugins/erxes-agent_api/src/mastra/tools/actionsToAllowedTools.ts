@@ -57,6 +57,27 @@ export const readEntity = (a: string): string =>
 const readOpMatches = (op: OperationMeta, entity: string): boolean =>
   op.operationType === 'query' && normModule(op.module) === entity;
 
+const WRITE_ACTION_SUFFIX = /(Create|Add|Update|Edit|Remove|Delete)$/i;
+
+const writeVerbAliases = (action: string): string[] => {
+  const suffix = action.match(WRITE_ACTION_SUFFIX)?.[1]?.toLowerCase();
+  if (suffix === 'create' || suffix === 'add') return ['create', 'add'];
+  if (suffix === 'update' || suffix === 'edit') return ['update', 'edit'];
+  if (suffix === 'remove' || suffix === 'delete') return ['remove', 'delete'];
+  return [];
+};
+
+const writeOpMatches = (
+  op: OperationMeta,
+  permissionModule: string | undefined,
+  action: string,
+): boolean => {
+  if (op.operationType !== 'mutation' || !permissionModule) return false;
+  if (normModule(op.module) !== normModule(permissionModule)) return false;
+  const operationName = op.operation.toLowerCase();
+  return writeVerbAliases(action).some((verb) => operationName.includes(verb));
+};
+
 /**
  * Map a grant group's permissions to a tool-filter allowlist of bare operation
  * names. Pure + deterministic: dedup + stable (sorted) output.
@@ -66,8 +87,8 @@ const readOpMatches = (op: OperationMeta, entity: string): boolean =>
  *         → emit that "<operationName>" (covers every write action, whose name
  *           IS the mutation name: dealsAdd → dealsAdd).
  *   (ii)  a read/show gate (showDeals / posOrderRead) → emit that module's READ
- *         (query) ops, matched leniently by normalized module.
- *   (iii) "*" (whole-module wildcard) or anything unresolved → DROP.
+ *         operations; a standard Create/Add/Update/Edit/Remove/Delete action
+ *         → emit same-module mutations with the corresponding verb.
  *         "*" grants nothing server-side (`canGroup` keys on concrete action
  *         names, never "*"), so the tool side stays in lock-step by dropping it
  *         too; the UI expands "all" to explicit names before it is ever stored.
@@ -106,6 +127,15 @@ export function actionsToAllowedTools(
           out.add(candidate.operation);
         }
         continue;
+      }
+
+      // Standard write gates commonly use taskCreate while GraphQL exposes
+      // createTask. Match only the same plugin/module and verb family.
+      for (const candidate of ops) {
+        if (plugin && candidate.plugin !== plugin) continue;
+        if (writeOpMatches(candidate, perm.module, action)) {
+          out.add(candidate.operation);
+        }
       }
 
       // (iii) unresolved → drop (fail-closed).
@@ -147,7 +177,9 @@ export function assertAllowedToolsInvariant(
       if (actions.includes(op.operation)) return true;
       // read gate covering this query op's module
       return actions.some(
-        (a) => isReadActionName(a) && readOpMatches(op, readEntity(a)),
+        (action) =>
+          (isReadActionName(action) && readOpMatches(op, readEntity(action))) ||
+          writeOpMatches(op, p.module, action),
       );
     });
 

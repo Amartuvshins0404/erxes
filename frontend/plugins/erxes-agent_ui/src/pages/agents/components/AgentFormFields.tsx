@@ -22,9 +22,7 @@ import {
   SelectProvider,
   useProviderOptions,
 } from '~/components/SelectProviderModel';
-import { AgentToolPicker } from './AgentToolPicker';
 import { AgentVisibilitySectionFields } from './AgentVisibilitySectionFields';
-import { useAvailableErxesTools } from '../hooks/useAvailableErxesTools';
 import { AgentFormValues } from '../validations';
 
 type AgentForm = UseFormReturn<AgentFormValues>;
@@ -224,110 +222,16 @@ const AiModelSection = ({ form }: { form: AgentForm }) => {
   );
 };
 
-const ToolAccessSection = ({ form }: { form: AgentForm }) => {
+const ExecutionSafetySection = ({ form }: { form: AgentForm }) => {
   const { t } = useTranslation('mastra');
-  const toolPolicy = form.watch('toolPolicy');
   const destructiveOps = form.watch('destructiveOps');
-  const { operations, loading: availableLoading } = useAvailableErxesTools(
-    toolPolicy === 'custom',
-  );
 
   return (
     <FormSection
       step={3}
-      title={t('agent-settings-access-title')}
-      description={t('agent-settings-access-description')}
+      title={t('agent-settings-safety-title')}
+      description={t('agent-settings-safety-description')}
     >
-      <Form.Field
-        control={form.control}
-        name="toolPolicy"
-        render={({ field }) => (
-          <Form.Item>
-            <Form.Label>{t('agent-settings-tool-policy-label')}</Form.Label>
-            <Form.Description>
-              {t('agent-settings-tool-policy-description')}
-            </Form.Description>
-            <Form.Control>
-              <RadioGroup
-                value={field.value}
-                onValueChange={field.onChange}
-                className="grid gap-3 pt-1 md:grid-cols-2"
-              >
-                <label
-                  className={`flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors ${
-                    field.value === 'custom'
-                      ? 'border-primary bg-primary/5'
-                      : 'hover:bg-muted/40'
-                  }`}
-                >
-                  <RadioGroup.Item value="custom" />
-                  <span className="min-w-0 space-y-1">
-                    <span className="flex flex-wrap items-center gap-2 text-sm font-medium">
-                      {t('agent-settings-selected-tools')}
-                      <Badge variant="secondary">
-                        {t('agent-settings-recommended')}
-                      </Badge>
-                    </span>
-                    <span className="block text-xs text-muted-foreground">
-                      {t('agent-settings-selected-tools-description')}
-                    </span>
-                  </span>
-                </label>
-
-                <label
-                  className={`flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors ${
-                    field.value === 'all'
-                      ? 'border-primary bg-primary/5'
-                      : 'hover:bg-muted/40'
-                  }`}
-                >
-                  <RadioGroup.Item value="all" />
-                  <span className="min-w-0 space-y-1">
-                    <span className="flex flex-wrap items-center gap-2 text-sm font-medium">
-                      {t('agent-settings-all-tools')}
-                      <Badge variant="outline">
-                        {t('agent-settings-broad-access')}
-                      </Badge>
-                    </span>
-                    <span className="block text-xs text-muted-foreground">
-                      {t('agent-settings-all-tools-description')}
-                    </span>
-                  </span>
-                </label>
-              </RadioGroup>
-            </Form.Control>
-            <Form.Message />
-          </Form.Item>
-        )}
-      />
-
-      {toolPolicy === 'custom' ? (
-        <Form.Field
-          control={form.control}
-          name="allowedTools"
-          render={({ field }) => (
-            <div className="rounded-lg border bg-muted/20 p-4">
-              <AgentToolPicker
-                value={field.value}
-                onChange={field.onChange}
-                operations={operations}
-                loading={availableLoading}
-              />
-            </div>
-          )}
-        />
-      ) : (
-        <Alert variant="warning">
-          <IconAlertTriangle className="size-4" />
-          <Alert.Title>{t('agent-settings-full-access-title')}</Alert.Title>
-          <Alert.Description>
-            {t('agent-settings-full-access-description')}
-          </Alert.Description>
-        </Alert>
-      )}
-
-      <Separator />
-
       <Form.Field
         control={form.control}
         name="destructiveOps"
@@ -401,13 +305,7 @@ const ToolAccessSection = ({ form }: { form: AgentForm }) => {
   );
 };
 
-const BehaviorSection = ({
-  form,
-  step,
-}: {
-  form: AgentForm;
-  step: number;
-}) => {
+const BehaviorSection = ({ form, step }: { form: AgentForm; step: number }) => {
   const { t } = useTranslation('mastra');
   const temperature = form.watch('temperature');
 
@@ -431,10 +329,7 @@ const BehaviorSection = ({
               </Form.Description>
             </div>
             <Form.Control>
-              <Switch
-                checked={field.value}
-                onCheckedChange={field.onChange}
-              />
+              <Switch checked={field.value} onCheckedChange={field.onChange} />
             </Form.Control>
           </Form.Item>
         )}
@@ -454,10 +349,7 @@ const BehaviorSection = ({
               </Form.Description>
             </div>
             <Form.Control>
-              <Switch
-                checked={field.value}
-                onCheckedChange={field.onChange}
-              />
+              <Switch checked={field.value} onCheckedChange={field.onChange} />
             </Form.Control>
           </Form.Item>
         )}
@@ -537,9 +429,7 @@ const BehaviorSection = ({
                     max={2}
                     step={0.1}
                     value={[field.value ?? 1]}
-                    onValueChange={([value]: number[]) =>
-                      field.onChange(value)
-                    }
+                    onValueChange={([value]: number[]) => field.onChange(value)}
                     className="max-w-xs flex-1"
                   />
                   <span className="w-16 text-sm tabular-nums text-muted-foreground">
@@ -577,15 +467,15 @@ const BehaviorSection = ({
 export const AgentFormFields = ({
   form,
   agentIdEditable = false,
-  isAdmin = false,
+  canShare = false,
   onNameChange,
   onAgentIdChange,
 }: {
   form: AgentForm;
   /** Create flow only — agentId is the bot-endpoint key, frozen once it exists. */
   agentIdEditable?: boolean;
-  /** When true the Visibility section is shown (admin-only feature). */
-  isAdmin?: boolean;
+  /** When true the audience section is shown. */
+  canShare?: boolean;
   /** Lets the create page drive its auto-slug behaviour off the name field. */
   onNameChange?: (value: string) => void;
   /** Lets the create page stop auto-slugging once agentId is hand-edited. */
@@ -609,9 +499,9 @@ export const AgentFormFields = ({
         onAgentIdChange={onAgentIdChange}
       />
       <AiModelSection form={form} />
-      <ToolAccessSection form={form} />
-      {isAdmin && <AgentVisibilitySectionFields form={form} step={4} />}
-      <BehaviorSection form={form} step={isAdmin ? 5 : 4} />
+      <ExecutionSafetySection form={form} />
+      {canShare && <AgentVisibilitySectionFields form={form} step={4} />}
+      <BehaviorSection form={form} step={canShare ? 5 : 4} />
     </>
   );
 };

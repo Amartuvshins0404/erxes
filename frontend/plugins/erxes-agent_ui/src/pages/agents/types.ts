@@ -1,3 +1,16 @@
+export interface IMastraAgentCapabilities {
+  canReadConfig: boolean;
+  canChat: boolean;
+  canEdit: boolean;
+  canRemove: boolean;
+  canShare: boolean;
+  canTransferOwnership: boolean;
+  canManageGrant: boolean;
+  canReadWorkflows: boolean;
+  canReadSkills: boolean;
+  canReadLearnings: boolean;
+}
+
 export interface IMastraAgent {
   _id: string;
   name: string;
@@ -6,8 +19,6 @@ export interface IMastraAgent {
   instructions?: string | null;
   provider?: string | null;
   model?: string | null;
-  toolPolicy?: 'all' | 'custom' | null;
-  allowedTools?: string[] | null;
   grantGroupId?: string | null;
   skills?: string[] | null;
   destructiveOps?: 'allow' | 'ask' | null;
@@ -20,10 +31,10 @@ export interface IMastraAgent {
   teamId?: string | null;
   departmentId?: string | null;
   unitId?: string | null;
-  createdBy?: string | null;
   isOwnAgent?: boolean | null;
   createdAt?: string;
   updatedAt?: string;
+  capabilities?: IMastraAgentCapabilities | null;
 }
 
 export interface IMastraAgentResponse {
@@ -34,43 +45,4 @@ export interface IMastraAgentQuotaStatus {
   count: number;
   quota: number;
   atQuota: boolean;
-}
-
-export interface IErxesTool {
-  plugin?: string | null;
-  module?: string | null;
-  operation: string;
-  operationType?: string | null;
-  description?: string | null;
-  graphqlArgs?: string | null;
-  returnType?: string | null;
-}
-
-export interface IAvailableErxesToolsResponse {
-  mastraAvailableErxesTools: IErxesTool[];
-}
-
-export type ToolKind = 'erxes' | 'builtin';
-
-export interface IToolItem {
-  kind: ToolKind;
-  key: string;
-  operation: string;
-  operationType?: string;
-  plugin: string;
-  module: string;
-  description: string;
-}
-
-export interface IToolModuleGroup {
-  module: string;
-  items: IToolItem[];
-}
-
-export interface IToolPluginGroup {
-  pluginKey: string;
-  plugin: string;
-  isBuiltin: boolean;
-  count: number;
-  modules: IToolModuleGroup[];
 }

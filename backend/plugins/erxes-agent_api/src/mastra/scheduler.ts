@@ -36,7 +36,6 @@ type ScheduleRuntime = {
 
 let runtimePromise: Promise<ScheduleRuntime> | undefined;
 
-
 /** One Mastra workflow dispatches every scheduled workflow definition. */
 export async function dispatchScheduledRun(input: DispatchInput) {
   const models = await generateModels(input.subdomain);
@@ -46,6 +45,7 @@ export async function dispatchScheduledRun(input: DispatchInput) {
   if (
     !workflow ||
     !workflow.isEnabled ||
+    workflow.approvalStatus !== 'approved' ||
     workflow.definition?.trigger?.type !== 'schedule'
   ) {
     return { status: 'skipped' };
@@ -83,8 +83,7 @@ async function createRuntime(): Promise<ScheduleRuntime> {
   const storage = new MongoDBStore({
     id: 'erxes-agent-scheduler',
     uri: process.env.MONGO_URL || 'mongodb://localhost:27017',
-    dbName:
-      process.env.ERXES_AGENT_SCHEDULER_DB || 'erxes_mastra_scheduler',
+    dbName: process.env.ERXES_AGENT_SCHEDULER_DB || 'erxes_mastra_scheduler',
   });
   const mastra = new Mastra({
     workflows: { [DISPATCH_WORKFLOW_ID]: dispatchWorkflow },
@@ -204,7 +203,7 @@ export async function syncTenantSchedules(
       input,
       cron.trim(),
       timezone,
-      workflow.isEnabled,
+      workflow.isEnabled && workflow.approvalStatus === 'approved',
     );
     desired.set(row.id, row);
   }

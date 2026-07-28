@@ -6,6 +6,12 @@
 const mintRunToken = jest.fn();
 const ensureServiceUser = jest.fn();
 const syncServiceUserGroup = jest.fn();
+const sendTRPCMessage = jest.fn();
+class ExpectedError extends Error {}
+jest.mock('erxes-api-shared/utils', () => ({
+  ExpectedError,
+  sendTRPCMessage: (...args: unknown[]) => sendTRPCMessage(...args),
+}));
 jest.mock('../runToken', () => ({
   mintRunToken: (...args: unknown[]) => mintRunToken(...args),
 }));
@@ -14,14 +20,14 @@ jest.mock('../servicePrincipal', () => ({
   syncServiceUserGroup: (...args: unknown[]) => syncServiceUserGroup(...args),
 }));
 
+import type { IModels } from '~/connectionResolvers';
 import {
   resolveBackgroundPrincipal,
   backgroundRunEnableError,
 } from '../backgroundPrincipal';
 
 const APP_TOKEN = 'sk_app-token';
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const MODELS = {} as any;
+const MODELS = {} as unknown as IModels;
 
 const agent = (overrides: Record<string, unknown> = {}) => ({
   _id: 'agent-doc-1',
@@ -37,6 +43,10 @@ describe('resolveBackgroundPrincipal (service-user swap)', () => {
     mintRunToken.mockReset();
     ensureServiceUser.mockReset();
     syncServiceUserGroup.mockReset();
+    sendTRPCMessage.mockReset();
+    sendTRPCMessage.mockResolvedValue([
+      { _id: 'profile-1', principalType: 'agent' },
+    ]);
     infoSpy = jest.spyOn(console, 'info').mockImplementation(() => undefined);
   });
 
@@ -51,7 +61,7 @@ describe('resolveBackgroundPrincipal (service-user swap)', () => {
     mintRunToken.mockResolvedValue('MINTED');
 
     const result = await resolveBackgroundPrincipal({
-      agentConfig: agent({ grantGroupId: 'grp-9', ownerUserId: 'owner-9' }),
+      agentConfig: agent({ grantGroupId: 'grp-9' }),
       subdomain: 'os',
       appToken: APP_TOKEN,
       models: MODELS,
@@ -186,6 +196,27 @@ describe('resolveBackgroundPrincipal (service-user swap)', () => {
 
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error).toMatch(/could not sync/i);
+    expect(mintRunToken).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when the configured group is not an agent profile', async () => {
+    ensureServiceUser.mockResolvedValue({
+      serviceUserId: 'svc-1',
+      permissionGroupIds: ['human-group'],
+    });
+    sendTRPCMessage.mockResolvedValue([
+      { _id: 'human-group', principalType: 'human' },
+    ]);
+
+    const result = await resolveBackgroundPrincipal({
+      agentConfig: agent({ grantGroupId: 'human-group' }),
+      subdomain: 'os',
+      appToken: APP_TOKEN,
+      models: MODELS,
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toMatch(/not an agent profile/i);
     expect(mintRunToken).not.toHaveBeenCalled();
   });
 

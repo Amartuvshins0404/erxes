@@ -47,11 +47,11 @@ const workflowAutomationProducers = {
     const workflow = await context.models.MastraWorkflow.getWorkflow(
       workflowId,
     );
-    if (!workflow.isEnabled) {
+    if (!workflow.isEnabled || workflow.approvalStatus !== 'approved') {
       return {
         result: {
           success: false,
-          error: `Workflow "${workflow.name}" is disabled`,
+          error: `Workflow "${workflow.name}" is not approved and enabled`,
         },
       };
     }

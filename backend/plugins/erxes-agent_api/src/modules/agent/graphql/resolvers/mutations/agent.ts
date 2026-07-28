@@ -1,34 +1,26 @@
 import { ExpectedError, sendTRPCMessage } from 'erxes-api-shared/utils';
 import { canGroup } from 'erxes-api-shared/core-modules';
-import type { IUserDocument } from 'erxes-api-shared/core-types';
 import { IContext } from '~/connectionResolvers';
 import { IMastraAgent } from '@/agent/@types/agent';
-import { isAgentAdmin, getAgentQuotaStatus } from '@/agent/utils';
+import { getAgentQuotaStatus } from '@/agent/utils';
+import { requireScopedAgent } from '@/agent/authorization';
+import { requireActionScope } from '@/_shared/authorization';
 import {
   deactivateServiceUser,
   syncServiceUserGroup,
 } from '~/mastra/auth/servicePrincipal';
-import type { GroupPermission } from '~/mastra/tools/actionsToAllowedTools';
-import { deriveGrantAllowedTools } from './grantTools';
+import { ERXES_AGENT_ACTIONS } from '~/meta/permissionActions';
 import { toUserFacingAgentError } from './agentErrors';
 
-/** A permission group as returned by core `permissionGroups.find`. */
 interface CoreGroup {
   _id: string;
-  name?: string;
-  permissions?: GroupPermission[];
+  principalType?: string;
 }
 
-/**
- * Fetch a requested grant group (core `permissionGroups.find`), asserting it
- * exists before it is bound to the agent. The group is the agent's server-side
- * permission grant: a background run mints a service-user token carrying this
- * group's actions, so a dangling id would silently leave the agent with no
- * grant. Read-only core trpc — group CREATION/EDIT stays in core (gated by
- * permissionsManage). Returns the group so the caller can DERIVE the tool
- * filter from its permissions without a second round-trip. Throws ExpectedError
- * when it does not exist.
- */
+interface CoreUser {
+  _id: string;
+}
+
 const fetchGrantGroup = async (
   subdomain: string,
   groupId: string,
@@ -47,63 +39,11 @@ const fetchGrantGroup = async (
       `Permission group "${groupId}" was not found — pick an existing group from Settings → Permissions.`,
     );
   }
-  return groups[0] as CoreGroup;
-};
-
-/**
- * Authorize a requested `ownerUserId` value. The owner is the identity
- * background runs mint a real gateway token for, so naming someone else as
- * owner is equivalent to acting as that user. Because an `isOwner` target
- * short-circuits every permission check, the bar is true ORGANIZATION
- * OWNERSHIP — not the agent-admin group, which would otherwise be a path to
- * isOwner. So only an org owner (already top privilege, can't be escalated by
- * assignment) may name an owner other than themselves; everyone else may omit
- * it (createdBy default) or name only their own _id. No-op when not supplied.
- */
-const assertOwnerAssignable = (
-  ownerUserId: string | undefined,
-  callerId: string,
-  callerIsOwner: boolean,
-) => {
-  if (!ownerUserId || callerIsOwner || ownerUserId === callerId) return;
-  throw new ExpectedError(
-    'Only an organization owner may assign another user as the agent owner',
-  );
-};
-
-/**
- * Authorize BINDING/CHANGING an agent's `grantGroupId` to a non-empty value.
- * The grant group carries the agent's server-side permissions: a background run
- * mints a service-user token whose actions ARE this group's. Binding the agent
- * to a group whose actions exceed the caller's own is a privilege escalation — a
- * prompt-injectable background run could then drive ops the caller can't perform
- * (e.g. a group carrying core `permissionsManage`), which is exactly the risk
- * `ownerUserId` guards against above.
- *
- * The bar is: the caller must hold `permissionsManage` OR be an org owner
- * (`canGroup` short-circuits true for `isOwner`). This mirrors (a) who can
- * AUTHOR the group in core — `permissionGroupAdd`/`Edit` are permissionsManage-
- * gated — and (b) the UI's own `permissionsManage || isOwner` Access gate, so it
- * closes the escalation regardless of which group id is pointed at. `isAgentAdmin`
- * is deliberately NOT enough: an agent-admin is not necessarily a permission
- * manager and could otherwise gain cross-plugin actions by binding a privileged
- * group. Clearing a grant (null) is de-escalation — allowed for anyone who can
- * edit and never reaches here.
- *
- * This REPLACES the earlier org-owner-only gate and its spoofable, name-based
- * `agent-grant:<agentId>` "self-owned" exemption. That exemption trusted a
- * caller-settable, reusable `agentId` and ungated core group enumeration, so an
- * attacker with only `agentsCreate`/`agentsEdit` could rename their agent onto
- * an orphaned privileged group's name and bind it — see PR #273 Finding #1.
- */
-const assertGrantAssignable = async (
-  subdomain: string,
-  user: IUserDocument,
-): Promise<void> => {
-  if (await canGroup(subdomain, 'permissionsManage', user)) return;
-  throw new ExpectedError(
-    'Binding an agent permission grant requires the Manage Permissions permission.',
-  );
+  const group = groups[0] as CoreGroup;
+  if (group.principalType !== 'agent') {
+    throw new ExpectedError('Agents may only use agent grant profiles');
+  }
+  return group;
 };
 
 export const agentMutations = {
@@ -112,33 +52,40 @@ export const agentMutations = {
     { doc }: { doc: IMastraAgent },
     { models, subdomain, user, checkPermission }: IContext,
   ) => {
-    await checkPermission('agentsCreate');
+    await checkPermission(ERXES_AGENT_ACTIONS.agent.create);
     if (!user?._id) throw new ExpectedError('Login required');
 
-    const admin = isAgentAdmin(user);
+    const scope = await requireActionScope({
+      subdomain,
+      user,
+      action: ERXES_AGENT_ACTIONS.agent.create,
+    });
+    const visibility = doc.visibility ?? 'private';
 
-    if (!admin && doc.visibility && doc.visibility !== 'private') {
-      throw new ExpectedError('Users may only create private agents');
+    if (visibility !== 'private') {
+      await checkPermission(ERXES_AGENT_ACTIONS.agent.share);
+      const shareScope = await requireActionScope({
+        subdomain,
+        user,
+        action: ERXES_AGENT_ACTIONS.agent.share,
+      });
+      if (shareScope !== 'all') {
+        throw new ExpectedError(
+          'Creating a shared agent requires all-agent sharing permission',
+        );
+      }
+    }
+    if (
+      doc.createdBy !== undefined ||
+      doc.serviceUserId !== undefined ||
+      doc.grantGroupId !== undefined
+    ) {
+      throw new ExpectedError(
+        'Agent ownership and grants use dedicated security actions',
+      );
     }
 
-    // The owner is the principal unattended workflow/bot runs mint a gateway
-    // token for. Assigning it to another user means acting as that user,
-    // and an isOwner target bypasses every permission check, so only an org
-    // owner may name an owner other than themselves; otherwise an agent-admin
-    // (or any user) could bind the agent to an org owner and escalate to
-    // isOwner. Everyone else gets the createdBy default below.
-    assertOwnerAssignable(doc.ownerUserId, user._id, Boolean(user.isOwner));
-
-    // Same escalation surface as update: seeding grantGroupId at create time
-    // would bind a privileged group onto the new agent's service user, so the
-    // grant gate applies here too. The UI never sets grantGroupId on create
-    // (it's an update-only Access surface), so this only bites raw-API callers —
-    // exactly the attacker path. Clearing/omitting it is a no-op.
-    if (doc.grantGroupId?.trim()) {
-      await assertGrantAssignable(subdomain, user);
-    }
-
-    if (!admin) {
+    if (scope !== 'all') {
       const status = await getAgentQuotaStatus(models, user._id);
       if (status.atQuota) {
         throw new ExpectedError(`Agent quota reached (${status.quota})`);
@@ -146,7 +93,11 @@ export const agentMutations = {
     }
 
     try {
-      return await models.MastraAgent.createAgent({ ...doc, createdBy: user._id });
+      return await models.MastraAgent.createAgent({
+        ...doc,
+        visibility,
+        createdBy: user._id,
+      });
     } catch (error) {
       throw toUserFacingAgentError(error);
     }
@@ -157,106 +108,190 @@ export const agentMutations = {
     { _id, doc }: { _id: string; doc: Partial<IMastraAgent> },
     { models, subdomain, user, checkPermission }: IContext,
   ) => {
-    await checkPermission('agentsEdit');
+    await checkPermission(ERXES_AGENT_ACTIONS.agent.update);
     if (!user?._id) throw new ExpectedError('Login required');
-    const admin = isAgentAdmin(user);
-    // Same owner-assignment guard as create: reassigning the owner = acting as
-    // that user when background runs mint its token, so only an org owner may
-    // name someone other than themselves (the createdBy filter scopes non-owners
-    // to their own agents, but the owner VALUE is otherwise unconstrained).
-    assertOwnerAssignable(doc.ownerUserId, user._id, Boolean(user.isOwner));
 
-    // Grant-group change: the group carries the agent's server-side permissions,
-    // synced onto its service user. Validate a set group exists BEFORE persisting
-    // (an empty/blank value clears the grant → empty permissions). Step 23's
-    // Access surface drives this: one action-picker writes the group AND, here,
-    // DERIVES the tool filter from it so the two never drift.
-    const grantChanged = doc.grantGroupId !== undefined;
-    // A cleared grant persists as null (NOT undefined) so `$set` actually clears
-    // the stored field — mongoose strips undefined from $set, which would leave a
-    // stale grantGroupId the mint path would then re-sync back onto the user.
-    const grantGroupId: string | null = doc.grantGroupId?.trim() || null;
+    const {
+      agentId,
+      createdBy,
+      serviceUserId,
+      grantGroupId,
+      visibility,
+      teamId,
+      departmentId,
+      unitId,
+      ...config
+    } = doc;
 
-    // Fetch the current config once when we need it to compare against: to
-    // enforce agentId immutability and/or to tell whether the grant is actually
-    // CHANGING (re-persisting the same grant is not an escalation).
-    const needsConfig = doc.agentId !== undefined || (grantChanged && !!grantGroupId);
-    const agentConfig = needsConfig
-      ? await models.MastraAgent.findOne({ _id })
-      : null;
-
-    // agentId is the stable workflow/learning ownership key; mutating it would
-    // strand resources and permit identity spoofing.
     if (
-      doc.agentId !== undefined &&
-      agentConfig &&
-      doc.agentId !== agentConfig.agentId
+      agentId !== undefined ||
+      createdBy !== undefined ||
+      serviceUserId !== undefined ||
+      grantGroupId !== undefined ||
+      visibility !== undefined ||
+      teamId !== undefined ||
+      departmentId !== undefined ||
+      unitId !== undefined
     ) {
       throw new ExpectedError(
-        "An agent's agentId is immutable once created and cannot be changed.",
+        'Agent identity, audience, ownership, and grants use dedicated security actions',
       );
     }
 
-    // The tool-registry filter (toolPolicy/allowedTools) is DERIVED from the
-    // grant and persisted ATOMICALLY with it (same updateAgent write) so grant
-    // and filter can't diverge. Empty until we know a grant changed.
-    let toolFields: Partial<IMastraAgent> = {};
-
-    if (grantChanged && grantGroupId) {
-      // Binding/changing the grant to a NEW non-empty group is a privilege
-      // escalation surface, so require permissionsManage (or org ownership) —
-      // authorize BEFORE any core round-trip so an unauthorized caller can't even
-      // probe group existence. Skipped when the same grant is re-persisted (no
-      // change → nothing to escalate).
-      if (grantGroupId !== (agentConfig?.grantGroupId ?? null)) {
-        await assertGrantAssignable(subdomain, user);
-      }
-
-      // Resolve the group (existence + permissions), then derive the tool filter.
-      const group = await fetchGrantGroup(subdomain, grantGroupId);
-      const allowedTools = await deriveGrantAllowedTools(
-        models,
-        group.permissions || [],
-      );
-      toolFields = { toolPolicy: 'custom', allowedTools };
-    } else if (grantChanged) {
-      // Clearing a grant is de-escalation: drop the derived custom filter back to
-      // the 'all' default rather than leaving a stale, now-unbounded allowlist.
-      toolFields = { toolPolicy: 'all', allowedTools: [] };
-    }
+    const { agent } = await requireScopedAgent({
+      models,
+      subdomain,
+      user,
+      action: ERXES_AGENT_ACTIONS.agent.update,
+      agentId: _id,
+    });
 
     try {
-      const updated = await models.MastraAgent.updateAgent(
-        _id,
-        grantChanged
-          ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            ({ ...doc, grantGroupId, ...toolFields } as any)
-          : doc,
-        admin ? undefined : user._id,
-      );
-
-      // Push the new grant onto the service user immediately (if one is already
-      // provisioned) + bust its action cache, so the change takes effect on the
-      // next background run without waiting for the mint-time reconcile. The
-      // agent config already persisted the id via updateAgent, so pass no models
-      // here to avoid a redundant second write. Best-effort: never fail the
-      // update if core is unreachable — the mint path re-syncs from grantGroupId.
-      if (grantChanged && updated.serviceUserId) {
-        try {
-          await syncServiceUserGroup({
-            serviceUserId: updated.serviceUserId,
-            groupId: grantGroupId,
-            subdomain,
-          });
-        } catch (error) {
-          console.error(`Failed to sync grant group for agent ${_id}:`, error);
-        }
-      }
-
-      return updated;
+      return await models.MastraAgent.updateAgent(_id, config, agent.createdBy);
     } catch (error) {
       throw toUserFacingAgentError(error);
     }
+  },
+
+  mastraAgentSetAudience: async (
+    _parent: undefined,
+    {
+      _id,
+      visibility,
+      teamId,
+      departmentId,
+      unitId,
+    }: {
+      _id: string;
+      visibility: 'private' | 'team' | 'department' | 'unit' | 'org';
+      teamId?: string;
+      departmentId?: string;
+      unitId?: string;
+    },
+    { models, subdomain, user, checkPermission }: IContext,
+  ) => {
+    await checkPermission(ERXES_AGENT_ACTIONS.agent.share);
+    if (!user?._id) throw new ExpectedError('Login required');
+
+    if (visibility === 'team' && !teamId) {
+      throw new ExpectedError('A team is required for team visibility');
+    }
+    if (visibility === 'department' && (!teamId || !departmentId)) {
+      throw new ExpectedError(
+        'A team and department are required for department visibility',
+      );
+    }
+    if (visibility === 'unit' && (!teamId || !departmentId || !unitId)) {
+      throw new ExpectedError(
+        'A team, department, and unit are required for unit visibility',
+      );
+    }
+
+    const { agent } = await requireScopedAgent({
+      models,
+      subdomain,
+      user,
+      action: ERXES_AGENT_ACTIONS.agent.share,
+      agentId: _id,
+    });
+
+    return models.MastraAgent.updateAgent(
+      _id,
+      {
+        visibility,
+        teamId:
+          visibility === 'team' ||
+          visibility === 'department' ||
+          visibility === 'unit'
+            ? teamId
+            : null,
+        departmentId:
+          visibility === 'department' || visibility === 'unit'
+            ? departmentId
+            : null,
+        unitId: visibility === 'unit' ? unitId : null,
+      },
+      agent.createdBy,
+    );
+  },
+
+  mastraAgentTransferOwnership: async (
+    _parent: undefined,
+    { _id, newOwnerUserId }: { _id: string; newOwnerUserId: string },
+    { models, subdomain, user, checkPermission }: IContext,
+  ) => {
+    await checkPermission(ERXES_AGENT_ACTIONS.agent.transferOwnership);
+    if (!user?._id) throw new ExpectedError('Login required');
+
+    const { agent, scope } = await requireScopedAgent({
+      models,
+      subdomain,
+      user,
+      action: ERXES_AGENT_ACTIONS.agent.transferOwnership,
+      agentId: _id,
+    });
+    if (scope !== 'all') {
+      throw new ExpectedError('Ownership transfer requires all-agent scope');
+    }
+
+    const owner = (await sendTRPCMessage({
+      subdomain,
+      pluginName: 'core',
+      module: 'users',
+      action: 'findOne',
+      method: 'query',
+      input: { query: { _id: newOwnerUserId, isActive: { $ne: false } } },
+      defaultValue: null,
+    })) as CoreUser | null;
+    if (!owner?._id) throw new ExpectedError('Owner user not found');
+
+    return models.MastraAgent.updateAgent(
+      _id,
+      { createdBy: owner._id },
+      agent.createdBy,
+    );
+  },
+
+  mastraAgentSetGrant: async (
+    _parent: undefined,
+    {
+      _id,
+      grantGroupId: requestedGroupId,
+    }: { _id: string; grantGroupId?: string | null },
+    { models, subdomain, user, checkPermission }: IContext,
+  ) => {
+    const canManageGrant =
+      (await canGroup(subdomain, 'permissionsAgentProfilesManage', user)) ||
+      (await canGroup(subdomain, 'permissionsManage', user));
+    if (!canManageGrant) throw new ExpectedError('Permission required');
+    await checkPermission(ERXES_AGENT_ACTIONS.agent.update);
+    if (!user?._id) throw new ExpectedError('Login required');
+    const grantGroupId = requestedGroupId?.trim() || null;
+
+    const { agent } = await requireScopedAgent({
+      models,
+      subdomain,
+      user,
+      action: ERXES_AGENT_ACTIONS.agent.update,
+      agentId: _id,
+    });
+    if (grantGroupId) {
+      await fetchGrantGroup(subdomain, grantGroupId);
+    }
+
+    if (agent.serviceUserId) {
+      await syncServiceUserGroup({
+        serviceUserId: agent.serviceUserId,
+        groupId: grantGroupId,
+        subdomain,
+      });
+    }
+
+    return models.MastraAgent.updateAgent(
+      _id,
+      { grantGroupId },
+      agent.createdBy,
+    );
   },
 
   mastraAgentRemove: async (
@@ -264,18 +299,18 @@ export const agentMutations = {
     { _id }: { _id: string },
     { models, subdomain, user, checkPermission }: IContext,
   ) => {
-    await checkPermission('agentsRemove');
+    await checkPermission(ERXES_AGENT_ACTIONS.agent.remove);
     if (!user?._id) throw new ExpectedError('Login required');
-    const admin = isAgentAdmin(user);
-    const ownerScope = admin ? {} : { createdBy: user._id };
 
-    // Deactivate the agent's service user before removal (best-effort). This
-    // stops new run-token mints; any already-issued token expires within its
-    // ≤1h TTL. Never fail the delete if core is unreachable — the removal is
-    // the user's intent and the service user can be reaped in bulk later
-    // (role:'system' selector). Scoped to the caller's own agent for non-admins.
-    const agent = await models.MastraAgent.findOne({ _id, ...ownerScope });
-    if (agent?.serviceUserId) {
+    const { agent } = await requireScopedAgent({
+      models,
+      subdomain,
+      user,
+      action: ERXES_AGENT_ACTIONS.agent.remove,
+      agentId: _id,
+    });
+
+    if (agent.serviceUserId) {
       try {
         await deactivateServiceUser({
           serviceUserId: agent.serviceUserId,
@@ -289,6 +324,6 @@ export const agentMutations = {
       }
     }
 
-    return models.MastraAgent.removeAgent(_id, admin ? undefined : user._id);
+    return models.MastraAgent.removeAgent(_id, agent.createdBy);
   },
 };

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import {
   Link,
+  Navigate,
   useNavigate,
   useParams,
   useSearchParams,
@@ -24,12 +25,12 @@ import {
   Form,
   Input,
   Separator,
-  Switch,
   Tabs,
   Textarea,
   toast,
 } from 'erxes-ui';
 import { PageHeader } from 'ui-modules';
+import { usePermissionCheck } from 'ui-modules';
 import { FormSection } from '~/components/FormLayout';
 import { useResourceForm } from '~/components/useResourceForm';
 import { WorkflowGraph } from './graph/WorkflowGraph';
@@ -37,6 +38,7 @@ import { useWorkflow } from './hooks/useWorkflow';
 import { useWorkflowFormMutations } from './hooks/useWorkflowMutations';
 import { IWorkflow, IWorkflowDefinition, IWorkflowValidation } from './types';
 import { workflowFormSchema, WorkflowFormValues } from './validations';
+import { ERXES_AGENT_ACTIONS } from '~/permissions';
 
 // Minimal valid starter so a hand-authored workflow begins from a runnable shape.
 const TEMPLATE: IWorkflowDefinition = {
@@ -52,7 +54,6 @@ const TEMPLATE: IWorkflowDefinition = {
 const DEFAULT_VALUES: WorkflowFormValues = {
   name: '',
   description: '',
-  isEnabled: false,
   definitionText: JSON.stringify(TEMPLATE, null, 2),
 };
 
@@ -71,6 +72,11 @@ export const WorkflowFormPage = () => {
   const [searchParams] = useSearchParams();
   const isEdit = !!id;
 
+  const { hasActionPermission, isLoaded: permissionsLoaded } =
+    usePermissionCheck();
+  const canCreate = hasActionPermission(
+    ERXES_AGENT_ACTIONS.workflow.createDraft,
+  );
   // New workflows opened from an agent workspace inherit that business agentId.
   const presetAgentId = searchParams.get('agentId') || undefined;
 
@@ -89,7 +95,6 @@ export const WorkflowFormPage = () => {
     load: (workflow) => ({
       name: workflow.name || '',
       description: workflow.description || '',
-      isEnabled: workflow.isEnabled ?? false,
       definitionText: JSON.stringify(workflow.definition ?? {}, null, 2),
     }),
   });
@@ -156,7 +161,6 @@ export const WorkflowFormPage = () => {
       name: values.name,
       description: values.description,
       definition,
-      isEnabled: values.isEnabled,
       // Only stamp the owner on create; edits keep their existing agentId.
       ...(!isEdit && presetAgentId ? { agentId: presetAgentId } : {}),
     };
@@ -166,7 +170,15 @@ export const WorkflowFormPage = () => {
 
   const isSaving = creating || updating;
   const name = form.watch('name');
-  const isEnabled = form.watch('isEnabled');
+  const canEdit = workflow?.capabilities.canUpdate ?? false;
+
+  if (
+    permissionsLoaded &&
+    ((!isEdit && (!canCreate || !presetAgentId)) ||
+      (isEdit && workflow && !canEdit))
+  ) {
+    return <Navigate to="/erxes-agent/workflows" replace />;
+  }
 
   return (
     <div className="flex h-full flex-col">
@@ -190,10 +202,6 @@ export const WorkflowFormPage = () => {
               </Breadcrumb.Item>
             </Breadcrumb.List>
           </Breadcrumb>
-          <Separator.Inline />
-          <Badge variant={isEnabled ? 'success' : 'secondary'}>
-            {isEnabled ? 'Enabled' : 'Disabled'}
-          </Badge>
         </PageHeader.Start>
         <PageHeader.End>
           <Button variant="outline" asChild>
@@ -408,31 +416,6 @@ export const WorkflowFormPage = () => {
                         />
                       </Form.Control>
                       <Form.Message />
-                    </Form.Item>
-                  )}
-                />
-              </FormSection>
-
-              <FormSection title="Activation">
-                <Form.Field
-                  control={form.control}
-                  name="isEnabled"
-                  render={({ field }) => (
-                    <Form.Item className="flex items-start justify-between gap-4 space-y-0">
-                      <div className="space-y-1">
-                        <Form.Label>Enable workflow</Form.Label>
-                        <Form.Description>
-                          Scheduled and automated triggers run only while
-                          enabled. Manual runs remain available.
-                        </Form.Description>
-                      </div>
-                      <Form.Control>
-                        <Switch
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                          className="mt-0.5 shrink-0"
-                        />
-                      </Form.Control>
                     </Form.Item>
                   )}
                 />

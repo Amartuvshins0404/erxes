@@ -9,8 +9,6 @@ export const AGENT_FIELDS = gql`
     instructions
     provider
     model
-    toolPolicy
-    allowedTools
     grantGroupId
     skills
     destructiveOps
@@ -23,10 +21,21 @@ export const AGENT_FIELDS = gql`
     teamId
     departmentId
     unitId
-    createdBy
     isOwnAgent
     createdAt
     updatedAt
+    capabilities {
+      canReadConfig
+      canChat
+      canEdit
+      canRemove
+      canShare
+      canTransferOwnership
+      canManageGrant
+      canReadWorkflows
+      canReadSkills
+      canReadLearnings
+    }
   }
 `;
 
@@ -39,11 +48,21 @@ export const WORKFLOW_FIELDS = gql`
     definition
     version
     isEnabled
+    approvalStatus
+    approvedByUserId
+    approvedAt
+    capabilities {
+      canUpdate
+      canRemove
+      canRun
+      canApprove
+      canSchedule
+      canReadRuns
+    }
     createdAt
     updatedAt
   }
 `;
-
 
 export const MASTRA_AGENTS = gql`
   query MastraAgents {
@@ -66,20 +85,26 @@ export const MASTRA_AGENTS_MAIN = gql`
         name
         agentId
         description
-        provider
-        model
-        toolPolicy
-        allowedTools
-        skills
         isEnabled
         visibility
         teamId
         departmentId
         unitId
-        createdBy
         isOwnAgent
         createdAt
         workflowsCount
+        capabilities {
+          canReadConfig
+          canChat
+          canEdit
+          canRemove
+          canShare
+          canTransferOwnership
+          canManageGrant
+          canReadWorkflows
+          canReadSkills
+          canReadLearnings
+        }
       }
       totalCount
     }
@@ -130,7 +155,6 @@ export const MASTRA_THREAD_ARTIFACTS = gql`
   }
 `;
 
-
 export const MASTRA_ATTACHMENT_STORAGE_STATUS = gql`
   query MastraAttachmentStorageStatus {
     mastraAttachmentStorageStatus {
@@ -172,20 +196,6 @@ export const MASTRA_VOICE_CATALOG = gql`
       id
       label
       gender
-    }
-  }
-`;
-
-export const MASTRA_AVAILABLE_ERXES_TOOLS = gql`
-  query MastraAvailableErxesTools {
-    mastraAvailableErxesTools {
-      plugin
-      module
-      operation
-      operationType
-      description
-      graphqlArgs
-      returnType
     }
   }
 `;
@@ -284,19 +294,29 @@ export const MASTRA_USER_AGENT_QUOTA = gql`
 
 export const AGENT_FORM_BRANCHES = gql`
   query AgentFormBranches {
-    branches { _id title }
+    branches {
+      _id
+      title
+    }
   }
 `;
 
 export const AGENT_FORM_DEPARTMENTS = gql`
   query AgentFormDepartments {
-    departments { _id title }
+    departments {
+      _id
+      title
+    }
   }
 `;
 
 export const AGENT_FORM_UNITS = gql`
   query AgentFormUnits {
-    units { _id title departmentId }
+    units {
+      _id
+      title
+      departmentId
+    }
   }
 `;
 
@@ -366,7 +386,6 @@ export const MASTRA_WORKFLOW = gql`
   }
   ${WORKFLOW_FIELDS}
 `;
-
 
 export const MASTRA_WORKFLOW_RUNS = gql`
   query MastraWorkflowRuns($workflowId: String!, $page: Int, $perPage: Int) {

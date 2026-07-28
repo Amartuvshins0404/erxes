@@ -20,7 +20,12 @@ const envelope = { source: 'schedule', type: 'schedule', payload: {} } as never;
  * issues, so a disabled owning agent resolves to null (the kill switch) — a
  * blanket mock would hide that the query ever filtered on isEnabled.
  */
-const makeModels = (agent: { isEnabled?: boolean } | null) => {
+const makeModels = (
+  agent: {
+    isEnabled?: boolean;
+    destructiveOps?: 'allow' | 'ask' | 'block';
+  } | null,
+) => {
   const createRun = jest.fn((doc: Record<string, unknown>) =>
     Promise.resolve({ _id: 'run-1', ...doc }),
   );
@@ -48,11 +53,13 @@ const workflow = (over: Record<string, unknown> = {}) =>
   ({
     _id: 'wf-1',
     version: 1,
+    approvalStatus: 'approved',
+    isEnabled: true,
     agentId: 'agent-A',
     definition: { trigger: { type: 'schedule' } },
     ...over,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  }) as any;
+  } as any);
 
 describe('runBackgroundWorkflow fail-closed', () => {
   beforeEach(() => resolveBackgroundPrincipal.mockReset());
@@ -103,6 +110,24 @@ describe('runBackgroundWorkflow fail-closed', () => {
     });
     expect(rec.status).toBe('failed');
     expect(rec.error).toMatch(/not found or is disabled/i);
+    expect(resolveBackgroundPrincipal).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when the owning agent allows destructive operations', async () => {
+    const { models } = makeModels({
+      isEnabled: true,
+      destructiveOps: 'allow',
+    });
+
+    const rec = await runBackgroundWorkflow({
+      models,
+      subdomain: 'os',
+      workflow: workflow(),
+      envelope,
+    });
+
+    expect(rec.status).toBe('failed');
+    expect(rec.error).toMatch(/destructive operations/i);
     expect(resolveBackgroundPrincipal).not.toHaveBeenCalled();
   });
 

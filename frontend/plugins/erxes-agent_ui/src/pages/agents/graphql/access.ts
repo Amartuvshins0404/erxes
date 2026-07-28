@@ -14,12 +14,17 @@ export const PERMISSION_MODULES = gql`
       modules {
         name
         description
+        scopes {
+          name
+          description
+        }
         actions {
           name
           title
           description
           always
           disabled
+          agentCallable
         }
       }
     }
@@ -52,6 +57,7 @@ export const PERMISSION_GROUPS = gql`
     permissionGroups {
       _id
       name
+      principalType
     }
   }
 `;
@@ -60,11 +66,13 @@ export const PERMISSION_GROUP_ADD = gql`
   mutation PermissionGroupAdd(
     $name: String!
     $description: String
+    $principalType: String
     $permissions: [PermissionInput]!
   ) {
     permissionGroupAdd(
       name: $name
       description: $description
+      principalType: $principalType
       permissions: $permissions
     ) {
       _id
@@ -76,9 +84,15 @@ export const PERMISSION_GROUP_EDIT = gql`
   mutation PermissionGroupEdit(
     $_id: String!
     $name: String
+    $principalType: String
     $permissions: [PermissionInput]
   ) {
-    permissionGroupEdit(_id: $_id, name: $name, permissions: $permissions) {
+    permissionGroupEdit(
+      _id: $_id
+      name: $name
+      principalType: $principalType
+      permissions: $permissions
+    ) {
       _id
     }
   }

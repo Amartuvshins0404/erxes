@@ -16,18 +16,13 @@ import {
   IconShieldLock,
   IconSitemap,
 } from '@tabler/icons-react';
-import {
-  Breadcrumb,
-  Button,
-  Separator,
-  Spinner,
-  Tabs,
-} from 'erxes-ui';
+import { Breadcrumb, Button, Separator, Spinner, Tabs } from 'erxes-ui';
 import { PageHeader } from 'ui-modules';
 import { useAgent } from './hooks/useAgent';
 import { useAgentsBasePath } from './hooks/useAgentsBasePath';
 import { AgentSkillsTab } from './components/AgentSkillsTab';
 import { AgentAccessTab } from './components/AgentAccessTab';
+import type { IMastraAgentCapabilities } from './types';
 
 // Existing resource pages are embedded and scoped to this agent's business
 // agentId, alongside skills, access, learnings, and settings.
@@ -45,13 +40,43 @@ const AgentFormPage = lazy(() =>
   import('./AgentFormPage').then((m) => ({ default: m.AgentFormPage })),
 );
 
-const TABS = [
-  { value: 'workflows', label: 'Workflows', icon: IconSitemap },
-  { value: 'skills', label: 'Skills', icon: IconBook2 },
-  { value: 'learnings', label: 'Learnings', icon: IconBulb },
-  { value: 'access', label: 'Access', icon: IconShieldLock },
-  { value: 'config', label: 'Settings', icon: IconSettings },
-] as const;
+const TABS: Array<{
+  value: 'workflows' | 'skills' | 'learnings' | 'access' | 'config';
+  label: string;
+  icon: typeof IconSitemap;
+  capability: keyof IMastraAgentCapabilities;
+}> = [
+  {
+    value: 'workflows',
+    label: 'Workflows',
+    icon: IconSitemap,
+    capability: 'canReadWorkflows',
+  },
+  {
+    value: 'skills',
+    label: 'Skills',
+    icon: IconBook2,
+    capability: 'canReadSkills',
+  },
+  {
+    value: 'learnings',
+    label: 'Learnings',
+    icon: IconBulb,
+    capability: 'canReadLearnings',
+  },
+  {
+    value: 'access',
+    label: 'Access',
+    icon: IconShieldLock,
+    capability: 'canManageGrant',
+  },
+  {
+    value: 'config',
+    label: 'Settings',
+    icon: IconSettings,
+    capability: 'canReadConfig',
+  },
+];
 
 type TabValue = (typeof TABS)[number]['value'];
 
@@ -85,6 +110,17 @@ export const AgentDetailPage = () => {
     return <Navigate to={basePath} replace />;
   }
 
+  const visibleTabs = TABS.filter(
+    (tab) => agent.capabilities?.[tab.capability] === true,
+  );
+  if (visibleTabs.length === 0) {
+    return <Navigate to={basePath} replace />;
+  }
+  const fallbackTab = visibleTabs[0]?.value ?? 'config';
+  const canOpenTab = (tab: TabValue) =>
+    visibleTabs.some(({ value }) => value === tab);
+  const visibleActiveTab = canOpenTab(activeTab) ? activeTab : fallbackTab;
+
   return (
     <div className="flex flex-col h-full">
       <PageHeader>
@@ -115,11 +151,11 @@ export const AgentDetailPage = () => {
 
       <div className="px-3 pt-2">
         <Tabs
-          value={activeTab}
+          value={visibleActiveTab}
           onValueChange={(value) => navigate(`${detailBase}/${value}`)}
         >
           <Tabs.List>
-            {TABS.map((tab) => (
+            {visibleTabs.map((tab) => (
               <Tabs.Trigger key={tab.value} value={tab.value}>
                 <tab.icon className="size-4 mr-1.5" />
                 {tab.label}
@@ -138,31 +174,61 @@ export const AgentDetailPage = () => {
           }
         >
           <Routes>
-            <Route index element={<Navigate to="workflows" replace />} />
+            <Route index element={<Navigate to={fallbackTab} replace />} />
             <Route
               path="workflows"
               element={
-                <WorkflowsIndexPage agentId={agent.agentId} embedded />
+                canOpenTab('workflows') ? (
+                  <WorkflowsIndexPage agentId={agent.agentId} embedded />
+                ) : (
+                  <Navigate to={`../${fallbackTab}`} replace />
+                )
               }
             />
             <Route
               path="skills"
               element={
-                <AgentSkillsTab
-                  agentId={agent._id}
-                  skills={agent.skills ?? []}
-                />
+                canOpenTab('skills') ? (
+                  <AgentSkillsTab
+                    agentId={agent._id}
+                    skills={agent.skills ?? []}
+                  />
+                ) : (
+                  <Navigate to={`../${fallbackTab}`} replace />
+                )
               }
             />
             <Route
               path="learnings"
               element={
-                <LearningsIndexPage agentId={agent.agentId} embedded />
+                canOpenTab('learnings') ? (
+                  <LearningsIndexPage agentId={agent.agentId} embedded />
+                ) : (
+                  <Navigate to={`../${fallbackTab}`} replace />
+                )
               }
             />
-            <Route path="access" element={<AgentAccessTab agent={agent} />} />
-            <Route path="config" element={<AgentFormPage embedded />} />
-            <Route path="*" element={<Navigate to="workflows" replace />} />
+            <Route
+              path="access"
+              element={
+                canOpenTab('access') ? (
+                  <AgentAccessTab agent={agent} />
+                ) : (
+                  <Navigate to={`../${fallbackTab}`} replace />
+                )
+              }
+            />
+            <Route
+              path="config"
+              element={
+                canOpenTab('config') ? (
+                  <AgentFormPage embedded />
+                ) : (
+                  <Navigate to={`../${fallbackTab}`} replace />
+                )
+              }
+            />
+            <Route path="*" element={<Navigate to={fallbackTab} replace />} />
           </Routes>
         </Suspense>
       </div>

@@ -1,4 +1,5 @@
 import type { OperationMeta } from './operationRegistry';
+import { deriveModule } from './humanize';
 import {
   actionsToAllowedTools,
   assertAllowedToolsInvariant,
@@ -74,7 +75,7 @@ describe('actionsToAllowedTools', () => {
     expect(out).toEqual(['dealsAdd', 'dealsEdit']); // sorted + exact
   });
 
-  it('maps a show/read gate to the module\'s read (query) ops only', () => {
+  it("maps a show/read gate to the module's read (query) ops only", () => {
     const out = actionsToAllowedTools(
       [perm('sales', 'deal', ['showDeals'])],
       registry(),
@@ -86,7 +87,14 @@ describe('actionsToAllowedTools', () => {
 
   it('combines reads + writes for a full-module grant, deduped + sorted', () => {
     const out = actionsToAllowedTools(
-      [perm('sales', 'deal', ['showDeals', 'dealsAdd', 'dealsAdd', 'dealsEdit'])],
+      [
+        perm('sales', 'deal', [
+          'showDeals',
+          'dealsAdd',
+          'dealsAdd',
+          'dealsEdit',
+        ]),
+      ],
       registry(),
     );
     expect(out).toEqual(['dealDetail', 'deals', 'dealsAdd', 'dealsEdit']);
@@ -97,11 +105,38 @@ describe('actionsToAllowedTools', () => {
     const foreign = registry([op('dealsAdd', 'mutation', 'other', 'deals')]);
     // A SALES grant of dealsAdd must NOT emit the foreign 'other' op (plugin
     // mismatch → fail-closed drop).
-    expect(actionsToAllowedTools([perm('sales', 'deal', ['dealsAdd'])], foreign))
-      .toEqual([]);
+    expect(
+      actionsToAllowedTools([perm('sales', 'deal', ['dealsAdd'])], foreign),
+    ).toEqual([]);
     // The matching plugin's grant emits it.
-    expect(actionsToAllowedTools([perm('other', 'deals', ['dealsAdd'])], foreign))
-      .toEqual(['dealsAdd']);
+    expect(
+      actionsToAllowedTools([perm('other', 'deals', ['dealsAdd'])], foreign),
+    ).toEqual(['dealsAdd']);
+  });
+
+  it('maps permission-first write names to same-module operation verbs', () => {
+    const taskModule = deriveModule('createTask');
+    expect(taskModule).toBe('task');
+
+    const operationRegistry = registry([
+      op('createTask', 'mutation', 'operation', taskModule),
+      op('updateTask', 'mutation', 'operation', deriveModule('updateTask')),
+      op('removeTask', 'mutation', 'operation', deriveModule('removeTask')),
+      op(
+        'createProject',
+        'mutation',
+        'operation',
+        deriveModule('createProject'),
+      ),
+    ]);
+
+    const out = actionsToAllowedTools(
+      [perm('operation', 'task', ['taskCreate', 'taskUpdate', 'taskRemove'])],
+      operationRegistry,
+    );
+
+    expect(out).toEqual(['createTask', 'removeTask', 'updateTask']);
+    expect(out).not.toContain('createProject');
   });
 
   it('drops the "*" wildcard (grants nothing server-side → stays in lock-step)', () => {

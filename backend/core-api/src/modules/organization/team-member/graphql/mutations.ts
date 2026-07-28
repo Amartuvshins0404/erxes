@@ -11,6 +11,7 @@ import {
   getPlugin,
   getPlugins,
   getSaasOrganizationDetail,
+  graphqlPubsub,
 } from 'erxes-api-shared/utils';
 import { IContext, IModels } from '~/connectionResolvers';
 import { saveValidatedToken } from '~/modules/auth/utils';
@@ -23,6 +24,19 @@ export interface IUsersEdit extends IUser {
   channelIds?: string[];
   _id: string;
 }
+
+const publishUserStatusChanged = (
+  subdomain: string,
+  userId: string,
+  updatedUser: IUser,
+) => {
+  const payload = { userStatusChanged: updatedUser };
+
+  return Promise.all([
+    graphqlPubsub.publish(`userStatusChanged:${subdomain}:${userId}`, payload),
+    graphqlPubsub.publish(`userStatusChanged:${subdomain}`, payload),
+  ]);
+};
 
 const validatePermissionGroupIds = async (
   models: IModels,
@@ -247,7 +261,7 @@ export const userMutations: Record<string, Resolver<any, any, IContext>> = {
   async usersSetActiveStatus(
     _parent: undefined,
     { _id }: { _id: string },
-    { user, models, checkPermission }: IContext,
+    { user, models, subdomain, checkPermission }: IContext,
   ) {
     await checkPermission('teamMembersRemove');
 
@@ -257,13 +271,15 @@ export const userMutations: Record<string, Resolver<any, any, IContext>> = {
 
     const updatedUser = await models.Users.setUserActiveOrInactive(_id);
 
+    await publishUserStatusChanged(subdomain, _id, updatedUser);
+
     return updatedUser;
   },
 
   async usersSetActiveStatusBatch(
     _parent: undefined,
     { _ids }: { _ids: string[] },
-    { user, models, checkPermission }: IContext,
+    { user, models, subdomain, checkPermission }: IContext,
   ) {
     await checkPermission('teamMembersRemove');
 
@@ -277,7 +293,9 @@ export const userMutations: Record<string, Resolver<any, any, IContext>> = {
       const targetUser = await models.Users.findOne({ _id });
 
       if (targetUser && targetUser.isActive !== false) {
-        await models.Users.setUserActiveOrInactive(_id);
+        const updatedUser = await models.Users.setUserActiveOrInactive(_id);
+
+        await publishUserStatusChanged(subdomain, _id, updatedUser);
       }
     }
 

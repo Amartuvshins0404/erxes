@@ -40,6 +40,7 @@ export type IUIConfig = {
     relationWidgets?: {
       name: string;
       icon?: React.ElementType;
+      label?: string;
     }[];
     customerDetailWidgets?: {
       name: string;

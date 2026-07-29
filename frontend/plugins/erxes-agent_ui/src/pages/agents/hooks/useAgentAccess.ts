@@ -2,6 +2,7 @@ import { ApolloError } from '@apollo/client';
 import { toast } from 'erxes-ui';
 import { usePermissionCheck } from 'ui-modules';
 import { ERXES_AGENT_ACTIONS } from '~/permissions';
+import { resolveAgentActionScope } from './agentActionScope';
 
 const PERMISSION_DENIED = {
   title: 'Permission denied',
@@ -40,13 +41,18 @@ type AgentAccessTarget = {
   capabilities?: Partial<Record<AgentCapability, boolean>> | null;
 };
 
+
 /** Permission checks for agent CRUD. Action scope controls whether a visible
  * agent may be changed or only the caller's own agent may be changed. */
 export const useAgentAccess = () => {
-  const { getActionScope, hasActionPermission, isLoaded } =
-    usePermissionCheck();
+  const permissionCheck = usePermissionCheck();
+  const { hasActionPermission, isLoaded } = permissionCheck;
 
-  const canShare = getActionScope(ERXES_AGENT_ACTIONS.agent.share) === 'all';
+  const canShare =
+    resolveAgentActionScope(
+      permissionCheck,
+      ERXES_AGENT_ACTIONS.agent.share,
+    ) === 'all';
   const canReadConfig = hasActionPermission(
     ERXES_AGENT_ACTIONS.agent.readConfig,
   );
@@ -55,7 +61,7 @@ export const useAgentAccess = () => {
   const canRemove = hasActionPermission(ERXES_AGENT_ACTIONS.agent.remove);
 
   const canUseScopedAction = (action: string, agent: AgentAccessTarget) => {
-    const scope = getActionScope(action);
+    const scope = resolveAgentActionScope(permissionCheck, action);
     return scope === 'all' || scope === 'group' || !!agent.isOwnAgent;
   };
 

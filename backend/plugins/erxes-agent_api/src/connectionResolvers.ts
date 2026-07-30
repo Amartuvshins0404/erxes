@@ -84,9 +84,8 @@ export const loadClasses = (db: mongoose.Connection): IModels => {
   const models = {} as IModels;
 
   models.MastraAgent = db.model<IMastraAgentDocument, IMastraAgentModel>(
-    'mastra_agent_profiles',
+    'mastra_agents',
     loadAgentClass(models),
-    'mastra_agent_profiles',
   );
 
   models.MastraAgentActionLog = db.model<

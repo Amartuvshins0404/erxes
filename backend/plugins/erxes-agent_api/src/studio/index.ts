@@ -33,7 +33,7 @@ const fallback = new Agent({
   id: 'studio-info',
   name: 'studio-info',
   instructions:
-    'No erxes agents were registered. Check MONGO_URL, the gateway (:4000), and that mastra_agent_profiles holds active AI team members.',
+    'No erxes agents were registered. Check MONGO_URL, the gateway (:4000), and that mastra_agents holds active AI team members.',
   model: openai('gpt-4o-mini'),
 });
 

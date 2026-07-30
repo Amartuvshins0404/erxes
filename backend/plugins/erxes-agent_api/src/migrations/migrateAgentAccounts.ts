@@ -11,7 +11,6 @@ import {
 } from '~/mastra/auth/servicePrincipal';
 
 interface LegacyAgentProfile {
-  [key: string]: unknown;
   _id: string;
   name?: string;
   agentId?: string;
@@ -53,15 +52,8 @@ const LEGACY_FIELDS = {
   unitId: '',
 } as const;
 
-const profileCollection = (models: IModels): Collection<LegacyAgentProfile> =>
+const agentCollection = (models: IModels): Collection<LegacyAgentProfile> =>
   models.MastraAgent.collection as unknown as Collection<LegacyAgentProfile>;
-
-const legacyAgentCollection = (
-  models: IModels,
-): Collection<LegacyAgentProfile> =>
-  models.MastraAgent.db.collection(
-    'mastra_agents',
-  ) as unknown as Collection<LegacyAgentProfile>;
 
 const legacyAccountFor = async (subdomain: string, userId?: string) => {
   if (!userId) return null;
@@ -70,10 +62,9 @@ const legacyAccountFor = async (subdomain: string, userId?: string) => {
 };
 
 const migrateProfile = async (
+  models: IModels,
   subdomain: string,
   profile: LegacyAgentProfile,
-  source: Collection<LegacyAgentProfile>,
-  target: Collection<LegacyAgentProfile>,
 ): Promise<void> => {
   const legacyUserId = profile.serviceUserId || profile.agentUserId;
   const legacyCandidate = await legacyAccountFor(subdomain, legacyUserId);
@@ -130,33 +121,21 @@ const migrateProfile = async (
     }
   }
 
-  if (source.collectionName === target.collectionName) {
-    await target.updateOne({ _id: profile._id }, { $unset: LEGACY_FIELDS });
-  } else {
-    const { _id, ...runtimeProfile } = profile;
-    for (const field of Object.keys(LEGACY_FIELDS)) {
-      delete runtimeProfile[field];
-    }
-    await target.updateOne(
-      { _id },
-      { $setOnInsert: runtimeProfile },
-      { upsert: true },
-    );
-    await source.deleteOne({ _id });
-  }
+  await agentCollection(models).updateOne(
+    { _id: profile._id },
+    { $unset: LEGACY_FIELDS },
+  );
   console.info(`[erxes-agent:accounts] migrated AI team member ${profile._id}`);
 };
 
-const migrateCollection = async (
+export async function migrateTenantAgentAccounts(
+  models: IModels,
   subdomain: string,
-  source: Collection<LegacyAgentProfile>,
-  target: Collection<LegacyAgentProfile>,
-  filter: Filter<LegacyAgentProfile>,
-): Promise<void> => {
-  const cursor = source.find(filter);
+): Promise<void> {
+  const cursor = agentCollection(models).find(LEGACY_FILTER);
   for await (const profile of cursor) {
     try {
-      await migrateProfile(subdomain, profile, source, target);
+      await migrateProfile(models, subdomain, profile);
     } catch (error) {
       console.error(
         `[erxes-agent:accounts] migration failed for ${profile._id}: ${
@@ -164,19 +143,6 @@ const migrateCollection = async (
         }`,
       );
     }
-  }
-};
-
-export async function migrateTenantAgentAccounts(
-  models: IModels,
-  subdomain: string,
-): Promise<void> {
-  const target = profileCollection(models);
-  await migrateCollection(subdomain, target, target, LEGACY_FILTER);
-
-  const legacy = legacyAgentCollection(models);
-  if (legacy.collectionName !== target.collectionName) {
-    await migrateCollection(subdomain, legacy, target, {});
   }
 }
 

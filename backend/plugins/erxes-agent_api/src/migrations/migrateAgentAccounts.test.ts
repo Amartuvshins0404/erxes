@@ -33,11 +33,7 @@ jest.mock('~/mastra/auth/servicePrincipal', () => ({
 import type { IModels } from '~/connectionResolvers';
 import { migrateTenantAgentAccounts } from './migrateAgentAccounts';
 
-interface StoredProfile extends Record<string, unknown> {
-  _id: string;
-}
-
-const legacyProfile: StoredProfile = {
+const legacyProfile: Record<string, unknown> = {
   _id: 'agent-profile-1',
   agentId: 'sales-agent',
   name: 'Sales Agent',
@@ -45,85 +41,27 @@ const legacyProfile: StoredProfile = {
   isEnabled: true,
   serviceUserId: 'legacy-service-user-1',
   grantGroupId: 'legacy-group',
-  provider: 'openai',
-  model: 'gpt-4.1',
-  instructions: 'Handle sales work',
 };
 
-const LEGACY_KEYS = new Set([
-  'name',
-  'agentId',
-  'description',
-  'isEnabled',
-  'serviceUserId',
-  'agentUserId',
-  'grantGroupId',
-  'createdBy',
-  'visibility',
-  'teamId',
-  'departmentId',
-  'unitId',
-]);
-
-const makeCollection = (
-  collectionName: string,
-  initial: StoredProfile[] = [],
-) => {
-  const store = new Map(
-    initial.map((profile) => [profile._id, { ...profile }]),
+const makeModels = () => {
+  const profile = { ...legacyProfile };
+  const updateOne = jest.fn(
+    async (_selector: unknown, update: { $unset?: Record<string, string> }) => {
+      for (const key of Object.keys(update.$unset ?? {})) delete profile[key];
+      return { modifiedCount: 1 };
+    },
   );
-  const find = jest.fn((filter: Record<string, unknown>) => ({
+  const find = jest.fn(() => ({
     async *[Symbol.asyncIterator]() {
-      const rows = [...store.values()].filter(
-        (profile) =>
-          Object.keys(filter).length === 0 ||
-          Object.keys(profile).some((key) => LEGACY_KEYS.has(key)),
-      );
-      for (const profile of rows) yield { ...profile };
+      if ('agentId' in profile) yield { ...profile };
     },
   }));
-  const updateOne = jest.fn(
-    async (
-      selector: { _id: string },
-      update: {
-        $unset?: Record<string, string>;
-        $setOnInsert?: Record<string, unknown>;
-      },
-      options?: { upsert?: boolean },
-    ) => {
-      const existing = store.get(selector._id);
-      if (existing && update.$unset) {
-        for (const key of Object.keys(update.$unset)) delete existing[key];
-      } else if (!existing && options?.upsert && update.$setOnInsert) {
-        store.set(selector._id, {
-          _id: selector._id,
-          ...update.$setOnInsert,
-        });
-      }
-      return { modifiedCount: existing ? 1 : 0 };
-    },
-  );
-  const deleteOne = jest.fn(async ({ _id }: { _id: string }) => {
-    store.delete(_id);
-    return { deletedCount: 1 };
-  });
-  return { collectionName, store, find, updateOne, deleteOne };
-};
-
-const makeModels = (options?: {
-  legacy?: StoredProfile[];
-  current?: StoredProfile[];
-}) => {
-  const legacy = makeCollection('mastra_agents', options?.legacy);
-  const current = makeCollection('mastra_agent_profiles', options?.current);
-  const collection = jest.fn(() => legacy);
   const models = {
     MastraAgent: {
-      collection: current,
-      db: { collection },
+      collection: { find, updateOne },
     },
   } as unknown as IModels;
-  return { models, legacy, current, collection };
+  return { models, find, updateOne };
 };
 
 beforeEach(() => {
@@ -157,10 +95,8 @@ afterEach(() => {
 });
 
 describe('migrateTenantAgentAccounts', () => {
-  it('moves a legacy collection profile and adopts its service account once', async () => {
-    const { models, legacy, current } = makeModels({
-      legacy: [legacyProfile],
-    });
+  it('adopts the legacy service account and links it to the profile once', async () => {
+    const { models, find, updateOne } = makeModels();
 
     await migrateTenantAgentAccounts(models, 'os');
     await migrateTenantAgentAccounts(models, 'os');
@@ -176,48 +112,20 @@ describe('migrateTenantAgentAccounts', () => {
       isActive: true,
     });
     expect(createAgentAccount).not.toHaveBeenCalled();
-    expect(legacy.store.size).toBe(0);
-    expect(current.store.get('agent-profile-1')).toEqual({
-      _id: 'agent-profile-1',
-      provider: 'openai',
-      model: 'gpt-4.1',
-      instructions: 'Handle sales work',
-    });
+    expect(updateOne).toHaveBeenCalledTimes(1);
+    expect(find).toHaveBeenCalledTimes(2);
   });
 
-  it('keeps the source profile intact when account creation fails', async () => {
-    const { models, legacy, current } = makeModels({
-      legacy: [legacyProfile],
-    });
+  it('keeps legacy fields intact when account creation fails so startup can retry', async () => {
+    const { models, updateOne } = makeModels();
     findCoreUsers.mockResolvedValue([]);
     createAgentAccount.mockRejectedValue(new Error('core unavailable'));
 
     await migrateTenantAgentAccounts(models, 'os');
 
-    expect(legacy.store.get('agent-profile-1')).toEqual(legacyProfile);
-    expect(current.store.size).toBe(0);
+    expect(updateOne).not.toHaveBeenCalled();
     expect(console.error).toHaveBeenCalledWith(
       expect.stringContaining('migration failed for agent-profile-1'),
     );
-  });
-
-  it('preserves an already-written target profile while completing a retry', async () => {
-    const currentProfile = {
-      _id: 'agent-profile-1',
-      provider: 'openai',
-      model: 'gpt-4.1',
-      instructions: 'New instructions',
-    };
-    const { models, legacy, current } = makeModels({
-      legacy: [legacyProfile],
-      current: [currentProfile],
-    });
-    getAgentAccount.mockResolvedValue({ _id: 'account-1' });
-
-    await migrateTenantAgentAccounts(models, 'os');
-
-    expect(updateAgentAccount).toHaveBeenCalledTimes(1);
-    expect(current.store.get('agent-profile-1')).toEqual(currentProfile);
-    expect(legacy.store.size).toBe(0);
   });
 });

@@ -6,14 +6,12 @@ import mongoose from 'mongoose';
 import { loadClasses } from '~/connectionResolvers';
 
 describe('AI team-member profile storage', () => {
-  it('isolates canonical account profiles from the legacy agent collection', () => {
+  it('uses the original agent collection', () => {
     const connection = mongoose.createConnection();
     const models = loadClasses(connection);
 
-    expect(models.MastraAgent.modelName).toBe('mastra_agent_profiles');
-    expect(models.MastraAgent.collection.collectionName).toBe(
-      'mastra_agent_profiles',
-    );
-    expect(connection.models.mastra_agents).toBeUndefined();
+    expect(models.MastraAgent.modelName).toBe('mastra_agents');
+    expect(models.MastraAgent.collection.collectionName).toBe('mastra_agents');
+    expect(connection.models.mastra_agent_profiles).toBeUndefined();
   });
 });

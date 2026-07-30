@@ -12,21 +12,11 @@
         "cwd": "backend/plugins/erxes-agent_api",
         "commands": ["pnpm build"]
       },
-      "dependsOn": ["^build", "build:packageJson"]
-    },
-    "build:packageJson": {
-      "executor": "@nx/js:tsc",
-      "options": {
-        "main": "backend/plugins/erxes-agent_api/dist/src/main.js",
-        "tsConfig": "backend/plugins/erxes-agent_api/tsconfig.build.json",
-        "outputPath": "backend/plugins/erxes-agent_api/dist",
-        "updateBuildableProjectDepsInPackageJson": true,
-        "buildableProjectDepsInPackageJsonType": "dependencies"
-      }
+      "dependsOn": ["^build"]
     },
     "start": {
       "executor": "nx:run-commands",
-      "dependsOn": ["typecheck", "build"],
+      "dependsOn": ["build"],
       "options": {
         "cwd": "backend/plugins/erxes-agent_api",
         "command": "NODE_ENV=development node dist/src/main.js"

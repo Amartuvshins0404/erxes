@@ -24,7 +24,7 @@ export const MASTRA_CHAT_CANCEL = gql`
 `;
 
 export const MASTRA_AGENT_CREATE = gql`
-  mutation MastraAgentCreate($doc: MastraAgentCreateInput!) {
+  mutation MastraAgentCreate($doc: MastraAgentInput!) {
     mastraAgentCreate(doc: $doc) {
       ...AgentFields
     }
@@ -33,7 +33,7 @@ export const MASTRA_AGENT_CREATE = gql`
 `;
 
 export const MASTRA_AGENT_UPDATE = gql`
-  mutation MastraAgentUpdate($_id: String!, $doc: MastraAgentConfigInput!) {
+  mutation MastraAgentUpdate($_id: String!, $doc: MastraAgentInput!) {
     mastraAgentUpdate(_id: $_id, doc: $doc) {
       ...AgentFields
     }

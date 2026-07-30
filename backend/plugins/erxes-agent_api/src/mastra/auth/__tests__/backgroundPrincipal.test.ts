@@ -12,7 +12,6 @@ jest.mock('../servicePrincipal', () => ({
   getAgentAccount: (...args: unknown[]) => getAgentAccount(...args),
 }));
 
-import type { IModels } from '~/connectionResolvers';
 import type { WorkflowDefinition } from '../../workflows/dsl';
 import {
   assertWorkflowSchedulable,
@@ -20,13 +19,12 @@ import {
   resolveAgentPrincipal,
 } from '../backgroundPrincipal';
 
-const APP_TOKEN = 'sk_app-token';
 const USER_ID = 'agent-user-1';
-const MODELS = {} as IModels;
+const ACCOUNT_ID = 'core-agent-user-1';
 const agent = { _id: USER_ID };
 
 const account = (overrides: Record<string, unknown> = {}) => ({
-  _id: USER_ID,
+  _id: ACCOUNT_ID,
   role: 'user',
   isOwner: false,
   isActive: true,
@@ -46,8 +44,6 @@ describe('resolveAgentPrincipal', () => {
     const result = await resolveAgentPrincipal({
       agentConfig: agent,
       subdomain: 'os',
-      appToken: APP_TOKEN,
-      models: MODELS,
       background: false,
     });
 
@@ -56,10 +52,10 @@ describe('resolveAgentPrincipal', () => {
       authCtx: {
         token: 'MINTED',
         subdomain: 'os',
-        principalUserId: USER_ID,
+        principalUserId: ACCOUNT_ID,
         userHeader: Buffer.from(
           JSON.stringify({
-            _id: USER_ID,
+            _id: ACCOUNT_ID,
             role: 'user',
             isOwner: false,
             isActive: true,
@@ -75,11 +71,7 @@ describe('resolveAgentPrincipal', () => {
       userId: USER_ID,
       subdomain: 'os',
     });
-    expect(mintRunToken).toHaveBeenCalledWith({
-      userId: USER_ID,
-      subdomain: 'os',
-      appToken: APP_TOKEN,
-    });
+    expect(mintRunToken).toHaveBeenCalledWith({ account: account() });
   });
 
   it('accepts custom permissions without a permission group', async () => {
@@ -95,8 +87,6 @@ describe('resolveAgentPrincipal', () => {
     const result = await resolveAgentPrincipal({
       agentConfig: agent,
       subdomain: 'os',
-      appToken: APP_TOKEN,
-      models: MODELS,
       background: true,
     });
 
@@ -109,8 +99,6 @@ describe('resolveAgentPrincipal', () => {
     const result = await resolveAgentPrincipal({
       agentConfig: agent,
       subdomain: 'os',
-      appToken: APP_TOKEN,
-      models: MODELS,
       background: true,
     });
 
@@ -132,8 +120,6 @@ describe('resolveAgentPrincipal', () => {
     const result = await resolveAgentPrincipal({
       agentConfig: agent,
       subdomain: 'os',
-      appToken: APP_TOKEN,
-      models: MODELS,
       background: true,
     });
 
@@ -146,40 +132,19 @@ describe('resolveAgentPrincipal', () => {
     expect(mintRunToken).not.toHaveBeenCalled();
   });
 
-  it('fails closed when the app credential is missing', async () => {
-    const result = await resolveAgentPrincipal({
-      agentConfig: agent,
-      subdomain: 'os',
-      appToken: undefined,
-      models: MODELS,
-      background: true,
-    });
-
-    expect(result).toEqual(
-      expect.objectContaining({
-        ok: false,
-        error: expect.stringMatching(/app token/i),
-      }),
-    );
-    expect(getAgentAccount).not.toHaveBeenCalled();
-    expect(mintRunToken).not.toHaveBeenCalled();
-  });
-
-  it('never falls back to the app credential when run-token minting fails', async () => {
+  it('fails closed when run-token minting fails', async () => {
     mintRunToken.mockResolvedValue(undefined);
 
     const result = await resolveAgentPrincipal({
       agentConfig: agent,
       subdomain: 'os',
-      appToken: APP_TOKEN,
-      models: MODELS,
       background: true,
     });
 
     expect(result).toEqual(
       expect.objectContaining({
         ok: false,
-        error: expect.stringMatching(/not falling back/i),
+        error: expect.stringMatching(/could not mint/i),
       }),
     );
     expect(result).not.toHaveProperty('authCtx');
@@ -187,23 +152,14 @@ describe('resolveAgentPrincipal', () => {
 });
 
 describe('backgroundRunEnableError', () => {
-  it('requires an app credential and team-member permissions', () => {
+  it('requires team-member permissions', () => {
     expect(
       backgroundRunEnableError({
         destructiveAllow: false,
         subject: 'workflow',
-        appToken: APP_TOKEN,
         hasPermissions: false,
       }),
     ).toMatch(/assign permissions/i);
-    expect(
-      backgroundRunEnableError({
-        destructiveAllow: false,
-        subject: 'workflow',
-        appToken: undefined,
-        hasPermissions: true,
-      }),
-    ).toMatch(/app token/i);
   });
 
   it('rejects destructive operations and accepts a bounded background run', () => {
@@ -211,7 +167,6 @@ describe('backgroundRunEnableError', () => {
       backgroundRunEnableError({
         destructiveAllow: true,
         subject: 'workflow',
-        appToken: APP_TOKEN,
         hasPermissions: true,
       }),
     ).toMatch(/destructiveOps/);
@@ -219,7 +174,6 @@ describe('backgroundRunEnableError', () => {
       backgroundRunEnableError({
         destructiveAllow: false,
         subject: 'workflow',
-        appToken: APP_TOKEN,
         hasPermissions: true,
       }),
     ).toBeNull();
@@ -232,12 +186,8 @@ describe('assertWorkflowSchedulable', () => {
       _id: USER_ID,
       destructiveOps: 'ask',
     });
-    const getSettings = jest.fn().mockResolvedValue({
-      erxesApiToken: APP_TOKEN,
-    });
     const models = {
       MastraAgent: { findOne },
-      MastraSettings: { getSettings },
     } as unknown as IModels;
 
     await assertWorkflowSchedulable({

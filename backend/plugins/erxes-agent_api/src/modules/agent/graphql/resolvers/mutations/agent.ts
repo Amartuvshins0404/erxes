@@ -55,7 +55,7 @@ const assertPermissionGroupsAssignable = async (
 
 const toAgentView = (profile: IMastraAgentDocument, account: AgentAccount) => ({
   ...profile.toObject(),
-  _id: account._id,
+  _id: profile._id,
   accountName:
     account.details?.fullName ||
     account.username ||

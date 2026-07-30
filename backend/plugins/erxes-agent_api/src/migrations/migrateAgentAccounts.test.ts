@@ -3,7 +3,6 @@ const findCoreUsers = jest.fn();
 const createAgentAccount = jest.fn();
 const updateAgentAccount = jest.fn();
 const adoptLegacyAgentAccount = jest.fn();
-const retireLegacyAgentAccount = jest.fn();
 
 jest.mock('erxes-api-shared/utils', () => ({
   getEnv: jest.fn(() => 'os'),
@@ -19,8 +18,16 @@ jest.mock('~/mastra/auth/servicePrincipal', () => ({
   updateAgentAccount: (...args: unknown[]) => updateAgentAccount(...args),
   adoptLegacyAgentAccount: (...args: unknown[]) =>
     adoptLegacyAgentAccount(...args),
-  retireLegacyAgentAccount: (...args: unknown[]) =>
-    retireLegacyAgentAccount(...args),
+  isAdoptableAgentAccount: (account?: {
+    role?: string;
+    email?: string;
+    appId?: string;
+  }) =>
+    Boolean(
+      account?.appId?.startsWith('erxes-agent:') ||
+        (account?.role === 'system' &&
+          account.email?.endsWith('@agents.local')),
+    ),
 }));
 
 import type { IModels } from '~/connectionResolvers';
@@ -67,6 +74,7 @@ beforeEach(() => {
             {
               _id: 'legacy-service-user-1',
               role: 'system',
+              email: 'sales-agent@agents.local',
               permissionGroupIds: ['legacy-group'],
               details: { fullName: 'Sales Agent' },
             },
@@ -78,7 +86,6 @@ beforeEach(() => {
   });
   updateAgentAccount.mockReset();
   adoptLegacyAgentAccount.mockReset();
-  retireLegacyAgentAccount.mockReset().mockResolvedValue(undefined);
   jest.spyOn(console, 'info').mockImplementation(() => undefined);
   jest.spyOn(console, 'warn').mockImplementation(() => undefined);
   jest.spyOn(console, 'error').mockImplementation(() => undefined);
@@ -89,33 +96,30 @@ afterEach(() => {
 });
 
 describe('migrateTenantAgentAccounts', () => {
-  it('creates the team member under the profile ID and retires the old service user once', async () => {
+  it('adopts the legacy service account and links it to the profile once', async () => {
     const { models, find, updateOne } = makeModels();
 
     await migrateTenantAgentAccounts(models, 'os');
     await migrateTenantAgentAccounts(models, 'os');
 
-    expect(createAgentAccount).toHaveBeenCalledTimes(1);
-    expect(createAgentAccount).toHaveBeenCalledWith({
-      userId: 'agent-profile-1',
+    expect(adoptLegacyAgentAccount).toHaveBeenCalledTimes(1);
+    expect(adoptLegacyAgentAccount).toHaveBeenCalledWith({
+      agentId: 'agent-profile-1',
+      accountId: 'legacy-service-user-1',
       subdomain: 'os',
-      input: {
-        name: 'Sales Agent',
-        description: 'Handles sales work',
-        permissionGroupIds: ['legacy-group'],
-        isActive: true,
-      },
+      name: 'Sales Agent',
+      description: 'Handles sales work',
+      permissionGroupIds: ['legacy-group'],
+      isActive: true,
     });
-    expect(retireLegacyAgentAccount).toHaveBeenCalledWith({
-      userId: 'legacy-service-user-1',
-      subdomain: 'os',
-    });
+    expect(createAgentAccount).not.toHaveBeenCalled();
     expect(updateOne).toHaveBeenCalledTimes(1);
     expect(find).toHaveBeenCalledTimes(2);
   });
 
   it('keeps legacy fields intact when account creation fails so startup can retry', async () => {
     const { models, updateOne } = makeModels();
+    findCoreUsers.mockResolvedValue([]);
     createAgentAccount.mockRejectedValue(new Error('core unavailable'));
 
     await migrateTenantAgentAccounts(models, 'os');

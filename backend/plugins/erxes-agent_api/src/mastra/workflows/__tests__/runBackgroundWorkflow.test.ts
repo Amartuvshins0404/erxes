@@ -15,8 +15,8 @@ import type { IMastraWorkflowDocument } from '@/workflow/@types/workflow';
 const envelope = { source: 'schedule', type: 'schedule', payload: {} } as never;
 
 /**
- * The profile lookup resolves only the workflow's canonical account-keyed
- * profile. Account activity is enforced by resolveAgentPrincipal against core.
+ * The profile lookup resolves the workflow's plugin profile. Account identity
+ * and activity are enforced by resolveAgentPrincipal against core.
  */
 const makeModels = (agent: Record<string, unknown> | null) => {
   const createRun = jest.fn((doc: Record<string, unknown>) =>
@@ -33,9 +33,6 @@ const makeModels = (agent: Record<string, unknown> | null) => {
     findOne,
     models: {
       MastraAgent: { findOne },
-      MastraSettings: {
-        getSettings: jest.fn().mockResolvedValue({ erxesApiToken: 'sk_app' }),
-      },
       MastraWorkflowRun: { createRun },
     } as unknown as IModels,
   };
@@ -127,16 +124,12 @@ describe('runBackgroundWorkflow fail-closed', () => {
       envelope,
     });
 
-    // The owning agent's config (+ models, for the service-user lifecycle) — not
-    // a createdByUserId shim — is what's passed.
-    expect(resolveAgentPrincipal).toHaveBeenCalledWith(
-      expect.objectContaining({
-        agentConfig: agent,
-        subdomain: 'os',
-        appToken: 'sk_app',
-        models,
-      }),
-    );
+    // The owning profile — not a createdByUserId or app-token shim — is passed.
+    expect(resolveAgentPrincipal).toHaveBeenCalledWith({
+      agentConfig: agent,
+      subdomain: 'os',
+      background: true,
+    });
     expect(rec.status).toBe('failed');
     expect(rec.error).toMatch(/could not mint/i);
   });

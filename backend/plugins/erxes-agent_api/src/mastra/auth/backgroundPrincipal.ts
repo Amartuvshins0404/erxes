@@ -5,9 +5,6 @@ import type { WorkflowDefinition } from '../workflows/dsl';
 import { mintRunToken } from './runToken';
 import { getAgentAccount } from './servicePrincipal';
 
-const CONFIGURE_APP_TOKEN =
-  'Agent runs execute as the AI team member; configure the erxes app token in Agent settings.';
-
 /** Auth propagated to every agent tool under the canonical core user. */
 export interface AgentPrincipalAuthCtx {
   token: string;
@@ -31,15 +28,9 @@ export type PrincipalSource =
 export async function resolveAgentPrincipal(opts: {
   agentConfig: PrincipalSource;
   subdomain: string;
-  appToken: string | undefined;
-  models: IModels;
   background: boolean;
 }): Promise<AgentPrincipalResult> {
-  const { agentConfig, subdomain, appToken, background } = opts;
-  const clientToken = appToken?.trim();
-  if (!clientToken) {
-    return { ok: false, error: `Agent run refused: ${CONFIGURE_APP_TOKEN}` };
-  }
+  const { agentConfig, subdomain, background } = opts;
 
   const userId = agentConfig?._id;
   if (!userId) {
@@ -56,7 +47,7 @@ export async function resolveAgentPrincipal(opts: {
     return {
       ok: false,
       error:
-        'Agent run refused: the AI team-member account is missing or inactive. Not falling back to the app token.',
+        'Agent run refused: the AI team-member account is missing or inactive.',
     };
   }
   if (
@@ -70,16 +61,12 @@ export async function resolveAgentPrincipal(opts: {
     };
   }
 
-  const minted = await mintRunToken({
-    userId,
-    subdomain,
-    appToken: clientToken,
-  });
+  const minted = await mintRunToken({ account });
   if (!minted) {
     return {
       ok: false,
       error:
-        'Agent run refused: could not mint a token for the AI team member. Not falling back to the app token.',
+        'Agent run refused: could not mint a token for the AI team member.',
     };
   }
 
@@ -89,7 +76,7 @@ export async function resolveAgentPrincipal(opts: {
       token: minted,
       userHeader: Buffer.from(
         JSON.stringify({
-          _id: userId,
+          _id: account._id,
           role: 'user',
           isOwner: false,
           isActive: account.isActive !== false,
@@ -97,7 +84,7 @@ export async function resolveAgentPrincipal(opts: {
           customPermissions: account.customPermissions ?? [],
         }),
       ).toString('base64'),
-      principalUserId: userId,
+      principalUserId: account._id,
       subdomain,
       background,
       agentId: userId,
@@ -109,13 +96,9 @@ export async function resolveAgentPrincipal(opts: {
 export function backgroundRunEnableError(opts: {
   destructiveAllow: boolean;
   subject: string;
-  appToken: string | undefined;
   hasPermissions: boolean;
 }): string | null {
-  const { destructiveAllow, subject, appToken, hasPermissions } = opts;
-  if (!appToken?.trim()) {
-    return `Cannot enable this ${subject}: ${CONFIGURE_APP_TOKEN}`;
-  }
+  const { destructiveAllow, subject, hasPermissions } = opts;
   if (!hasPermissions) {
     return `Cannot enable this ${subject}: assign permissions to its AI team member first.`;
   }
@@ -157,11 +140,9 @@ export const assertWorkflowSchedulable = async (opts: {
       `Cannot enable this workflow: its owning AI team member "${agentId}" is missing or inactive.`,
     );
   }
-  const settings = await opts.models.MastraSettings.getSettings();
   const error = backgroundRunEnableError({
     destructiveAllow: agent.destructiveOps === 'allow',
     subject: 'workflow',
-    appToken: settings?.erxesApiToken,
     hasPermissions: Boolean(
       account.permissionGroupIds?.length || account.customPermissions?.length,
     ),

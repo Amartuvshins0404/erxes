@@ -1,43 +1,61 @@
-import { sendTRPCMessage } from 'erxes-api-shared/utils';
+import { createHmac } from 'node:crypto';
+import { redis } from 'erxes-api-shared/utils';
+import type { AgentAccount } from './servicePrincipal';
+import { isAgentAccount } from './servicePrincipal';
 
-// ---------------------------------------------------------------------------
-// Run-token minting for an AI team-member account.
-//
-// The app token is only the client credential presented to core's
-// `users.issueRunToken`. The returned short-lived token identifies the
-// passwordless, non-owner AI team member and is the sole acting principal.
-// ---------------------------------------------------------------------------
+const RUN_TOKEN_TTL_SECONDS = 60 * 60;
+
+const encodeSegment = (value: object): string =>
+  Buffer.from(JSON.stringify(value)).toString('base64url');
+
+const signRunToken = (userId: string, secret: string): string => {
+  const issuedAt = Math.floor(Date.now() / 1000);
+  const unsigned = `${encodeSegment({
+    alg: 'HS256',
+    typ: 'JWT',
+  })}.${encodeSegment({
+    user: { _id: userId, isOwner: false },
+    iat: issuedAt,
+    exp: issuedAt + RUN_TOKEN_TTL_SECONDS,
+  })}`;
+  const signature = createHmac('sha256', secret)
+    .update(unsigned)
+    .digest('base64url');
+  return `${unsigned}.${signature}`;
+};
 
 /**
- * Mint a short-lived gateway token for `userId` via core's `users.issueRunToken`,
- * or `undefined` when the userId or app token is missing / the mint fails (core
- * unreachable, revoked/invalid app token, deactivated or isOwner user). Never
- * logs the token. The app token is sent only as the client credential
- * authenticating to core; the returned token is the principal the caller runs as.
+ * Mint the short-lived token used by this plugin's validated AI team-member
+ * principal. This reproduces the gateway's existing user-token contract
+ * locally, so the plugin does not require an agent-specific core API.
  */
 export async function mintRunToken(opts: {
-  userId: string;
-  subdomain: string;
-  appToken: string | undefined;
+  account: AgentAccount;
 }): Promise<string | undefined> {
-  const uid = opts.userId?.trim();
-  const token = opts.appToken?.trim();
-  if (!uid || !token) return undefined;
+  const { account } = opts;
+  if (
+    !account._id?.trim() ||
+    !isAgentAccount(account) ||
+    account.isActive === false
+  ) {
+    return undefined;
+  }
+
+  const secret = process.env.JWT_TOKEN_SECRET || 'SECRET';
+  if (process.env.NODE_ENV === 'production' && secret === 'SECRET') {
+    return undefined;
+  }
 
   try {
-    const res = await sendTRPCMessage({
-      subdomain: opts.subdomain,
-      pluginName: 'core',
-      module: 'users',
-      action: 'issueRunToken',
-      method: 'mutation',
-      input: { userId: uid, appToken: token },
-      defaultValue: null,
-    });
-    return res?.token || undefined;
+    const token = signRunToken(account._id, secret);
+    await redis.set(
+      `user-token-${account._id}-${token}`,
+      '1',
+      'EX',
+      RUN_TOKEN_TTL_SECONDS,
+    );
+    return token;
   } catch {
-    // Mint failed (core unreachable, revoked/invalid app token, deactivated
-    // service user, …). Never surface the token here — the caller fails closed.
     return undefined;
   }
 }

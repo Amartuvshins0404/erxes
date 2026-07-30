@@ -384,17 +384,13 @@ export async function runWorkflow(args: {
 }
 
 /**
- * Background (schedule- or automation-triggered) workflow entry point. Unlike a
- * manual run — which executes AS the requesting user (the mutation wraps it in
- * runWithAuth) — a background run has no user session, so it runs as the
- * workflow's OWNING AGENT: its service-user principal is minted from that
- * agent's configuration.
+ * Background (schedule- or automation-triggered) workflow entry point. It has
+ * no human session, so it runs as the workflow's owning AI team member.
  *
  * A workflow with no owning agent (or one pointing at a deleted agent) has no
- * identity to run under, so it fails CLOSED — records a failed run and does NOT
- * execute. Likewise when the owner token can't be minted: operation steps can
- * never fall through to the admin app token (buildAuthHeaders' no-context
- * fallback).
+ * identity to run under, so it fails closed and records a failed run without
+ * executing. A token-mint failure fails the same way; operation steps never
+ * fall through to the configured app token.
  */
 export async function runBackgroundWorkflow(args: {
   models: IModels;
@@ -442,15 +438,11 @@ export async function runBackgroundWorkflow(args: {
     );
   }
 
-  // The app token (settings.erxesApiToken) is only the CLIENT CREDENTIAL that
-  // authenticates to core's mint endpoint — the minted owner token, bound to the
-  // owning agent's principal, is what every operation step runs as.
-  const settings = await models.MastraSettings.getSettings();
+  // Every operation step runs as the owning AI team-member account through a
+  // short-lived token; no app-level credential is used as the acting principal.
   const principal = await resolveAgentPrincipal({
     agentConfig,
     subdomain,
-    appToken: settings?.erxesApiToken,
-    models,
     background: true,
   });
   if (!principal.ok) {

@@ -6,7 +6,10 @@ import {
 import { generateModels } from '~/connectionResolvers';
 import { prepareTurn } from '@/agent/prepare';
 import { runAgentTurn } from '@/agent/run';
-import { getAgentAccount } from '~/mastra/auth/servicePrincipal';
+import {
+  agentIdForAccount,
+  getAgentAccountByUserId,
+} from '~/mastra/auth/servicePrincipal';
 
 const SERVICE = 'erxes-agent';
 const RUN_QUEUE = 'notification-run';
@@ -28,6 +31,7 @@ interface AgentNotification {
 interface NotificationRunJob {
   subdomain: string;
   recipientUserId: string;
+  agentId: string;
   notification: AgentNotification;
 }
 
@@ -117,9 +121,9 @@ const stableThreadId = (
 };
 
 async function runNotificationJob(job: NotificationRunJob) {
-  const { subdomain, recipientUserId, notification } = job;
+  const { subdomain, recipientUserId, agentId, notification } = job;
   const models = await generateModels(subdomain);
-  const agent = await models.MastraAgent.findOne({ _id: recipientUserId });
+  const agent = await models.MastraAgent.findOne({ _id: agentId });
   if (!agent) return { status: 'ignored', reason: 'recipient-is-not-agent' };
   if (notification.fromUserId === recipientUserId) {
     return { status: 'ignored', reason: 'self-notification' };
@@ -155,16 +159,22 @@ async function enqueueIfAgentRecipient(
 ): Promise<void> {
   if (!isMentionOrAssignment(notification)) return;
   const models = await generateModels(subdomain);
-  if (!(await models.MastraAgent.exists({ _id: recipientUserId }))) return;
-  try {
-    await getAgentAccount({ userId: recipientUserId, subdomain });
-  } catch {
-    return;
-  }
+  const account = await getAgentAccountByUserId({
+    userId: recipientUserId,
+    subdomain,
+  }).catch(() => null);
+  if (!account) return;
+  const agentId = agentIdForAccount(account);
+  if (!agentId || !(await models.MastraAgent.exists({ _id: agentId }))) return;
 
   await sendWorkerQueue(SERVICE, RUN_QUEUE).add(
     RUN_QUEUE,
-    { subdomain, recipientUserId, notification } satisfies NotificationRunJob,
+    {
+      subdomain,
+      recipientUserId,
+      agentId,
+      notification,
+    } satisfies NotificationRunJob,
     {
       jobId: notificationJobId(subdomain, recipientUserId, notification._id),
       attempts: 3,

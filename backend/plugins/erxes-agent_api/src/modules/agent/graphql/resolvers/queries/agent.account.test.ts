@@ -10,6 +10,9 @@ jest.mock('@/agent/turn', () => ({
 
 const findCoreUsers = jest.fn();
 jest.mock('~/mastra/auth/servicePrincipal', () => ({
+  agentAccountAppId: (agentId: string) => `erxes-agent:${agentId}`,
+  agentIdForAccount: (account: { appId?: string }) =>
+    account.appId?.replace(/^erxes-agent:/, '') || null,
   agentAccountName: (account: {
     details?: { fullName?: string };
     username?: string;
@@ -44,12 +47,12 @@ const profile = (id: string, provider = 'openai') => {
   return { ...value, toObject: jest.fn(() => value) };
 };
 
-const agentAccount = (id: string, name: string) => ({
-  _id: id,
+const agentAccount = (accountId: string, name: string, agentId: string) => ({
+  _id: accountId,
   role: 'user',
   isOwner: false,
   isActive: true,
-  appId: `erxes-agent:${id}`,
+  appId: `erxes-agent:${agentId}`,
   details: { fullName: name, description: `${name} description` },
   permissionGroupIds: ['group-1'],
 });
@@ -77,7 +80,7 @@ beforeEach(() => {
 describe('account-hydrated agent queries', () => {
   it('returns only profiles backed by marked core AI team-member accounts', async () => {
     findCoreUsers.mockResolvedValue([
-      agentAccount('account-1', 'Sales Agent'),
+      agentAccount('core-user-1', 'Sales Agent', 'account-1'),
       {
         _id: 'account-2',
         role: 'user',
@@ -91,7 +94,9 @@ describe('account-hydrated agent queries', () => {
     const result = await agentQueries.mastraAgents(undefined, undefined, ctx);
 
     expect(findCoreUsers).toHaveBeenCalledWith('os', {
-      _id: { $in: ['account-1', 'account-2'] },
+      appId: {
+        $in: ['erxes-agent:account-1', 'erxes-agent:account-2'],
+      },
     });
     expect(result).toEqual([
       expect.objectContaining({
@@ -108,10 +113,12 @@ describe('account-hydrated agent queries', () => {
   it('searches core account identity and paginates matching profile ids', async () => {
     findCoreUsers
       .mockResolvedValueOnce([
-        agentAccount('account-1', 'Sales Agent'),
-        agentAccount('account-2', 'Support Agent'),
+        agentAccount('core-user-1', 'Sales Agent', 'account-1'),
+        agentAccount('core-user-2', 'Support Agent', 'account-2'),
       ])
-      .mockResolvedValueOnce([agentAccount('account-2', 'Support Agent')]);
+      .mockResolvedValueOnce([
+        agentAccount('core-user-2', 'Support Agent', 'account-2'),
+      ]);
     const { ctx, getAgents, getAgentsList } = makeCtx();
 
     const result = await agentQueries.mastraAgentsMain(

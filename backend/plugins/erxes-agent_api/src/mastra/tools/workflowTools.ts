@@ -131,9 +131,8 @@ function currentAgentId(): string | undefined {
 }
 
 /**
- * A workflow owner is both a canonical agent profile and an active core
- * service-user account. Deactivating that account is the background kill
- * switch.
+ * A workflow owner is both an agent runtime profile and an active linked core
+ * team-member account. Deactivating that account is the background kill switch.
  */
 async function assertAgentExists(
   models: IModels,

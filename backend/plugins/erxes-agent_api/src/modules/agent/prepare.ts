@@ -361,8 +361,6 @@ export async function prepareTurn(
   const principal = await resolveAgentPrincipal({
     agentConfig,
     subdomain,
-    appToken: settings?.erxesApiToken,
-    models,
     background: identity.kind !== 'user',
   });
   if (!principal.ok) {

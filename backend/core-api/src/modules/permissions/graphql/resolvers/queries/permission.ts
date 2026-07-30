@@ -4,14 +4,13 @@ import {
   IPermissionAction,
   IPermissionModule,
   IDefaultPermissionGroup,
-  ICustomPermission,
 } from 'erxes-api-shared/core-types';
 import { getPlugins, getPlugin } from 'erxes-api-shared/utils';
 import { canGroup } from 'erxes-api-shared/core-modules';
 import { IContext } from '~/connectionResolvers';
 import { isAgentCallablePermissionAction } from '~/modules/permissions/agentProfiles';
 
-export interface IEffectivePermission extends IPermissionGroupPermission {
+interface IEffectivePermission extends IPermissionGroupPermission {
   actionScopes: Record<string, PermissionScope>;
 }
 
@@ -23,7 +22,7 @@ const SCOPE_PRIORITY: Record<PermissionScope, number> = {
 
 export const mergePermission = (
   map: Map<string, IEffectivePermission>,
-  permission: IPermissionGroupPermission | ICustomPermission,
+  permission: IPermissionGroupPermission,
   sourcePlugin?: string,
 ) => {
   const plugin = permission.plugin || sourcePlugin || '';

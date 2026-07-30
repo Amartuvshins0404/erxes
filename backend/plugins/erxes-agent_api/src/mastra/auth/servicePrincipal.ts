@@ -3,9 +3,9 @@ import { sendTRPCMessage } from 'erxes-api-shared/utils';
 import { clearGroupActionsCache } from 'erxes-api-shared/core-modules';
 import type { GroupPermission } from '~/mastra/tools/actionsToAllowedTools';
 
-// A Mastra agent is a core team-member account. The plugin stores only the
-// account's 1:1 AI profile under the same _id; core owns identity, status, and
-// permissions. These helpers are the sole account lifecycle boundary.
+// Core owns the AI team member's identity, status, and permissions. The plugin
+// keeps only runtime configuration and links it to the account through the
+// account's deterministic appId marker; no core schema or API change is needed.
 
 export interface AgentAccount {
   _id: string;
@@ -38,6 +38,21 @@ export const isAgentAccount = (user: AgentAccount): boolean =>
   user.role === 'user' &&
   user.isOwner !== true &&
   Boolean(user.appId?.startsWith(AGENT_APP_PREFIX));
+
+export const agentIdForAccount = (user: AgentAccount): string | null => {
+  if (!isAgentAccount(user)) return null;
+  const agentId = user.appId?.slice(AGENT_APP_PREFIX.length).trim();
+  return agentId || null;
+};
+
+export const isAdoptableAgentAccount = (
+  user: AgentAccount | null | undefined,
+): user is AgentAccount =>
+  Boolean(
+    user?._id &&
+      (user.appId?.startsWith(AGENT_APP_PREFIX) ||
+        (user.role === 'system' && user.email?.endsWith('@agents.local'))),
+  );
 
 export const agentAccountName = (user: AgentAccount): string =>
   user.details?.fullName || user.username || user.email || 'AI team member';
@@ -117,6 +132,25 @@ export async function getAgentAccount(opts: {
   requireActive?: boolean;
 }): Promise<AgentAccount> {
   const { userId, subdomain, requireActive = true } = opts;
+  const agentId = userId.trim();
+  const user = agentId
+    ? await findCoreUser(subdomain, { appId: agentAccountAppId(agentId) })
+    : null;
+  if (!user?._id || !isAgentAccount(user)) {
+    throw new Error(`AI team-member account for agent ${userId} was not found`);
+  }
+  if (requireActive && user.isActive === false) {
+    throw new Error(`AI team-member account for agent ${userId} is inactive`);
+  }
+  return user;
+}
+
+export async function getAgentAccountByUserId(opts: {
+  userId: string;
+  subdomain: string;
+  requireActive?: boolean;
+}): Promise<AgentAccount> {
+  const { userId, subdomain, requireActive = true } = opts;
   const user = await findCoreUser(subdomain, { _id: userId });
   if (!user?._id || !isAgentAccount(user)) {
     throw new Error(`AI team-member account ${userId} was not found`);
@@ -132,13 +166,13 @@ export async function createAgentAccount(opts: {
   input: AgentAccountInput;
   userId?: string;
 }): Promise<AgentAccount> {
-  const { subdomain, input, userId } = opts;
+  const { subdomain, input } = opts;
+  const requestedAgentId = opts.userId?.trim();
   const handle = accountHandle(input.name);
   const permissionGroupIds = normalizePermissionGroupIds(
     input.permissionGroupIds,
   );
   const created = await createCoreUser(subdomain, {
-    ...(userId ? { _id: userId } : {}),
     notUsePassword: true,
     isActive: input.isActive !== false,
     isOwner: false,
@@ -154,15 +188,7 @@ export async function createAgentAccount(opts: {
     throw new Error('Failed to create AI team-member account');
   }
 
-  if (userId && created._id !== userId) {
-    await updateCoreUser(
-      subdomain,
-      { _id: created._id },
-      { $set: { isActive: false } },
-    ).catch(() => undefined);
-    throw new Error('Core did not preserve the requested AI team-member ID');
-  }
-
+  const agentId = requestedAgentId || created._id;
   try {
     await updateCoreUser(
       subdomain,
@@ -172,7 +198,7 @@ export async function createAgentAccount(opts: {
           role: 'user',
           isOwner: false,
           isActive: input.isActive !== false,
-          appId: agentAccountAppId(created._id),
+          appId: agentAccountAppId(agentId),
           permissionGroupIds,
           'details.fullName': input.name.trim(),
           'details.description': input.description?.trim() || '',
@@ -181,7 +207,7 @@ export async function createAgentAccount(opts: {
     );
     await clearGroupActionsCache({ subdomain, userId: created._id });
     return getAgentAccount({
-      userId: created._id,
+      userId: agentId,
       subdomain,
       requireActive: false,
     });
@@ -201,7 +227,11 @@ export async function updateAgentAccount(opts: {
   input: Partial<AgentAccountInput>;
 }): Promise<AgentAccount> {
   const { userId, subdomain, input } = opts;
-  await getAgentAccount({ userId, subdomain, requireActive: false });
+  const account = await getAgentAccount({
+    userId,
+    subdomain,
+    requireActive: false,
+  });
 
   const set: Record<string, unknown> = {};
   if (input.name !== undefined) set['details.fullName'] = input.name.trim();
@@ -216,9 +246,9 @@ export async function updateAgentAccount(opts: {
   if (input.isActive !== undefined) set.isActive = input.isActive;
 
   if (Object.keys(set).length) {
-    await updateCoreUser(subdomain, { _id: userId }, { $set: set });
+    await updateCoreUser(subdomain, { _id: account._id }, { $set: set });
     if (input.permissionGroupIds !== undefined) {
-      await clearGroupActionsCache({ subdomain, userId });
+      await clearGroupActionsCache({ subdomain, userId: account._id });
     }
   }
 
@@ -230,73 +260,59 @@ export async function deactivateAgentAccount(opts: {
   subdomain: string;
 }): Promise<void> {
   const { userId, subdomain } = opts;
-  await getAgentAccount({ userId, subdomain, requireActive: false });
+  const account = await getAgentAccount({
+    userId,
+    subdomain,
+    requireActive: false,
+  });
   await updateCoreUser(
     subdomain,
-    { _id: userId },
+    { _id: account._id },
     { $set: { isActive: false } },
   );
-  await clearGroupActionsCache({ subdomain, userId });
+  await clearGroupActionsCache({ subdomain, userId: account._id });
 }
 
 // Migration-only reconciliation for accounts created by the former linked-user
 // model. It never claims an ordinary human account.
 export async function adoptLegacyAgentAccount(opts: {
-  userId: string;
+  agentId: string;
+  accountId: string;
   subdomain: string;
   name: string;
   description?: string;
   permissionGroupIds: string[];
   isActive: boolean;
 }): Promise<AgentAccount> {
-  const { userId, subdomain, name, description, permissionGroupIds, isActive } =
-    opts;
-  const existing = await findCoreUser(subdomain, { _id: userId });
-  const legacyMarked =
-    existing?.appId?.startsWith(AGENT_APP_PREFIX) ||
-    (existing?.role === 'system' && existing.email?.endsWith('@agents.local'));
-  if (!existing?._id || !legacyMarked) {
-    throw new Error(`Refusing to claim non-agent account ${userId}`);
+  const {
+    agentId,
+    accountId,
+    subdomain,
+    name,
+    description,
+    permissionGroupIds,
+    isActive,
+  } = opts;
+  const existing = await findCoreUser(subdomain, { _id: accountId });
+  if (!isAdoptableAgentAccount(existing)) {
+    throw new Error(`Refusing to claim non-agent account ${accountId}`);
   }
 
   await updateCoreUser(
     subdomain,
-    { _id: userId },
+    { _id: accountId },
     {
       $set: {
         role: 'user',
         isOwner: false,
         isActive,
-        appId: agentAccountAppId(userId),
+        appId: agentAccountAppId(agentId),
         permissionGroupIds: normalizePermissionGroupIds(permissionGroupIds),
         'details.fullName': name.trim(),
         'details.description': description?.trim() || '',
       },
     },
   );
-  await clearGroupActionsCache({ subdomain, userId });
-  return getAgentAccount({ userId, subdomain, requireActive: false });
-}
-
-/** Deactivate an obsolete service account after its profile ID becomes the
- * canonical AI team-member ID. Only accounts carrying an agent marker qualify. */
-export async function retireLegacyAgentAccount(opts: {
-  userId: string;
-  subdomain: string;
-}): Promise<void> {
-  const { userId, subdomain } = opts;
-  const existing = await findCoreUser(subdomain, { _id: userId });
-  const legacyMarked =
-    existing?.appId?.startsWith(AGENT_APP_PREFIX) ||
-    (existing?.role === 'system' && existing.email?.endsWith('@agents.local'));
-  if (!existing?._id) return;
-  if (!legacyMarked) {
-    throw new Error(`Refusing to retire non-agent account ${userId}`);
-  }
-  await updateCoreUser(
-    subdomain,
-    { _id: userId },
-    { $set: { isActive: false } },
-  );
-  await clearGroupActionsCache({ subdomain, userId });
+  await clearGroupActionsCache({ subdomain, userId: accountId });
+  return getAgentAccount({ userId: agentId, subdomain, requireActive: false });
 }

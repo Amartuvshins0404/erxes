@@ -113,20 +113,19 @@ describe('createAgentAccount', () => {
     expect(result).toEqual(readyUser);
   });
 
-  it('preserves a requested profile ID during legacy account cutover', async () => {
-    const canonicalUser = {
+  it('links a core-generated account ID to a requested legacy profile ID', async () => {
+    const linkedUser = {
       ...readyUser,
-      _id: 'legacy-profile-1',
       appId: 'erxes-agent:legacy-profile-1',
     };
     let marked = false;
     sendTRPCMessage.mockImplementation(async (call: TrpcCall) => {
-      if (call.action === 'create') return canonicalUser;
+      if (call.action === 'create') return pendingUser;
       if (call.action === 'updateOne') {
         marked = true;
         return { acknowledged: true };
       }
-      if (call.action === 'findOne') return marked ? canonicalUser : null;
+      if (call.action === 'findOne') return marked ? linkedUser : null;
       return null;
     });
 
@@ -139,34 +138,15 @@ describe('createAgentAccount', () => {
       },
     });
 
-    expect(callsFor('create')[0].input.data).toEqual(
-      expect.objectContaining({ _id: 'legacy-profile-1' }),
-    );
-    expect(result._id).toBe('legacy-profile-1');
-  });
-
-  it('deactivates and rejects a cutover account when core changes its ID', async () => {
-    sendTRPCMessage.mockImplementation(async (call: TrpcCall) => {
-      if (call.action === 'create') return pendingUser;
-      if (call.action === 'updateOne') return { acknowledged: true };
-      return null;
-    });
-
-    await expect(
-      createAgentAccount({
-        userId: 'legacy-profile-1',
-        subdomain: 'os',
-        input: {
-          name: 'Sales Agent',
-          permissionGroupIds: ['group-1'],
-        },
+    expect(callsFor('create')[0].input.data?._id).toBeUndefined();
+    expect(callsFor('updateOne')[0].input.modifier).toEqual(
+      expect.objectContaining({
+        $set: expect.objectContaining({
+          appId: 'erxes-agent:legacy-profile-1',
+        }),
       }),
-    ).rejects.toThrow(/did not preserve/i);
-
-    expect(callsFor('updateOne')[0].input).toEqual({
-      selector: { _id: 'agent-user-1' },
-      modifier: { $set: { isActive: false } },
-    });
+    );
+    expect(result).toEqual(linkedUser);
   });
 
   it('deactivates a partially created account when finalization fails', async () => {
@@ -278,7 +258,7 @@ describe('account validation and updates', () => {
 });
 
 describe('adoptLegacyAgentAccount', () => {
-  it('converts a marked legacy system account into a normal AI team member', async () => {
+  it('links a marked legacy account to its existing plugin profile', async () => {
     const legacy = {
       _id: 'legacy-user-1',
       role: 'system',
@@ -288,7 +268,7 @@ describe('adoptLegacyAgentAccount', () => {
     const adopted = {
       ...readyUser,
       _id: 'legacy-user-1',
-      appId: 'erxes-agent:legacy-user-1',
+      appId: 'erxes-agent:legacy-profile-1',
     };
     let updated = false;
     sendTRPCMessage.mockImplementation(async (call: TrpcCall) => {
@@ -301,7 +281,8 @@ describe('adoptLegacyAgentAccount', () => {
     });
 
     const result = await adoptLegacyAgentAccount({
-      userId: 'legacy-user-1',
+      agentId: 'legacy-profile-1',
+      accountId: 'legacy-user-1',
       subdomain: 'os',
       name: 'Sales Agent',
       description: 'Handles sales',
@@ -309,13 +290,16 @@ describe('adoptLegacyAgentAccount', () => {
       isActive: true,
     });
 
-    expect(callsFor('updateOne')[0].input.modifier).toEqual({
-      $set: expect.objectContaining({
-        role: 'user',
-        isOwner: false,
-        appId: 'erxes-agent:legacy-user-1',
-        permissionGroupIds: ['group-1'],
-      }),
+    expect(callsFor('updateOne')[0].input).toEqual({
+      selector: { _id: 'legacy-user-1' },
+      modifier: {
+        $set: expect.objectContaining({
+          role: 'user',
+          isOwner: false,
+          appId: 'erxes-agent:legacy-profile-1',
+          permissionGroupIds: ['group-1'],
+        }),
+      },
     });
     expect(result).toEqual(adopted);
   });
@@ -329,7 +313,8 @@ describe('adoptLegacyAgentAccount', () => {
 
     await expect(
       adoptLegacyAgentAccount({
-        userId: 'human-user-1',
+        agentId: 'human-profile-1',
+        accountId: 'human-user-1',
         subdomain: 'os',
         name: 'Sales Agent',
         permissionGroupIds: ['group-1'],

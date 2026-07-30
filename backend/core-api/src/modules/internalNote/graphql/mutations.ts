@@ -1,4 +1,8 @@
-import { graphqlPubsub, isEnabled } from 'erxes-api-shared/utils';
+import {
+  graphqlPubsub,
+  isEnabled,
+  sendTRPCMessage,
+} from 'erxes-api-shared/utils';
 import { IContext } from '~/connectionResolvers';
 import { IInternalNote } from '~/modules/internalNote/types';
 
@@ -22,45 +26,73 @@ export const internalNoteMutations = {
       return null;
     }
 
-    const note = await models.InternalNotes.createInternalNote(args, user);
+    const notifDoc = {
+      title: `${moduleName.toUpperCase()} updated`,
+      createdUser: user,
+      action: `mentioned you in ${contentType}`,
+      receivers: mentionedUserIds,
+      content: '',
+      link: '',
+      notifType: '',
+      contentType: '',
+      contentTypeId: '',
+    };
 
-    const uniqueMentionedUserIds = [...new Set(mentionedUserIds)].filter(
-      (userId) => userId !== user._id,
-    );
-    if (uniqueMentionedUserIds.length) {
-      const actorName =
-        user.details?.fullName ||
-        user.email ||
-        user.username ||
-        'A team member';
-      const notifications = await Promise.all(
-        uniqueMentionedUserIds.map((userId) =>
-          models.Notifications.create({
-            title: `${moduleName} mention`,
-            message: `${actorName} mentioned you in ${contentType}`,
-            type: 'info',
-            userId,
-            fromUserId: user._id,
-            contentType,
-            contentTypeId,
-            action: 'mentioned',
-            kind: 'user',
-            priority: 'medium',
-            priorityLevel: 2,
-            isRead: false,
-            expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-            metadata: { noteId: note._id.toString() },
-          }),
-        ),
-      );
+    const updatedNotifDoc = await sendTRPCMessage({
+      subdomain,
 
-      for (const notification of notifications) {
-        await graphqlPubsub.publish(
-          `notificationInserted:${subdomain}:${notification.userId}`,
-          { notificationInserted: notification.toObject() },
-        );
-      }
+      pluginName,
+      method: 'query',
+      module: moduleName,
+      action: 'generateInternalNoteNotif',
+      input: {
+        type: moduleName,
+        contentTypeId,
+        notifDoc,
+      },
+      defaultValue: {},
+    });
+
+    if (updatedNotifDoc.notifOfItems) {
+      const { item } = updatedNotifDoc;
+
+      const relatedReceivers = await sendTRPCMessage({
+        subdomain,
+
+        pluginName,
+        method: 'query',
+        module: moduleName,
+        action: 'notifiedUserIds',
+        input: {
+          item,
+        },
+        defaultValue: [],
+      });
+
+      updatedNotifDoc.action = `added note in ${contentType}`;
+
+      updatedNotifDoc.receivers = relatedReceivers.filter((id) => {
+        return [...mentionedUserIds, user._id].indexOf(id) < 0;
+      });
+
+      //   sendNotificationsMessage({
+      //     subdomain,
+      //     action: 'send',
+      //     data: updatedNotifDoc,
+      //   });
+
+      graphqlPubsub.publish('activityLogsChanged', {});
     }
+
+    if (updatedNotifDoc.contentType) {
+      //   await sendNotificationsMessage({
+      //     subdomain,
+      //     action: 'send',
+      //     data: updatedNotifDoc,
+      //   });
+    }
+
+    const note = await models.InternalNotes.createInternalNote(args, user);
 
     if (contentTypeId) {
       try {

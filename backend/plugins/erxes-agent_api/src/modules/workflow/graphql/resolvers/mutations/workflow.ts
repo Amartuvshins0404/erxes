@@ -181,12 +181,9 @@ export const workflowMutations = {
     const agentConfig = agentId
       ? await models.MastraAgent.findOne({ _id: agentId })
       : null;
-    const settings = await models.MastraSettings.getSettings();
     const principal = await resolveAgentPrincipal({
       agentConfig,
       subdomain,
-      appToken: settings?.erxesApiToken,
-      models,
       background: false,
     });
     if (!principal.ok) throw new ExpectedError(principal.error);

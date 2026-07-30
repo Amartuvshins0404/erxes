@@ -83,9 +83,7 @@ export interface IUserModel extends Model<IUserDocument> {
   }): Promise<never>;
   getSecret(): string;
   generateToken(duration?: number): Promise<{ token: string; expires: Date }>;
-  createUser(
-    doc: IUser & { _id?: string; notUsePassword?: boolean },
-  ): Promise<IUserDocument>;
+  createUser(doc: IUser & { notUsePassword?: boolean }): Promise<IUserDocument>;
   updateUser(_id: string, doc: IUpdateUser): Promise<IUserDocument>;
   editProfile(_id: string, doc: IEditProfile): Promise<IUserDocument>;
   generateUserCode(): Promise<string>;
@@ -227,7 +225,6 @@ export const loadUserClass = (
      * Create new user
      */
     public static async createUser({
-      _id,
       username,
       email,
       password,
@@ -237,7 +234,7 @@ export const loadUserClass = (
       isActive,
       isOwner = false,
       notUsePassword = false,
-    }: IUser & { _id?: string; notUsePassword?: boolean; links: ILink[] }) {
+    }: IUser & { notUsePassword?: boolean; links: ILink[] }) {
       // empty string password validation
 
       if (password === '' && !notUsePassword) {
@@ -252,7 +249,6 @@ export const loadUserClass = (
       }
 
       const user = await models.Users.create({
-        ...(_id ? { _id } : {}),
         isOwner,
         username,
         email,

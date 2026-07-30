@@ -43,14 +43,14 @@ const AgentFormSection = ({
   description: string;
   children: ReactNode;
 }) => (
-  <section className="grid gap-5 border-b py-6 last:border-b-0 md:grid-cols-[minmax(0,14rem)_minmax(0,1fr)] md:gap-8">
+  <section className="grid gap-4 border-b py-4 last:border-b-0 md:grid-cols-[minmax(0,14rem)_minmax(0,1fr)] md:gap-6">
     <header className="space-y-1">
       <h2 className="text-sm font-semibold">{title}</h2>
       <p className="text-sm leading-relaxed text-muted-foreground">
         {description}
       </p>
     </header>
-    <div className="min-w-0 space-y-5">{children}</div>
+    <div className="min-w-0 space-y-4">{children}</div>
   </section>
 );
 
@@ -216,22 +216,11 @@ const AgentAccessSection = ({ form }: { form: AgentForm }) => {
       title={t('agent-settings-access-title')}
       description={t('agent-settings-access-description')}
     >
-      <Alert className="border-primary/20 bg-primary/5">
-        <IconInfoCircle className="size-4 text-primary" />
-        <Alert.Title>{t('agent-settings-linked-user-title')}</Alert.Title>
-        <Alert.Description>
-          {t('agent-settings-linked-user-description')}
-        </Alert.Description>
-      </Alert>
-
       <Form.Field
         control={form.control}
         name="permissionGroupIds"
         render={({ field }) => (
           <Form.Item>
-            <Form.Label>
-              {t('agent-settings-permission-group-label')}
-            </Form.Label>
             <Form.Control>
               <PermissionGroupSelector
                 groups={groups}
@@ -240,11 +229,6 @@ const AgentAccessSection = ({ form }: { form: AgentForm }) => {
                 loading={loading}
               />
             </Form.Control>
-            <Form.Description>
-              {groups.length === 0 && !loading
-                ? t('agent-settings-no-permission-groups')
-                : t('agent-settings-permission-group-description')}
-            </Form.Description>
             <Form.Message />
           </Form.Item>
         )}
@@ -253,9 +237,7 @@ const AgentAccessSection = ({ form }: { form: AgentForm }) => {
       {error && (
         <Alert variant="warning">
           <IconAlertTriangle className="size-4" />
-          <Alert.Description>
-            {t('agent-settings-permission-groups-error')}
-          </Alert.Description>
+          <Alert.Description>{t('error')}</Alert.Description>
         </Alert>
       )}
 
@@ -343,45 +325,55 @@ const BehaviorSection = ({ form }: { form: AgentForm }) => {
       title={t('agent-settings-behavior-title')}
       description={t('agent-settings-behavior-description')}
     >
-      <Form.Field
-        control={form.control}
-        name="isActive"
-        render={({ field }) => (
-          <Form.Item className="flex items-center justify-between gap-4 rounded-lg border p-4">
-            <div className="space-y-1">
-              <Form.Label>{t('agent-settings-availability-label')}</Form.Label>
-              <Form.Description>
-                {field.value
-                  ? t('agent-settings-availability-on-description')
-                  : t('agent-settings-availability-off-description')}
-              </Form.Description>
-            </div>
-            <Form.Control>
-              <Switch checked={field.value} onCheckedChange={field.onChange} />
-            </Form.Control>
-          </Form.Item>
-        )}
-      />
+      <div className="grid gap-2 md:grid-cols-2">
+        <Form.Field
+          control={form.control}
+          name="isActive"
+          render={({ field }) => (
+            <Form.Item className="flex items-center justify-between gap-3 rounded-lg border p-3">
+              <div className="space-y-1">
+                <Form.Label>
+                  {t('agent-settings-availability-label')}
+                </Form.Label>
+                <Form.Description>
+                  {field.value
+                    ? t('agent-settings-availability-on-description')
+                    : t('agent-settings-availability-off-description')}
+                </Form.Description>
+              </div>
+              <Form.Control>
+                <Switch
+                  checked={field.value}
+                  onCheckedChange={field.onChange}
+                />
+              </Form.Control>
+            </Form.Item>
+          )}
+        />
 
-      <Form.Field
-        control={form.control}
-        name="memoryEnabled"
-        render={({ field }) => (
-          <Form.Item className="flex items-center justify-between gap-4 rounded-lg border p-4">
-            <div className="space-y-1">
-              <Form.Label>{t('agent-settings-memory-label')}</Form.Label>
-              <Form.Description>
-                {field.value
-                  ? t('agent-settings-memory-on-description')
-                  : t('agent-settings-memory-off-description')}
-              </Form.Description>
-            </div>
-            <Form.Control>
-              <Switch checked={field.value} onCheckedChange={field.onChange} />
-            </Form.Control>
-          </Form.Item>
-        )}
-      />
+        <Form.Field
+          control={form.control}
+          name="memoryEnabled"
+          render={({ field }) => (
+            <Form.Item className="flex items-center justify-between gap-3 rounded-lg border p-3">
+              <div className="space-y-1">
+                <Form.Label>{t('agent-settings-memory-label')}</Form.Label>
+                <Form.Description>
+                  {field.value
+                    ? t('agent-settings-memory-on-description')
+                    : t('agent-settings-memory-off-description')}
+                </Form.Description>
+              </div>
+              <Form.Control>
+                <Switch
+                  checked={field.value}
+                  onCheckedChange={field.onChange}
+                />
+              </Form.Control>
+            </Form.Item>
+          )}
+        />
+      </div>
 
       <Collapsible className="overflow-hidden rounded-lg border">
         <Collapsible.TriggerButton

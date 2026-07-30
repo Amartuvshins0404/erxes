@@ -74,7 +74,7 @@ const PermissionRoute = ({
   return hasActionPermission(action) ? children : <Navigate to="/" replace />;
 };
 
-const MastraMain = () => {
+export const ErxesAgent = () => {
   const { hasActionPermission, isLoaded } = usePermissionCheck();
   if (!isLoaded) return null;
 
@@ -212,5 +212,3 @@ const MastraMain = () => {
     </PluginRoutesShell>
   );
 };
-
-export default MastraMain;

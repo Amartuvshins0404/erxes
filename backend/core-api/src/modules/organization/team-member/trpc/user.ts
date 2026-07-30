@@ -95,12 +95,14 @@ export const userTrpcRouter = t.router({
 
         return await models.Users.checkLoginAuth({ email, password });
       }),
-    // Mint a short-lived (1h), gateway-verifiable token only for a dedicated AI
-    // team-member account. The erxes App token is a client credential, never
-    // the acting principal. Core validates that credential against the
-    // tenant-scoped Apps collection and then binds the token to a marked,
-    // active, non-owner user. Missing/revoked credentials and ineligible users
-    // all return null without revealing which check failed.
+    // Mints a short-lived (1h) gateway-verifiable token for an agent's owner so
+    // background runs (bot/schedule) act as a real, bounded user instead of the
+    // privileged app token. Authenticated with the erxes App token (the core
+    // Apps collection, tenant-scoped via ctx.models — the same credential the
+    // gateway validates) rather than a bespoke shared secret, so there is no
+    // extra env var to provision. Returns null (never throws / never reveals
+    // which check failed) when the app token is missing/invalid/revoked or the
+    // owner is missing/inactive. Never logs the token.
     issueRunToken: t.procedure
       .input(z.object({ userId: z.string(), appToken: z.string() }))
       .mutation(async ({ ctx, input }) => {
@@ -130,21 +132,23 @@ export const userTrpcRouter = t.router({
           return null;
         }
 
-        // Only a real, active, passwordless AI team-member account may become
-        // the principal. Refusing ordinary users prevents an app credential
-        // from becoming a general user-impersonation primitive; refusing owners
-        // prevents prompt-injectable runs from acquiring god-mode.
+        // The owner must be a real, active user — a deactivated owner stops the
+        // background run cold.
         const user = await models.Users.findOne({
           _id: userId,
           isActive: { $ne: false },
         });
 
-        if (
-          !user ||
-          user.role !== 'user' ||
-          user.isOwner ||
-          !user.appId?.startsWith('erxes-agent:')
-        ) {
+        if (!user) {
+          return null;
+        }
+
+        // Run tokens are for BOUNDED background automation — never god-mode. An
+        // org owner (isOwner) short-circuits every permission check, so refuse to
+        // mint a run token for one; this forces exposed bots/schedules onto a
+        // scoped, non-owner owner (an org-owner-owned background run then fails
+        // closed rather than acting as god-mode on prompt-injectable input).
+        if (user.isOwner) {
           return null;
         }
 
@@ -158,12 +162,7 @@ export const userTrpcRouter = t.router({
 
         // Register the token under the exact Redis key the gateway checks. 1h
         // TTL matches the JWT expiry. Ephemeral — not pushed to validatedTokens.
-        await redis.set(
-          'user_token_' + user._id + '_' + token,
-          1,
-          'EX',
-          60 * 60,
-        );
+        await redis.set('user_token_' + user._id + '_' + token, 1, 'EX', 60 * 60);
 
         return { token };
       }),

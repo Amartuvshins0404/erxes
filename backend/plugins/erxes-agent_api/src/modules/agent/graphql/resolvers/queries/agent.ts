@@ -3,7 +3,9 @@ import { IContext } from '~/connectionResolvers';
 import { prepareChatTurn, persistTurn, runAgentTurn } from '@/agent/turn';
 import { IMastraAgentDocument } from '@/agent/@types/agent';
 import {
+  agentAccountAppId,
   agentAccountName,
+  agentIdForAccount,
   findCoreUsers,
   isAgentAccount,
 } from '~/mastra/auth/servicePrincipal';
@@ -14,10 +16,14 @@ const hydrateProfiles = async (
 ) => {
   if (!profiles.length) return [];
   const accounts = await findCoreUsers(subdomain, {
-    _id: { $in: profiles.map((profile) => profile._id) },
+    appId: {
+      $in: profiles.map((profile) => agentAccountAppId(profile._id)),
+    },
   });
   const accountsById = new Map(
-    accounts.filter(isAgentAccount).map((account) => [account._id, account]),
+    accounts
+      .filter(isAgentAccount)
+      .map((account) => [agentIdForAccount(account), account]),
   );
 
   return profiles.flatMap((profile) => {
@@ -26,7 +32,7 @@ const hydrateProfiles = async (
     return [
       {
         ...profile.toObject(),
-        _id: account._id,
+        _id: profile._id,
         accountName: agentAccountName(account),
         accountDescription: account.details?.description || '',
         permissionGroupIds: account.permissionGroupIds || [],
@@ -43,7 +49,9 @@ const findMatchingAccountIds = async (
 ): Promise<string[]> => {
   if (!searchValue?.trim() || !profiles.length) return [];
   const accounts = await findCoreUsers(subdomain, {
-    _id: { $in: profiles.map((profile) => profile._id) },
+    appId: {
+      $in: profiles.map((profile) => agentAccountAppId(profile._id)),
+    },
   });
   const needle = searchValue.trim().toLocaleLowerCase();
   return accounts
@@ -56,7 +64,7 @@ const findMatchingAccountIds = async (
         account.email,
       ].some((value) => value?.toLocaleLowerCase().includes(needle)),
     )
-    .map((account) => account._id);
+    .flatMap((account) => agentIdForAccount(account) ?? []);
 };
 
 const hydrateProfile = async (

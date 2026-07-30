@@ -20,6 +20,7 @@ import {
   IconCircleDot,
 } from '@tabler/icons-react';
 import { buildWorkflowGraph, NODE_W, WfNodeData } from './layout';
+import type { IWorkflowDefinition } from '../types';
 
 // ── Custom node ───────────────────────────────────────────────────────────────
 
@@ -105,7 +106,9 @@ const WorkflowNode = ({ data }: NodeProps) => {
             <span className="text-sm font-medium truncate">{d.label}</span>
             {d.status && (
               <span
-                className={`size-2 rounded-full shrink-0 ${STATUS_DOT[d.status] || 'bg-muted-foreground'}`}
+                className={`size-2 rounded-full shrink-0 ${
+                  STATUS_DOT[d.status] || 'bg-muted-foreground'
+                }`}
               />
             )}
           </div>
@@ -144,7 +147,7 @@ export const WorkflowGraph = ({
   stepsSummary,
   className,
 }: {
-  definition: any;
+  definition: IWorkflowDefinition;
   // Latest run's per-step results — decorates nodes with live status.
   stepsSummary?: Record<string, { status?: string; error?: string }> | null;
   className?: string;

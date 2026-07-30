@@ -6,7 +6,7 @@ import {
   createAgentAccount,
   findCoreUsers,
   getAgentAccount,
-  retireLegacyAgentAccount,
+  isAdoptableAgentAccount,
   updateAgentAccount,
 } from '~/mastra/auth/servicePrincipal';
 
@@ -67,7 +67,10 @@ const migrateProfile = async (
   profile: LegacyAgentProfile,
 ): Promise<void> => {
   const legacyUserId = profile.serviceUserId || profile.agentUserId;
-  const legacyAccount = await legacyAccountFor(subdomain, legacyUserId);
+  const legacyCandidate = await legacyAccountFor(subdomain, legacyUserId);
+  const legacyAccount = isAdoptableAgentAccount(legacyCandidate)
+    ? legacyCandidate
+    : null;
   const name =
     profile.name?.trim() ||
     legacyAccount?.details?.fullName?.trim() ||
@@ -97,10 +100,14 @@ const migrateProfile = async (
     });
     await updateAgentAccount({ userId: profile._id, subdomain, input });
   } catch {
-    const targetAccount = await legacyAccountFor(subdomain, profile._id);
-    if (targetAccount) {
+    const targetCandidate = await legacyAccountFor(subdomain, profile._id);
+    const accountToAdopt = [legacyAccount, targetCandidate].find(
+      isAdoptableAgentAccount,
+    );
+    if (accountToAdopt) {
       await adoptLegacyAgentAccount({
-        userId: profile._id,
+        agentId: profile._id,
+        accountId: accountToAdopt._id,
         subdomain,
         ...input,
         isActive: input.isActive,
@@ -112,19 +119,6 @@ const migrateProfile = async (
         input,
       });
     }
-  }
-
-  if (legacyUserId && legacyUserId !== profile._id) {
-    await retireLegacyAgentAccount({
-      userId: legacyUserId,
-      subdomain,
-    }).catch((error) => {
-      console.warn(
-        `[erxes-agent:accounts] kept legacy account ${legacyUserId}: ${
-          (error as Error).message
-        }`,
-      );
-    });
   }
 
   await agentCollection(models).updateOne(
@@ -161,7 +155,7 @@ const tenantSubdomains = async (): Promise<string[]> => {
 };
 
 /** Idempotent startup cutover from legacy agent + service-user pairs to one
- * canonical team-member ID. Failed profiles remain legacy-shaped and retry. */
+ * canonical core account link. Failed profiles remain legacy-shaped and retry. */
 export async function migrateAgentAccounts(): Promise<void> {
   for (const subdomain of await tenantSubdomains()) {
     try {

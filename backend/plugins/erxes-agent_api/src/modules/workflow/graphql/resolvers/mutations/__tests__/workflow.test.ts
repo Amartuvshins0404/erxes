@@ -285,8 +285,6 @@ describe('workflow AI team-member ownership', () => {
     expect(resolveAgentPrincipal).toHaveBeenCalledWith({
       agentConfig: ownerProfile,
       subdomain: 'os',
-      appToken: 'app-token',
-      models,
       background: false,
     });
     expect(buildManualEnvelope).toHaveBeenCalledWith(

@@ -14,27 +14,21 @@ const prepareTurn = jest.fn<
   [input: { message: string } & Record<string, unknown>]
 >();
 const runAgentTurn = jest.fn<Promise<unknown>, unknown[]>();
-const getAgentAccount = jest.fn<Promise<unknown>, unknown[]>();
+const getAgentAccountByUserId = jest.fn<Promise<unknown>, unknown[]>();
 const queueAdd = jest.fn<
   Promise<unknown>,
   [name: string, data: unknown, options: { jobId: string }]
 >();
 type NotificationJob = { data: unknown };
 type NotificationProcessor = (job: NotificationJob) => Promise<unknown>;
-type WorkerArgs = [
-  service: string,
-  queue: string,
-  run: NotificationProcessor,
-];
+type WorkerArgs = [service: string, queue: string, run: NotificationProcessor];
 
 let processor: NotificationProcessor | undefined;
 
-const createMQWorkerWithListeners = jest.fn(
-  (...args: WorkerArgs) => {
-    processor = args[2];
-    return {};
-  },
-);
+const createMQWorkerWithListeners = jest.fn((...args: WorkerArgs) => {
+  processor = args[2];
+  return {};
+});
 
 jest.mock('erxes-api-shared/utils', () => ({
   createMQWorkerWithListeners: (...args: unknown[]) =>
@@ -46,15 +40,16 @@ jest.mock('~/connectionResolvers', () => ({
 }));
 jest.mock('@/agent/prepare', () => ({
   prepareTurn: (...args: unknown[]) =>
-    prepareTurn(
-      ...(args as [{ message: string } & Record<string, unknown>]),
-    ),
+    prepareTurn(...(args as [{ message: string } & Record<string, unknown>])),
 }));
 jest.mock('@/agent/run', () => ({
   runAgentTurn: (...args: unknown[]) => runAgentTurn(...args),
 }));
 jest.mock('~/mastra/auth/servicePrincipal', () => ({
-  getAgentAccount: (...args: unknown[]) => getAgentAccount(...args),
+  getAgentAccountByUserId: (...args: unknown[]) =>
+    getAgentAccountByUserId(...args),
+  agentIdForAccount: (account: { appId?: string }) =>
+    account.appId?.replace(/^erxes-agent:/, '') || null,
 }));
 
 import { initNotificationTriggers } from '../notificationTriggers';
@@ -107,11 +102,11 @@ beforeEach(() => {
   generateModels.mockReset();
   prepareTurn.mockReset();
   runAgentTurn.mockReset();
-  getAgentAccount.mockReset().mockResolvedValue({
+  getAgentAccountByUserId.mockReset().mockResolvedValue({
     _id: 'agent-user-1',
     role: 'user',
     isActive: true,
-    appId: 'erxes-agent:agent-user-1',
+    appId: 'erxes-agent:agent-profile-1',
     permissionGroupIds: ['group-1'],
   });
   queueAdd.mockReset().mockResolvedValue(undefined);
@@ -135,7 +130,7 @@ describe('cross-system AI team-member triggers', () => {
     expect(subscriber.psubscribe).toHaveBeenCalledWith(
       'notificationInserted:*:*',
     );
-    expect(getAgentAccount).toHaveBeenCalledWith({
+    expect(getAgentAccountByUserId).toHaveBeenCalledWith({
       userId: 'agent-user-1',
       subdomain: 'os',
     });
@@ -144,6 +139,7 @@ describe('cross-system AI team-member triggers', () => {
       {
         subdomain: 'os',
         recipientUserId: 'agent-user-1',
+        agentId: 'agent-profile-1',
         notification: assignmentNotification,
       },
       expect.objectContaining({
@@ -177,6 +173,7 @@ describe('cross-system AI team-member triggers', () => {
       expect.objectContaining({
         subdomain: 'acme',
         recipientUserId: 'agent-user-1',
+        agentId: 'agent-profile-1',
         notification: mention,
       }),
       expect.any(Object),
@@ -199,15 +196,15 @@ describe('cross-system AI team-member triggers', () => {
     await settleQueueing();
 
     expect(exists).toHaveBeenCalledTimes(1);
-    expect(getAgentAccount).not.toHaveBeenCalled();
+    expect(getAgentAccountByUserId).toHaveBeenCalledTimes(1);
     expect(queueAdd).not.toHaveBeenCalled();
   });
 
-  it('ignores a profile whose canonical team-member account is inactive', async () => {
+  it('ignores a recipient whose linked team-member account is inactive', async () => {
     generateModels.mockResolvedValue({
       MastraAgent: { exists: jest.fn().mockResolvedValue(true) },
     });
-    getAgentAccount.mockRejectedValue(new Error('inactive'));
+    getAgentAccountByUserId.mockRejectedValue(new Error('inactive'));
     const { redis, emit } = makeRedis();
 
     await initNotificationTriggers(redis as never);
@@ -234,8 +231,8 @@ describe('cross-system AI team-member triggers', () => {
     );
   });
 
-  it('runs the canonical account profile in a stable record-scoped thread', async () => {
-    const agent = { _id: 'agent-user-1' };
+  it('runs the linked plugin profile in a stable record-scoped thread', async () => {
+    const agent = { _id: 'agent-profile-1' };
     generateModels.mockResolvedValue({
       MastraAgent: { findOne: jest.fn().mockResolvedValue(agent) },
     });
@@ -256,6 +253,7 @@ describe('cross-system AI team-member triggers', () => {
       data: {
         subdomain: 'os',
         recipientUserId: 'agent-user-1',
+        agentId: 'agent-profile-1',
         notification: assignmentNotification,
       },
     });
@@ -263,12 +261,12 @@ describe('cross-system AI team-member triggers', () => {
     expect(prepareTurn).toHaveBeenCalledWith(
       expect.objectContaining({
         subdomain: 'os',
-        agentId: 'agent-user-1',
+        agentId: 'agent-profile-1',
         identity: {
           kind: 'schedule',
-          resourceKey: 'notification:agent-user-1',
+          resourceKey: 'notification:agent-profile-1',
         },
-        threadId: 'notification:agent-user-1:operation:task:task-1',
+        threadId: 'notification:agent-profile-1:operation:task:task-1',
         weaveDigest: true,
       }),
     );
@@ -296,6 +294,7 @@ describe('cross-system AI team-member triggers', () => {
       data: {
         subdomain: 'os',
         recipientUserId: 'agent-user-1',
+        agentId: 'agent-profile-1',
         notification: {
           ...assignmentNotification,
           fromUserId: 'agent-user-1',

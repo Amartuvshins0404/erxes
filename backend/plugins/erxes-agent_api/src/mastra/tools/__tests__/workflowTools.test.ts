@@ -98,16 +98,15 @@ const mockAgentFindOne = jest.fn<Promise<MockAgent>, [Record<string, unknown>]>(
     return Promise.resolve(storedAgent);
   },
 );
-const mockGetAgentAccount = jest.fn(
-  ({ userId }: { userId: string }) =>
-    storedAgent?._id === userId && storedAgent.isEnabled
-      ? Promise.resolve({
-          _id: userId,
-          isActive: true,
-          permissionGroupIds: ['group-1'],
-          customPermissions: [],
-        })
-      : Promise.reject(new Error('Agent account not found or inactive')),
+const mockGetAgentAccount = jest.fn(({ userId }: { userId: string }) =>
+  storedAgent?._id === userId && storedAgent.isEnabled
+    ? Promise.resolve({
+        _id: userId,
+        isActive: true,
+        permissionGroupIds: ['group-1'],
+        customPermissions: [],
+      })
+    : Promise.reject(new Error('Agent account not found or inactive')),
 );
 jest.mock('../../auth/servicePrincipal', () => ({
   getAgentAccount: (opts: { userId: string }) => mockGetAgentAccount(opts),
@@ -667,19 +666,14 @@ describe('workflowSaveTool', () => {
 });
 
 /**
- * The agent-facing builder tools must apply the SAME enable-time gate the
- * GraphQL mutations do: an enabled schedule-triggered workflow is a live cron,
- * so it may only be enabled when the erxes app token (Agent settings) is present
- * and it doesn't run destructive ops unattended. Since step 22 the run executes
- * as the agent's service user, so no human owner is required. The tools surface
- * the refusal as a structured { success: false, error } result (not a thrown
- * 500) so the agent gets an actionable message.
+ * The agent-facing builder tools apply the same enable-time gate as GraphQL:
+ * an enabled schedule is a live cron, so it requires an active owning AI team
+ * member with permissions and must refuse destructive operations. Failures are
+ * returned as structured results so the agent receives an actionable message.
  */
 describe('schedule-enable gate (agent builder tools)', () => {
-  const APP_TOKEN = 'sk_app-token';
-
   beforeEach(() => {
-    // Default: no app token in Agent settings → secure path NOT configured.
+    // Default registry settings; run identity does not depend on an app token.
     mockGetSettings.mockResolvedValue({ erxesApiUrl: 'https://gw' });
     mockCreateWorkflow.mockClear();
     mockUpdateWorkflow.mockClear();
@@ -708,7 +702,7 @@ describe('schedule-enable gate (agent builder tools)', () => {
       expect(mockCreateWorkflow).not.toHaveBeenCalled();
     });
 
-    it('saves a schedule workflow as a disabled draft without an app token', async () => {
+    it('saves a schedule workflow as a disabled draft', async () => {
       const res = await asTool<SaveResult>(workflowSaveTool).execute({
         name: 'Nightly draft',
         definition: scheduleDefinition(),
@@ -722,7 +716,12 @@ describe('schedule-enable gate (agent builder tools)', () => {
   });
 
   describe('workflowUpdateTool', () => {
-    it('refuses to flip isEnabled on an existing schedule workflow without the app token', async () => {
+    it('refuses to enable a schedule without an active AI team member', async () => {
+      setAgent({
+        agentId: 'agent-self',
+        createdBy: 'u1',
+        isEnabled: false,
+      });
       mockRequireScopedWorkflow.mockResolvedValue({
         _id: 'wf-1',
         isEnabled: false,
@@ -734,8 +733,8 @@ describe('schedule-enable gate (agent builder tools)', () => {
         enable: true,
       });
       expect(res.success).toBe(false);
-      expect(res.error).toMatch(/erxes app token/i);
-      expect(mockUpdateWorkflow).not.toHaveBeenCalled();
+      expect(res.error).toMatch(/missing or inactive/i);
+      expect(mockSetEnabled).not.toHaveBeenCalled();
     });
 
     it('returns edits to draft instead of treating an enabled workflow as still scheduled', async () => {
@@ -772,11 +771,7 @@ describe('schedule-enable gate (agent builder tools)', () => {
       expect(mockSetEnabled).not.toHaveBeenCalled();
     });
 
-    it('allows enabling a schedule workflow update once the app token is configured', async () => {
-      mockGetSettings.mockResolvedValue({
-        erxesApiUrl: 'https://gw',
-        erxesApiToken: APP_TOKEN,
-      });
+    it('allows enabling a schedule for an active permitted AI team member', async () => {
       mockRequireScopedWorkflow.mockResolvedValue({
         _id: 'wf-1',
         isEnabled: false,

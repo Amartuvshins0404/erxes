@@ -38,8 +38,8 @@ interface RequestAuth {
    *  otherwise-gated delete/merge only when it matches one of these. */
   approvedOps?: ApprovedOp[];
   /** True for unattended workflow or frontline-bot execution authenticated as
-   *  the agent's service user. Destructive operations then require impossible
-   *  live approval and remain blocked. */
+   *  the agent's linked core account. Destructive operations then require
+   *  impossible live approval and remain blocked. */
   background?: boolean;
 }
 

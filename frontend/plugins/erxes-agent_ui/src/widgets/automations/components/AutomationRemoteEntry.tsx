@@ -23,7 +23,7 @@ const Remotes: Record<
   workflow: WorkflowRemoteEntry,
 };
 
-const AutomationRemoteEntries = ({
+export const AutomationRemoteEntries = ({
   moduleName,
   ...props
 }: AutomationRemoteEntryProps & { moduleName: string }) => {
@@ -39,5 +39,3 @@ const AutomationRemoteEntries = ({
     </Suspense>
   );
 };
-
-export default AutomationRemoteEntries;

@@ -1,6 +1,9 @@
 import { ApolloError } from '@apollo/client';
+import { useAtomValue } from 'jotai';
 import { toast } from 'erxes-ui';
-import { usePermissionCheck } from 'ui-modules';
+import { currentUserState, usePermissionCheck } from 'ui-modules';
+import { ERXES_AGENT_ACTIONS } from '~/permissions';
+import { resolveAgentActionScope } from './agentActionScope';
 
 const PERMISSION_DENIED = {
   title: 'Permission denied',
@@ -22,15 +25,38 @@ export const agentMutationError = () => (error: ApolloError) => {
 
 /** CRUD permissions mirror the core permission actions enforced by GraphQL. */
 export const useAgentAccess = () => {
-  const { hasActionPermission, isLoaded } = usePermissionCheck();
+  const permissionCheck = usePermissionCheck();
+  const { hasActionPermission, isLoaded } = permissionCheck;
+  const currentUserId = useAtomValue(currentUserState)?._id;
 
-  const isAdmin = hasActionPermission('settingsManage');
-  const canCreate = hasActionPermission('agentsCreate');
-  const canEdit = hasActionPermission('agentsEdit');
-  const canRemove = hasActionPermission('agentsRemove');
+  const isAdmin = hasActionPermission(ERXES_AGENT_ACTIONS.settings.manage);
+  const createScope = resolveAgentActionScope(
+    permissionCheck,
+    ERXES_AGENT_ACTIONS.agent.create,
+  );
+  const updateScope = resolveAgentActionScope(
+    permissionCheck,
+    ERXES_AGENT_ACTIONS.agent.update,
+  );
+  const removeScope = resolveAgentActionScope(
+    permissionCheck,
+    ERXES_AGENT_ACTIONS.agent.remove,
+  );
+  const canCreate = createScope !== null;
+  const canEdit = updateScope !== null;
+  const canRemove = removeScope !== null;
 
-  const canEditAgent = (_agent?: object) => canEdit;
-  const canRemoveAgent = (_agent?: object) => canRemove;
+  const isInScope = (
+    scope: 'own' | 'group' | 'all' | null,
+    agent?: { createdBy?: string | null },
+  ) =>
+    scope === 'all' ||
+    scope === 'group' ||
+    (scope === 'own' && agent?.createdBy === currentUserId);
+  const canEditAgent = (agent?: { createdBy?: string | null }) =>
+    canEdit && isInScope(updateScope, agent);
+  const canRemoveAgent = (agent?: { createdBy?: string | null }) =>
+    canRemove && isInScope(removeScope, agent);
 
   return {
     isLoaded,

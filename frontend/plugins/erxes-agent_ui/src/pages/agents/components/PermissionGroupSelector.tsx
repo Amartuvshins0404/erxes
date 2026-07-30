@@ -6,6 +6,7 @@ interface PermissionGroupSelectorProps {
   value: string[];
   onChange: (groupIds: string[]) => void;
   loading?: boolean;
+  idPrefix?: string;
 }
 
 export const PermissionGroupSelector = ({
@@ -13,6 +14,7 @@ export const PermissionGroupSelector = ({
   value,
   onChange,
   loading = false,
+  idPrefix = 'agent-permission',
 }: PermissionGroupSelectorProps) => {
   const builtInGroupsByPlugin = new Map<string, PermissionGroupOption[]>();
 
@@ -49,7 +51,7 @@ export const PermissionGroupSelector = ({
   };
 
   const renderGroup = (group: PermissionGroupOption) => {
-    const checkboxId = `agent-permission-${group.id}`;
+    const checkboxId = `${idPrefix}-${group.id}`;
     const selected = value.includes(group.id);
 
     return (

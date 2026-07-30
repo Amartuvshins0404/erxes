@@ -1,4 +1,5 @@
 import { useQuery } from '@apollo/client';
+import { useAtomValue } from 'jotai';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { IconAlertTriangle, IconInfoCircle } from '@tabler/icons-react';
@@ -7,8 +8,10 @@ import {
   Badge,
   Button,
   Collapsible,
+  Combobox,
   Form,
   Input,
+  Popover,
   RadioGroup,
   Separator,
   Slider,
@@ -16,7 +19,13 @@ import {
   Textarea,
 } from 'erxes-ui';
 import { Trans, useTranslation } from 'react-i18next';
-import { UseFormReturn } from 'react-hook-form';
+import { UseFormReturn, useWatch } from 'react-hook-form';
+import {
+  currentUserState,
+  SelectDepartments,
+  SelectMember,
+  usePermissionCheck,
+} from 'ui-modules';
 import { ClampedNumberInput } from '~/components/ClampedNumberInput';
 import { Field } from '~/components/FormLayout';
 import {
@@ -26,11 +35,16 @@ import {
 } from '~/components/SelectProviderModel';
 import { AgentFormValues } from '../validations';
 import {
+  AUDIENCE_TEAMS,
+  type AudienceTeamsData,
   PERMISSION_GROUPS,
   permissionGroupOptions,
   type PermissionGroupsData,
 } from '../graphql/access';
 import { PermissionGroupSelector } from './PermissionGroupSelector';
+import { AudienceTeamSelector } from './AudienceTeamSelector';
+import { ERXES_AGENT_ACTIONS } from '~/permissions';
+import { resolveAgentActionScope } from '../hooks/agentActionScope';
 
 type AgentForm = UseFormReturn<AgentFormValues>;
 
@@ -128,6 +142,182 @@ const BasicInfoSection = ({ form }: { form: AgentForm }) => {
   );
 };
 
+const AgentSharingSection = ({ form }: { form: AgentForm }) => {
+  const { t } = useTranslation('mastra');
+  const visibility = useWatch({ control: form.control, name: 'visibility' });
+  const { data: audienceTeamsData, loading: teamsLoading } =
+    useQuery<AudienceTeamsData>(AUDIENCE_TEAMS);
+  const teamOptions = audienceTeamsData?.getTeams ?? [];
+  const visibilityOptions = [
+    {
+      value: 'private',
+      label: 'agent-settings-private',
+      description: 'agent-settings-private-description',
+    },
+    {
+      value: 'shared',
+      label: 'agent-settings-many',
+      description: 'agent-settings-many-description',
+    },
+    {
+      value: 'organization',
+      label: 'agent-settings-everyone',
+      description: 'agent-settings-everyone-description',
+    },
+  ] as const;
+
+  const clearAudience = () => {
+    form.setValue('audienceUserIds', []);
+    form.setValue('audienceTeamIds', []);
+    form.setValue('audienceDepartmentIds', []);
+  };
+
+  return (
+    <AgentFormSection
+      title={t('agent-settings-visibility-title')}
+      description={t('agent-settings-visibility-description')}
+    >
+      <Form.Field
+        control={form.control}
+        name="visibility"
+        render={({ field }) => (
+          <Form.Item>
+            <Form.Control>
+              <RadioGroup
+                value={field.value}
+                onValueChange={(value) => {
+                  field.onChange(value);
+                  if (value !== 'shared') clearAudience();
+                }}
+                className="grid gap-3 md:grid-cols-3"
+              >
+                {visibilityOptions.map((option) => (
+                  <label
+                    key={option.value}
+                    className={`flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors ${
+                      field.value === option.value
+                        ? 'border-primary bg-primary/5'
+                        : 'hover:bg-muted/40'
+                    }`}
+                  >
+                    <RadioGroup.Item value={option.value} />
+                    <span className="min-w-0 space-y-1">
+                      <span className="block text-sm font-medium">
+                        {t(option.label)}
+                      </span>
+                      <span className="block text-xs text-muted-foreground">
+                        {t(option.description)}
+                      </span>
+                    </span>
+                  </label>
+                ))}
+              </RadioGroup>
+            </Form.Control>
+            <Form.Message />
+          </Form.Item>
+        )}
+      />
+
+      {visibility === 'shared' && (
+        <div className="space-y-5 rounded-lg border bg-muted/10 p-4">
+          <div className="space-y-1">
+            <p className="text-sm font-medium">
+              {t('agent-settings-audience-title')}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {t('agent-settings-audience-description')}
+            </p>
+          </div>
+
+          <Form.Field
+            control={form.control}
+            name="audienceUserIds"
+            render={({ field }) => (
+              <Form.Item>
+                <Form.Label>{t('agent-settings-audience-people')}</Form.Label>
+                <SelectMember.FormItem
+                  mode="multiple"
+                  value={field.value}
+                  onValueChange={(value) =>
+                    field.onChange(Array.isArray(value) ? value : [])
+                  }
+                  placeholder={t('agent-settings-audience-people-placeholder')}
+                />
+                <Form.Description>
+                  {t('agent-settings-audience-people-description')}
+                </Form.Description>
+              </Form.Item>
+            )}
+          />
+
+          <Form.Field
+            control={form.control}
+            name="audienceTeamIds"
+            render={({ field }) => (
+              <Form.Item>
+                <Form.Label>{t('agent-settings-audience-teams')}</Form.Label>
+                <Form.Control>
+                  <AudienceTeamSelector
+                    teams={teamOptions}
+                    value={field.value}
+                    onChange={field.onChange}
+                    loading={teamsLoading}
+                  />
+                </Form.Control>
+                <Form.Description>
+                  {t('agent-settings-audience-teams-description')}
+                </Form.Description>
+                {!teamsLoading && teamOptions.length === 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    {t('agent-settings-audience-no-teams')}
+                  </p>
+                )}
+              </Form.Item>
+            )}
+          />
+
+          <Form.Field
+            control={form.control}
+            name="audienceDepartmentIds"
+            render={({ field }) => (
+              <Form.Item>
+                <Form.Label>
+                  {t('agent-settings-audience-departments')}
+                </Form.Label>
+                <SelectDepartments
+                  mode="multiple"
+                  value={field.value}
+                  onValueChange={(value) =>
+                    field.onChange(Array.isArray(value) ? value : [])
+                  }
+                >
+                  <Popover>
+                    <Form.Control>
+                      <Combobox.Trigger className="w-full shadow-xs">
+                        <SelectDepartments.List
+                          placeholder={t(
+                            'agent-settings-audience-departments-placeholder',
+                          )}
+                        />
+                      </Combobox.Trigger>
+                    </Form.Control>
+                    <Combobox.Content>
+                      <SelectDepartments.Command disableCreateOption />
+                    </Combobox.Content>
+                  </Popover>
+                </SelectDepartments>
+                <Form.Description>
+                  {t('agent-settings-audience-departments-description')}
+                </Form.Description>
+              </Form.Item>
+            )}
+          />
+        </div>
+      )}
+    </AgentFormSection>
+  );
+};
+
 const AiModelSection = ({ form }: { form: AgentForm }) => {
   const { t } = useTranslation('mastra');
   const provider = form.watch('provider');
@@ -209,7 +399,23 @@ const AgentAccessSection = ({ form }: { form: AgentForm }) => {
   const destructiveOps = form.watch('destructiveOps');
   const { data, loading, error } =
     useQuery<PermissionGroupsData>(PERMISSION_GROUPS);
-  const groups = permissionGroupOptions(data);
+  const currentUser = useAtomValue(currentUserState);
+  const permissionCheck = usePermissionCheck();
+  const canAssignAnyGroup =
+    resolveAgentActionScope(
+      permissionCheck,
+      ERXES_AGENT_ACTIONS.agent.create,
+    ) === 'all' ||
+    resolveAgentActionScope(
+      permissionCheck,
+      ERXES_AGENT_ACTIONS.agent.update,
+    ) === 'all';
+  const availableGroups = permissionGroupOptions(data);
+  const groups = canAssignAnyGroup
+    ? availableGroups
+    : availableGroups.filter((group) =>
+        currentUser?.permissionGroupIds?.includes(group.id),
+      );
 
   return (
     <AgentFormSection
@@ -492,6 +698,7 @@ export const AgentFormFields = ({ form }: { form: AgentForm }) => {
         </Alert.Description>
       </Alert>
       <BasicInfoSection form={form} />
+      <AgentSharingSection form={form} />
       <AiModelSection form={form} />
       <AgentAccessSection form={form} />
       <BehaviorSection form={form} />

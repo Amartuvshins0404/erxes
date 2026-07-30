@@ -1,6 +1,15 @@
 class ExpectedError extends Error {}
 
-jest.mock('erxes-api-shared/utils', () => ({ ExpectedError }));
+const sendTRPCMessage = jest.fn();
+jest.mock('erxes-api-shared/utils', () => ({
+  ExpectedError,
+  sendTRPCMessage: (...args: unknown[]) => sendTRPCMessage(...args),
+}));
+
+const requireActionScope = jest.fn();
+jest.mock('@/_shared/authorization', () => ({
+  requireActionScope: (...args: unknown[]) => requireActionScope(...args),
+}));
 
 jest.mock('@/agent/turn', () => ({
   prepareChatTurn: jest.fn(),
@@ -60,20 +69,25 @@ const agentAccount = (accountId: string, name: string, agentId: string) => ({
 const makeCtx = () => {
   const profiles = [profile('account-1'), profile('account-2', 'anthropic')];
   const getAgents = jest.fn().mockResolvedValue(profiles);
-  const getAgent = jest.fn().mockResolvedValue(profiles[0]);
+  const findOne = jest.fn().mockResolvedValue(profiles[0]);
   const getAgentsList = jest.fn().mockResolvedValue({
     list: [profiles[1]],
     totalCount: 1,
   });
   const ctx = {
-    models: { MastraAgent: { getAgents, getAgent, getAgentsList } },
+    models: {
+      MastraAgent: { getAgents, getAgentsList, findOne },
+    },
     subdomain: 'os',
+    user: { _id: 'human-1' },
     checkPermission: jest.fn().mockResolvedValue(undefined),
   } as unknown as IContext;
-  return { ctx, profiles, getAgents, getAgent, getAgentsList };
+  return { ctx, profiles, getAgents, getAgentsList, findOne };
 };
 
 beforeEach(() => {
+  requireActionScope.mockReset().mockResolvedValue('group');
+  sendTRPCMessage.mockReset().mockResolvedValue([]);
   findCoreUsers.mockReset();
 });
 
@@ -92,6 +106,15 @@ describe('account-hydrated agent queries', () => {
     const { ctx } = makeCtx();
 
     const result = await agentQueries.mastraAgents(undefined, undefined, ctx);
+
+    expect(ctx.models.MastraAgent.getAgents).toHaveBeenCalledWith({
+      $or: [
+        { createdBy: 'human-1' },
+        { visibility: 'organization' },
+        { visibility: { $exists: false } },
+        { visibility: 'shared', audienceUserIds: 'human-1' },
+      ],
+    });
 
     expect(findCoreUsers).toHaveBeenCalledWith('os', {
       appId: {
@@ -133,6 +156,14 @@ describe('account-hydrated agent queries', () => {
       perPage: 30,
       searchValue: 'support',
       matchingAccountIds: ['account-2'],
+      filter: {
+        $or: [
+          { createdBy: 'human-1' },
+          { visibility: 'organization' },
+          { visibility: { $exists: false } },
+          { visibility: 'shared', audienceUserIds: 'human-1' },
+        ],
+      },
     });
     expect(result).toEqual({
       totalCount: 1,

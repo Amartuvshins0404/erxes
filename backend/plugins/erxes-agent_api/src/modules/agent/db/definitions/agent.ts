@@ -7,6 +7,27 @@ export const agentSchema = new Schema(
     instructions: { type: String, maxlength: 20000, label: 'Instructions' },
     provider: { type: String, required: true, label: 'Provider' },
     model: { type: String, required: true, label: 'Model' },
+    createdBy: { type: String, index: true, label: 'Created By' },
+    // No default: legacy profiles remain distinguishable and the access layer
+    // preserves their original organization-visible behavior.
+    visibility: {
+      type: String,
+      enum: ['private', 'shared', 'organization'],
+      required: true,
+      index: true,
+      label: 'Visibility',
+    },
+    audienceUserIds: [{ type: String }],
+    audienceTeamIds: [{ type: String }],
+    audienceDepartmentIds: [{ type: String }],
+    // Missing on legacy profiles means managed. New profiles always set this
+    // explicitly in the create resolver.
+    permissionMode: {
+      type: String,
+      enum: ['delegated', 'managed'],
+      required: true,
+      label: 'Permission Mode',
+    },
     // Skill allowlist. Glob patterns matched against global skills' name (or
     // "category/name"); the requesting user's own published skills are always
     // added on top. Empty/unset → the agent has no skills attached.

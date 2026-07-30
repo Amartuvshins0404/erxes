@@ -1,6 +1,14 @@
 class ExpectedError extends Error {}
 
 jest.mock('erxes-api-shared/utils', () => ({ ExpectedError }));
+
+const requireScopedWorkflow = jest.fn();
+const requireScopedWorkflowAgent = jest.fn();
+jest.mock('@/workflow/authorization', () => ({
+  requireScopedWorkflow: (...args: unknown[]) => requireScopedWorkflow(...args),
+  requireScopedWorkflowAgent: (...args: unknown[]) =>
+    requireScopedWorkflowAgent(...args),
+}));
 const runWorkflow = jest.fn();
 jest.mock('~/mastra/workflows/runtime', () => ({
   runWorkflow: (...args: unknown[]) => runWorkflow(...args),
@@ -80,6 +88,11 @@ const makeCtx = (profileExists = true) => {
   const getSettings = jest
     .fn()
     .mockResolvedValue({ erxesApiToken: 'app-token' });
+  requireScopedWorkflow.mockImplementation(() => getWorkflow());
+  requireScopedWorkflowAgent.mockResolvedValue({
+    agent: { _id: 'agent-user-1' },
+    scope: 'all',
+  });
   const models = {
     MastraAgent: { findOne },
     MastraSettings: { getSettings },
@@ -110,6 +123,8 @@ const makeCtx = (profileExists = true) => {
 };
 
 beforeEach(() => {
+  requireScopedWorkflow.mockReset();
+  requireScopedWorkflowAgent.mockReset();
   assertWorkflowSchedulable.mockReset().mockResolvedValue(undefined);
   const authCtx = {
     token: 'agent-run-token',
@@ -264,7 +279,7 @@ describe('workflow AI team-member ownership', () => {
       { _id: 'workflow-1', isEnabled: false },
       ctx,
     );
-    expect(getWorkflow).not.toHaveBeenCalled();
+    expect(getWorkflow).toHaveBeenCalled();
     expect(assertWorkflowSchedulable).not.toHaveBeenCalled();
     expect(setEnabled).toHaveBeenCalledWith('workflow-1', false);
   });

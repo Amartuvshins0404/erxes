@@ -2,9 +2,14 @@ class ExpectedError extends Error {}
 
 jest.mock('erxes-api-shared/utils', () => ({ ExpectedError }));
 
-const canGroup = jest.fn();
-jest.mock('erxes-api-shared/core-modules', () => ({
-  canGroup: (...args: unknown[]) => canGroup(...args),
+const requireActionScope = jest.fn();
+jest.mock('@/_shared/authorization', () => ({
+  requireActionScope: (...args: unknown[]) => requireActionScope(...args),
+}));
+
+const requireScopedAgent = jest.fn();
+jest.mock('@/agent/authorization', () => ({
+  requireScopedAgent: (...args: unknown[]) => requireScopedAgent(...args),
 }));
 
 const createAgentAccount = jest.fn();
@@ -28,6 +33,7 @@ jest.mock('./agentErrors', () => ({
 }));
 
 import type { IContext } from '~/connectionResolvers';
+import type { IUserDocument } from 'erxes-api-shared/core-types';
 import type { IMastraAgent, IMastraAgentInput } from '@/agent/@types/agent';
 import { agentMutations } from './agent';
 
@@ -89,6 +95,7 @@ const makeCtx = () => {
   const updateAgent = jest.fn().mockResolvedValue(profileDocument());
   const getAgent = jest.fn().mockResolvedValue(profileDocument());
   const removeAgent = jest.fn().mockResolvedValue({ acknowledged: true });
+  requireScopedAgent.mockResolvedValue({ agent: getAgent(), scope: 'all' });
   const deleteOne = jest.fn().mockResolvedValue({ acknowledged: true });
   const ctx = {
     models: {
@@ -115,7 +122,7 @@ const makeCtx = () => {
 };
 
 beforeEach(() => {
-  canGroup.mockReset().mockResolvedValue(true);
+  requireActionScope.mockReset().mockResolvedValue('all');
   createAgentAccount.mockReset().mockResolvedValue(account());
   updateAgentAccount.mockReset().mockResolvedValue(account());
   deactivateAgentAccount.mockReset().mockResolvedValue(undefined);
@@ -151,6 +158,7 @@ describe('AI team member account lifecycle', () => {
         description: 'Helps the sales team',
         permissionGroupIds: ['group-1', 'group-2'],
         isActive: true,
+        customPermissions: [],
       },
     });
     expect(createAgent).toHaveBeenCalledWith(
@@ -159,6 +167,12 @@ describe('AI team member account lifecycle', () => {
         instructions: 'Help the sales team',
         provider: 'provider-1',
         model: 'model-1',
+        createdBy: 'owner-1',
+        visibility: 'private',
+        audienceUserIds: [],
+        audienceTeamIds: [],
+        audienceDepartmentIds: [],
+        permissionMode: 'managed',
       }),
     );
     expect(createAgent.mock.calls[0][1]).not.toHaveProperty('name');
@@ -173,6 +187,31 @@ describe('AI team member account lifecycle', () => {
         accountDescription: 'Helps the sales team',
         permissionGroupIds: ['group-1'],
         isActive: true,
+      }),
+    );
+  });
+
+  it('accepts one team as the complete shared audience', async () => {
+    const { ctx, createAgent } = makeCtx();
+
+    await agentMutations.mastraAgentCreate(
+      undefined,
+      {
+        doc: profileInput({
+          visibility: 'shared',
+          audienceTeamIds: [' team-1 ', 'team-1'],
+        }),
+      },
+      ctx,
+    );
+
+    expect(createAgent).toHaveBeenCalledWith(
+      USER_ID,
+      expect.objectContaining({
+        visibility: 'shared',
+        audienceUserIds: [],
+        audienceTeamIds: ['team-1'],
+        audienceDepartmentIds: [],
       }),
     );
   });
@@ -231,17 +270,67 @@ describe('AI team member account lifecycle', () => {
     );
   });
 
-  it('requires Manage Permissions before assigning account groups', async () => {
-    canGroup.mockResolvedValue(false);
+  it('prevents a user from delegating permission groups they do not hold', async () => {
+    requireActionScope.mockResolvedValue('own');
     const { ctx, createAgent } = makeCtx();
+    ctx.user = {
+      _id: 'owner-1',
+      permissionGroupIds: ['group-1'],
+      customPermissions: [],
+    } as IUserDocument;
 
     await expect(
-      agentMutations.mastraAgentCreate(undefined, { doc: profileInput() }, ctx),
-    ).rejects.toThrow(/Manage Permissions/i);
+      agentMutations.mastraAgentCreate(
+        undefined,
+        {
+          doc: profileInput({ permissionGroupIds: ['group-2'] }),
+        },
+        ctx,
+      ),
+    ).rejects.toThrow(/only permission groups assigned to its creator/i);
 
-    expect(resolveAgentPermissions).not.toHaveBeenCalled();
     expect(createAgentAccount).not.toHaveBeenCalled();
     expect(createAgent).not.toHaveBeenCalled();
+  });
+
+  it('copies only the creator grant into a delegated agent account', async () => {
+    requireActionScope.mockResolvedValue('own');
+    const { ctx, createAgent } = makeCtx();
+    const customPermissions = [
+      {
+        plugin: 'sales',
+        module: 'deal',
+        actions: ['dealsRead'],
+        scope: 'own' as const,
+      },
+    ];
+    ctx.user = {
+      _id: 'owner-1',
+      permissionGroupIds: ['group-1'],
+      customPermissions,
+    } as IUserDocument;
+
+    await agentMutations.mastraAgentCreate(
+      undefined,
+      { doc: profileInput({ visibility: 'organization' }) },
+      ctx,
+    );
+
+    expect(createAgentAccount).toHaveBeenCalledWith({
+      subdomain: 'os',
+      input: expect.objectContaining({
+        permissionGroupIds: ['group-1'],
+        customPermissions,
+      }),
+    });
+    expect(createAgent).toHaveBeenCalledWith(
+      USER_ID,
+      expect.objectContaining({
+        createdBy: 'owner-1',
+        visibility: 'organization',
+        permissionMode: 'delegated',
+      }),
+    );
   });
 
   it('rejects missing permission groups before creating either record', async () => {
@@ -268,11 +357,13 @@ describe('AI team member account lifecycle', () => {
   });
 
   it('deactivates the canonical account before deleting its AI profile', async () => {
-    const { ctx, getAgent, removeAgent } = makeCtx();
+    const { ctx, removeAgent } = makeCtx();
 
     await agentMutations.mastraAgentRemove(undefined, { _id: USER_ID }, ctx);
 
-    expect(getAgent).toHaveBeenCalledWith(USER_ID);
+    expect(requireScopedAgent).toHaveBeenCalledWith(
+      expect.objectContaining({ agentId: USER_ID }),
+    );
     expect(deactivateAgentAccount).toHaveBeenCalledWith({
       userId: USER_ID,
       subdomain: 'os',

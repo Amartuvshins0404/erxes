@@ -53,6 +53,7 @@ export const MASTRA_PROVIDER_SAVE = gql`
       _id
       provider
       label
+      scope
       isDefault
       isEnabled
       isOpenAICompatible

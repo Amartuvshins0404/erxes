@@ -46,6 +46,10 @@ export const AgentFormPage = ({
     load: (record) => ({
       name: record.accountName,
       description: record.accountDescription || '',
+      visibility: record.visibility || 'organization',
+      audienceUserIds: record.audienceUserIds || [],
+      audienceTeamIds: record.audienceTeamIds || [],
+      audienceDepartmentIds: record.audienceDepartmentIds || [],
       instructions: record.instructions || '',
       provider: record.provider || '',
       model: record.model || '',

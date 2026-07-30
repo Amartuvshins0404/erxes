@@ -7,6 +7,7 @@ import {
   IconCalendar,
   IconCpu,
   IconPlus,
+  IconEye,
   IconRobot,
   IconShieldCheck,
   IconToggleRight,
@@ -22,6 +23,7 @@ import {
   Separator,
   toast,
 } from 'erxes-ui';
+import { useTranslation } from 'react-i18next';
 import { MASTRA_AGENT_REMOVE } from '~/graphql/mutations';
 import { IdentityCell, SortableHead } from '~/components/RecordTableShared';
 import { SortState, SortValue, useTableSort } from '~/components/useTableSort';
@@ -42,11 +44,16 @@ import {
 } from './graphql/access';
 
 type IAgent = IMastraAgentRow;
+type Visibility = IAgent['visibility'];
+type VisibilityLabels = Record<Visibility, string> & { title: string };
 
 const isConsoleShell = (basePath: string) => !basePath.startsWith('/settings');
-
-const agentOpenPath = (basePath: string, id: string) =>
-  isConsoleShell(basePath) ? `${basePath}/${id}` : `${basePath}/edit/${id}`;
+const agentOpenPath = (basePath: string, agent: IAgent, canEdit: boolean) =>
+  !canEdit
+    ? `/erxes-agent/chat/${agent._id}`
+    : isConsoleShell(basePath)
+    ? `${basePath}/${agent._id}`
+    : `${basePath}/edit/${agent._id}`;
 
 const agentListCacheUpdate = (cache: ApolloCache<unknown>) => {
   cache.evict({ fieldName: 'mastraAgentsMain' });
@@ -139,6 +146,8 @@ const AgentBulkDeleteCommandBar = () => {
 const buildColumns = (
   basePath: string,
   permissionGroupNames: Record<string, string>,
+  visibilityLabels: VisibilityLabels,
+  canEditAgent: (agent: IAgent) => boolean,
   sort: SortState,
   onSort: (id: string) => void,
 ): ColumnDef<IAgent>[] => [
@@ -162,7 +171,11 @@ const buildColumns = (
         name={
           <Link
             className="font-medium hover:underline"
-            to={agentOpenPath(basePath, row.original._id)}
+            to={agentOpenPath(
+              basePath,
+              row.original,
+              canEditAgent(row.original),
+            )}
           >
             {row.original.accountName}
           </Link>
@@ -171,6 +184,21 @@ const buildColumns = (
       />
     ),
     size: 280,
+  },
+  {
+    id: 'visibility',
+    accessorKey: 'visibility',
+    header: () => (
+      <RecordTable.InlineHead icon={IconEye} label={visibilityLabels.title} />
+    ),
+    cell: ({ row }) => (
+      <RecordTableInlineCell>
+        <Badge variant="secondary">
+          {visibilityLabels[row.original.visibility]}
+        </Badge>
+      </RecordTableInlineCell>
+    ),
+    size: 140,
   },
   {
     id: 'permissions',
@@ -269,6 +297,8 @@ const buildColumns = (
 ];
 
 export const AgentsIndexPage = () => {
+  const { t } = useTranslation('mastra');
+  const { canEditAgent } = useAgentAccess();
   const basePath = useAgentsBasePath();
   const { agentsList, loading, error, pageInfo, handleFetchMore, refetch } =
     useMastraAgentList();
@@ -283,6 +313,15 @@ export const AgentsIndexPage = () => {
         ]),
       ),
     [permissionData],
+  );
+  const visibilityLabels = useMemo<VisibilityLabels>(
+    () => ({
+      title: t('agent-settings-visibility-title'),
+      private: t('agent-settings-private'),
+      shared: t('agent-settings-specific-people'),
+      organization: t('agent-settings-everyone'),
+    }),
+    [t],
   );
   const getSortValue = useCallback((agent: IAgent, id: string): SortValue => {
     switch (id) {
@@ -300,8 +339,23 @@ export const AgentsIndexPage = () => {
   }, []);
   const { sort, toggle, sorted } = useTableSort(agentsList, getSortValue);
   const columns = useMemo(
-    () => buildColumns(basePath, permissionGroupNames, sort, toggle),
-    [basePath, permissionGroupNames, sort, toggle],
+    () =>
+      buildColumns(
+        basePath,
+        permissionGroupNames,
+        visibilityLabels,
+        canEditAgent,
+        sort,
+        toggle,
+      ),
+    [
+      basePath,
+      canEditAgent,
+      permissionGroupNames,
+      visibilityLabels,
+      sort,
+      toggle,
+    ],
   );
   const commandBar = useMemo(() => <AgentBulkDeleteCommandBar />, []);
   const headerExtra = useMemo(

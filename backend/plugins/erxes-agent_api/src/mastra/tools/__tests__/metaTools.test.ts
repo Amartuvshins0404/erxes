@@ -1,6 +1,9 @@
 jest.mock('@mastra/core/tools', () => ({ createTool: (config: unknown) => config }));
 
-const mockExecute = jest.fn(() => Promise.resolve({ ok: true }));
+const mockExecute = jest.fn((...args: unknown[]) => {
+  void args;
+  return Promise.resolve({ ok: true });
+});
 
 jest.mock('../erxesTools', () => ({
   executeErxesOperation: (...args: unknown[]) => mockExecute(...args),
@@ -114,7 +117,8 @@ describe('typed operation guard and audit', () => {
     await tool.execute({});
 
     expect(mockExecute).toHaveBeenCalledTimes(1);
-    const sentProcessId = mockExecute.mock.calls[0][4] as string;
+    const sentProcessId = mockExecute.mock.calls[0]?.[4];
+    expect(sentProcessId).toEqual(expect.any(String));
     expect(sentProcessId).toMatch(/^agt_/);
     expect(calls[0]).toMatchObject({
       operation: 'customersRemove',

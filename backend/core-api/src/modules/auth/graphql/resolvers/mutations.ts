@@ -8,6 +8,7 @@ import {
   redis,
   updateSaasOrganization,
 } from 'erxes-api-shared/utils';
+import { sendNotification } from 'erxes-api-shared/core-modules';
 import * as jwt from 'jsonwebtoken';
 import { IContext } from '~/connectionResolvers';
 import {

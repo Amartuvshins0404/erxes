@@ -119,7 +119,7 @@ export function isSecretName(name: string): boolean {
   if (isDbConnectionName(name)) return true;
   // (3) A name ending in "key" is secret (config.key/golomt, inStoreSPKey/
   // socialpay, serviceAccountKey/firebase) EXCEPT the public-by-design
-  // allowlist. Safe: anything here that ALSO carried a secret fragment already
+  // allowlist. Safe: a name here that ALSO carried a secret fragment already
   // returned at (1). Over-redacting a non-listed field ending in "key" is
   // accepted (security > minor utility).
   if (normalized.endsWith('key')) {

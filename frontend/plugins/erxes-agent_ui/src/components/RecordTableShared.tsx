@@ -161,6 +161,8 @@ export const RowActionsMenu = ({ children }: { children: React.ReactNode }) => (
   </Popover>
 );
 
+const noop = () => undefined;
+
 /** Enable/disable + delete tail of a row actions menu. */
 export const ToggleDeleteMenuItems = ({
   isEnabled,
@@ -186,7 +188,7 @@ export const ToggleDeleteMenuItems = ({
         size="sm"
         className="justify-start w-full h-8"
         allowed={!toggleDisabled}
-        onDenied={onToggleDenied ?? (() => {})}
+        onDenied={onToggleDenied ?? noop}
         onClick={onToggle}
       >
         {isEnabled ? (
@@ -206,7 +208,7 @@ export const ToggleDeleteMenuItems = ({
         size="sm"
         className="justify-start w-full h-8 text-destructive"
         allowed={!deleteDisabled}
-        onDenied={onDeleteDenied ?? (() => {})}
+        onDenied={onDeleteDenied ?? noop}
         onClick={onDelete}
       >
         <IconTrash className="size-4" /> Delete

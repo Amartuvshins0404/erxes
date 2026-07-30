@@ -1,297 +1,206 @@
-import { ExpectedError, sendTRPCMessage } from 'erxes-api-shared/utils';
+import { ExpectedError } from 'erxes-api-shared/utils';
 import { canGroup } from 'erxes-api-shared/core-modules';
+import type { IUserDocument } from 'erxes-api-shared/core-types';
 import { IContext } from '~/connectionResolvers';
-import { IMastraAgent } from '@/agent/@types/agent';
-import { getAgentQuotaStatus } from '@/agent/utils';
-import { requireScopedAgent } from '@/agent/authorization';
-import { requireActionScope } from '@/_shared/authorization';
+import type {
+  IMastraAgent,
+  IMastraAgentDocument,
+  IMastraAgentInput,
+} from '@/agent/@types/agent';
 import {
-  deactivateServiceUser,
-  syncServiceUserGroup,
+  AgentAccount,
+  createAgentAccount,
+  deactivateAgentAccount,
+  updateAgentAccount,
 } from '~/mastra/auth/servicePrincipal';
-import { ERXES_AGENT_ACTIONS } from '~/meta/permissionActions';
+import { resolveAgentPermissions } from '~/mastra/tools/permissionCapabilities';
 import { toUserFacingAgentError } from './agentErrors';
 
-interface CoreGroup {
-  _id: string;
-  principalType?: string;
-}
-
-interface CoreUser {
-  _id: string;
-}
-
-const fetchGrantGroup = async (
+const assertPermissionGroupsExist = async (
   subdomain: string,
-  groupId: string,
-): Promise<CoreGroup> => {
-  const groups = await sendTRPCMessage({
-    subdomain,
-    pluginName: 'core',
-    module: 'permissionGroups',
-    action: 'find',
-    method: 'query',
-    input: { query: { _id: groupId } },
-    defaultValue: [],
-  });
-  if (!Array.isArray(groups) || groups.length === 0) {
+  permissionGroupIds: string[],
+): Promise<string[]> => {
+  const normalized = [
+    ...new Set(permissionGroupIds.map((id) => id.trim()).filter(Boolean)),
+  ];
+  if (!normalized.length) {
     throw new ExpectedError(
-      `Permission group "${groupId}" was not found — pick an existing group from Settings → Permissions.`,
+      'Select at least one permission group for this AI team member.',
     );
   }
-  const group = groups[0] as CoreGroup;
-  if (group.principalType !== 'agent') {
-    throw new ExpectedError('Agents may only use agent grant profiles');
+  const { foundGroupIds } = await resolveAgentPermissions({
+    subdomain,
+    permissionGroupIds: normalized,
+  });
+  const missing = normalized.filter((id) => !foundGroupIds.includes(id));
+  if (missing.length) {
+    throw new ExpectedError(
+      `Permission group${
+        missing.length > 1 ? 's' : ''
+      } not found: ${missing.join(', ')}`,
+    );
   }
-  return group;
+  return normalized;
+};
+
+const assertPermissionGroupsAssignable = async (
+  subdomain: string,
+  user: IUserDocument,
+): Promise<void> => {
+  if (await canGroup(subdomain, 'permissionsManage', user)) return;
+  throw new ExpectedError(
+    'Assigning AI team-member permissions requires the Manage Permissions permission.',
+  );
+};
+
+const toAgentView = (profile: IMastraAgentDocument, account: AgentAccount) => ({
+  ...profile.toObject(),
+  _id: account._id,
+  accountName:
+    account.details?.fullName ||
+    account.username ||
+    account.email ||
+    'AI team member',
+  accountDescription: account.details?.description || '',
+  permissionGroupIds: account.permissionGroupIds || [],
+  isActive: account.isActive !== false,
+});
+
+const splitInput = (doc: IMastraAgentInput) => {
+  const { name, description, permissionGroupIds, isActive, ...profile } = doc;
+  return {
+    account: { name, description, permissionGroupIds, isActive },
+    profile,
+  };
 };
 
 export const agentMutations = {
   mastraAgentCreate: async (
     _parent: undefined,
-    { doc }: { doc: IMastraAgent },
+    { doc }: { doc: IMastraAgentInput },
     { models, subdomain, user, checkPermission }: IContext,
   ) => {
-    await checkPermission(ERXES_AGENT_ACTIONS.agent.create);
+    await checkPermission('agentsCreate');
     if (!user?._id) throw new ExpectedError('Login required');
-
-    const scope = await requireActionScope({
+    const { account, profile } = splitInput(doc);
+    const name = account.name?.trim();
+    if (!name) throw new ExpectedError('Name is required');
+    if (!profile.provider?.trim()) {
+      throw new ExpectedError('Provider is required');
+    }
+    if (!profile.model?.trim()) throw new ExpectedError('Model is required');
+    await assertPermissionGroupsAssignable(subdomain, user);
+    const permissionGroupIds = await assertPermissionGroupsExist(
       subdomain,
-      user,
-      action: ERXES_AGENT_ACTIONS.agent.create,
-    });
-    const visibility = doc.visibility ?? 'private';
+      account.permissionGroupIds ?? [],
+    );
 
-    if (visibility !== 'private') {
-      await checkPermission(ERXES_AGENT_ACTIONS.agent.share);
-      const shareScope = await requireActionScope({
-        subdomain,
-        user,
-        action: ERXES_AGENT_ACTIONS.agent.share,
-      });
-      if (shareScope !== 'all') {
-        throw new ExpectedError(
-          'Creating a shared agent requires all-agent sharing permission',
-        );
-      }
-    }
-    if (
-      doc.createdBy !== undefined ||
-      doc.serviceUserId !== undefined ||
-      doc.grantGroupId !== undefined
-    ) {
-      throw new ExpectedError(
-        'Agent ownership and grants use dedicated security actions',
-      );
-    }
-
-    if (scope !== 'all') {
-      const status = await getAgentQuotaStatus(models, user._id);
-      if (status.atQuota) {
-        throw new ExpectedError(`Agent quota reached (${status.quota})`);
-      }
-    }
-
+    let createdAccount: AgentAccount | null = null;
     try {
-      return await models.MastraAgent.createAgent({
-        ...doc,
-        visibility,
-        createdBy: user._id,
+      createdAccount = await createAgentAccount({
+        subdomain,
+        input: {
+          name,
+          description: account.description,
+          permissionGroupIds,
+          isActive: account.isActive,
+        },
       });
+      const createdProfile = await models.MastraAgent.createAgent(
+        createdAccount._id,
+        profile as IMastraAgent,
+      );
+      return toAgentView(createdProfile, createdAccount);
     } catch (error) {
+      if (createdAccount?._id) {
+        await deactivateAgentAccount({
+          userId: createdAccount._id,
+          subdomain,
+        }).catch(() => undefined);
+        await models.MastraAgent.deleteOne({
+          _id: createdAccount._id,
+        });
+      }
       throw toUserFacingAgentError(error);
     }
   },
 
   mastraAgentUpdate: async (
     _parent: undefined,
-    { _id, doc }: { _id: string; doc: Partial<IMastraAgent> },
+    { _id, doc }: { _id: string; doc: IMastraAgentInput },
     { models, subdomain, user, checkPermission }: IContext,
   ) => {
-    await checkPermission(ERXES_AGENT_ACTIONS.agent.update);
+    await checkPermission('agentsEdit');
     if (!user?._id) throw new ExpectedError('Login required');
+    const { account, profile } = splitInput(doc);
+    const existingProfile = await models.MastraAgent.getAgent(_id);
+    const existingAccount = await updateAgentAccount({
+      userId: _id,
+      subdomain,
+      input: {},
+    });
 
-    const {
-      agentId,
-      createdBy,
-      serviceUserId,
-      grantGroupId,
-      visibility,
-      teamId,
-      departmentId,
-      unitId,
-      ...config
-    } = doc;
-
-    if (
-      agentId !== undefined ||
-      createdBy !== undefined ||
-      serviceUserId !== undefined ||
-      grantGroupId !== undefined ||
-      visibility !== undefined ||
-      teamId !== undefined ||
-      departmentId !== undefined ||
-      unitId !== undefined
-    ) {
-      throw new ExpectedError(
-        'Agent identity, audience, ownership, and grants use dedicated security actions',
+    let permissionGroupIds = account.permissionGroupIds;
+    if (permissionGroupIds !== undefined) {
+      await assertPermissionGroupsAssignable(subdomain, user);
+      permissionGroupIds = await assertPermissionGroupsExist(
+        subdomain,
+        permissionGroupIds,
       );
     }
+    if (account.name !== undefined && !account.name.trim()) {
+      throw new ExpectedError('Name is required');
+    }
 
-    const { agent } = await requireScopedAgent({
-      models,
-      subdomain,
-      user,
-      action: ERXES_AGENT_ACTIONS.agent.update,
-      agentId: _id,
-    });
+    const accountChanged =
+      account.name !== undefined ||
+      account.description !== undefined ||
+      permissionGroupIds !== undefined ||
+      account.isActive !== undefined;
+    const profileChanged = Object.keys(profile).length > 0;
 
     try {
-      return await models.MastraAgent.updateAgent(_id, config, agent.createdBy);
+      const updatedAccount = accountChanged
+        ? await updateAgentAccount({
+            userId: _id,
+            subdomain,
+            input: {
+              ...(account.name !== undefined ? { name: account.name } : {}),
+              ...(account.description !== undefined
+                ? { description: account.description }
+                : {}),
+              ...(permissionGroupIds !== undefined
+                ? { permissionGroupIds }
+                : {}),
+              ...(account.isActive !== undefined
+                ? { isActive: account.isActive }
+                : {}),
+            },
+          })
+        : existingAccount;
+      const updatedProfile = profileChanged
+        ? await models.MastraAgent.updateAgent(_id, profile)
+        : existingProfile;
+      return toAgentView(updatedProfile, updatedAccount);
     } catch (error) {
+      if (accountChanged) {
+        await updateAgentAccount({
+          userId: _id,
+          subdomain,
+          input: {
+            name:
+              existingAccount.details?.fullName ||
+              existingAccount.username ||
+              existingAccount.email ||
+              'AI team member',
+            description: existingAccount.details?.description || '',
+            permissionGroupIds: existingAccount.permissionGroupIds || [],
+            isActive: existingAccount.isActive !== false,
+          },
+        }).catch(() => undefined);
+      }
       throw toUserFacingAgentError(error);
     }
-  },
-
-  mastraAgentSetAudience: async (
-    _parent: undefined,
-    {
-      _id,
-      visibility,
-      teamId,
-      departmentId,
-      unitId,
-    }: {
-      _id: string;
-      visibility: 'private' | 'team' | 'department' | 'unit' | 'org';
-      teamId?: string;
-      departmentId?: string;
-      unitId?: string;
-    },
-    { models, subdomain, user, checkPermission }: IContext,
-  ) => {
-    await checkPermission(ERXES_AGENT_ACTIONS.agent.share);
-    if (!user?._id) throw new ExpectedError('Login required');
-
-    if (visibility === 'team' && !teamId) {
-      throw new ExpectedError('A team is required for team visibility');
-    }
-    if (visibility === 'department' && (!teamId || !departmentId)) {
-      throw new ExpectedError(
-        'A team and department are required for department visibility',
-      );
-    }
-    if (visibility === 'unit' && (!teamId || !departmentId || !unitId)) {
-      throw new ExpectedError(
-        'A team, department, and unit are required for unit visibility',
-      );
-    }
-
-    const { agent } = await requireScopedAgent({
-      models,
-      subdomain,
-      user,
-      action: ERXES_AGENT_ACTIONS.agent.share,
-      agentId: _id,
-    });
-
-    return models.MastraAgent.updateAgent(
-      _id,
-      {
-        visibility,
-        teamId:
-          visibility === 'team' ||
-          visibility === 'department' ||
-          visibility === 'unit'
-            ? teamId
-            : null,
-        departmentId:
-          visibility === 'department' || visibility === 'unit'
-            ? departmentId
-            : null,
-        unitId: visibility === 'unit' ? unitId : null,
-      },
-      agent.createdBy,
-    );
-  },
-
-  mastraAgentTransferOwnership: async (
-    _parent: undefined,
-    { _id, newOwnerUserId }: { _id: string; newOwnerUserId: string },
-    { models, subdomain, user, checkPermission }: IContext,
-  ) => {
-    await checkPermission(ERXES_AGENT_ACTIONS.agent.transferOwnership);
-    if (!user?._id) throw new ExpectedError('Login required');
-
-    const { agent, scope } = await requireScopedAgent({
-      models,
-      subdomain,
-      user,
-      action: ERXES_AGENT_ACTIONS.agent.transferOwnership,
-      agentId: _id,
-    });
-    if (scope !== 'all') {
-      throw new ExpectedError('Ownership transfer requires all-agent scope');
-    }
-
-    const owner = (await sendTRPCMessage({
-      subdomain,
-      pluginName: 'core',
-      module: 'users',
-      action: 'findOne',
-      method: 'query',
-      input: { query: { _id: newOwnerUserId, isActive: { $ne: false } } },
-      defaultValue: null,
-    })) as CoreUser | null;
-    if (!owner?._id) throw new ExpectedError('Owner user not found');
-
-    return models.MastraAgent.updateAgent(
-      _id,
-      { createdBy: owner._id },
-      agent.createdBy,
-    );
-  },
-
-  mastraAgentSetGrant: async (
-    _parent: undefined,
-    {
-      _id,
-      grantGroupId: requestedGroupId,
-    }: { _id: string; grantGroupId?: string | null },
-    { models, subdomain, user, checkPermission }: IContext,
-  ) => {
-    const canManageGrant =
-      (await canGroup(subdomain, 'permissionsAgentProfilesManage', user)) ||
-      (await canGroup(subdomain, 'permissionsManage', user));
-    if (!canManageGrant) throw new ExpectedError('Permission required');
-    await checkPermission(ERXES_AGENT_ACTIONS.agent.update);
-    if (!user?._id) throw new ExpectedError('Login required');
-    const grantGroupId = requestedGroupId?.trim() || null;
-
-    const { agent } = await requireScopedAgent({
-      models,
-      subdomain,
-      user,
-      action: ERXES_AGENT_ACTIONS.agent.update,
-      agentId: _id,
-    });
-    if (grantGroupId) {
-      await fetchGrantGroup(subdomain, grantGroupId);
-    }
-
-    if (agent.serviceUserId) {
-      await syncServiceUserGroup({
-        serviceUserId: agent.serviceUserId,
-        groupId: grantGroupId,
-        subdomain,
-      });
-    }
-
-    return models.MastraAgent.updateAgent(
-      _id,
-      { grantGroupId },
-      agent.createdBy,
-    );
   },
 
   mastraAgentRemove: async (
@@ -299,31 +208,14 @@ export const agentMutations = {
     { _id }: { _id: string },
     { models, subdomain, user, checkPermission }: IContext,
   ) => {
-    await checkPermission(ERXES_AGENT_ACTIONS.agent.remove);
+    await checkPermission('agentsRemove');
     if (!user?._id) throw new ExpectedError('Login required');
-
-    const { agent } = await requireScopedAgent({
-      models,
-      subdomain,
-      user,
-      action: ERXES_AGENT_ACTIONS.agent.remove,
-      agentId: _id,
-    });
-
-    if (agent.serviceUserId) {
-      try {
-        await deactivateServiceUser({
-          serviceUserId: agent.serviceUserId,
-          subdomain,
-        });
-      } catch (error) {
-        console.error(
-          `Failed to deactivate service user for agent ${_id}:`,
-          error,
-        );
-      }
+    try {
+      await models.MastraAgent.getAgent(_id);
+      await deactivateAgentAccount({ userId: _id, subdomain });
+      return models.MastraAgent.removeAgent(_id);
+    } catch (error) {
+      throw toUserFacingAgentError(error);
     }
-
-    return models.MastraAgent.removeAgent(_id, agent.createdBy);
   },
 };

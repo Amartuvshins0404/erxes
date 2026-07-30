@@ -1,15 +1,14 @@
 import { buildAuthHeaders } from '../erxesTools';
 import { runWithAuth } from '../../requestContext';
 
-// WS0-step1: the agent forwards identity as `Authorization: Bearer <token>`
-// and NEVER a `user` header. The decoded `userHeader` stays in requestContext
-// for internal gating only — it must not leak into the outbound headers.
+// Tool calls forward the AI team member's short-lived token as a Bearer.
+// The decoded principal header stays internal and must never leak outbound.
 describe('buildAuthHeaders', () => {
   it('forwards the user token as a Bearer and never a `user` header', async () => {
     await runWithAuth(
       { userHeader: 'forged', token: 'TK', subdomain: 'os' },
       async () => {
-        const headers = buildAuthHeaders('APPTOKEN');
+        const headers = buildAuthHeaders();
         expect(headers['Authorization']).toBe('Bearer TK');
         expect(headers['hostname']).toBe('os');
         // The internal-only user header must never be sent outbound.
@@ -18,20 +17,15 @@ describe('buildAuthHeaders', () => {
     );
   });
 
-  it('falls back to the app token when no user token is present', async () => {
-    await runWithAuth(
-      { userHeader: 'forged', subdomain: 'os' },
-      async () => {
-        const headers = buildAuthHeaders('APPTOKEN');
-        expect(headers['Authorization']).toBe('Bearer APPTOKEN');
-        expect(headers).not.toHaveProperty('user');
-      },
-    );
+  it('fails closed when the AI team-member token is absent', async () => {
+    await runWithAuth({ userHeader: 'forged', subdomain: 'os' }, async () => {
+      expect(() => buildAuthHeaders()).toThrow('Agent principal unavailable');
+    });
   });
 
   it('stamps the correlation id when a processId is given', async () => {
     await runWithAuth({ token: 'TK', subdomain: 'os' }, async () => {
-      const headers = buildAuthHeaders('APPTOKEN', 'proc-123');
+      const headers = buildAuthHeaders('proc-123');
       expect(headers['x-erxes-process-id']).toBe('proc-123');
       expect(headers['Authorization']).toBe('Bearer TK');
     });

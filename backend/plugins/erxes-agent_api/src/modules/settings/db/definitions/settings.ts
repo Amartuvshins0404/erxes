@@ -8,6 +8,4 @@ export const settingsSchema = new Schema({
   defaultAgentId: { type: String },
   // Chat attachments toggle — effective only when core upload storage exists.
   attachmentsEnabled: { type: Boolean, default: true },
-  // 0 = unlimited. Admins exempt. Per-user override (MastraUserSettings) takes precedence.
-  defaultAgentQuota: { type: Number, default: 0 },
 });

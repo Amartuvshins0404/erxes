@@ -56,7 +56,7 @@ export const resolveRequestSkills = async (
   subdomain: string,
   globs: string[],
 ): Promise<StorageResolvedSkillType[]> => {
-  const userId = getCurrentAuth()?.userId ?? '';
+  const userId = getCurrentAuth()?.initiatorUserId ?? '';
   const reachable = await resolveReachableSkills(subdomain, userId, globs);
   return reachable.map((r) => r.skill);
 };

@@ -1,11 +1,3 @@
-// artifacts.ts pulls REACT_APP_API_URL and card icons for the non-logic
-// helpers; stub both so the pure readers under test load under node.
-jest.mock('erxes-ui', () => ({ REACT_APP_API_URL: 'http://localhost:4000' }));
-jest.mock(
-  '@tabler/icons-react',
-  () => new Proxy({}, { get: () => () => null }),
-);
-
 import type { AgentUIMessage } from '~/modules/chat/types';
 import type { ArtifactGroup } from '~/modules/chat/hooks/useThreadArtifacts';
 import {
@@ -14,6 +6,14 @@ import {
   mergeArtifacts,
   type Artifact,
 } from '~/modules/chat/lib/artifacts';
+
+// artifacts.ts pulls REACT_APP_API_URL and card icons for the non-logic
+// helpers; stub both so the pure readers under test load under node.
+jest.mock('erxes-ui', () => ({ REACT_APP_API_URL: 'http://localhost:4000' }));
+jest.mock(
+  '@tabler/icons-react',
+  () => new Proxy({}, { get: () => () => null }),
+);
 
 type MessagePart = AgentUIMessage['parts'][number];
 

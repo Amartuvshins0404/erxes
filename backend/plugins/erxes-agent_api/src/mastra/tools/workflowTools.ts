@@ -18,6 +18,7 @@ import {
 import { buildManualEnvelope } from '../workflows/envelope';
 import { runWorkflow } from '../workflows/runtime';
 import { assertWorkflowSchedulable } from '../auth/backgroundPrincipal';
+import { getAgentAccount } from '../auth/servicePrincipal';
 import { getOperationRegistry, OperationRegistry } from './operationRegistry';
 import { syncTenantSchedules } from '../scheduleSync';
 import {
@@ -130,15 +131,24 @@ function currentAgentId(): string | undefined {
 }
 
 /**
- * The referenced owning agent must exist and be enabled; disabling it is the
- * background workflow kill switch.
+ * A workflow owner is both a canonical agent profile and an active core
+ * service-user account. Deactivating that account is the background kill
+ * switch.
  */
 async function assertAgentExists(
   models: IModels,
   agentId: string,
 ): Promise<void> {
-  const agent = await models.MastraAgent.findOne({ agentId, isEnabled: true });
+  const agent = await models.MastraAgent.findOne({ _id: agentId });
   if (!agent) {
+    throw new ExpectedError(
+      `Owning agent "${agentId}" not found or disabled — enable it or reassign the workflow.`,
+    );
+  }
+
+  try {
+    await getAgentAccount({ userId: agentId, subdomain: tenant() });
+  } catch {
     throw new ExpectedError(
       `Owning agent "${agentId}" not found or disabled — enable it or reassign the workflow.`,
     );
@@ -669,6 +679,7 @@ export const workflowUpdateTool = tool({
           if (enable) {
             await assertWorkflowSchedulable({
               models,
+              subdomain: tenant(),
               agentId: existing.agentId,
               definition: existing.definition,
             });

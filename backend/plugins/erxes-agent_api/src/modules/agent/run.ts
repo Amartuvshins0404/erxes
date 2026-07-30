@@ -47,9 +47,6 @@ export async function runAgentTurn(params: {
 
     if (!uniqueResults.length) return null;
 
-    // Diagnostic: what did the agent actually call, and what came back?
-    logToolResults(uniqueResults);
-
     return await synthesizeFromToolResults({
       agent,
       message,
@@ -125,35 +122,6 @@ export function dedupeToolResults(
     const id = tr.toolCallId || tr.id || JSON.stringify(tr);
     return seenIds.has(id) ? false : (seenIds.add(id), true);
   });
-}
-
-/** Diagnostic log of which tools ran and the shape of what each returned. */
-export function logToolResults(uniqueResults: ToolResultLike[]) {
-  console.log(
-    '[mastraAgentChat] tool results:',
-    JSON.stringify(
-      uniqueResults.map((tr) => {
-        const data = tr.result ?? tr;
-        const record =
-          data && typeof data === 'object'
-            ? (data as Record<string, unknown>)
-            : null;
-        return {
-          tool: tr.toolName || tr.name,
-          shape:
-            data == null
-              ? 'null'
-              : Array.isArray(data)
-                ? `array(${data.length})`
-                : typeof data === 'object'
-                  ? Object.keys(data).slice(0, 6)
-                  : typeof data,
-          success: record ? record.success : undefined,
-          error: record ? record.error || record.message : undefined,
-        };
-      }),
-    ),
-  );
 }
 
 // Turn a set of tool results into a one-or-two sentence human answer. Skips

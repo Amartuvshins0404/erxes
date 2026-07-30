@@ -1,25 +1,11 @@
 import { sendTRPCMessage } from 'erxes-api-shared/utils';
 
 // ---------------------------------------------------------------------------
-// Run-token minting (agent-principal identity swap — step 22).
+// Run-token minting for an AI team-member account.
 //
-// Background runs (frontline bots and scheduled/automation workflows) have no
-// chatting user. They mint a short-lived gateway token for
-// the AGENT'S SERVICE USER — a passwordless, non-owner, role:'system' core user
-// (see servicePrincipal.ts) — via core's `users.issueRunToken` mutation. That
-// endpoint authenticates the CLIENT with the erxes App token (already stored in
-// Agent settings as `erxesApiToken`), so no extra secret is provisioned. The
-// agent forwards the minted token as `Authorization: Bearer`; the gateway then
-// resolves the request as that bounded service user.
-//
-// The app token here is ONLY the client credential presented to the minting
-// endpoint — never the acting principal. The minted service-user token is the
-// principal every background operation runs as.
-//
-// Prior to step 22 background runs minted for the AGENT'S HUMAN OWNER
-// (resolveOwner / resolveBackgroundToken / isSecureBackgroundRunRequired). That
-// path is retired: the human owner is no longer the background identity — each
-// agent runs as its own service user, resolved in resolveBackgroundPrincipal.
+// The app token is only the client credential presented to core's
+// `users.issueRunToken`. The returned short-lived token identifies the
+// passwordless, non-owner AI team member and is the sole acting principal.
 // ---------------------------------------------------------------------------
 
 /**

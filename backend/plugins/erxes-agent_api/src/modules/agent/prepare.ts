@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { IUserDocument } from 'erxes-api-shared/core-types';
 import { ExpectedError } from 'erxes-api-shared/utils';
-import { canUserAccessAgent, getUserUnitIds } from '@/agent/utils';
 import { IModels } from '~/connectionResolvers';
 import { getOrCreateAgent } from '~/mastra/agentRuntime';
 import { isAdvancedMemoryEnabled } from '~/mastra/memory/config';
@@ -16,6 +15,7 @@ import { buildActivatedSkillsBlock } from '@/skills/service/skillsService';
 import { IMastraAgentDocument } from '@/agent/@types/agent';
 import { IMastraProviderDocument } from '@/provider/@types/provider';
 import { IMastraSettingsDocument } from '@/settings/@types/settings';
+import { resolveAgentPrincipal } from '~/mastra/auth/backgroundPrincipal';
 import {
   MemoryBinding,
   PreparedTurn,
@@ -23,8 +23,6 @@ import {
   TurnIdentity,
   TurnMessage,
 } from '@/agent/types';
-import { requireActionScope } from '@/_shared/authorization';
-import { ERXES_AGENT_ACTIONS } from '~/meta/permissionActions';
 
 // Turn setup: everything a chat turn needs before the model runs — agent +
 // tools, thread ownership check, replayed history, advanced-memory blocks, and
@@ -34,8 +32,8 @@ import { ERXES_AGENT_ACTIONS } from '~/meta/permissionActions';
 // decides resource scoping, auth, ownership gating, and the memory toggle.
 // Throws user-facing errors on bad agent/thread.
 
-// Per-identity resource id, the memory toggle, and the auth context. Pure
-// (no I/O) so the spine reads as straight-line logic.
+// Per-identity resource id and memory toggle. API authorization is resolved
+// separately from the AI team-member principal for every identity.
 function resolveIdentity(
   identity: TurnIdentity,
   agentId: string,
@@ -44,28 +42,16 @@ function resolveIdentity(
 ): {
   resourceId: string;
   useMemory: boolean;
-  userHeader?: string;
-  token?: string;
 } {
   switch (identity.kind) {
     case 'user':
       return {
         resourceId: deriveResourceId({ user: identity.user, agentId }),
-        // Advanced memory rides on the agent's own history toggle.
         useMemory: advanced,
-        userHeader: identity.user
-          ? Buffer.from(JSON.stringify(identity.user)).toString('base64')
-          : undefined,
-        // Forward the logged-in user's login token outbound (as a Bearer) so
-        // gateway calls run under THEIR permissions — not the app token. The
-        // decoded user carries loginToken even though IUserDocument omits it.
-        token: (identity.user as { loginToken?: string } | undefined)
-          ?.loginToken,
       };
     case 'bot':
       return {
         resourceId: identity.resourceKey,
-        // The bot only persists/recalls when there is a real user message.
         useMemory: advanced && Boolean(message.trim()),
       };
     case 'schedule':
@@ -99,51 +85,20 @@ interface TurnConfig {
   providers: IMastraProviderDocument[];
 }
 
-// The concurrent config/access reads plus the access-control gate. Four
-// independent reads collapsed into one round trip. Unit membership lives on the
-// unit document (not the user), so it needs its own query — issued in parallel
-// with the other three so it adds no wall-clock latency. Non-user identities
-// (bot, schedule) don't need unit membership.
+// Read runtime configuration. Core account status and permissions are checked
+// by resolveAgentPrincipal before any model/tool execution.
 async function readTurnConfig(
   models: IModels,
-  subdomain: string,
-  identity: TurnIdentity,
   agentId: string,
 ): Promise<TurnConfig> {
-  const [agentConfig, settings, providers, unitIds, actionScope] =
-    await Promise.all([
-      models.MastraAgent.findOne({ agentId, isEnabled: true }),
-      models.MastraSettings.getSettings(),
-      models.MastraProvider.find({ isEnabled: true }),
-      identity.kind === 'user' && identity.user
-        ? getUserUnitIds(models, identity.user._id)
-        : Promise.resolve<string[]>([]),
-      identity.kind === 'user' && identity.user
-        ? requireActionScope({
-            subdomain,
-            user: identity.user,
-            action: ERXES_AGENT_ACTIONS.agent.chat,
-          })
-        : Promise.resolve(null),
-    ]);
-  if (!agentConfig)
-    throw new ExpectedError(`Agent "${agentId}" not found or disabled`);
-
-  if (identity.kind === 'user' && identity.user) {
-    if (
-      !canUserAccessAgent(
-        agentConfig,
-        identity.user._id,
-        actionScope ?? 'own',
-        identity.user.branchIds ?? [],
-        identity.user.departmentIds ?? [],
-        unitIds,
-      )
-    ) {
-      throw new ExpectedError(`Agent "${agentId}" not found or disabled`);
-    }
+  const [agentConfig, settings, providers] = await Promise.all([
+    models.MastraAgent.findOne({ _id: agentId }),
+    models.MastraSettings.getSettings(),
+    models.MastraProvider.find({ isEnabled: true }),
+  ]);
+  if (!agentConfig) {
+    throw new ExpectedError(`AI team member "${agentId}" was not found`);
   }
-
   return { agentConfig, settings, providers };
 }
 
@@ -151,8 +106,6 @@ interface TurnMemory {
   advanced: boolean;
   resourceId: string;
   useMemory: boolean;
-  userHeader?: string;
-  token?: string;
   memCtx: MemoryContext;
   memoryBinding?: MemoryBinding;
 }
@@ -174,7 +127,7 @@ function resolveTurnMemory(args: {
   // Advanced memory rides on the agent's own memory toggle.
   const advanced = isAdvancedMemoryEnabled() && useHistory;
 
-  const { resourceId, useMemory, userHeader, token } = resolveIdentity(
+  const { resourceId, useMemory } = resolveIdentity(
     identity,
     agentId,
     advanced,
@@ -201,8 +154,6 @@ function resolveTurnMemory(args: {
     advanced,
     resourceId,
     useMemory,
-    userHeader,
-    token,
     memCtx,
     memoryBinding,
   };
@@ -393,29 +344,30 @@ export async function prepareTurn(
 
   const { agentConfig, settings, providers } = await readTurnConfig(
     models,
-    subdomain,
-    identity,
     agentId,
   );
 
   const sessionId = deriveSessionId(threadId);
 
-  const {
-    advanced,
-    resourceId,
-    useMemory,
-    userHeader,
-    token,
-    memCtx,
-    memoryBinding,
-  } = resolveTurnMemory({
-    identity,
+  const { advanced, resourceId, useMemory, memCtx, memoryBinding } =
+    resolveTurnMemory({
+      identity,
+      agentConfig,
+      agentId,
+      message,
+      subdomain,
+      sessionId,
+    });
+  const principal = await resolveAgentPrincipal({
     agentConfig,
-    agentId,
-    message,
     subdomain,
-    sessionId,
+    appToken: settings?.erxesApiToken,
+    models,
+    background: identity.kind !== 'user',
   });
+  if (!principal.ok) {
+    throw new ExpectedError(principal.error);
+  }
 
   const { agent, tools } = await buildAgentAndGateMemory({
     agentConfig,
@@ -446,25 +398,21 @@ export async function prepareTurn(
     settings,
   });
 
-  // Only an in-app user can slash-activate skills; bot turns have no composer.
-  const userId = identity.kind === 'user' ? identity.user?._id : undefined;
+  // Only an in-app user can own or explicitly activate personal skills.
+  const initiatorUserId =
+    identity.kind === 'user' ? identity.user?._id : undefined;
 
   const activated = await activateTurnSkills({
-    userId,
+    userId: initiatorUserId,
     activeSkillNames,
     subdomain,
     agentConfig,
   });
 
   const authCtx = {
-    userHeader,
-    // Interactive turns forward the user's login token; bot turns without one
-    // fall back to the configured app token.
-    token: token ?? settings?.erxesApiToken,
-    userId,
+    ...principal.authCtx,
+    initiatorUserId,
     threadId: sessionId,
-    agentId,
-    subdomain,
     turnId: randomUUID(),
     turnStartedAt: new Date(),
     turnPrompt: (message || '').slice(0, 200),

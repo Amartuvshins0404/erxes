@@ -25,19 +25,21 @@ export interface ToolResultLike {
   result?: unknown;
 }
 
-// The auth context a turn propagates to tools and follow-up LLM calls.
+// The auth context propagated to every tool call.
 export interface TurnAuthCtx {
+  /** Decoded AI team-member principal for internal permission gates. */
   userHeader?: string;
+  /** Short-lived token minted for the AI team member. */
   token?: string;
+  principalUserId?: string;
+  /** Human who initiated an interactive turn; absent for background events. */
+  initiatorUserId?: string;
   subdomain?: string;
   threadId?: string;
   turnId?: string;
   turnStartedAt?: Date;
   turnPrompt?: string;
   resourceId?: string;
-  // True for unattended frontline-bot execution. Workflow execution carries
-  // the same flag through BackgroundAuthCtx so destructive operations remain
-  // gated without live approval.
   background?: boolean;
 }
 

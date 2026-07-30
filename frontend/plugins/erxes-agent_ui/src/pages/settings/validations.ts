@@ -34,7 +34,6 @@ export const generalSettingsSchema = z.object({
   erxesApiToken: z.string(),
   defaultAgentId: z.string(),
   attachmentsEnabled: z.boolean(),
-  defaultAgentQuota: z.number().int().min(0).default(0),
 });
 
 export type GeneralSettingsValues = z.infer<typeof generalSettingsSchema>;
@@ -44,7 +43,6 @@ export const GENERAL_SETTINGS_DEFAULTS: GeneralSettingsValues = {
   erxesApiToken: '',
   defaultAgentId: '',
   attachmentsEnabled: true,
-  defaultAgentQuota: 0,
 };
 
 // Sensible default voice when none is chosen — a natural Chimege v2 female.

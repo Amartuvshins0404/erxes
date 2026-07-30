@@ -214,6 +214,9 @@ describe('autofit', () => {
     expect(info.ok).toBe(true);
     expect(info.width).toBe(SLIDE_W * RENDER_SCALE);
     expect(info.height).toBe(SLIDE_H * RENDER_SCALE);
+  });
+});
+
 describe('getFonts', () => {
   it('exposes the full per-glyph fallback set with Noto Sans leading', () => {
     const fonts = getFonts();

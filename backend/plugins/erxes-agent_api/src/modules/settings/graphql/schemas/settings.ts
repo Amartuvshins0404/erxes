@@ -22,7 +22,6 @@ export const types = `
     defaultAgentId: String
     attachmentsEnabled: Boolean
     attachmentStorage: MastraAttachmentStorageStatus
-    defaultAgentQuota: Int
 
     # Read-only: the "Advanced memory feature" is controlled by the
     # ERXES_AGENT_MEMORY env var, not by app data. Surfaced for display only.
@@ -34,12 +33,6 @@ export const types = `
     erxesApiToken: String
     defaultAgentId: String
     attachmentsEnabled: Boolean
-    defaultAgentQuota: Int
-  }
-
-  type MastraUserSettings {
-    userId: String!
-    agentQuota: Int
   }
 `;
 
@@ -47,10 +40,8 @@ export const queries = `
   mastraSettings: MastraSettings
   mastraAttachmentStorageStatus: MastraAttachmentStorageStatus
   mastraVoiceStatus: MastraVoiceStatus
-  mastraUserAgentQuota(userId: String!): MastraUserSettings
 `;
 
 export const mutations = `
   mastraSettingsSave(doc: MastraSettingsInput!): MastraSettings
-  mastraUserAgentQuotaSet(userId: String!, quota: Int): MastraUserSettings
 `;

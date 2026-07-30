@@ -1,9 +1,4 @@
-// turn.ts statically imports agentRuntime, which pulls ESM-only p-map via
-// @mastra/core/agent and fails to parse under the nx jest preset. Stub it so the
-// pure helper under test loads.
-jest.mock('~/mastra/agentRuntime', () => ({ getOrCreateAgent: jest.fn() }));
-
-import { toUserFacingError } from '@/agent/turn';
+import { toUserFacingError } from '@/agent/run';
 
 describe('toUserFacingError', () => {
   const cases: [string, RegExp][] = [

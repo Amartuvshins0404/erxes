@@ -1,16 +1,10 @@
-import DOMPurify from 'dompurify';
+/** @jest-environment jsdom */
 
-// Mirrors the exact sanitize profile used by PanZoomSvg before the SVG is
-// injected via dangerouslySetInnerHTML. Guards against XSS regressions while
-// ensuring legitimate Mermaid/chart diagram content survives.
-const sanitize = (svg: string) =>
-  DOMPurify.sanitize(svg, {
-    USE_PROFILES: { svg: true, svgFilters: true, html: true },
-  });
+import { sanitizeSvg } from '../hooks/usePanZoom';
 
 describe('PanZoomSvg SVG sanitization', () => {
   it('strips <script> elements from injected SVG', () => {
-    const out = sanitize(
+    const out = sanitizeSvg(
       '<svg xmlns="http://www.w3.org/2000/svg"><script>window.__pwned = 1</script><rect width="10" height="10"/></svg>',
     );
     expect(out).not.toMatch(/<script/i);
@@ -19,7 +13,7 @@ describe('PanZoomSvg SVG sanitization', () => {
   });
 
   it('strips inline event handlers (onload / onclick)', () => {
-    const out = sanitize(
+    const out = sanitizeSvg(
       '<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"><rect onclick="alert(2)" width="10" height="10"/></svg>',
     );
     expect(out.toLowerCase()).not.toContain('onload');
@@ -28,10 +22,11 @@ describe('PanZoomSvg SVG sanitization', () => {
   });
 
   it('strips javascript: URLs in anchors', () => {
-    const out = sanitize(
-      '<svg xmlns="http://www.w3.org/2000/svg"><a href="javascript:alert(1)"><text>x</text></a></svg>',
+    const javascriptProtocol = ['java', 'script:'].join('');
+    const out = sanitizeSvg(
+      `<svg xmlns="http://www.w3.org/2000/svg"><a href="${javascriptProtocol}alert(1)"><text>x</text></a></svg>`,
     );
-    expect(out.toLowerCase()).not.toContain('javascript:');
+    expect(out.toLowerCase()).not.toContain(javascriptProtocol);
   });
 
   it('preserves legitimate diagram content (paths, text, styles, viewBox)', () => {
@@ -42,7 +37,7 @@ describe('PanZoomSvg SVG sanitization', () => {
       '<path d="M0 0 L80 40" stroke="#333"/>' +
       '<text x="10" y="20" class="nodeLabel">Start</text></g>' +
       '</svg>';
-    const out = sanitize(diagram);
+    const out = sanitizeSvg(diagram);
     expect(out).toContain('viewBox="0 0 200 100"');
     expect(out).toContain('<path');
     expect(out).toContain('nodeLabel');
@@ -51,7 +46,7 @@ describe('PanZoomSvg SVG sanitization', () => {
   });
 
   it('preserves foreignObject labels used by Mermaid html labels', () => {
-    const out = sanitize(
+    const out = sanitizeSvg(
       '<svg xmlns="http://www.w3.org/2000/svg"><foreignObject width="100" height="30">' +
         '<div xmlns="http://www.w3.org/1999/xhtml" class="nodeLabel">Hello</div>' +
         '</foreignObject></svg>',

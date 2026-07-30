@@ -6,9 +6,8 @@ export const workflowSchema = new Schema(
     _id: mongooseStringRandomId,
     name: { type: String, required: true, label: 'Name' },
     description: { type: String, label: 'Description' },
-    // Owning business agentId (not the Mongoose _id), used as the unattended
-    // execution identity. Optional in storage so boot backfill can disable
-    // unassignable legacy rows; mutation/tool boundaries require a valid owner.
+    // Canonical core user id of the owning AI team member. Optional only for
+    // legacy rows awaiting the idempotent startup backfill.
     agentId: { type: String, index: true, label: 'Agent' },
     // The full DSL document ({ trigger, policy, bindings, limits, steps }).
     // Schema-validated in code (validateDefinition) — Mongo stores it opaquely.

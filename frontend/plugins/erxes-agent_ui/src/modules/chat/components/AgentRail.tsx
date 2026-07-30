@@ -30,9 +30,6 @@ const AgentRailItem = memo(
     const hasUnread = useAgentUnread(agent._id) && !isActive;
     const activity = useAgentActivity(agent._id);
     const showActivity = isWorking ? activity : undefined;
-    const canOpenEditor =
-      agent.capabilities?.canReadConfig === true &&
-      agent.capabilities?.canEdit === true;
 
     return (
       <div
@@ -56,10 +53,10 @@ const AgentRailItem = memo(
               {hasUnread && (
                 <span className="size-1.5 shrink-0 rounded-full bg-destructive" />
               )}
-              <span className="truncate">{agent.name}</span>
+              <span className="truncate">{agent.accountName}</span>
               {isNameDuplicated && (
                 <span className="shrink-0 font-mono text-[10px] font-normal text-muted-foreground">
-                  {agent.agentId}
+                  {agent._id.slice(-6)}
                 </span>
               )}
             </p>
@@ -71,32 +68,30 @@ const AgentRailItem = memo(
               </p>
             ) : (
               <p className="mt-0.5 truncate font-mono text-xs text-muted-foreground">
-                {agent.model || agent.description || agent.agentId}
+                {agent.model}
               </p>
             )}
           </div>
         </button>
 
-        {/* Quick-edit is available only when the server says this specific agent
-          can be read in full and edited. */}
-        {canOpenEditor && (
-          <Tooltip.Provider>
-            <Tooltip>
-              <Tooltip.Trigger asChild>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  aria-label={`Edit ${agent.name} settings`}
-                  className="absolute right-1 top-1 z-10 size-6 text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100"
-                  onClick={() => onEdit(agent)}
-                >
-                  <IconSettings className="size-3.5" />
-                </Button>
-              </Tooltip.Trigger>
-              <Tooltip.Content>Edit agent settings</Tooltip.Content>
-            </Tooltip>
-          </Tooltip.Provider>
-        )}
+        {/* Quick-edit affordance — appears on hover/focus, opens the in-chat
+          settings modal without leaving the conversation. */}
+        <Tooltip.Provider>
+          <Tooltip>
+            <Tooltip.Trigger asChild>
+              <Button
+                size="icon"
+                variant="ghost"
+                aria-label={`Edit ${agent.accountName} settings`}
+                className="absolute right-1 top-1 z-10 size-6 text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100"
+                onClick={() => onEdit(agent)}
+              >
+                <IconSettings className="size-3.5" />
+              </Button>
+            </Tooltip.Trigger>
+            <Tooltip.Content>Edit agent settings</Tooltip.Content>
+          </Tooltip>
+        </Tooltip.Provider>
       </div>
     );
   },
@@ -119,11 +114,9 @@ export const AgentRail = memo(
     // only while open so its form/mutation/subscriptions don't exist per row.
     const [editingAgent, setEditingAgent] = useState<IChatAgent | null>(null);
 
-    // Names aren't unique, so duplicates would render as identical rows. Flag the
-    // colliding names once for the whole list and tag those rows with the unique
-    // agentId so they stay tellable apart.
+    // Names are not unique; show an account-id suffix only for collisions.
     const duplicatedNames = useMemo(
-      () => duplicatedAgentNames(agents.map((a) => a.name)),
+      () => duplicatedAgentNames(agents.map((agent) => agent.accountName)),
       [agents],
     );
 
@@ -131,7 +124,7 @@ export const AgentRail = memo(
       <div className="flex flex-col h-full">
         <div className="px-3 py-2.5 border-b">
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-            Agents
+            AI Team Members
           </p>
         </div>
         <div className="ea-scroll flex-1 overflow-auto">
@@ -145,7 +138,7 @@ export const AgentRail = memo(
             <div className="p-4 text-center">
               <ErxesLogoIcon className="h-7 w-auto text-muted-foreground mx-auto mb-2" />
               <p className="text-sm text-muted-foreground">
-                No enabled agents.
+                No active AI team members.
               </p>
             </div>
           ) : (
@@ -155,7 +148,7 @@ export const AgentRail = memo(
                   key={agent._id}
                   agent={agent}
                   isActive={activeAgentId === agent._id}
-                  isNameDuplicated={duplicatedNames.has(agent.name)}
+                  isNameDuplicated={duplicatedNames.has(agent.accountName)}
                   onSelect={onSelect}
                   onEdit={setEditingAgent}
                 />

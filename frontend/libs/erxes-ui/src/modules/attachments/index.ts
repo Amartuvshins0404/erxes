@@ -8,4 +8,4 @@ export type {
 
 export { useAttachmentContext } from './context';
 export { parseFilesAsAttachments } from './types';
-export type { IAttachment, AttachmentContextType } from './types';
+export type { AttachmentContextType } from './types';

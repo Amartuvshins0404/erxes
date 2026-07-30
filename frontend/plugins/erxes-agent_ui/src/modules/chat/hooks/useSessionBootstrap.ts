@@ -4,16 +4,13 @@ import { useParams, useSearchParams } from 'react-router-dom';
 import { IMastraThread } from '~/modules/chat/types';
 import { chatStore, useChatStore } from '~/modules/chat/store/chatStore';
 
-// Owns the session state-machine that used to live in ChatPage's effects: slug→id
-// redirect, ?thread= deep-link, current-agent tracking, and bootstrapping /
-// re-homing the active session ("pick the most-recent thread or open a draft").
-// Keeps that business logic out of the view; ChatPage retains only view-local
-// effects (scroll-pin, focus, textarea autogrow).
+// Owns addressable thread selection, current-agent tracking, and session
+// bootstrapping/re-homing for one canonical AI team-member account id.
 export const useSessionBootstrap = (
-  selectedAgent: { _id: string; agentId: string } | null,
+  selectedAgent: { _id: string } | null,
   threads: IMastraThread[],
   sessionsLoaded: boolean,
-): string | null => {
+): void => {
   const { agentId } = useParams<{ agentId: string }>();
   const apolloClient = useApolloClient();
   const [searchParams] = useSearchParams();
@@ -22,17 +19,7 @@ export const useSessionBootstrap = (
     agentId ? s.agents[agentId]?.activeThreadId : undefined,
   );
   const threadParam = searchParams.get('thread');
-  const mastraAgentId = selectedAgent?.agentId;
-  const selectedId = selectedAgent?._id;
-
-  // Slug routes normalize to the _id route so the chat store stays keyed by _id.
-  // Returned as a redirect target (rendered via <Navigate replace/> by the view)
-  // rather than fired from an effect, so the normalization isn't a faked handler.
-  const search = searchParams.toString();
-  const slugRedirect =
-    selectedId && agentId && selectedId !== agentId
-      ? `/erxes-agent/chat/${selectedId}${search ? `?${search}` : ''}`
-      : null;
+  const mastraAgentId = selectedAgent?._id;
 
   // ?thread=<id> is the addressable active conversation: this opens it once
   // sessions have loaded, and re-fires whenever the value changes — a deep-link,
@@ -77,6 +64,4 @@ export const useSessionBootstrap = (
     threads,
     apolloClient,
   ]);
-
-  return slugRedirect;
 };

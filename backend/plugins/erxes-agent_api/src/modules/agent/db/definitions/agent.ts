@@ -4,9 +4,6 @@ import { mongooseStringRandomId } from 'erxes-api-shared/utils';
 export const agentSchema = new Schema(
   {
     _id: mongooseStringRandomId,
-    name: { type: String, required: true, maxlength: 200, label: 'Name' },
-    agentId: { type: String, required: true, unique: true, label: 'Agent ID' },
-    description: { type: String, label: 'Description' },
     instructions: { type: String, maxlength: 20000, label: 'Instructions' },
     provider: { type: String, required: true, label: 'Provider' },
     model: { type: String, required: true, label: 'Model' },
@@ -35,26 +32,6 @@ export const agentSchema = new Schema(
     // (the legacy OpenAI-compatible loop defaults to 0). Some models pin it:
     // e.g. Kimi thinking models reject anything but 1.
     temperature: { type: Number, min: 0, max: 2, label: 'Temperature' },
-    isEnabled: { type: Boolean, default: true },
-    createdBy: { type: String, label: 'Created By' },
-    // Agent-as-principal (step 21). serviceUserId: the agent's dedicated core
-    // service user (passwordless, role:'system'), provisioned lazily by
-    // ensureServiceUser. grantGroupId: the permission group synced onto that
-    // user (its server-side grant). Both unset until the lifecycle runs.
-    serviceUserId: { type: String, label: 'Service User' },
-    grantGroupId: { type: String, label: 'Grant Group' },
-    visibility: {
-      type: String,
-      enum: ['private', 'team', 'department', 'unit', 'org'],
-      default: 'private',
-      label: 'Visibility',
-    },
-    // teamId   — branch _id for 'team' scope; also stored as cascade context for
-    //            'department' and 'unit' scopes so the edit form can reconstruct
-    //            the branch selection without a reverse-lookup.
-    teamId: { type: String },
-    departmentId: { type: String },
-    unitId: { type: String },
   },
   { timestamps: true },
 );

@@ -69,11 +69,11 @@ export const MessageList = ({
             <AgentMark size="lg" />
             <div className="space-y-1">
               <p className="text-xl font-semibold tracking-tight">
-                {agent.name}
+                {agent.accountName}
               </p>
-              {agent.description && (
+              {agent.accountDescription && (
                 <p className="mx-auto max-w-sm text-sm text-muted-foreground">
-                  {agent.description}
+                  {agent.accountDescription}
                 </p>
               )}
             </div>
@@ -122,7 +122,9 @@ export const MessageList = ({
                 debug={debug}
               />
             ))}
-            {chatLoading && lastMsg?.role !== 'assistant' && <WaitingIndicator />}
+            {chatLoading && lastMsg?.role !== 'assistant' && (
+              <WaitingIndicator />
+            )}
           </>
         )}
         <div ref={endRef} />

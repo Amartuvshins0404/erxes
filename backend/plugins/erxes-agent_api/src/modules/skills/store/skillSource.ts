@@ -34,7 +34,7 @@ export class ErxesMongoSkillSource implements SkillSource {
   }
 
   async #resolved(): Promise<Map<string, CachedSkill>> {
-    const userId = getCurrentAuth()?.userId ?? '';
+    const userId = getCurrentAuth()?.initiatorUserId ?? '';
     const now = Date.now();
     if (
       this.#cache &&

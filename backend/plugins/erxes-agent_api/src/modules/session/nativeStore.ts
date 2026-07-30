@@ -376,6 +376,42 @@ export async function ensureThreadRegistered(
   await preserveTitleUpdate(memory, existing, threadId, { agentId, subdomain });
 }
 
+/**
+ * Rewrite legacy agent identifiers in native thread metadata after the account
+ * becomes canonical. Resource ownership and messages stay untouched.
+ */
+export async function migrateNativeAgentIds(
+  subdomain: string,
+  aliases: ReadonlyMap<string, string>,
+): Promise<number> {
+  if (!aliases.size) return 0;
+  const memory = await getNativeMemory(subdomain);
+  const perPage = 100;
+  let page = 0;
+  let changed = 0;
+  while (true) {
+    const result = await memory.listThreads({
+      filter: { metadata: { subdomain } },
+      orderBy: { field: 'createdAt', direction: 'ASC' },
+      perPage,
+      page,
+    });
+    const threads = result?.threads ?? [];
+    for (const thread of threads) {
+      const metadata = (thread.metadata ?? {}) as { agentId?: string };
+      const agentId = metadata.agentId
+        ? aliases.get(metadata.agentId)
+        : undefined;
+      if (!agentId || agentId === metadata.agentId) continue;
+      await preserveTitleUpdate(memory, thread, thread.id, { agentId });
+      changed += 1;
+    }
+    if (threads.length < perPage) break;
+    page += 1;
+  }
+  return changed;
+}
+
 /** Ownership-checked transcript for one thread (chronological), UI shape. */
 /** Throw "Thread not found" unless `userId` owns `threadId` (resourceId scope).
  *  Reused by reads that live outside the native store (e.g. the artifact list). */

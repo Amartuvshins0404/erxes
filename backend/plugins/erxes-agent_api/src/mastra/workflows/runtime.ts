@@ -16,7 +16,7 @@ import {
   destructiveOpsPreapproved,
 } from '../tools/destructiveGuard';
 import { runWithAuth, getCurrentAuth } from '../requestContext';
-import { resolveBackgroundPrincipal } from '../auth/backgroundPrincipal';
+import { resolveAgentPrincipal } from '../auth/backgroundPrincipal';
 import { writeAgentAction, makeAgentProcessId } from '../auditLog';
 import { getOperationRegistry } from '../tools/operationRegistry';
 import type { IModels } from '~/connectionResolvers';
@@ -44,10 +44,8 @@ export function workflowTenant(
 }
 
 /**
- * Snapshot storage lives in a DEDICATED database, never the erxes one: the
- * @mastra/mongodb adapter auto-creates collections named mastra_threads,
- * mastra_messages, mastra_agents — identical to this plugin's own collections
- * (verified live; docs/WORKFLOW-SPEC.md §7).
+ * Snapshot storage lives in a dedicated database, never the erxes business
+ * database. The @mastra/mongodb adapter owns its runtime collections there.
  */
 export function workflowDbName(tenant: string, env: Env = process.env): string {
   const prefix = (
@@ -69,7 +67,6 @@ function getWorkflowStorage(tenant: string): unknown {
   if (hit) return hit;
 
   // require(), not import() — see the loader-deadlock note in compiler.ts.
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
   const { MongoDBStore } = require('@mastra/mongodb'); // skipcq: JS-0359
   const storage = new MongoDBStore({
     id: `erxes-agent-workflows-${tenant}`,
@@ -133,14 +130,12 @@ function getJudgeAgent(
   const hit = judgeCache.get(agentConfig._id);
   if (hit && hit.version === version) return hit.judge;
 
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
   const { Agent } = require('@mastra/core/agent'); // skipcq: JS-0359
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
   const { buildModel } = require('../providers'); // skipcq: JS-0359
 
   const judge: JudgeAgent = new Agent({
     id: `judge-${agentConfig._id}`,
-    name: `${agentConfig.name} (judgment)`,
+    name: `AI team member ${agentConfig._id} (judgment)`,
     instructions:
       agentConfig.instructions ||
       'You are a precise classifier inside an automated workflow.',
@@ -326,7 +321,6 @@ export async function runWorkflow(args: {
   // NOT awaited — the Workflow object is a thenable (see compiler.ts).
   const compiled = compileDefinition(key, definition, deps);
 
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
   const { Mastra } = require('@mastra/core/mastra'); // skipcq: JS-0359
   const storage = getWorkflowStorage(tenant);
   // A fresh instance per run is deliberate: the compiled graph closes over
@@ -436,16 +430,10 @@ export async function runBackgroundWorkflow(args: {
       'This workflow has no owning agent — assign one before it can run in the background.',
     );
   }
-  // A DISABLED owning agent is the kill switch: it must stop the workflows it
-  // owns from running in the background, exactly as it stops the agent's own
-  // scheduled runs. Fail closed just as for a missing agent.
-  const agentConfig = await models.MastraAgent.findOne({
-    agentId,
-    isEnabled: true,
-  });
+  const agentConfig = await models.MastraAgent.findOne({ _id: agentId });
   if (!agentConfig) {
     return failClosed(
-      `This workflow's owning agent "${agentId}" was not found or is disabled — enable it or reassign the workflow before it can run.`,
+      `This workflow's owning AI team member "${agentId}" was not found.`,
     );
   }
   if (agentConfig.destructiveOps === 'allow') {
@@ -458,11 +446,12 @@ export async function runBackgroundWorkflow(args: {
   // authenticates to core's mint endpoint — the minted owner token, bound to the
   // owning agent's principal, is what every operation step runs as.
   const settings = await models.MastraSettings.getSettings();
-  const principal = await resolveBackgroundPrincipal({
+  const principal = await resolveAgentPrincipal({
     agentConfig,
     subdomain,
     appToken: settings?.erxesApiToken,
     models,
+    background: true,
   });
   if (!principal.ok) {
     return failClosed(principal.error);

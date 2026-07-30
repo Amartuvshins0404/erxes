@@ -4,7 +4,8 @@ import * as jwt from 'jsonwebtoken';
 // assert the exact key/TTL the gateway looks up.
 const redisStore: Record<string, unknown> = {};
 const mockRedisSet = jest.fn(
-  (key: string, value: unknown, ..._rest: unknown[]) => {
+  (...args: [key: string, value: unknown, ...rest: unknown[]]) => {
+    const [key, value] = args;
     redisStore[key] = value;
     return Promise.resolve('OK');
   },
@@ -25,28 +26,28 @@ import { userTrpcRouter } from '../user';
 
 const GATEWAY_SECRET = 'gateway-jwt-secret';
 // A representative erxes App token (sk_ + 48 hex, per Apps.createApp).
-const APP_TOKEN =
-  'sk_0123456789abcdef0123456789abcdef0123456789abcdef';
+const APP_TOKEN = 'sk_0123456789abcdef0123456789abcdef0123456789abcdef';
 
 // The Apps lookup is tenant-scoped (ctx.models). It returns the ACTIVE app doc
 // only when the queried token matches AND status:'active' — mirroring the
 // gateway's `findOne({ token, status:'active' })`.
 const makeApps = () => ({
-  findOne: jest.fn(
-    ({ token, status }: { token: string; status: string }) =>
-      Promise.resolve(
-        token === APP_TOKEN && status === 'active'
-          ? { _id: 'app-1', token: APP_TOKEN, status: 'active' }
-          : null,
-      ),
+  findOne: jest.fn(({ token, status }: { token: string; status: string }) =>
+    Promise.resolve(
+      token === APP_TOKEN && status === 'active'
+        ? { _id: 'app-1', token: APP_TOKEN, status: 'active' }
+        : null,
+    ),
   ),
 });
+
+type CallerContext = Parameters<typeof userTrpcRouter.createCaller>[0];
 
 const makeCtx = (userFindOne: jest.Mock, apps = makeApps()) =>
   ({
     subdomain: 'test',
     models: { Users: { findOne: userFindOne }, Apps: apps },
-  }) as any;
+  } as unknown as CallerContext);
 
 describe('users.issueRunToken', () => {
   const OLD_ENV = process.env;
@@ -62,16 +63,18 @@ describe('users.issueRunToken', () => {
     process.env = OLD_ENV;
   });
 
-  it('mints a gateway-verifiable token + Redis key for an active, bounded (non-org-owner) owner', async () => {
+  it('mints a gateway-verifiable token and Redis key for a marked AI team member', async () => {
     const findOne = jest.fn().mockResolvedValue({
-      _id: 'owner-1',
+      _id: 'agent-user-1',
+      role: 'user',
       isOwner: false,
       isActive: true,
+      appId: 'erxes-agent:agent-user-1',
     });
     const caller = userTrpcRouter.createCaller(makeCtx(findOne));
 
     const res = await caller.users.issueRunToken({
-      userId: 'owner-1',
+      userId: 'agent-user-1',
       appToken: APP_TOKEN,
     });
 
@@ -79,9 +82,9 @@ describe('users.issueRunToken', () => {
     const token = (res as { token: string }).token;
     expect(typeof token).toBe('string');
 
-    // Only active owners are eligible.
+    // Only the requested active AI team-member account is eligible.
     expect(findOne).toHaveBeenCalledWith({
-      _id: 'owner-1',
+      _id: 'agent-user-1',
       isActive: { $ne: false },
     });
 
@@ -89,12 +92,12 @@ describe('users.issueRunToken', () => {
     const decoded = jwt.verify(token, GATEWAY_SECRET) as {
       user: { _id: string; isOwner?: boolean };
     };
-    expect(decoded.user._id).toBe('owner-1');
+    expect(decoded.user._id).toBe('agent-user-1');
     expect(decoded.user.isOwner).toBe(false);
 
     // The exact key + 1h TTL the gateway checks.
     expect(mockRedisSet).toHaveBeenCalledWith(
-      'user_token_owner-1_' + token,
+      'user_token_agent-user-1_' + token,
       1,
       'EX',
       3600,
@@ -106,6 +109,8 @@ describe('users.issueRunToken', () => {
       _id: 'org-owner',
       isOwner: true,
       isActive: true,
+      role: 'user',
+      appId: 'erxes-agent:org-owner',
     });
     const caller = userTrpcRouter.createCaller(makeCtx(findOne));
 
@@ -155,7 +160,26 @@ describe('users.issueRunToken', () => {
     expect(mockRedisSet).not.toHaveBeenCalled();
   });
 
-  it('returns null for an inactive or unknown owner', async () => {
+  it('returns null for an ordinary user so the app token cannot impersonate people', async () => {
+    const findOne = jest.fn().mockResolvedValue({
+      _id: 'human-user-1',
+      role: 'user',
+      isOwner: false,
+      isActive: true,
+      appId: undefined,
+    });
+    const caller = userTrpcRouter.createCaller(makeCtx(findOne));
+
+    const res = await caller.users.issueRunToken({
+      userId: 'human-user-1',
+      appToken: APP_TOKEN,
+    });
+
+    expect(res).toBeNull();
+    expect(mockRedisSet).not.toHaveBeenCalled();
+  });
+
+  it('returns null for an inactive or unknown AI team member', async () => {
     const findOne = jest.fn().mockResolvedValue(null);
     const caller = userTrpcRouter.createCaller(makeCtx(findOne));
 

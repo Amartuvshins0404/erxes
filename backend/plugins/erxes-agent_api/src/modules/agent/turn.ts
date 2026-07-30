@@ -36,7 +36,6 @@ export {
   runAgentTurn,
   toUserFacingError,
   dedupeToolResults,
-  logToolResults,
   synthesizeFromToolResults,
 } from '@/agent/run';
 

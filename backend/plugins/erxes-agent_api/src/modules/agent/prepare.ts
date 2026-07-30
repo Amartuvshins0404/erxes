@@ -360,6 +360,7 @@ export async function prepareTurn(
     });
   const principal = await resolveAgentPrincipal({
     agentConfig,
+    models,
     subdomain,
     background: identity.kind !== 'user',
   });

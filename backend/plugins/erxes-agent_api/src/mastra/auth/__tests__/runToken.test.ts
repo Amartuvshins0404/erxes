@@ -1,11 +1,11 @@
-const redisSet = jest.fn();
+const sendTRPCMessage = jest.fn();
 jest.mock('erxes-api-shared/utils', () => ({
-  redis: { set: (...args: unknown[]) => redisSet(...args) },
+  sendTRPCMessage: (...args: unknown[]) => sendTRPCMessage(...args),
 }));
 
-import jwt from 'jsonwebtoken';
 import { mintRunToken } from '../runToken';
 
+const APP_TOKEN = 'existing-erxes-app-token';
 const account = (overrides: Record<string, unknown> = {}) => ({
   _id: 'agent-user-1',
   role: 'user',
@@ -15,62 +15,76 @@ const account = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
-const originalEnv = process.env;
-
 describe('mintRunToken', () => {
   beforeEach(() => {
-    redisSet.mockReset().mockResolvedValue('OK');
-    process.env = {
-      ...originalEnv,
-      NODE_ENV: 'test',
-      JWT_TOKEN_SECRET: 'agent-run-token-test-secret',
-    };
+    sendTRPCMessage.mockReset().mockResolvedValue({ token: 'MINTED' });
   });
 
-  afterAll(() => {
-    process.env = originalEnv;
-  });
-
-  it('mints and registers a one-hour gateway token for the linked core account', async () => {
-    const token = await mintRunToken({ account: account() });
-
-    expect(token).toEqual(expect.any(String));
-    expect(jwt.verify(token as string, 'agent-run-token-test-secret')).toEqual(
-      expect.objectContaining({
-        user: { _id: 'agent-user-1', isOwner: false },
+  it('asks core to mint a token with the existing erxes App credential', async () => {
+    await expect(
+      mintRunToken({
+        account: account(),
+        subdomain: 'os',
+        appToken: APP_TOKEN,
       }),
-    );
-    expect(redisSet).toHaveBeenCalledWith(
-      `user-token-agent-user-1-${token}`,
-      '1',
-      'EX',
-      3600,
-    );
+    ).resolves.toBe('MINTED');
+
+    expect(sendTRPCMessage).toHaveBeenCalledWith({
+      subdomain: 'os',
+      pluginName: 'core',
+      module: 'users',
+      action: 'issueRunToken',
+      method: 'mutation',
+      input: {
+        userId: 'agent-user-1',
+        appToken: APP_TOKEN,
+      },
+      defaultValue: null,
+    });
   });
 
   it.each([
-    ['ordinary human', { appId: undefined }],
-    ['owner', { isOwner: true }],
-    ['inactive account', { isActive: false }],
-    ['empty account id', { _id: ' ' }],
-  ])('refuses an %s principal', async (_label, overrides) => {
+    ['ordinary human', { appId: undefined }, APP_TOKEN],
+    ['owner', { isOwner: true }, APP_TOKEN],
+    ['inactive account', { isActive: false }, APP_TOKEN],
+    ['empty account id', { _id: ' ' }, APP_TOKEN],
+    ['missing App token', {}, undefined],
+    ['blank App token', {}, ' '],
+  ])('refuses an %s principal', async (_label, overrides, appToken) => {
     await expect(
-      mintRunToken({ account: account(overrides) }),
+      mintRunToken({
+        account: account(overrides),
+        subdomain: 'os',
+        appToken,
+      }),
     ).resolves.toBeUndefined();
-    expect(redisSet).not.toHaveBeenCalled();
+    expect(sendTRPCMessage).not.toHaveBeenCalled();
   });
 
-  it('fails closed when token registration fails', async () => {
-    redisSet.mockRejectedValue(new Error('redis unavailable'));
+  it.each([null, {}, { token: '' }, { token: 42 }])(
+    'fails closed on an invalid core response',
+    async (response) => {
+      sendTRPCMessage.mockResolvedValue(response);
 
-    await expect(mintRunToken({ account: account() })).resolves.toBeUndefined();
-  });
+      await expect(
+        mintRunToken({
+          account: account(),
+          subdomain: 'os',
+          appToken: APP_TOKEN,
+        }),
+      ).resolves.toBeUndefined();
+    },
+  );
 
-  it('fails closed in production when the shared JWT secret is not configured', async () => {
-    process.env.NODE_ENV = 'production';
-    delete process.env.JWT_TOKEN_SECRET;
+  it('fails closed when core token issuance fails', async () => {
+    sendTRPCMessage.mockRejectedValue(new Error('core unavailable'));
 
-    await expect(mintRunToken({ account: account() })).resolves.toBeUndefined();
-    expect(redisSet).not.toHaveBeenCalled();
+    await expect(
+      mintRunToken({
+        account: account(),
+        subdomain: 'os',
+        appToken: APP_TOKEN,
+      }),
+    ).resolves.toBeUndefined();
   });
 });

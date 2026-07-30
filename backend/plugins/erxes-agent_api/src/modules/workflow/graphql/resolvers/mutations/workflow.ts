@@ -183,6 +183,7 @@ export const workflowMutations = {
       : null;
     const principal = await resolveAgentPrincipal({
       agentConfig,
+      models,
       subdomain,
       background: false,
     });

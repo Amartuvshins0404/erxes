@@ -27,10 +27,11 @@ export type PrincipalSource =
 /** Resolve and mint a token for the AI team-member account. Never falls back. */
 export async function resolveAgentPrincipal(opts: {
   agentConfig: PrincipalSource;
+  models: IModels;
   subdomain: string;
   background: boolean;
 }): Promise<AgentPrincipalResult> {
-  const { agentConfig, subdomain, background } = opts;
+  const { agentConfig, models, subdomain, background } = opts;
 
   const userId = agentConfig?._id;
   if (!userId) {
@@ -61,7 +62,17 @@ export async function resolveAgentPrincipal(opts: {
     };
   }
 
-  const minted = await mintRunToken({ account });
+  let minted: string | undefined;
+  try {
+    const settings = await models.MastraSettings.getSettings();
+    minted = await mintRunToken({
+      account,
+      subdomain,
+      appToken: settings.erxesApiToken,
+    });
+  } catch {
+    minted = undefined;
+  }
   if (!minted) {
     return {
       ok: false,

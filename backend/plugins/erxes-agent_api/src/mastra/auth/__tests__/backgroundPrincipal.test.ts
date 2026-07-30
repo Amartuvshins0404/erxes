@@ -12,6 +12,7 @@ jest.mock('../servicePrincipal', () => ({
   getAgentAccount: (...args: unknown[]) => getAgentAccount(...args),
 }));
 
+import type { IModels } from '../../../connectionResolvers';
 import type { WorkflowDefinition } from '../../workflows/dsl';
 import {
   assertWorkflowSchedulable,
@@ -34,15 +35,24 @@ const account = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
+const getSettings = jest.fn();
+const principalModels = {
+  MastraSettings: { getSettings },
+} as unknown as IModels;
+
 beforeEach(() => {
   mintRunToken.mockReset().mockResolvedValue('MINTED');
   getAgentAccount.mockReset().mockResolvedValue(account());
+  getSettings
+    .mockReset()
+    .mockResolvedValue({ erxesApiToken: 'existing-erxes-app-token' });
 });
 
 describe('resolveAgentPrincipal', () => {
   it('mints and propagates a bounded token for the canonical team member id', async () => {
     const result = await resolveAgentPrincipal({
       agentConfig: agent,
+      models: principalModels,
       subdomain: 'os',
       background: false,
     });
@@ -71,7 +81,11 @@ describe('resolveAgentPrincipal', () => {
       userId: USER_ID,
       subdomain: 'os',
     });
-    expect(mintRunToken).toHaveBeenCalledWith({ account: account() });
+    expect(mintRunToken).toHaveBeenCalledWith({
+      account: account(),
+      subdomain: 'os',
+      appToken: 'existing-erxes-app-token',
+    });
   });
 
   it('accepts custom permissions without a permission group', async () => {
@@ -86,6 +100,7 @@ describe('resolveAgentPrincipal', () => {
 
     const result = await resolveAgentPrincipal({
       agentConfig: agent,
+      models: principalModels,
       subdomain: 'os',
       background: true,
     });
@@ -98,6 +113,7 @@ describe('resolveAgentPrincipal', () => {
 
     const result = await resolveAgentPrincipal({
       agentConfig: agent,
+      models: principalModels,
       subdomain: 'os',
       background: true,
     });
@@ -119,6 +135,7 @@ describe('resolveAgentPrincipal', () => {
 
     const result = await resolveAgentPrincipal({
       agentConfig: agent,
+      models: principalModels,
       subdomain: 'os',
       background: true,
     });
@@ -137,6 +154,7 @@ describe('resolveAgentPrincipal', () => {
 
     const result = await resolveAgentPrincipal({
       agentConfig: agent,
+      models: principalModels,
       subdomain: 'os',
       background: true,
     });
@@ -148,6 +166,25 @@ describe('resolveAgentPrincipal', () => {
       }),
     );
     expect(result).not.toHaveProperty('authCtx');
+  });
+
+  it('fails closed when the existing App credential cannot be loaded', async () => {
+    getSettings.mockRejectedValue(new Error('settings unavailable'));
+
+    const result = await resolveAgentPrincipal({
+      agentConfig: agent,
+      models: principalModels,
+      subdomain: 'os',
+      background: true,
+    });
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        ok: false,
+        error: expect.stringMatching(/could not mint/i),
+      }),
+    );
+    expect(mintRunToken).not.toHaveBeenCalled();
   });
 });
 

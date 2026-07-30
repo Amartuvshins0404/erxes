@@ -372,6 +372,7 @@ router.post('/bot/:conversationId', llmRouteLimiter, async (req, res) => {
     // through a short-lived token and fail closed if that token cannot be minted.
     const principal = await resolveAgentPrincipal({
       agentConfig,
+      models,
       subdomain,
       background: true,
     });

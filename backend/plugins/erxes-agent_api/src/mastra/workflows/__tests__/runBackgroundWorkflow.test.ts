@@ -127,6 +127,7 @@ describe('runBackgroundWorkflow fail-closed', () => {
     // The owning profile — not a createdByUserId or app-token shim — is passed.
     expect(resolveAgentPrincipal).toHaveBeenCalledWith({
       agentConfig: agent,
+      models,
       subdomain: 'os',
       background: true,
     });

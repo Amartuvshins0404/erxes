@@ -442,6 +442,7 @@ export async function runBackgroundWorkflow(args: {
   // short-lived token; no app-level credential is used as the acting principal.
   const principal = await resolveAgentPrincipal({
     agentConfig,
+    models,
     subdomain,
     background: true,
   });

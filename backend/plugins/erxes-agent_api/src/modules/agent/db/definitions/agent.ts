@@ -10,16 +10,6 @@ export const agentSchema = new Schema(
     instructions: { type: String, maxlength: 20000, label: 'Instructions' },
     provider: { type: String, required: true, label: 'Provider' },
     model: { type: String, required: true, label: 'Model' },
-    // Tool reach. 'all' (default) lets the agent search & execute every erxes
-    // operation + builtin. 'custom' restricts it to `allowedTools`, whose entries
-    // are operation names, "plugin:<name>", "module:<name>", or "builtin:<key>".
-    toolPolicy: {
-      type: String,
-      enum: ['all', 'custom'],
-      default: 'all',
-      label: 'Tool Policy',
-    },
-    allowedTools: [{ type: String }],
     // Skill allowlist. Glob patterns matched against global skills' name (or
     // "category/name"); the requesting user's own published skills are always
     // added on top. Empty/unset → the agent has no skills attached.
@@ -47,9 +37,12 @@ export const agentSchema = new Schema(
     temperature: { type: Number, min: 0, max: 2, label: 'Temperature' },
     isEnabled: { type: Boolean, default: true },
     createdBy: { type: String, label: 'Created By' },
-    // Background-run principal (Phase 3): bounded user whose gateway permissions
-    // background runs (bot/schedule) act under. Unset → defaults to createdBy.
-    ownerUserId: { type: String, label: 'Owner User' },
+    // Agent-as-principal (step 21). serviceUserId: the agent's dedicated core
+    // service user (passwordless, role:'system'), provisioned lazily by
+    // ensureServiceUser. grantGroupId: the permission group synced onto that
+    // user (its server-side grant). Both unset until the lifecycle runs.
+    serviceUserId: { type: String, label: 'Service User' },
+    grantGroupId: { type: String, label: 'Grant Group' },
     visibility: {
       type: String,
       enum: ['private', 'team', 'department', 'unit', 'org'],

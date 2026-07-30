@@ -55,6 +55,7 @@ export async function persistTurn(params: {
         reasoningSummaries,
         turnSummary,
         assistantMessageId,
+        turnStartedAt: prepared.authCtx?.turnStartedAt,
         interrupted,
       });
     } catch (e) {
@@ -94,8 +95,30 @@ export async function persistTurn(params: {
 interface NativeChatMessage {
   id: string;
   role: string;
+  createdAt?: Date | string;
   content?: { metadata?: Record<string, unknown> } & Record<string, unknown>;
 }
+
+// Recovery guard for the "most recent row" fallbacks below: only rows written
+// at/after the turn started (minus clock-skew slack) can be THIS turn's rows.
+// Without the guard, a recall that runs before Mastra finishes persisting the
+// new assistant row silently returns the PREVIOUS turn's — and the turn's
+// artifacts get linked to the wrong message (their inline cards then re-render
+// under no bubble at all).
+const RECOVERY_SKEW_MS = 5_000;
+// One short retry for when the row is simply still mid-write at recall time.
+const RECOVERY_RETRY_DELAY_MS = 500;
+
+const isFromTurn = (
+  m: NativeChatMessage,
+  turnStartedAt?: Date,
+): boolean => {
+  if (!turnStartedAt) return true;
+  const at = m.createdAt ? new Date(m.createdAt).getTime() : NaN;
+  // A row with no readable timestamp can't be verified — treat it as stale
+  // rather than risk a mislink (unlinked degrades gracefully, mislinked not).
+  return Number.isFinite(at) && at >= turnStartedAt.getTime() - RECOVERY_SKEW_MS;
+};
 
 function mergeErxesMeta(
   content: NativeChatMessage['content'],
@@ -119,11 +142,13 @@ export async function patchNativeTurn(params: {
   reasoningSummaries?: (string | null)[];
   turnSummary?: string;
   assistantMessageId?: string;
+  turnStartedAt?: Date;
   interrupted?: boolean;
 }): Promise<string | null> {
   const { subdomain, binding, agentId, reply, attachments } = params;
   const { reasoningSummaries, turnSummary, assistantMessageId, interrupted } =
     params;
+  const { turnStartedAt } = params;
 
   // The erxes-meta fields to stamp onto the assistant message (only the present
   // ones), so a reload re-renders the short thoughts + turn headline. A stopped
@@ -150,23 +175,48 @@ export async function patchNativeTurn(params: {
   }
 
   const memory = await getNativeMemory(subdomain);
-  const recalled = (await memory.recall({
-    threadId: binding.thread,
-    resourceId: binding.resource,
-    perPage: 4,
-    page: 0,
-    orderBy: { field: 'createdAt', direction: 'DESC' },
-  })) as { messages?: NativeChatMessage[] };
-  const recent = recalled?.messages ?? [];
+  const recallRecent = async (): Promise<NativeChatMessage[]> => {
+    const recalled = (await memory.recall({
+      threadId: binding.thread,
+      resourceId: binding.resource,
+      perPage: 4,
+      page: 0,
+      orderBy: { field: 'createdAt', direction: 'DESC' },
+    })) as { messages?: NativeChatMessage[] };
+    return recalled?.messages ?? [];
+  };
+  let recent = await recallRecent();
+
+  // THIS turn's assistant row: by id when the stream carried one, else the most
+  // recent assistant row THAT WAS WRITTEN DURING THIS TURN. Better to recover
+  // nothing (artifacts stay unlinked; the client's prompt matcher re-attaches
+  // them) than the previous turn's id (a permanent mislink).
+  const findAssistant = (): NativeChatMessage | undefined =>
+    assistantMessageId
+      ? recent.find((m) => m.id === assistantMessageId)
+      : recent.find(
+          (m) => m.role === 'assistant' && isFromTurn(m, turnStartedAt),
+        );
+
+  let assistantMsg = findAssistant();
+  const needAssistant = wantAssistant || (!assistantMessageId && !!reply);
+  if (!assistantMsg && needAssistant) {
+    // The row is usually just mid-write when the first recall runs.
+    await new Promise((resolve) =>
+      setTimeout(resolve, RECOVERY_RETRY_DELAY_MS),
+    );
+    recent = await recallRecent();
+    assistantMsg = findAssistant();
+  }
 
   // Patch via the STORAGE domain (patchNativeMessages), not Memory.updateMessages:
-  // the latter re-embeds the message and rewrites its Qdrant vectors whenever
-  // semantic recall is on (always, here). For a metadata-only patch that is pure
-  // waste (content.content is unchanged) and fragile — a single embed/Qdrant
-  // hiccup throws and loses the patch. patchNativeMessages is a plain Mongo
-  // write: no embeddings, no vector I/O, and best-effort.
+  // for a metadata-only patch the store write is a plain Mongo update
+  // (content.content is unchanged), and best-effort — a write hiccup never loses
+  // the rest of the turn's work.
   if (wantUser) {
-    const userMsg = recent.find((m) => m.role === 'user');
+    const userMsg = recent.find(
+      (m) => m.role === 'user' && isFromTurn(m, turnStartedAt),
+    );
     if (userMsg) {
       await patchNativeMessages(subdomain, [
         {
@@ -177,23 +227,14 @@ export async function patchNativeTurn(params: {
     }
   }
 
-  if (wantAssistant) {
-    // The just-saved assistant row (by id when known, else the most recent).
-    const assistantMsg = assistantMessageId
-      ? recent.find((m) => m.id === assistantMessageId)
-      : recent.find((m) => m.role === 'assistant');
-    if (assistantMsg) {
-      await patchNativeMessages(subdomain, [
-        {
-          id: assistantMsg.id,
-          content: mergeErxesMeta(assistantMsg.content, assistantMeta),
-        },
-      ]);
-    }
+  if (wantAssistant && assistantMsg) {
+    await patchNativeMessages(subdomain, [
+      {
+        id: assistantMsg.id,
+        content: mergeErxesMeta(assistantMsg.content, assistantMeta),
+      },
+    ]);
   }
 
-  return (
-    assistantMessageId ??
-    (reply ? recent.find((m) => m.role === 'assistant')?.id ?? null : null)
-  );
+  return assistantMessageId ?? (reply ? assistantMsg?.id ?? null : null);
 }

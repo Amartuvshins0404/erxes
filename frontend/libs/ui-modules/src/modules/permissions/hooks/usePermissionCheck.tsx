@@ -6,6 +6,7 @@ import {
   isPermissionsLoadedState,
 } from 'ui-modules/states/currentUserPermissionsState';
 import { currentUserState } from 'ui-modules/states/currentUserState';
+import { PermissionScope } from './useCurrentUserPermissions';
 
 export const usePermissionCheck = () => {
   const permissions = useAtomValue(currentUserPermissionsState);
@@ -33,38 +34,73 @@ export const usePermissionCheck = () => {
   }, [permissions, pluginsWithPermissions, isWildcard]);
 
   const hasModulePermission = useMemo(() => {
-    return (moduleName: string) => {
+    return (moduleName: string, pluginName?: string) => {
       if (isWildcard) return true;
       if (!permissions) return false;
       return permissions.some(
-        (p) => p.module === moduleName && p.actions.length > 0,
+        (permission) =>
+          permission.module === moduleName &&
+          (!pluginName || permission.plugin === pluginName) &&
+          permission.actions.length > 0,
       );
     };
   }, [permissions, isWildcard]);
 
   const hasActionPermission = useMemo(() => {
-    return (actionName: string) => {
+    return (actionName: string, pluginName?: string) => {
       if (isWildcard) return true;
       if (!permissions) return false;
-      return permissions.some((p) => p.actions.includes(actionName));
+      return permissions.some(
+        (permission) =>
+          (!pluginName || permission.plugin === pluginName) &&
+          permission.actions.includes(actionName),
+      );
     };
   }, [permissions, isWildcard]);
 
   const getModuleActions = useMemo(() => {
-    return (moduleName: string): string[] => {
+    return (moduleName: string, pluginName?: string): string[] => {
       if (isWildcard) return ['*'];
       if (!permissions) return [];
-      const perm = permissions.find((p) => p.module === moduleName);
-      return perm?.actions ?? [];
+      const permission = permissions.find(
+        (candidate) =>
+          candidate.module === moduleName &&
+          (!pluginName || candidate.plugin === pluginName),
+      );
+      return permission?.actions ?? [];
     };
   }, [permissions, isWildcard]);
 
   const getModuleScope = useMemo(() => {
-    return (moduleName: string): string => {
+    return (moduleName: string, pluginName?: string): PermissionScope => {
       if (isWildcard) return 'all';
       if (!permissions) return 'own';
-      const perm = permissions.find((p) => p.module === moduleName);
-      return perm?.scope ?? 'own';
+      const permission = permissions.find(
+        (candidate) =>
+          candidate.module === moduleName &&
+          (!pluginName || candidate.plugin === pluginName),
+      );
+      return permission?.scope ?? 'own';
+    };
+  }, [permissions, isWildcard]);
+
+  const getActionScope = useMemo(() => {
+    return (
+      actionName: string,
+      pluginName?: string,
+    ): PermissionScope | null => {
+      if (isWildcard) return 'all';
+      if (!permissions) return null;
+
+      const permission = permissions.find(
+        (candidate) =>
+          (!pluginName || candidate.plugin === pluginName) &&
+          candidate.actions.includes(actionName),
+      );
+
+      return (
+        permission?.actionScopes?.[actionName] ?? permission?.scope ?? null
+      );
     };
   }, [permissions, isWildcard]);
 
@@ -78,5 +114,6 @@ export const usePermissionCheck = () => {
     hasActionPermission,
     getModuleActions,
     getModuleScope,
+    getActionScope,
   };
 };

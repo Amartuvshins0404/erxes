@@ -29,6 +29,8 @@ export const DEPLOY_MANAGED_AGENT = gql`
       token
       agentId
       serverId
+      provider
+      model
       status
       provisioning {
         stage

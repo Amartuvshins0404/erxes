@@ -1,24 +1,40 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useQuery } from '@apollo/client';
 import { IconBulb, IconRefresh } from '@tabler/icons-react';
 import { Badge, Button } from 'erxes-ui';
 import { MASTRA_LEARNINGS } from '~/graphql/queries';
 import { ResourceIndexLayout } from '~/components/ResourceIndexLayout';
 import { SortValue, useTableSort } from '~/components/useTableSort';
+import { useAuthedListQuery } from '~/hooks/useAuthedListQuery';
 import { LearningDetailSheet } from './components/LearningDetailSheet';
 import { useLearningColumns } from './hooks/useLearningColumns';
-import { ILearningRow, StatusFilter, STATUS_FILTERS } from './types';
+import {
+  ILearningRow,
+  IMastraLearningsResponse,
+  StatusFilter,
+  STATUS_FILTERS,
+} from './types';
 
-export const LearningsIndexPage = () => {
+/**
+ * Standalone learnings index, and — when `agentId` is passed — the per-agent
+ * Learnings tab (the list is filtered to that agent's distilled learnings).
+ */
+export const LearningsIndexPage = ({
+  agentId,
+  embedded,
+}: {
+  agentId?: string;
+  embedded?: boolean;
+} = {}) => {
   const [status, setStatus] = useState<StatusFilter>('');
   const [selected, setSelected] = useState<ILearningRow | null>(null);
 
-  const { data, loading, refetch } = useQuery(MASTRA_LEARNINGS, {
-    variables: { status: status || undefined, perPage: 200 },
-    fetchPolicy: 'cache-and-network',
-    notifyOnNetworkStatusChange: true,
-  });
+  const { data, loading, error, refetch } =
+    useAuthedListQuery<IMastraLearningsResponse>(MASTRA_LEARNINGS, {
+      variables: { status: status || undefined, agentId, perPage: 200 },
+      fetchPolicy: 'cache-and-network',
+      notifyOnNetworkStatusChange: true,
+    });
 
   const items: ILearningRow[] = data?.mastraLearnings?.list ?? [];
   const totalCount: number = data?.mastraLearnings?.totalCount ?? items.length;
@@ -54,6 +70,32 @@ export const LearningsIndexPage = () => {
     onSort: toggle,
   });
 
+  const headerExtra = useMemo(
+    () => (
+      <>
+        <div className="flex items-center gap-1">
+          {STATUS_FILTERS.map((f) => (
+            <Button
+              key={f.value || 'all'}
+              variant={status === f.value ? 'secondary' : 'ghost'}
+              size="sm"
+              onClick={() => setStatus(f.value)}
+            >
+              {f.label}
+            </Button>
+          ))}
+        </div>
+        <Badge variant="secondary">
+          {totalCount} {totalCount === 1 ? 'learning' : 'learnings'}
+        </Badge>
+        <Button variant="secondary" onClick={() => refetch()} disabled={loading}>
+          <IconRefresh /> Refresh
+        </Button>
+      </>
+    ),
+    [status, totalCount, loading, refetch],
+  );
+
   return (
     <>
       <ResourceIndexLayout<ILearningRow>
@@ -64,34 +106,10 @@ export const LearningsIndexPage = () => {
         columns={columns}
         data={sorted}
         loading={loading}
+        embedded={embedded}
         skeletonRows={8}
         stickyColumns={['more', 'statement']}
-        headerExtra={
-          <>
-            <div className="flex items-center gap-1">
-              {STATUS_FILTERS.map((f) => (
-                <Button
-                  key={f.value || 'all'}
-                  variant={status === f.value ? 'secondary' : 'ghost'}
-                  size="sm"
-                  onClick={() => setStatus(f.value)}
-                >
-                  {f.label}
-                </Button>
-              ))}
-            </div>
-            <Badge variant="secondary">
-              {totalCount} {totalCount === 1 ? 'learning' : 'learnings'}
-            </Badge>
-            <Button
-              variant="secondary"
-              onClick={() => refetch()}
-              disabled={loading}
-            >
-              <IconRefresh /> Refresh
-            </Button>
-          </>
-        }
+        headerExtra={headerExtra}
         empty={{
           className: 'max-w-md',
           title: 'No learnings yet',
@@ -103,6 +121,18 @@ export const LearningsIndexPage = () => {
             </Button>
           ),
         }}
+        error={
+          error
+            ? {
+                title: "Couldn't load learnings",
+                description:
+                  'Something went wrong while fetching your learnings.',
+                onRetry: () => {
+                  void refetch().catch(() => undefined);
+                },
+              }
+            : undefined
+        }
       />
 
       <LearningDetailSheet item={selected} onClose={() => setSelected(null)} />

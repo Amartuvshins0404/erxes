@@ -31,4 +31,28 @@ const syncSupplierRecord = async (req: Request, res: Response) => {
 
 router.post('/updateSupplier', syncSupplierRecord);
 
+const syncOrderRecord = async (req: Request, res: Response) => {
+  try {
+    const { subdomain, payload } = req.body || {};
+    const { entityId, order, status } = payload || {};
+
+    if (!subdomain)
+      return res.status(400).json({ error: 'subdomain is required' });
+    if (!entityId)
+      return res.status(400).json({ error: 'payload.entityId is required' });
+    if (!order)
+      return res.status(400).json({ error: 'payload.order is required' });
+
+    const models = await generateModels(subdomain);
+
+    await models.Order.syncFromSupplier(subdomain, entityId, order, status);
+
+    return res.status(200).json({ success: true });
+  } catch (e: any) {
+    return res.status(400).json({ error: e.message });
+  }
+};
+
+router.post('/order-sync', syncOrderRecord);
+
 export { router };

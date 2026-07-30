@@ -6,10 +6,7 @@ import { generateModels } from './connectionResolvers';
 import { getOrCreateAgent } from './mastra/agentRuntime';
 import { isReasoningEffort } from './mastra/providers';
 import { runWithAuth, ApprovedOp } from './mastra/requestContext';
-import {
-  resolveBackgroundToken,
-  isSecureBackgroundRunRequired,
-} from './mastra/auth/runToken';
+import { resolveBackgroundPrincipal } from './mastra/auth/backgroundPrincipal';
 import { isAdvancedMemoryEnabled } from './mastra/memory/config';
 import { scopedResource } from './mastra/memory/mastraMemory';
 import { augmentConvo } from './mastra/memory';
@@ -23,12 +20,10 @@ import {
 import { IMastraChatAttachment } from '@/session/@types/session';
 import { attachmentStorageStatus } from '@/settings/graphql/resolvers/queries/settings';
 import { registerVoiceRoutes } from './mastra/voice/routes';
-import {
-  streamAgentTurn,
-  type ChatStreamRequest,
-} from './mastra/streamTurn';
+import { streamAgentTurn, type ChatStreamRequest } from './mastra/streamTurn';
 import { makeIpRateLimiter } from './utils/rateLimit';
 import { registerActiveRun } from './mastra/runRegistry';
+import { ERXES_AGENT_ACTIONS } from './meta/permissionActions';
 
 export const router: Router = Router();
 
@@ -176,7 +171,9 @@ function parseChatStreamBody(raw: unknown): ParseResult {
     return { ok: false, error: 'Invalid attachments payload' };
   }
 
-  const approvedOperations = sanitizeApprovedOperations(body.approvedOperations);
+  const approvedOperations = sanitizeApprovedOperations(
+    body.approvedOperations,
+  );
   if (approvedOperations === null) {
     return { ok: false, error: 'Invalid approvedOperations payload' };
   }
@@ -220,10 +217,10 @@ router.post('/chat/stream', llmRouteLimiter, async (req, res) => {
   const subdomain = getSubdomain(req);
 
   // Streaming chat is the HTTP twin of the mastraAgentChat resolver, so it is
-  // gated by the same `agentsChat` permission. checkPermissionGroup throws on
-  // denial (FORBIDDEN) — translate that into a 403 for the SSE client.
+  // gated by the same chat permission. checkPermissionGroup throws on denial
+  // (FORBIDDEN) — translate that into a 403 for the SSE client.
   try {
-    await checkPermissionGroup(subdomain, user)('agentsChat');
+    await checkPermissionGroup(subdomain, user)(ERXES_AGENT_ACTIONS.agent.chat);
   } catch {
     return res.status(403).json({ error: 'Permission required' });
   }
@@ -268,7 +265,7 @@ router.post('/chat/stream', llmRouteLimiter, async (req, res) => {
   // the key the cancel mutation carries. Unregistered in the run's finally.
   const unregisterRun = threadId
     ? registerActiveRun(subdomain, user._id, threadId, controller)
-    : () => {};
+    : () => undefined;
 
   const stream = createUIMessageStream({
     onError: (err) => {
@@ -367,23 +364,24 @@ router.post('/bot/:conversationId', llmRouteLimiter, async (req, res) => {
     const convo = augmentConvo({
       recentHistory: [],
       userMessage: userText,
-      recallBlock: null,
       workingMemoryBlock: null,
       learnedDigestBlock: digest?.block,
     });
 
-    // Bot requests have no user session — run as the agent's bound owner
-    // (Phase 3). Falls back to the static app token ONLY in the degraded mode
-    // where the secure path isn't active (secret unset or no owner). When the
-    // secure path IS active (secret set + owner present) but the mint failed
-    // (owner deactivated, secret skew, core unreachable) we fail closed rather
-    // than fall back to the privileged app token — falling back would silently
-    // escalate the run to admin instead of stopping the bot.
-    const ownerToken = await resolveBackgroundToken(agentConfig, subdomain);
-    if (!ownerToken && isSecureBackgroundRunRequired(agentConfig)) {
-      console.error(
-        '[agent] bot run refused — owner token mint failed (owner deactivated or secret skew); not falling back to app token',
-      );
+    // Bot requests have no user session — run as the agent's bound owner and
+    // fail closed when that principal can't be minted. NEVER falls back to the
+    // app token: doing so would silently escalate the bot to admin instead of
+    // stopping it. The app token (settings.erxesApiToken) is passed only as the
+    // CLIENT CREDENTIAL that authenticates to core's mint endpoint — the minted
+    // owner token, not the app token, is the acting principal for the run.
+    const principal = await resolveBackgroundPrincipal({
+      agentConfig,
+      subdomain,
+      appToken: settings?.erxesApiToken,
+      models,
+    });
+    if (!principal.ok) {
+      console.error(`[agent] bot run refused — ${principal.error}`);
       return res.json({
         responses: [
           {
@@ -393,11 +391,7 @@ router.post('/bot/:conversationId', llmRouteLimiter, async (req, res) => {
         ],
       });
     }
-    if (!ownerToken)
-      console.warn(
-        '[agent] bot run falling back to app token — set ERXES_AGENT_RUN_TOKEN_SECRET and an agent owner',
-      );
-    const authCtx = { token: ownerToken ?? settings?.erxesApiToken, subdomain };
+    const authCtx = principal.authCtx;
     const reply =
       (await runWithAuth(authCtx, () =>
         runAgentTurn({

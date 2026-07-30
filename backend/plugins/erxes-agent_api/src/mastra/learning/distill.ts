@@ -3,8 +3,9 @@
 //
 // One thread in, zero-or-more shared lessons out:
 //   extract + PII-redact (LLM: distiller agent with a PIIDetector output
-//   processor) → dedupe against the existing corpus (merge evidence) → store
-//   candidate → auto-promote when the k-anonymity + confidence floors are met.
+//   processor) → dedupe against the existing corpus by normalized statement
+//   (merge evidence) → store candidate → auto-promote when the k-anonymity +
+//   confidence floors are met.
 //
 // The contributor is recorded only as HMAC(thread owner id) — identity never
 // reaches the shared tier.
@@ -19,11 +20,26 @@ import {
   ExtractionRuntime,
   TranscriptMessage,
 } from './extractor';
-import {
-  indexLearning,
-  searchLearnings,
-  setLearningVectorStatus,
-} from './store';
+
+/**
+ * Normalize a statement for exact/near-duplicate detection against the Mongo
+ * corpus (case/whitespace/punctuation-insensitive). This replaces the vector
+ * similarity dedupe: it only catches re-derived lessons phrased identically,
+ * but that is the common case for FAQs/procedures and it keeps the k-anonymity
+ * counter meaningful without an embedder.
+ */
+export function normalizeStatement(statement: string): string {
+  return statement
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** Escape a string for safe use inside a RegExp (dedupe exact-match query). */
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
 
 export interface DistillResult {
   extracted: number;
@@ -33,10 +49,9 @@ export interface DistillResult {
   promoted: number;
 }
 
-/** Promote a candidate when both floors hold. Best-effort vector sync. */
+/** Promote a candidate when both floors hold. */
 async function maybeAutoPromote(
   models: IModels,
-  tenant: string,
   learning: IMastraLearningDocument | null,
 ): Promise<boolean> {
   if (!learning || learning.status !== 'candidate') return false;
@@ -49,11 +64,6 @@ async function maybeAutoPromote(
     return false;
   }
   await models.MastraLearning.setStatus(String(learning._id), 'approved');
-  try {
-    await setLearningVectorStatus(tenant, String(learning._id), 'approved');
-  } catch {
-    // converged later by the sweep's status reconciliation
-  }
   return true;
 }
 
@@ -64,22 +74,14 @@ async function maybeAutoPromote(
  */
 export async function distillThread(params: {
   models: IModels;
-  tenant: string; // canonical Qdrant tenant tag (learningTenant())
   agentId: string;
   ownerResourceId: string; // thread owner — hashed before storage
   messages: TranscriptMessage[];
   runtime: ExtractionRuntime;
   outcome?: string;
 }): Promise<DistillResult> {
-  const {
-    models,
-    tenant,
-    agentId,
-    ownerResourceId,
-    messages,
-    runtime,
-    outcome,
-  } = params;
+  const { models, agentId, ownerResourceId, messages, runtime, outcome } =
+    params;
   const result: DistillResult = {
     extracted: 0,
     gated: 0,
@@ -99,32 +101,39 @@ export async function distillThread(params: {
   if (!candidates.length) return result;
 
   const sourceHash = hashSource(ownerResourceId);
-  const tuning = resolveLearningTuning();
 
   for (const candidate of candidates) {
     try {
-      // 3. Dedupe against candidates AND approved lessons — a re-derived
-      //    lesson merges (evidence++, contributor recorded) instead of
-      //    duplicating, which is also what feeds the k-anonymity counter.
-      const [similar] = await searchLearnings(tenant, candidate.statement, {
-        topK: 1,
-        minScore: tuning.mergeScore,
-        statuses: ['candidate', 'approved'],
+      // 3. Dedupe against candidates AND approved lessons by normalized
+      //    statement — a re-derived lesson phrased the same way merges
+      //    (evidence++, contributor recorded) instead of duplicating, which is
+      //    also what feeds the k-anonymity counter. Mongo can't normalize
+      //    server-side without a stored field, so match case-insensitively on
+      //    the raw statement (catches the common identical re-derivation) and
+      //    confirm against the normalized form in memory.
+      const normalized = normalizeStatement(candidate.statement);
+      const existing = await models.MastraLearning.findOne({
+        status: { $in: ['candidate', 'approved'] },
+        statement: { $regex: `^${escapeRegExp(candidate.statement)}$`, $options: 'i' },
       });
+      const similarId =
+        existing && normalizeStatement(existing.statement) === normalized
+          ? String(existing._id)
+          : null;
 
-      if (similar?.learningId) {
-        const merged = await models.MastraLearning.mergeEvidence(
-          similar.learningId,
-          { confidence: candidate.confidence, sourceHash },
-        );
+      if (similarId) {
+        const merged = await models.MastraLearning.mergeEvidence(similarId, {
+          confidence: candidate.confidence,
+          sourceHash,
+        });
         result.merged++;
-        if (await maybeAutoPromote(models, tenant, merged)) result.promoted++;
+        if (await maybeAutoPromote(models, merged)) result.promoted++;
         continue;
       }
 
       // 4. New lesson — stored as a candidate, invisible to live turns until
       //    promoted (curation UI or the floors).
-      const created = await models.MastraLearning.createLearning({
+      await models.MastraLearning.createLearning({
         statement: candidate.statement,
         type: candidate.type,
         contextTags: candidate.contextTags,
@@ -135,7 +144,6 @@ export async function distillThread(params: {
         sourceHashes: [sourceHash],
         createdBy: 'system',
       });
-      await indexLearning(tenant, created);
       result.created++;
     } catch (e) {
       // eslint-disable-next-line no-console

@@ -83,11 +83,8 @@ interface NativeStoreFacade {
     messageIds: string[];
   }): Promise<{ messages: NativeMessage[] }>;
   // Storage-domain message write — patches content as a plain Mongo update.
-  // Deliberately NOT Memory.updateMessages: that one re-embeds the message and
-  // deletes/recreates its Qdrant vectors whenever semantic recall is configured
-  // (which it is here), so a metadata-only patch would pay an embed + vector
-  // round trip and, worse, abandon the whole patch on any embed/Qdrant hiccup.
-  // The store write touches only the message document. See patchNativeMessages.
+  // Deliberately NOT Memory.updateMessages so a metadata-only patch touches only
+  // the message document. See patchNativeMessages.
   updateMessages(args: {
     messages: { id: string; content: Record<string, unknown> }[];
   }): Promise<unknown>;
@@ -113,15 +110,12 @@ async function getNativeStore(subdomain: string): Promise<NativeStoreFacade> {
  * thinking, tool calls, attachments) via the STORAGE domain, bypassing
  * Memory.updateMessages on purpose.
  *
- * Memory.updateMessages re-embeds each message and deletes/recreates its Qdrant
- * vectors whenever semantic recall is on (it always is here). For a metadata-only
- * patch that is pure waste — the embeddable text (content.content) is unchanged —
- * and it is fragile: a single embed or Qdrant error there throws and abandons the
- * turn-end patch, which is exactly what was silently dropping thinking history on
- * reload (and, transitively, nulling the assistant-id the inline artifact cards
- * link to). The store write is a plain Mongo update of the message document: no
- * embeddings, no vector I/O. Best-effort — a write failure is logged, never
- * thrown, so it can't abort the rest of the turn-end work.
+ * Memory.updateMessages carries extra write semantics that can throw and abandon
+ * the turn-end patch — which is exactly what was silently dropping thinking
+ * history on reload (and, transitively, nulling the assistant-id the inline
+ * artifact cards link to). The store write is a plain Mongo update of the message
+ * document. Best-effort — a write failure is logged, never thrown, so it can't
+ * abort the rest of the turn-end work.
  */
 export async function patchNativeMessages(
   subdomain: string,
@@ -407,6 +401,41 @@ export async function getOwnedThreadMessages(
   // (or a bot thread) reads back as null — reported as "not found", no leak.
   const thread = await memory.getThreadById({ threadId, resourceId });
   if (!thread) throw new ExpectedError('Thread not found');
+  const res = await memory.recall({
+    threadId,
+    resourceId,
+    perPage: false,
+    page: 0,
+    orderBy: { field: 'createdAt', direction: 'ASC' },
+  });
+  return (res?.messages ?? []).map(toErxesMessage);
+}
+
+/**
+ * Read a thread's messages under an EXPLICIT resource — no ownership check.
+ *
+ * SECURITY: this primitive performs NO ownership/authorization check of its own.
+ * Callers MUST authorize (e.g. agent-access) BEFORE calling, and MUST derive
+ * threadId/resourceId from trusted SERVER state — never from raw caller input.
+ * Wiring caller-influenced ids in here would let any caller read any thread.
+ *
+ * Unlike getOwnedThreadMessages this does NOT scope the resource to the viewer:
+ * the caller passes the exact resourceId the thread lives under and is fully
+ * responsible for authorizing the read BEFORE calling. Used by the schedule
+ * transcript query, which authorizes by AGENT ACCESS (canUserAccessAgent) and
+ * then reads the schedule's dedicated output thread under the schedule's OWN
+ * background resource (scopedResource(subdomain, `schedule:<id>`)) — the same
+ * resource its runs wrote under — never the viewer's. A missing thread (schedule
+ * that has not run yet) reads back as an empty transcript rather than throwing.
+ */
+export async function getThreadMessagesByResource(
+  subdomain: string,
+  threadId: string,
+  resourceId: string,
+): Promise<ErxesMessage[]> {
+  const memory = await getNativeMemory(subdomain);
+  const thread = await memory.getThreadById({ threadId, resourceId });
+  if (!thread) return [];
   const res = await memory.recall({
     threadId,
     resourceId,

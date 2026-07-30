@@ -1,9 +1,19 @@
 import { memo, type ReactNode } from 'react';
-import { IconBolt, IconPencil, IconRefresh, IconRepeat } from '@tabler/icons-react';
+import {
+  IconAlertTriangle,
+  IconBolt,
+  IconPencil,
+  IconRefresh,
+  IconRepeat,
+} from '@tabler/icons-react';
 import { Tooltip } from 'erxes-ui';
 import { AgentUIMessage, ChatAttachment } from '~/modules/chat/types';
 import { asToolPart, messageText } from '~/modules/chat/lib/uiParts';
-import { artifactOutcomes, type Artifact } from '~/modules/chat/lib/artifacts';
+import {
+  artifactOutcomes,
+  mergeArtifacts,
+  type Artifact,
+} from '~/modules/chat/lib/artifacts';
 import { AgentAvatar } from '~/modules/chat/components/Avatars';
 import { AgentTrace } from '~/modules/chat/components/AgentTrace';
 import {
@@ -140,14 +150,32 @@ export const MessageBubble = memo(function MessageBubble({
   );
   // Charts and generated documents surface as prominent ArtifactCards (with a
   // Preview-panel opener), not buried in the collapsed thinking section. Live
-  // turns read them off the tool parts; after a reload (tool parts gone) we fall
-  // back to the persisted store artifacts for this message.
+  // turns read them off the tool parts, merged with the persisted store rows
+  // for this message — either source can have holes (a rehydrated tool part
+  // without its artifact blob; a store row whose message link failed), so each
+  // rescues the other.
   const { artifacts: liveArtifacts, failures: failedArtifactTools } =
-    artifactOutcomes(msg.parts);
-  const artifacts = liveArtifacts.length
-    ? liveArtifacts
-    : (storeArtifacts ?? []);
+    artifactOutcomes(msg.parts, !streaming);
+  const artifacts = mergeArtifacts(liveArtifacts, storeArtifacts);
+  // A tool that finished without an artifact on it (lost/truncated output, not
+  // an error) may be exactly what a merged store row just rescued — don't show
+  // a failure card next to the rescued chart. Genuine tool errors always show;
+  // artifact-less finishes show only when the store rows don't cover them.
+  const rescuedCount = artifacts.length - liveArtifacts.length;
+  const visibleFailures = failedArtifactTools
+    .filter((t) => t.isError)
+    .concat(
+      failedArtifactTools.filter((t) => !t.isError).slice(rescuedCount),
+    );
   const canRegenerate = isLast && !chatLoading;
+  // A settled assistant turn that produced neither prose nor any artifact —
+  // render an explicit interrupted/empty notice with a retry instead of a blank
+  // reading column (the "agent stopped mid-turn" symptom).
+  const showEmptyState =
+    !streaming &&
+    !text &&
+    artifacts.length === 0 &&
+    failedArtifactTools.length === 0;
   const activeSkills = msg.metadata?.activeSkills;
   const messageId = msg.metadata?.messageId;
   const handleRate =
@@ -198,6 +226,30 @@ export const MessageBubble = memo(function MessageBubble({
             <span className="ea-typing-dot" />
             <span className="ea-typing-dot" />
           </div>
+        ) : showEmptyState ? (
+          // A settled turn with no answer text and no artifact must never read as
+          // a blank bubble — surface the outcome (interrupted mid-tool, or the
+          // model stopped without prose) and offer a retry. Newly-generated turns
+          // carry a backend fallback line, so this mainly catches turns that
+          // dead-ended before that fix and any residual empty edge case.
+          <div className="flex items-center gap-2 py-1 text-xs text-muted-foreground">
+            <IconAlertTriangle className="size-3.5 shrink-0 text-amber-600 dark:text-amber-500" />
+            <span>
+              {msg.metadata?.interrupted
+                ? 'This response was interrupted before it finished.'
+                : 'No response was generated for this message.'}
+            </span>
+            {canRegenerate && (
+              <button
+                type="button"
+                onClick={onRegenerate}
+                className="inline-flex items-center gap-1 text-primary hover:underline"
+              >
+                <IconRefresh className="size-3" />
+                Retry
+              </button>
+            )}
+          </div>
         ) : null}
         {streaming && text && <span className="ea-caret" />}
         {artifacts.length > 0 && (
@@ -211,9 +263,9 @@ export const MessageBubble = memo(function MessageBubble({
             ))}
           </div>
         )}
-        {failedArtifactTools.length > 0 && (
+        {visibleFailures.length > 0 && (
           <div className="mt-1">
-            {failedArtifactTools.map((tool, i) => (
+            {visibleFailures.map((tool, i) => (
               <ArtifactFailureCard
                 key={tool.toolCallId || `failed-${i}`}
                 toolName={tool.toolName}

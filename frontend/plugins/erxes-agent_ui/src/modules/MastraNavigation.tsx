@@ -1,12 +1,7 @@
-import {
-  IconRobot,
-  IconMessageCircle,
-  IconSitemap,
-  IconBulb,
-  IconBook2,
-  IconCalendarTime,
-} from '@tabler/icons-react';
+import { IconMessageCircle, IconRobot, IconSitemap } from '@tabler/icons-react';
 import { NavigationMenuLinkItem } from 'erxes-ui';
+import { usePermissionCheck } from 'ui-modules';
+import { ERXES_AGENT_ACTIONS } from '~/permissions';
 import { useHasAnyActivity } from '~/modules/chat/hooks/useChatView';
 
 const ChatNavItem = () => {
@@ -27,35 +22,35 @@ const ChatNavItem = () => {
   );
 };
 
+// Only render surfaces granted to the current role; deeper routes enforce the
+// same actions independently.
 export const MastraNavigation = () => {
+  const { hasActionPermission } = usePermissionCheck();
+  const canChat = hasActionPermission(ERXES_AGENT_ACTIONS.agent.chat);
+  const canReadAgents = hasActionPermission(
+    ERXES_AGENT_ACTIONS.agent.readSummary,
+  );
+  const canReadWorkflows = hasActionPermission(
+    ERXES_AGENT_ACTIONS.workflow.read,
+  );
+
   return (
     <>
-      <ChatNavItem />
-      <NavigationMenuLinkItem
-        name="Agents"
-        icon={IconRobot}
-        path="erxes-agent/agents"
-      />
-      <NavigationMenuLinkItem
-        name="Workflows"
-        icon={IconSitemap}
-        path="erxes-agent/workflows"
-      />
-      <NavigationMenuLinkItem
-        name="Skills"
-        icon={IconBook2}
-        path="erxes-agent/skills"
-      />
-      <NavigationMenuLinkItem
-        name="Schedules"
-        icon={IconCalendarTime}
-        path="erxes-agent/schedules"
-      />
-      <NavigationMenuLinkItem
-        name="Agent learnings"
-        icon={IconBulb}
-        path="erxes-agent/learnings"
-      />
+      {canChat && <ChatNavItem />}
+      {canReadAgents && (
+        <NavigationMenuLinkItem
+          name="Agents"
+          icon={IconRobot}
+          path="erxes-agent/agents"
+        />
+      )}
+      {canReadWorkflows && (
+        <NavigationMenuLinkItem
+          name="Workflows"
+          icon={IconSitemap}
+          path="erxes-agent/workflows"
+        />
+      )}
     </>
   );
 };

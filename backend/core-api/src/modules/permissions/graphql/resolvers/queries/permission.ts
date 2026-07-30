@@ -1,30 +1,91 @@
-import { IContext } from '~/connectionResolvers';
+import {
+  IPermissionGroupPermission,
+  PermissionScope,
+  IPermissionAction,
+  IPermissionModule,
+  IDefaultPermissionGroup,
+} from 'erxes-api-shared/core-types';
 import { getPlugins, getPlugin } from 'erxes-api-shared/utils';
+import { canGroup } from 'erxes-api-shared/core-modules';
+import { IContext } from '~/connectionResolvers';
+import { isAgentCallablePermissionAction } from '~/modules/permissions/agentProfiles';
 
-const mergePerm = (map: Map<string, any>, perm: any, plugin?: string) => {
-  const existing = map.get(perm.module);
+interface IEffectivePermission extends IPermissionGroupPermission {
+  actionScopes: Record<string, PermissionScope>;
+}
+
+const SCOPE_PRIORITY: Record<PermissionScope, number> = {
+  own: 1,
+  group: 2,
+  all: 3,
+};
+
+export const mergePermission = (
+  map: Map<string, IEffectivePermission>,
+  permission: IPermissionGroupPermission,
+  sourcePlugin?: string,
+) => {
+  const plugin = permission.plugin || sourcePlugin || '';
+  const key = `${plugin}:${permission.module}`;
+  const existing = map.get(key);
 
   if (!existing) {
-    map.set(perm.module, {
-      plugin: perm.plugin || plugin,
-      module: perm.module,
-      actions: [...perm.actions],
-      scope: perm.scope,
+    map.set(key, {
+      plugin,
+      module: permission.module,
+      actions: [...permission.actions],
+      scope: permission.scope,
+      actionScopes: Object.fromEntries(
+        permission.actions.map((actionName) => [actionName, permission.scope]),
+      ),
     });
     return;
   }
 
-  existing.actions = [...new Set([...existing.actions, ...perm.actions])];
+  existing.actions = [...new Set([...existing.actions, ...permission.actions])];
 
-  const priority: Record<string, number> = { own: 1, group: 2, all: 3 };
-  if (priority[perm.scope] > priority[existing.scope]) {
-    existing.scope = perm.scope;
+  if (SCOPE_PRIORITY[permission.scope] > SCOPE_PRIORITY[existing.scope]) {
+    existing.scope = permission.scope;
+  }
+
+  for (const actionName of permission.actions) {
+    const currentScope = existing.actionScopes[actionName];
+
+    if (
+      !currentScope ||
+      SCOPE_PRIORITY[permission.scope] > SCOPE_PRIORITY[currentScope]
+    ) {
+      existing.actionScopes[actionName] = permission.scope;
+    }
   }
 };
 
+const getPermissionReadMode = async (
+  context: IContext,
+): Promise<'all' | 'agent'> => {
+  if (!context.user) throw new Error('Login required');
+  if (
+    (await canGroup(context.subdomain, 'permissionsRead', context.user)) ||
+    (await canGroup(context.subdomain, 'permissionsManage', context.user))
+  ) {
+    return 'all';
+  }
+  if (
+    await canGroup(
+      context.subdomain,
+      'permissionsAgentProfilesManage',
+      context.user,
+    )
+  ) {
+    return 'agent';
+  }
+  throw new Error('Permission required');
+};
+
 export const permissionQueries = {
-  async permissionModules() {
-    const grouped: { plugin: string; modules: any[] }[] = [];
+  async permissionModules(_root: unknown, _args: unknown, context: IContext) {
+    await getPermissionReadMode(context);
+    const grouped: { plugin: string; modules: IPermissionModule[] }[] = [];
     const services = await getPlugins();
 
     for (const name of services) {
@@ -33,8 +94,22 @@ export const permissionQueries = {
       if (!permissions?.modules) continue;
 
       const modules = permissions.modules
-        .map((module: any) => ({ ...module, plugin: name }))
-        .sort((a: any, b: any) => a.name.localeCompare(b.name));
+        .map((module: IPermissionModule) => ({
+          ...module,
+          plugin: name,
+          actions: (module.actions ?? []).map(
+            (permissionAction: IPermissionAction) => ({
+              ...permissionAction,
+              agentCallable: isAgentCallablePermissionAction(
+                module,
+                permissionAction,
+              ),
+            }),
+          ),
+        }))
+        .sort((a: IPermissionModule, b: IPermissionModule) =>
+          a.name.localeCompare(b.name),
+        );
 
       grouped.push({ plugin: name, modules });
     }
@@ -42,8 +117,15 @@ export const permissionQueries = {
     return grouped.sort((a, b) => a.plugin.localeCompare(b.plugin));
   },
 
-  async permissionDefaultGroups() {
-    const groups: any[] = [];
+  async permissionDefaultGroups(
+    _root: unknown,
+    _args: unknown,
+    context: IContext,
+  ) {
+    if ((await getPermissionReadMode(context)) !== 'all') {
+      throw new Error('Permission required');
+    }
+    const groups: Array<{ plugin: string; [key: string]: unknown }> = [];
     const services = await getPlugins();
 
     for (const name of services) {
@@ -59,21 +141,26 @@ export const permissionQueries = {
     return groups;
   },
 
-  async permissionGroups(_root: any, _args: any, { models }: IContext) {
-    return models.PermissionGroups.find({}).sort({ name: 1 });
+  async permissionGroups(_root: unknown, _args: unknown, context: IContext) {
+    const mode = await getPermissionReadMode(context);
+    const filter = mode === 'agent' ? { principalType: 'agent' } : {};
+    return context.models.PermissionGroups.find(filter).sort({ name: 1 });
   },
 
   async permissionGroupDetail(
-    _root: any,
+    _root: unknown,
     { id }: { id: string },
-    { models }: IContext,
+    context: IContext,
   ) {
-    return models.PermissionGroups.findOne({ _id: id });
+    const mode = await getPermissionReadMode(context);
+    const filter =
+      mode === 'agent' ? { _id: id, principalType: 'agent' } : { _id: id };
+    return context.models.PermissionGroups.findOne(filter);
   },
 
   async currentUserPermissions(
-    _root: any,
-    _args: any,
+    _root: unknown,
+    _args: unknown,
     { user, models }: IContext,
   ) {
     if (!user) throw new Error('Login required');
@@ -81,7 +168,7 @@ export const permissionQueries = {
     const plugins = await getPlugins();
 
     const pluginsWithPermissions: string[] = [];
-    const allDefaultGroups: any[] = [];
+    const allDefaultGroups: IDefaultPermissionGroup[] = [];
 
     for (const pluginName of plugins) {
       const plugin = await getPlugin(pluginName);
@@ -98,7 +185,9 @@ export const permissionQueries = {
 
     if (user.isOwner) {
       return {
-        permissions: [{ plugin: '*', module: '*', actions: ['*'], scope: 'all' }],
+        permissions: [
+          { plugin: '*', module: '*', actions: ['*'], scope: 'all' },
+        ],
         pluginsWithPermissions,
       };
     }
@@ -106,14 +195,14 @@ export const permissionQueries = {
     const groupIds = user.permissionGroupIds || [];
     const customPermissions = user.customPermissions || [];
 
-    const permMap = new Map();
+    const permMap = new Map<string, IEffectivePermission>();
 
     for (const groupId of groupIds) {
       if (groupId.includes(':')) {
         const group = allDefaultGroups.find((g) => g.id === groupId);
         if (group) {
           for (const perm of group.permissions) {
-            mergePerm(permMap, perm);
+            mergePermission(permMap, perm);
           }
         }
       } else {
@@ -121,14 +210,14 @@ export const permissionQueries = {
 
         if (group) {
           for (const perm of group.permissions) {
-            mergePerm(permMap, perm);
+            mergePermission(permMap, perm);
           }
         }
       }
     }
 
     for (const perm of customPermissions) {
-      mergePerm(permMap, perm);
+      mergePermission(permMap, perm);
     }
 
     return {

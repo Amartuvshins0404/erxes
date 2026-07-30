@@ -1,4 +1,3 @@
-import { ExpectedError } from 'erxes-api-shared/utils';
 import { canGroup } from 'erxes-api-shared/core-modules';
 import { IContext } from '~/connectionResolvers';
 import { ISkillCreateInput, ISkillUpdateInput } from '@/skills/@types/skills';
@@ -14,15 +13,15 @@ import {
 } from '@/skills/service/skillsService';
 import { distillThreadToSkill } from '@/skills/service/distill';
 import { requireUserId } from '@/_shared/auth';
+import { requireScopedWorkflowAgent } from '@/workflow/authorization';
+import { ERXES_AGENT_ACTIONS } from '~/meta/permissionActions';
 
-// A skills "admin" is anyone who can promote (the Agent Admin group, plus the
-// instance owner — canGroup short-circuits true for isOwner). Only admins may
-// manage skills they don't author (seeds, other users' promoted globals);
-// everyone else is limited to their OWN skills.
+// Moderators may manage global or seed skills they do not author.
 const isSkillsAdmin = (
   subdomain: string,
   user: IContext['user'],
-): Promise<boolean> => canGroup(subdomain, 'skillsPromote', user);
+): Promise<boolean> =>
+  canGroup(subdomain, ERXES_AGENT_ACTIONS.skills.moderate, user);
 
 export const skillMutations = {
   mastraSkillCreate: async (
@@ -30,9 +29,10 @@ export const skillMutations = {
     { doc }: { doc: ISkillCreateInput },
     { user, subdomain, checkPermission }: IContext,
   ) => {
-    await checkPermission('skillsCreate');
-    // Creating a public (global) skill directly is a promotion — gate it.
-    if (doc.visibility === 'public') await checkPermission('skillsPromote');
+    await checkPermission(ERXES_AGENT_ACTIONS.skills.create);
+    if (doc.visibility === 'public') {
+      await checkPermission(ERXES_AGENT_ACTIONS.skills.promote);
+    }
     return createSkill(subdomain, requireUserId(user), doc);
   },
 
@@ -41,7 +41,7 @@ export const skillMutations = {
     { _id, doc }: { _id: string; doc: ISkillUpdateInput },
     { user, subdomain, checkPermission }: IContext,
   ) => {
-    await checkPermission('skillsEdit');
+    await checkPermission(ERXES_AGENT_ACTIONS.skills.update);
     return updateSkill(subdomain, requireUserId(user), _id, doc);
   },
 
@@ -50,9 +50,14 @@ export const skillMutations = {
     { _id }: { _id: string },
     { user, subdomain, checkPermission }: IContext,
   ) => {
-    await checkPermission('skillsRemove');
+    await checkPermission(ERXES_AGENT_ACTIONS.skills.remove);
     const userId = requireUserId(user);
-    return removeSkill(subdomain, userId, _id, await isSkillsAdmin(subdomain, user));
+    return removeSkill(
+      subdomain,
+      userId,
+      _id,
+      await isSkillsAdmin(subdomain, user),
+    );
   },
 
   mastraSkillPublish: async (
@@ -60,7 +65,7 @@ export const skillMutations = {
     { _id }: { _id: string },
     { user, subdomain, checkPermission }: IContext,
   ) => {
-    await checkPermission('skillsEdit');
+    await checkPermission(ERXES_AGENT_ACTIONS.skills.publish);
     return publishSkill(subdomain, requireUserId(user), _id);
   },
 
@@ -69,7 +74,7 @@ export const skillMutations = {
     { _id, versionId }: { _id: string; versionId: string },
     { user, subdomain, checkPermission }: IContext,
   ) => {
-    await checkPermission('skillsEdit');
+    await checkPermission(ERXES_AGENT_ACTIONS.skills.publish);
     return activateSkillVersion(subdomain, requireUserId(user), _id, versionId);
   },
 
@@ -78,7 +83,7 @@ export const skillMutations = {
     { _id }: { _id: string },
     { user, subdomain, checkPermission }: IContext,
   ) => {
-    await checkPermission('skillsPromote');
+    await checkPermission(ERXES_AGENT_ACTIONS.skills.promote);
     return promoteSkill(subdomain, requireUserId(user), _id);
   },
 
@@ -87,13 +92,14 @@ export const skillMutations = {
     { _id }: { _id: string },
     { user, subdomain, checkPermission }: IContext,
   ) => {
-    // Demote is the inverse of promote, but it must also be available to the
-    // skill's AUTHOR (who has skillsEdit but not skillsPromote). So gate the
-    // action with skillsEdit and enforce author-or-admin ownership in the
-    // service (admins may demote skills they don't own, e.g. seeds).
-    await checkPermission('skillsEdit');
+    await checkPermission(ERXES_AGENT_ACTIONS.skills.update);
     const userId = requireUserId(user);
-    return demoteSkill(subdomain, userId, _id, await isSkillsAdmin(subdomain, user));
+    return demoteSkill(
+      subdomain,
+      userId,
+      _id,
+      await isSkillsAdmin(subdomain, user),
+    );
   },
 
   mastraSkillFromThread: async (
@@ -103,14 +109,25 @@ export const skillMutations = {
       threadId,
       nameHint,
       scopeHint,
-    }: { agentId: string; threadId: string; nameHint?: string; scopeHint?: string },
+    }: {
+      agentId: string;
+      threadId: string;
+      nameHint?: string;
+      scopeHint?: string;
+    },
     { models, user, subdomain, checkPermission }: IContext,
   ) => {
-    await checkPermission('skillsCreate');
+    await checkPermission(ERXES_AGENT_ACTIONS.skills.create);
+    await checkPermission(ERXES_AGENT_ACTIONS.agent.chat);
     const userId = requireUserId(user);
 
-    const agent = await models.MastraAgent.findOne({ agentId });
-    if (!agent) throw new ExpectedError(`Agent "${agentId}" not found`);
+    const { agent } = await requireScopedWorkflowAgent({
+      models,
+      subdomain,
+      user,
+      action: ERXES_AGENT_ACTIONS.agent.chat,
+      agentId,
+    });
 
     const [providers, settings] = await Promise.all([
       models.MastraProvider.find({ isEnabled: true }),
@@ -131,7 +148,10 @@ export const skillMutations = {
       scopeHint,
     });
 
-    return createSkill(subdomain, userId, { ...content, visibility: 'private' });
+    return createSkill(subdomain, userId, {
+      ...content,
+      visibility: 'private',
+    });
   },
 
   mastraSkillActivate: async (
@@ -139,11 +159,17 @@ export const skillMutations = {
     { agentId, name }: { agentId: string; name: string },
     { models, user, subdomain, checkPermission }: IContext,
   ) => {
-    // Activation only READS a skill's instructions, so gate it with the read
-    // permission, not skillsEdit.
-    await checkPermission('skillsView');
-    const agent = await models.MastraAgent.findOne({ agentId });
-    const globs = agent?.skills ?? [];
-    return activateInvocableSkill(subdomain, requireUserId(user), globs, name);
+    await checkPermission(ERXES_AGENT_ACTIONS.skills.read);
+    await checkPermission(ERXES_AGENT_ACTIONS.agent.chat);
+    const userId = requireUserId(user);
+    const { agent } = await requireScopedWorkflowAgent({
+      models,
+      subdomain,
+      user,
+      action: ERXES_AGENT_ACTIONS.agent.chat,
+      agentId,
+    });
+    const globs = agent.skills ?? [];
+    return activateInvocableSkill(subdomain, userId, globs, name);
   },
 };

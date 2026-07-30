@@ -1,15 +1,21 @@
 import { ExpectedError } from 'erxes-api-shared/utils';
-import { IContext, IModels } from '~/connectionResolvers';
+import { canGroup } from 'erxes-api-shared/core-modules';
+import type { IContext, IModels } from '~/connectionResolvers';
 import { validateDefinition } from '~/mastra/workflows/dsl';
 import { buildManualEnvelope } from '~/mastra/workflows/envelope';
 import { runWorkflow } from '~/mastra/workflows/runtime';
 import { getOperationRegistry } from '~/mastra/tools/operationRegistry';
 import { runWithAuth } from '~/mastra/requestContext';
-import { IMastraWorkflow } from '@/workflow/@types/workflow';
+import { assertWorkflowSchedulable } from '~/mastra/auth/backgroundPrincipal';
+import type { IMastraWorkflow } from '@/workflow/@types/workflow';
 import { requireUserId } from '@/_shared/auth';
+import { syncTenantSchedules } from '~/mastra/scheduleSync';
+import {
+  requireScopedWorkflow,
+  requireScopedWorkflowAgent,
+} from '@/workflow/authorization';
+import { ERXES_AGENT_ACTIONS } from '~/meta/permissionActions';
 
-// Save-time validation runs with the LIVE operation registry, so a definition
-// referencing a nonexistent or out-of-policy operation never reaches Mongo.
 const validateWithRegistry = async (models: IModels, definition: unknown) => {
   const settings = await models.MastraSettings.getSettings();
   const registry = await getOperationRegistry(settings);
@@ -22,18 +28,40 @@ const validateWithRegistry = async (models: IModels, definition: unknown) => {
   }
 };
 
-/** Mutations for workflow definitions and manual workflow runs. */
 export const workflowMutations = {
   mastraWorkflowCreate: async (
     _parent: undefined,
     { doc }: { doc: IMastraWorkflow },
-    { models, user, checkPermission }: IContext,
+    { models, user, checkPermission, subdomain }: IContext,
   ) => {
-    await checkPermission('workflowsCreate');
+    await checkPermission(ERXES_AGENT_ACTIONS.workflow.createDraft);
     const userId = requireUserId(user);
+    const agentId = doc.agentId?.trim();
+    if (!agentId) {
+      throw new ExpectedError(
+        'A workflow must have an owning agent — set agentId to an existing agent.',
+      );
+    }
+
+    const { agent } = await requireScopedWorkflowAgent({
+      models,
+      subdomain,
+      user,
+      action: ERXES_AGENT_ACTIONS.workflow.createDraft,
+      agentId,
+    });
+    if (!agent.isEnabled) {
+      throw new ExpectedError(
+        `Owning agent "${agentId}" is disabled — enable it before creating a workflow.`,
+      );
+    }
+
     await validateWithRegistry(models, doc.definition);
     return models.MastraWorkflow.createWorkflow({
       ...doc,
+      agentId,
+      isEnabled: false,
+      approvalStatus: 'draft',
       createdByUserId: userId,
     });
   },
@@ -41,43 +69,158 @@ export const workflowMutations = {
   mastraWorkflowUpdate: async (
     _parent: undefined,
     { _id, doc }: { _id: string; doc: Partial<IMastraWorkflow> },
-    { models, user, checkPermission }: IContext,
+    { models, subdomain, user, checkPermission }: IContext,
   ) => {
-    await checkPermission('workflowsEdit');
+    await checkPermission(ERXES_AGENT_ACTIONS.workflow.updateDraft);
     requireUserId(user);
-    if (doc.definition) await validateWithRegistry(models, doc.definition);
-    return models.MastraWorkflow.updateWorkflow(_id, doc);
+    await requireScopedWorkflow({
+      models,
+      subdomain,
+      user,
+      action: ERXES_AGENT_ACTIONS.workflow.updateDraft,
+      workflowId: _id,
+    });
+
+    const {
+      isEnabled,
+      approvalStatus,
+      approvedByUserId,
+      approvedAt,
+      createdByUserId,
+      ...draft
+    } = doc;
+    if (
+      isEnabled !== undefined ||
+      approvalStatus !== undefined ||
+      approvedByUserId !== undefined ||
+      approvedAt !== undefined ||
+      createdByUserId !== undefined
+    ) {
+      throw new ExpectedError(
+        'Workflow approval and scheduling use dedicated actions',
+      );
+    }
+
+    if (draft.agentId !== undefined) {
+      const agentId = draft.agentId.trim();
+      if (!agentId)
+        throw new ExpectedError('A workflow must have an owning agent');
+      const { agent } = await requireScopedWorkflowAgent({
+        models,
+        subdomain,
+        user,
+        action: ERXES_AGENT_ACTIONS.workflow.updateDraft,
+        agentId,
+      });
+      if (!agent.isEnabled) {
+        throw new ExpectedError(`Owning agent "${agentId}" is disabled`);
+      }
+      draft.agentId = agentId;
+    }
+    if (draft.definition) {
+      await validateWithRegistry(models, draft.definition);
+    }
+
+    const updated = await models.MastraWorkflow.updateWorkflow(_id, draft);
+    await syncTenantSchedules(models, subdomain);
+    return updated;
   },
 
   mastraWorkflowRemove: async (
     _parent: undefined,
     { _id }: { _id: string },
-    { models, user, checkPermission }: IContext,
+    { models, subdomain, user, checkPermission }: IContext,
   ) => {
-    await checkPermission('workflowsRemove');
+    await checkPermission(ERXES_AGENT_ACTIONS.workflow.remove);
     requireUserId(user);
-    return models.MastraWorkflow.removeWorkflow(_id);
+    await requireScopedWorkflow({
+      models,
+      subdomain,
+      user,
+      action: ERXES_AGENT_ACTIONS.workflow.remove,
+      workflowId: _id,
+    });
+    const removed = await models.MastraWorkflow.removeWorkflow(_id);
+    await syncTenantSchedules(models, subdomain);
+    return removed;
+  },
+
+  mastraWorkflowApprove: async (
+    _parent: undefined,
+    { _id }: { _id: string },
+    { models, subdomain, user, checkPermission }: IContext,
+  ) => {
+    await checkPermission(ERXES_AGENT_ACTIONS.workflow.approve);
+    const userId = requireUserId(user);
+    const workflow = await requireScopedWorkflow({
+      models,
+      subdomain,
+      user,
+      action: ERXES_AGENT_ACTIONS.workflow.approve,
+      workflowId: _id,
+    });
+    await validateWithRegistry(models, workflow.definition);
+    await assertWorkflowSchedulable({
+      models,
+      agentId: workflow.agentId,
+      definition: workflow.definition,
+    });
+    return models.MastraWorkflow.approveWorkflow(
+      _id,
+      userId,
+      workflow.version,
+      workflow.updatedAt,
+    );
   },
 
   mastraWorkflowSetEnabled: async (
     _parent: undefined,
     { _id, isEnabled }: { _id: string; isEnabled: boolean },
-    { models, user, checkPermission }: IContext,
+    { models, subdomain, user, checkPermission }: IContext,
   ) => {
-    await checkPermission('workflowsEdit');
+    await checkPermission(ERXES_AGENT_ACTIONS.workflow.schedule);
     requireUserId(user);
-    return models.MastraWorkflow.setEnabled(_id, isEnabled);
+    const workflow = await requireScopedWorkflow({
+      models,
+      subdomain,
+      user,
+      action: ERXES_AGENT_ACTIONS.workflow.schedule,
+      workflowId: _id,
+    });
+    if (isEnabled) {
+      if (workflow.approvalStatus !== 'approved') {
+        throw new ExpectedError(
+          'Workflow must be approved before it can be enabled',
+        );
+      }
+      await assertWorkflowSchedulable({
+        models,
+        agentId: workflow.agentId,
+        definition: workflow.definition,
+      });
+    }
+    const updated = await models.MastraWorkflow.setEnabled(_id, isEnabled);
+    await syncTenantSchedules(models, subdomain);
+    return updated;
   },
 
-  // Dry validation for the master agent's draft loop — returns structured
-  // errors instead of throwing, so the model can iterate. Read-only, so it is
-  // gated by the same view permission as reading workflows.
   mastraWorkflowValidate: async (
     _parent: undefined,
     { definition }: { definition: unknown },
-    { models, user, checkPermission }: IContext,
+    { models, user, subdomain }: IContext,
   ) => {
-    await checkPermission('workflowsView');
+    const canValidate =
+      (await canGroup(
+        subdomain,
+        ERXES_AGENT_ACTIONS.workflow.createDraft,
+        user,
+      )) ||
+      (await canGroup(
+        subdomain,
+        ERXES_AGENT_ACTIONS.workflow.updateDraft,
+        user,
+      ));
+    if (!canValidate) throw new ExpectedError('Permission required');
     requireUserId(user);
     const settings = await models.MastraSettings.getSettings();
     const registry = await getOperationRegistry(settings);
@@ -85,20 +228,25 @@ export const workflowMutations = {
     return { ok: result.ok, errors: result.errors };
   },
 
-  // Manual trigger. Allowed even when the workflow is disabled — disabling
-  // gates event triggers, not deliberate test runs.
   mastraWorkflowRunStart: async (
     _parent: undefined,
     { _id, input }: { _id: string; input?: Record<string, unknown> },
     { models, subdomain, user, checkPermission }: IContext,
   ) => {
-    await checkPermission('workflowsRun');
+    await checkPermission(ERXES_AGENT_ACTIONS.workflow.run);
     const userId = requireUserId(user);
-    const workflow = await models.MastraWorkflow.getWorkflow(_id);
+    const workflow = await requireScopedWorkflow({
+      models,
+      subdomain,
+      user,
+      action: ERXES_AGENT_ACTIONS.workflow.run,
+      workflowId: _id,
+    });
+    if (workflow.approvalStatus !== 'approved') {
+      throw new ExpectedError('Workflow must be approved before it can run');
+    }
     const envelope = buildManualEnvelope(input || {}, userId);
-    // Operation steps execute AS the requesting user (erxes enforces their
-    // permissions), not as the privileged app token — that fallback is
-    // reserved for background (schedule/automation) runs.
+
     return runWithAuth(
       {
         userHeader: Buffer.from(JSON.stringify(user)).toString('base64'),

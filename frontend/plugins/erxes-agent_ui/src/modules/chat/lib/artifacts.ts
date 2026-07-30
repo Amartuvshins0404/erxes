@@ -51,13 +51,19 @@ export const asArtifactPart = (call: ToolPartView): Artifact | null => {
 
 /**
  * One pass over an assistant message's parts → the artifact cards to render
- * plus the artifact-classified tools that settled WITHOUT producing one.
+ * plus the artifact-classified tools that finished WITHOUT producing one.
  * Failures matter here because artifact tools are hidden from the run trace
  * (a card is their surface) — an errored render-chart call would otherwise
  * leave the turn looking like nothing happened at all.
+ *
+ * `settled` = the message is done streaming. A settled message's artifact tool
+ * still awaiting its output will never get one (the output chunk was lost —
+ * e.g. the stream aborted mid-tool), so it counts as a failure too; while
+ * streaming the same pending state is just "still running" and reports nothing.
  */
 export const artifactOutcomes = (
   parts: AgentUIMessage['parts'],
+  settled = false,
 ): { artifacts: Artifact[]; failures: ToolPartView[] } => {
   const artifacts: Artifact[] = [];
   const failures: ToolPartView[] = [];
@@ -69,12 +75,31 @@ export const artifactOutcomes = (
       artifacts.push(artifact);
     } else if (
       toolKind(tool.toolName) === 'artifact' &&
-      (tool.state === 'output-available' || tool.state === 'output-error')
+      (tool.state === 'output-available' ||
+        tool.state === 'output-error' ||
+        (settled && tool.pending))
     ) {
       failures.push(tool);
     }
   }
   return { artifacts, failures };
+};
+
+/**
+ * The artifact cards a bubble renders: the live tool-part artifacts UNIONED
+ * with the persisted store rows for the message, deduped by id (live first —
+ * its spec is always current). Either source alone can have holes: a rehydrated
+ * tool part may have lost its `output.artifact` (live miss), and a store row's
+ * message link can fail (store miss) — merging lets each rescue the other
+ * instead of the old either/or hiding the artifact entirely.
+ */
+export const mergeArtifacts = (
+  live: Artifact[],
+  store: Artifact[] | undefined,
+): Artifact[] => {
+  if (!store?.length) return live;
+  const seen = new Set(live.map((a) => a.id));
+  return [...live, ...store.filter((a) => !seen.has(a.id))];
 };
 
 /**
@@ -99,7 +124,17 @@ export const associateArtifacts = (
     [...byMessageId].map(([id, items]) => [id, [...items]]),
   );
 
-  const unlinked = groups.filter((g) => !g.linked && g.prompt);
+  // Prompt/order matching covers groups with no backend link at all AND groups
+  // whose stamped messageId matches no message in this thread (a failed or
+  // stale id recovery) — a link to nowhere would otherwise hide the group from
+  // the inline view entirely.
+  const knownIds = new Set(
+    messages.map((m) => m.metadata?.messageId).filter(Boolean),
+  );
+  const unlinked = groups.filter(
+    (g) =>
+      g.prompt && (!g.linked || !g.messageId || !knownIds.has(g.messageId)),
+  );
   if (!unlinked.length) return result;
 
   // Each user turn paired with the id of the assistant bubble that answered it,

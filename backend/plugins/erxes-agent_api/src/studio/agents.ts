@@ -3,7 +3,7 @@
  *
  * Reuses the production builder `getOrCreateAgent(cfg, models, subdomain)`.
  * Passing the subdomain makes the builder attach the NATIVE Mastra Memory
- * (semantic recall + working memory on Mongo `erxes_mastra_memory` + Qdrant, via
+ * (recent-history replay + working memory on Mongo `erxes_mastra_memory`, via
  * getMastraMemory) whenever ERXES_AGENT_MEMORY=enable and the agent's
  * memoryEnabled !== false — so Studio lists each real agent AND its per-agent
  * history tab lights up, with zero schema translation. Resilient per-agent: a
@@ -14,6 +14,7 @@
  * the native Mastra store.
  */
 import type { Agent } from '@mastra/core/agent';
+import type { IMastraAgentDocument } from '@/agent/@types/agent';
 import { getOrCreateAgent } from '~/mastra/agentRuntime';
 import { getMastraMemory } from '~/mastra/memory/mastraMemory';
 import { studioModels, STUDIO_SUBDOMAIN } from './tenant';
@@ -28,10 +29,10 @@ export async function buildStudioAgents(): Promise<Record<string, Agent>> {
   const agents: Record<string, Agent> = {};
 
   let models: Awaited<ReturnType<typeof studioModels>>;
-  let configs: Array<{ _id: string; agentId?: string; name?: string }>;
+  let configs: IMastraAgentDocument[];
   try {
     models = await studioModels();
-    configs = await models.MastraAgent.getAgents();
+    configs = await models.MastraAgent.getAgentsInternal();
   } catch (err) {
     console.error(
       '[erxes-studio] could not load agents from Mongo:',
@@ -47,7 +48,10 @@ export async function buildStudioAgents(): Promise<Record<string, Agent>> {
   try {
     const devResource = await detectDevResource(STUDIO_SUBDOMAIN);
     if (devResource) {
-      pinned = pinResource(await getMastraMemory(STUDIO_SUBDOMAIN), devResource);
+      pinned = pinResource(
+        await getMastraMemory(STUDIO_SUBDOMAIN),
+        devResource,
+      );
       console.log(
         `[erxes-studio] memory pinned to dashboard resource: ${devResource}`,
       );
@@ -64,19 +68,16 @@ export async function buildStudioAgents(): Promise<Record<string, Agent>> {
 
   for (const cfg of configs) {
     try {
-      const { agent } = await getOrCreateAgent(
-        cfg as never,
-        models,
-        STUDIO_SUBDOMAIN,
-      );
+      const { agent } = await getOrCreateAgent(cfg, models, STUDIO_SUBDOMAIN);
       // Override the agent's memory with the resource-pinned facade so its
       // chat + history-tab reads/writes land in the dashboard's bucket.
       // `__setMemory` is Mastra's internal memory setter — fine for this
       // dev-only bridge (it never ships in the production build), but guarded:
       // if a future Mastra renames/removes it, Studio still boots, just
       // unpinned (its own resource scope) instead of crashing.
-      const setMemory = (agent as unknown as { __setMemory?: (m: unknown) => void })
-        .__setMemory;
+      const setMemory = (
+        agent as unknown as { __setMemory?: (m: unknown) => void }
+      ).__setMemory;
       if (pinned && typeof setMemory === 'function') {
         setMemory.call(agent, pinned);
       } else if (pinned) {
@@ -88,13 +89,17 @@ export async function buildStudioAgents(): Promise<Record<string, Agent>> {
       console.log(`[erxes-studio] registered: ${cfg.name} (${keyOf(cfg)})`);
     } catch (err) {
       console.error(
-        `[erxes-studio] skipped ${cfg?.name ?? cfg?._id}: ${(err as Error).message}`,
+        `[erxes-studio] skipped ${cfg?.name ?? cfg?._id}: ${
+          (err as Error).message
+        }`,
       );
     }
   }
 
   console.log(
-    `[erxes-studio] ${Object.keys(agents).length}/${configs.length} agents registered`,
+    `[erxes-studio] ${Object.keys(agents).length}/${
+      configs.length
+    } agents registered`,
   );
   return agents;
 }

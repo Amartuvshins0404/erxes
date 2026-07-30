@@ -1,13 +1,5 @@
 import { Document } from 'mongoose';
 
-export interface IKnowledgeSyncStatus {
-  lastSweepAt?: Date;
-  pointCount?: number;
-  /** Per-content-type sweep status: { [type]: { count, points, error? } } */
-  types?: Record<string, { count: number; points: number; error?: string }>;
-  lastError?: string | null;
-}
-
 export interface IMastraSettings {
   erxesApiUrl?: string;
   erxesApiToken?: string;
@@ -16,7 +8,6 @@ export interface IMastraSettings {
   // (S3/R2/Azure/GCS/local, configured in core). Defaults to on; only
   // effective when that storage is actually configured.
   attachmentsEnabled?: boolean;
-  knowledgeSyncStatus?: IKnowledgeSyncStatus;
   // Per-user agent creation cap. 0 = unlimited. Admins are always exempt.
   defaultAgentQuota?: number;
 }

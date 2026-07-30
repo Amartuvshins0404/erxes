@@ -2,6 +2,7 @@ import { IContext } from '~/connectionResolvers';
 import { renameOwnedThread, removeOwnedThread } from '@/session/nativeStore';
 import { cancelActiveRun } from '~/mastra/runRegistry';
 import { requireUserId } from '@/_shared/auth';
+import { ERXES_AGENT_ACTIONS } from '~/meta/permissionActions';
 
 /** Mutations on a user's own chat threads (rename / delete), Mastra-native. */
 export const sessionMutations = {
@@ -10,7 +11,7 @@ export const sessionMutations = {
     { threadId, title }: { threadId: string; title: string },
     { user, subdomain, checkPermission }: IContext,
   ) => {
-    await checkPermission('agentsChat');
+    await checkPermission(ERXES_AGENT_ACTIONS.agent.chat);
     return renameOwnedThread(subdomain, requireUserId(user), threadId, title);
   },
 
@@ -19,7 +20,7 @@ export const sessionMutations = {
     { threadId }: { threadId: string },
     { user, subdomain, checkPermission }: IContext,
   ) => {
-    await checkPermission('agentsChat');
+    await checkPermission(ERXES_AGENT_ACTIONS.agent.chat);
     return removeOwnedThread(subdomain, requireUserId(user), threadId);
   },
 
@@ -32,7 +33,7 @@ export const sessionMutations = {
     { threadId }: { threadId: string },
     { user, subdomain, checkPermission }: IContext,
   ) => {
-    await checkPermission('agentsChat');
+    await checkPermission(ERXES_AGENT_ACTIONS.agent.chat);
     return cancelActiveRun(subdomain, requireUserId(user), threadId);
   },
 };

@@ -24,10 +24,11 @@ import {
 import { formatFileSize } from '~/modules/chat/lib/attachments';
 import { previewStore } from '~/modules/chat/preview/previewStore';
 import { MermaidViewer } from '~/modules/chat/preview/MermaidViewer';
-import { CHECKERBOARD_STYLE } from '~/modules/chat/preview/ImageViewer';
+import { CHECKERBOARD_STYLE } from '~/modules/chat/preview/checkerboard';
 
 // Registers the artifact in the Files list (without auto-opening the panel) on
-// the first live render. Shared by all artifact card variants.
+// the first live render. Shared by the non-chart artifact card variants —
+// charts stay inline-only and never auto-open the panel.
 function usePresentIfLive(artifact: Artifact, live?: boolean) {
   const presentIfNew = previewStore((s) => s.presentIfNew);
   // A streaming turn hands us a fresh `artifact` object on every throttled tick,
@@ -45,10 +46,9 @@ function usePresentIfLive(artifact: Artifact, live?: boolean) {
 // No card chrome — a large left-aligned heading with quiet actions on its
 // right, then the interactive chart + totals + filter sliders directly in the
 // chat flow, width-constrained by the message column itself.
-const ChartPreview = ({ artifact, live }: { artifact: ChartArtifact; live?: boolean }) => {
+const ChartPreview = ({ artifact }: { artifact: ChartArtifact }) => {
   const openArtifact = previewStore((s) => s.openArtifact);
   const [expanded, setExpanded] = useState(false);
-  usePresentIfLive(artifact, live);
 
   return (
     <div className="ea-pop my-4">
@@ -233,7 +233,7 @@ const artifactsEqual = (a: Artifact, b: Artifact): boolean =>
 // itself reference-churn-resilient; this just spares it the wasted renders.
 export const ArtifactCard = memo(
   function ArtifactCard({ artifact, live }: { artifact: Artifact; live?: boolean }) {
-    if (artifact.kind === 'chart') return <ChartPreview artifact={artifact} live={live} />;
+    if (artifact.kind === 'chart') return <ChartPreview artifact={artifact} />;
     if (artifact.kind === 'diagram') return <DiagramPreview artifact={artifact} live={live} />;
     if (artifact.kind === 'image') return <ImageCard artifact={artifact} live={live} />;
     return <DocumentCard artifact={artifact} live={live} />;

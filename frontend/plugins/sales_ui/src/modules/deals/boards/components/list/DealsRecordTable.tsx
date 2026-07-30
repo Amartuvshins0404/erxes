@@ -11,6 +11,7 @@ import { useStages } from '@/deals/stage/hooks/useStages';
 export const DealsRecordTable = () => {
   const [pipelineId] = useQueryState<string | null>('pipelineId');
   const [searchParams] = useSearchParams();
+  const columns = DealsColumn();
 
   const { stages, loading: stagesLoading } = useStages({
     variables: {
@@ -19,24 +20,16 @@ export const DealsRecordTable = () => {
     skip: !pipelineId,
   });
 
-  const archivedOnly = searchParams.get('archivedOnly') === 'true';
   const queryVariables = getDealsQueryVariables(searchParams);
-
-  const { deals, loading, handleFetchMore } = useDeals({
+  const { deals, loading, handleFetchMore, pageInfo } = useDeals({
     skip: !pipelineId,
     variables: {
-      boardId: searchParams.get('boardId'),
       pipelineId,
       stageId: searchParams.get('stageId'),
       ...queryVariables,
     },
   });
-
-  const filteredDeals = deals?.filter((deal) => {
-    return archivedOnly
-      ? deal.status === 'archived'
-      : deal.status !== 'archived';
-  });
+  const { hasPreviousPage, hasNextPage } = pageInfo || {};
 
   if (pipelineId && !stagesLoading && stages.length === 0) {
     return <NoStagesWarning />;
@@ -45,12 +38,17 @@ export const DealsRecordTable = () => {
   return (
     <div className="flex flex-col overflow-hidden h-full relative">
       <RecordTable.Provider
-        columns={DealsColumn()}
-        data={filteredDeals || (loading ? [{}] : [])}
+        columns={columns}
+        data={deals || (loading ? [{}] : [])}
         className="m-3 h-full"
-        stickyColumns={['checkbox', 'name']}
+        stickyColumns={['more', 'checkbox', 'name']}
+        tableId="sales_deals_record_table"
       >
-        <RecordTable.CursorProvider dataLength={deals?.length}>
+        <RecordTable.CursorProvider
+          dataLength={deals?.length}
+          hasPreviousPage={hasPreviousPage}
+          hasNextPage={hasNextPage}
+        >
           <RecordTable>
             <RecordTable.Header />
             <RecordTable.Body>

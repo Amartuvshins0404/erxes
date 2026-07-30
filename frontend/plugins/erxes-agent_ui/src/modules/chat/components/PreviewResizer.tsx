@@ -1,4 +1,10 @@
-import { RefObject, useEffect, useLayoutEffect, useRef } from 'react';
+import {
+  RefObject,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+} from 'react';
 
 // Persisted width of the docked Preview panel (px). One key for the whole
 // plugin — the preferred split reads as an app setting, not per-agent state.
@@ -64,41 +70,47 @@ export const PreviewResizer = ({
   }, [sideCollapsed]);
 
   // Collapse/expand the side panel based on where the chat width would land.
-  const syncSidePanel = (previewWidth: number, total: number) => {
-    const chatWithSide = total - SIDE_WIDTH - previewWidth;
-    if (!collapsedRef.current && chatWithSide < COLLAPSE_AT) {
-      collapsedRef.current = true;
-      onSideCollapsedChange(true);
-    } else if (collapsedRef.current && chatWithSide >= EXPAND_AT) {
-      collapsedRef.current = false;
-      onSideCollapsedChange(false);
-    }
-  };
+  const syncSidePanel = useCallback(
+    (previewWidth: number, total: number) => {
+      const chatWithSide = total - SIDE_WIDTH - previewWidth;
+      if (!collapsedRef.current && chatWithSide < COLLAPSE_AT) {
+        collapsedRef.current = true;
+        onSideCollapsedChange(true);
+      } else if (collapsedRef.current && chatWithSide >= EXPAND_AT) {
+        collapsedRef.current = false;
+        onSideCollapsedChange(false);
+      }
+    },
+    [onSideCollapsedChange],
+  );
 
-  const applyWidth = (px: number) => {
-    const container = splitRef.current;
-    if (!container) return;
-    const total = container.getBoundingClientRect().width;
-    // Side panel first: if this width squeezes the chat, reclaim the column
-    // before clamping so the drag continues smoothly into the freed space.
-    syncSidePanel(px, total);
-    const side = collapsedRef.current ? 0 : SIDE_WIDTH;
-    const max = Math.max(total - side - CHAT_MIN, MIN_WIDTH);
-    const width = Math.round(Math.min(Math.max(px, MIN_WIDTH), max));
-    container.style.setProperty('--ea-preview-w', `${width}px`);
-    // Remember the REQUESTED width (lower-bounded only), not the clamp: a
-    // window shrink must not permanently degrade the preference — growing the
-    // window back re-applies the desired width via the resize recheck.
-    widthRef.current = Math.round(Math.max(px, MIN_WIDTH));
-    // Value semantics for the focusable separator, kept in sync imperatively
-    // (this path runs per drag frame — no re-render).
-    const handle = handleRef.current;
-    if (handle) {
-      handle.setAttribute('aria-valuenow', String(width));
-      handle.setAttribute('aria-valuemin', String(MIN_WIDTH));
-      handle.setAttribute('aria-valuemax', String(Math.round(max)));
-    }
-  };
+  const applyWidth = useCallback(
+    (px: number) => {
+      const container = splitRef.current;
+      if (!container) return;
+      const total = container.getBoundingClientRect().width;
+      // Side panel first: if this width squeezes the chat, reclaim the column
+      // before clamping so the drag continues smoothly into the freed space.
+      syncSidePanel(px, total);
+      const side = collapsedRef.current ? 0 : SIDE_WIDTH;
+      const max = Math.max(total - side - CHAT_MIN, MIN_WIDTH);
+      const width = Math.round(Math.min(Math.max(px, MIN_WIDTH), max));
+      container.style.setProperty('--ea-preview-w', `${width}px`);
+      // Remember the REQUESTED width (lower-bounded only), not the clamp: a
+      // window shrink must not permanently degrade the preference — growing the
+      // window back re-applies the desired width via the resize recheck.
+      widthRef.current = Math.round(Math.max(px, MIN_WIDTH));
+      // Value semantics for the focusable separator, kept in sync imperatively
+      // (this path runs per drag frame — no re-render).
+      const handle = handleRef.current;
+      if (handle) {
+        handle.setAttribute('aria-valuenow', String(width));
+        handle.setAttribute('aria-valuemin', String(MIN_WIDTH));
+        handle.setAttribute('aria-valuemax', String(Math.round(max)));
+      }
+    },
+    [splitRef, syncSidePanel],
+  );
 
   const persist = () => {
     if (widthRef.current) saveWidth(widthRef.current);
@@ -106,10 +118,13 @@ export const PreviewResizer = ({
 
   // The dock's rendered width — source of truth for keyboard stepping and the
   // default 42% state, where no explicit pixel width has been set yet.
-  const dockWidth = () =>
-    splitRef.current
-      ?.querySelector('.ea-preview-dock')
-      ?.getBoundingClientRect().width ?? 0;
+  const dockWidth = useCallback(
+    () =>
+      splitRef.current
+        ?.querySelector('.ea-preview-dock')
+        ?.getBoundingClientRect().width ?? 0,
+    [splitRef],
+  );
 
   // Restore the saved split when the docked panel (re)opens, and keep the
   // clamp + side-panel state honest across window resizes. Layout effect, not
@@ -130,8 +145,7 @@ export const PreviewResizer = ({
     else recheck();
     window.addEventListener('resize', recheck);
     return () => window.removeEventListener('resize', recheck);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [applyWidth, syncSidePanel, dockWidth, splitRef]);
 
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     e.preventDefault();

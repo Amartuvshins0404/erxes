@@ -1,12 +1,26 @@
 export const types = `
+  type MastraWorkflowCapabilities {
+    canUpdate: Boolean!
+    canRemove: Boolean!
+    canRun: Boolean!
+    canApprove: Boolean!
+    canSchedule: Boolean!
+    canReadRuns: Boolean!
+  }
+
   type MastraWorkflow {
     _id: String
     name: String
     description: String
+    agentId: String
     definition: JSON
     version: Int
     isEnabled: Boolean
     createdByUserId: String
+    approvalStatus: String
+    approvedByUserId: String
+    approvedAt: Date
+    capabilities: MastraWorkflowCapabilities!
     createdAt: Date
     updatedAt: Date
   }
@@ -14,8 +28,8 @@ export const types = `
   input MastraWorkflowInput {
     name: String
     description: String
+    agentId: String
     definition: JSON
-    isEnabled: Boolean
   }
 
   type MastraWorkflowRun {
@@ -36,7 +50,7 @@ export const types = `
 `;
 
 export const queries = `
-  mastraWorkflows: [MastraWorkflow]
+  mastraWorkflows(agentId: String): [MastraWorkflow]
   mastraWorkflow(_id: String!): MastraWorkflow
   mastraWorkflowRuns(workflowId: String!, page: Int, perPage: Int): [MastraWorkflowRun]
 `;
@@ -45,6 +59,7 @@ export const mutations = `
   mastraWorkflowCreate(doc: MastraWorkflowInput!): MastraWorkflow
   mastraWorkflowUpdate(_id: String!, doc: MastraWorkflowInput!): MastraWorkflow
   mastraWorkflowRemove(_id: String!): JSON
+  mastraWorkflowApprove(_id: String!): MastraWorkflow
   mastraWorkflowSetEnabled(_id: String!, isEnabled: Boolean!): MastraWorkflow
   mastraWorkflowValidate(definition: JSON!): JSON
   mastraWorkflowRunStart(_id: String!, input: JSON): MastraWorkflowRun

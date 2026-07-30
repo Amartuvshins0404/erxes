@@ -54,11 +54,6 @@ import {
   IMastraFeedbackDocument,
 } from '@/learning/@types/learning';
 import {
-  loadScheduleClass,
-  IMastraScheduleModel,
-} from '@/schedule/db/models/Schedule';
-import { IMastraScheduleDocument } from '@/schedule/@types/schedule';
-import {
   loadArtifactClass,
   IMastraArtifactModel,
 } from '@/artifact/db/models/Artifact';
@@ -80,7 +75,6 @@ export interface IModels {
   MastraWorkflowRun: IMastraWorkflowRunModel;
   MastraLearning: IMastraLearningModel;
   MastraFeedback: IMastraFeedbackModel;
-  MastraSchedule: IMastraScheduleModel;
   MastraArtifact: IMastraArtifactModel;
   MastraVoiceConfig: IMastraVoiceConfigModel;
 }
@@ -145,10 +139,6 @@ export const loadClasses = (db: mongoose.Connection): IModels => {
     IMastraFeedbackModel
   >('mastra_feedbacks', loadFeedbackClass(models));
 
-  models.MastraSchedule = db.model<
-    IMastraScheduleDocument,
-    IMastraScheduleModel
-  >('mastra_schedules', loadScheduleClass(models));
 
   models.MastraArtifact = db.model<
     IMastraArtifactDocument,

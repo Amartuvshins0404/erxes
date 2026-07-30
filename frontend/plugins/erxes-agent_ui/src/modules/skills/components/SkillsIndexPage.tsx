@@ -83,20 +83,21 @@ const SkillMoreCell = ({
 }) => {
   const navigate = useNavigate();
   const { confirmRemove } = useConfirmedRemove();
-  const { canEdit, canRemove, canPromote } = useSkillAccess();
+  const { canEdit, canPublish, canRemove, canPromote, canModerate } =
+    useSkillAccess();
   const { remove, publish, promote, demote } = useSkillMutations(refetch);
 
   // isMine is a nullable Boolean — only an explicit `true` is the owner.
   const isOwner = skill.isMine === true;
-  const canPublish = skill.status === 'draft' && isOwner;
+  const canPublishRow = skill.status === 'draft' && isOwner;
   const canPromoteRow =
     skill.status === 'published' &&
     skill.visibility === 'private' &&
     canPromote;
-  // Demote is the escape hatch from a one-way promote: a global skill its
-  // author (or an admin) can pull back to private. Mirrors the backend's
-  // author-or-admin gate on mastraSkillDemote.
-  const canDemoteRow = skill.visibility === 'public' && (isOwner || canPromote);
+  // Demotion/removal of global skills is reserved for the author or moderator.
+  const canDemoteRow =
+    skill.visibility === 'public' && canEdit && (isOwner || canModerate);
+  const canRemoveRow = canRemove && (isOwner || canModerate);
 
   const handleDelete = () =>
     confirmRemove(
@@ -132,13 +133,13 @@ const SkillMoreCell = ({
                 <IconPencil className="size-4" /> Edit
               </PermissionButton>
             </Command.Item>
-            {canPublish && (
+            {canPublishRow && (
               <Command.Item asChild>
                 <PermissionButton
                   variant="ghost"
                   size="sm"
                   className="justify-start w-full h-8"
-                  allowed={canEdit}
+                  allowed={canPublish}
                   onDenied={() => showSkillPermissionError('publish')}
                   onClick={() => publish(skill._id)}
                 >
@@ -175,7 +176,7 @@ const SkillMoreCell = ({
                 variant="ghost"
                 size="sm"
                 className="justify-start w-full h-8 text-destructive"
-                allowed={canRemove && isOwner}
+                allowed={canRemoveRow}
                 onDenied={() => showSkillPermissionError('delete')}
                 onClick={handleDelete}
               >
@@ -319,6 +320,7 @@ export const SkillsIndexPage = () => {
     skillsList,
     totalCount,
     loading,
+    error,
     pageInfo,
     handleFetchMore,
     refetch,
@@ -329,6 +331,32 @@ export const SkillsIndexPage = () => {
   });
 
   const columns = useMemo(() => buildColumns(refetch), [refetch]);
+
+  const emptyView = error
+    ? {
+        title: "Couldn't load skills",
+        description: 'Something went wrong while fetching your skills.',
+        action: (
+          <Button
+            variant="outline"
+            onClick={() => {
+              void refetch().catch(() => undefined);
+            }}
+          >
+            Retry
+          </Button>
+        ),
+      }
+    : {
+        title: 'No skills yet',
+        description:
+          'Skills are reusable SKILL.md playbooks agents apply on demand. Create one, or distill a chat into a draft with “Make skill”.',
+        action: (
+          <CreateSkillButton>
+            <IconPlus /> Create skill
+          </CreateSkillButton>
+        ),
+      };
 
   return (
     <div className="flex flex-col h-full">
@@ -403,17 +431,10 @@ export const SkillsIndexPage = () => {
               <Empty.Media variant="icon">
                 <IconBook2 />
               </Empty.Media>
-              <Empty.Title>No skills yet</Empty.Title>
-              <Empty.Description>
-                Skills are reusable SKILL.md playbooks agents apply on demand.
-                Create one, or distill a chat into a draft with “Make skill”.
-              </Empty.Description>
+              <Empty.Title>{emptyView.title}</Empty.Title>
+              <Empty.Description>{emptyView.description}</Empty.Description>
             </Empty.Header>
-            <Empty.Content>
-              <CreateSkillButton>
-                <IconPlus /> Create skill
-              </CreateSkillButton>
-            </Empty.Content>
+            <Empty.Content>{emptyView.action}</Empty.Content>
           </Empty>
         </div>
       ) : (

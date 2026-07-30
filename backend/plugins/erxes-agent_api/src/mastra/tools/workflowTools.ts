@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { ExpectedError } from 'erxes-api-shared/utils';
+import type { IUserDocument } from 'erxes-api-shared/core-types';
 import { createTool } from '@mastra/core/tools';
+import type { IModels } from '../../connectionResolvers';
 import { getCurrentAuth } from '../requestContext';
 import {
   validateDefinition,
@@ -15,13 +17,22 @@ import {
 } from '../workflows/compiler';
 import { buildManualEnvelope } from '../workflows/envelope';
 import { runWorkflow } from '../workflows/runtime';
+import { assertWorkflowSchedulable } from '../auth/backgroundPrincipal';
 import { getOperationRegistry, OperationRegistry } from './operationRegistry';
+import { syncTenantSchedules } from '../scheduleSync';
+import {
+  getWorkflowAgentAccess,
+  requireScopedWorkflow,
+  requireScopedWorkflowAgent,
+} from '@/workflow/authorization';
+import { ERXES_AGENT_ACTIONS } from '~/meta/permissionActions';
+import type { IMastraWorkflowDocument } from '@/workflow/@types/workflow';
 
 /**
  * Builder tools — what turns a chat agent into the workflow MASTER AGENT
  * (docs/WORKFLOW-SPEC.md §5). The loop they enable, entirely in conversation:
  *
- *   workflowGuide → search_erxes_operations → workflowValidate (iterate on
+ *   workflowGuide → search_tools → workflowValidate (iterate on
  *   structured errors) → workflowSimulate (dry trace) → workflowSave →
  *   workflowRunNow / workflowRuns.
  *
@@ -78,7 +89,7 @@ const requireTeamMember = () => {
 };
 
 /** The tenant's plugin models, loaded lazily per call. */
-async function getModels() {
+async function getModels(): Promise<IModels> {
   // Lazy dynamic import keeps connectionResolvers (mongoose models +
   // erxes-api-shared — the whole plugin's module graph) out of this file's
   // load-time imports; jest mocks it and production loads it on first use.
@@ -86,14 +97,51 @@ async function getModels() {
   return generateModels(tenant());
 }
 
-/** The requesting user's _id, decoded from the propagated user header. */
-function currentUserId(): string | undefined {
+/** The authenticated user decoded from the propagated user header. */
+const isUserDocument = (value: unknown): value is IUserDocument =>
+  typeof value === 'object' &&
+  value !== null &&
+  '_id' in value &&
+  typeof value._id === 'string' &&
+  value._id.length > 0;
+
+function currentUser(): IUserDocument {
   const header = getCurrentAuth()?.userHeader;
-  if (!header) return undefined;
+  if (!header) throw new ExpectedError('Login required');
+
+  let parsed: unknown;
   try {
-    return JSON.parse(Buffer.from(header, 'base64').toString())._id;
+    parsed = JSON.parse(Buffer.from(header, 'base64').toString());
   } catch {
-    return undefined;
+    throw new ExpectedError('Login required');
+  }
+  if (!isUserDocument(parsed)) throw new ExpectedError('Login required');
+  return parsed;
+}
+
+/**
+ * The business agentId of the agent whose turn is running these tools — stamped
+ * on the auth context in prepare.ts. This is what a workflow the agent builds is
+ * owned by when the model doesn't name an explicit agentId, so a self-built
+ * workflow inherits its builder's identity (and background principal).
+ */
+function currentAgentId(): string | undefined {
+  return getCurrentAuth()?.agentId?.trim() || undefined;
+}
+
+/**
+ * The referenced owning agent must exist and be enabled; disabling it is the
+ * background workflow kill switch.
+ */
+async function assertAgentExists(
+  models: IModels,
+  agentId: string,
+): Promise<void> {
+  const agent = await models.MastraAgent.findOne({ agentId, isEnabled: true });
+  if (!agent) {
+    throw new ExpectedError(
+      `Owning agent "${agentId}" not found or disabled — enable it or reassign the workflow.`,
+    );
   }
 }
 
@@ -116,9 +164,10 @@ const resultEnvelope = <T extends z.ZodRawShape>(extra: T) =>
     ...extra,
   });
 
-/** Models plus a lazy operation-registry loader, shared by the builder tools. */
+/** Models, authenticated user, and a lazy registry loader shared by builder tools. */
 interface WorkflowContext {
-  models: Awaited<ReturnType<typeof getModels>>;
+  models: IModels;
+  user: IUserDocument;
   getRegistry: () => Promise<OperationRegistry>;
 }
 
@@ -131,11 +180,38 @@ async function withWorkflowContext<T>(
   run: (ctx: WorkflowContext) => Promise<T>,
 ): Promise<T> {
   requireTeamMember();
+  const user = currentUser();
   const models = await getModels();
   let registry: Promise<OperationRegistry> | undefined;
   const getRegistry = () =>
-    (registry ??= models.MastraSettings.getSettings().then(getOperationRegistry));
-  return run({ models, getRegistry });
+    (registry ??=
+      models.MastraSettings.getSettings().then(getOperationRegistry));
+  return run({ models, user, getRegistry });
+}
+
+/**
+ * Validation and simulation do not target a persisted workflow, but they still
+ * expose workflow-building behavior. Either draft capability is sufficient.
+ */
+async function requireWorkflowDraftCapability(
+  models: IModels,
+  user: IUserDocument,
+): Promise<void> {
+  try {
+    await getWorkflowAgentAccess({
+      models,
+      subdomain: tenant(),
+      user,
+      action: ERXES_AGENT_ACTIONS.workflow.createDraft,
+    });
+  } catch {
+    await getWorkflowAgentAccess({
+      models,
+      subdomain: tenant(),
+      user,
+      action: ERXES_AGENT_ACTIONS.workflow.updateDraft,
+    });
+  }
 }
 
 /** Validate a draft against the live registry, returning the typed definition. */
@@ -168,7 +244,7 @@ A workflow is a JSON document:
 
 STEP TYPES (max 30 steps total, ids unique, letters/digits/_/-):
 - { "id", "type": "operation", "operation": "<exact erxes operation name>", "args": { ... } }
-  Runs one erxes operation. Discover names/args with search_erxes_operations.
+  Runs one erxes operation. Discover exact names and arguments with search_tools.
 - { "id", "type": "agent", "agentRef": "<bindings key>", "prompt": "...", "outputSchema": { "field": "string|number|boolean|enum:a,b,c" } }
   One LLM judgment call. Append '?' for optional fields. Use an enum field for
   anything a branch will route on.
@@ -240,7 +316,9 @@ export const workflowValidateTool = tool({
   description:
     'Validates a draft workflow definition against the schema AND the live erxes operation registry (operation existence, policy coverage, reference integrity, condition syntax). Returns structured errors to fix — iterate until ok=true before saving.',
   inputSchema: z.object({
-    definition: z.record(z.unknown()).describe('The full workflow definition JSON'),
+    definition: z
+      .record(z.unknown())
+      .describe('The full workflow definition JSON'),
   }),
   outputSchema: z.object({
     ok: z.boolean(),
@@ -248,7 +326,8 @@ export const workflowValidateTool = tool({
     instruction: z.string().optional(),
   }),
   execute: ({ definition }: { definition: Record<string, unknown> }) =>
-    withWorkflowContext(async ({ getRegistry }) => {
+    withWorkflowContext(async ({ models, user, getRegistry }) => {
+      await requireWorkflowDraftCapability(models, user);
       const result = await validatedDefinition(definition, getRegistry);
       return {
         ok: result.ok,
@@ -294,135 +373,143 @@ export const workflowSimulateTool = tool({
     triggerPayload?: Record<string, unknown>;
     assumptions?: Record<string, Record<string, unknown>>;
   }) =>
-    withWorkflowContext(async ({ getRegistry }) => {
-    try {
-      const check = await validatedDefinition(definition, getRegistry);
-      if (!check.ok) {
-        return { success: false, errors: check.errors };
+    withWorkflowContext(async ({ models, user, getRegistry }) => {
+      try {
+        await requireWorkflowDraftCapability(models, user);
+        const check = await validatedDefinition(definition, getRegistry);
+        if (!check.ok) {
+          return { success: false, errors: check.errors };
+        }
+
+        const def = check.definition;
+        const trace: SimulationTraceEvent[] = [];
+
+        /** Auto-fills one agent output spec with type-appropriate sample values. */
+        const sampleFor = (spec: Record<string, string>) => {
+          const out: Record<string, unknown> = {};
+          for (const [field, raw] of Object.entries(spec)) {
+            if (raw.endsWith('?')) continue;
+            if (raw.startsWith('enum:'))
+              out[field] = raw.slice(5).split(',')[0];
+            else if (raw === 'number') out[field] = 0;
+            else if (raw === 'boolean') out[field] = false;
+            else out[field] = 'sample';
+          }
+          return out;
+        };
+
+        /** Finds a step by id anywhere in the tree (branch arms, parallel members). */
+        const findAgentStep = (
+          steps: WorkflowStep[],
+          id: string,
+        ): WorkflowStep | null => {
+          for (const s of steps) {
+            if (s.id === id) return s;
+            if (s.type === 'branch') {
+              for (const b of s.branches) {
+                const hit = findAgentStep(b.steps, id);
+                if (hit) return hit;
+              }
+              if (s.else) {
+                const hit = findAgentStep(s.else, id);
+                if (hit) return hit;
+              }
+            }
+            if (s.type === 'parallel') {
+              const hit = findAgentStep(s.steps, id);
+              if (hit) return hit;
+            }
+          }
+          return null;
+        };
+
+        const deps: CompiledDeps = {
+          executeOperation: (operation, args) => {
+            trace.push({ step: 'operation', operation, args });
+            return Promise.resolve({ simulated: true, operation });
+          },
+          runJudgment: ({ prompt, outputSpec }) => {
+            // Match the judgment back to its step id via the resolved prompt's
+            // origin — assumptions are keyed by step id, so locate the agent
+            // step whose outputSpec matches this call.
+            for (const [stepId, assumed] of Object.entries(assumptions || {})) {
+              const step = findAgentStep(def.steps, stepId);
+              if (
+                step &&
+                step.type === 'agent' &&
+                step.outputSchema === outputSpec
+              ) {
+                // Assumptions are usually PARTIAL (just the routing field) —
+                // merge them over auto-sampled defaults so the remaining
+                // required fields don't fail the step's schema validation.
+                const output = {
+                  ...sampleFor(outputSpec),
+                  ...assumed,
+                };
+                trace.push({
+                  step: 'agent',
+                  stepId,
+                  prompt,
+                  output,
+                  assumed: true,
+                });
+                return Promise.resolve(output);
+              }
+            }
+            const sampled = sampleFor(outputSpec);
+            trace.push({
+              step: 'agent',
+              prompt,
+              output: sampled,
+              assumed: false,
+            });
+            return Promise.resolve(sampled);
+          },
+        };
+
+        const wf = compileDefinition('simulation', def, deps);
+        const run = wf.createRunAsync
+          ? await wf.createRunAsync()
+          : await wf.createRun();
+        const result = await run.start({
+          inputData: {
+            trigger: buildManualEnvelope(triggerPayload || {}, 'simulation'),
+            steps: {},
+          },
+        });
+
+        return {
+          success: result.status === 'success',
+          status: result.status,
+          trace,
+          output:
+            result.status === 'success'
+              ? finalOutput(def, result.result)
+              : undefined,
+          error:
+            result.status === 'failed'
+              ? String(result.error?.message || result.error)
+              : undefined,
+        };
+      } catch (e) {
+        return fail(e);
       }
-
-      const def = check.definition;
-      const trace: SimulationTraceEvent[] = [];
-
-      /** Auto-fills one agent output spec with type-appropriate sample values. */
-      const sampleFor = (spec: Record<string, string>) => {
-        const out: Record<string, unknown> = {};
-        for (const [field, raw] of Object.entries(spec)) {
-          if (raw.endsWith('?')) continue;
-          if (raw.startsWith('enum:')) out[field] = raw.slice(5).split(',')[0];
-          else if (raw === 'number') out[field] = 0;
-          else if (raw === 'boolean') out[field] = false;
-          else out[field] = 'sample';
-        }
-        return out;
-      };
-
-      /** Finds a step by id anywhere in the tree (branch arms, parallel members). */
-      const findAgentStep = (
-        steps: WorkflowStep[],
-        id: string,
-      ): WorkflowStep | null => {
-        for (const s of steps) {
-          if (s.id === id) return s;
-          if (s.type === 'branch') {
-            for (const b of s.branches) {
-              const hit = findAgentStep(b.steps, id);
-              if (hit) return hit;
-            }
-            if (s.else) {
-              const hit = findAgentStep(s.else, id);
-              if (hit) return hit;
-            }
-          }
-          if (s.type === 'parallel') {
-            const hit = findAgentStep(s.steps, id);
-            if (hit) return hit;
-          }
-        }
-        return null;
-      };
-
-      const deps: CompiledDeps = {
-        executeOperation: (operation, args) => {
-          trace.push({ step: 'operation', operation, args });
-          return Promise.resolve({ simulated: true, operation });
-        },
-        runJudgment: ({ prompt, outputSpec }) => {
-          // Match the judgment back to its step id via the resolved prompt's
-          // origin — assumptions are keyed by step id, so locate the agent
-          // step whose outputSpec matches this call.
-          for (const [stepId, assumed] of Object.entries(assumptions || {})) {
-            const step = findAgentStep(def.steps, stepId);
-            if (
-              step &&
-              step.type === 'agent' &&
-              step.outputSchema === outputSpec
-            ) {
-              // Assumptions are usually PARTIAL (just the routing field) —
-              // merge them over auto-sampled defaults so the remaining
-              // required fields don't fail the step's schema validation.
-              const output = {
-                ...sampleFor(outputSpec),
-                ...assumed,
-              };
-              trace.push({
-                step: 'agent',
-                stepId,
-                prompt,
-                output,
-                assumed: true,
-              });
-              return Promise.resolve(output);
-            }
-          }
-          const sampled = sampleFor(outputSpec);
-          trace.push({
-            step: 'agent',
-            prompt,
-            output: sampled,
-            assumed: false,
-          });
-          return Promise.resolve(sampled);
-        },
-      };
-
-      const wf = compileDefinition('simulation', def, deps);
-      const run = wf.createRunAsync
-        ? await wf.createRunAsync()
-        : await wf.createRun();
-      const result = await run.start({
-        inputData: {
-          trigger: buildManualEnvelope(triggerPayload || {}, 'simulation'),
-          steps: {},
-        },
-      });
-
-      return {
-        success: result.status === 'success',
-        status: result.status,
-        trace,
-        output:
-          result.status === 'success'
-            ? finalOutput(def, result.result)
-            : undefined,
-        error:
-          result.status === 'failed'
-            ? String(result.error?.message || result.error)
-            : undefined,
-      };
-    } catch (e) {
-      return fail(e);
-    }
     }),
 });
 
 export const workflowSaveTool = tool({
   id: 'workflow-save',
   description:
-    'Saves a NEW workflow after the user explicitly confirmed the presented step list. Validates first; returns the saved workflow id. Workflows are saved DISABLED unless enable=true.',
+    'Saves a NEW draft workflow after the user explicitly confirmed the presented step list. Validates first; returns the saved workflow id. New workflows are always disabled and require separate human approval before scheduling. The workflow is OWNED by an agent (its background identity) — defaults to you, the agent building it; pass agentId only to hand ownership to a different existing agent.',
   inputSchema: z.object({
     name: z.string().min(1),
     description: z.string().optional(),
+    agentId: z
+      .string()
+      .optional()
+      .describe(
+        "The owning agent's id. Omit to own it yourself (the building agent).",
+      ),
     definition: z.record(z.unknown()),
     enable: z.boolean().default(false),
   }),
@@ -434,16 +521,41 @@ export const workflowSaveTool = tool({
   execute: async ({
     name,
     description,
+    agentId,
     definition,
     enable,
   }: {
     name: string;
     description?: string;
+    agentId?: string;
     definition: Record<string, unknown>;
     enable?: boolean;
   }) =>
-    withWorkflowContext(async ({ models, getRegistry }) => {
+    withWorkflowContext(async ({ models, user, getRegistry }) => {
       try {
+        if (enable) {
+          throw new ExpectedError(
+            'New workflows are saved as disabled drafts; approve the workflow before enabling it.',
+          );
+        }
+        // Own it: the explicit agentId, else the agent running this turn. Every
+        // workflow needs an owning agent — its background principal and enable
+        // preconditions resolve from it.
+        const ownerAgentId = agentId?.trim() || currentAgentId();
+        if (!ownerAgentId) {
+          throw new ExpectedError(
+            'This workflow needs an owning agent — pass agentId (the calling agent could not be determined).',
+          );
+        }
+        await requireScopedWorkflowAgent({
+          models,
+          subdomain: tenant(),
+          user,
+          action: ERXES_AGENT_ACTIONS.workflow.createDraft,
+          agentId: ownerAgentId,
+        });
+        await assertAgentExists(models, ownerAgentId);
+
         const check = await validatedDefinition(definition, getRegistry);
         if (!check.ok) {
           return { success: false, errors: check.errors };
@@ -452,10 +564,11 @@ export const workflowSaveTool = tool({
         const doc = await models.MastraWorkflow.createWorkflow({
           name,
           description,
+          agentId: ownerAgentId,
           definition: check.definition,
-          isEnabled: Boolean(enable),
-          createdByUserId: currentUserId(),
+          createdByUserId: user._id,
         });
+        await syncTenantSchedules(models, tenant());
         return { success: true, workflowId: doc._id, version: doc.version };
       } catch (e) {
         return fail(e);
@@ -466,11 +579,15 @@ export const workflowSaveTool = tool({
 export const workflowUpdateTool = tool({
   id: 'workflow-update',
   description:
-    'Updates an existing workflow (name, description, definition, enabled flag) after the user confirmed the change. Definition edits create a new version; in-flight runs keep their pinned version.',
+    'Updates an existing workflow draft after the user confirmed the change, or toggles scheduling as an enable-only operation. Definition edits create a new version and require re-approval; in-flight runs keep their pinned version.',
   inputSchema: z.object({
     workflowId: z.string(),
     name: z.string().optional(),
     description: z.string().optional(),
+    agentId: z
+      .string()
+      .optional()
+      .describe('Reassign the owning agent (must be an existing agent).'),
     definition: z.record(z.unknown()).optional(),
     enable: z.boolean().optional(),
   }),
@@ -482,22 +599,31 @@ export const workflowUpdateTool = tool({
     workflowId,
     name,
     description,
+    agentId,
     definition,
     enable,
   }: {
     workflowId: string;
     name?: string;
     description?: string;
+    agentId?: string;
     definition?: Record<string, unknown>;
     enable?: boolean;
   }) =>
-    withWorkflowContext(async ({ models, getRegistry }) => {
+    withWorkflowContext(async ({ models, user, getRegistry }) => {
       try {
+        const existing = await requireScopedWorkflow({
+          models,
+          subdomain: tenant(),
+          user,
+          action: ERXES_AGENT_ACTIONS.workflow.updateDraft,
+          workflowId,
+        });
         const patch: {
           name?: string;
           description?: string;
+          agentId?: string;
           definition?: WorkflowDefinition;
-          isEnabled?: boolean;
         } = {};
         if (definition !== undefined) {
           const check = await validatedDefinition(definition, getRegistry);
@@ -507,11 +633,52 @@ export const workflowUpdateTool = tool({
         }
         if (name !== undefined) patch.name = name;
         if (description !== undefined) patch.description = description;
-        if (enable !== undefined) patch.isEnabled = enable;
-        const doc = await models.MastraWorkflow.updateWorkflow(
-          workflowId,
-          patch,
-        );
+        // Reassigning ownership: only to an existing agent (never clear it).
+        if (agentId !== undefined) {
+          const next = agentId.trim();
+          await requireScopedWorkflowAgent({
+            models,
+            subdomain: tenant(),
+            user,
+            action: ERXES_AGENT_ACTIONS.workflow.updateDraft,
+            agentId: next,
+          });
+          await assertAgentExists(models, next);
+          patch.agentId = next;
+        }
+        const hasDraftChanges = Object.keys(patch).length > 0;
+        if (enable !== undefined) {
+          await requireScopedWorkflow({
+            models,
+            subdomain: tenant(),
+            user,
+            action: ERXES_AGENT_ACTIONS.workflow.schedule,
+            workflowId,
+          });
+        }
+        if (enable && hasDraftChanges) {
+          throw new ExpectedError(
+            'Workflow edits return it to draft; approve the changes before enabling it.',
+          );
+        }
+
+        let doc: IMastraWorkflowDocument;
+        if (hasDraftChanges) {
+          doc = await models.MastraWorkflow.updateWorkflow(workflowId, patch);
+        } else if (enable !== undefined) {
+          if (enable) {
+            await assertWorkflowSchedulable({
+              models,
+              agentId: existing.agentId,
+              definition: existing.definition,
+            });
+          }
+          doc = await models.MastraWorkflow.setEnabled(workflowId, enable);
+        } else {
+          throw new ExpectedError('No workflow changes were provided');
+        }
+
+        await syncTenantSchedules(models, tenant());
         return { success: true, version: doc.version };
       } catch (e) {
         return fail(e);
@@ -525,21 +692,27 @@ export const workflowListTool = tool({
     "Lists the tenant's saved workflows (id, name, version, enabled, trigger type).",
   inputSchema: z.object({}),
   outputSchema: z.object({ workflows: z.array(z.unknown()) }),
-  execute: async () => {
-    requireTeamMember();
-    const models = await getModels();
-    const docs = await models.MastraWorkflow.getWorkflows();
-    return {
-      workflows: docs.map((doc) => ({
-        _id: doc._id,
-        name: doc.name,
-        description: doc.description,
-        version: doc.version,
-        isEnabled: doc.isEnabled,
-        triggerType: doc.definition?.trigger?.type,
-      })),
-    };
-  },
+  execute: () =>
+    withWorkflowContext(async ({ models, user }) => {
+      const { agentIds } = await getWorkflowAgentAccess({
+        models,
+        subdomain: tenant(),
+        user,
+        action: ERXES_AGENT_ACTIONS.workflow.read,
+      });
+      const docs = await models.MastraWorkflow.getWorkflows({ agentIds });
+      return {
+        workflows: docs.map((doc) => ({
+          _id: doc._id,
+          name: doc.name,
+          description: doc.description,
+          agentId: doc.agentId,
+          version: doc.version,
+          isEnabled: doc.isEnabled,
+          triggerType: doc.definition?.trigger?.type,
+        })),
+      };
+    }),
 });
 
 export const workflowRunsTool = tool({
@@ -551,33 +724,33 @@ export const workflowRunsTool = tool({
     limit: z.number().int().min(1).max(20).default(5),
   }),
   outputSchema: z.object({ runs: z.array(z.unknown()) }),
-  execute: async ({
-    workflowId,
-    limit,
-  }: {
-    workflowId: string;
-    limit?: number;
-  }) => {
-    requireTeamMember();
-    const models = await getModels();
-    const docs = await models.MastraWorkflowRun.getRuns({
-      workflowId,
-      perPage: limit ?? 5,
-    });
-    return {
-      runs: docs.map((run) => ({
-        _id: run._id,
-        status: run.status,
-        version: run.version,
-        stepsSummary: run.stepsSummary,
-        output: run.output,
-        error: run.error,
-        usage: run.usage,
-        startedAt: run.startedAt,
-        finishedAt: run.finishedAt,
-      })),
-    };
-  },
+  execute: ({ workflowId, limit }: { workflowId: string; limit?: number }) =>
+    withWorkflowContext(async ({ models, user }) => {
+      await requireScopedWorkflow({
+        models,
+        subdomain: tenant(),
+        user,
+        action: ERXES_AGENT_ACTIONS.workflow.runsRead,
+        workflowId,
+      });
+      const docs = await models.MastraWorkflowRun.getRuns({
+        workflowId,
+        perPage: limit ?? 5,
+      });
+      return {
+        runs: docs.map((run) => ({
+          _id: run._id,
+          status: run.status,
+          version: run.version,
+          stepsSummary: run.stepsSummary,
+          output: run.output,
+          error: run.error,
+          usage: run.usage,
+          startedAt: run.startedAt,
+          finishedAt: run.finishedAt,
+        })),
+      };
+    }),
 });
 
 export const workflowRunNowTool = tool({
@@ -596,34 +769,39 @@ export const workflowRunNowTool = tool({
     output: z.unknown().optional(),
     stepsSummary: z.unknown().optional(),
   }),
-  execute: async ({
+  execute: ({
     workflowId,
     payload,
   }: {
     workflowId: string;
     payload?: Record<string, unknown>;
-  }) => {
-    requireTeamMember();
-    try {
-      const models = await getModels();
-      const workflow = await models.MastraWorkflow.getWorkflow(workflowId);
-      const record = await runWorkflow({
-        models,
-        subdomain: tenant(),
-        workflow,
-        envelope: buildManualEnvelope(payload || {}, currentUserId()),
-      });
-      return {
-        success: record.status === 'success',
-        status: record.status,
-        output: record.output,
-        stepsSummary: record.stepsSummary,
-        error: record.error,
-      };
-    } catch (e) {
-      return fail(e);
-    }
-  },
+  }) =>
+    withWorkflowContext(async ({ models, user }) => {
+      try {
+        const workflow = await requireScopedWorkflow({
+          models,
+          subdomain: tenant(),
+          user,
+          action: ERXES_AGENT_ACTIONS.workflow.run,
+          workflowId,
+        });
+        const record = await runWorkflow({
+          models,
+          subdomain: tenant(),
+          workflow,
+          envelope: buildManualEnvelope(payload || {}, user._id),
+        });
+        return {
+          success: record.status === 'success',
+          status: record.status,
+          output: record.output,
+          stepsSummary: record.stepsSummary,
+          error: record.error,
+        };
+      } catch (e) {
+        return fail(e);
+      }
+    }),
 });
 
 export const WORKFLOW_BUILTIN_TOOLS: Record<string, MastraTool> = {

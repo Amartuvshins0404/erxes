@@ -1,3 +1,6 @@
+export type PermissionScope = 'own' | 'group' | 'all';
+export type PermissionPrincipalType = 'human' | 'agent';
+
 export interface IPermissionAction {
   title: string;
   name: string;
@@ -7,10 +10,11 @@ export interface IPermissionAction {
   always?: boolean;
   disabled?: boolean;
   type?: 'resolver' | 'custom';
+  agentCallable?: boolean;
 }
 
 export interface IPermissionScope {
-  name: 'own' | 'group' | 'all';
+  name: PermissionScope;
   description: string;
 }
 
@@ -28,13 +32,14 @@ export interface IPermissionGroupPermission {
   plugin: string;
   module: string;
   actions: string[];
-  scope: 'own' | 'group' | 'all';
+  scope: PermissionScope;
 }
 
 export interface IDefaultPermissionGroup {
   id: string;
   name: string;
   description: string;
+  principalType?: PermissionPrincipalType;
   permissions: IPermissionGroupPermission[];
 }
 
@@ -48,6 +53,7 @@ export interface IPermissionConfig {
 export interface IPermissionGroup {
   name: string;
   description?: string;
+  principalType?: PermissionPrincipalType;
   permissions: IPermissionGroupPermission[];
 }
 
@@ -59,5 +65,5 @@ export interface IPermissionGroupDocument extends IPermissionGroup, Document {
 export interface IPermissionInput {
   module: string;
   actions: string[];
-  scope: 'own' | 'group' | 'all';
+  scope: PermissionScope;
 }

@@ -1,7 +1,10 @@
 import { gql } from '@apollo/client';
 
 export const UPDATE_AGENT_FILE = gql`
-  mutation UpdateAgentFile($identifierId: String!, $input: UpdateAgentFileInput!) {
+  mutation UpdateAgentFile(
+    $identifierId: String!
+    $input: UpdateAgentFileInput!
+  ) {
     updateAgentFile(identifierId: $identifierId, input: $input)
   }
 `;
@@ -19,19 +22,40 @@ export const FIX_AND_RESTART_AGENT = gql`
 `;
 
 export const UPDATE_DISCORD_SETTINGS = gql`
-  mutation UpdateDiscordSettings($identifierId: String!, $input: UpdateDiscordSettingsInput!) {
+  mutation UpdateDiscordSettings(
+    $identifierId: String!
+    $input: UpdateDiscordSettingsInput!
+  ) {
     updateDiscordSettings(identifierId: $identifierId, input: $input)
   }
 `;
 
 export const ADD_DISCORD_GUILD = gql`
-  mutation AddDiscordGuild($identifierId: String!, $input: AddDiscordGuildInput!) {
+  mutation AddDiscordGuild(
+    $identifierId: String!
+    $input: AddDiscordGuildInput!
+  ) {
     addDiscordGuild(identifierId: $identifierId, input: $input)
   }
 `;
 
-export const SET_KIMI_API_KEY = gql`
-  mutation SetKimiApiKey($identifierId: String!, $input: SetKimiApiKeyInput!) {
-    setKimiApiKey(identifierId: $identifierId, input: $input)
+export const SET_AGENT_LLM_CONNECTION = gql`
+  mutation SetAgentLlmConnection(
+    $identifierId: String!
+    $input: SetAgentLlmConnectionInput!
+  ) {
+    setAgentLlmConnection(identifierId: $identifierId, input: $input) {
+      _id
+      identifierId
+      name
+      url
+      token
+      agentId
+      serverId
+      provider
+      model
+      status
+      updatedAt
+    }
   }
 `;

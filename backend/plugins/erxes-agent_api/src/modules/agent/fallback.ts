@@ -4,17 +4,16 @@ import { ToolResultLike } from '@/agent/types';
 // the model itself produced no text. No I/O, no model calls — deterministic
 // inspection of the tool payloads only.
 
-// A search_erxes_operations result is navigational (it lists candidate ops),
-// never the final answer — the answer comes from execute_erxes_operation.
+// search_tools and load_tool navigate the operation catalog; a direct
+// operation result is required before the turn can report user-facing work.
 export function isSearchResult(tr: ToolResultLike): boolean {
-  return (tr?.toolName || tr?.name || '')
-    .toLowerCase()
-    .includes('search_erxes_operations');
+  const toolName = (tr?.toolName || tr?.name || '').toLowerCase();
+  return toolName === 'search_tools' || toolName === 'load_tool';
 }
 
 // True when a tool's return value carries a real answer worth reporting (vs a
-// failure payload or empty/null). Covers query lists, mutation records, the raw
-// execute_erxes_operation payload (any non-empty object), arrays, and scalars.
+// failure payload or empty/null). Covers query lists, mutation records, direct
+// operation payloads (any non-empty object), arrays, and scalars.
 export function isRealToolData(data: unknown): boolean {
   if (data === true) return true;
   if (Array.isArray(data)) return true; // even an empty array is a valid "0 results"
@@ -36,7 +35,7 @@ interface FallbackPayload {
   _id?: unknown;
   name?: unknown;
   list?: unknown;
-  availableStages?: string[];
+  candidates?: Array<{ id: string; name: string }>;
   instruction?: string;
   message?: string;
   error?: string;
@@ -47,11 +46,14 @@ function formatFoundCount(count: number): string {
   return `Found ${count} result${count !== 1 ? 's' : ''}.`;
 }
 
-/** Surface a failed payload's own guidance (stage list, instruction, message). */
+/** Surface a failed payload's own guidance (candidates, instruction, message). */
 function describeFailedResult(payload: FallbackPayload): string | null {
-  if (payload.availableStages?.length) {
-    const names = payload.availableStages.join(', ');
-    return `Which stage? Available: ${names}.`;
+  if (payload.candidates?.length) {
+    const names = payload.candidates
+      .map((candidate) => candidate.name)
+      .filter(Boolean)
+      .join(', ');
+    if (names) return `Which one? Available: ${names}.`;
   }
   if (payload.instruction) return payload.instruction;
   const msg = payload.message || payload.error;
@@ -89,8 +91,7 @@ export function buildFallbackFromResults(
 
     const payload = data as FallbackPayload;
 
-    // Explicit failure — surface the tool's own guidance. execute_erxes_operation
-    // reports failures under `error`; the GraphQL not-found path uses `message`.
+    // Explicit failures carry their own guidance under `error` or `message`.
     if (payload.success === false) return describeFailedResult(payload);
 
     const op: string = (tr.toolName || tr.name || '').toLowerCase();

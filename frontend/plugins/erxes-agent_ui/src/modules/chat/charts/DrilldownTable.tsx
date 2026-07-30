@@ -49,6 +49,80 @@ const blend = (fg: string, bg: string, alpha: number): string => {
   return `rgb(${mix[0]}, ${mix[1]}, ${mix[2]})`;
 };
 
+const emptyIconStyle = (accent: string, isDark: boolean): React.CSSProperties => ({
+  width: 46,
+  height: 46,
+  borderRadius: '50%',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  background: tint(accent, isDark ? 0.16 : 0.1),
+  color: accent,
+  marginBottom: 12,
+});
+
+const headerCellStyle = (
+  col: Column,
+  colors: ChartThemeColors,
+  headerBg: string,
+  accent: string,
+): React.CSSProperties => ({
+  position: 'sticky',
+  top: 0,
+  zIndex: 1,
+  textAlign: col.numeric ? 'right' : 'left',
+  padding: '11px 16px',
+  fontSize: 12,
+  fontWeight: 700,
+  letterSpacing: '0.05em',
+  textTransform: 'uppercase',
+  color: colors.foreground,
+  background: headerBg,
+  borderBottom: `2px solid ${tint(accent, colors.isDark ? 0.5 : 0.35)}`,
+  whiteSpace: 'nowrap',
+});
+
+const bodyCellStyle = (
+  col: Column,
+  colors: ChartThemeColors,
+  accent: string,
+  rowBorder: string,
+): React.CSSProperties => ({
+  textAlign: col.numeric ? 'right' : 'left',
+  padding: '11px 16px',
+  borderBottom: `1px solid ${rowBorder}`,
+  fontWeight: col.numeric ? 700 : 500,
+  fontVariantNumeric: col.numeric ? 'tabular-nums' : 'normal',
+  color: col.numeric ? accent : colors.foreground,
+  maxWidth: col.numeric ? undefined : 280,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+});
+
+const cellText = (col: Column, row: ChartSpec['data'][number]): string => {
+  const raw = (row as Record<string, unknown>)[col.key];
+  if (!col.numeric) return String(raw ?? '');
+  const num = Number(raw);
+  return Number.isFinite(num) ? fmtChartValue(num) : '—';
+};
+
+interface DrilldownCellProps {
+  col: Column;
+  row: ChartSpec['data'][number];
+  colors: ChartThemeColors;
+  accent: string;
+  rowBorder: string;
+}
+
+function DrilldownCell({ col, row, colors, accent, rowBorder }: DrilldownCellProps) {
+  return (
+    <td style={bodyCellStyle(col, colors, accent, rowBorder)}>
+      {cellText(col, row)}
+    </td>
+  );
+}
+
 // Renders a drilldown leaf (individual items — e.g. a list of companies) as a
 // premium, scrollable table instead of a one-bar-per-row chart. The first column
 // is the category label; each series contributes a right-aligned, accent-colored
@@ -94,14 +168,7 @@ export function DrilldownTable({ spec, colors }: DrilldownTableProps) {
   if (spec.data.length === 0) {
     return (
       <div style={{ ...shell, alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: 24 }}>
-        <div
-          style={{
-            width: 46, height: 46, borderRadius: '50%',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: tint(accent, colors.isDark ? 0.16 : 0.1),
-            color: accent, marginBottom: 12,
-          }}
-        >
+        <div style={emptyIconStyle(accent, colors.isDark)}>
           <IconDatabaseOff width={22} height={22} strokeWidth={1.8} />
         </div>
         <div style={{ fontSize: 14, fontWeight: 600, color: colors.foreground }}>No data available</div>
@@ -111,13 +178,6 @@ export function DrilldownTable({ spec, colors }: DrilldownTableProps) {
       </div>
     );
   }
-
-  const renderCell = (col: Column, row: ChartSpec['data'][number]) => {
-    const raw = (row as Record<string, unknown>)[col.key];
-    if (!col.numeric) return String(raw ?? '');
-    const num = Number(raw);
-    return Number.isFinite(num) ? fmtChartValue(num) : '—';
-  };
 
   return (
     <div style={shell}>
@@ -134,24 +194,7 @@ export function DrilldownTable({ spec, colors }: DrilldownTableProps) {
           <thead>
             <tr>
               {columns.map((col) => (
-                <th
-                  key={col.key}
-                  style={{
-                    position: 'sticky',
-                    top: 0,
-                    zIndex: 1,
-                    textAlign: col.numeric ? 'right' : 'left',
-                    padding: '11px 16px',
-                    fontSize: 11,
-                    fontWeight: 700,
-                    letterSpacing: '0.05em',
-                    textTransform: 'uppercase',
-                    color: colors.foreground,
-                    background: headerBg,
-                    borderBottom: `2px solid ${tint(accent, colors.isDark ? 0.5 : 0.35)}`,
-                    whiteSpace: 'nowrap',
-                  }}
-                >
+                <th key={col.key} style={headerCellStyle(col, colors, headerBg, accent)}>
                   {col.label}
                 </th>
               ))}
@@ -160,7 +203,7 @@ export function DrilldownTable({ spec, colors }: DrilldownTableProps) {
           <tbody>
             {spec.data.map((row, i) => (
               <tr
-                key={i}
+                key={String(row['label'] ?? i)}
                 onMouseEnter={() => setHovered(i)}
                 onMouseLeave={() => setHovered((h) => (h === i ? null : h))}
                 style={{
@@ -170,23 +213,14 @@ export function DrilldownTable({ spec, colors }: DrilldownTableProps) {
                 }}
               >
                 {columns.map((col) => (
-                  <td
+                  <DrilldownCell
                     key={col.key}
-                    style={{
-                      textAlign: col.numeric ? 'right' : 'left',
-                      padding: '11px 16px',
-                      borderBottom: `1px solid ${rowBorder}`,
-                      fontWeight: col.numeric ? 700 : 500,
-                      fontVariantNumeric: col.numeric ? 'tabular-nums' : 'normal',
-                      color: col.numeric ? accent : colors.foreground,
-                      maxWidth: col.numeric ? undefined : 280,
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {renderCell(col, row)}
-                  </td>
+                    col={col}
+                    row={row}
+                    colors={colors}
+                    accent={accent}
+                    rowBorder={rowBorder}
+                  />
                 ))}
               </tr>
             ))}

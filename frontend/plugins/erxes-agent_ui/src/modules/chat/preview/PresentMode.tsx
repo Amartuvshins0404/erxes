@@ -42,18 +42,27 @@ export const PresentMode = ({
   }, []);
 
   // Enter real fullscreen on mount (the Present click is the user gesture).
-  // Falls back to the fixed overlay if the request is rejected.
+  // Falls back to the fixed overlay if the request is rejected. Mount-only:
+  // it touches no reactive value, so it must not re-run on wake changes.
   useEffect(() => {
     const el = rootRef.current;
     el?.requestFullscreen?.().catch(() => undefined);
-    wake();
     return () => {
-      if (idleTimer.current) clearTimeout(idleTimer.current);
       if (document.fullscreenElement) {
         document.exitFullscreen().catch(() => undefined);
       }
     };
-  }, [wake]);
+  }, []);
+
+  // Start the idle-hide countdown and tear it down on unmount. Mount-only: it
+  // seeds the same state wake() would on a fresh timer, so it reads no reactive
+  // value and must not re-run.
+  useEffect(() => {
+    idleTimer.current = setTimeout(() => setIdle(true), IDLE_MS);
+    return () => {
+      if (idleTimer.current) clearTimeout(idleTimer.current);
+    };
+  }, []);
 
   // Esc exits; arrows/space/etc. navigate. When in real fullscreen, the browser
   // intercepts Esc to drop fullscreen — fullscreenchange below then exits.

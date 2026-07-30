@@ -38,6 +38,7 @@ export const types = `
         _id: String
         createdAt: Date
         activityType: String
+        sourcePlugin: String
         actorType: String
         actor: JSON
         targetType: String
@@ -132,6 +133,10 @@ const activityLogQueryParams = `
     targetId: String!
     action: String
     variant: String
+    activityType: String
+    excludeActivityType: String
+    dateFrom: Date
+    dateTo: Date
 `;
 
 export const queries = `
@@ -151,5 +156,3 @@ export const mutations = `
       resolutions: [LogRevertDocResolutionInput!]
     ): LogRevertResult
 `;
-
-export default { types, queries, mutations };

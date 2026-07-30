@@ -8,11 +8,11 @@ import {
   useRef,
   useState,
 } from 'react';
-import { flushSync } from 'react-dom';
 import ReactECharts from 'echarts-for-react';
 import type { EChartsType } from 'echarts';
 import { IconChevronLeft } from '@tabler/icons-react';
 import { CHART_FONT, useAppChartColors } from './chartColors';
+import type { ChartThemeColors } from './chartColors';
 import { chartSpecToEChartsOption } from './chartSpecToEChartsOption';
 import type { SingleBarRenderHints } from './chartSpecToEChartsOption';
 import { DrilldownTable } from './DrilldownTable';
@@ -36,8 +36,7 @@ interface EChartProps {
 }
 
 function useMounted(): boolean {
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  const [mounted] = useState(() => typeof document !== 'undefined');
   return mounted;
 }
 
@@ -105,15 +104,52 @@ function drillReducer(state: DrillState, action: DrillAction): DrillState {
       };
     }
     case 'TOGGLE_LEGEND': {
-      const hiddenLabels = new Set(
-        Object.entries(action.selected)
-          .filter(([, visible]) => !visible)
-          .map(([name]) => name),
-      );
+      const hiddenLabels = new Set<string>();
+      for (const [name, visible] of Object.entries(action.selected)) {
+        if (!visible) hiddenLabels.add(name);
+      }
       return { ...state, hiddenLabels };
     }
   }
 }
+
+const backButtonStyle = (colors: ChartThemeColors): React.CSSProperties => ({
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 4,
+  fontSize: 12,
+  fontWeight: 500,
+  fontFamily: CHART_FONT,
+  color: colors.mutedForeground,
+  background: 'none',
+  border: 'none',
+  padding: '3px 6px',
+  cursor: 'pointer',
+  borderRadius: 6,
+  flexShrink: 0,
+});
+
+const drilldownTitleStyle = (colors: ChartThemeColors): React.CSSProperties => ({
+  fontSize: 13,
+  fontWeight: 600,
+  fontFamily: CHART_FONT,
+  color: colors.foreground,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+  flex: 1,
+});
+
+const chartTitleStyle = (colors: ChartThemeColors): React.CSSProperties => ({
+  textAlign: 'center',
+  fontSize: 14,
+  fontWeight: 700,
+  fontFamily: CHART_FONT,
+  color: colors.foreground,
+  lineHeight: 1.35,
+  padding: '8px 16px 6px',
+  flexShrink: 0,
+});
 
 // ── EChart ────────────────────────────────────────────────────────────────────
 
@@ -134,8 +170,8 @@ export const EChart = forwardRef<EChartHandle, EChartProps>(function EChart(
   );
   const [containerWidth, setContainerWidth] = useState(0);
 
-  // Cancel any pending transition timer on unmount so flushSync never fires on
-  // an unmounted tree.
+  // Cancel any pending transition timer on unmount so the deferred dispatch
+  // never fires on an unmounted tree.
   useEffect(() => () => clearTimeout(timerRef.current), []);
 
   // Animate the body panel out, dispatch synchronously, then animate in.
@@ -148,7 +184,7 @@ export const EChart = forwardRef<EChartHandle, EChartProps>(function EChart(
     }
     clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
-      flushSync(() => dispatch(action));
+      dispatch(action);
       if (el) {
         el.style.transition = 'none';
         el.style.opacity = '0';
@@ -347,29 +383,19 @@ export const EChart = forwardRef<EChartHandle, EChartProps>(function EChart(
             marginBottom: 2,
           }}
         >
-          <button
-            type="button"
-            onClick={handleBack}
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: 4,
-              fontSize: 12, fontWeight: 500, fontFamily: CHART_FONT,
-              color: colors.mutedForeground,
-              background: 'none', border: 'none',
-              padding: '3px 6px', cursor: 'pointer', borderRadius: 6, flexShrink: 0,
-            }}
-          >
+          <button type="button" onClick={handleBack} style={backButtonStyle(colors)}>
             <IconChevronLeft width={13} height={13} strokeWidth={2.5} />
             {parentTitle ?? 'Back'}
           </button>
           {activeSpec.title && (
-            <span style={{ fontSize: 13, fontWeight: 600, fontFamily: CHART_FONT, color: colors.foreground, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+            <span style={drilldownTitleStyle(colors)}>
               {activeSpec.title}
             </span>
           )}
         </div>
       ) : (
         activeSpec.title && !hideTitle && (
-          <div style={{ textAlign: 'center', fontSize: 14, fontWeight: 700, fontFamily: CHART_FONT, color: colors.foreground, lineHeight: 1.35, padding: '8px 16px 6px', flexShrink: 0 }}>
+          <div style={chartTitleStyle(colors)}>
             {activeSpec.title}
           </div>
         )

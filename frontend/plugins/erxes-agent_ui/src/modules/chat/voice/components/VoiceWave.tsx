@@ -82,5 +82,5 @@ export const VoiceWave = ({
     };
   }, [analyser, reducedMotion]);
 
-  return <canvas ref={canvasRef} className="ea-voice-canvas" aria-hidden />;
+  return <canvas ref={canvasRef} className="ea-voice-canvas" />;
 };

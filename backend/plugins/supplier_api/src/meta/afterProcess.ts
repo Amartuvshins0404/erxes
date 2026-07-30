@@ -3,13 +3,13 @@ import {
   IAfterProcessRule,
   sendTRPCMessage,
 } from 'erxes-api-shared/utils';
-import { sendMessage } from '~/modules/admin/utils';
+import { sendMessage } from '~/modules/platform/shared';
 import {
   buildCategorySnapshot,
   buildProductSyncPayload,
   getPosCategoryIds,
   getSupplierPosToken,
-} from '~/modules/admin/productSync';
+} from '~/modules/platform/productSync';
 
 const productCreateOrUpdateMutations = ['productsAdd', 'productsEdit'];
 const productCategoryCreateOrUpdateMutations = [

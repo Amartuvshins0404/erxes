@@ -10,13 +10,22 @@ import { validateDefinition } from '~/mastra/workflows/dsl';
 
 export interface IMastraWorkflowModel extends Model<IMastraWorkflowDocument> {
   getWorkflow(_id: string): Promise<IMastraWorkflowDocument>;
-  getWorkflows(): Promise<IMastraWorkflowDocument[]>;
+  getWorkflows(filter?: {
+    agentId?: string;
+    agentIds?: string[];
+  }): Promise<IMastraWorkflowDocument[]>;
   createWorkflow(doc: IMastraWorkflow): Promise<IMastraWorkflowDocument>;
   updateWorkflow(
     _id: string,
     doc: Partial<IMastraWorkflow>,
   ): Promise<IMastraWorkflowDocument>;
   setEnabled(_id: string, isEnabled: boolean): Promise<IMastraWorkflowDocument>;
+  approveWorkflow(
+    _id: string,
+    approvedByUserId: string,
+    reviewedVersion: number,
+    reviewedUpdatedAt: Date,
+  ): Promise<IMastraWorkflowDocument>;
   removeWorkflow(_id: string): Promise<{ ok: number }>;
 }
 
@@ -42,13 +51,27 @@ export const loadWorkflowClass = (_models: IModels) => {
       return workflow;
     }
 
-    public static async getWorkflows() {
-      return _models.MastraWorkflow.find().sort({ createdAt: -1 });
+    public static async getWorkflows(
+      filter: { agentId?: string; agentIds?: string[] } = {},
+    ) {
+      const query = filter.agentId
+        ? { agentId: filter.agentId }
+        : filter.agentIds
+        ? { agentId: { $in: filter.agentIds } }
+        : {};
+      return _models.MastraWorkflow.find(query).sort({ createdAt: -1 });
     }
 
     public static async createWorkflow(doc: IMastraWorkflow) {
       assertStructurallyValid(doc.definition);
-      return _models.MastraWorkflow.create({ ...doc, version: 1 });
+      return _models.MastraWorkflow.create({
+        ...doc,
+        version: 1,
+        isEnabled: false,
+        approvalStatus: 'draft',
+        approvedByUserId: null,
+        approvedAt: null,
+      });
     }
 
     public static async updateWorkflow(
@@ -60,9 +83,6 @@ export const loadWorkflowClass = (_models: IModels) => {
       let versionBump = false;
       if (doc.definition) {
         assertStructurallyValid(doc.definition);
-        // Every definition change is a new version. In-flight runs keep
-        // executing their pinned snapshot and never migrate. $inc (not a
-        // computed value) so concurrent edits can't both claim one version.
         versionBump =
           JSON.stringify(doc.definition) !==
           JSON.stringify(existing.definition);
@@ -70,20 +90,68 @@ export const loadWorkflowClass = (_models: IModels) => {
 
       const updated = await _models.MastraWorkflow.findOneAndUpdate(
         { _id },
-        { $set: { ...doc }, ...(versionBump ? { $inc: { version: 1 } } : {}) },
+        {
+          $set: {
+            ...doc,
+            isEnabled: false,
+            approvalStatus: 'draft',
+            approvedByUserId: null,
+            approvedAt: null,
+          },
+          ...(versionBump ? { $inc: { version: 1 } } : {}),
+        },
         { new: true },
       );
       if (!updated) throw new ExpectedError('Workflow not found');
       return updated;
     }
 
+    public static async approveWorkflow(
+      _id: string,
+      approvedByUserId: string,
+      reviewedVersion: number,
+      reviewedUpdatedAt: Date,
+    ) {
+      const updated = await _models.MastraWorkflow.findOneAndUpdate(
+        {
+          _id,
+          version: reviewedVersion,
+          updatedAt: reviewedUpdatedAt,
+          approvalStatus: 'draft',
+        },
+        {
+          $set: {
+            approvalStatus: 'approved',
+            approvedByUserId,
+            approvedAt: new Date(),
+          },
+        },
+        { new: true },
+      );
+      if (!updated) {
+        throw new ExpectedError(
+          'Workflow changed or was already approved while it was being reviewed; reload it before approving.',
+        );
+      }
+      return updated;
+    }
+
     public static async setEnabled(_id: string, isEnabled: boolean) {
       const updated = await _models.MastraWorkflow.findOneAndUpdate(
-        { _id },
+        {
+          _id,
+          ...(isEnabled ? { approvalStatus: 'approved' } : {}),
+        },
         { $set: { isEnabled } },
         { new: true },
       );
-      if (!updated) throw new ExpectedError('Workflow not found');
+      if (!updated) {
+        throw new ExpectedError(
+          isEnabled
+            ? 'Workflow must be approved before it can be enabled'
+            : 'Workflow not found',
+        );
+      }
       return updated;
     }
 

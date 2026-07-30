@@ -65,25 +65,21 @@ const SessionItem = memo(({
   };
 
   return (
-    <button
-      type="button"
-      onClick={() => onSelect(session.threadId)}
+    <div
       className={cn(
-        'group/sess w-full text-left rounded-md px-2.5 py-2 transition-colors hover:bg-accent',
+        'group/sess relative rounded-md transition-colors hover:bg-accent',
         (active || working) && 'bg-accent',
       )}
     >
-      <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-1.5 px-2.5 py-2">
         {editing ? (
           <input
             ref={focusOnMount}
             aria-label="Session title"
             value={draftTitle}
             onChange={(e) => setDraftTitle(e.target.value)}
-            onClick={(e) => e.stopPropagation()}
             onBlur={commit}
             onKeyDown={(e) => {
-              e.stopPropagation();
               if (e.key === 'Enter') {
                 e.preventDefault();
                 commit();
@@ -96,34 +92,36 @@ const SessionItem = memo(({
             className="text-sm flex-1 min-w-0 bg-transparent outline-none border-b border-primary"
           />
         ) : (
-          // The title is the session's summary — the whole row. It shimmers
-          // while that session is generating a reply.
-          <p
-            className={cn('flex-1 truncate text-sm', working && 'ea-shimmer-text')}
-            onDoubleClick={(e) => {
-              e.stopPropagation();
-              beginEdit();
-            }}
+          // Selecting the session is the row's primary action — a real button.
+          // The title doubles as a rename affordance on double-click.
+          <button
+            type="button"
+            onClick={() => onSelect(session.threadId)}
+            className="flex-1 min-w-0 text-left"
           >
-            {title}
-          </p>
+            <p
+              className={cn('truncate text-sm', working && 'ea-shimmer-text')}
+              onDoubleClick={(e) => {
+                e.stopPropagation();
+                beginEdit();
+              }}
+            >
+              {title}
+            </p>
+          </button>
         )}
-        <span
-          role="button"
-          tabIndex={0}
+        {/* Sibling button (not nested in the row) — a valid, keyboard-native
+            delete control. */}
+        <button
+          type="button"
+          aria-label="Delete session"
           onClick={(e) => onDelete(e, session.threadId)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              onDelete(e, session.threadId);
-            }
-          }}
           className="opacity-0 group-hover/sess:opacity-100 transition-opacity text-muted-foreground hover:text-destructive shrink-0"
         >
           <IconTrash className="size-3.5" />
-        </span>
+        </button>
       </div>
-    </button>
+    </div>
   );
 });
 SessionItem.displayName = 'SessionItem';
@@ -142,6 +140,9 @@ interface SessionListProps {
   onDelete: DeleteHandler;
   onRename: RenameHandler;
   onBack?: () => void;
+  /** The session list fetch failed — show a retry instead of "No sessions yet." */
+  hasError?: boolean;
+  onRetry?: () => void;
 }
 
 export const SessionList = memo(({
@@ -158,6 +159,8 @@ export const SessionList = memo(({
   onDelete,
   onRename,
   onBack,
+  hasError,
+  onRetry,
 }: SessionListProps) => {
   // Infinite scroll: load the next page when a sentinel near the bottom of the
   // list scrolls into view. Observing within the scroll container (root) with a
@@ -231,7 +234,23 @@ export const SessionList = memo(({
                 </p>
               </div>
             )}
-            {sessions.length === 0 && !isDraft ? (
+            {sessions.length === 0 && !isDraft && hasError ? (
+              <div className="flex flex-col items-start gap-1.5 px-2.5 py-3">
+                <p className="text-xs text-muted-foreground">
+                  Couldn't load sessions.
+                </p>
+                {onRetry && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-6"
+                    onClick={onRetry}
+                  >
+                    Retry
+                  </Button>
+                )}
+              </div>
+            ) : sessions.length === 0 && !isDraft ? (
               <p className="text-xs text-muted-foreground px-2.5 py-3">
                 No sessions yet.
               </p>

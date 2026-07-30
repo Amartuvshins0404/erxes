@@ -7,8 +7,6 @@ export const types = `
     instructions: String
     provider: String
     model: String
-    toolPolicy: String
-    allowedTools: [String]
     skills: [String]
     destructiveOps: String
     memoryEnabled: Boolean
@@ -16,8 +14,7 @@ export const types = `
     maxSteps: Int
     temperature: Float
     isEnabled: Boolean
-    createdBy: String
-    ownerUserId: String
+    grantGroupId: String
     isOwnAgent: Boolean
     visibility: String
     teamId: String
@@ -25,17 +22,30 @@ export const types = `
     unitId: String
     createdAt: Date
     updatedAt: Date
+    workflowsCount: Int
+    capabilities: MastraAgentCapabilities
   }
 
-  input MastraAgentInput {
+  type MastraAgentCapabilities {
+    canReadConfig: Boolean!
+    canChat: Boolean!
+    canEdit: Boolean!
+    canRemove: Boolean!
+    canShare: Boolean!
+    canTransferOwnership: Boolean!
+    canManageGrant: Boolean!
+    canReadWorkflows: Boolean!
+    canReadSkills: Boolean!
+    canReadLearnings: Boolean!
+  }
+
+  input MastraAgentCreateInput {
     name: String
     agentId: String
     description: String
     instructions: String
     provider: String
     model: String
-    toolPolicy: String
-    allowedTools: [String]
     skills: [String]
     destructiveOps: String
     memoryEnabled: Boolean
@@ -43,11 +53,25 @@ export const types = `
     maxSteps: Int
     temperature: Float
     isEnabled: Boolean
-    ownerUserId: String
     visibility: String
     teamId: String
     departmentId: String
     unitId: String
+  }
+
+  input MastraAgentConfigInput {
+    name: String
+    description: String
+    instructions: String
+    provider: String
+    model: String
+    skills: [String]
+    destructiveOps: String
+    memoryEnabled: Boolean
+    debug: Boolean
+    maxSteps: Int
+    temperature: Float
+    isEnabled: Boolean
   }
 
   type MastraAgentListResponse {
@@ -72,7 +96,16 @@ export const queries = `
 `;
 
 export const mutations = `
-  mastraAgentCreate(doc: MastraAgentInput!): MastraAgent
-  mastraAgentUpdate(_id: String!, doc: MastraAgentInput!): MastraAgent
+  mastraAgentCreate(doc: MastraAgentCreateInput!): MastraAgent
+  mastraAgentUpdate(_id: String!, doc: MastraAgentConfigInput!): MastraAgent
+  mastraAgentSetAudience(
+    _id: String!
+    visibility: String!
+    teamId: String
+    departmentId: String
+    unitId: String
+  ): MastraAgent
+  mastraAgentTransferOwnership(_id: String!, newOwnerUserId: String!): MastraAgent
+  mastraAgentSetGrant(_id: String!, grantGroupId: String): MastraAgent
   mastraAgentRemove(_id: String!): JSON
 `;

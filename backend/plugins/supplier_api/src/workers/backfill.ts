@@ -3,14 +3,11 @@ import {
   redis,
   sendWorkerQueue,
 } from 'erxes-api-shared/utils';
-import { backfillPosToMushop } from '~/modules/admin/productSync';
+import { backfillPosCatalog } from '~/modules/platform/productSync';
 
 const QUEUE_NAME = 'backfill';
-const JOB_NAME = 'posToMushop';
+const JOB_NAME = 'posCatalog';
 
-// Durable, Redis-backed worker: pushes a supplier's selected POS catalog to
-// mushop. Survives restarts and retries on failure (BullMQ), so the backfill
-// completes without any manual trigger even if the server bounces mid-run.
 export const initBackfillWorker = () => {
   createMQWorkerWithListeners(
     'supplier',
@@ -21,16 +18,13 @@ export const initBackfillWorker = () => {
 
       if (!subdomain || !posToken) return;
 
-      // Throwing propagates to BullMQ so the job is retried per its options.
-      await backfillPosToMushop(subdomain, posToken);
+      await backfillPosCatalog(subdomain, posToken);
     },
     redis,
     () => console.log('[Worker] supplier-backfill worker ready'),
   );
 };
 
-// Enqueue without blocking the caller. Retries with backoff; old jobs are
-// auto-trimmed so the queue doesn't grow unbounded.
 export const enqueuePosBackfill = async (
   subdomain: string,
   posToken: string,
@@ -43,7 +37,6 @@ export const enqueuePosBackfill = async (
     JOB_NAME,
     { subdomain, data: { posToken } },
     {
-      // Coalesce repeated selections of the same POS into one pending job.
       jobId: `${subdomain}:${posToken}`,
       attempts: 5,
       backoff: { type: 'exponential', delay: 5000 },

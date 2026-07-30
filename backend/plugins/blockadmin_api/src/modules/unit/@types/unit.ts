@@ -9,6 +9,7 @@ export interface IUnit extends IBlock {
   isFeatured: boolean;
   agencySubdomain?: string;
   agencyEntityId?: string;
+  locked?: boolean;
 }
 
 export interface IUnitInput extends IUnit {

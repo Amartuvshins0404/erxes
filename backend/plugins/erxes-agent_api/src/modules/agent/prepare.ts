@@ -1,24 +1,17 @@
 import { randomUUID } from 'node:crypto';
 import { IUserDocument } from 'erxes-api-shared/core-types';
 import { ExpectedError } from 'erxes-api-shared/utils';
-import { isAgentAdmin, canUserAccessAgent, getUserUnitIds } from '@/agent/utils';
+import { canUserAccessAgent, getUserUnitIds } from '@/agent/utils';
 import { IModels } from '~/connectionResolvers';
 import { getOrCreateAgent } from '~/mastra/agentRuntime';
-import {
-  isAdvancedMemoryEnabled,
-  resolveRecallTuning,
-} from '~/mastra/memory/config';
+import { isAdvancedMemoryEnabled } from '~/mastra/memory/config';
 import { scopedResource } from '~/mastra/memory/mastraMemory';
 import { deriveResourceId, augmentConvo, MemoryContext } from '~/mastra/memory';
 import { readLearnedDigest } from '~/mastra/learning/digest';
 import { ApprovedOp } from '~/mastra/requestContext';
 import { buildChatUserContent } from '~/mastra/files/chatContent';
 import { IMastraChatAttachment } from '@/session/@types/session';
-import {
-  ensureThreadRegistered,
-  getNativeMemory,
-  resourceHasThreads,
-} from '@/session/nativeStore';
+import { ensureThreadRegistered, getNativeMemory } from '@/session/nativeStore';
 import { buildActivatedSkillsBlock } from '@/skills/service/skillsService';
 import { IMastraAgentDocument } from '@/agent/@types/agent';
 import { IMastraProviderDocument } from '@/provider/@types/provider';
@@ -30,6 +23,8 @@ import {
   TurnIdentity,
   TurnMessage,
 } from '@/agent/types';
+import { requireActionScope } from '@/_shared/authorization';
+import { ERXES_AGENT_ACTIONS } from '~/meta/permissionActions';
 
 // Turn setup: everything a chat turn needs before the model runs — agent +
 // tools, thread ownership check, replayed history, advanced-memory blocks, and
@@ -111,17 +106,26 @@ interface TurnConfig {
 // (bot, schedule) don't need unit membership.
 async function readTurnConfig(
   models: IModels,
+  subdomain: string,
   identity: TurnIdentity,
   agentId: string,
 ): Promise<TurnConfig> {
-  const [agentConfig, settings, providers, unitIds] = await Promise.all([
-    models.MastraAgent.findOne({ agentId, isEnabled: true }),
-    models.MastraSettings.getSettings(),
-    models.MastraProvider.find({ isEnabled: true }),
-    identity.kind === 'user' && identity.user
-      ? getUserUnitIds(models, identity.user._id)
-      : Promise.resolve<string[]>([]),
-  ]);
+  const [agentConfig, settings, providers, unitIds, actionScope] =
+    await Promise.all([
+      models.MastraAgent.findOne({ agentId, isEnabled: true }),
+      models.MastraSettings.getSettings(),
+      models.MastraProvider.find({ isEnabled: true }),
+      identity.kind === 'user' && identity.user
+        ? getUserUnitIds(models, identity.user._id)
+        : Promise.resolve<string[]>([]),
+      identity.kind === 'user' && identity.user
+        ? requireActionScope({
+            subdomain,
+            user: identity.user,
+            action: ERXES_AGENT_ACTIONS.agent.chat,
+          })
+        : Promise.resolve(null),
+    ]);
   if (!agentConfig)
     throw new ExpectedError(`Agent "${agentId}" not found or disabled`);
 
@@ -130,7 +134,7 @@ async function readTurnConfig(
       !canUserAccessAgent(
         agentConfig,
         identity.user._id,
-        isAgentAdmin(identity.user),
+        actionScope ?? 'own',
         identity.user.branchIds ?? [],
         identity.user.departmentIds ?? [],
         unitIds,
@@ -163,7 +167,8 @@ function resolveTurnMemory(args: {
   subdomain: string;
   sessionId: string;
 }): TurnMemory {
-  const { identity, agentConfig, agentId, message, subdomain, sessionId } = args;
+  const { identity, agentConfig, agentId, message, subdomain, sessionId } =
+    args;
 
   const useHistory = agentConfig.memoryEnabled !== false;
   // Advanced memory rides on the agent's own memory toggle.
@@ -184,10 +189,10 @@ function resolveTurnMemory(args: {
   };
 
   // Mastra Memory (attached to the agent in getOrCreateAgent) is the ONLY chat
-  // store: it persists the turn, replays recent history, and runs semantic
-  // recall + working memory via the per-turn binding below. An unknown tenant
-  // does NOT skip persistence — scopedResource defaults an empty subdomain to
-  // the "os" scope so the thread is still persisted and listable.
+  // store: it persists the turn, replays recent history, and runs working
+  // memory via the per-turn binding below. An unknown tenant does NOT skip
+  // persistence — scopedResource defaults an empty subdomain to the "os" scope
+  // so the thread is still persisted and listable.
   const memoryBinding: MemoryBinding | undefined = useMemory
     ? { thread: sessionId, resource: scopedResource(subdomain, resourceId) }
     : undefined;
@@ -203,13 +208,9 @@ function resolveTurnMemory(args: {
   };
 }
 
-// Build the agent, read the thread (ownership + thread-history), and — under
-// resource-scoped recall — probe whether the resource owns any prior thread, all
-// concurrently. None needs another's result, so they overlap instead of stacking
-// round trips. The resource probe is issued speculatively (its result is only
-// consulted when the thread itself turns out to be new); it rides alongside the
-// ownership read, so it adds no wall-clock on the common path. Enforces the
-// ownership gate and decides the scope-aware recall skip.
+// Build the agent and read the thread (ownership + thread-history)
+// concurrently. Neither needs the other's result, so they overlap instead of
+// stacking round trips. Enforces the ownership gate.
 async function buildAgentAndGateMemory(args: {
   agentConfig: IMastraAgentDocument;
   models: IModels;
@@ -233,24 +234,13 @@ async function buildAgentAndGateMemory(args: {
     memoryBinding,
   } = args;
 
-  // What the semantic recall is scoped to (env-driven, default 'resource'). This
-  // decides what "nothing to recall" means for the first-turn skip below.
-  const recallResource = memoryBinding?.resource;
-  const recallScope = resolveRecallTuning().scope;
-
   const needsThreadRead = Boolean(
     identity.kind === 'user' &&
       memoryBinding &&
       typeof threadId === 'string' &&
       threadId,
   );
-  const needsResourceProbe = Boolean(
-    identity.kind === 'user' &&
-      memoryBinding &&
-      recallScope === 'resource' &&
-      recallResource,
-  );
-  const [{ agent, tools }, priorThread, resourceHadThreads] = await Promise.all([
+  const [{ agent, tools }, priorThread] = await Promise.all([
     getOrCreateAgent(agentConfig, models, subdomain, {
       settings,
       providers,
@@ -260,20 +250,10 @@ async function buildAgentAndGateMemory(args: {
           m.getThreadById({ threadId: sessionId }),
         )
       : Promise.resolve(null),
-    needsResourceProbe && recallResource
-      ? // Best-effort: this is only a recall optimization, so a failure must degrade
-        // to the safe default (null → "history might exist" → recall stays on), never
-        // abort the turn via the Promise.all.
-        resourceHasThreads(subdomain, recallResource).catch(() => null)
-      : Promise.resolve<boolean | null>(null),
   ]);
 
-  // Ownership gate: a CONTINUED thread must belong to this caller. getThreadById
-  // without a resource returns the thread whatever its owner; if it exists under
-  // a different resource it is someone else's session — reported as "not found"
-  // (no existence leak). Only in-app users own threads; bot/schedule resources
-  // are synthetic and self-scoped, so the gate is a no-op for them. (Building the
-  // agent for a thread that fails this check is harmless — the agent is cached.)
+  // Continued threads must belong to the caller. A thread under another
+  // resource is reported as not found; bot resources are synthetic/self-scoped.
   if (
     priorThread &&
     memoryBinding &&
@@ -282,36 +262,11 @@ async function buildAgentAndGateMemory(args: {
     throw new ExpectedError('Thread not found');
   }
 
-  // Skip semantic recall only when it can return NOTHING — the embed + Qdrant
-  // round trip inside agent.stream() is otherwise pure latency. "Nothing to
-  // recall" is scope-aware (the critical correctness point):
-  //   • thread scope  → recall sees only THIS thread, so skip when it is new
-  //     (priorThread === null, i.e. owned thread does not exist yet).
-  //   • resource scope → recall spans every thread of the resource, so a new
-  //     thread can still recall from the user's other threads; only a resource
-  //     with no prior thread (resourceHadThreads === false) has nothing.
-  // A continued thread (priorThread present) always keeps recall on. Non-user
-  // identities keep their existing always-recall behaviour. The skip is a
-  // per-call deep-merge of semanticRecall:false, so working memory, recent
-  // history, and native titling are untouched.
-  const recallCanReturnHistory =
-    identity.kind !== 'user' ||
-    !memoryBinding ||
-    !!priorThread ||
-    (recallScope === 'resource' && resourceHadThreads !== false);
-  const skipSemanticRecall = Boolean(memoryBinding && !recallCanReturnHistory);
-
-  return { agent, tools, skipSemanticRecall };
+  return { agent, tools };
 }
 
-// Register the thread + its agent binding NOW, before the model streams, so the
-// session is listable the moment the turn starts — not only after it finishes.
-// This is what lets a refresh WHILE the agent is still running keep the session:
-// the sidebar query (listOwnedThreads → metadata.agentId) finds it, and reopening
-// it hydrates the persisted turn. patchNativeTurn re-stamps the same binding at
-// turn-end. In-app chat only (bot/schedule threads are not user-listable, and
-// their binding stamp at turn-end suffices). Best-effort: never block the turn on
-// a store hiccup (the end-of-turn stamp is the backstop).
+// Register before execution so a refresh can restore an in-flight session.
+// Best-effort: persistence failures must not block the turn.
 async function preRegisterThread(args: {
   identity: TurnIdentity;
   memoryBinding: MemoryBinding | undefined;
@@ -358,7 +313,6 @@ async function buildTurnConvo(args: {
   const convo: TurnMessage[] = augmentConvo({
     recentHistory: [],
     userMessage: message,
-    recallBlock: null,
     workingMemoryBlock: null,
     learnedDigestBlock: digest?.block,
   });
@@ -439,6 +393,7 @@ export async function prepareTurn(
 
   const { agentConfig, settings, providers } = await readTurnConfig(
     models,
+    subdomain,
     identity,
     agentId,
   );
@@ -462,7 +417,7 @@ export async function prepareTurn(
     sessionId,
   });
 
-  const { agent, tools, skipSemanticRecall } = await buildAgentAndGateMemory({
+  const { agent, tools } = await buildAgentAndGateMemory({
     agentConfig,
     models,
     subdomain,
@@ -473,9 +428,6 @@ export async function prepareTurn(
     sessionId,
     memoryBinding,
   });
-  if (memoryBinding && skipSemanticRecall) {
-    memoryBinding.options = { semanticRecall: false };
-  }
 
   await preRegisterThread({
     identity,
@@ -494,8 +446,7 @@ export async function prepareTurn(
     settings,
   });
 
-  // Only an in-app user can slash-activate skills (bot/schedule turns carry no
-  // composer). The user's id resolves their own reachable skills below.
+  // Only an in-app user can slash-activate skills; bot turns have no composer.
   const userId = identity.kind === 'user' ? identity.user?._id : undefined;
 
   const activated = await activateTurnSkills({
@@ -507,14 +458,15 @@ export async function prepareTurn(
 
   const authCtx = {
     userHeader,
-    // Interactive turns forward the user's own login token; bot/schedule turns
-    // (no login token) fall back to the configured app token.
+    // Interactive turns forward the user's login token; bot turns without one
+    // fall back to the configured app token.
     token: token ?? settings?.erxesApiToken,
     userId,
     threadId: sessionId,
     agentId,
     subdomain,
     turnId: randomUUID(),
+    turnStartedAt: new Date(),
     turnPrompt: (message || '').slice(0, 200),
     resourceId,
     approvedOps: approvedOperations,

@@ -1,5 +1,16 @@
 export type TPropertyInputMeta = Record<string, unknown>;
 
+export type TActivityRowProps = {
+  activity: {
+    _id: string;
+    activityType: string;
+    sourcePlugin?: string;
+    createdAt: string | Date;
+    metadata?: Record<string, any>;
+    [key: string]: any;
+  };
+};
+
 export type TPropertyInputProps = {
   value: string;
   onValueChange: (value: string) => void;
@@ -15,6 +26,7 @@ export type IUIConfig = {
   path: string;
   icon?: React.ElementType;
   i18n?: boolean;
+  i18nNamespace?: string;
   hasFloatingWidget?: boolean;
   settingsNavigation?: () => React.ReactNode;
   navigationGroup?: {
@@ -28,6 +40,7 @@ export type IUIConfig = {
     relationWidgets?: {
       name: string;
       icon?: React.ElementType;
+      label?: string;
     }[];
     customerDetailWidgets?: {
       name: string;
@@ -38,6 +51,7 @@ export type IUIConfig = {
       icon?: React.ElementType;
     }[];
     propertyInputs?: Record<string, React.ComponentType<TPropertyInputProps>>;
+    activityRows?: Record<string, React.ComponentType<TActivityRowProps>>;
   };
   modules?: {
     name: string;

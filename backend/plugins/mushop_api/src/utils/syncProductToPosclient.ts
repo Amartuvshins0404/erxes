@@ -81,7 +81,8 @@ export const syncProductToPosclient = async ({
     await crudData(subdomain, posToken, {
       type: 'product',
       action,
-      object: { ...product, status: "active"},
+      external: true,
+      object: { ...product, status: 'active' },
       updatedDocument: product,
     });
   } catch (e) {
@@ -131,6 +132,7 @@ export const syncCategoryToPosclient = async ({
     await crudData(subdomain, posToken, {
       type: 'productCategory',
       action,
+      external: true,
       object: category,
       updatedDocument: category,
     });

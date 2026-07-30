@@ -11,6 +11,7 @@ import {
   listAgents,
   listDiscordGuilds,
 } from '~/modules/agent/utils';
+import { fetchManagedLlmModels } from '~/modules/agent/managedLlmProviders';
 import {
   createDiscordConnectUrl,
   getDiscordInstallation,
@@ -136,6 +137,18 @@ export const agentQueries = {
     }
 
     return checkKimiKeySet(server.name);
+  },
+
+  agentManagedLlmModels: async (
+    _root: undefined,
+    { provider, apiKey }: { provider: string; apiKey: string },
+    { user }: IContext,
+  ) => {
+    if (!user) {
+      throw new Error('Authentication required');
+    }
+
+    return fetchManagedLlmModels(provider, apiKey);
   },
 
   agentDiscordConnectUrl: async (

@@ -48,7 +48,7 @@ export const supplierSchema = schemaWrapper(
       paymentId: { type: String, label: 'Payment method' },
       posToken: {
         type: String,
-        label: 'POS exposed to mushop for product sync',
+        label: 'POS exposed to the consumer platform for product sync',
       },
 
       verificationStatus: {

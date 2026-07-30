@@ -1,6 +1,7 @@
-import { useQuery } from '@apollo/client';
 import { useCallback, useMemo } from 'react';
 import { MASTRA_AGENTS_MAIN } from '~/graphql/queries';
+import { useAuthedListQuery } from '~/hooks/useAuthedListQuery';
+import type { IMastraAgentCapabilities } from './types';
 
 export const AGENTS_PER_PAGE = 30;
 
@@ -9,18 +10,15 @@ export interface IMastraAgentRow {
   name: string;
   agentId: string;
   description?: string;
-  provider: string;
-  model: string;
-  toolPolicy?: 'all' | 'custom';
-  allowedTools?: string[];
   isEnabled: boolean;
   visibility?: 'private' | 'team' | 'department' | 'unit' | 'org';
   teamId?: string;
   departmentId?: string;
   unitId?: string;
-  createdBy?: string;
   isOwnAgent?: boolean;
+  capabilities?: IMastraAgentCapabilities | null;
   createdAt: string;
+  workflowsCount?: number;
 }
 
 interface IMastraAgentsMainResponse {
@@ -46,8 +44,8 @@ export const useMastraAgentList = (searchValue?: string) => {
     searchValue: searchValue || undefined,
   };
 
-  const { data, loading, fetchMore, refetch } =
-    useQuery<IMastraAgentsMainResponse>(MASTRA_AGENTS_MAIN, {
+  const { data, loading, rawLoading, error, fetchMore, refetch } =
+    useAuthedListQuery<IMastraAgentsMainResponse>(MASTRA_AGENTS_MAIN, {
       variables,
       notifyOnNetworkStatusChange: true,
       fetchPolicy: 'network-only',
@@ -71,7 +69,7 @@ export const useMastraAgentList = (searchValue?: string) => {
   );
 
   const handleFetchMore = useCallback(() => {
-    if (loading || agentsList.length >= totalCount) return;
+    if (rawLoading || agentsList.length >= totalCount) return;
 
     fetchMore({
       variables: {
@@ -92,12 +90,13 @@ export const useMastraAgentList = (searchValue?: string) => {
         };
       },
     });
-  }, [loading, agentsList.length, totalCount, fetchMore, searchValue]);
+  }, [rawLoading, agentsList.length, totalCount, fetchMore, searchValue]);
 
   return {
     agentsList,
     totalCount,
     loading,
+    error,
     pageInfo,
     handleFetchMore,
     refetch,

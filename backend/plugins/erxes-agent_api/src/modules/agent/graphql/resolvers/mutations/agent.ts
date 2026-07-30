@@ -1,54 +1,91 @@
-import { ExpectedError } from 'erxes-api-shared/utils';
+import { ExpectedError, sendTRPCMessage } from 'erxes-api-shared/utils';
+import { canGroup } from 'erxes-api-shared/core-modules';
 import { IContext } from '~/connectionResolvers';
 import { IMastraAgent } from '@/agent/@types/agent';
-import { isAgentAdmin, getAgentQuotaStatus } from '@/agent/utils';
+import { getAgentQuotaStatus } from '@/agent/utils';
+import { requireScopedAgent } from '@/agent/authorization';
+import { requireActionScope } from '@/_shared/authorization';
+import {
+  deactivateServiceUser,
+  syncServiceUserGroup,
+} from '~/mastra/auth/servicePrincipal';
+import { ERXES_AGENT_ACTIONS } from '~/meta/permissionActions';
 import { toUserFacingAgentError } from './agentErrors';
 
-/**
- * Authorize a requested `ownerUserId` value. The owner is the identity
- * background runs mint a real gateway token for, so naming someone else as
- * owner is equivalent to acting as that user. Because an `isOwner` target
- * short-circuits every permission check, the bar is true ORGANIZATION
- * OWNERSHIP — not the agent-admin group, which would otherwise be a path to
- * isOwner. So only an org owner (already top privilege, can't be escalated by
- * assignment) may name an owner other than themselves; everyone else may omit
- * it (createdBy default) or name only their own _id. No-op when not supplied.
- */
-const assertOwnerAssignable = (
-  ownerUserId: string | undefined,
-  callerId: string,
-  callerIsOwner: boolean,
-) => {
-  if (!ownerUserId || callerIsOwner || ownerUserId === callerId) return;
-  throw new ExpectedError(
-    'Only an organization owner may assign another user as the agent owner',
-  );
+interface CoreGroup {
+  _id: string;
+  principalType?: string;
+}
+
+interface CoreUser {
+  _id: string;
+}
+
+const fetchGrantGroup = async (
+  subdomain: string,
+  groupId: string,
+): Promise<CoreGroup> => {
+  const groups = await sendTRPCMessage({
+    subdomain,
+    pluginName: 'core',
+    module: 'permissionGroups',
+    action: 'find',
+    method: 'query',
+    input: { query: { _id: groupId } },
+    defaultValue: [],
+  });
+  if (!Array.isArray(groups) || groups.length === 0) {
+    throw new ExpectedError(
+      `Permission group "${groupId}" was not found — pick an existing group from Settings → Permissions.`,
+    );
+  }
+  const group = groups[0] as CoreGroup;
+  if (group.principalType !== 'agent') {
+    throw new ExpectedError('Agents may only use agent grant profiles');
+  }
+  return group;
 };
 
 export const agentMutations = {
   mastraAgentCreate: async (
     _parent: undefined,
     { doc }: { doc: IMastraAgent },
-    { models, user, checkPermission }: IContext,
+    { models, subdomain, user, checkPermission }: IContext,
   ) => {
-    await checkPermission('agentsCreate');
+    await checkPermission(ERXES_AGENT_ACTIONS.agent.create);
     if (!user?._id) throw new ExpectedError('Login required');
 
-    const admin = isAgentAdmin(user);
+    const scope = await requireActionScope({
+      subdomain,
+      user,
+      action: ERXES_AGENT_ACTIONS.agent.create,
+    });
+    const visibility = doc.visibility ?? 'private';
 
-    if (!admin && doc.visibility && doc.visibility !== 'private') {
-      throw new ExpectedError('Users may only create private agents');
+    if (visibility !== 'private') {
+      await checkPermission(ERXES_AGENT_ACTIONS.agent.share);
+      const shareScope = await requireActionScope({
+        subdomain,
+        user,
+        action: ERXES_AGENT_ACTIONS.agent.share,
+      });
+      if (shareScope !== 'all') {
+        throw new ExpectedError(
+          'Creating a shared agent requires all-agent sharing permission',
+        );
+      }
+    }
+    if (
+      doc.createdBy !== undefined ||
+      doc.serviceUserId !== undefined ||
+      doc.grantGroupId !== undefined
+    ) {
+      throw new ExpectedError(
+        'Agent ownership and grants use dedicated security actions',
+      );
     }
 
-    // The owner is the principal background runs (bot/schedule) mint a gateway
-    // token for (Phase 3). Assigning it to another user = acting as that user,
-    // and an isOwner target bypasses every permission check, so only an org
-    // owner may name an owner other than themselves; otherwise an agent-admin
-    // (or any user) could bind the agent to an org owner and escalate to
-    // isOwner. Everyone else gets the createdBy default below.
-    assertOwnerAssignable(doc.ownerUserId, user._id, Boolean(user.isOwner));
-
-    if (!admin) {
+    if (scope !== 'all') {
       const status = await getAgentQuotaStatus(models, user._id);
       if (status.atQuota) {
         throw new ExpectedError(`Agent quota reached (${status.quota})`);
@@ -56,7 +93,11 @@ export const agentMutations = {
     }
 
     try {
-      return await models.MastraAgent.createAgent({ ...doc, createdBy: user._id });
+      return await models.MastraAgent.createAgent({
+        ...doc,
+        visibility,
+        createdBy: user._id,
+      });
     } catch (error) {
       throw toUserFacingAgentError(error);
     }
@@ -65,31 +106,224 @@ export const agentMutations = {
   mastraAgentUpdate: async (
     _parent: undefined,
     { _id, doc }: { _id: string; doc: Partial<IMastraAgent> },
-    { models, user, checkPermission }: IContext,
+    { models, subdomain, user, checkPermission }: IContext,
   ) => {
-    await checkPermission('agentsEdit');
+    await checkPermission(ERXES_AGENT_ACTIONS.agent.update);
     if (!user?._id) throw new ExpectedError('Login required');
-    const admin = isAgentAdmin(user);
-    // Same owner-assignment guard as create: reassigning the owner = acting as
-    // that user when background runs mint its token, so only an org owner may
-    // name someone other than themselves (the createdBy filter scopes non-owners
-    // to their own agents, but the owner VALUE is otherwise unconstrained).
-    assertOwnerAssignable(doc.ownerUserId, user._id, Boolean(user.isOwner));
+
+    const {
+      agentId,
+      createdBy,
+      serviceUserId,
+      grantGroupId,
+      visibility,
+      teamId,
+      departmentId,
+      unitId,
+      ...config
+    } = doc;
+
+    if (
+      agentId !== undefined ||
+      createdBy !== undefined ||
+      serviceUserId !== undefined ||
+      grantGroupId !== undefined ||
+      visibility !== undefined ||
+      teamId !== undefined ||
+      departmentId !== undefined ||
+      unitId !== undefined
+    ) {
+      throw new ExpectedError(
+        'Agent identity, audience, ownership, and grants use dedicated security actions',
+      );
+    }
+
+    const { agent } = await requireScopedAgent({
+      models,
+      subdomain,
+      user,
+      action: ERXES_AGENT_ACTIONS.agent.update,
+      agentId: _id,
+    });
+
     try {
-      return await models.MastraAgent.updateAgent(_id, doc, admin ? undefined : user._id);
+      return await models.MastraAgent.updateAgent(_id, config, agent.createdBy);
     } catch (error) {
       throw toUserFacingAgentError(error);
     }
   },
 
+  mastraAgentSetAudience: async (
+    _parent: undefined,
+    {
+      _id,
+      visibility,
+      teamId,
+      departmentId,
+      unitId,
+    }: {
+      _id: string;
+      visibility: 'private' | 'team' | 'department' | 'unit' | 'org';
+      teamId?: string;
+      departmentId?: string;
+      unitId?: string;
+    },
+    { models, subdomain, user, checkPermission }: IContext,
+  ) => {
+    await checkPermission(ERXES_AGENT_ACTIONS.agent.share);
+    if (!user?._id) throw new ExpectedError('Login required');
+
+    if (visibility === 'team' && !teamId) {
+      throw new ExpectedError('A team is required for team visibility');
+    }
+    if (visibility === 'department' && (!teamId || !departmentId)) {
+      throw new ExpectedError(
+        'A team and department are required for department visibility',
+      );
+    }
+    if (visibility === 'unit' && (!teamId || !departmentId || !unitId)) {
+      throw new ExpectedError(
+        'A team, department, and unit are required for unit visibility',
+      );
+    }
+
+    const { agent } = await requireScopedAgent({
+      models,
+      subdomain,
+      user,
+      action: ERXES_AGENT_ACTIONS.agent.share,
+      agentId: _id,
+    });
+
+    return models.MastraAgent.updateAgent(
+      _id,
+      {
+        visibility,
+        teamId:
+          visibility === 'team' ||
+          visibility === 'department' ||
+          visibility === 'unit'
+            ? teamId
+            : null,
+        departmentId:
+          visibility === 'department' || visibility === 'unit'
+            ? departmentId
+            : null,
+        unitId: visibility === 'unit' ? unitId : null,
+      },
+      agent.createdBy,
+    );
+  },
+
+  mastraAgentTransferOwnership: async (
+    _parent: undefined,
+    { _id, newOwnerUserId }: { _id: string; newOwnerUserId: string },
+    { models, subdomain, user, checkPermission }: IContext,
+  ) => {
+    await checkPermission(ERXES_AGENT_ACTIONS.agent.transferOwnership);
+    if (!user?._id) throw new ExpectedError('Login required');
+
+    const { agent, scope } = await requireScopedAgent({
+      models,
+      subdomain,
+      user,
+      action: ERXES_AGENT_ACTIONS.agent.transferOwnership,
+      agentId: _id,
+    });
+    if (scope !== 'all') {
+      throw new ExpectedError('Ownership transfer requires all-agent scope');
+    }
+
+    const owner = (await sendTRPCMessage({
+      subdomain,
+      pluginName: 'core',
+      module: 'users',
+      action: 'findOne',
+      method: 'query',
+      input: { query: { _id: newOwnerUserId, isActive: { $ne: false } } },
+      defaultValue: null,
+    })) as CoreUser | null;
+    if (!owner?._id) throw new ExpectedError('Owner user not found');
+
+    return models.MastraAgent.updateAgent(
+      _id,
+      { createdBy: owner._id },
+      agent.createdBy,
+    );
+  },
+
+  mastraAgentSetGrant: async (
+    _parent: undefined,
+    {
+      _id,
+      grantGroupId: requestedGroupId,
+    }: { _id: string; grantGroupId?: string | null },
+    { models, subdomain, user, checkPermission }: IContext,
+  ) => {
+    const canManageGrant =
+      (await canGroup(subdomain, 'permissionsAgentProfilesManage', user)) ||
+      (await canGroup(subdomain, 'permissionsManage', user));
+    if (!canManageGrant) throw new ExpectedError('Permission required');
+    await checkPermission(ERXES_AGENT_ACTIONS.agent.update);
+    if (!user?._id) throw new ExpectedError('Login required');
+    const grantGroupId = requestedGroupId?.trim() || null;
+
+    const { agent } = await requireScopedAgent({
+      models,
+      subdomain,
+      user,
+      action: ERXES_AGENT_ACTIONS.agent.update,
+      agentId: _id,
+    });
+    if (grantGroupId) {
+      await fetchGrantGroup(subdomain, grantGroupId);
+    }
+
+    if (agent.serviceUserId) {
+      await syncServiceUserGroup({
+        serviceUserId: agent.serviceUserId,
+        groupId: grantGroupId,
+        subdomain,
+      });
+    }
+
+    return models.MastraAgent.updateAgent(
+      _id,
+      { grantGroupId },
+      agent.createdBy,
+    );
+  },
+
   mastraAgentRemove: async (
     _parent: undefined,
     { _id }: { _id: string },
-    { models, user, checkPermission }: IContext,
+    { models, subdomain, user, checkPermission }: IContext,
   ) => {
-    await checkPermission('agentsRemove');
+    await checkPermission(ERXES_AGENT_ACTIONS.agent.remove);
     if (!user?._id) throw new ExpectedError('Login required');
-    const admin = isAgentAdmin(user);
-    return models.MastraAgent.removeAgent(_id, admin ? undefined : user._id);
+
+    const { agent } = await requireScopedAgent({
+      models,
+      subdomain,
+      user,
+      action: ERXES_AGENT_ACTIONS.agent.remove,
+      agentId: _id,
+    });
+
+    if (agent.serviceUserId) {
+      try {
+        await deactivateServiceUser({
+          serviceUserId: agent.serviceUserId,
+          subdomain,
+        });
+      } catch (error) {
+        console.error(
+          `Failed to deactivate service user for agent ${_id}:`,
+          error,
+        );
+      }
+    }
+
+    return models.MastraAgent.removeAgent(_id, agent.createdBy);
   },
 };

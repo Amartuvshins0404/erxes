@@ -1,12 +1,9 @@
 // ---------------------------------------------------------------------------
 // Agent Learning — configuration (pure, env-driven).
 //
-// Mirrors mastra/memory/config.ts and mastra/knowledge/config.ts: injectable
-// `env` map, no I/O. The learning feature shares the Qdrant + embedder
-// configuration with advanced memory but has its own master switch and its
-// own Qdrant collection (the tenant's distilled "Agent knowledge").
-//
-// See docs/LEARNING-SYSTEM.md.
+// Injectable `env` map, no I/O. Learning is Mongo-backed (the MastraLearning
+// collection is the source of truth); it has its own master switch and tuning
+// knobs. No vector store is involved.
 // ---------------------------------------------------------------------------
 
 import { createHmac } from 'crypto';
@@ -15,18 +12,10 @@ import {
   val,
   parsePositiveInt,
   parseScore,
-  collectionName as buildCollectionName,
   enabledBy,
   canonicalTenant,
-  buildVectorStatus,
 } from '~/mastra/configEnv';
-import {
-  resolveEmbedderConfig,
-  qdrantUrl,
-  qdrantApiKey,
-} from '~/mastra/memory/config';
 
-export { resolveEmbedderConfig, qdrantUrl, qdrantApiKey };
 export type { Env };
 
 export interface LearningTuning {
@@ -35,11 +24,6 @@ export interface LearningTuning {
   // derived from at least k distinct people before it can auto-promote.
   autoPromoteMinSources: number;
   autoPromoteMinConfidence: number;
-  // Retrieval knobs for the agent-knowledge tool.
-  topK: number;
-  minScore: number;
-  // Dedupe: similarity above this merges a candidate into the existing lesson.
-  mergeScore: number;
   // Prompt digest budget (characters) and entry cap.
   digestMaxChars: number;
   digestMaxEntries: number;
@@ -57,19 +41,11 @@ export interface LearningTuning {
 
 /**
  * The master switch. Learning is enabled ONLY when ERXES_AGENT_LEARNING is
- * exactly "enable" — same unambiguous contract as ERXES_AGENT_MEMORY /
- * ERXES_AGENT_KNOWLEDGE, independent of both.
+ * exactly "enable" — same unambiguous contract as ERXES_AGENT_MEMORY,
+ * independent of it.
  */
 export function isLearningEnabled(env: Env = process.env): boolean {
   return enabledBy(env, 'ERXES_AGENT_LEARNING');
-}
-
-/** Qdrant collection for distilled learnings, separate from memory/knowledge. */
-export function learningCollectionName(
-  model: string,
-  dimension: number,
-): string {
-  return buildCollectionName('mastra_learnings', model, dimension);
 }
 
 /** All learning knobs with safe defaults; invalid env values are ignored. */
@@ -83,9 +59,6 @@ export function resolveLearningTuning(env: Env = process.env): LearningTuning {
       val(env, 'ERXES_AGENT_LEARNING_MIN_CONF'),
       0.75,
     ),
-    topK: parsePositiveInt(val(env, 'ERXES_AGENT_LEARNING_TOPK'), 4),
-    minScore: parseScore(val(env, 'ERXES_AGENT_LEARNING_MIN_SCORE'), 0.5),
-    mergeScore: parseScore(val(env, 'ERXES_AGENT_LEARNING_MERGE_SCORE'), 0.9),
     digestMaxChars: parsePositiveInt(
       val(env, 'ERXES_AGENT_LEARNING_DIGEST_CHARS'),
       2400,
@@ -118,8 +91,8 @@ export function learningSweepCron(env: Env = process.env): string {
 }
 
 /**
- * Canonical tenant tag for Qdrant points and filters — same convention as
- * company knowledge: saas → org subdomain, non-saas → fixed 'os'.
+ * Canonical tenant tag for learning scoping — saas → org subdomain, non-saas →
+ * fixed 'os'.
  */
 export function learningTenant(
   requestSubdomain: string | undefined,
@@ -142,37 +115,4 @@ export function hashSource(resourceId: string, env: Env = process.env): string {
     .update(resourceId)
     .digest('hex')
     .slice(0, 32);
-}
-
-export interface LearningStatus {
-  enabled: boolean;
-  embedder: string | null;
-  embedderModel: string | null;
-  qdrantUrl: string | null;
-  collection: string | null;
-  autoPromoteMinSources: number | null;
-  autoPromoteMinConfidence: number | null;
-}
-
-/** Read-only status surfaced in the UI. All nulls when disabled. */
-export function computeLearningStatus(env: Env = process.env): LearningStatus {
-  if (!isLearningEnabled(env)) {
-    return {
-      enabled: false,
-      embedder: null,
-      embedderModel: null,
-      qdrantUrl: null,
-      collection: null,
-      autoPromoteMinSources: null,
-      autoPromoteMinConfidence: null,
-    };
-  }
-  const emb = resolveEmbedderConfig(env);
-  const tuning = resolveLearningTuning(env);
-  return {
-    ...buildVectorStatus('mastra_learnings', emb, qdrantUrl(env)),
-    enabled: true,
-    autoPromoteMinSources: tuning.autoPromoteMinSources,
-    autoPromoteMinConfidence: tuning.autoPromoteMinConfidence,
-  };
 }

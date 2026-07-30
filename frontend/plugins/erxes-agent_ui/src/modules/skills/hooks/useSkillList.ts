@@ -1,6 +1,6 @@
-import { useQuery } from '@apollo/client';
 import { useCallback, useMemo } from 'react';
 import { MASTRA_SKILLS } from '../graphql/queries';
+import { useAuthedListQuery } from '~/hooks/useAuthedListQuery';
 import {
   IMastraSkillRow,
   IMastraSkillsResponse,
@@ -25,16 +25,19 @@ export interface SkillListFilters {
  */
 export const useSkillList = (filters: SkillListFilters = {}) => {
   const { scope, status, searchValue } = filters;
-  const variables = {
-    page: 1,
-    perPage: SKILLS_PER_PAGE,
-    scope,
-    status,
-    searchValue: searchValue || undefined,
-  };
+  const variables = useMemo(
+    () => ({
+      page: 1,
+      perPage: SKILLS_PER_PAGE,
+      scope,
+      status,
+      searchValue: searchValue || undefined,
+    }),
+    [scope, status, searchValue],
+  );
 
-  const { data, loading, fetchMore, refetch } =
-    useQuery<IMastraSkillsResponse>(MASTRA_SKILLS, {
+  const { data, loading, rawLoading, error, fetchMore, refetch } =
+    useAuthedListQuery<IMastraSkillsResponse>(MASTRA_SKILLS, {
       variables,
       notifyOnNetworkStatusChange: true,
       fetchPolicy: 'network-only',
@@ -58,7 +61,7 @@ export const useSkillList = (filters: SkillListFilters = {}) => {
   );
 
   const handleFetchMore = useCallback(() => {
-    if (loading || skillsList.length >= totalCount) return;
+    if (rawLoading || skillsList.length >= totalCount) return;
 
     fetchMore({
       variables: {
@@ -78,15 +81,13 @@ export const useSkillList = (filters: SkillListFilters = {}) => {
         };
       },
     });
-    // `variables` is rebuilt each render; the filter primitives below keep the
-    // memoized callback paginating the CURRENT filter, not a stale closure.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, skillsList.length, totalCount, fetchMore, scope, status, searchValue]);
+  }, [rawLoading, skillsList.length, totalCount, fetchMore, variables]);
 
   return {
     skillsList,
     totalCount,
     loading,
+    error,
     pageInfo,
     handleFetchMore,
     refetch,

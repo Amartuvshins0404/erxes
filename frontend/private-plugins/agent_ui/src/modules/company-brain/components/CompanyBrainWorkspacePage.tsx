@@ -30,6 +30,7 @@ import { MembersInline, PageHeader } from 'ui-modules';
 import { z } from 'zod';
 import { AssistantBillingSheet } from '~/modules/company-brain/components/AssistantBillingSheet';
 import { AssistantPaymentAlertDialog } from '~/modules/company-brain/components/AssistantPaymentAlertDialog';
+import { LlmProviderApiKeyFields } from '~/modules/company-brain/components/LlmProviderApiKeyFields';
 import { AssistantOrgManageSheet } from '~/modules/assistant-orgs/components/AssistantOrgManageSheet';
 import { useAgentAssistantLimit } from '~/modules/assistant-orgs/hooks/useAgentAssistantLimit';
 import { useCreateIdentifier } from '~/modules/assistant-orgs/hooks/useCreateAssistantOrg';
@@ -49,9 +50,12 @@ import { OPENCODE_PROVIDER_OPTIONS } from '~/modules/opencode/constants';
 import { useOpencodeDeploy } from '~/modules/opencode/deploy/hooks/useOpencodeDeploy';
 import { useOpencodeTransfer } from '~/modules/opencode/deploy/hooks/useOpencodeTransfer';
 import { useOpencode } from '~/modules/opencode/main/hooks/useOpencode';
+import {
+  ASSISTANT_PROVIDER_OPTIONS,
+  getManagedAssistantModel,
+} from '~/modules/company-brain/llmProviders';
 import { useManagedDiscordSetup } from '../hooks/useManagedDiscordSetup';
 
-const ASSISTANT_PROVIDER_OPTIONS = [{ value: 'kimi', label: 'Kimi' }] as const;
 const MANUAL_REFRESH_THROTTLE_MS = 1_500;
 
 const workspaceFormSchema = z.object({
@@ -59,6 +63,7 @@ const workspaceFormSchema = z.object({
   discordConnectionMode: z.enum(['managed', 'byob']),
   serverName: z.string().min(1, 'Identifier name is required'),
   provider: z.string().optional(),
+  model: z.string().optional(),
   apiToken: z.string().optional(),
   discordBotToken: z.string().optional(),
   transferServerName: z.string().optional(),
@@ -72,6 +77,7 @@ const workspaceFormSchema = z.object({
 
 type WorkspaceFormValues = z.infer<typeof workspaceFormSchema>;
 type DiscordConnectionMode = WorkspaceFormValues['discordConnectionMode'];
+type AssistantCreationSheetStep = 'details' | 'provider';
 type ManagedCreationStep =
   | 'details'
   | 'provisioning'
@@ -79,7 +85,7 @@ type ManagedCreationStep =
   | 'channel'
   | 'complete';
 
-const DEFAULT_DISCORD_CONNECTION_MODE: DiscordConnectionMode = 'byob';
+const DEFAULT_DISCORD_CONNECTION_MODE: DiscordConnectionMode = 'managed';
 
 const getStatusLabel = (status?: string | null) => {
   if (!status) {
@@ -103,9 +109,10 @@ const getProviderLabel = (provider?: string | null) => {
   }
 
   const normalized = provider.trim().toLowerCase();
-  const option = OPENCODE_PROVIDER_OPTIONS.find(
-    ({ value }) => value === normalized,
-  );
+  const option = [
+    ...ASSISTANT_PROVIDER_OPTIONS,
+    ...OPENCODE_PROVIDER_OPTIONS,
+  ].find(({ value }) => value === normalized);
 
   return option?.label || provider;
 };
@@ -345,11 +352,11 @@ const AssistantDiscordManageSheet = ({
 
   const handleRetryProvisioning = async () => {
     if (!retryApiToken.trim()) {
-      const message = 'Kimi API key is required to retry provisioning.';
+      const message = 'An API key is required to retry provisioning.';
       setError(message);
       toast({
         variant: 'destructive',
-        title: 'Kimi API key required',
+        title: 'API key required',
         description: message,
       });
       return;
@@ -359,7 +366,8 @@ const AssistantDiscordManageSheet = ({
       setError('');
       await deployManagedAgent({
         apiToken: retryApiToken,
-        provider: 'kimi',
+        provider: agent?.provider || 'kimi',
+        model: agent?.model || getManagedAssistantModel(agent?.provider),
       });
       setRetryApiToken('');
       await refetchAgent();
@@ -577,7 +585,8 @@ const AssistantDiscordManageSheet = ({
               <Input
                 value={retryApiToken}
                 onChange={(event) => setRetryApiToken(event.target.value)}
-                placeholder="Paste your Kimi API key"
+                placeholder="Paste the provider API key"
+                type="password"
                 autoComplete="off"
                 disabled={retryingProvisioning}
               />
@@ -781,11 +790,9 @@ const AssistantDiscordManageSheet = ({
 const AssistantWorkspaceCard = ({
   identifier,
   billingBlocked,
-  billingMessage,
 }: {
   identifier: Identifier;
   billingBlocked: boolean;
-  billingMessage?: string;
 }) => {
   const { agent, loading } = useAgent(identifier._id);
   const isManagedAssistant = isManagedAssistantAgent(agent);
@@ -828,16 +835,6 @@ const AssistantWorkspaceCard = ({
       </div>
 
       <InvitedMembersRow memberIds={identifier.memberIds} />
-
-      {billingBlocked && (
-        <Alert variant="warning">
-          <Alert.Title>You have to pay</Alert.Title>
-          <Alert.Description>
-            {billingMessage ||
-              'This assistant is blocked until the bill is paid.'}
-          </Alert.Description>
-        </Alert>
-      )}
 
       <Button
         asChild={!billingBlocked}
@@ -930,8 +927,8 @@ export const CompanyBrainWorkspacePage = ({
   const { transferOpencode, loading: transferringAgent } =
     useOpencodeTransfer();
   const [open, setOpen] = useState(false);
-  const [discordConnectionMode, setDiscordConnectionModeState] =
-    useState<DiscordConnectionMode>(DEFAULT_DISCORD_CONNECTION_MODE);
+  const [assistantCreationSheetStep, setAssistantCreationSheetStep] =
+    useState<AssistantCreationSheetStep>('details');
   const [managedAssistantId, setManagedAssistantId] = useState('');
   const [managedStep, setManagedStep] =
     useState<ManagedCreationStep>('details');
@@ -956,9 +953,10 @@ export const CompanyBrainWorkspacePage = ({
     () =>
       mode === 'assistant'
         ? {
-            title: 'AI Assistant',
-            subtitle: 'Manage assistants for your company brain.',
-            buttonLabel: 'Add AI Assistant',
+            title: 'OpenClaw Assistant',
+            subtitle:
+              'Multi-platform AI with explicit, auditable memory and community skills.',
+            buttonLabel: 'Add OpenClaw Assistant',
             emptyTitle: 'No AI assistants yet',
             emptyDescription:
               'Create your first AI assistant or link one transferred from another SaaS.',
@@ -968,9 +966,10 @@ export const CompanyBrainWorkspacePage = ({
               'Create a new server or link an existing assistant server from another SaaS.',
           }
         : {
-            title: 'AI Agents',
-            subtitle: 'Manage agents for your company brain.',
-            buttonLabel: 'Add AI Agent',
+            title: 'OpenCode Coder',
+            subtitle:
+              'AI coding agent for terminal, IDE, and desktop. Any model, any provider.',
+            buttonLabel: 'Add OpenCode Coder',
             emptyTitle: 'No AI agents yet',
             emptyDescription:
               'Create your first AI agent or link one transferred from another SaaS.',
@@ -989,6 +988,10 @@ export const CompanyBrainWorkspacePage = ({
       discordConnectionMode: DEFAULT_DISCORD_CONNECTION_MODE,
       serverName: '',
       provider: config.providerOptions[0]?.value || '',
+      model:
+        mode === 'assistant'
+          ? ASSISTANT_PROVIDER_OPTIONS[0].defaultModel
+          : undefined,
       apiToken: '',
       discordBotToken: '',
       transferServerName: '',
@@ -1003,26 +1006,16 @@ export const CompanyBrainWorkspacePage = ({
 
   const setupMode = form.watch('setupMode');
   const isTransfer = setupMode === 'transfer';
-  const isManagedAssistantCreation =
-    mode === 'assistant' && !isTransfer && discordConnectionMode === 'managed';
+  const showAssistantProviderStep =
+    mode === 'assistant' &&
+    !isTransfer &&
+    assistantCreationSheetStep === 'provider';
   const showManagedDiscordStep =
     mode === 'assistant' && !!managedAssistantId && managedStep !== 'details';
   const isManagedRuntimeReady =
     managedAgent?.status === SERVER_STATUSES.APPROVED && !!managedAgent?.url;
   const isManagedRuntimeFailed =
     managedAgent?.status === SERVER_STATUSES.FAILED;
-
-  const setDiscordConnectionMode = (value: DiscordConnectionMode) => {
-    setDiscordConnectionModeState(value);
-    form.setValue('discordConnectionMode', value, {
-      shouldDirty: true,
-      shouldValidate: true,
-    });
-
-    if (value === 'managed') {
-      form.setValue('discordBotToken', '');
-    }
-  };
 
   const isSubmitting =
     creatingIdentifier ||
@@ -1078,6 +1071,10 @@ export const CompanyBrainWorkspacePage = ({
       discordConnectionMode: DEFAULT_DISCORD_CONNECTION_MODE,
       serverName: '',
       provider: config.providerOptions[0]?.value || '',
+      model:
+        mode === 'assistant'
+          ? ASSISTANT_PROVIDER_OPTIONS[0].defaultModel
+          : undefined,
       apiToken: '',
       discordBotToken: '',
       transferServerName: '',
@@ -1088,12 +1085,28 @@ export const CompanyBrainWorkspacePage = ({
       transferSourceSubdomain: '',
       description: '',
     });
-    setDiscordConnectionModeState(DEFAULT_DISCORD_CONNECTION_MODE);
+    setAssistantCreationSheetStep('details');
     setManagedAssistantId('');
     setManagedStep('details');
     setManagedError('');
     setManagedRetryApiToken('');
     setManagedProvisioningStartedAt('');
+  };
+
+  const handleCreateSheetOpenChange = (nextOpen: boolean) => {
+    setOpen(nextOpen);
+
+    if (!nextOpen) {
+      setAssistantCreationSheetStep('details');
+    }
+  };
+
+  const continueToAssistantProviderStep = async () => {
+    const valid = await form.trigger(['serverName']);
+
+    if (valid) {
+      setAssistantCreationSheetStep('provider');
+    }
   };
 
   const clearManagedSearchParams = () => {
@@ -1230,11 +1243,11 @@ export const CompanyBrainWorkspacePage = ({
     }
 
     if (!managedRetryApiToken.trim()) {
-      const message = 'Kimi API key is required to retry provisioning.';
+      const message = 'An API key is required to retry provisioning.';
       setManagedError(message);
       toast({
         variant: 'destructive',
-        title: 'Kimi API key required',
+        title: 'API key required',
         description: message,
       });
       return;
@@ -1244,7 +1257,10 @@ export const CompanyBrainWorkspacePage = ({
       setManagedError('');
       await deployManagedAgent({
         identifierId: managedAssistantId,
-        provider: 'kimi',
+        provider: managedAgent?.provider || 'kimi',
+        model:
+          managedAgent?.model ||
+          getManagedAssistantModel(managedAgent?.provider),
         apiToken: managedRetryApiToken,
       });
       setManagedRetryApiToken('');
@@ -1456,7 +1472,8 @@ export const CompanyBrainWorkspacePage = ({
                 onChange={(event) =>
                   setManagedRetryApiToken(event.target.value)
                 }
-                placeholder="Paste your Kimi API key"
+                placeholder="Paste the provider API key"
+                type="password"
                 autoComplete="off"
                 disabled={deployingManagedAssistant}
               />
@@ -1547,7 +1564,8 @@ export const CompanyBrainWorkspacePage = ({
                     onChange={(event) =>
                       setManagedRetryApiToken(event.target.value)
                     }
-                    placeholder="Paste your Kimi API key"
+                    placeholder="Paste the provider API key"
+                    type="password"
                     autoComplete="off"
                     disabled={deployingManagedAssistant}
                   />
@@ -1749,6 +1767,7 @@ export const CompanyBrainWorkspacePage = ({
             const deployedAgent = await deployManagedAgent({
               identifierId: createdIdentifier._id,
               provider: values.provider || config.providerOptions[0]?.value,
+              model: values.model || getManagedAssistantModel(values.provider),
               apiToken,
               description: values.description?.trim() || undefined,
               systemPrompt: values.description?.trim() || undefined,
@@ -1851,18 +1870,13 @@ export const CompanyBrainWorkspacePage = ({
     }
   };
 
-  const renderCard = (
-    identifier: Identifier,
-    billingBlocked: boolean,
-    billingMessage?: string,
-  ) => {
+  const renderCard = (identifier: Identifier, billingBlocked: boolean) => {
     if (mode === 'assistant') {
       return (
         <AssistantWorkspaceCard
           key={identifier._id}
           identifier={identifier}
           billingBlocked={billingBlocked}
-          billingMessage={billingMessage}
         />
       );
     }
@@ -1929,7 +1943,10 @@ export const CompanyBrainWorkspacePage = ({
                   />
                 )}
                 <Button
-                  onClick={() => setOpen(true)}
+                  onClick={() => {
+                    resetCreateForm();
+                    setOpen(true);
+                  }}
                   disabled={createButtonDisabled}
                   className="gap-2"
                 >
@@ -1963,7 +1980,10 @@ export const CompanyBrainWorkspacePage = ({
                 </p>
               </div>
               <Button
-                onClick={() => setOpen(true)}
+                onClick={() => {
+                  resetCreateForm();
+                  setOpen(true);
+                }}
                 disabled={createButtonDisabled}
                 className="gap-2"
               >
@@ -2017,7 +2037,6 @@ export const CompanyBrainWorkspacePage = ({
                   return renderCard(
                     identifier,
                     billingItem?.blocked ?? assistantBillingBlocked,
-                    billingItem?.message ?? assistantBillingOverview?.message,
                   );
                 })}
               </div>
@@ -2026,7 +2045,7 @@ export const CompanyBrainWorkspacePage = ({
         </div>
       </div>
 
-      <Sheet open={open} onOpenChange={setOpen}>
+      <Sheet open={open} onOpenChange={handleCreateSheetOpenChange}>
         <Sheet.View className="p-0 md:w-[calc(100vw-theme(spacing.4))] sm:max-w-xl">
           <Form {...form}>
             <form
@@ -2041,6 +2060,41 @@ export const CompanyBrainWorkspacePage = ({
               <Sheet.Content className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-5 py-5">
                 {showManagedDiscordStep ? (
                   renderManagedDiscordStep()
+                ) : showAssistantProviderStep ? (
+                  <div className="flex min-h-0 flex-1 flex-col gap-5">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                        <span>1. Assistant</span>
+                        <IconArrowRight className="size-3" />
+                        <span className="text-foreground">2. AI provider</span>
+                      </div>
+                      <div className="space-y-1">
+                        <h3 className="text-sm font-medium">AI connection</h3>
+                        <p className="text-xs text-muted-foreground">
+                          Select the model provider for this OpenClaw assistant.
+                        </p>
+                      </div>
+                    </div>
+
+                    <LlmProviderApiKeyFields
+                      control={form.control}
+                      providerName="provider"
+                      apiKeyName="apiToken"
+                      modelName="model"
+                      providerOptions={ASSISTANT_PROVIDER_OPTIONS}
+                      apiKeyPlaceholder="Paste your provider API key"
+                      onProviderChange={(provider) => {
+                        form.setValue('apiToken', '', {
+                          shouldDirty: true,
+                        });
+                        form.setValue(
+                          'model',
+                          getManagedAssistantModel(provider),
+                          { shouldDirty: true },
+                        );
+                      }}
+                    />
+                  </div>
                 ) : (
                   <>
                     <div className="space-y-1">
@@ -2099,160 +2153,41 @@ export const CompanyBrainWorkspacePage = ({
                       )}
                     />
 
-                    {(!isTransfer || mode === 'agent') && (
-                      <Form.Field
-                        name="provider"
-                        render={({ field }) => (
-                          <Form.Item>
-                            <Form.Label>Provider</Form.Label>
-                            <Select
-                              value={
-                                field.value ||
-                                config.providerOptions[0]?.value ||
-                                ''
-                              }
-                              onValueChange={field.onChange}
-                            >
-                              <Form.Control>
-                                <Select.Trigger className="w-full">
-                                  <Select.Value placeholder="Choose provider" />
-                                </Select.Trigger>
-                              </Form.Control>
-                              <Select.Content>
-                                {config.providerOptions.map((option) => (
-                                  <Select.Item
-                                    key={option.value}
-                                    value={option.value}
-                                  >
-                                    {option.label}
-                                  </Select.Item>
-                                ))}
-                              </Select.Content>
-                            </Select>
-                            <Form.Message />
-                          </Form.Item>
-                        )}
+                    {!isTransfer && mode === 'agent' && (
+                      <LlmProviderApiKeyFields
+                        control={form.control}
+                        providerName="provider"
+                        apiKeyName="apiToken"
+                        providerOptions={config.providerOptions}
+                        providerLabel="Provider"
+                        apiKeyLabel="API token"
+                        providerPlaceholder="Choose provider"
+                        apiKeyPlaceholder="Paste your API token"
+                        onProviderChange={(provider) => {
+                          if (mode === 'assistant') {
+                            form.setValue(
+                              'model',
+                              getManagedAssistantModel(provider),
+                              { shouldDirty: true },
+                            );
+                          }
+                        }}
                       />
                     )}
 
-                    {!isTransfer && (
-                      <Form.Field
-                        name="apiToken"
-                        render={({ field }) => (
-                          <Form.Item>
-                            <Form.Label>API token</Form.Label>
-                            <Form.Control>
-                              <Input
-                                {...field}
-                                value={field.value || ''}
-                                placeholder="Paste your API token"
-                                autoComplete="off"
-                              />
-                            </Form.Control>
-                            <Form.Message />
-                          </Form.Item>
-                        )}
+                    {isTransfer && mode === 'agent' && (
+                      <LlmProviderApiKeyFields
+                        control={form.control}
+                        providerName="provider"
+                        apiKeyName="apiToken"
+                        providerOptions={config.providerOptions}
+                        providerLabel="Provider"
+                        apiKeyLabel="API token"
+                        providerPlaceholder="Choose provider"
+                        apiKeyPlaceholder="Paste your API token"
+                        showApiKey={false}
                       />
                     )}
-
-                    {!isTransfer && mode === 'assistant' && (
-                      <Form.Field
-                        name="discordConnectionMode"
-                        render={() => (
-                          <Form.Item>
-                            <Form.Label>Discord connection</Form.Label>
-                            <Form.Control>
-                              <div className="grid gap-3 sm:grid-cols-2">
-                                <button
-                                  type="button"
-                                  className={`flex cursor-pointer items-center gap-3 rounded-lg border p-3 text-left text-sm transition-colors ${
-                                    discordConnectionMode === 'managed'
-                                      ? 'border-primary bg-primary/5'
-                                      : 'border-border bg-background'
-                                  }`}
-                                  onClick={() =>
-                                    setDiscordConnectionMode('managed')
-                                  }
-                                >
-                                  <span
-                                    className={`flex size-4 shrink-0 items-center justify-center rounded-full border ${
-                                      discordConnectionMode === 'managed'
-                                        ? 'border-primary'
-                                        : 'border-input'
-                                    }`}
-                                  >
-                                    {discordConnectionMode === 'managed' && (
-                                      <span className="size-2 rounded-full bg-primary" />
-                                    )}
-                                  </span>
-                                  <span className="space-y-1">
-                                    <span className="block font-medium">
-                                      Use erxes Ai Assistant
-                                    </span>
-                                  </span>
-                                </button>
-                                <button
-                                  type="button"
-                                  className={`flex cursor-pointer items-center gap-3 rounded-lg border p-3 text-left text-sm transition-colors ${
-                                    discordConnectionMode === 'byob'
-                                      ? 'border-primary bg-primary/5'
-                                      : 'border-border bg-background'
-                                  }`}
-                                  onClick={() =>
-                                    setDiscordConnectionMode('byob')
-                                  }
-                                >
-                                  <span
-                                    className={`flex size-4 shrink-0 items-center justify-center rounded-full border ${
-                                      discordConnectionMode === 'byob'
-                                        ? 'border-primary'
-                                        : 'border-input'
-                                    }`}
-                                  >
-                                    {discordConnectionMode === 'byob' && (
-                                      <span className="size-2 rounded-full bg-primary" />
-                                    )}
-                                  </span>
-                                  <span className="space-y-1">
-                                    <span className="block font-medium">
-                                      Bring your own bot
-                                    </span>
-                                  </span>
-                                </button>
-                              </div>
-                            </Form.Control>
-                            <Form.Message />
-                          </Form.Item>
-                        )}
-                      />
-                    )}
-
-                    {!isTransfer &&
-                      mode === 'assistant' &&
-                      discordConnectionMode === 'byob' && (
-                        <Form.Field
-                          name="discordBotToken"
-                          render={({ field }) => (
-                            <Form.Item>
-                              <Form.Label>Discord bot token</Form.Label>
-                              <Form.Control>
-                                <Input
-                                  {...field}
-                                  value={field.value || ''}
-                                  placeholder="Paste your Discord bot token"
-                                  autoComplete="off"
-                                />
-                              </Form.Control>
-                              <p className="text-xs text-muted-foreground">
-                                Required. Uses this token during bootstrap so
-                                the bot can come online and send the pairing
-                                code.
-                              </p>
-                              <Form.Message />
-                            </Form.Item>
-                          )}
-                        />
-                      )}
 
                     {isTransfer && (
                       <>
@@ -2485,19 +2420,6 @@ export const CompanyBrainWorkspacePage = ({
 
                       {managedStep === 'channel' && (
                         <>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            disabled={isSubmitting}
-                            onClick={handleRefreshManagedRuntime}
-                          >
-                            <IconRefresh
-                              className={`size-4 ${
-                                refreshingManagedRuntime ? 'animate-spin' : ''
-                              }`}
-                            />
-                            Refresh runtime
-                          </Button>
                           {isManagedRuntimeFailed && (
                             <Button
                               type="button"
@@ -2540,6 +2462,22 @@ export const CompanyBrainWorkspacePage = ({
                         </>
                       )}
                     </>
+                  ) : showAssistantProviderStep ? (
+                    <>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={isSubmitting}
+                        onClick={() => setAssistantCreationSheetStep('details')}
+                      >
+                        Back
+                      </Button>
+                      <Button type="submit" disabled={createButtonDisabled}>
+                        {isSubmitting
+                          ? 'Saving...'
+                          : 'Connect erxes Ai Assistant'}
+                      </Button>
+                    </>
                   ) : (
                     <>
                       <Button
@@ -2553,13 +2491,19 @@ export const CompanyBrainWorkspacePage = ({
                       >
                         Cancel
                       </Button>
-                      <Button type="submit" disabled={createButtonDisabled}>
-                        {isSubmitting
-                          ? 'Saving...'
-                          : isManagedAssistantCreation
-                          ? 'Connect erxes Ai Assistant'
-                          : config.buttonLabel}
-                      </Button>
+                      {mode === 'assistant' && !isTransfer ? (
+                        <Button
+                          type="button"
+                          disabled={createButtonDisabled}
+                          onClick={continueToAssistantProviderStep}
+                        >
+                          Continue <IconArrowRight className="size-4" />
+                        </Button>
+                      ) : (
+                        <Button type="submit" disabled={createButtonDisabled}>
+                          {isSubmitting ? 'Saving...' : config.buttonLabel}
+                        </Button>
+                      )}
                     </>
                   )}
                 </div>

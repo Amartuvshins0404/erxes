@@ -45,9 +45,20 @@ Font.register({
   ],
 });
 
+// Every fallback family needs an italic source: the layout engine resolves the
+// whole FONT_FALLBACK chain for every text run with that run's style, and the
+// font store matches fontStyle exactly (no oblique synthesis, no normal-style
+// fallback) — so a family with no italic source makes ANY italic run throw
+// "Could not resolve font for Noto Sans SC" even for pure Latin text. Alias the
+// upright TTFs as italic: upright CJK/Arabic/emoji glyphs inside italic runs
+// beat crashing the whole document. Weight fallback needs no such aliases —
+// missing weights resolve to the nearest registered one.
 Font.register({
   family: 'Noto Sans SC',
-  fonts: [{ src: path.join(FONT_DIR, 'NotoSansSC-Regular.otf') }],
+  fonts: [
+    { src: path.join(FONT_DIR, 'NotoSansSC-Regular.ttf') },
+    { src: path.join(FONT_DIR, 'NotoSansSC-Regular.ttf'), fontStyle: 'italic' },
+  ],
 });
 
 Font.register({
@@ -55,12 +66,21 @@ Font.register({
   fonts: [
     { src: path.join(FONT_DIR, 'NotoSansArabic-Regular.ttf'), fontWeight: 'normal' },
     { src: path.join(FONT_DIR, 'NotoSansArabic-Bold.ttf'), fontWeight: 'bold' },
+    { src: path.join(FONT_DIR, 'NotoSansArabic-Regular.ttf'), fontStyle: 'italic' },
+    {
+      src: path.join(FONT_DIR, 'NotoSansArabic-Bold.ttf'),
+      fontWeight: 'bold',
+      fontStyle: 'italic',
+    },
   ],
 });
 
 Font.register({
   family: 'Noto Emoji',
-  fonts: [{ src: path.join(FONT_DIR, 'NotoEmoji-Regular.ttf') }],
+  fonts: [
+    { src: path.join(FONT_DIR, 'NotoEmoji-Regular.ttf') },
+    { src: path.join(FONT_DIR, 'NotoEmoji-Regular.ttf'), fontStyle: 'italic' },
+  ],
 });
 
 // Disable hyphenation: the default splits Cyrillic words at odd points.

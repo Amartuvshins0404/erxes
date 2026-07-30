@@ -24,6 +24,8 @@ export const types = `
 
     agentId: String
     serverId: String
+    provider: String
+    model: String
     status: AgentDeploymentStatus!
     provisioning: AgentProvisioningProgress
     transferredFromSubdomain: String
@@ -56,7 +58,9 @@ export const types = `
 
   input DeployManagedAgentInput {
     provider: String
-    kimiApiKey: String!
+    model: String
+    apiKey: String
+    kimiApiKey: String
     description: String
     systemPrompt: String
   }
@@ -108,6 +112,17 @@ export const types = `
     kimiApiKey: String!
   }
 
+  input SetAgentLlmConnectionInput {
+    provider: String!
+    model: String!
+    apiKey: String!
+  }
+
+  type AgentLlmModel {
+    id: String!
+    name: String!
+  }
+
   type DiscordGuild {
     guildId: String
     requireMention: Boolean
@@ -131,6 +146,7 @@ export const queries = `
   getAgentDetails(identifierId: String!, agentId: String): [AgentFile]
   getDiscordGuilds(identifierId: String!): [DiscordGuild]
   checkKimiKeySet(identifierId: String!): Boolean
+  agentManagedLlmModels(provider: String!, apiKey: String!): [AgentLlmModel!]!
   agentDiscordConnectUrl(assistantId: String!, returnUrl: String): String
   agentDiscordInstallations(assistantId: String!): JSON
   agentDiscordChannels(assistantId: String!, installationId: String!): JSON
@@ -157,6 +173,7 @@ export const mutations = `
   updateDiscordSettings(identifierId: String!, input: UpdateDiscordSettingsInput!): Boolean
   addDiscordGuild(identifierId: String!, input: AddDiscordGuildInput!): Boolean
   setKimiApiKey(identifierId: String!, input: SetKimiApiKeyInput!): Boolean
+  setAgentLlmConnection(identifierId: String!, input: SetAgentLlmConnectionInput!): AgentServer
   agentDiscordCreateBinding(assistantId: String!, installationId: String!, discordChannelId: String!): JSON
   agentDiscordUpdateBinding(assistantId: String!, bindingId: String!, input: UpdateDiscordBindingInput!): JSON
   agentDiscordDeleteBinding(assistantId: String!, bindingId: String!): JSON

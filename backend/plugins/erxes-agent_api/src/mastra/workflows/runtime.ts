@@ -13,7 +13,10 @@ import { isOperationAllowed, ToolPolicy } from '../tools/scope';
 import {
   isDestructiveOperation,
   resolveDestructiveOpsPolicy,
+  destructiveOpsPreapproved,
 } from '../tools/destructiveGuard';
+import { runWithAuth, getCurrentAuth } from '../requestContext';
+import { resolveBackgroundPrincipal } from '../auth/backgroundPrincipal';
 import { writeAgentAction, makeAgentProcessId } from '../auditLog';
 import { getOperationRegistry } from '../tools/operationRegistry';
 import type { IModels } from '~/connectionResolvers';
@@ -194,10 +197,15 @@ export async function buildRunDeps(
       // Defense-in-depth: validation already rejects destructive ops without
       // consent, but re-check at execution time (a definition could be run
       // without re-validation) so a remove/delete/merge never slips through.
-      if (
-        isDestructiveOperation(meta) &&
-        resolveDestructiveOpsPolicy(definition) !== 'allow'
-      ) {
+      // A background (schedule/automation) run is UNATTENDED — force the gate on
+      // regardless of the definition's destructiveOps, so a saved
+      // destructiveOps:'allow' can never delete/merge on a cron with no human.
+      const backgroundRun = getCurrentAuth()?.background === true;
+      const destructiveAllowed = destructiveOpsPreapproved(
+        resolveDestructiveOpsPolicy(definition),
+        backgroundRun,
+      );
+      if (isDestructiveOperation(meta) && !destructiveAllowed) {
         if (isMutation)
           writeAgentAction(models, {
             source: 'workflow',
@@ -222,8 +230,7 @@ export async function buildRunDeps(
         meta,
         args || {},
         settings,
-        registry.inputTypesMap,
-        registry.objectFieldsMap,
+        registry,
         processId,
       );
 
@@ -307,6 +314,10 @@ export async function runWorkflow(args: {
   envelope: TriggerEnvelope;
 }): Promise<IMastraWorkflowRunDocument> {
   const { models, subdomain, workflow, envelope } = args;
+  if (workflow.approvalStatus !== 'approved') {
+    throw new ExpectedError('Workflow must be approved before it can run');
+  }
+
   const definition = workflow.definition;
   const tenant = workflowTenant(subdomain);
   const key = `wf_${workflow._id}_v${workflow.version}`;
@@ -376,4 +387,90 @@ export async function runWorkflow(args: {
       finishedAt: new Date(),
     });
   }
+}
+
+/**
+ * Background (schedule- or automation-triggered) workflow entry point. Unlike a
+ * manual run — which executes AS the requesting user (the mutation wraps it in
+ * runWithAuth) — a background run has no user session, so it runs as the
+ * workflow's OWNING AGENT: its service-user principal is minted from that
+ * agent's configuration.
+ *
+ * A workflow with no owning agent (or one pointing at a deleted agent) has no
+ * identity to run under, so it fails CLOSED — records a failed run and does NOT
+ * execute. Likewise when the owner token can't be minted: operation steps can
+ * never fall through to the admin app token (buildAuthHeaders' no-context
+ * fallback).
+ */
+export async function runBackgroundWorkflow(args: {
+  models: IModels;
+  subdomain: string;
+  workflow: IMastraWorkflowDocument;
+  envelope: TriggerEnvelope;
+}): Promise<IMastraWorkflowRunDocument> {
+  const { models, subdomain, workflow, envelope } = args;
+
+  /** Records a failed run without executing — the fail-closed exit. */
+  const failClosed = (error: string) =>
+    models.MastraWorkflowRun.createRun({
+      workflowId: workflow._id,
+      version: workflow.version,
+      runId: '',
+      status: 'failed',
+      triggerEnvelope: envelope,
+      definitionSnapshot: workflow.definition,
+      error,
+      startedAt: new Date(),
+      finishedAt: new Date(),
+    });
+
+  if (!workflow.isEnabled || workflow.approvalStatus !== 'approved') {
+    return failClosed(
+      'This workflow is not both approved and enabled for background execution.',
+    );
+  }
+
+  const agentId = workflow.agentId?.trim();
+  if (!agentId) {
+    return failClosed(
+      'This workflow has no owning agent — assign one before it can run in the background.',
+    );
+  }
+  // A DISABLED owning agent is the kill switch: it must stop the workflows it
+  // owns from running in the background, exactly as it stops the agent's own
+  // scheduled runs. Fail closed just as for a missing agent.
+  const agentConfig = await models.MastraAgent.findOne({
+    agentId,
+    isEnabled: true,
+  });
+  if (!agentConfig) {
+    return failClosed(
+      `This workflow's owning agent "${agentId}" was not found or is disabled — enable it or reassign the workflow before it can run.`,
+    );
+  }
+  if (agentConfig.destructiveOps === 'allow') {
+    return failClosed(
+      `This workflow's owning agent "${agentId}" allows destructive operations, which are refused for unattended runs.`,
+    );
+  }
+
+  // The app token (settings.erxesApiToken) is only the CLIENT CREDENTIAL that
+  // authenticates to core's mint endpoint — the minted owner token, bound to the
+  // owning agent's principal, is what every operation step runs as.
+  const settings = await models.MastraSettings.getSettings();
+  const principal = await resolveBackgroundPrincipal({
+    agentConfig,
+    subdomain,
+    appToken: settings?.erxesApiToken,
+    models,
+  });
+  if (!principal.ok) {
+    return failClosed(principal.error);
+  }
+
+  // AsyncLocalStorage carries the owner principal (and background:true) into
+  // every operation step's buildAuthHeaders and the destructive-op gate above.
+  return runWithAuth(principal.authCtx, () =>
+    runWorkflow({ models, subdomain, workflow, envelope }),
+  );
 }

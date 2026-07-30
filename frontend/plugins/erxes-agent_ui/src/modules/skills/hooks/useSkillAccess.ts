@@ -1,6 +1,7 @@
 import { ApolloError } from '@apollo/client';
 import { toast } from 'erxes-ui';
 import { usePermissionCheck } from 'ui-modules';
+import { ERXES_AGENT_ACTIONS } from '~/permissions';
 
 type SkillAction =
   | 'create'
@@ -30,18 +31,20 @@ export const skillMutationError = (action: SkillAction) => (e: ApolloError) =>
     ? showSkillPermissionError(action)
     : toast({ title: 'Error', description: e.message, variant: 'destructive' });
 
-/**
- * Frontend gate mirroring the backend skills permission module. `skillsView`
- * is held by every logged-in user; create/edit/remove by admin + user groups;
- * `skillsPromote` is admin-only. Ownership (isMine) is enforced separately in
- * resolvers — these flags only gate the affordances.
- */
+/** Frontend affordances mirror the discrete backend skill actions. Ownership
+ * checks remain at each row/form because permissions alone never disclose a
+ * different user's private skill. */
 export const useSkillAccess = () => {
   const { hasActionPermission } = usePermissionCheck();
   return {
-    canCreate: hasActionPermission('skillsCreate'),
-    canEdit: hasActionPermission('skillsEdit'),
-    canRemove: hasActionPermission('skillsRemove'),
-    canPromote: hasActionPermission('skillsPromote'),
+    canCreate: hasActionPermission(ERXES_AGENT_ACTIONS.skills.create),
+    canEdit: hasActionPermission(ERXES_AGENT_ACTIONS.skills.update),
+    canPublish: hasActionPermission(ERXES_AGENT_ACTIONS.skills.publish),
+    canRemove: hasActionPermission(ERXES_AGENT_ACTIONS.skills.remove),
+    canPromote: hasActionPermission(ERXES_AGENT_ACTIONS.skills.promote),
+    canModerate: hasActionPermission(ERXES_AGENT_ACTIONS.skills.moderate),
+    canActivate:
+      hasActionPermission(ERXES_AGENT_ACTIONS.skills.read) &&
+      hasActionPermission(ERXES_AGENT_ACTIONS.agent.chat),
   };
 };

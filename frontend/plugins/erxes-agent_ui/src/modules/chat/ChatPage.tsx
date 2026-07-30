@@ -1,20 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useApolloClient } from '@apollo/client';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import {
-  IconAlertTriangle,
-  IconArrowDown,
-  IconFiles,
-  IconFileUpload,
-  IconLayoutSidebar,
-  IconMessageCircle,
-  IconPlus,
-  IconReload,
-  IconSparkles,
-} from '@tabler/icons-react';
-import { AlertDialog, Breadcrumb, Button, cn, Empty } from 'erxes-ui';
-import { PageHeader } from 'ui-modules';
-import { ChatAttachment, ApprovedOp, ReasoningEffort } from '~/modules/chat/types';
+import { IconArrowDown } from '@tabler/icons-react';
+import type {
+  ChatAttachment,
+  ApprovedOp,
+  ReasoningEffort,
+} from '~/modules/chat/types';
 import { chatStore } from '~/modules/chat/store/chatStore';
 import {
   useChatAgents,
@@ -29,9 +21,26 @@ import { useAttachments } from '~/modules/chat/hooks/useAttachments';
 import { useThreadArtifacts } from '~/modules/chat/hooks/useThreadArtifacts';
 import { useSessionBootstrap } from '~/modules/chat/hooks/useSessionBootstrap';
 import { withThreadParam } from '~/modules/chat/lib/threadParam';
+import {
+  readChatMode,
+  readWorkflowParam,
+  withChatMode,
+  withWorkflowParam,
+  type ChatMode,
+} from '~/modules/chat/lib/chatMode';
+import { useWorkflows } from '~/pages/workflows/hooks/useWorkflows';
 import { useIsNarrow } from '~/modules/chat/hooks/useIsNarrow';
-import { AgentRail } from '~/modules/chat/components/AgentRail';
-import { SessionList } from '~/modules/chat/components/SessionList';
+import { ChatPageHeader } from '~/modules/chat/components/ChatPageHeader';
+import { ChatSidePanel } from '~/modules/chat/components/ChatSidePanel';
+import { DeleteSessionDialog } from '~/modules/chat/components/DeleteSessionDialog';
+import {
+  AmbientBackdrop,
+  ChatErrorBanner,
+  DropOverlay,
+  SelectAgentEmpty,
+  SkillDraftBanner,
+} from '~/modules/chat/components/ChatNotices';
+import { WorkflowChatView } from '~/modules/chat/components/WorkflowChatView';
 import { MessageList } from '~/modules/chat/components/MessageList';
 import { Composer } from '~/modules/chat/components/Composer';
 import { ApprovalBar } from '~/modules/chat/components/ApprovalBar';
@@ -66,10 +75,25 @@ export const ChatPage = () => {
   // writes it (push, so browser Back walks between conversations); reload/deep-
   // link restores it (useSessionBootstrap). An agent-only URL keeps the old
   // behavior — bootstrap opens the most-recent thread or a fresh draft.
-  const [, setSearchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const setThreadParam = useCallback(
     (threadId: string | undefined, replace = false) =>
       setSearchParams((prev) => withThreadParam(prev, threadId), { replace }),
+    [setSearchParams],
+  );
+  // Chat | Workflow is deep-linkable alongside the active thread.
+  const chatMode = readChatMode(searchParams);
+  const workflowParam = readWorkflowParam(searchParams);
+  const setChatMode = useCallback(
+    (mode: ChatMode) =>
+      setSearchParams((prev) => withChatMode(prev, mode), { replace: false }),
+    [setSearchParams],
+  );
+  const setWorkflowParam = useCallback(
+    (workflowId: string | undefined, replace = false) =>
+      setSearchParams((prev) => withWorkflowParam(prev, workflowId), {
+        replace,
+      }),
     [setSearchParams],
   );
   const [railOpen, setRailOpen] = useState(!agentId);
@@ -86,16 +110,19 @@ export const ChatPage = () => {
   const attachmentsEnabled = useAttachmentsEnabled();
   const voiceEnabled = useVoiceEnabled();
 
-  // The route is keyed by the agent record _id, but inbound links (e.g.
-  // Schedules → View output) may carry the agent slug — accept both.
+  // The route accepts either the agent record id or business agentId.
   const selectedAgent = useMemo(
     () =>
       agentId
-        ? (agents.find((a) => a._id === agentId || a.agentId === agentId) ??
-          null)
+        ? agents.find((a) => a._id === agentId || a.agentId === agentId) ?? null
         : null,
     [agents, agentId],
   );
+
+  const canReadWorkflows =
+    selectedAgent?.capabilities?.canReadWorkflows === true;
+  const activeChatMode: ChatMode =
+    chatMode === 'workflow' && canReadWorkflows ? 'workflow' : 'chat';
 
   const view = useAgentChatView(agentId);
   const {
@@ -125,13 +152,59 @@ export const ChatPage = () => {
   const {
     threads,
     loading: threadsLoading,
+    error: threadsError,
+    refetch: refetchThreads,
     hasMore: hasMoreSessions,
     loadingMore: loadingMoreSessions,
     loadMore: loadMoreSessions,
   } = useMastraThreads(selectedAgent?.agentId);
   const sessionsLoaded = !!selectedAgent && !threadsLoading;
+  const retrySessions = useCallback(() => {
+    void refetchThreads().catch(() => undefined);
+  }, [refetchThreads]);
   const { renameThread } = useRenameMastraThread();
   const { removeThread } = useRemoveMastraThread(selectedAgent?.agentId);
+
+  // Workflow mode lists only definitions owned by the selected agent.
+  const {
+    workflows,
+    loading: workflowsLoading,
+    error: workflowsError,
+    refetch: refetchWorkflows,
+  } = useWorkflows(
+    selectedAgent?.agentId,
+    activeChatMode !== 'workflow' || !canReadWorkflows,
+  );
+  const retryWorkflows = useCallback(() => {
+    void refetchWorkflows().catch(() => undefined);
+  }, [refetchWorkflows]);
+  const selectedWorkflow = useMemo(
+    () => workflows.find(({ _id }) => _id === workflowParam) ?? null,
+    [workflows, workflowParam],
+  );
+  const handleSelectWorkflow = useCallback(
+    (workflowId: string) => {
+      setSidebarOpen(false);
+      setWorkflowParam(workflowId);
+    },
+    [setWorkflowParam],
+  );
+  useEffect(() => {
+    if (activeChatMode !== 'workflow' || workflowsLoading || selectedWorkflow)
+      return;
+    if (workflows.length === 0) {
+      if (workflowParam) setWorkflowParam(undefined, true);
+      return;
+    }
+    setWorkflowParam(workflows[0]._id, true);
+  }, [
+    activeChatMode,
+    workflowsLoading,
+    selectedWorkflow,
+    workflows,
+    workflowParam,
+    setWorkflowParam,
+  ]);
 
   const [input, setInput] = useState('');
   const [showScrollDown, setShowScrollDown] = useState(false);
@@ -185,12 +258,16 @@ export const ChatPage = () => {
     makeSkill({ agentId: selectedAgent.agentId, threadId: activeThreadId });
   };
 
-  // Activation is per-turn: drop the pill and any banner when the thread changes.
-  useEffect(() => {
-    slash.clearActiveSkill();
+  // Activation is per-turn: drop the /slash pill and any dismissed-draft banner
+  // when the thread changes. A render-time reset (store the last thread, adjust
+  // when it differs) rather than an effect, so it lands in the same render.
+  const { clearActiveSkill } = slash;
+  const [resetThread, setResetThread] = useState(activeThreadId);
+  if (resetThread !== activeThreadId) {
+    setResetThread(activeThreadId);
+    clearActiveSkill();
     setDraftDismissed(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeThreadId]);
+  }
 
   // Session state-machine (slug→id redirect, ?thread= deep-link, current-agent
   // tracking, bootstrap/re-home) lives in the hook so the view keeps only its
@@ -372,7 +449,12 @@ export const ChatPage = () => {
 
   const handleDeny = () => {
     if (chatLoading) return;
-    sendMessage('Cancelled — do not delete or merge anything.', [], undefined, true);
+    sendMessage(
+      'Cancelled — do not delete or merge anything.',
+      [],
+      undefined,
+      true,
+    );
   };
 
   const handleSend = async () => {
@@ -387,7 +469,9 @@ export const ChatPage = () => {
     const message = input.trim();
     // Carry the /slash-activated skill into this turn's request (names only —
     // the server force-loads their instructions). Consumed on send.
-    const activeSkillNames = slash.activeSkill ? [slash.activeSkill] : undefined;
+    const activeSkillNames = slash.activeSkill
+      ? [slash.activeSkill]
+      : undefined;
     // Files are staged, not uploaded, until now — upload them as part of sending.
     // If any upload fails, abort: keep the composer's text + chips so the user
     // can retry (send again) or remove the offending file. Nothing is sent.
@@ -446,7 +530,8 @@ export const ChatPage = () => {
   // Composer callback props, stabilized so the memoized Composer /
   // ReasoningEffortControl don't re-render on every streamed token.
   const handleReasoningEffortChange = useCallback(
-    (effort?: ReasoningEffort) => chatStore.setReasoningEffort(agentId!, effort),
+    (effort?: ReasoningEffort) =>
+      chatStore.setReasoningEffort(agentId!, effort),
     [agentId],
   );
 
@@ -505,134 +590,59 @@ export const ChatPage = () => {
   return (
     <div className="flex flex-col h-full">
       {!voiceActive && (
-      <PageHeader>
-        <PageHeader.Start>
-          {asDrawer && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setSidebarOpen((v) => !v)}
-              aria-label="Toggle sessions"
-            >
-              <IconLayoutSidebar className="size-4" />
-            </Button>
-          )}
-          <Breadcrumb>
-            <Breadcrumb.List className="gap-1">
-              <Breadcrumb.Item>
-                <Button variant="ghost" size="sm">
-                  <IconMessageCircle />
-                  Chat
-                </Button>
-              </Breadcrumb.Item>
-              {selectedAgent && (
-                <>
-                  <Breadcrumb.Separator />
-                  <Breadcrumb.Item>
-                    <span className="text-muted-foreground text-sm">
-                      {selectedAgent.name}
-                    </span>
-                  </Breadcrumb.Item>
-                </>
-              )}
-            </Breadcrumb.List>
-          </Breadcrumb>
-        </PageHeader.Start>
-        {selectedAgent && !voiceActive && (
-          <PageHeader.End>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => previewStore.getState().openList()}
-            >
-              <IconFiles className="size-3.5" />
-              <span className="hidden sm:inline">Files</span>
-            </Button>
-            {activeThreadId && !isDraft && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleMakeSkill}
-                disabled={making || chatLoading}
-              >
-                <IconSparkles className="size-3.5" />
-                <span className="hidden sm:inline">
-                  {making ? 'Distilling…' : 'Make skill'}
-                </span>
-              </Button>
-            )}
-            <Button variant="outline" size="sm" onClick={handleNewThread}>
-              <IconPlus className="size-3.5" />
-              <span className="hidden sm:inline">New chat</span>
-            </Button>
-          </PageHeader.End>
-        )}
-      </PageHeader>
+        <ChatPageHeader
+          hasAgent={!!selectedAgent}
+          agentName={selectedAgent?.name}
+          agentId={selectedAgent?._id}
+          asDrawer={asDrawer}
+          onToggleSidebar={() => setSidebarOpen((v) => !v)}
+          chatMode={activeChatMode}
+          activeThreadId={activeThreadId}
+          isDraft={isDraft}
+          onMakeSkill={handleMakeSkill}
+          making={making}
+          chatLoading={chatLoading}
+          onNewThread={handleNewThread}
+        />
       )}
 
       <div ref={splitRef} className="flex flex-1 overflow-hidden relative">
         {/* ── Side panel: AgentRail ↔ SessionList slide (hidden in voice mode) ── */}
         {!voiceActive && (
-          <>
-            {asDrawer && sidebarOpen && (
-              <div
-                className="absolute inset-0 z-30 bg-black/40"
-                onClick={() => setSidebarOpen(false)}
-                aria-hidden
-              />
-            )}
-            <div
-              className={cn(
-                'shrink-0 border-r overflow-hidden w-60',
-                asDrawer
-                  ? 'absolute inset-y-0 left-0 z-40 shadow-xl transition-transform duration-200 ease-in-out'
-                  : 'relative',
-                asDrawer && !sidebarOpen && '-translate-x-full',
-              )}
-            >
-              <div
-                className="absolute inset-0 transition-transform duration-200 ease-in-out"
-                style={{
-                  transform: showAgentRail
-                    ? 'translateX(0)'
-                    : 'translateX(-100%)',
-                }}
-              >
-                <AgentRail
-                  agents={agents}
-                  loading={agentsLoading}
-                  activeAgentId={agentId}
-                  onSelect={handleAgentSelect}
-                />
-              </div>
-              {selectedAgent && agentId && (
-                <div
-                  className="absolute inset-0 transition-transform duration-200 ease-in-out"
-                  style={{
-                    transform: showAgentRail
-                      ? 'translateX(100%)'
-                      : 'translateX(0)',
-                  }}
-                >
-                  <SessionList
-                    agentId={agentId}
-                    sessions={threads}
-                    sessionsLoaded={sessionsLoaded}
-                    isDraft={isDraft}
-                    activeThreadId={activeThreadId}
-                    hasMore={hasMoreSessions}
-                    loadingMore={loadingMoreSessions}
-                    onLoadMore={loadMoreSessions}
-                    onSelect={handleSelectSession}
-                    onNew={handleNewThread}
-                    onDelete={handleDeleteSession}
-                    onRename={handleRenameSession}
-                    onBack={handleRailOpen}
-                  />
-                </div>
-              )}
-            </div>
-          </>
+          <ChatSidePanel
+            asDrawer={asDrawer}
+            sidebarOpen={sidebarOpen}
+            onCloseSidebar={() => setSidebarOpen(false)}
+            showAgentRail={showAgentRail}
+            agents={agents}
+            agentsLoading={agentsLoading}
+            agentId={agentId}
+            onAgentSelect={handleAgentSelect}
+            hasAgent={!!selectedAgent}
+            chatMode={activeChatMode}
+            canReadWorkflows={canReadWorkflows}
+            onChatModeChange={setChatMode}
+            threads={threads}
+            sessionsLoaded={sessionsLoaded}
+            isDraft={isDraft}
+            activeThreadId={activeThreadId}
+            hasMoreSessions={hasMoreSessions}
+            loadingMoreSessions={loadingMoreSessions}
+            onLoadMore={loadMoreSessions}
+            onSelectSession={handleSelectSession}
+            onNewThread={handleNewThread}
+            onDeleteSession={handleDeleteSession}
+            onRenameSession={handleRenameSession}
+            onRailOpen={handleRailOpen}
+            sessionsError={!!threadsError}
+            onRetrySessions={retrySessions}
+            workflows={workflows}
+            workflowsLoading={workflowsLoading}
+            workflowsError={!!workflowsError}
+            onRetryWorkflows={retryWorkflows}
+            workflowParam={workflowParam}
+            onSelectWorkflow={handleSelectWorkflow}
+          />
         )}
 
         {/* ── Chat area ── */}
@@ -643,42 +653,17 @@ export const ChatPage = () => {
           onDragLeave={attachments.onDragLeave}
           onDrop={attachments.onDrop}
         >
-          {attachments.isDragging && selectedAgent && (
-            <div className="ea-pop absolute inset-3 z-20 rounded-2xl border-2 border-dashed border-primary/50 bg-primary/6 backdrop-blur-[2px] flex flex-col items-center justify-center gap-2 pointer-events-none">
-              <IconFileUpload className="size-9 text-primary" />
-              <p className="text-sm font-medium text-primary">
-                Drop files to attach
-              </p>
-              <p className="text-xs text-muted-foreground">
-                images · PDF · Excel · Word · CSV
-              </p>
-            </div>
-          )}
+          {attachments.isDragging && selectedAgent && <DropOverlay />}
 
-          {selectedAgent && chatLoading && (
-            <div
-              aria-hidden
-              className="ea-ambient pointer-events-none absolute inset-0 z-0 overflow-hidden"
-            >
-              <span className="ea-ambient-blob ea-ambient-blob-1" />
-              <span className="ea-ambient-blob ea-ambient-blob-2" />
-            </div>
-          )}
+          {selectedAgent && chatLoading && <AmbientBackdrop />}
 
           {!selectedAgent ? (
-            <div className="flex-1 flex items-center justify-center">
-              <Empty>
-                <Empty.Header>
-                  <Empty.Media variant="icon">
-                    <IconMessageCircle />
-                  </Empty.Media>
-                  <Empty.Title>Select an agent</Empty.Title>
-                  <Empty.Description>
-                    Choose an agent from the sidebar to start a conversation.
-                  </Empty.Description>
-                </Empty.Header>
-              </Empty>
-            </div>
+            <SelectAgentEmpty />
+          ) : activeChatMode === 'workflow' ? (
+            <WorkflowChatView
+              workflow={selectedWorkflow}
+              onWorkflowChanged={retryWorkflows}
+            />
           ) : (
             <>
               <MessageList
@@ -715,27 +700,10 @@ export const ChatPage = () => {
               )}
 
               {chatError && !chatLoading && (
-                <div className="max-w-3xl mx-auto w-full px-3 pb-1.5">
-                  <div className="flex items-center gap-2 rounded-lg border border-destructive/40 bg-destructive/8 px-3 py-2 text-xs">
-                    <IconAlertTriangle className="size-4 shrink-0 text-destructive" />
-                    <span
-                      className="min-w-0 flex-1 truncate text-destructive"
-                      title={chatError.message}
-                    >
-                      {chatError.message ||
-                        'Something went wrong generating a response.'}
-                    </span>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      className="h-6 shrink-0"
-                      onClick={handleRetry}
-                    >
-                      <IconReload className="size-3.5" />
-                      Retry
-                    </Button>
-                  </div>
-                </div>
+                <ChatErrorBanner
+                  message={chatError.message}
+                  onRetry={handleRetry}
+                />
               )}
 
               {approval && !chatLoading && (
@@ -748,34 +716,11 @@ export const ChatPage = () => {
               )}
 
               {detectedDraft && !draftOpen && !draftDismissed && (
-                <div className="max-w-3xl mx-auto w-full px-3 pb-1.5">
-                  <div className="flex items-center gap-2 rounded-lg border border-primary/40 bg-primary/8 px-3 py-1.5 text-xs">
-                    <IconSparkles className="size-4 text-primary" />
-                    <span className="flex-1 text-primary">
-                      A draft skill
-                      {detectedDraft.name ? (
-                        <span className="font-mono"> /{detectedDraft.name}</span>
-                      ) : null}{' '}
-                      was created from this conversation.
-                    </span>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      className="h-6"
-                      onClick={() => openDraft(detectedDraft._id)}
-                    >
-                      Review
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-6"
-                      onClick={() => setDraftDismissed(true)}
-                    >
-                      Dismiss
-                    </Button>
-                  </div>
-                </div>
+                <SkillDraftBanner
+                  name={detectedDraft.name}
+                  onReview={() => openDraft(detectedDraft._id)}
+                  onDismiss={() => setDraftDismissed(true)}
+                />
               )}
 
               {slash.open && (
@@ -827,14 +772,17 @@ export const ChatPage = () => {
         </div>
 
         {/* ── Artifact Preview panel (charts / generated documents) ── */}
-        {previewOpen && selectedAgent && !previewFullscreen && (
-          <PreviewResizer
-            splitRef={splitRef}
-            sideCollapsed={sideCollapsed}
-            onSideCollapsedChange={setSideCollapsed}
-          />
-        )}
-        {previewOpen && selectedAgent && (
+        {previewOpen &&
+          selectedAgent &&
+          activeChatMode === 'chat' &&
+          !previewFullscreen && (
+            <PreviewResizer
+              splitRef={splitRef}
+              sideCollapsed={sideCollapsed}
+              onSideCollapsedChange={setSideCollapsed}
+            />
+          )}
+        {previewOpen && selectedAgent && activeChatMode === 'chat' && (
           <PreviewPanel threadId={activeThreadId} />
         )}
       </div>
@@ -846,29 +794,11 @@ export const ChatPage = () => {
         onDone={() => setDraftDismissed(true)}
       />
 
-      <AlertDialog
+      <DeleteSessionDialog
         open={!!pendingDelete}
         onOpenChange={(open) => !open && setPendingDelete(null)}
-      >
-        <AlertDialog.Content>
-          <AlertDialog.Header>
-            <AlertDialog.Title>Delete this session?</AlertDialog.Title>
-            <AlertDialog.Description>
-              This permanently deletes the session and all of its messages. This
-              can’t be undone.
-            </AlertDialog.Description>
-          </AlertDialog.Header>
-          <AlertDialog.Footer>
-            <AlertDialog.Cancel>Cancel</AlertDialog.Cancel>
-            <AlertDialog.Action
-              onClick={confirmDelete}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Delete
-            </AlertDialog.Action>
-          </AlertDialog.Footer>
-        </AlertDialog.Content>
-      </AlertDialog>
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 };

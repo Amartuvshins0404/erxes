@@ -129,9 +129,11 @@ export const useAttachments = (enabled: boolean) => {
   }> => {
     const current = pendingRef.current;
     // Entries already uploaded in a prior (partial) send carry straight through.
-    const alreadyDone: ChatAttachment[] = current
-      .filter((a) => a.status === 'done' && a.url)
-      .map((a) => ({ url: a.url!, name: a.name, type: a.type, size: a.size }));
+    const alreadyDone = current.reduce<ChatAttachment[]>((acc, a) => {
+      if (a.status === 'done' && a.url)
+        acc.push({ url: a.url, name: a.name, type: a.type, size: a.size });
+      return acc;
+    }, []);
 
     const targets = current.filter((a) => a.file && a.status !== 'done');
     if (!targets.length) return { attachments: alreadyDone, ok: true };

@@ -55,10 +55,10 @@ const toToolPart = (call: DbToolCall, fallbackId: string): MessagePart => {
 const nativeReasoningText = (part: DbNativePart): string => {
   const p = part as Extract<DbNativePart, { type: 'reasoning' }>;
   if (p.reasoning?.trim()) return p.reasoning;
-  const fromDetails = (p.details ?? [])
-    .filter((d) => d.type === 'text')
-    .map((d) => d.text ?? '')
-    .join('');
+  const fromDetails = (p.details ?? []).reduce(
+    (acc, d) => (d.type === 'text' ? acc + (d.text ?? '') : acc),
+    '',
+  );
   return fromDetails || p.text || '';
 };
 

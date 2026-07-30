@@ -14,7 +14,7 @@ export const orderSchema = new Schema<IOrderDocument>(
       default: ORDER_STATUS.PENDING,
       index: true,
     },
-    entityId: { type: String, default: null },
+    entityId: { type: String, default: null, index: true },
     customerId: { type: String, default: null, index: true },
     error: { type: String, default: null },
   },

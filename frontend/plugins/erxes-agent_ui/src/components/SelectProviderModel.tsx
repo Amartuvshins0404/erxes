@@ -2,10 +2,11 @@ import { useRef, useState } from 'react';
 import { useQuery } from '@apollo/client';
 import { Button, Combobox, Command, Input, Popover, Spinner } from 'erxes-ui';
 import {
-  MASTRA_PROVIDERS,
   MASTRA_PROVIDER_CATALOG,
   MASTRA_PROVIDER_MODELS,
 } from '~/graphql/queries';
+import { usePermissionCheck } from 'ui-modules';
+import { ERXES_AGENT_ACTIONS } from '~/permissions';
 
 // ─── Reusable provider / model pickers ───────────────────────────────────────
 //
@@ -31,12 +32,6 @@ interface ICatalogEntry {
   isConfigured?: boolean;
 }
 
-interface IProviderRecord {
-  provider: string;
-  label?: string | null;
-  isEnabled?: boolean | null;
-}
-
 interface IProviderModel {
   id: string;
   name: string;
@@ -46,10 +41,6 @@ interface IProviderCatalogResponse {
   mastraProviderCatalog: ICatalogEntry[];
 }
 
-interface IProvidersResponse {
-  mastraProviders: IProviderRecord[];
-}
-
 interface IProviderModelsResponse {
   mastraProviderModels: IProviderModel[];
 }
@@ -57,27 +48,23 @@ interface IProviderModelsResponse {
 // Providers offered for selection: configured presets (DB doc or env key)
 // plus any custom DB providers outside the presets catalog.
 export const useProviderOptions = () => {
-  const { data: catalogData, loading: catalogLoading } =
-    useQuery<IProviderCatalogResponse>(MASTRA_PROVIDER_CATALOG);
-  const { data: providersData, loading: providersLoading } =
-    useQuery<IProvidersResponse>(MASTRA_PROVIDERS);
+  const { hasActionPermission, isLoaded } = usePermissionCheck();
+  const canReadCatalog =
+    isLoaded && hasActionPermission(ERXES_AGENT_ACTIONS.provider.catalogRead);
+  const { data: catalogData, loading } = useQuery<IProviderCatalogResponse>(
+    MASTRA_PROVIDER_CATALOG,
+    { skip: !canReadCatalog },
+  );
 
-  const catalogConfigured: ProviderOption[] = (
+  const providers: ProviderOption[] = (
     catalogData?.mastraProviderCatalog || []
-  )
-    .filter((p) => p.isConfigured)
-    .map((p) => ({ provider: p.provider, label: p.label }));
-  const catalogKeys = new Set(catalogConfigured.map((p) => p.provider));
-  const customDbProviders: ProviderOption[] = (
-    providersData?.mastraProviders || []
-  )
-    .filter((p) => p.isEnabled && !catalogKeys.has(p.provider))
-    .map((p) => ({ provider: p.provider, label: p.label || p.provider }));
+  ).flatMap((provider) =>
+    provider.isConfigured
+      ? [{ provider: provider.provider, label: provider.label }]
+      : [],
+  );
 
-  return {
-    providers: [...catalogConfigured, ...customDbProviders],
-    loading: catalogLoading || providersLoading,
-  };
+  return { providers, loading };
 };
 
 export const SelectProvider = ({
@@ -142,6 +129,9 @@ export const SelectModel = ({
   onValueChange: (model: string) => void;
   disabled?: boolean;
 }) => {
+  const { hasActionPermission, isLoaded } = usePermissionCheck();
+  const canReadCatalog =
+    isLoaded && hasActionPermission(ERXES_AGENT_ACTIONS.provider.catalogRead);
   // Live list from the provider's own model-listing API (via the backend).
   // cache-and-network: an earlier empty/failed fetch must not stick — every
   // mount re-asks the provider while still painting cached data instantly.
@@ -149,7 +139,7 @@ export const SelectModel = ({
     MASTRA_PROVIDER_MODELS,
     {
       variables: { provider },
-      skip: !provider,
+      skip: !provider || !canReadCatalog,
       fetchPolicy: 'cache-and-network',
     },
   );

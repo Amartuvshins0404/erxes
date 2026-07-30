@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { IconHistory, IconRestore } from '@tabler/icons-react';
 import {
   Badge,
@@ -37,22 +37,37 @@ export const SkillVersionHistoryDialog = ({
   );
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [wasOpen, setWasOpen] = useState(open);
 
-  // On open, default the selection to the active (or newest) version.
+  // Clear the pick when the dialog closes so reopening (possibly for a different
+  // skill) starts from that skill's active version rather than a stale id.
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (!open) setSelectedId(null);
+  }
+
+  // The active (or newest) version is the default preview until the user picks a
+  // row — derive it during render instead of copying it into state.
+  const effectiveSelectedId =
+    selectedId ?? (versions.length > 0 ? activeVersionId ?? versions[0]._id : null);
+
+  // Fetch the default version's body once it's known. The ref guards the lazy
+  // query so it fires once per id (on open and when versions arrive), not on
+  // every render; user picks fetch directly from handleSelect.
+  const loadedRef = useRef<string | null>(null);
   useEffect(() => {
     if (!open) {
-      setSelectedId(null);
+      loadedRef.current = null;
       return;
     }
-    if (!selectedId && versions.length > 0) {
-      const initial = activeVersionId ?? versions[0]._id;
-      setSelectedId(initial);
-      loadVersion(initial);
+    if (effectiveSelectedId && loadedRef.current !== effectiveSelectedId) {
+      loadedRef.current = effectiveSelectedId;
+      loadVersion(effectiveSelectedId);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, versions, activeVersionId]);
+  }, [open, effectiveSelectedId, loadVersion]);
 
   const handleSelect = (versionId: string) => {
+    loadedRef.current = versionId;
     setSelectedId(versionId);
     loadVersion(versionId);
   };
@@ -94,7 +109,7 @@ export const SkillVersionHistoryDialog = ({
               <ul className="divide-y">
                 {versions.map((v) => {
                   const isActive = v._id === activeVersionId;
-                  const isSelected = v._id === selectedId;
+                  const isSelected = v._id === effectiveSelectedId;
                   return (
                     <li key={v._id}>
                       <button

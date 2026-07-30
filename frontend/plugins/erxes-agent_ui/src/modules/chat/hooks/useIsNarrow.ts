@@ -6,12 +6,15 @@ import { useEffect, useState } from 'react';
 const NARROW_BREAKPOINT = 768;
 
 export const useIsNarrow = (): boolean => {
-  const [narrow, setNarrow] = useState(false);
+  const [narrow, setNarrow] = useState(
+    () =>
+      typeof window !== 'undefined' &&
+      window.matchMedia(`(max-width: ${NARROW_BREAKPOINT - 1}px)`).matches,
+  );
 
   useEffect(() => {
     const mql = window.matchMedia(`(max-width: ${NARROW_BREAKPOINT - 1}px)`);
     const onChange = () => setNarrow(mql.matches);
-    onChange();
     mql.addEventListener('change', onChange);
     return () => mql.removeEventListener('change', onChange);
   }, []);

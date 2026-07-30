@@ -1,8 +1,7 @@
-import { ExpectedError } from 'erxes-api-shared/utils';
 import { IContext } from '~/connectionResolvers';
 import { IMastraSettings } from '@/settings/@types/settings';
-import { isKnowledgeEnabled, knowledgeTenant } from '~/mastra/knowledge/config';
-import { enqueueKnowledgeSweep } from '~/mastra/knowledge/worker';
+import { toPublicSettings } from '@/settings/utils/publicSettings';
+import { ERXES_AGENT_ACTIONS } from '~/meta/permissionActions';
 
 /** Mutations for the plugin-wide Mastra settings document. */
 export const settingsMutations = {
@@ -11,8 +10,11 @@ export const settingsMutations = {
     { doc }: { doc: IMastraSettings },
     { models, checkPermission }: IContext,
   ) => {
-    await checkPermission('settingsManage');
-    return models.MastraSettings.saveSettings(doc);
+    await checkPermission(ERXES_AGENT_ACTIONS.settings.manage);
+    if (doc.defaultAgentQuota !== undefined) {
+      await checkPermission(ERXES_AGENT_ACTIONS.settings.quotasManage);
+    }
+    return toPublicSettings(await models.MastraSettings.saveSettings(doc));
   },
 
   mastraUserAgentQuotaSet: async (
@@ -20,37 +22,8 @@ export const settingsMutations = {
     { userId, quota }: { userId: string; quota?: number | null },
     { models, checkPermission }: IContext,
   ) => {
-    await checkPermission('settingsManage');
+    await checkPermission(ERXES_AGENT_ACTIONS.settings.quotasManage);
     // null or undefined clears the per-user override (falls back to default)
     return models.MastraUserSettings.setUserQuota(userId, quota ?? null);
-  },
-
-  /**
-   * Force a Company Knowledge reindex now — AS the requesting user. Agent =
-   * Person: the sweep reads company data with this user's permissions (the
-   * same `user` header the chat/workflow paths use), never an unattended
-   * service token. It runs in the background worker; the read-only status
-   * block reflects the result on the next settings load.
-   */
-  mastraKnowledgeSync: async (
-    _parent: undefined,
-    _args: unknown,
-    { subdomain, user, checkPermission }: IContext,
-  ) => {
-    await checkPermission('settingsKnowledgeSync');
-    if (!user?._id) {
-      throw new ExpectedError('Login required');
-    }
-    if (!isKnowledgeEnabled()) {
-      throw new ExpectedError(
-        'Company knowledge is not enabled on this deployment.',
-      );
-    }
-    const userHeader = Buffer.from(JSON.stringify(user)).toString('base64');
-    await enqueueKnowledgeSweep({
-      subdomain: knowledgeTenant(subdomain) ?? subdomain,
-      auth: { userHeader },
-    });
-    return { ok: true, queued: true };
   },
 };

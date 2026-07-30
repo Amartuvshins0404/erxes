@@ -21,14 +21,14 @@ Then open **http://localhost:4111**.
   import; a bad URL makes erxes-api-shared `process.exit(1)`).
 - The **gateway / erxes API on `:4000`** must be up — full-reuse agents build
   their tools from its operation registry, and workflows compile against it.
-- **`ERXES_AGENT_MEMORY=enable`** for the per-agent memory/history tab and Qdrant
-  semantic recall (otherwise agents register without memory).
+- **`ERXES_AGENT_MEMORY=enable`** for the per-agent memory/history tab
+  (otherwise agents register without memory).
 - SaaS only: set `ERXES_STUDIO_SUBDOMAIN=<org-subdomain>` (defaults to `os`).
 
 ## What you get
 - **Agents** — real, tool-bound, via `getOrCreateAgent(cfg, models, subdomain)`.
-- **Memory / history** — native `getMastraMemory` (Mongo `erxes_mastra_memory` +
-  Qdrant + fastembed). `/api/memory/status` is `true` for memory-enabled agents.
+- **Memory / history** — native `getMastraMemory` (Mongo `erxes_mastra_memory`).
+  `/api/memory/status` is `true` for memory-enabled agents.
 - **Workflows** — the `mastra_workflows` definitions, compiled via the production
   `buildRunDeps` + `compileDefinition` and registered by readable name.
 - **Processors** — the memory `ToolCallFilter` surfaces as `*-input-processor`.

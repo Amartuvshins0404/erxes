@@ -12,6 +12,8 @@ export interface IMastraLearningFilter {
   status?: MastraLearningStatus;
   type?: string;
   agentId?: string;
+  agentIds?: string[];
+  includeUnassigned?: boolean;
   searchValue?: string;
 }
 
@@ -43,7 +45,11 @@ export interface IMastraLearningModel extends Model<IMastraLearningDocument> {
     page?: number,
     perPage?: number,
   ): Promise<{ list: IMastraLearningDocument[]; totalCount: number }>;
-  getStats(): Promise<Record<string, number>>;
+  getStats(filter?: {
+    agentIds?: string[];
+    includeUnassigned?: boolean;
+    approvedOnly?: boolean;
+  }): Promise<Record<string, number>>;
 }
 
 /** Bind the MastraLearning statics onto the learning schema (mongoose loadClass). */
@@ -145,6 +151,14 @@ export const loadLearningClass = (_models: IModels) => {
       if (filter.status) query.status = filter.status;
       if (filter.type) query.type = filter.type;
       if (filter.agentId) query.agentId = filter.agentId;
+      if (filter.agentIds) {
+        query.$or = [
+          { agentId: { $in: filter.agentIds } },
+          ...(filter.includeUnassigned
+            ? [{ agentId: { $exists: false } }, { agentId: null }]
+            : []),
+        ];
+      }
       if (filter.searchValue) {
         query.statement = { $regex: filter.searchValue, $options: 'i' };
       }
@@ -159,8 +173,25 @@ export const loadLearningClass = (_models: IModels) => {
     }
 
     /** Per-status learning counts for the review dashboard. */
-    public static async getStats() {
+    public static async getStats(
+      filter: {
+        agentIds?: string[];
+        includeUnassigned?: boolean;
+        approvedOnly?: boolean;
+      } = {},
+    ) {
+      const match: FilterQuery<IMastraLearningDocument> = {};
+      if (filter.approvedOnly) match.status = 'approved';
+      if (filter.agentIds) {
+        match.$or = [
+          { agentId: { $in: filter.agentIds } },
+          ...(filter.includeUnassigned
+            ? [{ agentId: { $exists: false } }, { agentId: null }]
+            : []),
+        ];
+      }
       const rows = await _models.MastraLearning.aggregate([
+        { $match: match },
         { $group: { _id: '$status', count: { $sum: 1 } } },
       ]);
       const stats: Record<string, number> = {

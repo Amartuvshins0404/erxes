@@ -2,7 +2,6 @@ import { Model } from 'mongoose';
 import { IModels } from '~/connectionResolvers';
 import { settingsSchema } from '@/settings/db/definitions/settings';
 import {
-  IKnowledgeSyncStatus,
   IMastraSettings,
   IMastraSettingsDocument,
 } from '@/settings/@types/settings';
@@ -10,7 +9,6 @@ import {
 export interface IMastraSettingsModel extends Model<IMastraSettingsDocument> {
   getSettings(): Promise<IMastraSettingsDocument>;
   saveSettings(doc: IMastraSettings): Promise<IMastraSettingsDocument>;
-  saveKnowledgeSyncStatus(status: IKnowledgeSyncStatus): Promise<void>;
 }
 
 // 30-second in-process cache — eliminates a DB round-trip on every turn.
@@ -76,16 +74,6 @@ export const loadSettingsClass = (_models: IModels) => {
         );
       }
       return _models.MastraSettings.create(doc);
-    }
-
-    // Sweep status only — kept separate from saveSettings so the background
-    // worker can never clobber user-edited settings fields.
-    public static async saveKnowledgeSyncStatus(status: IKnowledgeSyncStatus) {
-      const existing = await _models.MastraSettings.getSettings();
-      await _models.MastraSettings.updateOne(
-        { _id: existing._id },
-        { $set: { knowledgeSyncStatus: status } },
-      );
     }
   }
 

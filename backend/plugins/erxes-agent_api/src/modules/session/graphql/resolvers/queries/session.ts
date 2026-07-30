@@ -5,6 +5,8 @@ import {
   assertThreadOwned,
 } from '@/session/nativeStore';
 import { requireUserId } from '@/_shared/auth';
+import { requireScopedWorkflowAgent } from '@/workflow/authorization';
+import { ERXES_AGENT_ACTIONS } from '~/meta/permissionActions';
 
 // Threads are private: every query requires a logged-in user and is filtered
 // to threads that user owns. Ownership + tenant isolation is by the native
@@ -20,9 +22,16 @@ export const sessionQueries = {
       page,
       perPage,
     }: { agentId: string; page?: number; perPage?: number },
-    { user, subdomain, checkPermission }: IContext,
+    { models, user, subdomain, checkPermission }: IContext,
   ) => {
-    await checkPermission('agentsChat');
+    await checkPermission(ERXES_AGENT_ACTIONS.agent.chat);
+    await requireScopedWorkflowAgent({
+      models,
+      subdomain,
+      user,
+      action: ERXES_AGENT_ACTIONS.agent.chat,
+      agentId,
+    });
     // page/perPage are optional — listOwnedThreads applies its own defaults so a
     // caller omitting them still gets the first (newest) page, not everything.
     return listOwnedThreads(
@@ -39,7 +48,7 @@ export const sessionQueries = {
     { threadId }: { threadId: string },
     { user, subdomain, checkPermission }: IContext,
   ) => {
-    await checkPermission('agentsChat');
+    await checkPermission(ERXES_AGENT_ACTIONS.agent.chat);
     // Ownership is enforced inside (resourceId scope) — reading another user's
     // transcript reads back as "Thread not found".
     return getOwnedThreadMessages(subdomain, requireUserId(user), threadId);
@@ -52,7 +61,7 @@ export const sessionQueries = {
     { threadId }: { threadId: string },
     { models, user, subdomain, checkPermission }: IContext,
   ) => {
-    await checkPermission('agentsChat');
+    await checkPermission(ERXES_AGENT_ACTIONS.agent.chat);
     // Same ownership gate as the transcript — non-owners get "Thread not found".
     await assertThreadOwned(subdomain, requireUserId(user), threadId);
     return models.MastraArtifact.listByThread(threadId);

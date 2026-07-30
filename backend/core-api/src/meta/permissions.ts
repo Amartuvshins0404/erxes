@@ -552,6 +552,12 @@ export const permissions: IPermissionConfig = {
           description:
             'Create, edit, delete permission groups and assign permissions',
         },
+        {
+          title: 'Manage agent grant profiles',
+          name: 'permissionsAgentProfilesManage',
+          description:
+            'Create and edit service-user permission profiles for AI agents',
+        },
       ],
     },
     {

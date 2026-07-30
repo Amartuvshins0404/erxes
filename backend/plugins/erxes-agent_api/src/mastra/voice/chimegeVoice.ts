@@ -35,6 +35,21 @@ export function isLikelyWav(buf: Buffer): boolean {
   );
 }
 
+/** True when `token` can be sent verbatim as the Chimege HTTP `token` header. A
+ *  real Chimege token is an opaque run of printable ASCII (letters/digits) — no
+ *  whitespace and nothing above Latin-1 (charCode 255). We reject anything else
+ *  because undici's `fetch` throws an opaque "Cannot convert argument to a
+ *  ByteString …" TypeError when a header value contains a character > 255 (e.g.
+ *  a pasted Cyrillic sentence), which would otherwise surface as the misleading
+ *  "Could not reach the transcription service". Exported for unit testing. */
+export function isValidChimegeToken(token: string): boolean {
+  if (!token || /\s/.test(token)) return false;
+  for (let i = 0; i < token.length; i++) {
+    if (token.charCodeAt(i) > 255) return false;
+  }
+  return true;
+}
+
 export interface TranscribeParams {
   token: string;
   // The body is ALREADY a 16-bit PCM WAV (encoded in the browser) — relayed
@@ -54,6 +69,14 @@ export async function transcribe(params: TranscribeParams): Promise<string> {
   if (audio.length > MAX_WAV_BYTES) {
     throw new ExpectedError(
       'Recording is too long. Please keep it under ~90 seconds.',
+    );
+  }
+
+  // Defense in depth behind the save-time validator: a token that can't be an
+  // HTTP header value would make fetch throw an opaque ByteString TypeError.
+  if (!isValidChimegeToken(token)) {
+    throw new ExpectedError(
+      'The configured Chimege STT token is invalid — re-save it in Voice settings.',
     );
   }
 
@@ -129,6 +152,14 @@ async function synthesizeChunk(params: SynthesizeParams): Promise<Buffer> {
   };
   if (typeof speed === 'number') headers['speed'] = String(speed);
   if (typeof pitch === 'number') headers['pitch'] = String(pitch);
+
+  // Defense in depth behind the save-time validator: a token that can't be an
+  // HTTP header value would make fetch throw an opaque ByteString TypeError.
+  if (!isValidChimegeToken(token)) {
+    throw new ExpectedError(
+      'The configured Chimege TTS token is invalid — re-save it in Voice settings.',
+    );
+  }
 
   let response: Response;
   try {

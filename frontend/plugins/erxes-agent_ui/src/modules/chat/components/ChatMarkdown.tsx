@@ -12,6 +12,14 @@ import { MermaidViewer } from '~/modules/chat/preview/MermaidViewer';
 import { sanitizeMermaid } from '~/modules/chat/hooks/useMermaidRender';
 import { splitStreamingMarkdown } from '~/modules/chat/lib/markdown';
 
+// Stable, content-derived key for a markdown block — so a frozen block keeps its
+// identity as later blocks stream in, without keying on the array index.
+const blockKey = (s: string): string => {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+  return `b${h >>> 0}`;
+};
+
 // Extract the raw text out of a code node's children (string or nested nodes).
 const codeText = (children: ReactNode): string => {
   if (typeof children === 'string') return children;
@@ -120,8 +128,8 @@ const CodeBlock = ({ lang, code }: { lang: string; code: string }) => {
     if (specs.length) {
       return (
         <>
-          {specs.map((spec, i) => (
-            <LegacyChartBlock key={i} spec={spec} />
+          {specs.map((spec) => (
+            <LegacyChartBlock key={`${spec.chartType}:${spec.title}`} spec={spec} />
           ))}
         </>
       );
@@ -256,8 +264,8 @@ export const StreamingMarkdown = ({ content }: { content: string }) => {
   );
   return (
     <div className="space-y-1 text-sm break-words">
-      {blocks.map((block, i) => (
-        <MarkdownBlock key={i} content={block} />
+      {blocks.map((block) => (
+        <MarkdownBlock key={blockKey(block)} content={block} />
       ))}
       {tail ? <MarkdownBlock content={tail} /> : null}
     </div>

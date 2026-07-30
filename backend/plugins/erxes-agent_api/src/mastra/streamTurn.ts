@@ -198,26 +198,38 @@ async function finalizeTurn(params: {
   const interrupted = controller.signal.aborted;
   let reply: string | null = acc.text || null;
 
-  if (!interrupted && !acc.text) {
-    // No answer text streamed — synthesize from tool results. (Native generate()
-    // produces the final text itself, so this only fires when the model ended a
-    // turn on tool calls without prose.) synthesizeFromToolResults internally
-    // skips synthesis when nothing real came back, so we never fabricate success.
-    const toolResults = acc.toolResults();
-    if (toolResults.length) {
-      reply = await synthesizeFromToolResults({
-        agent,
-        message,
-        authCtx,
-        toolResults,
-      });
-      if (reply) {
-        const id = `synth-${Date.now()}`;
-        writer.write({ type: 'text-start', id });
-        writer.write({ type: 'text-delta', id, delta: reply });
-        writer.write({ type: 'text-end', id });
+  if (!acc.text) {
+    // No answer text streamed. When the turn ran to completion the model ended
+    // on tool calls without prose — synthesize a summary from the tool results
+    // (synthesizeFromToolResults skips synthesis when nothing real came back, so
+    // we never fabricate success). An interrupted turn leaves tool calls
+    // half-done, so we don't synthesize; we go straight to the fallback below.
+    if (!interrupted) {
+      const toolResults = acc.toolResults();
+      if (toolResults.length) {
+        reply = await synthesizeFromToolResults({
+          agent,
+          message,
+          authCtx,
+          toolResults,
+        });
       }
     }
+    // Safety net: a turn must never dead-end as a blank bubble. If nothing
+    // streamed and synthesis produced nothing (interrupted mid-tool, or the
+    // model stopped on a tool call whose result carried nothing to report),
+    // write an explicit line so the user always sees — and can retry — the
+    // outcome. This is streamed AND persisted (persistTurn takes `reply`), so it
+    // survives a reload too.
+    if (!reply) {
+      reply = interrupted
+        ? 'This response was interrupted before it finished. Please tap retry to continue.'
+        : "I couldn't produce a response for that. Please try again.";
+    }
+    const id = interrupted ? `interrupt-${Date.now()}` : `synth-${Date.now()}`;
+    writer.write({ type: 'text-start', id });
+    writer.write({ type: 'text-delta', id, delta: reply });
+    writer.write({ type: 'text-end', id });
   }
 
   // Close the assistant message NOW — the full reply already streamed, so nothing

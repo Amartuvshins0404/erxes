@@ -5,7 +5,6 @@ import { z } from 'zod';
 export const workflowFormSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   description: z.string(),
-  isEnabled: z.boolean(),
   definitionText: z.string().refine((text) => {
     try {
       JSON.parse(text);

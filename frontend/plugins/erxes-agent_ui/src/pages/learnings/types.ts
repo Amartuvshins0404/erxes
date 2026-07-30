@@ -21,6 +21,13 @@ export interface ILearningRow {
   updatedAt?: string;
 }
 
+export interface IMastraLearningsResponse {
+  mastraLearnings: {
+    list: ILearningRow[];
+    totalCount: number;
+  } | null;
+}
+
 export type StatusFilter = '' | 'approved' | 'candidate' | 'archived' | 'rejected';
 
 export const STATUS_FILTERS: { value: StatusFilter; label: string }[] = [

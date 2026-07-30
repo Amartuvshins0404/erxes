@@ -35,7 +35,10 @@ export const useSetLlmConnection = () => {
   ) => {
     await setAgentLlmConnection({
       variables: { identifierId, input },
-      context: { timeout: 0 },
+      // Applying a key re-provisions the assistant and waits for the pod to come
+      // back (~60-90s). Bound the wait so a dropped proxy connection can never
+      // hang the dialog forever (previously timeout:0 => frozen UI, refresh only).
+      context: { timeout: 180000 },
       onCompleted: callbacks?.onCompleted,
       onError: callbacks?.onError,
     });

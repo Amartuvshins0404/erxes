@@ -10,9 +10,9 @@ export interface ApprovedOp {
 }
 
 interface RequestAuth {
-  /** Base64-encoded AI team-member principal for internal permission gates. */
+  /** Base64-encoded acting user for trusted internal subgraph calls. */
   userHeader?: string;
-  /** Short-lived bearer token minted for the AI team member. */
+  /** Optional caller token for auxiliary flows; erxes operations ignore it. */
   token?: string;
   /** Acting principal used by permission-sensitive caches and entity lookup. */
   principalUserId?: string;

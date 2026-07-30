@@ -12,7 +12,9 @@
 
 // --- Harness mocks (plumbing only; do not encode expected behavior) -----------
 // createTool is identity so a built tool === the config object (has .execute).
-jest.mock('@mastra/core/tools', () => ({ createTool: (config: unknown) => config }));
+jest.mock('@mastra/core/tools', () => ({
+  createTool: (config: unknown) => config,
+}));
 
 // erxes-api-shared is mocked so nothing hits a live core. sendTRPCMessage is a
 // jest.fn() created INSIDE the factory (avoids TDZ/hoist issues); we grab the
@@ -20,14 +22,10 @@ jest.mock('@mastra/core/tools', () => ({ createTool: (config: unknown) => config
 jest.mock('erxes-api-shared/utils', () => ({
   sendTRPCMessage: jest.fn(),
   getPlugins: jest.fn(async () => []),
-  getPluginAddress: jest.fn(async () => ''),
+  getPluginAddress: jest.fn(async () => 'http://127.0.0.1:59999'),
 }));
 
-import {
-  isSecretName,
-  redactSecrets,
-  REDACTED,
-} from '../secretRedaction';
+import { isSecretName, redactSecrets, REDACTED } from '../secretRedaction';
 import {
   executeErxesOperation,
   type ErxesOperationRef,
@@ -39,8 +37,8 @@ import { runWithAuth } from '../../requestContext';
 
 const mockSend = sendTRPCMessage as unknown as jest.Mock;
 
-// Unreachable gateway: a real network attempt fails fast AFTER the code runs.
-const SETTINGS = { erxesApiUrl: 'http://127.0.0.1:59999', erxesApiToken: '' };
+// Unreachable internal subgraph: a real network attempt fails fast after guards.
+const SETTINGS = { erxesApiUrl: 'http://gateway.invalid', erxesApiToken: '' };
 
 // -----------------------------------------------------------------------------
 // SECTION 3 (foundational): isSecretName — the name-level predicate.
@@ -110,7 +108,10 @@ describe('redactSecrets — hides secret values', () => {
   }
 
   const secretRows: SecretRow[] = [
-    { code: 'AWS_SECRET_ACCESS_KEY', value: 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY' },
+    {
+      code: 'AWS_SECRET_ACCESS_KEY',
+      value: 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY',
+    },
     { code: 'CLOUDFLARE_API_TOKEN', value: 'cf-token-abc123' },
     { key: 'apiKey', value: 'sk_test_deadbeef' },
     { key: 'apiToken', value: 'tok-123' },
@@ -119,7 +120,11 @@ describe('redactSecrets — hides secret values', () => {
     { code: 'SMTP_PASS', value: 'p@ssw0rd' },
     { code: 'SENTRY_DSN', value: 'https://pub:secret@o1.ingest.sentry.io/1' },
     { code: 'MONGO_URL', value: 'mongodb://u:p@host/db' },
-    { code: 'AZURE_STORAGE_CONNECTION_STRING', value: 'DefaultEndpointsProtocol=https;AccountName=x;AccountKey=abc123==;EndpointSuffix=core.windows.net' },
+    {
+      code: 'AZURE_STORAGE_CONNECTION_STRING',
+      value:
+        'DefaultEndpointsProtocol=https;AccountName=x;AccountKey=abc123==;EndpointSuffix=core.windows.net',
+    },
     { code: 'BLOCKADMIN_PUBLIC_API_KEY', value: 'zzz-secret' },
     { code: 'MUSHOP_PUBLIC_API_KEY', value: 'yyy-secret' },
   ];
@@ -137,7 +142,10 @@ describe('redactSecrets — hides secret values', () => {
   // when under a non-secret key elsewhere), so ONLY the name-level predicate can
   // hide it. Per contract, MONGO_URL names a credential -> value hidden.
   it('redacts a MONGO_URL row even when the value has no inline password (name-level protection)', () => {
-    const out = redactSecrets({ code: 'MONGO_URL', value: 'mongodb://plainhost:27017/appdb' });
+    const out = redactSecrets({
+      code: 'MONGO_URL',
+      value: 'mongodb://plainhost:27017/appdb',
+    });
     expect(out.value).toBe(REDACTED);
   });
 
@@ -145,7 +153,10 @@ describe('redactSecrets — hides secret values', () => {
   const secretProps: Array<[string, unknown]> = [
     ['password', 'hunter2'],
     ['clientSecret', 'cs-abc'],
-    ['privateKey', '-----BEGIN PRIVATE KEY-----\nabc\n-----END PRIVATE KEY-----'],
+    [
+      'privateKey',
+      '-----BEGIN PRIVATE KEY-----\nabc\n-----END PRIVATE KEY-----',
+    ],
     ['accessToken', 'ya29.a0AfB_xyz'],
     ['serviceAccountKey', '{"type":"service_account","private_key":"x"}'],
     ['secretKey', 'sk-1234'],
@@ -172,27 +183,30 @@ describe('redactSecrets — hides secret values', () => {
   });
 
   it('redacts a Sentry DSN under a benign key', () => {
-    const out = redactSecrets({ description: 'https://abc123:def456@o1.ingest.sentry.io/1' });
+    const out = redactSecrets({
+      description: 'https://abc123:def456@o1.ingest.sentry.io/1',
+    });
     expect(JSON.stringify(out)).not.toContain('abc123:def456');
   });
 
   it('redacts an Azure AccountKey blob under a benign key', () => {
-    const out = redactSecrets({ blob: 'Endpoint=sb://x;SharedAccessKeyName=y;AccountKey=SUPERSECRETKEY==;EntityPath=z' });
+    const out = redactSecrets({
+      blob: 'Endpoint=sb://x;SharedAccessKeyName=y;AccountKey=SUPERSECRETKEY==;EntityPath=z',
+    });
     expect(JSON.stringify(out)).not.toContain('SUPERSECRETKEY');
   });
 
   it('redacts a credential embedded inside a JSON-string blob', () => {
-    const out = redactSecrets({ data: '{"MONGO_URL":"mongodb://user:pass@host/db","ok":1}' });
+    const out = redactSecrets({
+      data: '{"MONGO_URL":"mongodb://user:pass@host/db","ok":1}',
+    });
     expect(JSON.stringify(out)).not.toContain('user:pass@host');
   });
 
   it('redacts secrets nested in objects and arrays (deep traversal)', () => {
     const input = {
       level1: {
-        list: [
-          { code: 'MAIL_PASS', value: 'topsecret' },
-          { bucket: 'safe' },
-        ],
+        list: [{ code: 'MAIL_PASS', value: 'topsecret' }, { bucket: 'safe' }],
         deep: { password: 'nested-pw' },
       },
     };
@@ -206,7 +220,11 @@ describe('redactSecrets — hides secret values', () => {
   });
 
   it('does NOT mutate the input object', () => {
-    const input = { code: 'MAIL_PASS', value: 'hunter2', nested: { password: 'x' } };
+    const input = {
+      code: 'MAIL_PASS',
+      value: 'hunter2',
+      nested: { password: 'x' },
+    };
     const snapshot = JSON.parse(JSON.stringify(input));
     redactSecrets(input);
     expect(input).toEqual(snapshot); // original untouched -> returns NEW structure
@@ -234,7 +252,10 @@ describe('redactSecrets — keeps benign data visible', () => {
   it('keeps empty/unset secret values truthful (NOT redacted)', () => {
     const emptyRow = redactSecrets({ code: 'MAIL_PASS', value: '' });
     expect(emptyRow.value).toBe(''); // "not configured" must stay truthful
-    const nullRow = redactSecrets({ code: 'AWS_SECRET_ACCESS_KEY', value: null });
+    const nullRow = redactSecrets({
+      code: 'AWS_SECRET_ACCESS_KEY',
+      value: null,
+    });
     expect(nullRow.value).toBeNull();
     const nullProp = redactSecrets({ password: null, apiKey: '' });
     expect(nullProp.password).toBeNull();
@@ -333,7 +354,6 @@ describe('executeErxesOperation — secret-reference reject-guard', () => {
     mockFetch.mockClear();
     const result = await runWithAuth(
       {
-        token: 'test-token',
         userHeader: Buffer.from('{"_id":"u1"}').toString('base64'),
         principalUserId: 'u1',
         subdomain: 'os',
@@ -380,10 +400,19 @@ describe('executeErxesOperation — secret-reference reject-guard', () => {
   );
 
   const secretNested: Array<[string, Record<string, unknown>]> = [
-    ['secret ref nested in JSON object', { configsMap: { MAIL_PASS: '{{secret:MAIL_PASS}}' } }],
-    ['secret ref nested in array', { configsMap: { list: ['ok', '{{secret:AWS_SECRET_ACCESS_KEY}}'] } }],
+    [
+      'secret ref nested in JSON object',
+      { configsMap: { MAIL_PASS: '{{secret:MAIL_PASS}}' } },
+    ],
+    [
+      'secret ref nested in array',
+      { configsMap: { list: ['ok', '{{secret:AWS_SECRET_ACCESS_KEY}}'] } },
+    ],
     ['{{keep}} nested deep', { configsMap: { a: { b: { c: '{{keep}}' } } } }],
-    ['REDACTED marker nested in array', { configsMap: { arr: ['fine', REDACTED] } }],
+    [
+      'REDACTED marker nested in array',
+      { configsMap: { arr: ['fine', REDACTED] } },
+    ],
     ['REDACTED marker nested deep', { configsMap: { a: { b: REDACTED } } }],
   ];
 

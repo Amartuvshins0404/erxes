@@ -16,19 +16,18 @@ const mockSendTRPC = jest.fn<Promise<unknown>, unknown[]>();
 jest.mock('erxes-api-shared/utils', () => ({
   sendTRPCMessage: (...args: unknown[]) => mockSendTRPC(...args),
   getPlugins: jest.fn(async () => []),
-  getPluginAddress: jest.fn(async () => ''),
+  getPluginAddress: jest.fn(async () => 'http://127.0.0.1:59999'),
 }));
 
-import {
-  executeErxesOperation,
-  type ErxesOperationRef,
-} from '../erxesTools';
+import { executeErxesOperation, type ErxesOperationRef } from '../erxesTools';
 import { REDACTED } from '../secretRedaction';
 import { buildErxesSupportTools } from '../metaTools';
 
-// A gateway that fails fast (ECONNREFUSED) — reached ONLY when the guard lets a
-// call through, so a non-refusal result proves the guard did not fire.
-const UNREACHABLE = { erxesApiUrl: 'http://127.0.0.1:59999', erxesApiToken: '' };
+// A direct subgraph address that fails fast (ECONNREFUSED) when the guard allows.
+const UNREACHABLE = {
+  erxesApiUrl: 'http://gateway.invalid',
+  erxesApiToken: '',
+};
 
 const mkOp = (
   name: string,
@@ -38,9 +37,7 @@ const mkOp = (
   operation: name,
   operationType: 'mutation',
   plugin: 'core',
-  graphqlArgs: [
-    { name: argName, type: { kind: 'SCALAR', name: typeName } },
-  ],
+  graphqlArgs: [{ name: argName, type: { kind: 'SCALAR', name: typeName } }],
   returnType: null,
 });
 
@@ -55,7 +52,9 @@ describe('secret-reference reject-guard', () => {
   it('refuses a {{secret:CODE}} reference nested inside configsMap, before a network call', async () => {
     const res = await executeErxesOperation(
       mkOp('configsUpdate', 'configsMap', 'JSON'),
-      { configsMap: { CLOUDFLARE_API_TOKEN: '{{secret:CLOUDFLARE_API_TOKEN}}' } },
+      {
+        configsMap: { CLOUDFLARE_API_TOKEN: '{{secret:CLOUDFLARE_API_TOKEN}}' },
+      },
       UNREACHABLE,
     );
     expect(res).toMatchObject({ success: false, error: REFUSAL });

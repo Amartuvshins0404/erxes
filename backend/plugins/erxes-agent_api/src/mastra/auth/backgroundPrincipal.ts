@@ -2,12 +2,10 @@ import { ExpectedError } from 'erxes-api-shared/utils';
 import type { IModels } from '~/connectionResolvers';
 import type { IMastraAgentDocument } from '@/agent/@types/agent';
 import type { WorkflowDefinition } from '../workflows/dsl';
-import { mintRunToken } from './runToken';
 import { getAgentAccount } from './servicePrincipal';
 
 /** Auth propagated to every agent tool under the canonical core user. */
 export interface AgentPrincipalAuthCtx {
-  token: string;
   userHeader: string;
   principalUserId: string;
   subdomain: string;
@@ -24,14 +22,17 @@ export type PrincipalSource =
   | null
   | undefined;
 
-/** Resolve and mint a token for the AI team-member account. Never falls back. */
+/**
+ * Resolve the canonical AI team-member account for internal service calls.
+ * The plugin forwards this validated principal only to private subgraph
+ * addresses; it never asks core to mint a user token.
+ */
 export async function resolveAgentPrincipal(opts: {
   agentConfig: PrincipalSource;
-  models: IModels;
   subdomain: string;
   background: boolean;
 }): Promise<AgentPrincipalResult> {
-  const { agentConfig, models, subdomain, background } = opts;
+  const { agentConfig, subdomain, background } = opts;
 
   const userId = agentConfig?._id;
   if (!userId) {
@@ -62,37 +63,24 @@ export async function resolveAgentPrincipal(opts: {
     };
   }
 
-  let minted: string | undefined;
-  try {
-    const settings = await models.MastraSettings.getSettings();
-    minted = await mintRunToken({
-      account,
-      subdomain,
-      appToken: settings.erxesApiToken,
-    });
-  } catch {
-    minted = undefined;
-  }
-  if (!minted) {
-    return {
-      ok: false,
-      error:
-        'Agent run refused: could not mint a token for the AI team member.',
-    };
-  }
-
   return {
     ok: true,
     authCtx: {
-      token: minted,
       userHeader: Buffer.from(
         JSON.stringify({
           _id: account._id,
-          role: 'user',
+          email: account.email,
+          details: account.details,
           isOwner: false,
-          isActive: account.isActive !== false,
+          groupIds: account.groupIds,
+          brandIds: account.brandIds,
+          username: account.username,
+          code: account.code,
+          branchIds: account.branchIds,
+          departmentIds: account.departmentIds,
           permissionGroupIds: account.permissionGroupIds ?? [],
           customPermissions: account.customPermissions ?? [],
+          sessionCode: '',
         }),
       ).toString('base64'),
       principalUserId: account._id,

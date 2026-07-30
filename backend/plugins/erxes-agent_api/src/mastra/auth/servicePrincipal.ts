@@ -14,6 +14,11 @@ export interface AgentAccount {
   isActive?: boolean;
   email?: string;
   username?: string;
+  code?: string;
+  groupIds?: string[];
+  brandIds?: string[];
+  branchIds?: string[];
+  departmentIds?: string[];
   appId?: string;
   details?: { fullName?: string; description?: string; avatar?: string };
   permissionGroupIds?: string[];

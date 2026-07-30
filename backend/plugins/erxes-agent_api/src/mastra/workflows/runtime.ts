@@ -438,11 +438,10 @@ export async function runBackgroundWorkflow(args: {
     );
   }
 
-  // Every operation step runs as the owning AI team-member account through a
-  // short-lived token; no app-level credential is used as the acting principal.
+  // Every operation step runs as the owning AI team-member account through
+  // private subgraph calls; no app credential acts as the principal.
   const principal = await resolveAgentPrincipal({
     agentConfig,
-    models,
     subdomain,
     background: true,
   });

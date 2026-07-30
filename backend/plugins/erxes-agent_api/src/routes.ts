@@ -369,10 +369,9 @@ router.post('/bot/:conversationId', llmRouteLimiter, async (req, res) => {
     });
 
     // Bot requests have no user session. They run as the linked AI team member
-    // through a short-lived token and fail closed if that token cannot be minted.
+    // through private subgraph calls and fail closed without that principal.
     const principal = await resolveAgentPrincipal({
       agentConfig,
-      models,
       subdomain,
       background: true,
     });

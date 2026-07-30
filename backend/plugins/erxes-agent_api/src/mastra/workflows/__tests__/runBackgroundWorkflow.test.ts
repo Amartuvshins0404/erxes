@@ -1,8 +1,7 @@
 // The background workflow entry point resolves its principal from the workflow's
-// OWNING AGENT (step 24) and fails CLOSED — recording a failed run without
-// executing — when there is no owning agent, the agent is missing, or the
-// AI team-member token can't be minted. resolveAgentPrincipal is mocked so
-// these tests pin the fail-closed branches and verify the owning agent passed.
+// OWNING AGENT and fails CLOSED — recording a failed run without executing —
+// when there is no owning agent or its canonical team-member account is
+// unavailable. resolveAgentPrincipal is mocked to pin these branches.
 const resolveAgentPrincipal = jest.fn();
 jest.mock('../../auth/backgroundPrincipal', () => ({
   resolveAgentPrincipal: (...args: unknown[]) => resolveAgentPrincipal(...args),
@@ -106,15 +105,13 @@ describe('runBackgroundWorkflow fail-closed', () => {
     );
   });
 
-  it('resolves the principal from the OWNING AGENT config and fails closed on mint failure', async () => {
-    const agent = {
-      _id: 'agent-A',
-    };
+  it('resolves the principal from the OWNING AGENT config and fails closed when unavailable', async () => {
+    const agent = { _id: 'agent-user-1', isActive: true };
     const { models } = makeModels(agent);
     resolveAgentPrincipal.mockResolvedValue({
       ok: false,
       error:
-        "Background run refused: could not mint a run token for the agent's AI team member",
+        "Background run refused: the agent's AI team-member account is missing or inactive",
     });
 
     const rec = await runBackgroundWorkflow({
@@ -127,11 +124,10 @@ describe('runBackgroundWorkflow fail-closed', () => {
     // The owning profile — not a createdByUserId or app-token shim — is passed.
     expect(resolveAgentPrincipal).toHaveBeenCalledWith({
       agentConfig: agent,
-      models,
       subdomain: 'os',
       background: true,
     });
     expect(rec.status).toBe('failed');
-    expect(rec.error).toMatch(/could not mint/i);
+    expect(rec.error).toMatch(/missing or inactive/i);
   });
 });

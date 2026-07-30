@@ -2,17 +2,12 @@ class ExpectedError extends Error {}
 
 jest.mock('erxes-api-shared/utils', () => ({ ExpectedError }));
 
-const mintRunToken = jest.fn();
 const getAgentAccount = jest.fn();
 
-jest.mock('../runToken', () => ({
-  mintRunToken: (...args: unknown[]) => mintRunToken(...args),
-}));
 jest.mock('../servicePrincipal', () => ({
   getAgentAccount: (...args: unknown[]) => getAgentAccount(...args),
 }));
 
-import type { IModels } from '../../../connectionResolvers';
 import type { WorkflowDefinition } from '../../workflows/dsl';
 import {
   assertWorkflowSchedulable,
@@ -30,29 +25,26 @@ const account = (overrides: Record<string, unknown> = {}) => ({
   isOwner: false,
   isActive: true,
   appId: `erxes-agent:${USER_ID}`,
+  email: 'agent@agents.local',
+  username: 'agent-helper',
+  details: { fullName: 'Agent Helper' },
+  groupIds: ['legacy-group'],
+  brandIds: ['brand-1'],
+  branchIds: ['branch-1'],
+  departmentIds: ['department-1'],
   permissionGroupIds: ['group-1', 'group-2'],
   customPermissions: [],
   ...overrides,
 });
 
-const getSettings = jest.fn();
-const principalModels = {
-  MastraSettings: { getSettings },
-} as unknown as IModels;
-
 beforeEach(() => {
-  mintRunToken.mockReset().mockResolvedValue('MINTED');
   getAgentAccount.mockReset().mockResolvedValue(account());
-  getSettings
-    .mockReset()
-    .mockResolvedValue({ erxesApiToken: 'existing-erxes-app-token' });
 });
 
 describe('resolveAgentPrincipal', () => {
-  it('mints and propagates a bounded token for the canonical team member id', async () => {
+  it('propagates the canonical team member through the internal user header', async () => {
     const result = await resolveAgentPrincipal({
       agentConfig: agent,
-      models: principalModels,
       subdomain: 'os',
       background: false,
     });
@@ -60,17 +52,22 @@ describe('resolveAgentPrincipal', () => {
     expect(result).toEqual({
       ok: true,
       authCtx: {
-        token: 'MINTED',
         subdomain: 'os',
         principalUserId: ACCOUNT_ID,
         userHeader: Buffer.from(
           JSON.stringify({
             _id: ACCOUNT_ID,
-            role: 'user',
+            email: 'agent@agents.local',
+            details: { fullName: 'Agent Helper' },
             isOwner: false,
-            isActive: true,
+            groupIds: ['legacy-group'],
+            brandIds: ['brand-1'],
+            username: 'agent-helper',
+            branchIds: ['branch-1'],
+            departmentIds: ['department-1'],
             permissionGroupIds: ['group-1', 'group-2'],
             customPermissions: [],
+            sessionCode: '',
           }),
         ).toString('base64'),
         background: false,
@@ -80,11 +77,6 @@ describe('resolveAgentPrincipal', () => {
     expect(getAgentAccount).toHaveBeenCalledWith({
       userId: USER_ID,
       subdomain: 'os',
-    });
-    expect(mintRunToken).toHaveBeenCalledWith({
-      account: account(),
-      subdomain: 'os',
-      appToken: 'existing-erxes-app-token',
     });
   });
 
@@ -100,7 +92,6 @@ describe('resolveAgentPrincipal', () => {
 
     const result = await resolveAgentPrincipal({
       agentConfig: agent,
-      models: principalModels,
       subdomain: 'os',
       background: true,
     });
@@ -113,7 +104,6 @@ describe('resolveAgentPrincipal', () => {
 
     const result = await resolveAgentPrincipal({
       agentConfig: agent,
-      models: principalModels,
       subdomain: 'os',
       background: true,
     });
@@ -125,7 +115,6 @@ describe('resolveAgentPrincipal', () => {
       }),
     );
     expect(result).not.toHaveProperty('authCtx');
-    expect(mintRunToken).not.toHaveBeenCalled();
   });
 
   it('fails closed when the team member has no permissions', async () => {
@@ -135,7 +124,6 @@ describe('resolveAgentPrincipal', () => {
 
     const result = await resolveAgentPrincipal({
       agentConfig: agent,
-      models: principalModels,
       subdomain: 'os',
       background: true,
     });
@@ -146,45 +134,6 @@ describe('resolveAgentPrincipal', () => {
         error: expect.stringMatching(/no permissions/i),
       }),
     );
-    expect(mintRunToken).not.toHaveBeenCalled();
-  });
-
-  it('fails closed when run-token minting fails', async () => {
-    mintRunToken.mockResolvedValue(undefined);
-
-    const result = await resolveAgentPrincipal({
-      agentConfig: agent,
-      models: principalModels,
-      subdomain: 'os',
-      background: true,
-    });
-
-    expect(result).toEqual(
-      expect.objectContaining({
-        ok: false,
-        error: expect.stringMatching(/could not mint/i),
-      }),
-    );
-    expect(result).not.toHaveProperty('authCtx');
-  });
-
-  it('fails closed when the existing App credential cannot be loaded', async () => {
-    getSettings.mockRejectedValue(new Error('settings unavailable'));
-
-    const result = await resolveAgentPrincipal({
-      agentConfig: agent,
-      models: principalModels,
-      subdomain: 'os',
-      background: true,
-    });
-
-    expect(result).toEqual(
-      expect.objectContaining({
-        ok: false,
-        error: expect.stringMatching(/could not mint/i),
-      }),
-    );
-    expect(mintRunToken).not.toHaveBeenCalled();
   });
 });
 

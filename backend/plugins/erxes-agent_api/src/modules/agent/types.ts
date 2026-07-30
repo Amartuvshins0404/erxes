@@ -27,9 +27,9 @@ export interface ToolResultLike {
 
 // The auth context propagated to every tool call.
 export interface TurnAuthCtx {
-  /** Decoded AI team-member principal for internal permission gates. */
+  /** Base64-encoded acting user for trusted internal subgraph calls. */
   userHeader?: string;
-  /** Short-lived token minted for the AI team member. */
+  /** Optional caller token for auxiliary flows; erxes operations ignore it. */
   token?: string;
   principalUserId?: string;
   /** Human who initiated an interactive turn; absent for background events. */

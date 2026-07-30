@@ -43,7 +43,7 @@ import {
 export type { GqlArgDef, GqlFieldDef, GqlTypeRef, SchemaMaps };
 export { graphqlTypeToString, sanitizeServerError };
 
-/** Connection settings for reaching the erxes gateway (API URL + app token). */
+/** Gateway settings used for schema discovery, not acting-user authentication. */
 export interface ErxesToolSettings {
   erxesApiUrl?: string;
   erxesApiToken?: string;
@@ -113,19 +113,36 @@ async function gqlCall<TData = Record<string, unknown>>(
 }
 
 /**
- * Gateway access the entity resolver needs, bound to this request's auth. Every
- * candidate lookup runs through the same `gqlCall` (Bearer + tenant hostname)
- * the operation itself uses. The cache scope carries subdomain and acting
- * principal because entity visibility is permission-scoped.
+ * Route permission-sensitive calls straight to their owning private subgraph.
+ * The gateway accepts only signed user tokens and must remain unchanged; direct
+ * service calls use erxes' existing trusted `user` header contract.
  */
-function makeResolverDeps(
-  apiUrl: string,
-  authHeaders: Record<string, string>,
-): EntityResolverDeps {
+function makeServiceExecutionContext(authHeaders: Record<string, string>): {
+  resolveAddress: (serviceName: string) => Promise<string | undefined>;
+  resolverDeps: EntityResolverDeps;
+} {
   const auth = getCurrentAuth();
+  const addressCache = new Map<string, Promise<string | undefined>>();
+  const resolveAddress = (serviceName: string): Promise<string | undefined> => {
+    let pending = addressCache.get(serviceName);
+    if (!pending) {
+      pending = getPluginAddress(serviceName)
+        .then((address) => address?.trim() || undefined)
+        .catch(() => undefined);
+      addressCache.set(serviceName, pending);
+    }
+    return pending;
+  };
+
   return {
-    runQuery: (query) => gqlCall(apiUrl, authHeaders, query),
-    scope: `${auth?.subdomain || ''}::${auth?.principalUserId || ''}`,
+    resolveAddress,
+    resolverDeps: {
+      runQuery: async (query, ownerService) => {
+        const address = await resolveAddress(ownerService);
+        return address ? gqlCall(address, authHeaders, query) : null;
+      },
+      scope: `${auth?.subdomain || ''}::${auth?.principalUserId || ''}`,
+    },
   };
 }
 
@@ -164,22 +181,21 @@ export interface ErxesOperationRef {
 }
 
 /**
- * Build gateway headers from the resolved AI team-member principal. Missing
- * principal auth is fatal; the configured app token is never a fallback.
+ * Build headers for an internal subgraph call from the resolved principal.
+ * A bearer or configured App token is never accepted as an acting-user fallback.
  */
 export function buildAuthHeaders(processId?: string): Record<string, string> {
   const reqAuth = getCurrentAuth();
-  const bearer = reqAuth?.token?.trim();
-  if (!bearer) {
+  const userHeader = reqAuth?.userHeader?.trim();
+  const hostname = reqAuth?.subdomain?.trim();
+  if (!userHeader || !hostname) {
     throw new Error('Agent principal unavailable');
   }
 
   const authHeaders: Record<string, string> = {
-    Authorization: asBearer(bearer),
+    user: userHeader,
+    hostname,
   };
-  if (reqAuth?.subdomain) {
-    authHeaders.hostname = reqAuth.subdomain;
-  }
   if (processId) {
     authHeaders['x-erxes-process-id'] = processId;
   }
@@ -251,7 +267,7 @@ function secretRefRefusedResult() {
 export async function executeErxesOperation(
   op: ErxesOperationRef,
   rawArgs: Record<string, unknown>,
-  settings: ErxesToolSettings | null,
+  _settings: ErxesToolSettings | null,
   schemaMaps?: Partial<SchemaMaps>,
   processId?: string,
   requestedFields?: string[],
@@ -261,7 +277,6 @@ export async function executeErxesOperation(
   // on — never an exception that surfaces to the user as a raw stack message
   // and strands them.
   try {
-    const apiUrl = settings?.erxesApiUrl || 'http://localhost:4000';
     const erxesOperation = op.operation;
     const erxesOperationType = op.operationType;
     const args = op.graphqlArgs || [];
@@ -298,10 +313,15 @@ export async function executeErxesOperation(
       return secretRefRefusedResult();
     }
 
-    // Auth must be resolved first — needed for the entity-resolver lookups.
+    // Auth is resolved before entity lookups. Every request stays on the
+    // private service network and runs as the validated AI team member.
     const authHeaders = buildAuthHeaders(processId);
-    const resolverDeps = makeResolverDeps(apiUrl, authHeaders);
-
+    const execution = makeServiceExecutionContext(authHeaders);
+    const resolverDeps = execution.resolverDeps;
+    const operationAddress = await execution.resolveAddress(op.plugin);
+    if (!operationAddress) {
+      throw new Error(`Erxes service "${op.plugin}" is unavailable`);
+    }
     const idResolution = await resolveIdArgs(
       resolvedArgs,
       resolverDeps,
@@ -332,7 +352,7 @@ export async function executeErxesOperation(
         op.returnType,
         finalResponseFields,
       );
-      return gqlFetch<GraphqlEnvelope>(apiUrl, authHeaders, {
+      return gqlFetch<GraphqlEnvelope>(operationAddress, authHeaders, {
         query,
         variables,
       });

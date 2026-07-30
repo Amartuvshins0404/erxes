@@ -143,12 +143,14 @@ export type ResolveIdArgsResult =
   | { ok: false; failure: EntityResolutionFailure };
 
 /**
- * Gateway access injected by the executor: `runQuery` runs one GraphQL query
- * through the request's auth context (null on any failure); `scope` is the
- * tenant+user key the candidate cache partitions on.
+ * Internal subgraph access injected by the executor. Each query names the
+ * service that owns it; `scope` partitions candidate caches by tenant+user.
  */
 export interface EntityResolverDeps {
-  runQuery: (query: string) => Promise<Record<string, unknown> | null>;
+  runQuery: (
+    query: string,
+    ownerService: string,
+  ) => Promise<Record<string, unknown> | null>;
   scope: string;
 }
 
@@ -260,6 +262,7 @@ const fetchStageRows = async (
 ): Promise<FetchedRows | null> => {
   const pipesData = await deps.runQuery(
     `{ salesPipelines(limit: ${PIPELINE_WALK_LIMIT}) { list { _id } } }`,
+    'sales',
   );
   if (!pipesData) return null;
   const pipelineRows = extractRows(pipesData.salesPipelines, true);
@@ -271,6 +274,7 @@ const fetchStageRows = async (
   if (!pipelineIds.length) return { rows: [], atCap };
   const stagesData = await deps.runQuery(
     `{ salesStages(pipelineIds: ${JSON.stringify(pipelineIds)}) { _id name } }`,
+    'sales',
   );
   if (!stagesData) return null;
   const rows = extractRows(stagesData.salesStages, false);
@@ -287,6 +291,7 @@ const fetchEntityRows = async (
   const inner = desc.connection ? `list { ${selection} }` : selection;
   const data = await deps.runQuery(
     `{ ${desc.listOperation}${buildArgString(desc.listArgs)} { ${inner} } }`,
+    desc.ownerService,
   );
   if (!data) return null;
   const rows = extractRows(data[desc.listOperation], desc.connection);
@@ -327,7 +332,10 @@ const searchEntityRows = async (
   const selection = [desc.idField, ...desc.labelFields].join(' ');
   const inner = desc.connection ? `list { ${selection} }` : selection;
   const data = await deps.runQuery(
-    `{ ${desc.listOperation}(${desc.searchArg}: ${JSON.stringify(value)}) { ${inner} } }`,
+    `{ ${desc.listOperation}(${desc.searchArg}: ${JSON.stringify(
+      value,
+    )}) { ${inner} } }`,
+    desc.ownerService,
   );
   if (!data) return null;
   const rows = extractRows(data[desc.listOperation], desc.connection);
@@ -389,8 +397,7 @@ const resolveScalar = async (
   if (pageMatch.kind === 'id') return pageMatch;
   if (pageMatch.kind === 'ambiguous')
     return { kind: 'fail', candidates: pageMatch.candidates };
-  if (entry.complete)
-    return { kind: 'fail', candidates: pageMatch.candidates };
+  if (entry.complete) return { kind: 'fail', candidates: pageMatch.candidates };
 
   const value = stripQuotes(String(rawValue));
   if (!value) return { kind: 'pass' };

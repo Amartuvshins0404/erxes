@@ -63,8 +63,6 @@ export const loadBaMembershipClass = (models: IModels) => {
       return membership;
     }
 
-    // any non-terminal membership (active) — used so a new grant reuses it
-    // instead of creating a parallel duplicate row
     public static async getOpenMembership(customerId: string) {
       return models.Membership.findOne({
         customerId,

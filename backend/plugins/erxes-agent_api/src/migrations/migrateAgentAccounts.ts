@@ -1,4 +1,4 @@
-import type { Collection, Filter } from 'mongodb';
+import { MongoServerError, type Collection, type Filter } from 'mongodb';
 import { getEnv, getSaasOrganizations } from 'erxes-api-shared/utils';
 import { generateModels, type IModels } from '~/connectionResolvers';
 import {
@@ -52,8 +52,20 @@ const LEGACY_FIELDS = {
   unitId: '',
 } as const;
 
+const LEGACY_AGENT_ID_INDEX = 'agentId_1';
+
 const agentCollection = (models: IModels): Collection<LegacyAgentProfile> =>
   models.MastraAgent.collection as unknown as Collection<LegacyAgentProfile>;
+
+const dropLegacyAgentIdIndex = async (models: IModels): Promise<void> => {
+  const collection = agentCollection(models);
+  if (!(await collection.indexExists(LEGACY_AGENT_ID_INDEX))) return;
+  try {
+    await collection.dropIndex(LEGACY_AGENT_ID_INDEX);
+  } catch (error) {
+    if (!(error instanceof MongoServerError) || error.code !== 27) throw error;
+  }
+};
 
 const legacyAccountFor = async (subdomain: string, userId?: string) => {
   if (!userId) return null;
@@ -132,6 +144,7 @@ export async function migrateTenantAgentAccounts(
   models: IModels,
   subdomain: string,
 ): Promise<void> {
+  await dropLegacyAgentIdIndex(models);
   const cursor = agentCollection(models).find(LEGACY_FILTER);
   for await (const profile of cursor) {
     try {

@@ -56,12 +56,18 @@ const makeModels = () => {
       if ('agentId' in profile) yield { ...profile };
     },
   }));
+  let hasLegacyIndex = true;
+  const indexExists = jest.fn(async () => hasLegacyIndex);
+  const dropIndex = jest.fn(async () => {
+    hasLegacyIndex = false;
+    return { ok: 1 };
+  });
   const models = {
     MastraAgent: {
-      collection: { find, updateOne },
+      collection: { find, updateOne, indexExists, dropIndex },
     },
   } as unknown as IModels;
-  return { models, find, updateOne };
+  return { models, find, updateOne, indexExists, dropIndex };
 };
 
 beforeEach(() => {
@@ -96,7 +102,7 @@ afterEach(() => {
 
 describe('migrateTenantAgentAccounts', () => {
   it('adopts the legacy service account and links it to the profile once', async () => {
-    const { models, find, updateOne } = makeModels();
+    const { models, find, updateOne, indexExists, dropIndex } = makeModels();
 
     await migrateTenantAgentAccounts(models, 'os');
     await migrateTenantAgentAccounts(models, 'os');
@@ -114,6 +120,11 @@ describe('migrateTenantAgentAccounts', () => {
     expect(createAgentAccount).not.toHaveBeenCalled();
     expect(updateOne).toHaveBeenCalledTimes(1);
     expect(find).toHaveBeenCalledTimes(2);
+    expect(indexExists).toHaveBeenCalledTimes(2);
+    expect(dropIndex).toHaveBeenCalledTimes(1);
+    expect(dropIndex.mock.invocationCallOrder[0]).toBeLessThan(
+      updateOne.mock.invocationCallOrder[0],
+    );
   });
 
   it('keeps legacy fields intact when account creation fails so startup can retry', async () => {

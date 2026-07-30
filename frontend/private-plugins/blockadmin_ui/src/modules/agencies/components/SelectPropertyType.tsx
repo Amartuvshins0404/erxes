@@ -3,7 +3,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { IconX } from '@tabler/icons-react';
 import { PROPERTY_TYPE_LABELS } from '../constants';
 
-type PropertyTypeKey = keyof typeof PROPERTY_TYPE_LABELS;
+export type PropertyTypeKey = keyof typeof PROPERTY_TYPE_LABELS;
 
 interface SelectPropertyTypeProps {
   value: PropertyTypeKey[];

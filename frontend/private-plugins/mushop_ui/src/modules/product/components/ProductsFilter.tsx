@@ -5,11 +5,13 @@ import {
   IconTruck,
 } from '@tabler/icons-react';
 import { Combobox, Command, Filter, useMultiQueryState } from 'erxes-ui';
+import { useTranslation } from 'react-i18next';
 import { SelectSupplier } from '@/supplier/components/select/SelectSupplier';
 import { SelectProductStatus } from './SelectProductStatus';
 import { SelectProductCategory } from './SelectProductCategory';
 
 const ProductsFilterPopover = () => {
+  const { t } = useTranslation('mushop');
   const [queries] = useMultiQueryState<{
     searchValue: string;
     status: string;
@@ -27,26 +29,26 @@ const ProductsFilterPopover = () => {
           <Filter.View>
             <Command>
               <Filter.CommandInput
-                placeholder="Filter"
+                placeholder={t('Filter')}
                 variant="secondary"
                 className="bg-background"
               />
               <Command.List className="p-1">
                 <Filter.Item value="searchValue" inDialog>
                   <IconSearch />
-                  Search
+                  {t('Search')}
                 </Filter.Item>
                 <Filter.Item value="status">
                   <IconProgress />
-                  Status
+                  {t('Status')}
                 </Filter.Item>
                 <Filter.Item value="supplierId">
                   <IconTruck />
-                  Supplier
+                  {t('Supplier')}
                 </Filter.Item>
                 <Filter.Item value="categoryId">
                   <IconCategory />
-                  Category
+                  {t('Category')}
                 </Filter.Item>
               </Command.List>
             </Command>
@@ -66,6 +68,7 @@ const ProductsFilterPopover = () => {
 };
 
 export const ProductsFilter = () => {
+  const { t } = useTranslation('mushop');
   const [queries] = useMultiQueryState<{
     searchValue: string;
     supplierId: string;
@@ -78,7 +81,7 @@ export const ProductsFilter = () => {
         <Filter.BarItem queryKey="searchValue">
           <Filter.BarName>
             <IconSearch />
-            Search
+            {t('Search')}
           </Filter.BarName>
           <Filter.BarButton filterKey="searchValue" inDialog>
             {queries?.searchValue || ''}
@@ -87,21 +90,21 @@ export const ProductsFilter = () => {
         <Filter.BarItem queryKey="status">
           <Filter.BarName>
             <IconProgress />
-            Status
+            {t('Status')}
           </Filter.BarName>
           <SelectProductStatus.FilterBar />
         </Filter.BarItem>
         <Filter.BarItem queryKey="supplierId">
           <Filter.BarName>
             <IconTruck />
-            Supplier
+            {t('Supplier')}
           </Filter.BarName>
           <SelectSupplier.FilterBar />
         </Filter.BarItem>
         <Filter.BarItem queryKey="categoryId">
           <Filter.BarName>
             <IconCategory />
-            Category
+            {t('Category')}
           </Filter.BarName>
           <SelectProductCategory.FilterBar />
         </Filter.BarItem>

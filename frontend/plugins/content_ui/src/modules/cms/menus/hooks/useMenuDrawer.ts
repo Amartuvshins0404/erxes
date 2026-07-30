@@ -2,6 +2,7 @@ import { ApolloError, useMutation, useQuery } from '@apollo/client';
 import { toast } from 'erxes-ui';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useForm } from 'react-hook-form';
 import { cmsLanguageAtom } from '../../shared/states/cmsLanguageState';
 import { useCmsTranslation } from '../../shared/hooks/useCmsTranslation';
@@ -87,6 +88,7 @@ function buildMenuTranslations(
 }
 
 export function useMenuDrawer({ isOpen, onClose, onSuccess, clientPortalId, menu }: MenuDrawerProps) {
+  const { t } = useTranslation('content');
   const [hasPermissionError, setHasPermissionError] = useState(false);
   const isEditing = Boolean(menu?._id);
   const cmsLanguage = useAtomValue(cmsLanguageAtom);
@@ -155,7 +157,10 @@ export function useMenuDrawer({ isOpen, onClose, onSuccess, clientPortalId, menu
     (m: RawMenuItem) => m._id !== menu?._id,
   );
 
-  const parentOptions = buildFlatTree(rawMenus).map((item) => ({
+  const parentOptions = buildFlatTree(
+    rawMenus,
+    selectedLanguage || cmsLanguage || defaultLanguage || 'en',
+  ).map((item) => ({
     _id: item._id,
     label: getDepthPrefix(item.depth) + item.label,
   }));
@@ -189,7 +194,7 @@ export function useMenuDrawer({ isOpen, onClose, onSuccess, clientPortalId, menu
   });
 
   const { data: tagsData } = useQuery(MENU_TAGS_QUERY, {
-    variables: { clientPortalId, limit: 100 },
+    variables: { clientPortalId, language: selectedLanguage || cmsLanguage },
     skip: !isOpen || !clientPortalId || linkType !== 'tag',
     fetchPolicy: 'cache-first',
   });
@@ -239,15 +244,15 @@ export function useMenuDrawer({ isOpen, onClose, onSuccess, clientPortalId, menu
     if (permissionError) {
       setHasPermissionError(true);
       toast({
-        title: 'Permission Required',
-        description: 'You do not have permission to manage menus. Please contact your administrator.',
+        title: t('permission-required'),
+        description: t('no-permission-to-manage-menus'),
         variant: 'destructive',
         duration: 8000,
       });
     } else {
       toast({
-        title: 'Error',
-        description: error.message || 'Failed to save menu. Please try again.',
+        title: t('error'),
+        description: error.message || t('failed-to-save-menu'),
         variant: 'destructive',
         duration: 5000,
       });
@@ -259,7 +264,7 @@ export function useMenuDrawer({ isOpen, onClose, onSuccess, clientPortalId, menu
       onClose();
       form.reset();
       onSuccess?.();
-      toast({ title: 'Success', description: 'Menu created successfully', variant: 'default' });
+      toast({ title: t('success'), description: t('menu-created-successfully'), variant: 'default' });
     },
     onError: handleError,
   });
@@ -268,7 +273,7 @@ export function useMenuDrawer({ isOpen, onClose, onSuccess, clientPortalId, menu
     onCompleted: () => {
       onClose();
       onSuccess?.();
-      toast({ title: 'Success', description: 'Menu updated successfully', variant: 'default' });
+      toast({ title: t('success'), description: t('menu-updated-successfully'), variant: 'default' });
     },
     onError: handleError,
   });

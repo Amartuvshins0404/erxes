@@ -1,0 +1,618 @@
+/* Chat animations — colors come exclusively from erxes-ui design tokens
+   (var(--primary), var(--muted-foreground), …) so theme and brand-color
+   changes propagate without touching this file. */
+
+/* Message entry — slides up and settles. */
+@keyframes ea-msg-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.ea-msg-in {
+  animation: ea-msg-in 0.28s cubic-bezier(0.21, 1.02, 0.73, 1) both;
+}
+
+/* User message bubble — the blue gradient + width cap live here, not on the
+   Tailwind utilities `from-primary` / `to-primary/85` / `max-w-[78%]`. Those
+   are unique to this plugin, and the host (core-ui) global CSS is built
+   without scanning this plugin's source, so they aren't generated in
+   production — the bubble then renders transparent (white text on a
+   transparent background = invisible). Driving the gradient off the shared
+   --primary token keeps it self-contained and theme/brand-aware. */
+.ea-user-bubble {
+  max-width: 78%;
+  background-image: linear-gradient(
+    to bottom right,
+    var(--primary),
+    color-mix(in oklch, var(--primary) 85%, transparent)
+  );
+}
+
+/* ── Agent mark ───────────────────────────────────────────────────────────
+   ONE brand mark for the agent everywhere it appears — chat avatar, empty
+   state, agent rail row. A FLAT fill (no gradient) off the --primary token, so
+   it survives the production CSS purge (same rule as .ea-user-bubble) and reads
+   identically in every spot. `.ea-mark-active` only deepens the flat tint. */
+.ea-mark {
+  background: color-mix(in oklch, var(--primary) 8%, var(--background));
+  border-color: color-mix(in oklch, var(--primary) 18%, transparent);
+  color: var(--primary);
+}
+.ea-mark-active {
+  background: color-mix(in oklch, var(--primary) 14%, var(--background));
+  border-color: color-mix(in oklch, var(--primary) 34%, transparent);
+}
+
+/* Thinking ring — the single "working" motion, shared by the mark and the
+   timeline's running node: one brand-coloured arc sweeping around the rim.
+   Replaces the old expanding-glow ping, the breathing halo, and the sliding
+   row gradients (all removed). */
+@keyframes ea-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.ea-spin-ring {
+  position: absolute;
+  inset: -2px;
+  border-radius: 9999px;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg 210deg,
+    color-mix(in oklch, var(--primary) 30%, transparent) 300deg,
+    var(--primary) 360deg
+  );
+  -webkit-mask: radial-gradient(
+    farthest-side,
+    transparent calc(100% - 2px),
+    #000 calc(100% - 2px)
+  );
+  mask: radial-gradient(
+    farthest-side,
+    transparent calc(100% - 2px),
+    #000 calc(100% - 2px)
+  );
+  animation: ea-spin 0.9s linear infinite;
+  pointer-events: none;
+}
+
+/* Small elements (chips, tool rows) popping into the flow. */
+@keyframes ea-pop {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.ea-pop {
+  animation: ea-pop 0.2s ease-out both;
+}
+
+/* Expanding detail panes (tool args/results, finished thoughts). */
+@keyframes ea-expand {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.ea-expand {
+  animation: ea-expand 0.18s ease-out both;
+}
+
+/* ── Agent run timeline ───────────────────────────────────────────────────
+   The assistant's reasoning + tool calls render as a single vertical thread:
+   a 1px rail with a status node per step. Replaces the old stack of bordered
+   pills. Colours come off the design tokens so they survive the production
+   CSS purge (same rule as .ea-user-bubble above). */
+.ea-trace {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  position: relative;
+}
+.ea-step {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+}
+/* Gutter holds the node and draws the connecting thread behind it. */
+.ea-step-rail {
+  position: relative;
+  flex: none;
+  width: 1.25rem;
+  align-self: stretch;
+}
+.ea-step-rail::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  transform: translateX(-50%);
+  background: color-mix(in oklch, var(--border) 85%, transparent);
+  z-index: 0;
+}
+/* Trim the thread so it starts/ends at the node centre, not the row edge. */
+.ea-step:first-child .ea-step-rail::before {
+  top: 0.625rem;
+}
+.ea-step:last-child .ea-step-rail::before {
+  bottom: auto;
+  height: 0.625rem;
+}
+.ea-step:only-child .ea-step-rail::before {
+  display: none;
+}
+/* Node — opaque so it masks the thread, giving "beads on a string". */
+.ea-node {
+  position: absolute;
+  left: 50%;
+  top: 0.625rem;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 9999px;
+  transform: translate(-50%, -50%);
+  background: var(--background);
+  box-sizing: border-box;
+  z-index: 1;
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
+}
+/* Reasoning step — hollow ring. */
+.ea-node-reason {
+  box-shadow: inset 0 0 0 1.5px
+    color-mix(in oklch, var(--muted-foreground) 55%, transparent);
+}
+/* Tool step — solid bead. */
+.ea-node-tool {
+  background: color-mix(in oklch, var(--primary) 55%, transparent);
+}
+.ea-node-tool.is-running {
+  background: var(--primary);
+}
+/* Running node wears the same sweep ring as the agent mark — one motion. */
+.ea-node-tool.is-running::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 9999px;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg 210deg,
+    color-mix(in oklch, var(--primary) 30%, transparent) 300deg,
+    var(--primary) 360deg
+  );
+  -webkit-mask: radial-gradient(
+    farthest-side,
+    transparent calc(100% - 1.5px),
+    #000 calc(100% - 1.5px)
+  );
+  mask: radial-gradient(
+    farthest-side,
+    transparent calc(100% - 1.5px),
+    #000 calc(100% - 1.5px)
+  );
+  animation: ea-spin 0.9s linear infinite;
+}
+.ea-node-tool.is-error {
+  background: var(--destructive);
+}
+/* Step body sits to the right of the rail; first text line aligns to the node. */
+.ea-step-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0.1875rem 0 0.375rem;
+}
+/* The clickable summary row — quiet by default, faint wash on hover. */
+.ea-trace-row {
+  border-radius: var(--radius-sm);
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+.ea-trace-row:hover {
+  background: color-mix(in oklch, var(--foreground) 6%, transparent);
+}
+/* Recessed request/response panes inside an expanded tool step. */
+.ea-trace-pre {
+  background: color-mix(in oklch, var(--muted) 65%, transparent);
+}
+
+/* Shimmer sweep over "Thinking…" labels while the model reasons. */
+@keyframes ea-shimmer {
+  0% {
+    background-position: 200% center;
+  }
+  100% {
+    background-position: -200% center;
+  }
+}
+.ea-shimmer-text {
+  background: linear-gradient(
+    90deg,
+    var(--muted-foreground) 0%,
+    var(--foreground) 35%,
+    var(--primary) 50%,
+    var(--foreground) 65%,
+    var(--muted-foreground) 100%
+  );
+  background-size: 200% auto;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: ea-shimmer 2.2s linear infinite;
+}
+
+/* Typing dots while waiting for the first event. */
+@keyframes ea-dot {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.35;
+  }
+  30% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
+}
+.ea-typing-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: var(--primary);
+  animation: ea-dot 1.2s ease-in-out infinite;
+}
+.ea-typing-dot:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.ea-typing-dot:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+/* Streaming caret at the end of live answer text. */
+@keyframes ea-caret {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+.ea-caret {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin-left: 2px;
+  border-radius: 1px;
+  background: var(--primary);
+  vertical-align: text-bottom;
+  animation: ea-caret 0.9s steps(1) infinite;
+}
+
+/* The composer pill owns the focus treatment — the textarea inside it must
+   not draw its own border/focus shadow (erxes-ui Textarea ships shadow-xs +
+   focus-visible:shadow-focus, which tailwind-merge can't dedupe). */
+.ea-composer-textarea,
+.ea-composer-textarea:focus-visible {
+  box-shadow: none !important;
+  border: none !important;
+  outline: none !important;
+}
+
+/* Ambient glow — two blurred gradient blobs that drift around the chat
+   background space for as long as a reply streams. */
+@keyframes ea-ambient-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.ea-ambient {
+  animation: ea-ambient-in 0.6s ease-out both;
+}
+.ea-ambient-blob {
+  position: absolute;
+  width: 42%;
+  aspect-ratio: 1;
+  border-radius: 9999px;
+  filter: blur(70px);
+  background: radial-gradient(
+    circle,
+    color-mix(in oklch, var(--primary) 22%, transparent),
+    color-mix(in oklch, var(--primary) 9%, transparent) 55%,
+    transparent 72%
+  );
+}
+@keyframes ea-ambient-drift-1 {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  25% {
+    transform: translate(110%, 15%) scale(1.15);
+  }
+  50% {
+    transform: translate(90%, 95%) scale(0.9);
+  }
+  75% {
+    transform: translate(5%, 80%) scale(1.1);
+  }
+}
+@keyframes ea-ambient-drift-2 {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  25% {
+    transform: translate(-100%, -20%) scale(0.95);
+  }
+  50% {
+    transform: translate(-85%, -90%) scale(1.2);
+  }
+  75% {
+    transform: translate(-5%, -70%) scale(1);
+  }
+}
+.ea-ambient-blob-1 {
+  top: -10%;
+  left: -8%;
+  animation: ea-ambient-drift-1 11s ease-in-out infinite;
+}
+.ea-ambient-blob-2 {
+  bottom: -12%;
+  right: -8%;
+  animation: ea-ambient-drift-2 13s ease-in-out infinite;
+}
+
+/* Honor reduced-motion for the thinking sweep — show a static arc, no spin. */
+@media (prefers-reduced-motion: reduce) {
+  .ea-spin-ring,
+  .ea-node-tool.is-running::after {
+    animation: none;
+  }
+}
+
+/* ── PPTX slide deck preview ───────────────────────────────────────────────
+   The deck itself is rendered by @aiden0z/pptx-renderer (high-fidelity OOXML →
+   HTML/SVG, pixel-tested against PowerPoint). This is ONLY the brand chrome
+   around it: a calm stage with each slide framed as a floating card. We style
+   the stage and the top-level slide nodes ONLY — never the renderer's inner
+   nodes. (An earlier `max-w-full` on every descendant collapsed the slides'
+   absolute layout and overlapped the text; that bug is gone.) Colours come off
+   design tokens so the frame is theme-aware and survives the production purge. */
+.ea-pptx-stage {
+  background: var(--muted);
+  padding: 1.25rem;
+}
+/* The renderer scales each slide to the width of the node it draws into, so the
+   width cap lives on this deck — capping the slides directly would clip them. */
+.ea-pptx-deck {
+  max-width: 60rem;
+  margin-inline: auto;
+}
+.ea-pptx-deck > * {
+  margin-bottom: 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow:
+    0 1px 2px color-mix(in oklch, var(--foreground) 8%, transparent),
+    0 10px 30px color-mix(in oklch, var(--foreground) 9%, transparent);
+}
+.ea-pptx-deck > *:last-child {
+  margin-bottom: 0;
+}
+
+/* ── Voice mode ──────────────────────────────────────────────────────────
+   A single big, organic, audio-reactive blob raymarched in WebGL (VoiceBlob)
+   floats centre-stage on a dark purple field. This file owns only the chrome
+   around it: the dark surface, the CSS fallback that shows while the WebGL
+   chunk loads (or when a browser lacks webgl2), the legibility scrim, and the
+   status + mic styling. The blob's motion lives in the shader. */
+.ea-voice-surface {
+  background:
+    radial-gradient(120% 90% at 50% 34%, #160e33 0%, #0b0820 55%, #050410 100%);
+  color: #fff;
+}
+
+/* The full-bleed layer the blob (canvas) and its fallback share. */
+.ea-voice-stage {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+.ea-voice-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Pure-CSS glowing blob: covers the gap while the WebGL chunk loads and is the
+   graceful fallback when webgl2 is unavailable. The opaque canvas draws over it
+   once the real blob is live. */
+@keyframes ea-blob-breathe {
+  0%,
+  100% {
+    transform: translate(-50%, -50%) scale(0.96);
+    opacity: 0.78;
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.05);
+    opacity: 0.92;
+  }
+}
+.ea-voice-fallback {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  width: min(62vmin, 540px);
+  aspect-ratio: 1;
+  border-radius: 9999px;
+  background: radial-gradient(
+    circle at 42% 38%,
+    #ede7ff 0%,
+    #9a6cff 34%,
+    #5b34c9 58%,
+    transparent 72%
+  );
+  filter: blur(26px);
+  opacity: 0.7;
+  animation: ea-blob-breathe 5s ease-in-out infinite;
+}
+
+/* The corner erxes logo: the white asset glyph, dimmed and given a soft brand
+   glow so it reads as a premium mark, not a hard sticker. */
+.ea-voice-logo {
+  opacity: 0.82;
+  filter: drop-shadow(0 0 10px rgba(154, 108, 255, 0.45));
+}
+
+/* Darken the lower third so the status line and mic stay legible over the blob. */
+.ea-voice-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  background: linear-gradient(
+    to top,
+    rgba(5, 3, 10, 0.85) 0%,
+    rgba(5, 3, 10, 0.25) 28%,
+    transparent 50%
+  );
+}
+
+/* Status line: a solid luminous lavender (brand family) with a soft glow that
+   gently breathes. No gradient-clipped text. */
+@keyframes ea-voice-status-glow {
+  0%,
+  100% {
+    opacity: 0.82;
+    text-shadow: 0 0 18px rgba(154, 108, 255, 0.45);
+  }
+  50% {
+    opacity: 1;
+    text-shadow: 0 0 26px rgba(176, 138, 255, 0.7);
+  }
+}
+.ea-voice-status {
+  color: #e9e2ff;
+  animation: ea-voice-status-glow 2.6s ease-in-out infinite;
+}
+
+/* Each status/detail line is keyed by its text, so React remounts it on change;
+   this calm fade+rise cross-fades one phrase into the next without a flash,
+   matching the visualiser's slow motion. The glow animation layers on top for
+   the active status line. */
+@keyframes ea-voice-line-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.ea-voice-line {
+  animation: ea-voice-line-in 420ms ease-out both;
+}
+.ea-voice-status.ea-voice-line {
+  animation:
+    ea-voice-line-in 420ms ease-out both,
+    ea-voice-status-glow 2.6s ease-in-out infinite;
+}
+
+/* The mic affordance: a glowing indigo-violet disc; turns red while open. */
+@keyframes ea-voice-mic-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.06);
+  }
+}
+.ea-voice-mic {
+  background: linear-gradient(180deg, #9a6cff, #6336d6) !important;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.2),
+    0 10px 40px rgba(99, 54, 214, 0.5),
+    0 0 60px rgba(154, 108, 255, 0.42);
+}
+.ea-voice-mic.is-listening {
+  background: linear-gradient(180deg, #ff5a6b, #e11d48) !important;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.22),
+    0 0 50px rgba(225, 29, 72, 0.5);
+  animation: ea-voice-mic-pulse 1.2s ease-in-out infinite;
+}
+
+/* Accessibility: honor reduced-motion. The blob itself renders a single calm
+   static frame (VoiceBlob freezes its rAF); here we still its CSS chrome. The
+   state is always conveyed by the status label and mic colour too, so nothing
+   is lost. */
+@media (prefers-reduced-motion: reduce) {
+  .ea-voice-fallback,
+  .ea-voice-status,
+  .ea-voice-line,
+  .ea-voice-status.ea-voice-line,
+  .ea-voice-mic.is-listening {
+    animation: none !important;
+  }
+}
+
+/* ── Artifact preview panel layout ────────────────────────────────────────
+   The docked preview is a right-side column beside the chat that collapses to
+   a full-area overlay on narrow screens. These layout rules MUST live here, not
+   as Tailwind utilities: the docking relied on plugin-unique responsive +
+   arbitrary-value utilities (lg:static, lg:w-[42%], lg:min-w-[360px], …) that
+   are purged from the production host CSS. There they vanished and the panel
+   fell back to its bare `absolute inset-0` overlay — rendering as a full-screen
+   takeover instead of docking to the side. Driven off design tokens so it
+   survives the purge (same rule as .ea-user-bubble above). */
+.ea-preview-dock {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  background: var(--background);
+  border-left: 1px solid var(--border);
+}
+@media (min-width: 1024px) {
+  .ea-preview-dock {
+    position: static;
+    z-index: auto;
+    width: 42%;
+    min-width: 360px;
+    max-width: 680px;
+  }
+}
+
+/* The fullscreen file-list sidebar — hidden on narrow screens, shown from the
+   md breakpoint up. Was `hidden … md:flex`; the `md:flex` half is the same
+   purge-prone responsive utility, so the responsive display lives here too. */
+.ea-preview-sidebar {
+  display: none;
+}
+@media (min-width: 768px) {
+  .ea-preview-sidebar {
+    display: flex;
+  }
+}

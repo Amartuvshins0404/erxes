@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Combobox,
   Command,
@@ -38,6 +39,7 @@ const Provider = ({
 );
 
 const Content = () => {
+  const { t } = useTranslation('mushop');
   const { value, onValueChange } = useCtx();
   const [search, setSearch] = useState('');
   const { categories, loading } = useCoreProductCategories(search || undefined);
@@ -45,13 +47,13 @@ const Content = () => {
   return (
     <Command shouldFilter={false}>
       <Command.Input
-        placeholder="Search categories..."
+        placeholder={t('Search categories...')}
         value={search}
         onValueChange={setSearch}
       />
       <Command.List>
-        {loading && <Command.Item disabled>Loading...</Command.Item>}
-        <Command.Empty>No categories found.</Command.Empty>
+        {loading && <Command.Item disabled>{t('Loading...')}</Command.Item>}
+        <Command.Empty>{t('No categories found.')}</Command.Empty>
         {categories.map((cat: IMushopProductCategory) => (
           <Command.Item
             key={cat._id}
@@ -86,6 +88,7 @@ const FilterView = ({ queryKey = 'categoryId' }: { queryKey?: string }) => {
 };
 
 const FilterBar = ({ queryKey = 'categoryId' }: { queryKey?: string }) => {
+  const { t } = useTranslation('mushop');
   const [value, setValue] = useQueryState<string>(queryKey);
   const [open, setOpen] = useState(false);
   const { categories } = useCoreProductCategories();
@@ -103,7 +106,7 @@ const FilterBar = ({ queryKey = 'categoryId' }: { queryKey?: string }) => {
         <Popover.Trigger asChild>
           <Filter.BarButton filterKey={queryKey}>
             {selected?.name ?? (
-              <span className="text-accent-foreground/80">Select category...</span>
+              <span className="text-accent-foreground/80">{t('Select category...')}</span>
             )}
           </Filter.BarButton>
         </Popover.Trigger>

@@ -20,6 +20,12 @@ const UnitOpportunity = lazy(() =>
   })),
 );
 
+const UnitOffers = lazy(() =>
+  import('./UnitOffers').then((module) => ({
+    default: module.UnitOffers,
+  })),
+);
+
 export const UnitTabs = () => {
   const [activeUnitTab] = useQueryState('activeUnitTab', {
     defaultValue: UNIT_DOCUMENT_TABS_KEYS.overview,
@@ -33,6 +39,7 @@ export const UnitTabs = () => {
       {activeUnitTab === UNIT_DOCUMENT_TABS_KEYS.opportunities && (
         <UnitOpportunity />
       )}
+      {activeUnitTab === UNIT_DOCUMENT_TABS_KEYS.offers && <UnitOffers />}
       {activeUnitTab === UNIT_DOCUMENT_TABS_KEYS.contracts && <UnitContract />}
     </Suspense>
   );

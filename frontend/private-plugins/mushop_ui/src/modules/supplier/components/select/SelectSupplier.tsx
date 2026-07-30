@@ -13,6 +13,7 @@ import {
   useQueryState,
 } from 'erxes-ui';
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useDebounce } from 'use-debounce';
 
 interface ISupplier {
@@ -104,6 +105,7 @@ export const SelectSupplierProvider = ({
 };
 
 const SelectSupplierValue = ({ placeholder }: { placeholder?: string }) => {
+  const { t } = useTranslation('mushop');
   const {
     value,
     contentSuppliers,
@@ -128,7 +130,7 @@ const SelectSupplierValue = ({ placeholder }: { placeholder?: string }) => {
   if (!value) {
     return (
       <span className="text-accent-foreground/80">
-        {placeholder || 'Select supplier...'}
+        {placeholder || t('Select supplier...')}
       </span>
     );
   }
@@ -152,6 +154,7 @@ const SelectSupplierCommandItem = ({ supplier }: { supplier: ISupplier }) => {
 };
 
 const SelectSupplierContent = () => {
+  const { t } = useTranslation('mushop');
   const {
     selectedSuppliers = [],
     contentSuppliers = [],
@@ -164,12 +167,12 @@ const SelectSupplierContent = () => {
   return (
     <Command id="supplier-command-menu">
       <Command.Input
-        placeholder="Search supplier..."
+        placeholder={t('Search supplier...')}
         value={search}
         onValueChange={setSearch}
       />
       <Command.List>
-        <Command.Empty>No supplier found</Command.Empty>
+        <Command.Empty>{t('No supplier found')}</Command.Empty>
         {!!selectedSuppliers?.length && (
           <>
             {selectedSuppliers.map((supplier) => (

@@ -15,6 +15,7 @@ import {
   SelectUOM,
 } from 'ui-modules';
 import { IconBuildingSkyscraper, IconGitBranch } from '@tabler/icons-react';
+import { useTranslation } from 'react-i18next';
 
 import { ColumnDef } from '@tanstack/table-core';
 import { SelectAssigneeDeal } from '@/deals/components/deal-selects/SelectAssigneeDeal';
@@ -28,10 +29,12 @@ export const ProductNumberField = ({
   _id,
   product,
   formatValue,
+  calculateProduct = false,
   children,
 }: INumberFieldContainerProps & {
   product: IProductData;
   formatValue?: (value: number) => string;
+  calculateProduct?: boolean;
   children?: React.ReactNode;
 }) => {
   const { updateRecord } = useUpdateProductRecord();
@@ -43,7 +46,14 @@ export const ProductNumberField = ({
       scope={`product-${_id}-${field}`}
       formatValue={formatValue}
       onSave={(value) => {
-        updateRecord(product, { [field]: value });
+        if (calculateProduct) {
+          const base = { ...product, [field]: value };
+          const updates = calculateProductValues(field, base);
+          const fullUpdate = { [field]: value, ...updates };
+          updateRecord(product, fullUpdate);
+        } else {
+          updateRecord(product, { [field]: value });
+        }
       }}
     >
       {children}
@@ -216,7 +226,10 @@ export const ProductDepartmentField = ({
 export const taxPercent: ColumnDef<IProductData> = {
   id: 'taxPercent',
   accessorKey: 'taxPercent',
-  header: () => <RecordTable.InlineHead label="Tax %" />,
+  header: () => {
+    const { t } = useTranslation('sales');
+    return <RecordTable.InlineHead label={t('tax-percent')} />;
+  },
   cell: ({ cell }) => {
     return (
       <RecordTableInlineCell>
@@ -235,7 +248,10 @@ export const taxPercent: ColumnDef<IProductData> = {
 export const tax: ColumnDef<IProductData> = {
   id: 'tax',
   accessorKey: 'tax',
-  header: () => <RecordTable.InlineHead label="Tax" />,
+  header: () => {
+    const { t } = useTranslation('sales');
+    return <RecordTable.InlineHead label={t('tax')} />;
+  },
   cell: ({ cell }) => {
     return (
       <RecordTableInlineCell>
@@ -254,7 +270,10 @@ export const tax: ColumnDef<IProductData> = {
 export const currency: ColumnDef<IProductData> = {
   id: 'currency',
   accessorKey: 'currency',
-  header: () => <RecordTable.InlineHead label="Currency" />,
+  header: () => {
+    const { t } = useTranslation('sales');
+    return <RecordTable.InlineHead label={t('currency')} />;
+  },
   cell: ({ cell }) => {
     return (
       <RecordTableInlineCell>
@@ -271,7 +290,10 @@ export const currency: ColumnDef<IProductData> = {
 export const uom: ColumnDef<IProductData> = {
   id: 'uom',
   accessorKey: 'uom',
-  header: () => <RecordTable.InlineHead label="UOM" />,
+  header: () => {
+    const { t } = useTranslation('sales');
+    return <RecordTable.InlineHead label={t('uom')} />;
+  },
   cell: ({ cell }) => {
     return (
       <RecordTableInlineCell>
@@ -288,7 +310,10 @@ export const uom: ColumnDef<IProductData> = {
 export const branch: ColumnDef<IProductData> = {
   id: 'branchId',
   accessorKey: 'branchId',
-  header: () => <RecordTable.InlineHead icon={IconGitBranch} label="Branch" />,
+  header: () => {
+    const { t } = useTranslation('sales');
+    return <RecordTable.InlineHead icon={IconGitBranch} label={t('branch')} />;
+  },
   cell: ({ cell }) => {
     return (
       <ProductBranchField
@@ -303,9 +328,10 @@ export const branch: ColumnDef<IProductData> = {
 export const department: ColumnDef<IProductData> = {
   id: 'departmentId',
   accessorKey: 'departmentId',
-  header: () => (
-    <RecordTable.InlineHead icon={IconBuildingSkyscraper} label="Department" />
-  ),
+  header: () => {
+    const { t } = useTranslation('sales');
+    return <RecordTable.InlineHead icon={IconBuildingSkyscraper} label={t('department')} />;
+  },
   cell: ({ cell }) => {
     return (
       <RecordTableInlineCell>

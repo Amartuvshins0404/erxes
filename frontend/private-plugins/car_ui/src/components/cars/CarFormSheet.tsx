@@ -133,11 +133,13 @@ export const CarFormSheet = ({
   onOpenChange,
   car,
   categories,
+  onCompleted,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   car?: ICar | null;
   categories: ICarCategory[];
+  onCompleted?: (car: ICar) => void;
 }) => {
   const { t } = useTranslation('car');
   const { carsAdd, carsEdit, loading } = useCarMutations();
@@ -197,7 +199,15 @@ export const CarFormSheet = ({
         })
       : carsAdd({ variables });
 
-    mutation.then(() => onOpenChange(false));
+    mutation.then((result) => {
+      const savedCar = car?._id ? result.data?.carsEdit : result.data?.carsAdd;
+
+      if (savedCar) {
+        onCompleted?.(savedCar);
+      }
+
+      onOpenChange(false);
+    });
   };
 
   return (

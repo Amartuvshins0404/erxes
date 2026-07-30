@@ -1,7 +1,7 @@
-import { CurrencyCode, IAttachment } from 'erxes-ui';
-
+import { CurrencyCode } from 'erxes-ui';
 import { PRODUCT_FORM_SCHEMA } from '../constants/addProductFormSchema';
 import { z } from 'zod';
+import { IProductCategory } from '../categories/types/category';
 
 export interface IProduct {
   _id: string;
@@ -15,6 +15,15 @@ export interface IProduct {
   departmentId?: string;
   uom: string;
   type: 'product' | 'service' | 'unique' | 'subscription';
+  duration?: number;
+  durationType?:
+    | 'minute'
+    | 'hour'
+    | 'day'
+    | 'week'
+    | 'month'
+    | 'quarter'
+    | 'year';
   currency: CurrencyCode;
   remainder: any;
 }
@@ -72,16 +81,6 @@ export interface IProductData {
   departmentId?: string;
   assignedUserId?: string;
   conditions?: IDealBundleItem[];
-}
-
-export interface IProductCategory {
-  _id: string;
-  name: string;
-  avatar: IAttachment;
-  code: string;
-  order: string;
-  productCount: number;
-  parentId: string;
 }
 
 export interface IUom {

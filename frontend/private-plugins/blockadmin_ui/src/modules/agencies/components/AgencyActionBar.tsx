@@ -17,7 +17,7 @@ import { useState } from 'react';
 import { useAgencyVerify } from '../hooks/useAgencyVerify';
 import { useParams } from 'react-router-dom';
 import { useAgencyReject } from '../hooks/useAgencyReject';
-import { AgencyRejectionReasons } from '../types';
+import { AgencyRejectionReasons } from '../types/agencyTypes';
 import { Block } from '@blocknote/core';
 
 export const AgencyActionBar = () => {

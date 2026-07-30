@@ -1,5 +1,6 @@
 import { sendTRPCMessage } from 'erxes-api-shared/utils';
 import { generateModels } from '~/connectionResolvers';
+import { linkRelation } from '~/utils/relation';
 
 interface IPaymentCallbackData {
   _id: string;
@@ -10,24 +11,17 @@ interface IPaymentCallbackData {
   data: {
     cpUserId: string;
     clientPortalId: string;
-    planId: string;
+    planId?: string;
+    // For ticket purchases the UI creates the ticket itself and passes its id
+    // through on the invoice, so the callback only has to link the relation.
+    ticketId?: string;
   };
 }
 
-const handleSubscriptionPayment = async (
+const resolveCustomerId = async (
   subdomain: string,
   data: IPaymentCallbackData,
-) => {
-  const models = await generateModels(subdomain);
-
-  const exists = await models.MushopSubscription.findOne({
-    invoiceId: data._id,
-  }).lean();
-
-  if (exists) {
-    return;
-  }
-
+): Promise<string | null> => {
   const cpUser = await sendTRPCMessage({
     subdomain,
     pluginName: 'core',
@@ -45,28 +39,77 @@ const handleSubscriptionPayment = async (
       `[mushop:payments] cpUser not found for id=${data.data.cpUserId}`,
     );
 
-    return;
+    return null;
   }
 
-  const customerId = cpUser.erxesCustomerId || cpUser._id;
+  return cpUser.erxesCustomerId || cpUser._id;
+};
 
-  // const planId = data.data?.planId;
-  const planId = process.env.MUSHOP_SUBSCRIPTION_PLAN_ID;
+const handleTicketPayment = async (
+  subdomain: string,
+  data: IPaymentCallbackData,
+) => {
+  const ticketId = data.data.ticketId;
 
-  if (!planId) {
+  if (!ticketId) {
     console.error(
-      `[mushop:payments] Invoice ${data._id} missing planId — cannot determine subscription duration`,
+      `[mushop:payments] Invoice ${data._id} is a ticket purchase but carries no ticketId`,
     );
 
     return;
   }
 
-  const existSubscription = await models.MushopSubscription.getActiveSubscription(
-    customerId,
-  );
+  const customerId = await resolveCustomerId(subdomain, data);
 
-  if (existSubscription) {
-    await models.MushopSubscription.renewSubscription(existSubscription._id, {
+  if (!customerId) {
+    return;
+  }
+
+  await linkRelation({
+    subdomain,
+    main: { contentType: 'frontline:ticket', contentId: ticketId },
+    related: [
+      { contentType: 'core:customer', contentId: customerId },
+      { contentType: 'payment:invoice', contentId: data._id },
+    ],
+  });
+};
+
+const handleMembershipPayment = async (
+  subdomain: string,
+  data: IPaymentCallbackData,
+) => {
+  const models = await generateModels(subdomain);
+
+  const exists = await models.Membership.findOne({
+    invoiceId: data._id,
+  }).lean();
+
+  if (exists) {
+    return;
+  }
+
+  const customerId = await resolveCustomerId(subdomain, data);
+
+  if (!customerId) {
+    return;
+  }
+
+  const planId = process.env.MUSHOP_MEMBERSHIP_PLAN_ID;
+
+  if (!planId) {
+    console.error(
+      `[mushop:payments] Invoice ${data._id} missing planId — cannot determine membership duration`,
+    );
+
+    return;
+  }
+
+  const existMembership =
+    await models.Membership.getActiveMembership(customerId);
+
+  if (existMembership) {
+    await models.Membership.renewMembership(existMembership._id, {
       planId,
       invoiceId: data._id,
       amount: data.amount,
@@ -76,7 +119,7 @@ const handleSubscriptionPayment = async (
     return;
   }
 
-  const subscription = await models.MushopSubscription.createSubscription({
+  const membership = await models.Membership.createMembership({
     customerId,
     planId,
     invoiceId: data._id,
@@ -84,37 +127,33 @@ const handleSubscriptionPayment = async (
     currency: data.currency,
   });
 
-  await sendTRPCMessage({
+  await linkRelation({
     subdomain,
-    pluginName: 'core',
-    method: 'mutation',
-    module: 'relation',
-    action: 'createMultipleRelations',
-    input: {
-      relations: [
-        {
-          entities: [
-            { contentType: 'mushop:subscription', contentId: subscription._id },
-            { contentType: 'core:customer', contentId: customerId },
-          ],
-        },
-      ],
-    },
+    main: { contentType: 'mushop:membership', contentId: membership._id },
+    related: [
+      { contentType: 'core:customer', contentId: customerId },
+      { contentType: 'payment:invoice', contentId: data._id },
+    ],
   });
 };
 
 export const payments = {
   callback: async (subdomain: string, data: IPaymentCallbackData) => {
-    if (data.contentType !== 'mushop:subscription') {
-      return;
-    }
-
     if (data.status !== 'paid') {
       return;
     }
 
     try {
-      await handleSubscriptionPayment(subdomain, data);
+      switch (data.contentType) {
+        case 'mushop:membership':
+          await handleMembershipPayment(subdomain, data);
+          break;
+        case 'frontline:ticket':
+          await handleTicketPayment(subdomain, data);
+          break;
+        default:
+          return;
+      }
     } catch (e: any) {
       console.error(
         `[mushop:payments] callback failed for invoice ${data._id}: ${e.message}`,

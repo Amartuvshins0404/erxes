@@ -1,14 +1,15 @@
-import { IconSelector } from '@tabler/icons-react';
+import { IconCircleFilled, IconMailOpened, IconSelector, IconUsers } from '@tabler/icons-react';
 import { ColumnDef } from '@tanstack/table-core';
 import {
   Badge,
   Button,
+  Collapsible,
   DropdownMenu,
   RecordTable,
   RecordTableInlineCell,
   RelativeDateDisplay,
 } from 'erxes-ui';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useMutation, useQuery } from '@apollo/client';
 import { useRegistrations } from '@/registration/hooks/useRegistrations';
 import { REGISTRATIONS_CURSOR_SESSION_KEY } from '@/registration/constants/registrationsCursorSessionKey';
@@ -16,7 +17,7 @@ import { RegistrationFilters as RegistrationFiltersType } from '@/registration/t
 import { RegistrationDetailSheet } from '@/registration/components/RegistrationDetailSheet';
 import { GET_CLIENT_PORTAL_USER_FOR_SELECT } from '@/registration/graphql/clientPortalUsersQueries';
 import { IClientPortalUserRow } from '@/registration/components/ClientPortalUserSelect';
-import { MTO_REGISTRATION_APPLICATION_UPDATE } from '@/registration/graphql/registrationMutations';
+import { MTO_REGISTRATION_APPLICATION_UPDATE, MTO_REGISTRATION_APPLICATION_MARK_READ } from '@/registration/graphql/registrationMutations';
 
 function formatCpUserLabel(u: IClientPortalUserRow): string {
   const name = [u.firstName, u.lastName].filter(Boolean).join(' ').trim();
@@ -61,6 +62,33 @@ function CpUserPhoneCell({ cpUserId }: { cpUserId?: string | null }) {
   );
 }
 
+function paymentStatusBadgeVariant(
+  paymentStatus?: string | null,
+): 'success' | 'warning' | 'secondary' {
+  if (paymentStatus === 'paid' || paymentStatus === 'manual_verified') {
+    return 'success';
+  }
+
+  if (paymentStatus === 'unpaid') {
+    return 'warning';
+  }
+
+  return 'secondary';
+}
+
+function PaymentStatusCell({ paymentStatus }: { paymentStatus?: string | null }) {
+  return (
+    <RecordTableInlineCell>
+      <Badge
+        variant={paymentStatusBadgeVariant(paymentStatus)}
+        className="capitalize text-xs"
+      >
+        {paymentStatus ?? 'unpaid'}
+      </Badge>
+    </RecordTableInlineCell>
+  );
+}
+
 const ALL_STATUSES = ['draft', 'submitted', 'under_review', 'approved', 'rejected'] as const;
 
 function StatusChangeCell({
@@ -81,8 +109,9 @@ function StatusChangeCell({
   return (
     <DropdownMenu>
       <DropdownMenu.Trigger asChild>
-        <Button type="button" variant="outline" size="icon" disabled={loading}>
-          <IconSelector size={16} />
+        <Button type="button" variant="outline" size="sm" disabled={loading} className="capitalize gap-1">
+          {currentStatus}
+          <IconSelector size={14} />
         </Button>
       </DropdownMenu.Trigger>
       <DropdownMenu.Content align="end">
@@ -93,6 +122,177 @@ function StatusChangeCell({
         ))}
       </DropdownMenu.Content>
     </DropdownMenu>
+  );
+}
+
+function MarkReadCell({
+  id,
+  isRead,
+  onChanged,
+}: {
+  id: string;
+  isRead: boolean;
+  onChanged: () => void;
+}) {
+  const [markRead, { loading }] = useMutation(MTO_REGISTRATION_APPLICATION_MARK_READ);
+
+  const handleToggle = () => {
+    void markRead({ variables: { _id: id, isRead: !isRead } }).then(onChanged);
+  };
+
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon"
+      disabled={loading}
+      onClick={handleToggle}
+      title={isRead ? 'Уншсан' : 'Уншаагүй — тэмдэглэх'}
+      className={isRead ? 'text-muted-foreground' : 'text-primary'}
+    >
+      {isRead ? <IconMailOpened size={16} /> : <IconCircleFilled size={10} />}
+    </Button>
+  );
+}
+
+function GroupSection({
+  cpUserId,
+  registrations,
+  refetch,
+  onOpenDetail,
+}: {
+  cpUserId: string | null;
+  registrations: Record<string, unknown>[];
+  refetch: () => void;
+  onOpenDetail: (id: string) => void;
+}) {
+  const { user } = useCpUser(cpUserId);
+
+  const label = cpUserId
+    ? user
+      ? formatCpUserLabel(user)
+      : cpUserId
+    : 'Хэрэглэгчгүй';
+
+  const innerColumns: ColumnDef<Record<string, unknown>>[] = [
+    {
+      accessorKey: 'isRead',
+      header: '',
+      cell: ({ row }) => (
+        <RecordTableInlineCell className="w-8">
+          <MarkReadCell
+            id={row.original._id as string}
+            isRead={Boolean(row.original.isRead)}
+            onChanged={refetch}
+          />
+        </RecordTableInlineCell>
+      ),
+    },
+    {
+      accessorKey: 'membershipTypeTitle',
+      header: 'Төрөл',
+      cell: ({ cell }) => (
+        <RecordTableInlineCell className="text-sm font-medium max-w-[240px]">
+          {(cell.getValue() as string) || '—'}
+        </RecordTableInlineCell>
+      ),
+    },
+    {
+      accessorKey: 'paymentStatus',
+      header: 'Төлбөр',
+      cell: ({ cell }) => (
+        <PaymentStatusCell paymentStatus={cell.getValue() as string | null} />
+      ),
+    },
+
+    {
+      accessorKey: 'createdAt',
+      header: 'Огноо',
+      cell: ({ cell }) => (
+        <RecordTableInlineCell className="text-xs">
+          <RelativeDateDisplay value={cell.getValue() as string} asChild>
+            <RelativeDateDisplay.Value value={cell.getValue() as string} />
+          </RelativeDateDisplay>
+        </RecordTableInlineCell>
+      ),
+    },
+    {
+      id: 'actions',
+      header: '',
+      cell: ({ row }) => {
+        const id = row.original._id as string;
+        const status = row.original.status as string;
+        return (
+          <RecordTableInlineCell className="flex justify-start items-center gap-2">
+            <StatusChangeCell id={id} currentStatus={status} onChanged={refetch} />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => onOpenDetail(id)}
+            >
+              Дэлгэрэнгүй
+            </Button>
+          </RecordTableInlineCell>
+        );
+      },
+    },
+  ];
+
+  return (
+    <Collapsible defaultOpen className="border rounded-md overflow-hidden">
+      <Collapsible.Trigger asChild>
+        <button
+          type="button"
+          className="w-full flex items-center gap-3 px-3 py-2 bg-muted/50 hover:bg-muted text-sm font-medium text-left"
+        >
+          <Collapsible.TriggerIcon size={14} />
+          <span className="flex-1 truncate">{label}</span>
+          {user?.phone && (
+            <span className="text-xs text-muted-foreground font-normal shrink-0">
+              {user.phone}
+            </span>
+          )}
+          <Badge variant="secondary" className="shrink-0">
+            {registrations.length}
+          </Badge>
+        </button>
+      </Collapsible.Trigger>
+      <Collapsible.Content>
+        <RecordTable.Provider columns={innerColumns} data={registrations}>
+          <RecordTable>
+            <RecordTable.Header />
+            <RecordTable.Body>
+              <RecordTable.RowList />
+            </RecordTable.Body>
+          </RecordTable>
+        </RecordTable.Provider>
+      </Collapsible.Content>
+    </Collapsible>
+  );
+}
+
+function GroupedRegistrationsView({
+  groups,
+  refetch,
+  onOpenDetail,
+}: {
+  groups: [string | null, Record<string, unknown>[]][];
+  refetch: () => void;
+  onOpenDetail: (id: string) => void;
+}) {
+  return (
+    <div className="m-3 space-y-2">
+      {groups.map(([cpUserId, regs]) => (
+        <GroupSection
+          key={cpUserId ?? '__none__'}
+          cpUserId={cpUserId}
+          registrations={regs}
+          refetch={refetch}
+          onOpenDetail={onOpenDetail}
+        />
+      ))}
+    </div>
   );
 }
 
@@ -123,10 +323,35 @@ export function RegistrationsList({ filters }: RegistrationsListProps) {
 
   const [detailId, setDetailId] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [groupByUser, setGroupByUser] = useState(false);
+
+  const grouped = useMemo(() => {
+    if (!groupByUser || !registrations) return [];
+    const map = new Map<string | null, Record<string, unknown>[]>();
+    for (const reg of registrations as Record<string, unknown>[]) {
+      const key = (reg.cpUserId as string | null) ?? null;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(reg);
+    }
+    return Array.from(map.entries());
+  }, [groupByUser, registrations]);
 
   const { hasPreviousPage, hasNextPage } = pageInfo || {};
 
   const columns: ColumnDef<Record<string, unknown>>[] = [
+    {
+      accessorKey: 'isRead',
+      header: '',
+      cell: ({ row }) => (
+        <RecordTableInlineCell className="w-8">
+          <MarkReadCell
+            id={row.original._id as string}
+            isRead={Boolean(row.original.isRead)}
+            onChanged={() => void refetch()}
+          />
+        </RecordTableInlineCell>
+      ),
+    },
     {
       accessorKey: 'cpUserId',
       header: 'Хэрэглэгч',
@@ -152,36 +377,11 @@ export function RegistrationsList({ filters }: RegistrationsListProps) {
       ),
     },
     {
-      accessorKey: 'membershipTypeId',
-      header: 'ID төрөл',
+      accessorKey: 'paymentStatus',
+      header: 'Төлбөр',
       cell: ({ cell }) => (
-        <RecordTableInlineCell className="font-mono text-xs">
-          {cell.getValue() as string}
-        </RecordTableInlineCell>
+        <PaymentStatusCell paymentStatus={cell.getValue() as string | null} />
       ),
-    },
-    {
-      accessorKey: 'schemaVersion',
-      header: 'Хувилбар',
-      cell: ({ cell }) => (
-        <RecordTableInlineCell className="font-mono text-xs">
-          {cell.getValue() as string}
-        </RecordTableInlineCell>
-      ),
-    },
-    {
-      accessorKey: 'status',
-      header: 'Төлөв',
-      cell: ({ cell }) => {
-        const status = cell.getValue() as string;
-        return (
-          <RecordTableInlineCell>
-            <Badge variant={statusBadgeVariant(status)} className="capitalize">
-              {status}
-            </Badge>
-          </RecordTableInlineCell>
-        );
-      },
     },
     {
       accessorKey: 'createdAt',
@@ -201,7 +401,7 @@ export function RegistrationsList({ filters }: RegistrationsListProps) {
         const id = row.original._id as string;
         const status = row.original.status as string;
         return (
-          <RecordTableInlineCell className="flex gap-2">
+          <RecordTableInlineCell className="flex justify-start items-center gap-2">
             <StatusChangeCell id={id} currentStatus={status} onChanged={() => void refetch()} />
             <Button
               type="button"
@@ -222,32 +422,55 @@ export function RegistrationsList({ filters }: RegistrationsListProps) {
 
   return (
     <>
-      <RecordTable.Provider
-        columns={columns}
-        data={registrations || []}
-        className="m-3"
-      >
-        <RecordTable.CursorProvider
-          hasPreviousPage={hasPreviousPage}
-          hasNextPage={hasNextPage}
-          dataLength={registrations?.length}
-          sessionKey={REGISTRATIONS_CURSOR_SESSION_KEY}
+      <div className="flex justify-end px-3 pt-3">
+        <Button
+          variant={groupByUser ? 'default' : 'outline'}
+          size="sm"
+          type="button"
+          onClick={() => setGroupByUser((v) => !v)}
         >
-          <RecordTable>
-            <RecordTable.Header />
-            <RecordTable.Body>
-              <RecordTable.CursorBackwardSkeleton
-                handleFetchMore={handleFetchMore}
-              />
-              {loading && <RecordTable.RowSkeleton rows={40} />}
-              <RecordTable.RowList />
-              <RecordTable.CursorForwardSkeleton
-                handleFetchMore={handleFetchMore}
-              />
-            </RecordTable.Body>
-          </RecordTable>
-        </RecordTable.CursorProvider>
-      </RecordTable.Provider>
+          <IconUsers size={14} className="mr-1" />
+          Хэрэглэгчээр бүлэглэх
+        </Button>
+      </div>
+
+      {groupByUser ? (
+        <GroupedRegistrationsView
+          groups={grouped}
+          refetch={() => void refetch()}
+          onOpenDetail={(id) => {
+            setDetailId(id);
+            setDetailOpen(true);
+          }}
+        />
+      ) : (
+        <RecordTable.Provider
+          columns={columns}
+          data={registrations || []}
+          className="m-3"
+        >
+          <RecordTable.CursorProvider
+            hasPreviousPage={hasPreviousPage}
+            hasNextPage={hasNextPage}
+            dataLength={registrations?.length}
+            sessionKey={REGISTRATIONS_CURSOR_SESSION_KEY}
+          >
+            <RecordTable>
+              <RecordTable.Header />
+              <RecordTable.Body>
+                <RecordTable.CursorBackwardSkeleton
+                  handleFetchMore={handleFetchMore}
+                />
+                {loading && <RecordTable.RowSkeleton rows={40} />}
+                <RecordTable.RowList />
+                <RecordTable.CursorForwardSkeleton
+                  handleFetchMore={handleFetchMore}
+                />
+              </RecordTable.Body>
+            </RecordTable>
+          </RecordTable.CursorProvider>
+        </RecordTable.Provider>
+      )}
 
       <RegistrationDetailSheet
         applicationId={detailId}

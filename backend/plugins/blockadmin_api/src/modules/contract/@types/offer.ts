@@ -18,18 +18,27 @@ export interface IOfferParty {
 export interface IOfferPaymentPlan {
   type: BlockProjectPaymentPlanType;
   downPaymentPercentage: number;
+  downPaymentAmount?: number;
+  barterPercentage?: number;
+  barterAmount?: number;
   interestPercentage: number;
-  advancePaymentPercentage: number;
+  interestType: BlockProjectPaymentPlanInterestType;
+  completionPaymentPercentage: number;
+  completionPaymentAmount?: number;
   discountPercentage: number;
   description: string;
   installment: number;
   frequency: string;
   penaltyPercentage: number;
   vatIncluded: boolean;
+  roundedInstallmentAmount?: number;
+  installmentAmounts?: number[];
   paymentDates: number[];
+  paymentDueDates?: Date[];
   firstPaymentDate: Date;
-  advancePaymentDate: Date;
-  interestType: BlockProjectPaymentPlanInterestType;
+  downPaymentDate?: Date;
+  completionPaymentDate: Date;
+  completionPaymentDateLabel?: string;
 }
 
 export enum OfferStatus {

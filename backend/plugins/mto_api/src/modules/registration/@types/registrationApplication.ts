@@ -5,6 +5,8 @@ export type RegistrationApplicationStatus =
   | 'approved'
   | 'rejected';
 
+export type RegistrationPaymentStatus = 'unpaid' | 'paid' | 'manual_verified';
+
 export interface IRegistrationApplication {
   membershipTypeId: string;
   schemaVersion: string;
@@ -13,4 +15,8 @@ export interface IRegistrationApplication {
   subdomain: string;
   instanceId?: string;
   cpUserId?: string;
+  isRead?: boolean;
+  invoiceId?: string;
+  paymentStatus?: RegistrationPaymentStatus;
+  membershipFeeAmount?: number;
 }

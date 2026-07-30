@@ -20,6 +20,7 @@ import { SelectOpptyPriority } from './SelectPriority';
 import { SelectCustomerSource } from './SelectCustomerSource';
 import { SelectUnitTypeFilter } from './SelectUnitTypeFilter';
 import { SelectTenureTypeFilter } from './SelectTenureTypeFilter';
+import { OpptysTotalCount } from './OpptysTotalCount';
 
 const OpptysFilterPopover = () => {
   const [queries] = useMultiQueryState<{
@@ -121,7 +122,6 @@ export const OpptysFilter = () => {
   return (
     <Filter id="opptys-filter">
       <Filter.Bar>
-        <OpptysFilterPopover />
         <Filter.BarItem queryKey="searchValue">
           <Filter.BarName>
             <IconSearch />
@@ -174,6 +174,8 @@ export const OpptysFilter = () => {
           </Filter.BarName>
           <Filter.Date filterKey="targetDate" />
         </Filter.BarItem>
+        <OpptysFilterPopover />
+        <OpptysTotalCount />
       </Filter.Bar>
     </Filter>
   );

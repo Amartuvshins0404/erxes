@@ -13,6 +13,13 @@ export const GET_AGENT = gql`
       createdAt
       updatedAt
       status
+      provisioning {
+        stage
+        message
+        startedAt
+        updatedAt
+        error
+      }
     }
   }
 `;

@@ -74,15 +74,18 @@ export const ContractItem = ({
   currency,
   status,
   date,
-  endDate,
   onSelect,
 }: IContract & { onSelect?: (contract: IContract) => void }) => {
   return (
     <div className="flex gap-2">
       <div className="grid grid-cols-5 gap-2 items-center flex-auto">
-        <div className="font-medium flex items-center gap-1 text-xs">
+        <Badge
+          variant="secondary"
+          className="ml-2 cursor-pointer truncate font-medium"
+          onClick={() => onSelect?.({ _id, number, party, amount, currency, status, date } as IContract)}
+        >
           #{number || _id}
-        </div>
+        </Badge>
         <div className="truncate">
           <DisplayParty party={party} />
         </div>
@@ -145,14 +148,23 @@ export const ContractItem = ({
 
 export const DisplayParty = ({ party }: { party: IContract['party'] }) => {
   if (!party) return null;
-  const PartyInline =
-    party.type === 'customer' ? CustomersInline : CompaniesInline;
+  if (party.type === 'customer') {
+    return (
+      <CustomersInline.Provider customerIds={[party.id]}>
+        <span className="inline-flex items-center gap-2 overflow-hidden">
+          <CustomersInline.Avatar />
+          <CustomersInline.Title />
+        </span>
+      </CustomersInline.Provider>
+    );
+  }
   return (
-    <PartyInline
-      {...(party.type === 'customer'
-        ? { customerIds: [party.id] }
-        : { companyIds: [party.id] })}
-    />
+    <CompaniesInline.Provider companyIds={[party.id]}>
+      <span className="inline-flex items-center gap-2 overflow-hidden">
+        <CompaniesInline.Avatar />
+        <CompaniesInline.Title />
+      </span>
+    </CompaniesInline.Provider>
   );
 };
 

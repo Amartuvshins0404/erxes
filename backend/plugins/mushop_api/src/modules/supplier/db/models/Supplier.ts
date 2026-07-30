@@ -6,7 +6,8 @@ import {
   IMushopSupplierDocument,
   SupplierQueryParams,
 } from '@/supplier/@types/supplier';
-import { SUPPLIER_VERIFICATION_STATUS } from '~/constants';
+import { SUPPLIER_CODE, SUPPLIER_VERIFICATION_STATUS } from '~/constants';
+import { locationCode } from '@/supplier/utils/supplierCode';
 import { generateFilter } from '@/supplier/utils';
 import { cursorPaginate } from 'erxes-api-shared/utils';
 import { ICursorPaginateParams } from 'erxes-api-shared/core-types';
@@ -38,6 +39,7 @@ export interface ISupplierModel extends Model<IMushopSupplierDocument> {
     input: any,
     userId?: string,
   ): Promise<IMushopSupplierDocument | null>;
+  generateCode(input?: any): Promise<string>;
   removeSupplier(_id: string): Promise<{ ok?: number }>;
 }
 
@@ -99,6 +101,17 @@ export const loadSupplierClass = (
       );
     }
 
+    public static async generateCode(input?: any) {
+      const details = input?.address?.details || input?.address?.address || {};
+      const location = locationCode(details.city, details.city_district);
+
+      const seq = await models.Counter.next(
+        `${SUPPLIER_CODE.COUNTER_PREFIX}:${location}`,
+      );
+
+      return `${location}${seq}`;
+    }
+
     public static async syncFromSupplier(
       entityId: string,
       subdomain: string,
@@ -110,14 +123,22 @@ export const loadSupplierClass = (
         entityId,
       }).lean();
 
+      const { code: _ignoredCode, ...cleanInput } = input || {};
+
       const supplier = await models.Supplier.findOneAndUpdate(
         { subdomain, entityId },
         {
           $set: {
-            ...(input || {}),
+            ...cleanInput,
             ...(userId ? { ownerUserId: userId } : {}),
           },
-          $setOnInsert: { subdomain, entityId },
+          $setOnInsert: {
+            subdomain,
+            entityId,
+            ...(existing
+              ? {}
+              : { code: await models.Supplier.generateCode(input) }),
+          },
         },
         { upsert: true, new: true, setDefaultsOnInsert: true },
       );

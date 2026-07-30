@@ -15,6 +15,7 @@ import {
   IconUsers,
   IconWorld,
 } from '@tabler/icons-react';
+import { useTranslation } from 'react-i18next';
 import { ICollective } from '../types';
 
 const statusVariant = (status?: string) => {
@@ -29,9 +30,10 @@ export const collectivesColumns: ColumnDef<ICollective>[] = [
   {
     id: 'name',
     accessorKey: 'name',
-    header: () => (
-      <RecordTable.InlineHead label="Name" icon={IconLabelFilled} />
-    ),
+    header: () => {
+      const { t } = useTranslation('mushop');
+      return <RecordTable.InlineHead label={t('Name')} icon={IconLabelFilled} />;
+    },
     cell: ({ cell, row }) => {
       const [, setActiveCollectiveId] = useQueryState<string>(
         'activeCollectiveId',
@@ -55,9 +57,12 @@ export const collectivesColumns: ColumnDef<ICollective>[] = [
   {
     id: 'targetSubdomain',
     accessorKey: 'targetSubdomain',
-    header: () => (
-      <RecordTable.InlineHead label="Target subdomain" icon={IconWorld} />
-    ),
+    header: () => {
+      const { t } = useTranslation('mushop');
+      return (
+        <RecordTable.InlineHead label={t('Target subdomain')} icon={IconWorld} />
+      );
+    },
     cell: ({ cell }) => (
       <RecordTableInlineCell>
         {(cell.getValue() as string) || '-'}
@@ -67,7 +72,10 @@ export const collectivesColumns: ColumnDef<ICollective>[] = [
   },
   {
     id: 'suppliersCount',
-    header: () => <RecordTable.InlineHead label="Suppliers" icon={IconUsers} />,
+    header: () => {
+      const { t } = useTranslation('mushop');
+      return <RecordTable.InlineHead label={t('Suppliers')} icon={IconUsers} />;
+    },
     cell: ({ row }) => (
       <RecordTableInlineCell>
         <Badge variant="secondary">
@@ -80,7 +88,10 @@ export const collectivesColumns: ColumnDef<ICollective>[] = [
   {
     id: 'status',
     accessorKey: 'status',
-    header: () => <RecordTable.InlineHead label="Status" icon={IconCheck} />,
+    header: () => {
+      const { t } = useTranslation('mushop');
+      return <RecordTable.InlineHead label={t('Status')} icon={IconCheck} />;
+    },
     cell: ({ cell }) => (
       <RecordTableInlineCell>
         <Badge variant={statusVariant(cell.getValue() as string)}>
@@ -93,7 +104,10 @@ export const collectivesColumns: ColumnDef<ICollective>[] = [
   {
     id: 'totalCreated',
     accessorKey: 'totalCreated',
-    header: () => <RecordTable.InlineHead label="Created" icon={IconCheck} />,
+    header: () => {
+      const { t } = useTranslation('mushop');
+      return <RecordTable.InlineHead label={t('Created')} icon={IconCheck} />;
+    },
     cell: ({ cell }) => (
       <RecordTableInlineCell>
         {(cell.getValue() as number) ?? 0}
@@ -104,9 +118,10 @@ export const collectivesColumns: ColumnDef<ICollective>[] = [
   {
     id: 'totalFailed',
     accessorKey: 'totalFailed',
-    header: () => (
-      <RecordTable.InlineHead label="Failed" icon={IconCircleX} />
-    ),
+    header: () => {
+      const { t } = useTranslation('mushop');
+      return <RecordTable.InlineHead label={t('Failed')} icon={IconCircleX} />;
+    },
     cell: ({ cell }) => (
       <RecordTableInlineCell>
         {(cell.getValue() as number) ?? 0}
@@ -117,9 +132,12 @@ export const collectivesColumns: ColumnDef<ICollective>[] = [
   {
     id: 'lastSyncedAt',
     accessorKey: 'lastSyncedAt',
-    header: () => (
-      <RecordTable.InlineHead label="Last sync" icon={IconCalendar} />
-    ),
+    header: () => {
+      const { t } = useTranslation('mushop');
+      return (
+        <RecordTable.InlineHead label={t('Last sync')} icon={IconCalendar} />
+      );
+    },
     cell: ({ cell }) => {
       const value = cell.getValue() as string | undefined;
       if (!value) {
@@ -138,9 +156,12 @@ export const collectivesColumns: ColumnDef<ICollective>[] = [
   {
     id: 'createdAt',
     accessorKey: 'createdAt',
-    header: () => (
-      <RecordTable.InlineHead label="Created at" icon={IconCalendar} />
-    ),
+    header: () => {
+      const { t } = useTranslation('mushop');
+      return (
+        <RecordTable.InlineHead label={t('Created at')} icon={IconCalendar} />
+      );
+    },
     cell: ({ cell }) => (
       <RelativeDateDisplay value={cell.getValue() as string} asChild>
         <RecordTableInlineCell>

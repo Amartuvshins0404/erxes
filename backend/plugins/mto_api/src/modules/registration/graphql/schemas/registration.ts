@@ -19,6 +19,11 @@ export const types = `
     answers: JSON
     instanceId: String
     cpUserId: String
+    isRead: Boolean
+    invoiceId: String
+    paymentStatus: String
+    membershipFeeAmount: Float
+    invoice: JSON
   }
 
   type MtoRegistrationApplicationListResponse {
@@ -79,6 +84,10 @@ export const mutations = `
     status: String
     cpUserId: String
   ): MtoRegistrationApplication
+  mtoRegistrationApplicationMarkRead(
+    _id: String!
+    isRead: Boolean
+  ): MtoRegistrationApplication
   cpMtoRegistrationApplicationUpdate(
     _id: String!
     answers: JSON
@@ -94,4 +103,10 @@ export const mutations = `
   mtoRegistrationFormSchemaRemove(
     _id: String!
   ): JSON
+  mtoRegistrationApplicationVerifyManualPayment(
+    _id: String!
+  ): MtoRegistrationApplication
+  mtoRegistrationApplicationPaymentUrl(
+    _id: String!
+  ): String
 `;

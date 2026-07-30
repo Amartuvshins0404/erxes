@@ -5,13 +5,20 @@ import {
   UPDATE_CONTRACT_STATUS,
 } from '../graphql/contractMutations';
 import { IContractInput } from '../types/contractTypes';
-import { GET_CONTRACTS } from '../graphql/contractQueries';
+import { GET_CONTRACTS, GET_CONTRACT } from '../graphql/contractQueries';
 import { useQueryState } from 'erxes-ui';
+
+const COMMON_REFETCH = [
+  'BlockGetContracts',
+  'BlockGetContract',
+  'BlockGetContractPayments',
+  'BlockGetContractsList',
+];
 
 export function useCreateContract() {
   const [unitId] = useQueryState<string>('unitId');
   const [createContract, { loading, error }] = useMutation(CREATE_CONTRACT, {
-    refetchQueries: [{ query: GET_CONTRACTS, variables: { unit: unitId } }],
+    refetchQueries: COMMON_REFETCH,
   });
 
   return { createContract, loading, error };
@@ -21,7 +28,7 @@ export function useUpdateContractStatus() {
   const [updateStatus, { loading, error }] = useMutation(
     UPDATE_CONTRACT_STATUS,
     {
-      refetchQueries: [{ query: GET_CONTRACTS }],
+      refetchQueries: COMMON_REFETCH,
     },
   );
 
@@ -35,7 +42,7 @@ export function useUpdateContractStatus() {
 
 export function useUpdateContract() {
   const [updateContract, { loading, error }] = useMutation(UPDATE_CONTRACT, {
-    refetchQueries: [{ query: GET_CONTRACTS }],
+    refetchQueries: COMMON_REFETCH,
   });
 
   const handleUpdate = async (id: string, input: IContractInput) => {

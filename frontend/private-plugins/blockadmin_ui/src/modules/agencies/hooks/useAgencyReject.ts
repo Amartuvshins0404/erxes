@@ -1,7 +1,7 @@
 import { useMutation } from '@apollo/client';
 import { ADMIN_REJECT_AGENCY } from '../graphql';
 import { toast, useConfirm } from 'erxes-ui';
-import { AgencyRejectionReasons } from '../types';
+import { AgencyRejectionReasons } from '../types/agencyTypes';
 
 type THandleReject = (
   id: string,

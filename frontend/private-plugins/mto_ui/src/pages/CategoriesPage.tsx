@@ -1,13 +1,48 @@
-import { MtoPageLayout } from '~/components/MtoPageLayout';
+import { useApolloClient } from '@apollo/client';
+import { useState } from 'react';
+import { Button } from 'erxes-ui';
+import { IconCategory } from '@tabler/icons-react';
+import { MtoListPageLayout } from '~/components/MtoListPageLayout';
+import { CategoryFilters } from '@/category/components/CategoryFilters';
+import { CategoriesList } from '@/category/components/CategoriesList';
+import { CategoryFilters as CategoryFiltersType } from '@/category/types/categoryFilters';
+import { CategoryFormSheet } from '@/category/components/CategoryFormSheet';
+import { MTO_CATEGORIES } from '@/category/graphql/categoryQueries';
 
 export function CategoriesPage() {
+  const client = useApolloClient();
+  const [filters, setFilters] = useState<CategoryFiltersType>({});
+  const [createOpen, setCreateOpen] = useState(false);
+
   return (
-    <MtoPageLayout pageName="Categories">
-      <div className="container mx-auto py-6 text-sm text-muted-foreground">
-        Category CRUD UI is not included in this plugin build. The API must
-        expose <code className="text-xs">mtoActivityCategories</code> when you
-        add the full category module.
-      </div>
-    </MtoPageLayout>
+    <>
+      <MtoListPageLayout
+        pageName="Categories"
+        pageIcon={<IconCategory />}
+        filters={filters}
+        onFiltersChange={setFilters}
+        filtersComponent={CategoryFilters}
+        listComponent={CategoriesList}
+        createDialog={
+          <Button
+            variant="outline"
+            size="sm"
+            type="button"
+            onClick={() => setCreateOpen(true)}
+          >
+            Add Category
+          </Button>
+        }
+        createDialogInHeader
+      />
+
+      <CategoryFormSheet
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        onSaved={() => {
+          void client.refetchQueries({ include: [MTO_CATEGORIES] });
+        }}
+      />
+    </>
   );
 }

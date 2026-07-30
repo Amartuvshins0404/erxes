@@ -21,7 +21,7 @@ import { useContracts } from '../hooks/useContracts';
 import { useUpdateContractStatus } from '../hooks/useManageContract';
 import { IBlockContractStatus } from '@/contract-status/types';
 
-const TYPE_ORDER = ['reserved', 'draft', 'signed', 'lost', 'cancelled'];
+const TYPE_ORDER = ['reserved', 'draft', 'lost', 'cancelled', 'signed'];
 
 const sortStatuses = (statuses: IBlockContractStatus[]) =>
   [...statuses].sort((a, b) => {
@@ -41,7 +41,7 @@ function transformContractsToBoardItems(
   }));
 }
 
-export const ContractsBoard = () => {
+export const ContractsBoard = ({ unitId }: { unitId?: string } = {}) => {
   const { projectId: projectIdParam, id } = useParams<{
     projectId?: string;
     id?: string;
@@ -50,7 +50,7 @@ export const ContractsBoard = () => {
   const { statuses, loading: statusLoading } = useBlockContractStatusesByType({
     projectId,
   });
-  const { contracts, loading: contractsLoading } = useContracts();
+  const { contracts, loading: contractsLoading } = useContracts(unitId);
 
   if (!projectId) {
     return (

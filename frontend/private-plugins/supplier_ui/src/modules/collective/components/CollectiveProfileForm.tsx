@@ -16,6 +16,7 @@ import { ADDRESS_CITY, ADDRESS_DISTRICT } from '@/supplier/constants/address';
 import { SOCIAL_LINKS } from '@/supplier/constants/socialLinks';
 import { supplierProfileSchema as collectiveProfileSchema } from '@/supplier/constants/supplierProfileSchema';
 import { SupplierEditorField as CollectiveEditorField } from '@/supplier/components/SupplierEditorField';
+import { PaymentMethodField } from '@/supplier/components/PaymentMethodField';
 import { SupplierPhones as CollectivePhones } from '@/supplier/components/SupplierPhones';
 import { UploadImage } from '@/supplier/components/upload';
 import { MultiUploadImage } from '@/supplier/components/MultiUploadImage';
@@ -65,6 +66,7 @@ export const CollectiveProfileForm = () => {
       primaryPhone: collective?.primaryPhone || '',
       phones: collective?.phones || [],
       dateFounded: collective?.dateFounded || '',
+      paymentId: collective?.paymentId || '',
       address: {
         details: {
           countryCode: addressDetails?.countryCode || undefined,
@@ -316,37 +318,6 @@ export const CollectiveProfileForm = () => {
             </InfoCard.Content>
           </InfoCard>
 
-          <InfoCard title="Contact">
-            <InfoCard.Content>
-              <div className="gap-4 grid grid-cols-2">
-                <Form.Field
-                  name="primaryEmail"
-                  control={form.control}
-                  render={({ field }) => (
-                    <Form.Item>
-                      <Form.Label>Email</Form.Label>
-                      <Form.Control>
-                        <Input type="email" {...field} />
-                      </Form.Control>
-                      <Form.Message />
-                    </Form.Item>
-                  )}
-                />
-                <Form.Field
-                  name="primaryPhone"
-                  control={form.control}
-                  render={() => (
-                    <Form.Item>
-                      <Form.Label>Phone</Form.Label>
-                      <CollectivePhones form={form} />
-                      <Form.Message />
-                    </Form.Item>
-                  )}
-                />
-              </div>
-            </InfoCard.Content>
-          </InfoCard>
-
           <InfoCard title="Address">
             <InfoCard.Content>
               <div className="gap-4 grid grid-cols-2">
@@ -428,6 +399,41 @@ export const CollectiveProfileForm = () => {
               </div>
             </InfoCard.Content>
           </InfoCard>
+
+          <div className="flex flex-col gap-4">
+            <InfoCard title="Contact">
+              <InfoCard.Content>
+                <div className="gap-4 grid grid-cols-2">
+                  <Form.Field
+                    name="primaryEmail"
+                    control={form.control}
+                    render={({ field }) => (
+                      <Form.Item>
+                        <Form.Label>Email</Form.Label>
+                        <Form.Control>
+                          <Input type="email" {...field} />
+                        </Form.Control>
+                        <Form.Message />
+                      </Form.Item>
+                    )}
+                  />
+                  <Form.Field
+                    name="primaryPhone"
+                    control={form.control}
+                    render={() => (
+                      <Form.Item>
+                        <Form.Label>Phone</Form.Label>
+                        <CollectivePhones form={form} />
+                        <Form.Message />
+                      </Form.Item>
+                    )}
+                  />
+                </div>
+              </InfoCard.Content>
+            </InfoCard>
+
+            <PaymentMethodField control={form.control} />
+          </div>
 
           <InfoCard title="Attachments" className="lg:col-span-2">
             <InfoCard.Content>

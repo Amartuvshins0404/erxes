@@ -26,8 +26,8 @@ export const SelectPaymentPlan = ({
     );
     if (!paymentPlan) return;
     form.setValue('paymentPlan', {
-      type: paymentPlan.type,
       downPaymentPercentage: paymentPlan.downPaymentPercentage,
+      completionPaymentPercentage: paymentPlan.completionPaymentPercentage,
       interestPercentage: paymentPlan.interestPercentage,
       discountPercentage: paymentPlan.discountPercentage,
       installment: paymentPlan.installment,

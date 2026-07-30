@@ -55,6 +55,8 @@ const STATUS_TYPE_VARIANT: Record<
 
 type OpptyTabs = ValueOf<typeof OPPTY_TABS>;
 
+const LOCK_AFTER_MS = 10 * 60 * 1000;
+
 export const OpptyDetailSheet = () => {
   const [activeOpptyId, setActiveOpptyId] =
     useQueryState<string>('activeOpptyId');
@@ -66,6 +68,17 @@ export const OpptyDetailSheet = () => {
     variables: { _id: activeOpptyId || '' },
     skip: !activeOpptyId,
   });
+
+  const { statuses } = useBlockStatusesByType({
+    projectId: oppty?.projectId || '',
+  });
+
+  const isLocked = (() => {
+    if (!oppty) return false;
+    const statusObj = statuses.find((s) => s._id === oppty.status);
+    if (statusObj?.type !== 'closed_won') return false;
+    return Date.now() - new Date(oppty.updatedAt).getTime() > LOCK_AFTER_MS;
+  })();
 
   return (
     <FocusSheet
@@ -130,7 +143,7 @@ export const OpptyDetailSheet = () => {
           />
         </FocusSheet.Content>
         <Sheet.Footer className="flex-none">
-          <OpptyEditSheet />
+          <OpptyEditSheet disabled={isLocked} />
           <OpptyDelete
             opptyId={activeOpptyId || ''}
             onClose={() => setActiveOpptyId(null)}

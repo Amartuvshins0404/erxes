@@ -1,11 +1,15 @@
 import { getEnv } from 'erxes-api-shared/utils';
 import { IMushopSupplierDocument } from '~/modules/supplier/@types/supplier';
 
+const NODE_ENV = getEnv({ name: 'NODE_ENV', defaultValue: 'development' });
+
 const toFileUrl = (
   key: string | undefined,
   subdomain: string,
 ): string | null => {
   if (!key) return null;
+
+  if (NODE_ENV === 'development') return `http://localhost:4000/read-file?key=${key}`;
 
   if (key.startsWith('http://') || key.startsWith('https://')) return key;
 
@@ -39,4 +43,8 @@ export const MushopSupplier = {
     toFileUrl(logo, subdomain),
   coverImage: ({ coverImage, subdomain }: IMushopSupplierDocument) =>
     toFileUrl(coverImage, subdomain),
+  attachments: ({ attachments, subdomain }: IMushopSupplierDocument) =>
+    Array.isArray(attachments)
+      ? attachments.map((key) => toFileUrl(key, subdomain))
+      : null  
 };

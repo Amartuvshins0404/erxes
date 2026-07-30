@@ -7,19 +7,60 @@ const POS_PRODUCTS_QUERY = `
     poscProducts(perPage: $perPage) {
       _id
       name
-      shortName
-      code
-      type
       description
+      code
+      shortName
+      type
       barcodes
       barcodeDescription
       unitPrice
+      savedRemainder
       categoryId
+      customFieldsData
+      customFieldsDataByFieldCode
+      propertiesData
+      createdAt
       tagIds
+      vendorId
       uom
       subUoms
       currency
-      vendorId
+      remainder
+      soonIn
+      soonOut
+      remainders
+      isCheckRem
+      hasSimilarity
+      attachment {
+        url
+        name
+        type
+        size
+        duration
+      }
+      attachmentMore {
+        url
+        name
+        type
+        size
+        duration
+      }
+      pdfAttachment {
+        pdf {
+          url
+          name
+          type
+          size
+          duration
+        }
+        pages {
+          url
+          name
+          type
+          size
+          duration
+        }
+      }
       category {
         _id
         name

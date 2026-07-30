@@ -46,14 +46,14 @@ export const loadMushopProductClass = (
     ) {
       const { initialCategory, ...rest } = doc;
 
-      const existing = await models.MushopProduct.findOne({
+      const existing = await models.Product.findOne({
         subdomain,
         entityId,
       }).lean();
 
       console.log('existing', existing)
 
-      const synced = await models.MushopProduct.findOneAndUpdate(
+      const synced = await models.Product.findOneAndUpdate(
         { subdomain, entityId },
         {
           $set: {
@@ -79,20 +79,20 @@ export const loadMushopProductClass = (
     }
 
     public static async getProduct(_id: string) {
-      const product = await models.MushopProduct.findOne({ _id }).lean();
+      const product = await models.Product.findOne({ _id }).lean();
       if (!product) throw new Error('Product not found');
       return product;
     }
 
     public static async removeProduct(_id: string) {
-      const product = await models.MushopProduct.findOne({ _id }).lean();
+      const product = await models.Product.findOne({ _id }).lean();
       if (!product) throw new Error('Product not found');
-      await models.MushopProduct.deleteOne({ _id });
+      await models.Product.deleteOne({ _id });
       return product;
     }
 
     public static async assignCategory(_id: string, categoryId: string | null) {
-      const product = await models.MushopProduct.findOneAndUpdate(
+      const product = await models.Product.findOneAndUpdate(
         { _id },
         { $set: { categoryId: categoryId || null } },
         { new: true },
@@ -106,7 +106,7 @@ export const loadMushopProductClass = (
       status: string,
       note?: string,
     ) {
-      const product = await models.MushopProduct.findOneAndUpdate(
+      const product = await models.Product.findOneAndUpdate(
         { _id },
         { $set: { status, note: status === 'rejected' ? note ?? null : null } },
         { new: true },

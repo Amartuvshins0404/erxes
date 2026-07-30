@@ -27,7 +27,7 @@ export interface IProvider {
   description?: IMultilingualStringOptional;
   contactInfo: IContactInfo;
   facilities?: string[];
-  categoryIds: string[];
+  associationIds: string[];
   singleProviderLimit?: number;
   status: ProviderStatus;
   rejectionReason?: string;

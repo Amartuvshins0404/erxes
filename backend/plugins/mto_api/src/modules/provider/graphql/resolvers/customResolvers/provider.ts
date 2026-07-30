@@ -3,12 +3,13 @@ import { IContext } from '~/connectionResolvers';
 
 const providerCustomResolvers = {
   MtoProvider: {
-    categories: async (
+    associations: async (
       provider: IProviderDocument,
       _params: undefined,
       { models }: IContext,
     ) => {
-      return [];
+      if (!provider.associationIds?.length) return [];
+      return models.Association.find({ _id: { $in: provider.associationIds } });
     },
   },
 };

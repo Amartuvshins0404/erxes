@@ -15,6 +15,7 @@ export const types = `
 
   type MushopSupplier {
     _id: String!
+    code: String
     name: String
     description: String
     about: String

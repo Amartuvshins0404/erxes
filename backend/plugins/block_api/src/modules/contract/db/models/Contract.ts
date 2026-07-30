@@ -122,6 +122,31 @@ export const loadContractClass = (
         );
       }
 
+      if (updated && newStage.type === 'cancelled') {
+        await models.ContractPayment.updateMany(
+          { contractId: _id },
+          { $set: { status: 'cancelled' } },
+        );
+      }
+
+      if (updated && newStage.type === 'signed') {
+        await models.ContractPayment.regenerateForContract(_id, true);
+
+        if (updated.unit) {
+          const cancelledStage = await models.ContractStatus.findOne({ type: 'cancelled' });
+          if (cancelledStage) {
+            await models.Contract.updateMany(
+              {
+                _id: { $ne: _id },
+                unit: updated.unit,
+                status: { $ne: cancelledStage._id },
+              },
+              { $set: { status: cancelledStage._id } },
+            );
+          }
+        }
+      }
+
       return updated;
     }
 

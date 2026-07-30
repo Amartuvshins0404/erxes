@@ -10,6 +10,7 @@ import { BlockNoteView } from '@blocknote/shadcn';
 import { Button, Tooltip } from 'erxes-ui/components';
 import { cn } from 'erxes-ui/lib';
 import { themeState } from 'erxes-ui/state';
+import { IconPhoto } from '@tabler/icons-react';
 import { useAtomValue } from 'jotai';
 import { useState } from 'react';
 import { BlockEditorProps } from '../types';
@@ -29,6 +30,7 @@ export const BlockEditor = ({
   disabled,
   variant = 'default',
   sideMenu = false,
+  additionalSlashMenuItems,
 }: BlockEditorProps) => {
   const theme = useAtomValue(themeState);
   const [focus, setFocus] = useState(false);
@@ -60,6 +62,34 @@ export const BlockEditor = ({
           );
         },
       } satisfies DefaultReactSuggestionItem);
+    }
+
+    if ('gallery' in editor.schema.blockSchema) {
+      items.push({
+        title: 'Gallery',
+        subtext: 'Insert a multi-image gallery grid',
+        aliases: ['gallery', 'images', 'grid'],
+        badge: undefined,
+        group: editor.dictionary.slash_menu.image.group,
+        icon: <IconPhoto size={18} />,
+        onItemClick: () => {
+          const currentBlock = editor.getTextCursorPosition().block;
+          editor.insertBlocks(
+            [{ type: 'gallery' as any }],
+            currentBlock,
+            'after',
+          );
+        },
+      } satisfies DefaultReactSuggestionItem);
+    }
+
+    const customItems =
+      typeof additionalSlashMenuItems === 'function'
+        ? additionalSlashMenuItems(editor)
+        : additionalSlashMenuItems;
+
+    if (customItems?.length) {
+      items.push(...customItems);
     }
 
     return Promise.resolve(filterSuggestionItems(items, query));

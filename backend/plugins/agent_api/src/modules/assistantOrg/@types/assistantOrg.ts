@@ -7,6 +7,8 @@ export interface IIdentifier {
   slug: string;
   kind: TIdentifierKind;
   description?: string;
+  createdUserId?: string;
+  memberIds?: string[];
 }
 
 export interface IIdentifierDocument extends IIdentifier, Document {

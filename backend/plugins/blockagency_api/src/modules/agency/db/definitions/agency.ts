@@ -29,6 +29,8 @@ export const blockAgencySchema = new Schema<IBlockAgencyDocument>(
       services: [{ type: String, label: 'Services' }],
       clientTypes: [{ type: String, label: 'Client Types' }],
     },
+    messengerIntegrationId: { type: String, label: 'Messenger Integration Id' },
+    widgetBundleUrl: { type: String, label: 'Widget Bundle Url' },
     verificationStatus: {
       type: String,
       label: 'Verification Status',

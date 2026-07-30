@@ -74,6 +74,14 @@ export const boardQueries = {
     return models.Boards.findOne({ _id }).lean();
   },
 
+  async cpSalesBoardDetail(
+    _root: undefined,
+    { _id }: { _id: string },
+    { models }: IContext,
+  ) {
+    return models.Boards.findOne({ _id }).lean();
+  },
+
   /**
    * Get last board
    */
@@ -367,8 +375,8 @@ export const boardQueries = {
 
         pluginName: 'core',
         method: 'query',
-        module: 'forms',
-        action: 'fieldsGroups.find',
+        module: 'fieldsGroups',
+        action: 'find',
         input: {
           query: {
             contentType: `sales:${ct}`,
@@ -385,8 +393,8 @@ export const boardQueries = {
 
           pluginName: 'core',
           method: 'query',
-          module: 'forms',
-          action: 'fields.find',
+          module: 'fields',
+          action: 'find',
           input: {
             query: {
               contentType: `sales:${ct}`,
@@ -515,6 +523,10 @@ export const boardQueries = {
       context,
     );
   },
+};
+
+(boardQueries.cpSalesBoardDetail as any).wrapperConfig = {
+  forClientPortal: true,
 };
 
 (boardQueries.cpSalesBoards as any).wrapperConfig = {

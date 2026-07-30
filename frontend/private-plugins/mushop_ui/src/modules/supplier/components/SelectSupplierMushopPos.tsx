@@ -8,6 +8,7 @@ import {
   Spinner,
 } from 'erxes-ui';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { MUSHOP_POS_LIST } from '../graphql/queries';
 import { MUSHOP_UPDATE_SUPPLIER_MUSHOP_POS } from '../graphql/mutations';
 import { MUSHOP_SUPPLIER_DETAIL } from '../graphql/supplierDetail';
@@ -22,6 +23,7 @@ export const SelectSupplierMushopPos = ({
   supplierId,
   currentMushopPosToken,
 }: Props) => {
+  const { t } = useTranslation('mushop');
   const [open, setOpen] = useState(false);
 
   const { data, loading } = useQuery<{ posclientConfigs: IPosConfig[] }>(
@@ -58,13 +60,13 @@ export const SelectSupplierMushopPos = ({
           {saving ? (
             <Spinner className="w-4 h-4" />
           ) : (
-            selected?.name ?? currentMushopPosToken ?? 'Select POS...'
+            selected?.name ?? currentMushopPosToken ?? t('Select POS...')
           )}
         </Button>
       </Popover.Trigger>
       <Combobox.Content>
         <Command>
-          <Command.Input placeholder="Search POS..." />
+          <Command.Input placeholder={t('Search POS...')} />
           <Command.List>
             {loading && (
               <Command.Empty>
@@ -72,7 +74,7 @@ export const SelectSupplierMushopPos = ({
               </Command.Empty>
             )}
             {!loading && posList.length === 0 && (
-              <Command.Empty>No POS configurations found</Command.Empty>
+              <Command.Empty>{t('No POS configurations found')}</Command.Empty>
             )}
             {posList.map((pos) => (
               <Command.Item

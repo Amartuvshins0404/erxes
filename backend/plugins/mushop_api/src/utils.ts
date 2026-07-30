@@ -13,7 +13,7 @@ export const schemaWrapper = (schema: Schema) => {
   return schema;
 };
 
-export const checkSubscription = async ({
+export const checkMembership = async ({
   models,
   subdomain,
   cpUserId,
@@ -35,9 +35,9 @@ export const checkSubscription = async ({
     },
   });
 
-  const subscription = models.MushopSubscription.getActiveSubscription(
+  const membership = models.Membership.getActiveMembership(
     cpUser?.erxesCustomerId || cpUserId,
   );
 
-  return !!subscription;
+  return !!membership;
 };

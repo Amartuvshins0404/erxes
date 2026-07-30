@@ -1,12 +1,8 @@
 import { Schema } from 'mongoose';
-import {
-  ContractPartyType,
-  ContractAmountType,
-} from '@/contract/@types/contract';
+import { ContractPartyType } from '@/contract/@types/contract';
 
 import {
   BlockProjectPaymentPlanFrequency,
-  BlockProjectPaymentPlanType,
   BlockProjectPaymentPlanInterestType,
 } from '@/project/@types/payment';
 
@@ -25,13 +21,17 @@ const contractPartySchema = new Schema(
 const contractPaymentPlanSchema = new Schema(
   {
     downPaymentPercentage: { type: Number },
+    downPaymentAmount: { type: Number },
+    barterPercentage: { type: Number },
+    barterAmount: { type: Number },
     description: { type: String },
     interestPercentage: { type: Number },
     interestType: {
       type: String,
       enum: Object.values(BlockProjectPaymentPlanInterestType),
     },
-    advancePaymentPercentage: { type: Number },
+    completionPaymentPercentage: { type: Number },
+    completionPaymentAmount: { type: Number },
     discountPercentage: { type: Number },
     installment: { type: Number },
     frequency: {
@@ -40,8 +40,14 @@ const contractPaymentPlanSchema = new Schema(
     },
     penaltyPercentage: { type: Number },
     vatIncluded: { type: Boolean },
-    type: { type: String, enum: Object.values(BlockProjectPaymentPlanType) },
+    roundedInstallmentAmount: { type: Number },
+    installmentAmounts: { type: [Number] },
     paymentDates: { type: [Number] },
+    paymentDueDates: { type: [Date] },
+    firstPaymentDate: { type: Date },
+    downPaymentDate: { type: Date },
+    completionPaymentDate: { type: Date },
+    completionPaymentDateLabel: { type: String },
   },
   { _id: false },
 );
@@ -53,19 +59,14 @@ export const contractSchema = new Schema(
     unit: { type: Schema.Types.ObjectId, ref: 'block_units', required: true },
     date: { type: Date, required: true },
     amount: { type: Number, required: true },
-    amountType: { type: String, enum: Object.values(ContractAmountType) },
     status: {
       type: Schema.Types.ObjectId,
       ref: 'block_contract_statuses',
       index: true,
     },
-    startDate: { type: Date },
-    endDate: { type: Date },
-    isLifeTime: { type: Boolean, default: false },
     party: { type: contractPartySchema, required: true },
     description: { type: String },
     paymentPlan: { type: contractPaymentPlanSchema, required: true },
-    paymentDates: { type: [Number] },
     user: { type: String },
   },
   { timestamps: true },

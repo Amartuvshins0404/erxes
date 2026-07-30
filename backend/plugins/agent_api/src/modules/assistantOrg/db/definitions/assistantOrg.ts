@@ -14,6 +14,13 @@ export const assistantOrgSchema = schemaWrapper(
         enum: ['assistant', 'agent'],
       },
       description: { type: String, label: 'Description' },
+      createdUserId: { type: String, label: 'Created user ID', index: true },
+      memberIds: {
+        type: [String],
+        label: 'Invited member IDs',
+        index: true,
+        default: [],
+      },
     },
     {
       timestamps: true,

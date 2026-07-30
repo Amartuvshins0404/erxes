@@ -12,6 +12,7 @@ import {
   useQueryState,
 } from 'erxes-ui';
 import { ActivityLogs } from 'ui-modules';
+import { useTranslation } from 'react-i18next';
 import { ProductCategoryAssign } from './ProductCategoryAssign';
 import { format } from 'date-fns';
 import { useMushopProductDetail } from '../hooks/useMushopProductDetail';
@@ -43,31 +44,32 @@ const Row = ({
 );
 
 const ProductInfo = ({ product }: { product: IMushopProduct & { _id: string } }) => {
+  const { t } = useTranslation('mushop');
   return (
     <div className="flex flex-col gap-4 p-4">
-      <InfoCard title="General">
+      <InfoCard title={t('General')}>
         <InfoCard.Content className="shadow-none p-0 overflow-hidden">
           <Table>
             <Table.Body className="bt:[&_td]:px-2 bt:[&_tr:first-child_td]:border-t bt:[&_td]:h-10">
-              <Row label="Name" value={product.name} />
-              <Row label="Short Name" value={product.shortName} />
-              <Row label="Code" value={product.code} />
-              <Row label="Type" value={product.type} />
-              {product.description && <HtmlPreview label="Description" html={product.description} />}
+              <Row label={t('Name')} value={product.name} />
+              <Row label={t('Short Name')} value={product.shortName} />
+              <Row label={t('Code')} value={product.code} />
+              <Row label={t('Type')} value={product.type} />
+              {product.description && <HtmlPreview label={t('Description')} html={product.description} />}
               <Row
-                label="Unit Price"
+                label={t('Unit Price')}
                 value={
                   product.unitPrice != null
                     ? product.unitPrice.toLocaleString()
                     : null
                 }
               />
-              <Row label="UOM" value={product.uom} />
-              <Row label="Currency" value={product.currency} />
-              <Row label="Supplier" value={product.supplier?.name || product.vendorId} />
+              <Row label={t('UOM')} value={product.uom} />
+              <Row label={t('Currency')} value={product.currency} />
+              <Row label={t('Supplier')} value={product.supplier?.name || product.vendorId} />
               <Table.Row>
                 <Table.Cell className="bg-sidebar p-2 w-44 h-auto min-h-10 text-muted-foreground">
-                  Category
+                  {t('Category')}
                 </Table.Cell>
                 <Table.Cell className="p-1 px-2 h-auto min-h-10">
                   <ProductCategoryAssign.Provider
@@ -80,35 +82,35 @@ const ProductInfo = ({ product }: { product: IMushopProduct & { _id: string } })
                   </ProductCategoryAssign.Provider>
                 </Table.Cell>
               </Table.Row>
-              <Row label="Barcodes" value={product.barcodes?.join(', ') || null} />
-              <Row label="Barcode Description" value={product.barcodeDescription} />
+              <Row label={t('Barcodes')} value={product.barcodes?.join(', ') || null} />
+              <Row label={t('Barcode Description')} value={product.barcodeDescription} />
             </Table.Body>
           </Table>
         </InfoCard.Content>
       </InfoCard>
 
-      <InfoCard title="Status">
+      <InfoCard title={t('Status')}>
         <InfoCard.Content className="shadow-none p-0 overflow-hidden">
           <Table>
             <Table.Body className="bt:[&_td]:px-2 bt:[&_tr:first-child_td]:border-t bt:[&_td]:h-10">
               <Table.Row>
                 <Table.Cell className="bg-sidebar p-2 w-44 h-auto min-h-10 text-muted-foreground">
-                  Status
+                  {t('Status')}
                 </Table.Cell>
                 <Table.Cell className="p-1 px-2 h-auto min-h-10 whitespace-normal">
                   <ProductStatusAction productId={product._id} status={product.status}>
                     <Badge variant={statusVariant(product.status)} className="cursor-pointer">
-                      {product.status || 'pending'}
+                      {t(product.status || 'pending')}
                     </Badge>
                   </ProductStatusAction>
                 </Table.Cell>
               </Table.Row>
               <Row
-                label="Created"
+                label={t('Created')}
                 value={product.createdAt ? format(new Date(product.createdAt), 'dd.MM.yyyy HH:mm') : null}
               />
               <Row
-                label="Updated"
+                label={t('Updated')}
                 value={product.updatedAt ? format(new Date(product.updatedAt), 'dd.MM.yyyy HH:mm') : null}
               />
             </Table.Body>
@@ -122,6 +124,7 @@ const ProductInfo = ({ product }: { product: IMushopProduct & { _id: string } })
 const TABS = ['overview', 'activity'] as const;
 
 export const ProductDetailSheet = () => {
+  const { t } = useTranslation('mushop');
   const [activeProductId, setActiveProductId] = useQueryState<string>('activeProductId');
   const [tab, setTab] = useQueryState<string>('productTab');
   const { product, loading } = useMushopProductDetail(activeProductId);
@@ -131,20 +134,20 @@ export const ProductDetailSheet = () => {
   return (
     <FocusSheet open={!!activeProductId} onOpenChange={() => setActiveProductId(null)}>
       <FocusSheet.View className="w-[50%] md:w-[50%]">
-        <FocusSheet.Header title={product?.name || 'Product Detail'} />
+        <FocusSheet.Header title={product?.name || t('Product Detail')} />
         <FocusSheet.Content className="flex flex-auto overflow-hidden flex-row min-h-0">
           <FocusSheet.SideBar>
             <Sidebar.Content>
               <Sidebar.Group>
                 <Sidebar.GroupContent className="mt-2">
                   <Sidebar.Menu>
-                    {TABS.map((t) => (
-                      <Sidebar.MenuItem key={t}>
+                    {TABS.map((tabKey) => (
+                      <Sidebar.MenuItem key={tabKey}>
                         <Sidebar.MenuButton
-                          isActive={activeTab === t}
-                          onClick={() => setTab(t)}
+                          isActive={activeTab === tabKey}
+                          onClick={() => setTab(tabKey)}
                         >
-                          {t.charAt(0).toUpperCase() + t.slice(1)}
+                          {t(tabKey.charAt(0).toUpperCase() + tabKey.slice(1))}
                         </Sidebar.MenuButton>
                       </Sidebar.MenuItem>
                     ))}
@@ -160,7 +163,7 @@ export const ProductDetailSheet = () => {
                 <ScrollArea className="flex-1 min-h-0">
                   {loading && <div className="p-4"><Spinner /></div>}
                   {!loading && product && <ProductInfo product={product} />}
-                  {!loading && !product && <div className="p-4">Product not found</div>}
+                  {!loading && !product && <div className="p-4">{t('Product not found')}</div>}
                 </ScrollArea>
               </Tabs.Content>
 
@@ -181,7 +184,7 @@ export const ProductDetailSheet = () => {
             <Sheet.Footer className="flex-none border-t">
               <Sheet.Close asChild>
                 <Button variant="secondary" className="bg-border">
-                  Close
+                  {t('Close')}
                 </Button>
               </Sheet.Close>
             </Sheet.Footer>

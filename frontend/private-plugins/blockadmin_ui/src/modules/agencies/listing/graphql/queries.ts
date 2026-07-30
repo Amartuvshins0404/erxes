@@ -42,7 +42,21 @@ export const GET_ADMIN_LISTINGS = gql`
           city
           district
         }
+        specs{
+          area
+          floor
+          totalFloors
+          rooms
+          builtYear
+        }
         createdAt
+        agent {
+          _id
+          firstName
+          lastName
+          email
+        }
+        agencyId
       }
       ${GQL_PAGE_INFO}
       totalCount

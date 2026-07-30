@@ -1,9 +1,14 @@
 import { Sheet, Button, Spinner, toast, useQueryState } from 'erxes-ui';
+import { useTranslation } from 'react-i18next';
 import { useAtom } from 'jotai';
 import { useEffect, useCallback, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { addEBarimtStageInConfigSchema, TStageInEbarimtConfig } from '@/ebarimt/settings/stage-in-ebarimt-config/types';
+import {
+  addEBarimtStageInConfigSchema,
+  normalizeRuleIds,
+  TStageInEbarimtConfig,
+} from '@/ebarimt/settings/stage-in-ebarimt-config/types';
 import { stageInEbarimtDetailAtom } from '@/ebarimt/settings/stage-in-ebarimt-config/states/stageInEbarimtConfigStates';
 import { useSaveStageInEbarimtConfig } from '@/ebarimt/settings/stage-in-ebarimt-config/hooks/useSaveStageInEbarimtConfig';
 import { useEbarimtConfigState } from '@/ebarimt/settings/stage-in-ebarimt-config/hooks/useEbarimtConfigState';
@@ -12,6 +17,7 @@ import { StageInEBarimtConfigFormFields } from './StageInEBarimtConfigFormFields
 const FORM_ID = 'edit-stage-in-ebarimt-form';
 
 export const EditStageInEBarimtConfig = () => {
+  const { t } = useTranslation('mongolian');
   const [open, setOpen] = useQueryState<string>('stage_in_ebarimt_id');
   const [detail, setDetail] = useAtom(stageInEbarimtDetailAtom);
   const { saveStageInEbarimtConfig } = useSaveStageInEbarimtConfig();
@@ -37,10 +43,10 @@ export const EditStageInEBarimtConfig = () => {
       hasVat: false,
       citytaxPercent: '',
       vatPercent: '',
-      reverseVatRules: '',
+      reverseVatRules: [],
       hasCitytax: false,
       footerText: '',
-      reverseCtaxRules: '',
+      reverseCtaxRules: [],
       withDescription: false,
       skipEbarimt: false,
       headerText: '',
@@ -68,10 +74,10 @@ export const EditStageInEBarimtConfig = () => {
         hasVat: detail.hasVat || false,
         citytaxPercent: detail.citytaxPercent || '',
         vatPercent: detail.vatPercent || '',
-        reverseVatRules: detail.reverseVatRules || '',
+        reverseVatRules: normalizeRuleIds(detail.reverseVatRules),
         hasCitytax: detail.hasCitytax || false,
         footerText: detail.footerText || '',
-        reverseCtaxRules: detail.reverseCtaxRules || '',
+        reverseCtaxRules: normalizeRuleIds(detail.reverseCtaxRules),
         withDescription: detail.withDescription || false,
         skipEbarimt: detail.skipEbarimt || false,
         headerText: detail.headerText || '',
@@ -92,12 +98,20 @@ export const EditStageInEBarimtConfig = () => {
     try {
       setLoading(true);
       const existingConfig = getConfigByStageId(data.stageId);
-      await saveStageInEbarimtConfig(data, 'update', existingConfig?._id || detail._id);
+      await saveStageInEbarimtConfig(
+        data,
+        'update',
+        existingConfig?._id || detail._id,
+      );
       setOpen(null);
       setDetail(null);
       reset();
     } catch {
-      toast({ title: 'Error', description: 'Failed to save configuration', variant: 'destructive' });
+      toast({
+        title: t('error'),
+        description: t('failed-to-save-config'),
+        variant: 'destructive',
+      });
     } finally {
       setLoading(false);
     }
@@ -147,7 +161,7 @@ export const EditStageInEBarimtConfig = () => {
     <Sheet open={open !== null} onOpenChange={handleClose}>
       <Sheet.View side="right" className="bg-background sm:max-w-4xl">
         <Sheet.Header>
-          <Sheet.Title>Edit Stage In Ebarimt Config</Sheet.Title>
+          <Sheet.Title>{t('edit-stage-in-ebarimt-config')}</Sheet.Title>
           <Sheet.Close />
         </Sheet.Header>
         <div className="flex-1 overflow-y-auto px-5 py-4">
@@ -164,10 +178,12 @@ export const EditStageInEBarimtConfig = () => {
         </div>
         <Sheet.Footer className="gap-2 border-t bg-background">
           <Sheet.Close asChild>
-            <Button variant="outline" size="lg">Cancel</Button>
+            <Button variant="outline" size="lg">
+              {t('cancel')}
+            </Button>
           </Sheet.Close>
           <Button type="submit" form={FORM_ID} size="lg" disabled={loading}>
-            {loading ? <Spinner /> : 'Save'}
+            {loading ? <Spinner /> : t('save')}
           </Button>
         </Sheet.Footer>
       </Sheet.View>

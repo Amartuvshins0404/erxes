@@ -94,10 +94,10 @@ export const unitMutations = {
       throw new Error('Unit not found');
     }
 
-    const contract = await models.Contract.findOne({
-      unit: _id,
-      status: CONTRACT_STATUS.SIGNED,
-    });
+    const signedStatus = await models.ContractStatus.findOne({ type: CONTRACT_STATUS.SIGNED });
+    const contract = signedStatus
+      ? await models.Contract.findOne({ unit: _id, status: signedStatus._id })
+      : null;
 
     if (contract) {
       throw new Error('Can not update unit because contract is signed');

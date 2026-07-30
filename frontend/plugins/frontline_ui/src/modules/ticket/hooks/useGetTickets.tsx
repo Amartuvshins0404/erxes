@@ -1,5 +1,6 @@
 import { GET_TICKETS } from '@/ticket/graphql/queries/getTickets';
 import { TICKET_LIST_CHANGED } from '@/ticket/graphql/subscriptions/ticketListChanged';
+import { ticketSortAtom } from '@/ticket/states/ticketSortState';
 import { ITicket } from '@/ticket/types';
 import { QueryHookOptions, useQuery } from '@apollo/client';
 import {
@@ -11,7 +12,9 @@ import {
   useToast,
   validateFetchMore,
 } from 'erxes-ui';
+import { useAtomValue } from 'jotai';
 import { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 
 const TICKETS_PER_PAGE = 30;
 
@@ -21,6 +24,13 @@ interface ITicketChanged {
     ticket: ITicket;
   };
 }
+
+export const TICKET_SORT_FIELDS = [
+  { label: 'Updated', value: 'updatedAt' },
+  { label: 'Created', value: 'createdAt' },
+] as const;
+
+export type TicketSortField = (typeof TICKET_SORT_FIELDS)[number]['value'];
 
 export const useTicketsVariables = (
   variables?: QueryHookOptions<ICursorListResponse<ITicket>>['variables'],
@@ -42,15 +52,17 @@ export const useTicketsVariables = (
       'pipelineId',
     ]);
 
+  const sortField = useAtomValue(ticketSortAtom);
+
   return {
     cursor: '',
     limit: TICKETS_PER_PAGE,
     orderBy: {
-      updatedAt: -1,
+      [sortField]: -1,
     },
     direction: 'forward',
 
-    name: searchValue,
+    searchValue: searchValue,
     assigneeId: assignee,
     priority: priority,
     statusId: statusId,
@@ -63,6 +75,7 @@ export const useTicketsVariables = (
 export const useTickets = (
   options?: QueryHookOptions<ICursorListResponse<ITicket>>,
 ) => {
+  const { t } = useTranslation('frontline');
   const variables = useTicketsVariables(options?.variables);
   const { toast } = useToast();
   const { data, loading, fetchMore, subscribeToMore } = useQuery<
@@ -74,7 +87,7 @@ export const useTickets = (
     fetchPolicy: 'cache-and-network',
     onError: (e) => {
       toast({
-        title: 'Error',
+        title: t('error'),
         description: e.message,
         variant: 'destructive',
       });
@@ -126,8 +139,8 @@ export const useTickets = (
               type === 'create'
                 ? prev.getTickets.totalCount + 1
                 : type === 'remove'
-                  ? prev.getTickets.totalCount - 1
-                  : prev.getTickets.totalCount,
+                ? prev.getTickets.totalCount - 1
+                : prev.getTickets.totalCount,
           },
         };
       },

@@ -1,9 +1,11 @@
 import { NetworkStatus, useMutation, useQuery } from '@apollo/client';
 import { toast } from 'erxes-ui';
 import { useEffect, useMemo, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import { useNavigate, useParams } from 'react-router-dom';
 import {
   CONTENT_CREATE_CMS,
+  CONTENT_DELETE_CMS,
   CONTENT_UPDATE_CMS,
 } from '../../graphql/mutations';
 import { CONTENT_CMS_LIST, GET_WEBSITES } from '../../graphql/queries';
@@ -17,7 +19,9 @@ import {
 import { buildPublicUrl } from '../utils/settingsHelpers';
 
 export const useSettingsForm = () => {
+  const { t } = useTranslation('content');
   const { websiteId } = useParams();
+  const navigate = useNavigate();
   const [hydratedSettingsKey, setHydratedSettingsKey] = useState<string>();
   const [settings, setSettings] = useState<SettingsFormState>(DEFAULT_SETTINGS);
   const mutationOptions = {
@@ -47,8 +51,7 @@ export const useSettingsForm = () => {
     websitesQuery.observable.getCurrentResult().partial !== true &&
     Array.isArray(websitesData?.getClientPortals?.list);
 
-  const settingsQueriesFetched =
-    cmsQueryFetched && websitesQueryFetched;
+  const settingsQueriesFetched = cmsQueryFetched && websitesQueryFetched;
 
   const [createCMS, { loading: creatingCMS }] = useMutation(
     CONTENT_CREATE_CMS,
@@ -56,6 +59,10 @@ export const useSettingsForm = () => {
   );
   const [updateCMS, { loading: updatingCMS }] = useMutation(
     CONTENT_UPDATE_CMS,
+    mutationOptions,
+  );
+  const [deleteCMS, { loading: deletingCMS }] = useMutation(
+    CONTENT_DELETE_CMS,
     mutationOptions,
   );
 
@@ -126,6 +133,7 @@ export const useSettingsForm = () => {
         ? cms.customScripts.join('\n')
         : DEFAULT_SETTINGS.customHeadScripts,
       postUrlField: cms?.postUrlField || DEFAULT_SETTINGS.postUrlField,
+      postUrlPrefix: cms?.postUrlPrefix ?? DEFAULT_SETTINGS.postUrlPrefix,
       defaultPostStatus:
         cms?.defaultPostStatus || DEFAULT_SETTINGS.defaultPostStatus,
       allowComments: cms?.allowComments ?? DEFAULT_SETTINGS.allowComments,
@@ -134,6 +142,8 @@ export const useSettingsForm = () => {
         cms?.language || languages[0] || DEFAULT_SETTINGS.defaultLanguage,
       siteLogo: cms?.siteLogo || DEFAULT_SETTINGS.siteLogo,
       favicon: cms?.favicon || DEFAULT_SETTINGS.favicon,
+      accessPolicy: cms?.accessPolicy === 'assigned' ? 'assigned' : 'open',
+      assignedMemberIds: cms?.assignedMemberIds || [],
     });
     setHydratedSettingsKey(hydrationKey);
   }, [
@@ -177,8 +187,12 @@ export const useSettingsForm = () => {
       language,
       languages,
       postUrlField: settings.postUrlField,
+      postUrlPrefix: settings.postUrlPrefix,
       siteLogo: settings.siteLogo,
       favicon: settings.favicon,
+      accessPolicy: settings.accessPolicy,
+      assignedMemberIds:
+        settings.accessPolicy === 'assigned' ? settings.assignedMemberIds : [],
     };
 
     return includeContent
@@ -192,8 +206,8 @@ export const useSettingsForm = () => {
   const handleSave = async () => {
     if (!websiteId) {
       toast({
-        title: 'Settings not saved',
-        description: 'Select a CMS website before saving settings.',
+        title: t('settings-not-saved'),
+        description: t('select-cms-before-saving'),
         variant: 'destructive',
       });
       return;
@@ -201,8 +215,8 @@ export const useSettingsForm = () => {
 
     if (!settingsQueriesFetched) {
       toast({
-        title: 'Settings not saved',
-        description: 'Settings are still loading. Try again in a moment.',
+        title: t('settings-not-saved'),
+        description: t('settings-still-loading'),
         variant: 'destructive',
       });
       return;
@@ -210,8 +224,8 @@ export const useSettingsForm = () => {
 
     if (!settings.websiteName.trim() || !settings.shortDescription.trim()) {
       toast({
-        title: 'Settings not saved',
-        description: 'Website name and short description are required.',
+        title: t('settings-not-saved'),
+        description: t('website-name-and-desc-required'),
         variant: 'destructive',
       });
       return;
@@ -227,8 +241,8 @@ export const useSettingsForm = () => {
         });
 
         toast({
-          title: 'Success',
-          description: 'CMS settings updated successfully.',
+          title: t('success'),
+          description: t('cms-settings-updated-successfully'),
         });
         return;
       }
@@ -240,16 +254,52 @@ export const useSettingsForm = () => {
       });
 
       toast({
-        title: 'Success',
-        description: 'CMS settings created successfully.',
+        title: t('success'),
+        description: t('cms-settings-created-successfully'),
       });
     } catch (error) {
       toast({
-        title: 'Error',
+        title: t('error'),
         description:
           error instanceof Error
             ? error.message
-            : 'Failed to save CMS settings. Please try again.',
+            : t('failed-to-save-cms-settings'),
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!cms?._id) {
+      toast({
+        title: t('cms-not-deleted'),
+        description: t('save-cms-before-deleting'),
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      await deleteCMS({
+        variables: {
+          id: cms._id,
+        },
+        refetchQueries: [{ query: CONTENT_CMS_LIST }],
+        awaitRefetchQueries: true,
+      });
+
+      toast({
+        title: t('success'),
+        description: t('cms-deleted-successfully'),
+      });
+      navigate('/content/cms');
+    } catch (error) {
+      toast({
+        title: t('error'),
+        description:
+          error instanceof Error
+            ? error.message
+            : t('failed-to-delete-cms'),
         variant: 'destructive',
       });
     }
@@ -260,11 +310,15 @@ export const useSettingsForm = () => {
       Boolean(websiteId) &&
       settingsQueriesFetched &&
       !creatingCMS &&
-      !updatingCMS,
+      !updatingCMS &&
+      !deletingCMS,
     clientPortals,
+    cms,
+    isDeleting: deletingCMS,
     isSaving: creatingCMS || updatingCMS,
     settings,
     updateSetting,
+    handleDelete,
     handleSave,
   };
 };

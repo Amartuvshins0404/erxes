@@ -87,58 +87,53 @@ export function generateInstallmentDates(
     return d;
   };
 
+  const push = (computed: Date) => {
+    dates.push(dates.length === 0 ? startDate : computed);
+  };
+
   switch (frequency) {
     case 'ONE_TIME_PER_MONTH': {
-      for (let i = 0; i < count; i++) {
-        dates.push(setSafeDay(addMonths(startDate, i + 1), days[0]));
-      }
+      for (let i = 0; i < count; i++)
+        push(setSafeDay(addMonths(startDate, i), days[0]));
       break;
     }
     case 'TWO_TIME_PER_MONTH': {
       const dd = days.length >= 2 ? days.slice(0, 2) : [15, 30];
       const monthsNeeded = Math.ceil(count / 2);
-      for (let m = 0; m < monthsNeeded; m++) {
-        for (let i = 0; i < dd.length && dates.length < count; i++) {
-          dates.push(setSafeDay(addMonths(startDate, m + 1), dd[i]));
-        }
-      }
+      for (let m = 0; m < monthsNeeded; m++)
+        for (let i = 0; i < dd.length && dates.length < count; i++)
+          push(setSafeDay(addMonths(startDate, m), dd[i]));
       break;
     }
     case 'THREE_TIME_PER_MONTH': {
       const dd = days.length >= 3 ? days.slice(0, 3) : [10, 20, 30];
       const monthsNeeded = Math.ceil(count / 3);
-      for (let m = 0; m < monthsNeeded; m++) {
-        for (let i = 0; i < dd.length && dates.length < count; i++) {
-          dates.push(setSafeDay(addMonths(startDate, m + 1), dd[i]));
-        }
-      }
+      for (let m = 0; m < monthsNeeded; m++)
+        for (let i = 0; i < dd.length && dates.length < count; i++)
+          push(setSafeDay(addMonths(startDate, m), dd[i]));
       break;
     }
     case 'QUARTERLY': {
-      for (let i = 0; i < count; i++) {
-        dates.push(setSafeDay(addMonths(startDate, (i + 1) * 3), days[0]));
-      }
+      for (let i = 0; i < count; i++)
+        push(setSafeDay(addMonths(startDate, i * 3), days[0]));
       break;
     }
     case 'HALF_YEARLY': {
-      for (let i = 0; i < count; i++) {
-        dates.push(setSafeDay(addMonths(startDate, (i + 1) * 6), days[0]));
-      }
+      for (let i = 0; i < count; i++)
+        push(setSafeDay(addMonths(startDate, i * 6), days[0]));
       break;
     }
     case 'YEARLY': {
-      for (let i = 0; i < count; i++) {
-        dates.push(setSafeDay(addYears(startDate, i + 1), days[0]));
-      }
+      for (let i = 0; i < count; i++)
+        push(setSafeDay(addYears(startDate, i), days[0]));
       break;
     }
     case 'ONE_TIME': {
       break;
     }
     default: {
-      for (let i = 0; i < count; i++) {
-        dates.push(setSafeDay(addMonths(startDate, i + 1), days[0]));
-      }
+      for (let i = 0; i < count; i++)
+        push(setSafeDay(addMonths(startDate, i), days[0]));
     }
   }
   return dates;

@@ -6,13 +6,18 @@ import {
 } from 'erxes-ui';
 import {
   GET_CONTRACT_PAYMENTS,
+  GET_PAYMENT_TRANSACTIONS,
   GET_PROJECT_PAYMENTS,
 } from '@/contract-payment/graphql/queries';
 import {
-  MARK_PAYMENT_PAID,
-  MARK_PAYMENT_UNPAID,
+  ADD_PAYMENT_TRANSACTION,
+  REMOVE_PAYMENT_TRANSACTION,
+  UPDATE_PAYMENT_TRANSACTION,
 } from '@/contract-payment/graphql/mutations';
-import { IContractPayment } from '@/contract-payment/types';
+import {
+  IContractPayment,
+  IContractPaymentTransaction,
+} from '@/contract-payment/types';
 
 const PAYMENTS_PER_PAGE = 30;
 
@@ -29,10 +34,16 @@ type ProjectPaymentsResponse = {
   };
 };
 
-export const useProjectPayments = (projectId?: string, paid?: boolean) => {
+export const useProjectPayments = (
+  projectId?: string,
+  paid?: boolean,
+  contractNumber?: string,
+  customerId?: string,
+  unitNumber?: string,
+) => {
   const { data, loading, refetch, fetchMore } =
     useQuery<ProjectPaymentsResponse>(GET_PROJECT_PAYMENTS, {
-      variables: { projectId, paid, limit: PAYMENTS_PER_PAGE },
+      variables: { projectId, paid, contractNumber, customerId, unitNumber, limit: PAYMENTS_PER_PAGE },
       skip: !projectId,
       notifyOnNetworkStatusChange: true,
     });
@@ -156,49 +167,76 @@ export const useContractPayments = (contractId?: string) => {
   };
 };
 
-export const useMarkPaymentPaid = () => {
-  const [markPaid, { loading }] = useMutation(MARK_PAYMENT_PAID);
+const TXS_REFETCH = [
+  'BlockGetPaymentTransactions',
+  'BlockGetContractPayments',
+  'BlockGetProjectPayments',
+];
+
+export const usePaymentTransactions = (paymentId?: string) => {
+  const { data, loading, refetch } = useQuery<{
+    blockGetPaymentTransactions: IContractPaymentTransaction[];
+  }>(GET_PAYMENT_TRANSACTIONS, {
+    variables: { paymentId },
+    skip: !paymentId,
+    fetchPolicy: 'cache-and-network',
+  });
+
   return {
-    markPaid: async (
-      id: string,
-      input?: { paidAmount?: number; paidDate?: string; note?: string },
-    ) => {
-      const { data } = await markPaid({
-        variables: { id, ...input },
-        optimisticResponse: {
-          blockMarkContractPaymentPaid: {
-            __typename: 'BlockContractPayment',
-            _id: id,
-            paid: true,
-            paidAmount: input?.paidAmount ?? null,
-            paidDate: input?.paidDate ?? new Date().toISOString(),
-            note: input?.note ?? null,
-          },
-        },
-      });
-      return data?.blockMarkContractPaymentPaid;
+    transactions: data?.blockGetPaymentTransactions || [],
+    loading,
+    refetch,
+  };
+};
+
+export const useAddPaymentTransaction = () => {
+  const [addTransaction, { loading }] = useMutation(ADD_PAYMENT_TRANSACTION, {
+    refetchQueries: TXS_REFETCH,
+  });
+  return {
+    addTransaction: async (input: {
+      paymentId: string;
+      amount: number;
+      date?: string;
+      note?: string;
+      paymentMethod?: string;
+    }) => {
+      const { data } = await addTransaction({ variables: input });
+      return data?.blockAddPaymentTransaction;
     },
     loading,
   };
 };
 
-export const useMarkPaymentUnpaid = () => {
-  const [markUnpaid, { loading }] = useMutation(MARK_PAYMENT_UNPAID);
+export const useUpdatePaymentTransaction = () => {
+  const [updateTransaction, { loading }] = useMutation(
+    UPDATE_PAYMENT_TRANSACTION,
+    { refetchQueries: TXS_REFETCH },
+  );
   return {
-    markUnpaid: async (id: string) => {
-      const { data } = await markUnpaid({
-        variables: { id },
-        optimisticResponse: {
-          blockMarkContractPaymentUnpaid: {
-            __typename: 'BlockContractPayment',
-            _id: id,
-            paid: false,
-            paidAmount: null,
-            paidDate: null,
-          },
-        },
-      });
-      return data?.blockMarkContractPaymentUnpaid;
+    updateTransaction: async (input: {
+      id: string;
+      amount?: number;
+      date?: string;
+      note?: string;
+      paymentMethod?: string;
+    }) => {
+      const { data } = await updateTransaction({ variables: input });
+      return data?.blockUpdatePaymentTransaction;
+    },
+    loading,
+  };
+};
+
+export const useRemovePaymentTransaction = () => {
+  const [removeTransaction, { loading }] = useMutation(
+    REMOVE_PAYMENT_TRANSACTION,
+    { refetchQueries: TXS_REFETCH },
+  );
+  return {
+    removeTransaction: async (id: string) => {
+      const { data } = await removeTransaction({ variables: { id } });
+      return data?.blockRemovePaymentTransaction;
     },
     loading,
   };

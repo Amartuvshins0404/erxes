@@ -1,4 +1,4 @@
-import Labels from '@/deals/cards/components/detail/overview/label/Labels';
+import { Labels } from '@/deals/cards/components/detail/overview/label/Labels';
 import { ItemFooter } from '@/deals/cards/components/item/Footer';
 import { useDealsEdit } from '@/deals/cards/hooks/useDeals';
 import { SelectLabels } from '@/deals/components/common/filters/SelectLabel';
@@ -7,22 +7,33 @@ import { SelectDealPriority } from '@/deals/components/deal-selects/SelectDealPr
 import { dealDetailSheetState } from '@/deals/states/dealDetailSheetState';
 import { IDeal } from '@/deals/types/deals';
 import { IconAlertCircleFilled } from '@tabler/icons-react';
-import { Separator, useQueryState } from 'erxes-ui';
+import { CopyText, Separator, useQueryState } from 'erxes-ui';
 import { useSetAtom } from 'jotai';
 import { memo, useState } from 'react';
 import {
-  SelectCompany,
-  SelectCustomer,
-  SelectTags,
-  useManageRelations,
-} from 'ui-modules';
-import DealCardDetails from './DealsBoardCardDetails';
+  SelectCompanyFilterBar,
+  SelectCustomerFilterBar,
+} from 'ui-modules/modules/contacts';
+import { SelectTagsFilterBar } from 'ui-modules/modules/tags';
+import { useManageRelations } from 'ui-modules';
+import type { IProductData } from 'ui-modules';
+import { DealCardDetails } from './DealsBoardCardDetails';
+import { useTranslation } from 'react-i18next';
 
 interface DealsBoardCardProps {
   deal: IDeal;
 }
 
+const normalizeSelectedIds = (value?: string | string[]) => {
+  if (!value) {
+    return [];
+  }
+
+  return Array.isArray(value) ? value : [value];
+};
+
 const CardDetails = ({ deal }: { deal: IDeal }) => {
+  const { t } = useTranslation('sales');
   const { companies, customers, tags, customProperties } = deal;
 
   const productMap = new Map(deal.products?.map((p) => [p._id, p]));
@@ -48,9 +59,26 @@ const CardDetails = ({ deal }: { deal: IDeal }) => {
   const dealProducts = filterProducts(true);
   const excludedProducts = filterProducts(false);
 
+  const computeTotals = (items: IProductData[]) => {
+    const totals: Record<string, number> = {};
+    items.forEach((p) => {
+      const currency = p.currency || '';
+      totals[currency] = (totals[currency] || 0) + (p.amount || 0);
+    });
+    return totals;
+  };
+
+  const usedTotals = computeTotals(
+    deal.productsData?.filter((p) => p.tickUsed !== false) || [],
+  );
+  const unusedTotals = computeTotals(
+    deal.productsData?.filter((p) => p.tickUsed === false) || [],
+  );
+
+  const hasProducts = dealProducts.length > 0 || excludedProducts.length > 0;
+
   if (
-    !dealProducts?.length &&
-    !excludedProducts?.length &&
+    !hasProducts &&
     !companies?.length &&
     !customers?.length &&
     !tags?.length &&
@@ -60,13 +88,53 @@ const CardDetails = ({ deal }: { deal: IDeal }) => {
   }
 
   return (
-    <div className="p-3 pt-0">
-      <DealCardDetails items={companies} color="#EA475D" />
-      <DealCardDetails items={customers} color="#F7CE53" />
-      <DealCardDetails items={dealProducts} color="#63D2D6" />
-      <DealCardDetails items={excludedProducts} color="#b49cf1" />
-      <DealCardDetails color="#FF6600" items={tags || []} />
-      <DealCardDetails color="#FF9900" items={customProperties || []} />
+    <div className="flex flex-col gap-1.5 p-3 pt-0">
+      <DealCardDetails items={companies} color="#EA475D" separated />
+      <DealCardDetails items={customers} color="#F7CE53" separated />
+      <DealCardDetails items={dealProducts} color="#63D2D6" separated />
+      <DealCardDetails items={excludedProducts} color="#b49cf1" separated />
+      <DealCardDetails items={tags || []} color="#FF6600" separated />
+      <DealCardDetails
+        items={customProperties || []}
+        color="#FF9900"
+        separated
+      />
+      {hasProducts && (
+        <div className="flex flex-col gap-0.5 pt-0.5">
+          {Object.entries(usedTotals).map(([currency, total]) => (
+            <div
+              key={currency}
+              className="flex justify-between text-xs font-semibold"
+            >
+              <span className="text-muted-foreground">{t('total')}</span>
+              <span>
+                {total.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                {currency && (
+                  <span className="text-muted-foreground ml-1 text-[10px]">
+                    {currency}
+                  </span>
+                )}
+              </span>
+            </div>
+          ))}
+          {Object.entries(unusedTotals).map(([currency, total]) => (
+            <div
+              key={currency}
+              className="flex justify-between text-xs opacity-60"
+            >
+              <span className="text-muted-foreground">{t('unused')}</span>
+              <span>
+                {total.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                {currency && (
+                  <span className="text-muted-foreground ml-1 text-[10px]">
+                    {currency}
+                  </span>
+                )}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
@@ -102,7 +170,6 @@ export const DealsBoardCard = memo(function DealsBoardCard({
     stage,
     tagIds,
   } = deal;
-
   const onCardClick = () => {
     setSalesItemId(_id);
     setActiveDealAtom(_id);
@@ -110,6 +177,8 @@ export const DealsBoardCard = memo(function DealsBoardCard({
   const archivedOnly = searchParams === 'true';
   const isArchived = status === 'archived';
   const showArchivedBadge = archivedOnly || isArchived;
+  const { t } = useTranslation('sales');
+
 
   return (
     <div
@@ -118,14 +187,14 @@ export const DealsBoardCard = memo(function DealsBoardCard({
     >
       <div className="flex items-center justify-between h-9 px-1.5">
         <DateSelectDeal
-          placeholder="Start Date"
+          placeholder={t('start-date')}
           value={startDate}
           id={_id}
           type="startDate"
           variant="card"
         />
         <DateSelectDeal
-          placeholder="Close Date"
+          placeholder={t('close-date')}
           value={closeDate}
           id={_id}
           type="closeDate"
@@ -140,14 +209,16 @@ export const DealsBoardCard = memo(function DealsBoardCard({
           </div>
         )}
         <div className="flex flex-col gap-1">
-          <h5 className="font-semibold">{name}</h5>
+          <h5 className="font-semibold">
+            <CopyText value={name || ''} className="hover:opacity-70 text-left">
+              {name}
+            </CopyText>
+          </h5>
           {stage?.age !== undefined && stage.age < 0 && (
             <span className="px-2 rounded flex gap-1 bg-yellow-50 text-yellow-400 border-yellow-100 border">
               <IconAlertCircleFilled className="size-6 pt-2" />
               <h5 className="text-sm py-2">
-                Ready to move this card to the next column? (
-                {Math.abs(stage.age)}{' '}
-                {Math.abs(stage.age) === 1 ? 'day' : 'days'} elapsed)
+                {t('ready-to-move-card', { count: Math.abs(stage.age) })}
               </h5>
             </span>
           )}
@@ -161,15 +232,16 @@ export const DealsBoardCard = memo(function DealsBoardCard({
           <SelectLabels.FilterBar
             filterKey=""
             mode="multiple"
-            label="By Label"
+            label={t('by-label')}
             variant="card"
             targetId={_id}
             initialValue={labels?.map((label) => label._id || '') || []}
+            showLabels
           />
-          <SelectTags.FilterBar
+          <SelectTagsFilterBar
             filterKey=""
             mode="multiple"
-            label="By Tag"
+            label={t('by-tag')}
             variant="card"
             targetId={_id}
             tagType="sales:deal"
@@ -184,10 +256,10 @@ export const DealsBoardCard = memo(function DealsBoardCard({
               });
             }}
           />
-          <SelectCustomer.FilterBar
+          <SelectCustomerFilterBar
             filterKey=""
             mode="multiple"
-            label="By Customer"
+            label={t('by-customer')}
             variant="card"
             targetId={_id}
             initialValue={
@@ -196,10 +268,12 @@ export const DealsBoardCard = memo(function DealsBoardCard({
             value={
               currentCustomers?.map((customer) => customer._id || '') || []
             }
-            onValueChange={(value: any) => {
-              if (!value) return;
+            onValueChange={(value?: string | string[]) => {
+              const selectedIds = normalizeSelectedIds(value);
 
-              const updatedCustomers = (value || []).map(
+              if (!selectedIds.length) return;
+
+              const updatedCustomers = selectedIds.map(
                 (id: string) =>
                   currentCustomers?.find((c) => c._id === id) || { _id: id },
               );
@@ -209,25 +283,27 @@ export const DealsBoardCard = memo(function DealsBoardCard({
                 contentType: 'sales:deal',
                 contentId: _id,
                 relatedContentType: 'core:customer',
-                relatedContentIds: value || [],
+                relatedContentIds: selectedIds,
               });
             }}
             hideAvatar
           />
-          <SelectCompany.FilterBar
+          <SelectCompanyFilterBar
             filterKey=""
             mode="multiple"
-            label="By Company"
+            label={t('by-company')}
             variant="card"
             targetId={_id}
             initialValue={
               currentCompanies?.map((company) => company._id || '') || []
             }
             value={currentCompanies?.map((company) => company._id || '') || []}
-            onValueChange={(value: any) => {
-              if (!value) return;
+            onValueChange={(value?: string | string[]) => {
+              const selectedIds = normalizeSelectedIds(value);
 
-              const updatedCompanies = (value || []).map(
+              if (!selectedIds.length) return;
+
+              const updatedCompanies = selectedIds.map(
                 (id: string) =>
                   currentCompanies?.find((c) => c._id === id) || { _id: id },
               );
@@ -237,7 +313,7 @@ export const DealsBoardCard = memo(function DealsBoardCard({
                 contentType: 'sales:deal',
                 contentId: _id,
                 relatedContentType: 'core:company',
-                relatedContentIds: value || [],
+                relatedContentIds: selectedIds,
               });
             }}
             hideAvatar
@@ -255,7 +331,7 @@ export const DealsBoardCard = memo(function DealsBoardCard({
       {showArchivedBadge && (
         <div className="pointer-events-none select-none absolute bottom-6 -right-10 -rotate-45 w-40">
           <span className="block w-full text-center px-8 py-1 text-xs font-semibold bg-yellow-100 text-yellow-800 border-t border-b border-yellow-200 ">
-            Archived
+            {t('archived')}
           </span>
         </div>
       )}

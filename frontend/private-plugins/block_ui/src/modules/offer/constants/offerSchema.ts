@@ -1,27 +1,46 @@
 import { z } from 'zod';
 
 export const offerSchema = z.object({
-  priceId: z.string().min(1, 'Price is required'),
-  price: z.object({
-    currency: z.string().min(1, 'Currency is required'),
-    price: z.number().min(0, 'Price is required'),
-    priceType: z.enum(['priceBySize', 'priceByUnit']),
-  }),
+  priceId: z.string().optional(),
+  price: z
+    .object({
+      currency: z.string().nullish(),
+      price: z.number().nullish(),
+    })
+    .optional(),
   paymentPlanId: z.string().optional(),
-  paymentPlan: z.object({
-    type: z.string().min(1, 'Type is required'),
-    downPaymentPercentage: z
-      .number()
-      .min(0, 'Down payment percentage is required'),
-    interestPercentage: z.number().min(0, 'Interest percentage is required'),
-    discountPercentage: z.number().min(0, 'Discount percentage is required'),
-    installment: z.number().min(0, 'Installment is required'),
-    frequency: z.string().min(1, 'Frequency is required'),
-  }),
-  endDate: z.date().min(new Date(), 'End date must be in the future'),
-  partyType: z.enum(['customer', 'company']),
-  partyId: z.string().min(1, 'customer or company is required'),
-  user: z.string().min(1, 'User is required'),
+  paymentPlan: z
+    .object({
+      downPaymentPercentage: z.number().nullish(),
+      downPaymentAmount: z.number().nullish(),
+      barterPercentage: z.number().nullish(),
+      barterAmount: z.number().nullish(),
+      interestPercentage: z.number().nullish(),
+      interestType: z.string().nullish(),
+      completionPaymentPercentage: z.number().nullish(),
+      completionPaymentAmount: z.number().nullish(),
+      discountPercentage: z.number().nullish(),
+      description: z.string().nullish(),
+      installment: z.number().nullish(),
+      frequency: z.string().nullish(),
+      penaltyPercentage: z.number().nullish(),
+      vatIncluded: z.boolean().nullish(),
+      roundedInstallmentAmount: z.number().nullish(),
+      installmentAmounts: z.array(z.number()).nullish(),
+      paymentDates: z.array(z.number()).nullish(),
+      paymentDueDates: z.array(z.string()).nullish(),
+      firstPaymentDate: z.string().nullish(),
+      downPaymentDate: z.string().nullish(),
+      completionPaymentDate: z.string().nullish(),
+      completionPaymentDateLabel: z.string().nullish(),
+    })
+    .optional(),
+  unit: z.string().nullish(),
+  date: z.string().nullish(),
+  endDate: z.date().nullish(),
+  partyType: z.enum(['customer', 'company']).nullish(),
+  partyId: z.string().nullish(),
+  user: z.string().nullish(),
 });
 
 export type OfferFormData = z.infer<typeof offerSchema>;

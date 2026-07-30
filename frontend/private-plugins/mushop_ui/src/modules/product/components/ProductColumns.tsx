@@ -19,6 +19,7 @@ import {
   IconTag,
   IconUser,
 } from '@tabler/icons-react';
+import { useTranslation } from 'react-i18next';
 import { IMushopProduct } from '../types';
 import { ProductStatusAction } from './ProductStatusAction';
 import { ProductCategoryAssign } from './ProductCategoryAssign';
@@ -34,9 +35,10 @@ export const productColumns: ColumnDef<IMushopProduct>[] = [
   {
     id: 'name',
     accessorKey: 'name',
-    header: () => (
-      <RecordTable.InlineHead label="Name" icon={IconLabelFilled} />
-    ),
+    header: () => {
+      const { t } = useTranslation('mushop');
+      return <RecordTable.InlineHead label={t('Name')} icon={IconLabelFilled} />;
+    },
     cell: ({ cell, row }) => {
       const [, setActiveProductId] =
         useQueryState<string>('activeProductId');
@@ -53,7 +55,10 @@ export const productColumns: ColumnDef<IMushopProduct>[] = [
   {
     id: 'code',
     accessorKey: 'code',
-    header: () => <RecordTable.InlineHead label="Code" icon={IconBarcode} />,
+    header: () => {
+      const { t } = useTranslation('mushop');
+      return <RecordTable.InlineHead label={t('Code')} icon={IconBarcode} />;
+    },
     cell: ({ cell }) => (
       <RecordTableInlineCell>
         <TextOverflowTooltip value={cell.getValue() as string} />
@@ -64,7 +69,10 @@ export const productColumns: ColumnDef<IMushopProduct>[] = [
   {
     id: 'type',
     accessorKey: 'type',
-    header: () => <RecordTable.InlineHead label="Type" icon={IconTag} />,
+    header: () => {
+      const { t } = useTranslation('mushop');
+      return <RecordTable.InlineHead label={t('Type')} icon={IconTag} />;
+    },
     cell: ({ cell }) => (
       <RecordTableInlineCell>
         <TextOverflowTooltip value={cell.getValue() as string} />
@@ -75,9 +83,10 @@ export const productColumns: ColumnDef<IMushopProduct>[] = [
   {
     id: 'unitPrice',
     accessorKey: 'unitPrice',
-    header: () => (
-      <RecordTable.InlineHead label="Unit Price" icon={IconCoin} />
-    ),
+    header: () => {
+      const { t } = useTranslation('mushop');
+      return <RecordTable.InlineHead label={t('Unit Price')} icon={IconCoin} />;
+    },
     cell: ({ cell }) => (
       <RecordTableInlineCell>
         {cell.getValue() != null
@@ -90,7 +99,10 @@ export const productColumns: ColumnDef<IMushopProduct>[] = [
   {
     id: 'uom',
     accessorKey: 'uom',
-    header: () => <RecordTable.InlineHead label="UOM" icon={IconRuler} />,
+    header: () => {
+      const { t } = useTranslation('mushop');
+      return <RecordTable.InlineHead label={t('UOM')} icon={IconRuler} />;
+    },
     cell: ({ cell }) => (
       <RecordTableInlineCell>
         <TextOverflowTooltip value={cell.getValue() as string} />
@@ -100,9 +112,10 @@ export const productColumns: ColumnDef<IMushopProduct>[] = [
   },
   {
     id: 'category',
-    header: () => (
-      <RecordTable.InlineHead label="Category" icon={IconCategory} />
-    ),
+    header: () => {
+      const { t } = useTranslation('mushop');
+      return <RecordTable.InlineHead label={t('Category')} icon={IconCategory} />;
+    },
     cell: ({ row }) => (
       <ProductCategoryAssign.Provider
         productId={row.original._id}
@@ -117,9 +130,10 @@ export const productColumns: ColumnDef<IMushopProduct>[] = [
   },
   {
     id: 'supplier',
-    header: () => (
-      <RecordTable.InlineHead label="Supplier" icon={IconUser} />
-    ),
+    header: () => {
+      const { t } = useTranslation('mushop');
+      return <RecordTable.InlineHead label={t('Supplier')} icon={IconUser} />;
+    },
     cell: ({ row }) => (
       <RecordTableInlineCell>
         <TextOverflowTooltip value={row.original.supplier?.name || '-'} />
@@ -130,29 +144,34 @@ export const productColumns: ColumnDef<IMushopProduct>[] = [
   {
     id: 'status',
     accessorKey: 'status',
-    header: () => (
-      <RecordTable.InlineHead label="Status" icon={IconShieldCheck} />
-    ),
-    cell: ({ cell, row }) => (
-      <RecordTableInlineCell>
-        <ProductStatusAction
-          productId={row.original._id}
-          status={cell.getValue() as string}
-        >
-          <Badge variant={statusVariant(cell.getValue() as string)}>
-            {(cell.getValue() as string) || 'pending'}
-          </Badge>
-        </ProductStatusAction>
-      </RecordTableInlineCell>
-    ),
+    header: () => {
+      const { t } = useTranslation('mushop');
+      return <RecordTable.InlineHead label={t('Status')} icon={IconShieldCheck} />;
+    },
+    cell: ({ cell, row }) => {
+      const { t } = useTranslation('mushop');
+      return (
+        <RecordTableInlineCell>
+          <ProductStatusAction
+            productId={row.original._id}
+            status={cell.getValue() as string}
+          >
+            <Badge variant={statusVariant(cell.getValue() as string)}>
+              {t((cell.getValue() as string) || 'pending')}
+            </Badge>
+          </ProductStatusAction>
+        </RecordTableInlineCell>
+      );
+    },
     size: 140,
   },
   {
     id: 'createdAt',
     accessorKey: 'createdAt',
-    header: () => (
-      <RecordTable.InlineHead label="Created" icon={IconCalendar} />
-    ),
+    header: () => {
+      const { t } = useTranslation('mushop');
+      return <RecordTable.InlineHead label={t('Created')} icon={IconCalendar} />;
+    },
     cell: ({ cell }) => (
       <RelativeDateDisplay value={cell.getValue() as string} asChild>
         <RecordTableInlineCell>

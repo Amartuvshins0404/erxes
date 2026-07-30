@@ -4,24 +4,70 @@ import {
   IconCurrencyDollar,
   IconHash,
   IconLabel,
+  IconRefresh,
 } from '@tabler/icons-react';
 import { ColumnDef } from '@tanstack/table-core';
 import {
+  Checkbox,
   RecordTable,
   TextOverflowTooltip,
   RecordTableInlineCell,
   RelativeDateDisplay,
 } from 'erxes-ui';
 
-import { ICheckSyncedDeals } from '../types/checkSyncedDeals';
+import {
+  CheckSyncedDealStatus,
+  ICheckSyncedDeals,
+} from '../types/checkSyncedDeals';
 import { CheckSyncedDealsMoreColumn } from './CheckSyncedDealsMoreColumn';
-export const checkSyncedDealsColumns: ColumnDef<ICheckSyncedDeals>[] = [
+
+type CheckSyncedDealsColumnsOptions = {
+  toSyncDealIds: Record<string, boolean>;
+  syncableDealIds: string[];
+  onToggleToSync: (id: string, checked: boolean) => void;
+  onToggleAllToSync: (ids: string[], checked: boolean) => void;
+  t: (key: string) => string;
+};
+
+const syncableStatuses = new Set<CheckSyncedDealStatus>([
+  'checked',
+  'synced',
+  'pending',
+  'error',
+  'resynced',
+]);
+
+const getSyncStatus = (deal: ICheckSyncedDeals): CheckSyncedDealStatus =>
+  deal.syncStatus || 'skipped';
+
+export const isSyncableDeal = (deal: ICheckSyncedDeals) =>
+  syncableStatuses.has(getSyncStatus(deal));
+
+const stringifyAmount = (amount: unknown) => {
+  if (!amount) {
+    return '';
+  }
+
+  if (typeof amount === 'string') {
+    return amount;
+  }
+
+  return JSON.stringify(amount);
+};
+
+export const getCheckSyncedDealsColumns = ({
+  toSyncDealIds,
+  syncableDealIds,
+  onToggleToSync,
+  onToggleAllToSync,
+  t,
+}: CheckSyncedDealsColumnsOptions): ColumnDef<ICheckSyncedDeals>[] => [
   CheckSyncedDealsMoreColumn,
   RecordTable.checkboxColumn as ColumnDef<ICheckSyncedDeals>,
   {
     id: 'name',
     accessorKey: 'name',
-    header: () => <RecordTable.InlineHead icon={IconLabel} label="Deal name" />,
+    header: () => <RecordTable.InlineHead icon={IconLabel} label={t('deal-name')} />,
     cell: ({ cell }) => {
       return (
         <RecordTableInlineCell>
@@ -34,7 +80,7 @@ export const checkSyncedDealsColumns: ColumnDef<ICheckSyncedDeals>[] = [
     id: 'number',
     accessorKey: 'number',
     header: () => (
-      <RecordTable.InlineHead icon={IconHash} label="Deal number" />
+      <RecordTable.InlineHead icon={IconHash} label={t('deal-number')} />
     ),
     cell: ({ cell }) => {
       return (
@@ -48,14 +94,12 @@ export const checkSyncedDealsColumns: ColumnDef<ICheckSyncedDeals>[] = [
     id: 'amount',
     accessorKey: 'amount',
     header: () => (
-      <RecordTable.InlineHead icon={IconCurrencyDollar} label="Amount" />
+      <RecordTable.InlineHead icon={IconCurrencyDollar} label={t('amount')} />
     ),
     cell: ({ cell }) => {
-      const amount = cell.getValue() as any;
-      const amountStr = amount ? JSON.stringify(amount) : '';
       return (
         <RecordTableInlineCell>
-          <TextOverflowTooltip value={amountStr} />
+          <TextOverflowTooltip value={stringifyAmount(cell.getValue())} />
         </RecordTableInlineCell>
       );
     },
@@ -64,7 +108,7 @@ export const checkSyncedDealsColumns: ColumnDef<ICheckSyncedDeals>[] = [
     id: 'createdAt',
     accessorKey: 'createdAt',
     header: () => (
-      <RecordTable.InlineHead label="Created At" icon={IconCalendarPlus} />
+      <RecordTable.InlineHead label={t('created-at')} icon={IconCalendarPlus} />
     ),
     cell: ({ cell }) => {
       return (
@@ -80,7 +124,7 @@ export const checkSyncedDealsColumns: ColumnDef<ICheckSyncedDeals>[] = [
     id: 'modifiedAt',
     accessorKey: 'modifiedAt',
     header: () => (
-      <RecordTable.InlineHead icon={IconCategory} label="Modified At" />
+      <RecordTable.InlineHead icon={IconCategory} label={t('modified-at')} />
     ),
     cell: ({ cell }) => {
       return (
@@ -96,7 +140,7 @@ export const checkSyncedDealsColumns: ColumnDef<ICheckSyncedDeals>[] = [
     id: 'stageChangedDate',
     accessorKey: 'stageChangedDate',
     header: () => (
-      <RecordTable.InlineHead icon={IconCategory} label="Stage Changed Date" />
+      <RecordTable.InlineHead icon={IconCategory} label={t('stage-changed-date')} />
     ),
     cell: ({ cell }) => {
       return (
@@ -110,15 +154,61 @@ export const checkSyncedDealsColumns: ColumnDef<ICheckSyncedDeals>[] = [
   },
   {
     id: 'unSynced',
-    accessorKey: 'unSynced',
+    accessorKey: 'syncStatus',
     header: () => (
-      <RecordTable.InlineHead icon={IconCategory} label="Un Synced" />
+      <RecordTable.InlineHead icon={IconCategory} label={t('sync-status')} />
     ),
     cell: ({ cell }) => {
+      const status = (cell.getValue() || 'skipped') as string;
+
       return (
         <RecordTableInlineCell>
-          <TextOverflowTooltip value={cell.getValue() as string} />
+          <TextOverflowTooltip value={status} />
         </RecordTableInlineCell>
+      );
+    },
+  },
+  {
+    id: 'toSync',
+    accessorKey: 'toSync',
+    header: () => {
+      const selectedCount = syncableDealIds.filter((id) => toSyncDealIds[id])
+        .length;
+      const isAllSelected =
+        syncableDealIds.length > 0 && selectedCount === syncableDealIds.length;
+      const isSomeSelected = selectedCount > 0 && !isAllSelected;
+      const nextChecked = !(isAllSelected || isSomeSelected);
+
+      return (
+        <div className="relative z-20 flex items-center justify-center h-8">
+          <Checkbox
+            key={`${syncableDealIds.length}-${selectedCount}`}
+            checked={isAllSelected || (isSomeSelected && 'indeterminate')}
+            disabled={!syncableDealIds.length}
+            onCheckedChange={() =>
+              onToggleAllToSync(syncableDealIds, nextChecked)
+            }
+            aria-label="Select all deals to sync"
+          />
+        </div>
+      );
+    },
+    size: 33,
+    cell: ({ row }) => {
+      const deal = row.original;
+      const disabled = !isSyncableDeal(deal);
+
+      return (
+        <div className="flex items-center justify-center">
+          <Checkbox
+            checked={!disabled && Boolean(toSyncDealIds[deal._id])}
+            disabled={disabled}
+            onCheckedChange={(value) =>
+              onToggleToSync(deal._id, Boolean(value))
+            }
+            aria-label="Select deal to sync"
+          />
+        </div>
       );
     },
   },
@@ -126,7 +216,7 @@ export const checkSyncedDealsColumns: ColumnDef<ICheckSyncedDeals>[] = [
     id: 'syncedDate',
     accessorKey: 'syncedDate',
     header: () => (
-      <RecordTable.InlineHead icon={IconCategory} label="Synced Date" />
+      <RecordTable.InlineHead icon={IconCategory} label={t('synced-date')} />
     ),
     cell: ({ cell }) => {
       return (
@@ -140,7 +230,7 @@ export const checkSyncedDealsColumns: ColumnDef<ICheckSyncedDeals>[] = [
     id: 'syncedBillNumber',
     accessorKey: 'syncedBillNumber',
     header: () => (
-      <RecordTable.InlineHead icon={IconCategory} label="Synced bill number" />
+      <RecordTable.InlineHead icon={IconCategory} label={t('synced-bill-number')} />
     ),
     cell: ({ cell }) => {
       return (
@@ -154,7 +244,7 @@ export const checkSyncedDealsColumns: ColumnDef<ICheckSyncedDeals>[] = [
     id: 'syncedCustomer',
     accessorKey: 'syncedCustomer',
     header: () => (
-      <RecordTable.InlineHead icon={IconCategory} label="Synced customer" />
+      <RecordTable.InlineHead icon={IconCategory} label={t('synced-customer')} />
     ),
     cell: ({ cell }) => {
       return (
@@ -168,7 +258,7 @@ export const checkSyncedDealsColumns: ColumnDef<ICheckSyncedDeals>[] = [
     id: 'syncAction',
     accessorKey: 'syncAction',
     header: () => (
-      <RecordTable.InlineHead icon={IconCategory} label="Sync action" />
+      <RecordTable.InlineHead icon={IconRefresh} label={t('sync-action')} />
     ),
     cell: ({ cell }) => {
       return (

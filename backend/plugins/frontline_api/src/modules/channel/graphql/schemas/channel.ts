@@ -12,7 +12,9 @@ export const types = `
         createdAt: Date
         updatedAt: Date
         memberCount: Int
-        pipelineCount:Int
+        pipelineCount: Int
+        responseTemplateCount: Int
+        formCount: Int
     }
 
     type ChannelMember {
@@ -27,6 +29,7 @@ export const types = `
 export const queries = `
     getChannel(_id: String!): Channel
     getChannels(name: String, userId: String, channelIds: [String], integrationId: String): [Channel]
+    getMyChannels(name: String): [Channel]
     getChannelMembers(channelId: String, channelIds: [String]): [ChannelMember]
 `;
 

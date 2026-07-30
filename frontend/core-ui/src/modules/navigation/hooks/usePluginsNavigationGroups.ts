@@ -18,7 +18,7 @@ export const usePluginsModules = () => {
     if (pluginsMetaData) {
       const pluginsModules = Object.values(pluginsMetaData || {}).flatMap(
         (plugin) => {
-          if (isLoaded && !isWildcard && !hasPluginPermission(plugin.name)) {
+          if (isLoaded && !isWildcard && !hasPluginPermission(plugin.permissionName ?? plugin.name)) {
             return [];
           }
 
@@ -42,6 +42,7 @@ interface NavigationGroupResult {
   contents: any[];
   subGroups: any[];
   name: string;
+  i18n?: boolean;
 }
 
 type NavigationGroups = Record<string, NavigationGroupResult>;
@@ -59,7 +60,7 @@ export const usePluginsNavigationGroups = () => {
       (acc, plugin) => {
         if (!plugin?.modules?.length) return acc;
 
-        if (isLoaded && !isWildcard && !hasPluginPermission(plugin.name)) {
+        if (isLoaded && !isWildcard && !hasPluginPermission(plugin.permissionName ?? plugin.name)) {
           return acc;
         }
 
@@ -85,6 +86,7 @@ export const usePluginsNavigationGroups = () => {
           icon: plugin.navigationGroup?.icon || existingGroup.icon,
           contents: updatedContents,
           subGroups: updatedSubGroups,
+          i18n: plugin.i18n || existingGroup.i18n,
         };
 
         return acc;

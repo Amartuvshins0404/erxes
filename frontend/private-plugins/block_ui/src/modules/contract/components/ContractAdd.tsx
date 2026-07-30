@@ -20,7 +20,7 @@ export const ContractAddSheet = ({
           Add contract
         </Button>
       </Sheet.Trigger>
-      <Sheet.View className="p-0 sm:max-w-5xl">
+      <Sheet.View className="p-0 sm:max-w-7xl">
         <Sheet.Header>
           <Sheet.Title>New contract</Sheet.Title>
           <Sheet.Close />
@@ -43,7 +43,7 @@ export const ContractAddForm = ({ onClose }: { onClose: () => void }) => {
         : undefined;
     const amount =
       typeof data.amount === 'number' && !isNaN(data.amount)
-        ? Math.round(data.amount)
+        ? data.amount
         : undefined;
 
     createContract({
@@ -56,11 +56,7 @@ export const ContractAddForm = ({ onClose }: { onClose: () => void }) => {
           currency: data.currency,
           date: data.date || new Date().toISOString(),
           amount,
-          amountType: data.amountType,
           status: data.status || undefined,
-          startDate: data.startDate,
-          endDate: data.endDate,
-          isLifeTime: data.isLifeTime,
           party,
           paymentPlan,
           user: data.user || undefined,

@@ -14,6 +14,11 @@ export const agencyGeneralInfoSchema = z.object({
   website: z.string().optional(),
 });
 
+export const agencyIntegrationsSchema = z.object({
+  messengerIntegrationId: z.string().optional(),
+  widgetBundleUrl: z.string().optional(),
+});
+
 export const agencyContactInfoSchema = z.object({
   primaryEmail: z.string().optional(),
   emails: z.string().array().optional(),

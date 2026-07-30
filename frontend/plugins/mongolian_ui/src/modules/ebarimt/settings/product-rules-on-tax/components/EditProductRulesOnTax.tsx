@@ -9,6 +9,7 @@ import {
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ProductRulesOnTaxForm } from './ProductRulesOnTaxForm';
 import {
   productRulesOnTaxSchema,
@@ -20,6 +21,7 @@ import { useProductRulesOnTaxRowDetail } from '@/ebarimt/settings/product-rules-
 const FORM_ID = 'edit-product-rules-form';
 
 export const EditProductRulesOnTax = () => {
+  const { t } = useTranslation('mongolian');
   const [open, setOpen] = useQueryState<string>('product_rules_on_tax_id');
   const { productRulesOnTaxDetail, closeDetail, loading } =
     useProductRulesOnTaxRowDetail();
@@ -33,13 +35,13 @@ export const EditProductRulesOnTax = () => {
       taxType: '',
       taxCode: '',
       kind: '',
-      percent: 0,
-      productCategoryIds: '',
-      excludeCategoryIds: '',
-      productIds: '',
-      excludeProductIds: '',
-      tagIds: '',
-      excludeTagIds: '',
+      taxPercent: 0,
+      productCategoryIds: [],
+      excludeCategoryIds: [],
+      productIds: [],
+      excludeProductIds: [],
+      tagIds: [],
+      excludeTagIds: [],
       status: '',
     },
   });
@@ -52,16 +54,13 @@ export const EditProductRulesOnTax = () => {
         taxType: productRulesOnTaxDetail.taxType || '',
         taxCode: productRulesOnTaxDetail.taxCode || '',
         kind: productRulesOnTaxDetail.kind || '',
-        percent: productRulesOnTaxDetail.taxPercent || 0,
-        productCategoryIds:
-          productRulesOnTaxDetail.productCategoryIds?.join(', ') || '',
-        excludeCategoryIds:
-          productRulesOnTaxDetail.excludeCategoryIds?.join(', ') || '',
-        productIds: productRulesOnTaxDetail.productIds?.join(', ') || '',
-        excludeProductIds:
-          productRulesOnTaxDetail.excludeProductIds?.join(', ') || '',
-        tagIds: productRulesOnTaxDetail.tagIds?.join(', ') || '',
-        excludeTagIds: productRulesOnTaxDetail.excludeTagIds?.join(', ') || '',
+        taxPercent: productRulesOnTaxDetail.taxPercent || 0,
+        productCategoryIds: productRulesOnTaxDetail.productCategoryIds || [],
+        excludeCategoryIds: productRulesOnTaxDetail.excludeCategoryIds || [],
+        productIds: productRulesOnTaxDetail.productIds || [],
+        excludeProductIds: productRulesOnTaxDetail.excludeProductIds || [],
+        tagIds: productRulesOnTaxDetail.tagIds || [],
+        excludeTagIds: productRulesOnTaxDetail.excludeTagIds || [],
         status: productRulesOnTaxDetail.status || '',
       });
     }
@@ -74,14 +73,22 @@ export const EditProductRulesOnTax = () => {
   const handleSubmit = (data: TProductRulesOnTaxForm) => {
     if (!productRulesOnTaxDetail) return;
 
-    const toArray = (val: string | undefined) =>
-      val ? val.split(',').map((s) => s.trim()) : [];
+    const toArray = (val: string[] | string | undefined) =>
+      Array.isArray(val)
+        ? val
+        : val
+        ? val
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean)
+        : [];
 
     const newData: any = {
       title: data.title,
       taxType: data.taxType,
       taxCode: data.taxCode,
       kind: data.kind,
+      taxPercent: data.taxPercent,
       productCategoryIds: toArray(data.productCategoryIds),
       excludeCategoryIds: toArray(data.excludeCategoryIds),
       productIds: toArray(data.productIds),
@@ -89,10 +96,6 @@ export const EditProductRulesOnTax = () => {
       tagIds: toArray(data.tagIds),
       excludeTagIds: toArray(data.excludeTagIds),
     };
-
-    if (data.kind !== 'ctax') {
-      newData.taxPercent = data.percent;
-    }
 
     const initialData = {
       title: productRulesOnTaxDetail.title || '',
@@ -110,13 +113,9 @@ export const EditProductRulesOnTax = () => {
 
     const comparisonData = { ...newData };
     const comparisonInitial = { ...initialData };
-    if (data.kind === 'ctax') {
-      delete comparisonData.taxPercent;
-      delete comparisonInitial.taxPercent;
-    }
 
     if (isDeeplyEqual(comparisonData, comparisonInitial)) {
-      toast({ title: 'Success', description: 'No changes made' });
+      toast({ title: t('success'), description: t('no-changes-made') });
       reset();
       return closeDetail();
     }
@@ -131,8 +130,8 @@ export const EditProductRulesOnTax = () => {
       },
       onCompleted: () => {
         toast({
-          title: 'Success',
-          description: 'Product rules on tax updated successfully',
+          title: t('success'),
+          description: t('product-rules-on-tax-updated-successfully'),
         });
         closeDetail();
         reset();
@@ -140,8 +139,8 @@ export const EditProductRulesOnTax = () => {
       },
       onError: (error) => {
         toast({
-          title: 'Error',
-          description: error.message || 'Failed to update product rules on tax',
+          title: t('error'),
+          description: error.message || t('failed-to-update-product-rules-on-tax'),
           variant: 'destructive',
         });
       },
@@ -152,7 +151,7 @@ export const EditProductRulesOnTax = () => {
     <Sheet open={open !== null} onOpenChange={handleClose}>
       <Sheet.View side="right" className="bg-background sm:max-w-2xl">
         <Sheet.Header>
-          <Sheet.Title>Edit Product Rules On Tax</Sheet.Title>
+          <Sheet.Title>{t('edit-product-rules-on-tax')}</Sheet.Title>
           <Sheet.Close />
         </Sheet.Header>
         <div className="flex-1 overflow-y-auto px-5 py-4 relative">
@@ -172,7 +171,7 @@ export const EditProductRulesOnTax = () => {
         <Sheet.Footer className="gap-2 border-t bg-background">
           <Sheet.Close asChild>
             <Button variant="outline" size="lg">
-              Cancel
+              {t('cancel')}
             </Button>
           </Sheet.Close>
           <Button
@@ -181,7 +180,7 @@ export const EditProductRulesOnTax = () => {
             size="lg"
             disabled={editLoading || loading}
           >
-            {editLoading ? <Spinner /> : 'Save'}
+            {editLoading ? <Spinner /> : t('save')}
           </Button>
         </Sheet.Footer>
       </Sheet.View>

@@ -15,7 +15,7 @@ export const AgencyProfileSidebar = () => {
     AGENCY_TABS.CONTACT,
     AGENCY_TABS.SOCIAL_LINKS,
   ];
-  const settings = [AGENCY_TABS.MEMBERS];
+  const settings = [AGENCY_TABS.MEMBERS, AGENCY_TABS.INTEGRATIONS];
 
   return (
     <Sidebar

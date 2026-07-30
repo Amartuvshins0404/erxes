@@ -1,4 +1,9 @@
-import { IconTag, IconToggleLeft, IconLabelFilled } from '@tabler/icons-react';
+import {
+  IconLabelFilled,
+  IconListNumbers,
+  IconTag,
+  IconToggleLeft,
+} from '@tabler/icons-react';
 import { ColumnDef } from '@tanstack/table-core';
 import {
   RecordTable,
@@ -6,6 +11,7 @@ import {
   RecordTableInlineCell,
   Switch,
 } from 'erxes-ui';
+import { useTranslation } from 'react-i18next';
 import { ScoreNameCell } from '../score-detail/components/ScoreNameCell';
 import { IScore } from '../types/loyaltyScoreTypes';
 import { scoreMoreColumn } from './LoyaltyScoreMoreColumn';
@@ -19,7 +25,7 @@ export const scoreColumns: (
   {
     id: 'title',
     accessorKey: 'title',
-    header: () => <RecordTable.InlineHead icon={IconTag} label="Title" />,
+    header: () => { const { t } = useTranslation('loyalty'); return <RecordTable.InlineHead icon={IconTag} label={t('title')} />; },
     cell: ({ cell }: { cell: any }) => {
       return (
         <ScoreNameCell
@@ -31,11 +37,22 @@ export const scoreColumns: (
     size: 150,
   },
   {
+    id: 'order',
+    accessorKey: 'order',
+    header: () => { const { t } = useTranslation('loyalty'); return <RecordTable.InlineHead icon={IconListNumbers} label={t('order')} />; },
+    cell: ({ cell }: { cell: any }) => {
+      return (
+        <RecordTableInlineCell>
+          <TextOverflowTooltip value={`${cell.getValue() ?? ''}`} />
+        </RecordTableInlineCell>
+      );
+    },
+    size: 80,
+  },
+  {
     id: 'ownerType',
     accessorKey: 'ownerType',
-    header: () => (
-      <RecordTable.InlineHead icon={IconLabelFilled} label="Owner Type" />
-    ),
+    header: () => { const { t } = useTranslation('loyalty'); return <RecordTable.InlineHead icon={IconLabelFilled} label={t('owner-type')} />; },
     cell: ({ cell }: { cell: any }) => {
       return (
         <RecordTableInlineCell>
@@ -48,9 +65,7 @@ export const scoreColumns: (
   {
     id: 'status',
     accessorKey: 'status',
-    header: () => (
-      <RecordTable.InlineHead icon={IconToggleLeft} label="Status" />
-    ),
+    header: () => { const { t } = useTranslation('loyalty'); return <RecordTable.InlineHead icon={IconToggleLeft} label={t('status')} />; },
     cell: ({ cell }) => {
       const { _id } = cell.row.original || {};
       const currentStatus = cell.getValue() as string;

@@ -1,6 +1,11 @@
 # Stage 1: install production deps as flat real directories (no pnpm virtual store)
 FROM node:22-alpine3.22 AS installer
 WORKDIR /app
+# CI builds linux/arm64 under QEMU, where V8's JIT intermittently crashes with
+# SIGILL ("qemu: uncaught target signal 4") during pnpm install. Run Node in
+# interpreter-only mode for this stage: slower install, identical node_modules.
+# The runtime stage below is not affected.
+ENV NODE_OPTIONS=--jitless
 RUN npm install -g pnpm@9
 
 COPY pnpm-lock.yaml ./

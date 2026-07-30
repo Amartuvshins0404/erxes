@@ -28,6 +28,8 @@ export const GET_AGENCY_INFO = gql`
         services
         clientTypes
       }
+      messengerIntegrationId
+      widgetBundleUrl
     }
   }
 `;

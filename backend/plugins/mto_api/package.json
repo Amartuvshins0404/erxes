@@ -6,11 +6,7 @@
   "scripts": {
     "dev": "tsx watch src/main.ts",
     "build": "tsc --project tsconfig.build.json && tsc-alias -p tsconfig.build.json",
-    "start": "node -r tsconfig-paths/register dist/src/main.js",
-    "import:category": "tsx scripts/import-category.ts",
-    "import:providers": "tsx scripts/import-providers.ts",
-    "import:partner-activities": "tsx scripts/import-partner-activities.ts",
-    "update:activity-type-prices": "tsx scripts/update-activity-type-prices.ts"
+    "start": "node -r tsconfig-paths/register dist/src/main.js"
   },
   "keywords": [],
   "author": "",

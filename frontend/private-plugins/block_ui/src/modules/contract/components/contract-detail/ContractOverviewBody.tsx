@@ -100,14 +100,8 @@ export const ContractOverviewBody = ({
                 'Amount',
                 formatAmount(contract.amount, contract.currency),
               )}
-              {renderRow('Amount Type', contract.amountType)}
               {renderRow('Currency', contract.currency)}
               {renderRow('Contract Date', formatDate(contract.date))}
-              {renderRow('Start Date', formatDate(contract.startDate))}
-              {renderRow(
-                'End Date',
-                contract.isLifeTime ? 'Lifetime' : formatDate(contract.endDate),
-              )}
               {renderRow('Party', partyLabel)}
               {renderRow(
                 'Assigned User',

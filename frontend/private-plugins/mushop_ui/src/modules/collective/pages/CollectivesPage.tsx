@@ -6,11 +6,14 @@ import {
   Separator,
 } from 'erxes-ui';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { PageHeader } from 'ui-modules';
 import { CollectivesTable } from '../components/CollectivesTable';
 import { CollectiveDetailSheet } from '../components/CollectiveDetailSheet';
+import { CollectiveAddSheet } from '../components/CollectiveAddSheet';
 
 export const CollectivesPage = () => {
+  const { t } = useTranslation('mushop');
   return (
     <PageContainer>
       <PageHeader>
@@ -21,7 +24,7 @@ export const CollectivesPage = () => {
                 <Button variant="ghost" asChild>
                   <Link to="/mushop/collectives">
                     <IconBuildingStore />
-                    Collectives
+                    {t('Collectives')}
                   </Link>
                 </Button>
               </Breadcrumb.Item>
@@ -30,6 +33,9 @@ export const CollectivesPage = () => {
           <Separator.Inline />
           <PageHeader.FavoriteToggleButton />
         </PageHeader.Start>
+        <PageHeader.End>
+          <CollectiveAddSheet />
+        </PageHeader.End>
       </PageHeader>
 
       <CollectivesTable />

@@ -1,25 +1,43 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useInView } from 'react-intersection-observer';
-import { Badge, Button, Empty, ScrollArea, Separator, Spinner } from 'erxes-ui';
-import { IconCarSuv, IconLinkPlus, IconTrash } from '@tabler/icons-react';
-import { useManageRelations, useRelations } from 'ui-modules';
+import {
+  Badge,
+  Button,
+  Empty,
+  ScrollArea,
+  Separator,
+  Spinner,
+  Tooltip,
+} from 'erxes-ui';
+import {
+  IconCarSuv,
+  IconLinkPlus,
+  IconPlus,
+  IconTrash,
+} from '@tabler/icons-react';
+import { Can, useManageRelations, useRelations } from 'ui-modules';
 import { useTranslation } from 'react-i18next';
 
+import { CarFormSheet } from '~/components/cars/CarFormSheet';
 import { SelectCarsDialog } from '~/components/select/SelectCarsDialog';
-import { useCarsMain } from '~/hooks/useCarsData';
+import { useCarCategories, useCarsMain } from '~/hooks/useCarsData';
 import { getCarDisplayName } from '~/lib/car';
 import { ROOT_CAR_CONTENT_TYPE } from '~/lib/constants';
+import type { ICar } from '~/types/car';
 
 export const CarsRelationWidget = ({
   contentId,
   contentType,
+  access = 'write',
 }: {
   contentId: string;
   contentType: string;
+  access?: 'read' | 'write';
 }) => {
   const { t } = useTranslation('car');
   const [selectorOpen, setSelectorOpen] = useState(false);
+  const [createSheetOpen, setCreateSheetOpen] = useState(false);
   const { ownEntities, loading: loadingRelations } = useRelations({
     variables: {
       contentId,
@@ -28,6 +46,10 @@ export const CarsRelationWidget = ({
     },
   });
   const { manageRelations, loading: saving } = useManageRelations();
+  const { carCategories } = useCarCategories({
+    skip: !createSheetOpen,
+  });
+  const canWrite = access === 'write';
 
   const relatedCarIds = useMemo(
     () => Array.from(new Set(ownEntities.map((entity) => entity.contentId))),
@@ -66,8 +88,12 @@ export const CarsRelationWidget = ({
       contentId,
       contentType,
       relatedContentType: ROOT_CAR_CONTENT_TYPE,
-      relatedContentIds: nextIds,
+      relatedContentIds: Array.from(new Set(nextIds)),
     });
+  };
+
+  const handleCreatedCar = (car: ICar) => {
+    handleSaveRelations([...relatedCarIds, car._id]);
   };
 
   if (loadingRelations || loadingCars) {
@@ -87,14 +113,50 @@ export const CarsRelationWidget = ({
             })}
           </div>
         </div>
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={() => setSelectorOpen(true)}
-        >
-          <IconLinkPlus className="size-4" />
-          {t('Attach cars', { defaultValue: 'Attach cars' })}
-        </Button>
+        {canWrite ? (
+          <Tooltip.Provider>
+            <div className="flex flex-none items-center gap-2">
+              <Can action="manageCars">
+                <Tooltip>
+                  <Tooltip.Trigger asChild>
+                    <Button
+                      variant="secondary"
+                      size="icon"
+                      disabled={saving}
+                      aria-label={t('Create car', {
+                        defaultValue: 'Create car',
+                      })}
+                      onClick={() => setCreateSheetOpen(true)}
+                    >
+                      <IconPlus className="size-4" />
+                    </Button>
+                  </Tooltip.Trigger>
+                  <Tooltip.Content>
+                    {t('Create car', { defaultValue: 'Create car' })}
+                  </Tooltip.Content>
+                </Tooltip>
+              </Can>
+              <Tooltip>
+                <Tooltip.Trigger asChild>
+                  <Button
+                    variant="secondary"
+                    size="icon"
+                    disabled={saving}
+                    aria-label={t('Attach cars', {
+                      defaultValue: 'Attach cars',
+                    })}
+                    onClick={() => setSelectorOpen(true)}
+                  >
+                    <IconLinkPlus className="size-4" />
+                  </Button>
+                </Tooltip.Trigger>
+                <Tooltip.Content>
+                  {t('Attach cars', { defaultValue: 'Attach cars' })}
+                </Tooltip.Content>
+              </Tooltip>
+            </div>
+          </Tooltip.Provider>
+        ) : null}
       </div>
       <Separator />
 
@@ -154,20 +216,22 @@ export const CarsRelationWidget = ({
                       </span>
                     </div>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    disabled={saving}
-                    onClick={() =>
-                      handleSaveRelations(
-                        relatedCarIds.filter(
-                          (relatedId) => relatedId !== car._id,
-                        ),
-                      )
-                    }
-                  >
-                    <IconTrash className="size-4 text-destructive" />
-                  </Button>
+                  {canWrite ? (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      disabled={saving}
+                      onClick={() =>
+                        handleSaveRelations(
+                          relatedCarIds.filter(
+                            (relatedId) => relatedId !== car._id,
+                          ),
+                        )
+                      }
+                    >
+                      <IconTrash className="size-4 text-destructive" />
+                    </Button>
+                  ) : null}
                 </div>
               </div>
             ))}
@@ -193,6 +257,13 @@ export const CarsRelationWidget = ({
         onOpenChange={setSelectorOpen}
         selectedIds={relatedCarIds}
         onSubmit={handleSaveRelations}
+      />
+
+      <CarFormSheet
+        open={createSheetOpen}
+        onOpenChange={setCreateSheetOpen}
+        categories={carCategories}
+        onCompleted={handleCreatedCar}
       />
     </>
   );

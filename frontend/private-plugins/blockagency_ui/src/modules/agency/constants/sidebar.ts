@@ -9,4 +9,5 @@ export const AGENCY_TABS = {
   SOCIAL_LINKS: 'social links',
   MEMBERS: 'members',
   DASHBOARD: 'dashboard',
+  INTEGRATIONS: 'integrations',
 } as const;

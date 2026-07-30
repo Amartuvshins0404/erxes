@@ -87,6 +87,8 @@ export const afterProcess: AfterProcessConfigs = {
       }
     }
 
+    console.log('product', product)
+
     sendMessage({
       subdomain: ctx.subdomain,
       path: 'syncProduct',

@@ -40,7 +40,7 @@ export const productQueries = {
     const orderBy = { ...baseOrderBy, _id: 1 } as Record<string, any>;
 
     return cursorPaginateAggregation({
-      model: models.MushopProduct,
+      model: models.Product,
       params: { ...params, orderBy },
       formatter: { createdAt: 'date' },
       pipeline: [
@@ -68,6 +68,6 @@ export const productQueries = {
     { _id }: { _id: string },
     { models }: IContext,
   ) => {
-    return models.MushopProduct.getProduct(_id);
+    return models.Product.getProduct(_id);
   },
 };

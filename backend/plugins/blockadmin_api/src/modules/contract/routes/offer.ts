@@ -58,20 +58,6 @@ router.post(
 
       const offer = await models.Offer.createOffer(rest);
 
-      if (paymentPlan.frequency === BlockProjectPaymentPlanFrequency.CUSTOM) {
-        for (const invoice of invoices) {
-          await models.Invoice.createInvoice({
-            ...invoice,
-            itemId: offer._id,
-            itemType: InvoiceItemType.OFFER,
-            subdomain,
-            entityId,
-          });
-        }
-
-        return offer;
-      }
-
       let totalAmount =
         input.amountType === OfferAmountType.PER_SIZE
           ? input.amount * unitType.size
@@ -81,7 +67,7 @@ router.post(
         frequency,
         discountPercentage,
         downPaymentPercentage,
-        advancePaymentDate,
+        completionPaymentDate,
         installment,
         interestPercentage,
         interestType,
@@ -108,7 +94,7 @@ router.post(
           subdomain,
           entityId,
           amount: downPaymentAmount,
-          date: advancePaymentDate || new Date(),
+          date: completionPaymentDate || new Date(),
           status: InvoiceStatus.UNPAID,
           number: 1,
           itemId: offer._id,
@@ -122,7 +108,7 @@ router.post(
           subdomain,
           entityId,
           amount: totalAmount - downPaymentAmount,
-          date: advancePaymentDate || new Date(),
+          date: completionPaymentDate || new Date(),
           status: InvoiceStatus.UNPAID,
           number: downPaymentPercentage ? 2 : 1,
           itemId: offer._id,
@@ -134,7 +120,7 @@ router.post(
       }
 
       if (installment && installment > 0) {
-        const currentDate = advancePaymentDate || new Date();
+        const currentDate = completionPaymentDate || new Date();
         const addMonths = (date: Date, months: number) => {
           const d = new Date(date);
           d.setMonth(d.getMonth() + months);

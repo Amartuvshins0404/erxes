@@ -20,7 +20,7 @@ export interface IProviderModel extends Model<IProviderDocument> {
     rejectedBy: string,
   ): Promise<IProviderDocument>;
   removeProviders(ids: string[]): Promise<{ n: number; ok: number }>;
-  findByCategory(categoryId: string): Promise<IProviderDocument[]>;
+  findByAssociation(associationId: string): Promise<IProviderDocument[]>;
   findApprovedProviders(): Promise<IProviderDocument[]>;
 }
 
@@ -86,9 +86,9 @@ export const loadProviderClass = (models: IModels) => {
       return models.Provider.deleteMany({ _id: { $in: ids } });
     }
 
-    public static async findByCategory(categoryId: string) {
+    public static async findByAssociation(associationId: string) {
       return models.Provider.find({
-        categoryIds: categoryId,
+        associationIds: associationId,
         status: ProviderStatus.APPROVED,
         isActive: true,
       });

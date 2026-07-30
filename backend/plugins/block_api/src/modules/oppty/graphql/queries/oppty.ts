@@ -12,6 +12,41 @@ export const opptyQueries = {
     return models.Oppty.getOppty(_id);
   },
 
+  blockGetUnitOpptyOverview: async (
+    _parent: undefined,
+    { unitId, projectId }: { unitId: string; projectId: string },
+    { models }: IContext,
+  ) => {
+    const opptys = await models.Oppty.find(
+      {
+        projectId,
+        $or: [{ units: { $in: [unitId] } }, { unit: unitId }, { 'propertyRows.unitId': unitId }],
+      },
+      { status: 1 },
+    ).lean();
+    if (!opptys.length) return { total: 0, stages: [] };
+    const stageIdStrs = opptys.map((o: any) => o.status?.toString()).filter(Boolean);
+    const uniqueStageIds = [...new Set(stageIdStrs)];
+    const statuses = await models.OpptyStatus.find(
+      { _id: { $in: uniqueStageIds } },
+      { _id: 1, name: 1, order: 1 },
+    ).lean();
+    const nameById = new Map(statuses.map((s: any) => [s._id.toString(), s.name || 'Unknown']));
+    const countByStage = new Map<string, number>();
+    for (const o of opptys) {
+      const name = o.status ? (nameById.get(o.status.toString()) ?? 'Unknown') : 'Unknown';
+      countByStage.set(name, (countByStage.get(name) ?? 0) + 1);
+    }
+    const stageOrder = new Map<string, number>();
+    for (const s of statuses) {
+      stageOrder.set(s.name || 'Unknown', s.order ?? 9999);
+    }
+    const stages = [...countByStage.entries()]
+      .sort((a, b) => (stageOrder.get(a[0]) ?? 9999) - (stageOrder.get(b[0]) ?? 9999))
+      .map(([name, count]) => ({ name, count }));
+    return { total: opptys.length, stages };
+  },
+
   blockGetOpptyUnitRows: async (
     _parent: undefined,
     { _id }: { _id: string },
@@ -73,7 +108,12 @@ export const opptyQueries = {
     }
 
     if (filter?.unit) {
-      filterQuery.units = { $in: [filter.unit] };
+      filterQuery.$or = [
+        ...(filterQuery.$or || []),
+        { units: { $in: [filter.unit] } },
+        { unit: filter.unit },
+        { 'propertyRows.unitId': filter.unit },
+      ];
     }
 
     if (filter?.assignedUserId) {

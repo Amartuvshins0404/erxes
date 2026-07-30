@@ -1,5 +1,5 @@
 import { QueryHookOptions, useQuery } from '@apollo/client';
-import { IAgency } from '../types';
+import { IAgency } from '../types/agencyTypes';
 import { GET_AGENCY_INFO } from '../graphql';
 
 type GetAgencyInfoResponse = {

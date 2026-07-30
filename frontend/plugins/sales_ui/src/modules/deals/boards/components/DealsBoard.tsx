@@ -16,9 +16,15 @@ import { StagesLoading } from '@/deals/components/loading/StagesLoading';
 import { useColumnPagination } from '@/deals/boards/hooks/useColumnPagination';
 import { useDealsBoardData } from '@/deals/boards/hooks/useDealsBoardData';
 import { useDealsChange } from '@/deals/cards/hooks/useDeals';
+import { getDealsQueryVariables } from '@/deals/utils/queryVariables';
 import { useQueryState } from 'erxes-ui';
 import { useSearchParams } from 'react-router-dom';
 import { useStagesOrder } from '@/deals/stage/hooks/useStages';
+import { useAtom, useSetAtom } from 'jotai';
+import {
+  dealCountByBoardAtom,
+  dealTotalCountAtom,
+} from '@/deals/states/dealsTotalCountState';
 
 const PAGE_SIZE = 20;
 
@@ -34,67 +40,90 @@ export const DealsBoard = () => {
     Record<string, number>
   >({});
   const locallyMovedIdsRef = useRef<Record<string, string>>({});
+  const resetColumnsRef = useRef(columns);
+
+  const [dealCountByBoard] = useAtom(dealCountByBoardAtom);
+  const setTotalCount = useSetAtom(dealTotalCountAtom);
+
+  useEffect(() => {
+    if (columnsLoading) {
+      setTotalCount(null);
+      return;
+    }
+    const hasAllCounts = columns.every((col) =>
+      Object.prototype.hasOwnProperty.call(dealCountByBoard, col._id),
+    );
+    if (hasAllCounts) {
+      const sum = columns.reduce(
+        (acc, col) => acc + (dealCountByBoard[col._id] || 0),
+        0,
+      );
+      setTotalCount(sum);
+    } else {
+      setTotalCount(null);
+    }
+  }, [columns, columnsLoading, dealCountByBoard, setTotalCount]);
+
+  useEffect(() => {
+    return () => {
+      setTotalCount(null);
+    };
+  }, [setTotalCount]);
 
   const { pagination, initColumn, setLoading, updateAfterFetch } =
     useColumnPagination(PAGE_SIZE);
 
-  const queryVariables = useMemo(() => {
-    const ignoredKeys = ['boardId', 'pipelineId', 'salesItemId', 'tab'];
-    const vars: Record<string, any> = {};
-
-    for (const [key, value] of searchParams.entries()) {
-      if (ignoredKeys.includes(key)) continue;
-
-      try {
-        const parsed = JSON.parse(value);
-        vars[key] = parsed;
-      } catch {
-        vars[key] = value;
-      }
-    }
-
-    if (vars.productId) {
-      vars.productIds = Array.isArray(vars.productId)
-        ? vars.productId
-        : [vars.productId];
-      delete vars.productId;
-    }
-
-    if (searchParams.get('archivedOnly') === 'true') {
-      vars.noSkipArchive = true;
-    }
-
-    return vars;
-  }, [searchParams]);
+  const queryVariables = useMemo(
+    () => getDealsQueryVariables(searchParams),
+    [searchParams],
+  );
 
   const archivedOnly = searchParams.get('archivedOnly') === 'true';
   const queryVariablesKey = useMemo(
     () => JSON.stringify(queryVariables),
     [queryVariables],
   );
+  const columnIdsKey = useMemo(
+    () => columns.map((column: { _id: string }) => column._id).join(','),
+    [columns],
+  );
+
+  useEffect(() => {
+    resetColumnsRef.current = columns;
+  }, [columnIdsKey, columns]);
 
   useEffect(() => {
     setBoardState(null);
   }, [archivedOnly, setBoardState]);
 
   useEffect(() => {
-    if (columns.length === 0) return;
+    const resetColumns = resetColumnsRef.current;
+
+    if (resetColumns.length === 0) return;
 
     const resetState: DealsBoardState = {
-      columns,
+      columns: resetColumns,
       items: {},
-      columnItems: Object.fromEntries(columns.map((col) => [col._id, []])),
+      columnItems: Object.fromEntries(
+        resetColumns.map((col: { _id: string }) => [col._id, []]),
+      ),
     };
     setBoardState(resetState);
     setAllDealsMap({});
     locallyMovedIdsRef.current = {};
 
-    columns.forEach((col) => {
+    resetColumns.forEach((col: { _id: string; itemsTotalCount?: number }) => {
       initColumn(col._id, col.itemsTotalCount);
     });
 
     setFetchMoreTriggers({});
-  }, [columns, queryVariablesKey, setBoardState, setAllDealsMap, initColumn]);
+  }, [
+    columnIdsKey,
+    queryVariablesKey,
+    setBoardState,
+    setAllDealsMap,
+    initColumn,
+  ]);
 
   useEffect(() => {
     setBoardState((prev) => {

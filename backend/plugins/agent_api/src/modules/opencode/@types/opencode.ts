@@ -8,6 +8,8 @@ export interface IOpencodeServer {
   provider: string;
   serverId: string;
   serverPassword?: string;
+  transferredFromSubdomain?: string;
+  transferredAt?: Date;
   status: string;
 }
 

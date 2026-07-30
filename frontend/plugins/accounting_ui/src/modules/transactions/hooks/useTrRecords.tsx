@@ -2,6 +2,7 @@ import { OperationVariables, useQuery } from '@apollo/client';
 import {
   EnumCursorDirection,
   IRecordTableCursorPageInfo,
+  isUndefinedOrNull,
   mergeCursorData,
   validateFetchMore,
 } from 'erxes-ui';
@@ -20,6 +21,7 @@ export const useTrRecords = (options?: OperationVariables) => {
     };
   }>(TR_RECORDS_QUERY, {
     ...options,
+    skip: options?.skip || isUndefinedOrNull(variables.cursor),
     variables: {
       ...options?.variables,
       ...variables,

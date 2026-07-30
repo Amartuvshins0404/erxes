@@ -178,7 +178,7 @@ export const OptionsInfo = ({
 }: OptionsInfoProps) => {
   const { editPricing, loading } = useEditPricing();
   const { toast } = useToast();
-  const { t } = useTranslation();
+  const { t } = useTranslation('loyalty');
 
   const [repeatRules, setRepeatRules] = useState<RepeatRuleConfig[]>([]);
   const [editingRule, setEditingRule] = useState<RepeatRuleConfig | null>(null);
@@ -248,11 +248,7 @@ export const OptionsInfo = ({
           size="sm"
           disabled={loading}
         >
-          {loading
-            ? t('loyalty.options.saving', { defaultValue: 'Saving...' })
-            : t('loyalty.options.saveChanges', {
-                defaultValue: 'Save Changes',
-              })}
+          {loading ? t('saving') : t('save-changes')}
         </Button>
       ) : null,
     );
@@ -351,21 +347,13 @@ export const OptionsInfo = ({
       );
 
       toast({
-        title: t('loyalty.options.updated', {
-          defaultValue: 'Options updated',
-        }),
-        description: t('loyalty.options.savedDescription', {
-          defaultValue: 'Changes have been saved successfully.',
-        }),
+        title: t('options-updated'),
+        description: t('changes-saved'),
       });
     } catch {
       toast({
-        title: t('loyalty.options.updateFailed', {
-          defaultValue: 'Failed to update options',
-        }),
-        description: t('loyalty.options.unexpectedError', {
-          defaultValue: 'An unexpected error occurred.',
-        }),
+        title: t('failed-to-update-options'),
+        description: t('unexpected-error'),
         variant: 'destructive',
       });
     }
@@ -373,7 +361,7 @@ export const OptionsInfo = ({
 
   return (
     <div className="p-6">
-      <InfoCard title="Options">
+      <InfoCard title={t('options')}>
         <InfoCard.Content>
           <Form {...form}>
             <form
@@ -385,7 +373,7 @@ export const OptionsInfo = ({
               <div className="flex items-center my-4">
                 <div className="flex-1 border-t" />
                 <Label className="mx-2">
-                  {t('loyalty.options.location', { defaultValue: 'Location' })}
+                  {t('location')}
                 </Label>
                 <div className="flex-1 border-t" />
               </div>
@@ -394,16 +382,14 @@ export const OptionsInfo = ({
                 <div className="grid grid-cols-2 gap-4">
                   <Form.Field
                     control={control}
-                    name="departmentIds"
+                    name="branchIds"
                     render={({ field }) => (
                       <Form.Item>
                         <Form.Label>
-                          {t('loyalty.options.departments', {
-                            defaultValue: 'DEPARTMENTS',
-                          })}
+                          {t('branches-caps')}
                         </Form.Label>
                         <Form.Control>
-                          <SelectDepartments.FormItem
+                          <SelectBranches.FormItem
                             mode="multiple"
                             value={field.value}
                             onValueChange={field.onChange}
@@ -412,19 +398,16 @@ export const OptionsInfo = ({
                       </Form.Item>
                     )}
                   />
-
                   <Form.Field
                     control={control}
-                    name="branchIds"
+                    name="departmentIds"
                     render={({ field }) => (
                       <Form.Item>
                         <Form.Label>
-                          {t('loyalty.options.branches', {
-                            defaultValue: 'BRANCHES',
-                          })}
+                          {t('departments-caps')}
                         </Form.Label>
                         <Form.Control>
-                          <SelectBranches.FormItem
+                          <SelectDepartments.FormItem
                             mode="multiple"
                             value={field.value}
                             onValueChange={field.onChange}
@@ -439,7 +422,7 @@ export const OptionsInfo = ({
               <div className="flex items-center my-4">
                 <div className="flex-1 border-t" />
                 <Label className="mx-2">
-                  {t('loyalty.options.pipeline', { defaultValue: 'Pipeline' })}
+                  {t('pipeline')}
                 </Label>
                 <div className="flex-1 border-t" />
               </div>
@@ -452,17 +435,13 @@ export const OptionsInfo = ({
                     render={({ field }) => (
                       <Form.Item>
                         <Form.Label>
-                          {t('loyalty.options.board', {
-                            defaultValue: 'BOARD',
-                          })}
+                          {t('board-caps')}
                         </Form.Label>
                         <Form.Control>
                           <SelectBoardFormItem
                             value={field.value}
                             onValueChange={handleBoardChange}
-                            placeholder={t('loyalty.options.chooseBoard', {
-                              defaultValue: 'Choose a board',
-                            })}
+                            placeholder={t('choose-a-board')}
                           />
                         </Form.Control>
                       </Form.Item>
@@ -475,18 +454,14 @@ export const OptionsInfo = ({
                     render={({ field }) => (
                       <Form.Item>
                         <Form.Label>
-                          {t('loyalty.options.pipelineUpper', {
-                            defaultValue: 'PIPELINE',
-                          })}
+                          {t('pipeline-caps')}
                         </Form.Label>
                         <Form.Control>
                           <SelectPipelineFormItem
                             value={field.value}
                             onValueChange={field.onChange}
                             boardId={form.watch('boardId')}
-                            placeholder={t('loyalty.options.choosePipeline', {
-                              defaultValue: 'Choose a pipeline',
-                            })}
+                            placeholder={t('choose-a-pipeline')}
                           />
                         </Form.Control>
                       </Form.Item>
@@ -498,7 +473,7 @@ export const OptionsInfo = ({
               <div className="flex items-center my-4">
                 <div className="flex-1 border-t" />
                 <Label className="mx-2">
-                  {t('loyalty.options.repeat', { defaultValue: 'Repeat' })}
+                  {t('repeat')}
                 </Label>
                 <div className="flex-1 border-t" />
               </div>
@@ -516,10 +491,7 @@ export const OptionsInfo = ({
 
                   {repeatRules.length === 0 ? (
                     <div className="py-6 text-sm text-center text-muted-foreground">
-                      {t('loyalty.options.noRepeatRules', {
-                        defaultValue:
-                          'No repeat rules yet. Click "Add rule" to add one.',
-                      })}
+                      {t('no-repeat-rules')}
                     </div>
                   ) : (
                     <div className="space-y-2">
@@ -535,9 +507,7 @@ export const OptionsInfo = ({
                               variant="outline"
                               size="icon"
                               type="button"
-                              aria-label={t('loyalty.options.editRepeatRule', {
-                                defaultValue: 'Edit repeat rule',
-                              })}
+                              aria-label={t('edit-repeat-rule')}
                               onClick={() => setEditingRule(rule)}
                             >
                               <IconEdit size={14} />
@@ -547,12 +517,7 @@ export const OptionsInfo = ({
                               size="icon"
                               type="button"
                               className="text-destructive"
-                              aria-label={t(
-                                'loyalty.options.deleteRepeatRule',
-                                {
-                                  defaultValue: 'Delete repeat rule',
-                                },
-                              )}
+                              aria-label={t('delete-repeat-rule')}
                               onClick={() => handleRuleDelete(rule)}
                             >
                               <IconTrash size={14} />

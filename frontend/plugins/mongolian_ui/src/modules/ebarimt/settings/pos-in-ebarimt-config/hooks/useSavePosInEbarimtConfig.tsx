@@ -4,17 +4,28 @@ import {
   UPDATE_MN_CONFIG,
   GET_MN_CONFIGS,
 } from '@/ebarimt/settings/pos-in-ebarimt-config/graphql/mnConfigs';
+import { normalizeRuleIds } from '@/ebarimt/settings/pos-in-ebarimt-config/types';
 import { useToast } from 'erxes-ui';
+import { useTranslation } from 'react-i18next';
 
-const refetchOptions = [{ query: GET_MN_CONFIGS, variables: { code: 'posInEbarimt' } }];
+const refetchOptions = [
+  { query: GET_MN_CONFIGS, variables: { code: 'posInEbarimt' } },
+];
 
 export const useSavePosInEbarimtConfig = () => {
-  const [createConfig, { loading: createLoading }] = useMutation(CREATE_MN_CONFIG, {
-    refetchQueries: refetchOptions,
-  });
-  const [updateConfig, { loading: updateLoading }] = useMutation(UPDATE_MN_CONFIG, {
-    refetchQueries: refetchOptions,
-  });
+  const { t } = useTranslation('mongolian');
+  const [createConfig, { loading: createLoading }] = useMutation(
+    CREATE_MN_CONFIG,
+    {
+      refetchQueries: refetchOptions,
+    },
+  );
+  const [updateConfig, { loading: updateLoading }] = useMutation(
+    UPDATE_MN_CONFIG,
+    {
+      refetchQueries: refetchOptions,
+    },
+  );
   const loading = createLoading || updateLoading;
   const toast = useToast();
 
@@ -25,13 +36,18 @@ export const useSavePosInEbarimtConfig = () => {
   ) => {
     try {
       let result;
+      const value = {
+        ...config,
+        reverseVatRules: normalizeRuleIds(config.reverseVatRules),
+        reverseCtaxRules: normalizeRuleIds(config.reverseCtaxRules),
+      };
 
       if (operation === 'create' || !configId) {
         result = await createConfig({
           variables: {
             code: 'posInEbarimt',
             subId: config.posId,
-            value: config,
+            value,
           },
         });
       } else {
@@ -39,14 +55,14 @@ export const useSavePosInEbarimtConfig = () => {
           variables: {
             id: configId,
             subId: config.posId,
-            value: config,
+            value,
           },
         });
       }
 
       toast.toast({
-        title: 'Success',
-        description: 'Configuration saved successfully',
+        title: t('success'),
+        description: t('config-saved-successfully'),
         variant: 'default',
       });
 
@@ -57,8 +73,8 @@ export const useSavePosInEbarimtConfig = () => {
       );
     } catch (error) {
       toast.toast({
-        title: 'Error',
-        description: 'Failed to save configuration',
+        title: t('error'),
+        description: t('failed-to-save-config'),
         variant: 'destructive',
       });
       throw error;

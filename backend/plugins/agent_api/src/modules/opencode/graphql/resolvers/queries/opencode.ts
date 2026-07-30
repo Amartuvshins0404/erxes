@@ -1,4 +1,5 @@
 import { IContext } from '~/connectionResolvers';
+import { assertIdentifierAccess } from '~/modules/assistantOrg/permissions';
 import { ensureLegacyIdentifierLinks } from '~/modules/assistantOrg/utils';
 import {
   getOpencodeGatewayToken,
@@ -12,9 +13,10 @@ export const opencodeQueries = {
   getOpencode: async (
     _root: undefined,
     { identifierId }: { identifierId: string },
-    { models }: IContext,
+    { models, user }: IContext,
   ) => {
     await ensureLegacyIdentifierLinks(models);
+    await assertIdentifierAccess(models, identifierId, user);
 
     const opencode = await models.OpencodeServer.findOne({ identifierId }).lean();
 
@@ -100,9 +102,10 @@ export const opencodeQueries = {
   getOpencodeCredentials: async (
     _root: undefined,
     { identifierId }: { identifierId: string },
-    { models }: IContext,
+    { models, user }: IContext,
   ) => {
     await ensureLegacyIdentifierLinks(models);
+    await assertIdentifierAccess(models, identifierId, user);
 
     const opencode = await models.OpencodeServer.findOne({ identifierId }).lean();
 

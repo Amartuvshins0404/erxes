@@ -19,18 +19,29 @@ import { clsx } from 'clsx';
 import { useInView } from 'react-intersection-observer';
 import { useUpdateOppty } from '@/oppty/hooks/useUpdateOppty';
 import { useBlockStatusesByType } from '@/status/hooks/useGetBlockStatuses';
+import { IBlockStatus } from '@/status/types';
 
 import { allOpptysMapState } from '@/oppty/states/allOpptysMapState';
 
 const fetchedOpptysState = atom<BoardItemProps[]>([]);
 const opptyCountByProjectAtom = atom<Record<string, number>>({});
 
-export const OpptysBoard = ({ projectId }: { projectId: string }) => {
+const TYPE_ORDER = ['lead', 'qualified', 'site_visit', 'negotiation', 'closed_lost', 'closed_won'];
+
+const sortStatuses = (statuses: IBlockStatus[]) =>
+  [...statuses].sort((a, b) => {
+    const ti = TYPE_ORDER.indexOf(a.type);
+    const tj = TYPE_ORDER.indexOf(b.type);
+    if (ti !== tj) return ti - tj;
+    return (a.order || 0) - (b.order || 0);
+  });
+
+export const OpptysBoard = ({ projectId, unitId }: { projectId: string; unitId?: string }) => {
   const { statuses, loading: columnsLoading } = useBlockStatusesByType({
     projectId,
   });
 
-  const columns = (statuses || []).map((status) => ({
+  const columns = sortStatuses(statuses || []).map((status) => ({
     id: status._id,
     name: status.name,
     color: status.color,
@@ -47,14 +58,16 @@ export const OpptysBoard = ({ projectId }: { projectId: string }) => {
     );
   }
 
-  return <OpptysBoardInner projectId={projectId} columns={columns} />;
+  return <OpptysBoardInner projectId={projectId} unitId={unitId} columns={columns} />;
 };
 
 const OpptysBoardInner = ({
   projectId,
+  unitId,
   columns,
 }: {
   projectId: string;
+  unitId?: string;
   columns: { id: string; name: string; color: string }[];
 }) => {
   const [allOpptysMap, setAllOpptysMap] = useAtom(allOpptysMapState);
@@ -122,7 +135,7 @@ const OpptysBoardInner = ({
     >
       {(column) => (
         <Board id={column.id} key={column.id} sortBy="updated" className="w-80">
-          <OpptysBoardCards column={column} projectId={projectId} />
+          <OpptysBoardCards column={column} projectId={projectId} unitId={unitId} />
         </Board>
       )}
     </Board.Provider>
@@ -132,9 +145,11 @@ const OpptysBoardInner = ({
 export const OpptysBoardCards = ({
   column,
   projectId,
+  unitId,
 }: {
   column: BoardColumnProps;
   projectId: string;
+  unitId?: string;
 }) => {
   const [opptyCards, setOpptyCards] = useAtom(fetchedOpptysState);
   const [opptyCountByProject, setOpptyCountByProject] = useAtom(
@@ -155,6 +170,7 @@ export const OpptysBoardCards = ({
     {
       variables: {
         status: column.id,
+        ...(unitId ? { unit: unitId } : {}),
       },
     },
   );

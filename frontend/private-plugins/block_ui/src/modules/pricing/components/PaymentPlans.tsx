@@ -24,7 +24,7 @@ export const PaymentPlans = () => {
     >
       <InfoCardContent className='space-y-3'>
         <div className="grid grid-cols-12 gap-3">
-          <div className="blk:col-span-11 grid blk:grid-cols-8 gap-3 px-2">
+          <div className="blk:col-span-11 grid blk:grid-cols-9 gap-3 px-2">
             <Label asChild>
               <div className="col-span-2">Plan Name</div>
             </Label>
@@ -33,6 +33,9 @@ export const PaymentPlans = () => {
             </Label>
             <Label asChild>
               <div>Down Payment</div>
+            </Label>
+            <Label asChild>
+              <div>Completion</div>
             </Label>
             <Label asChild>
               <div>Interest</div>
@@ -86,8 +89,8 @@ export const PaymentPlanItem = ({
     const {
       _id,
       downPaymentPercentage,
+      completionPaymentPercentage,
       interestPercentage,
-      // advancePaymentPercentage,
       discountPercentage,
       name,
       frequency,
@@ -100,9 +103,9 @@ export const PaymentPlanItem = ({
       input: {
         type,
         downPaymentPercentage,
+        completionPaymentPercentage,
         interestPercentage,
         project: projectId,
-        // advancePaymentPercentage,
         discountPercentage,
         frequency,
         installment,
@@ -128,7 +131,7 @@ export const PaymentPlanItem = ({
 
   return (
     <div className="grid grid-cols-12 gap-3">
-      <div className="blk:col-span-11 grid blk:grid-cols-8 gap-3">
+      <div className="blk:col-span-11 grid blk:grid-cols-9 gap-3">
         <Input
           value={paymentPlanValue.name}
           onBlur={handleBlur}
@@ -143,6 +146,11 @@ export const PaymentPlanItem = ({
           value={paymentPlanValue.downPaymentPercentage}
           onBlur={handleBlur}
           onChange={(value) => handleChange('downPaymentPercentage', value)}
+        />
+        <CurrencyField.ValueInput
+          value={paymentPlanValue.completionPaymentPercentage}
+          onBlur={handleBlur}
+          onChange={(value) => handleChange('completionPaymentPercentage', value)}
         />
         <CurrencyField.ValueInput
           value={paymentPlanValue.interestPercentage}

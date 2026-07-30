@@ -1,9 +1,13 @@
 import { Sheet, Button, Spinner, toast } from 'erxes-ui';
+import { useTranslation } from 'react-i18next';
 import { useState, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { IconPlus } from '@tabler/icons-react';
-import { addEBarimtStageInConfigSchema, TStageInEbarimtConfig } from '@/ebarimt/settings/stage-in-ebarimt-config/types';
+import {
+  addEBarimtStageInConfigSchema,
+  TStageInEbarimtConfig,
+} from '@/ebarimt/settings/stage-in-ebarimt-config/types';
 import { useSaveStageInEbarimtConfig } from '@/ebarimt/settings/stage-in-ebarimt-config/hooks/useSaveStageInEbarimtConfig';
 import { StageInEBarimtConfigFormFields } from './StageInEBarimtConfigFormFields';
 
@@ -26,16 +30,17 @@ const DEFAULT_VALUES: TStageInEbarimtConfig = {
   hasVat: false,
   citytaxPercent: '',
   vatPercent: '',
-  reverseVatRules: '',
+  reverseVatRules: [],
   hasCitytax: false,
   footerText: '',
-  reverseCtaxRules: '',
+  reverseCtaxRules: [],
   withDescription: false,
   skipEbarimt: false,
   headerText: '',
 };
 
 export const AddStageInEBarimtConfig = () => {
+  const { t } = useTranslation('mongolian');
   const [open, setOpen] = useState(false);
   const { saveStageInEbarimtConfig } = useSaveStageInEbarimtConfig();
   const [loading, setLoading] = useState(false);
@@ -52,7 +57,11 @@ export const AddStageInEBarimtConfig = () => {
       setOpen(false);
       form.reset(DEFAULT_VALUES);
     } catch {
-      toast({ title: 'Error', description: 'Failed to create configuration', variant: 'destructive' });
+      toast({
+        title: t('error'),
+        description: t('failed-to-create-config'),
+        variant: 'destructive',
+      });
     } finally {
       setLoading(false);
     }
@@ -103,12 +112,12 @@ export const AddStageInEBarimtConfig = () => {
       <Sheet.Trigger asChild>
         <Button>
           <IconPlus />
-          Add Config
+          {t('add-config')}
         </Button>
       </Sheet.Trigger>
       <Sheet.View side="right" className="bg-background sm:max-w-4xl">
         <Sheet.Header>
-          <Sheet.Title>Add Stage In Ebarimt Config</Sheet.Title>
+          <Sheet.Title>{t('add-stage-in-ebarimt-config')}</Sheet.Title>
           <Sheet.Close />
         </Sheet.Header>
         <div className="flex-1 overflow-y-auto px-5 py-4">
@@ -125,10 +134,12 @@ export const AddStageInEBarimtConfig = () => {
         </div>
         <Sheet.Footer className="gap-2 border-t bg-background">
           <Sheet.Close asChild>
-            <Button variant="outline" size="lg">Cancel</Button>
+            <Button variant="outline" size="lg">
+              {t('cancel')}
+            </Button>
           </Sheet.Close>
           <Button type="submit" form={FORM_ID} size="lg" disabled={loading}>
-            {loading ? <Spinner /> : 'Save'}
+            {loading ? <Spinner /> : t('save')}
           </Button>
         </Sheet.Footer>
       </Sheet.View>

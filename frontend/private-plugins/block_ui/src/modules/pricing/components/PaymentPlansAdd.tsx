@@ -47,7 +47,7 @@ export const PaymentPlansAddForm = ({ onClose }: { onClose: () => void }) => {
   const form = useForm<IPaymentPlan>({
     resolver: zodResolver(paymentPlanSchema),
     defaultValues: {
-      // advancePaymentPercentage: 0,
+      completionPaymentPercentage: 0,
       description: '',
       name: '',
       type: PAYMENT_PLAN_TYPE.SALE,
@@ -149,6 +149,24 @@ export const PaymentPlansAddForm = ({ onClose }: { onClose: () => void }) => {
                   <div className="text-right w-6 text-sm">{field.value}%</div>
                 </div>
                 <Form.Description></Form.Description>
+                <Form.Message />
+              </Form.Item>
+            )}
+          />
+          <Form.Field
+            name="completionPaymentPercentage"
+            render={({ field }) => (
+              <Form.Item>
+                <Form.Label>Completion Payment %</Form.Label>
+                <div className="flex gap-2 font-medium">
+                  <Form.Control>
+                    <Slider
+                      value={[field.value]}
+                      onValueChange={(value) => field.onChange(value[0])}
+                    />
+                  </Form.Control>
+                  <div className="text-right w-6 text-sm">{field.value}%</div>
+                </div>
                 <Form.Message />
               </Form.Item>
             )}

@@ -25,6 +25,7 @@ export const GET_AGENCIES = gql`
         primaryPhone
         socialLinks
         dateFounded
+        verificationStatus
         operationArea {
           city
           district
@@ -72,6 +73,8 @@ export const GET_AGENCY_INFO = gql`
         services
         clientTypes
       }
+      messengerIntegrationId
+      widgetBundleUrl
     }
   }
 `;

@@ -1,16 +1,20 @@
 import {
   IOffer,
   IOfferInput,
-  OfferAmountType,
   OfferStatus,
 } from '@/contract/@types/offer';
-import { CONTRACT_STATUS } from '@/contract/constants';
 import { InvoiceItemType, InvoiceStatus } from '@/invoice/@types/invoice';
 import {
   BlockProjectPaymentPlanFrequency,
   BlockProjectPaymentPlanInterestType,
 } from '@/project/@types/payment';
 import { IContext } from '~/connectionResolvers';
+
+function stripNulls<T extends Record<string, any>>(obj: T): Partial<T> {
+  return Object.fromEntries(
+    Object.entries(obj).filter(([, v]) => v !== null && v !== undefined),
+  ) as Partial<T>;
+}
 
 export const offerMutations = {
   blockCreateOffer: async (
@@ -19,20 +23,8 @@ export const offerMutations = {
     { models }: IContext,
   ) => {
     const { invoices, ...rest } = input;
-
-    const number = Math.floor(Math.random() * 1000000).toString();
-
-    rest.number = number;
-
-    const contract = await models.Contract.findOne({
-      unit: input.unit,
-      status: CONTRACT_STATUS.SIGNED,
-    });
-
-    const paymentPlan = input.paymentPlan;
-
-    if (contract) {
-      throw new Error('Can not create offer because contract is signed');
+    if (rest.paymentPlan) {
+      rest.paymentPlan = stripNulls(rest.paymentPlan) as typeof rest.paymentPlan;
     }
 
     const unit = await models.Unit.findOne({ _id: input.unit });
@@ -40,6 +32,13 @@ export const offerMutations = {
     if (!unit) {
       throw new Error('Unit not found');
     }
+
+
+    const existingCount = await models.Offer.countDocuments({ unit: input.unit });
+    const number = `${unit.number}-${(existingCount + 1).toString().padStart(3, '0')}`;
+
+    rest.number = number;
+    rest.project = rest.project || (unit as any).project;
 
     const unitType = await models.UnitType.findOne({ _id: unit.type });
 
@@ -49,28 +48,13 @@ export const offerMutations = {
 
     const offer = await models.Offer.createOffer(rest);
 
-    if (paymentPlan.frequency === BlockProjectPaymentPlanFrequency.CUSTOM) {
-      for (const invoice of invoices) {
-        await models.Invoice.createInvoice({
-          ...invoice,
-          itemId: offer._id,
-          itemType: InvoiceItemType.OFFER,
-        });
-      }
-
-      return offer;
-    }
-
-    let totalAmount =
-      input.amountType === OfferAmountType.PER_SIZE
-        ? input.amount * unitType.size
-        : input.amount;
+    let totalAmount = input.amount * unitType.size;
 
     const {
       frequency,
       discountPercentage,
       downPaymentPercentage,
-      advancePaymentDate,
+      completionPaymentDate,
       installment,
       interestPercentage,
       interestType,
@@ -95,7 +79,7 @@ export const offerMutations = {
     if (downPaymentPercentage) {
       await models.Invoice.createInvoice({
         amount: downPaymentAmount,
-        date: advancePaymentDate || new Date(),
+        date: completionPaymentDate || new Date(),
         status: InvoiceStatus.UNPAID,
         number: 1,
         itemId: offer._id,
@@ -107,7 +91,7 @@ export const offerMutations = {
     if (frequency === BlockProjectPaymentPlanFrequency.ONE_TIME) {
       return models.Invoice.createInvoice({
         amount: totalAmount - downPaymentAmount,
-        date: advancePaymentDate || new Date(),
+        date: completionPaymentDate || new Date(),
         status: InvoiceStatus.UNPAID,
         number: downPaymentPercentage ? 2 : 1,
         itemId: offer._id,
@@ -117,7 +101,7 @@ export const offerMutations = {
     }
 
     if (installment && installment > 0) {
-      const currentDate = advancePaymentDate || new Date();
+      const currentDate = completionPaymentDate || new Date();
       const addMonths = (date: Date, months: number) => {
         const d = new Date(date);
         d.setMonth(d.getMonth() + months);
@@ -174,7 +158,7 @@ export const offerMutations = {
       return offer;
     }
 
-    return models.Offer.createOffer(rest);
+    return offer;
   },
 
   blockUpdateOffer: async (
@@ -182,6 +166,9 @@ export const offerMutations = {
     { _id, input }: { _id: string; input: IOffer },
     { models }: IContext,
   ) => {
+    if (input.paymentPlan) {
+      input.paymentPlan = stripNulls(input.paymentPlan) as typeof input.paymentPlan;
+    }
     return models.Offer.updateOffer(_id, input);
   },
 

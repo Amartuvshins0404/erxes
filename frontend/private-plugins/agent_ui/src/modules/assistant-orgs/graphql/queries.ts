@@ -8,8 +8,16 @@ export const GET_IDENTIFIERS = gql`
       slug
       kind
       description
+      createdUserId
+      memberIds
       createdAt
       updatedAt
+      server {
+        exists
+        hasNamespace
+        name
+        status
+      }
     }
   }
 `;
@@ -22,8 +30,16 @@ export const GET_IDENTIFIER = gql`
       slug
       kind
       description
+      createdUserId
+      memberIds
       createdAt
       updatedAt
+      server {
+        exists
+        hasNamespace
+        name
+        status
+      }
     }
   }
 `;

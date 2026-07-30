@@ -21,6 +21,10 @@ export interface MenuInput {
   clientPortalId: string;
   label: string;
   url: string;
+  contentType?: string;
+  contentTypeId?: string;
+  type?: 'cms' | 'web';
+  linkType?: string;
   kind: string;
   parentId?: string;
   target?: string;
@@ -28,10 +32,27 @@ export interface MenuInput {
   translations?: TranslationInput[];
 }
 
+export interface MenuItem {
+  _id: string;
+  label: string;
+  parentId?: string;
+  kind?: string;
+  url?: string;
+  order?: number;
+  depth?: number;
+  path?: string[];
+  translations?: { language: string }[];
+  [key: string]: unknown;
+}
+
 export interface MenuRecord {
   _id: string;
   label: string;
   url?: string;
+  contentType?: string;
+  contentTypeId?: string;
+  type?: 'cms' | 'web';
+  linkType?: string;
   kind?: string;
   parentId?: string;
   target?: string;
@@ -51,6 +72,9 @@ export interface MenuFormData {
   kind: string;
   clientPortalId: string;
   parentId: string;
+  contentType?: string;
+  contentTypeId?: string;
+  type?: 'cms' | 'web';
   linkType: string;
   target: boolean;
 }

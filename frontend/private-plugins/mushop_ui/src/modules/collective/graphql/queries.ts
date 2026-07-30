@@ -38,3 +38,9 @@ export const MUSHOP_COLLECTIVES = gql`
     }
   }
 `;
+
+export const MUSHOP_CHECK_SUBDOMAIN = gql`
+  query MushopCheckSubdomain($subdomain: String) {
+    mushopCheckSubdomain(subdomain: $subdomain)
+  }
+`;

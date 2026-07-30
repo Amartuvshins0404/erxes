@@ -1,5 +1,5 @@
 import { IContext } from '~/connectionResolvers';
-import { sendSupplierStatusToSupplier } from '~/utils/sendSupplierStatus';
+import { sendSupplierMessage } from '~/utils/sendSupplierMessage';
 import { fetchSupplierPosProducts } from '~/utils/fetchSupplierPosProducts';
 
 export const supplierMutations = {
@@ -10,18 +10,25 @@ export const supplierMutations = {
       verificationStatus,
       note,
     }: { _id: string; verificationStatus: string; note?: string },
-    { models, user }: IContext,
+    { models, checkPermission }: IContext,
   ) => {
-    if (!user) throw new Error('Login required');
+    await checkPermission('mushopUpdateSupplierVerificationStatus');
 
     const existing = await models.Supplier.getSupplier(_id);
 
-    await sendSupplierStatusToSupplier({
-      subdomain: existing.subdomain,
-      entityId: existing.entityId,
-      verificationStatus,
-      note,
-    });
+    try {
+      await sendSupplierMessage({
+        subdomain: existing.subdomain,
+        action: 'supplier',
+        payload: {
+          entityId: existing.entityId,
+          data: { verificationStatus, note },
+        },
+        timeout: 5000,
+      });
+    } catch (error) {
+      throw new Error(`Failed to send supplier status: ${error.message}`);
+    }
 
     return models.Supplier.updateVerificationStatus(
       _id,
@@ -33,16 +40,18 @@ export const supplierMutations = {
   mushopUpdateSupplierTier: async (
     _root: undefined,
     { _id, tierLevel }: { _id: string; tierLevel: number },
-    { models }: IContext,
+    { models, checkPermission }: IContext,
   ) => {
+    await checkPermission('mushopUpdateSupplierTier');
     return models.Supplier.updateTierLevel(_id, tierLevel);
   },
 
   mushopUpdateSupplierPos: async (
     _root: undefined,
     { _id, posToken }: { _id: string; posToken: string },
-    { models }: IContext,
+    { models, checkPermission }: IContext,
   ) => {
+    await checkPermission('mushopUpdateSupplierPos');
     const supplier = await models.Supplier.getSupplier(_id);
 
     const updated = await models.Supplier.findOneAndUpdate(
@@ -58,7 +67,7 @@ export const supplierMutations = {
 
     await Promise.all(
       products.map((p) =>
-        models.MushopProduct.syncProduct(supplier.subdomain, p._id, {
+        models.Product.syncProduct(supplier.subdomain, p._id, {
           name: p.name,
           shortName: p.shortName,
           code: p.code,
@@ -85,9 +94,9 @@ export const supplierMutations = {
   mushopUpdateSupplierMushopPos: async (
     _root: undefined,
     { _id, mushopPosToken }: { _id: string; mushopPosToken: string },
-    { models, user }: IContext,
+    { models, checkPermission }: IContext,
   ) => {
-    if (!user) throw new Error('Login required');
+    await checkPermission('mushopUpdateSupplierMushopPos');
 
     return models.Supplier.findOneAndUpdate(
       { _id },

@@ -4,14 +4,23 @@ import {
   UPDATE_MN_CONFIG,
   GET_MN_CONFIGS,
 } from '@/ebarimt/settings/stage-in-ebarimt-config/graphql/queries/mnConfigs';
+import { normalizeRuleIds } from '@/ebarimt/settings/stage-in-ebarimt-config/types';
 import { useToast } from 'erxes-ui';
+import { useTranslation } from 'react-i18next';
 
-const refetchOptions = [{ query: GET_MN_CONFIGS, variables: { code: 'stageInEbarimt' } }];
+const refetchOptions = [
+  { query: GET_MN_CONFIGS, variables: { code: 'stageInEbarimt' } },
+];
 
 export const useSaveStageInEbarimtConfig = () => {
-  const [createConfig] = useMutation(CREATE_MN_CONFIG, { refetchQueries: refetchOptions });
-  const [updateConfig] = useMutation(UPDATE_MN_CONFIG, { refetchQueries: refetchOptions });
+  const [createConfig] = useMutation(CREATE_MN_CONFIG, {
+    refetchQueries: refetchOptions,
+  });
+  const [updateConfig] = useMutation(UPDATE_MN_CONFIG, {
+    refetchQueries: refetchOptions,
+  });
   const toast = useToast();
+  const { t } = useTranslation('mongolian');
 
   const saveStageInEbarimtConfig = async (
     config: any,
@@ -20,13 +29,18 @@ export const useSaveStageInEbarimtConfig = () => {
   ) => {
     try {
       let result;
+      const value = {
+        ...config,
+        reverseVatRules: normalizeRuleIds(config.reverseVatRules),
+        reverseCtaxRules: normalizeRuleIds(config.reverseCtaxRules),
+      };
 
       if (operation === 'create' || !configId) {
         result = await createConfig({
           variables: {
             code: 'stageInEbarimt',
             subId: config.stageId,
-            value: config,
+            value,
           },
         });
       } else {
@@ -34,14 +48,14 @@ export const useSaveStageInEbarimtConfig = () => {
           variables: {
             id: configId,
             subId: config.stageId,
-            value: config,
+            value,
           },
         });
       }
 
       toast.toast({
-        title: 'Success',
-        description: 'Configuration saved successfully',
+        title: t('success'),
+        description: t('config-saved-successfully'),
         variant: 'default',
       });
 
@@ -52,8 +66,8 @@ export const useSaveStageInEbarimtConfig = () => {
       );
     } catch (error) {
       toast.toast({
-        title: 'Error',
-        description: 'Failed to save configuration',
+        title: t('error'),
+        description: t('failed-to-save-config'),
         variant: 'destructive',
       });
       throw error;

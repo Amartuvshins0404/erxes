@@ -19,6 +19,7 @@ import {
   IconStar,
   IconUser,
 } from '@tabler/icons-react';
+import { useTranslation } from 'react-i18next';
 import { ISupplier } from '../types';
 import { SupplierVerificationAction } from './SupplierVerificationAction';
 
@@ -51,9 +52,10 @@ export const suppliersColumns: ColumnDef<ISupplier>[] = [
   {
     id: 'name',
     accessorKey: 'name',
-    header: () => (
-      <RecordTable.InlineHead label="Name" icon={IconLabelFilled} />
-    ),
+    header: () => {
+      const { t } = useTranslation('mushop');
+      return <RecordTable.InlineHead label={t('Name')} icon={IconLabelFilled} />;
+    },
     cell: ({ cell, row }) => {
       const [, setActiveSupplierId] = useQueryState<string>('activeSupplierId');
       return (
@@ -75,7 +77,10 @@ export const suppliersColumns: ColumnDef<ISupplier>[] = [
   {
     id: 'primaryEmail',
     accessorKey: 'primaryEmail',
-    header: () => <RecordTable.InlineHead label="Email" icon={IconMail} />,
+    header: () => {
+      const { t } = useTranslation('mushop');
+      return <RecordTable.InlineHead label={t('Email')} icon={IconMail} />;
+    },
     cell: ({ cell }) => (
       <RecordTableInlineCell>
         {(cell.getValue() as string) || '-'}
@@ -86,7 +91,10 @@ export const suppliersColumns: ColumnDef<ISupplier>[] = [
   {
     id: 'primaryPhone',
     accessorKey: 'primaryPhone',
-    header: () => <RecordTable.InlineHead label="Phone" icon={IconPhone} />,
+    header: () => {
+      const { t } = useTranslation('mushop');
+      return <RecordTable.InlineHead label={t('Phone')} icon={IconPhone} />;
+    },
     cell: ({ cell }) => (
       <RecordTableInlineCell>
         {(cell.getValue() as string) || '-'}
@@ -96,7 +104,10 @@ export const suppliersColumns: ColumnDef<ISupplier>[] = [
   },
   {
     id: 'city',
-    header: () => <RecordTable.InlineHead label="City" icon={IconMapPin} />,
+    header: () => {
+      const { t } = useTranslation('mushop');
+      return <RecordTable.InlineHead label={t('City')} icon={IconMapPin} />;
+    },
     cell: ({ row }) => (
       <RecordTableInlineCell>
         {row.original.address?.details?.city || '-'}
@@ -107,7 +118,10 @@ export const suppliersColumns: ColumnDef<ISupplier>[] = [
   {
     id: 'tierLevel',
     accessorKey: 'tierLevel',
-    header: () => <RecordTable.InlineHead label="Tier" icon={IconStar} />,
+    header: () => {
+      const { t } = useTranslation('mushop');
+      return <RecordTable.InlineHead label={t('Tier')} icon={IconStar} />;
+    },
     cell: ({ cell }) => (
       <RecordTableInlineCell>
         {cell.getValue() != null ? (
@@ -122,9 +136,15 @@ export const suppliersColumns: ColumnDef<ISupplier>[] = [
   {
     id: 'verificationStatus',
     accessorKey: 'verificationStatus',
-    header: () => (
-      <RecordTable.InlineHead label="Verification" icon={IconShieldCheck} />
-    ),
+    header: () => {
+      const { t } = useTranslation('mushop');
+      return (
+        <RecordTable.InlineHead
+          label={t('Verification')}
+          icon={IconShieldCheck}
+        />
+      );
+    },
     cell: ({ cell, row }) => (
       <RecordTableInlineCell>
         <SupplierVerificationAction
@@ -142,9 +162,10 @@ export const suppliersColumns: ColumnDef<ISupplier>[] = [
   {
     id: 'createdAt',
     accessorKey: 'createdAt',
-    header: () => (
-      <RecordTable.InlineHead label="Created" icon={IconCalendar} />
-    ),
+    header: () => {
+      const { t } = useTranslation('mushop');
+      return <RecordTable.InlineHead label={t('Created')} icon={IconCalendar} />;
+    },
     cell: ({ cell }) => (
       <RelativeDateDisplay value={cell.getValue() as string} asChild>
         <RecordTableInlineCell>

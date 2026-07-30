@@ -31,7 +31,7 @@ export interface IContractPaymentPlan {
   type: BlockProjectPaymentPlanType;
   downPaymentPercentage: number;
   interestPercentage: number;
-  advancePaymentPercentage: number;
+  completionPaymentPercentage: number;
   discountPercentage: number;
   description: string;
   installment: number;
@@ -51,8 +51,6 @@ export interface IContract extends IBlock {
   amountType: ContractAmountType;
   currency: string;
   status: ContractStatus;
-  startDate: Date;
-  endDate: Date;
   isLifeTime: boolean;
   party: IContractParty;
   paymentPlan: IContractPaymentPlan;

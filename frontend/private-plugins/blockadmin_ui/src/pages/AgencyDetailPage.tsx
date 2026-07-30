@@ -1,8 +1,7 @@
 import { AgenciesBreadcrumb } from '@/agencies/components/AgenciesBreadcrumb';
 import { AgencyDetail } from '@/agencies/components/AgencyDetail';
 import { AgencyDetailBreadcrumb } from '@/agencies/components/AgencyDetailBreadcrumb';
-import { AgenciesSubNav } from '@/agencies/components/AgenciesSubNav';
-import { PageContainer, ScrollArea, Separator } from 'erxes-ui';
+import { PageContainer, Separator } from 'erxes-ui';
 import { PageHeader } from 'ui-modules';
 
 export const AgencyDetailPage = () => {
@@ -17,10 +16,9 @@ export const AgencyDetailPage = () => {
           <PageHeader.FavoriteToggleButton />
         </PageHeader.Start>
       </PageHeader>
-      <AgenciesSubNav />
-      <ScrollArea className="flex-auto">
+      <div className="flex-auto min-h-0">
         <AgencyDetail />
-      </ScrollArea>
+      </div>
     </PageContainer>
   );
 };

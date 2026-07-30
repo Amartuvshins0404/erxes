@@ -1,12 +1,14 @@
 import { IconBuildingStore } from '@tabler/icons-react';
 import { Breadcrumb, Button, PageContainer, PageSubHeader, Separator } from 'erxes-ui';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { PageHeader } from 'ui-modules';
 import { SuppliersFilter } from '../components/SuppliersFilter';
 import { SuppliersTable } from '../components/SuppliersTable';
 import { SupplierDetailSheet } from '../components/SupplierDetailSheet';
 
 export const SuppliersPage = () => {
+  const { t } = useTranslation('mushop');
   return (
     <PageContainer>
       <PageHeader>
@@ -17,7 +19,7 @@ export const SuppliersPage = () => {
                 <Button variant="ghost" asChild>
                   <Link to="/mushop/suppliers">
                     <IconBuildingStore />
-                    Suppliers
+                    {t('Suppliers')}
                   </Link>
                 </Button>
               </Breadcrumb.Item>

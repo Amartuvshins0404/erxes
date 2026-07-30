@@ -13,10 +13,8 @@ import {
   useFilterContext,
   useQueryState,
 } from 'erxes-ui';
-import { useAtomValue } from 'jotai';
 import React, { useState } from 'react';
 import { useUsers } from 'ui-modules/modules';
-import { currentUserState } from 'ui-modules/states';
 import { useDebounce } from 'use-debounce';
 import {
   SelectMemberContext,
@@ -156,20 +154,19 @@ const SelectMemberNoAssigneeItem = () => {
 const SelectMemberContent = () => {
   const [search, setSearch] = useState('');
   const [debouncedSearch] = useDebounce(search, 500);
-  const currentUser = useAtomValue(currentUserState) as IUser;
   const { memberIds, members, allowUnassigned } = useSelectMemberContext();
   const { users, loading, handleFetchMore, totalCount, error } = useUsers({
     variables: {
       searchValue: debouncedSearch,
-      excludeIds: true,
-      ids: [currentUser?._id],
     },
   });
 
   const filteredMembers = search
     ? members.filter((member) => {
         const q = search.toLowerCase();
-        const fullName = `${member.details?.firstName || ''} ${member.details?.lastName || ''}`.toLowerCase();
+        const fullName = `${member.details?.firstName || ''} ${
+          member.details?.lastName || ''
+        }`.toLowerCase();
         return (
           fullName.includes(q) ||
           (member.details?.fullName || '').toLowerCase().includes(q) ||
@@ -201,7 +198,7 @@ const SelectMemberContent = () => {
         {!loading && allowUnassigned && <SelectMemberNoAssigneeItem />}
 
         {!loading &&
-          [currentUser, ...users]
+          users
             .filter(
               (user) => !memberIds.find((memberId) => memberId === user._id),
             )

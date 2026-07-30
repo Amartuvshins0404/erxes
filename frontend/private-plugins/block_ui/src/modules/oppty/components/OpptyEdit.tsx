@@ -7,14 +7,14 @@ import { useUpdateOppty } from '../hooks/useUpdateOppty';
 import { TAddOppty } from '../types/validations';
 import { useManageRelations } from 'ui-modules';
 
-export const OpptyEditSheet = () => {
+export const OpptyEditSheet = ({ disabled }: { disabled?: boolean }) => {
   const [open, setOpen] = useState(false);
   const [activeOpptyId] = useQueryState<string | null>('activeOpptyId');
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <Sheet.Trigger asChild>
-        <Button>
+        <Button disabled={disabled} title={disabled ? 'Editing is locked after 10 minutes for completed opportunities' : undefined}>
           <IconPencil />
           Edit
         </Button>

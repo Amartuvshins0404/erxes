@@ -12,6 +12,7 @@ import {
   useQueryState,
 } from 'erxes-ui';
 import { ActivityLogs } from 'ui-modules';
+import { useTranslation } from 'react-i18next';
 import { useSupplierDetail } from '../hooks/useSupplierDetail';
 import { ISupplier } from '../types';
 import { SupplierVerificationAction } from './SupplierVerificationAction';
@@ -43,6 +44,7 @@ const Row = ({
 );
 
 const SupplierInfo = ({ supplier }: { supplier: ISupplier }) => {
+  const { t } = useTranslation('mushop');
   const {
     _id,
     posToken,
@@ -100,27 +102,27 @@ const SupplierInfo = ({ supplier }: { supplier: ISupplier }) => {
         </div>
       )}
 
-      <InfoCard title="General">
+      <InfoCard title={t('General')}>
         <InfoCard.Content className="shadow-none p-0 overflow-hidden">
           <Table>
             <Table.Body className="bt:[&_td]:px-2 bt:[&_tr:first-child_td]:border-t bt:[&_td]:h-10">
-              <Row label="Name" value={name} />
-              <Row label="Registration #" value={registrationNumber} />
-              <Row label="Founded" value={dateFounded} />
-              <Row label="Website" value={website} />
-              <Row label="Primary Email" value={primaryEmail} />
-              <Row label="Primary Phone" value={primaryPhone} />
+              <Row label={t('Name')} value={name} />
+              <Row label={t('Registration #')} value={registrationNumber} />
+              <Row label={t('Founded')} value={dateFounded} />
+              <Row label={t('Website')} value={website} />
+              <Row label={t('Primary Email')} value={primaryEmail} />
+              <Row label={t('Primary Phone')} value={primaryPhone} />
               {emails.length > 0 && (
-                <Row label="Emails" value={emails.join(', ')} />
+                <Row label={t('Emails')} value={emails.join(', ')} />
               )}
               {phones.length > 0 && (
-                <Row label="Phones" value={phones.join(', ')} />
+                <Row label={t('Phones')} value={phones.join(', ')} />
               )}
-              <Row label="City" value={cityDistrict || details?.city} />
-              <Row label="Address" value={address?.short} />
+              <Row label={t('City')} value={cityDistrict || details?.city} />
+              <Row label={t('Address')} value={address?.short} />
               <Table.Row>
                 <Table.Cell className="bg-sidebar p-2 w-40 h-auto min-h-10 text-muted-foreground">
-                  Verification
+                  {t('Verification')}
                 </Table.Cell>
                 <Table.Cell className="p-1 px-2 h-auto min-h-10 whitespace-normal">
                   <SupplierVerificationAction
@@ -134,7 +136,7 @@ const SupplierInfo = ({ supplier }: { supplier: ISupplier }) => {
                 </Table.Cell>
               </Table.Row>
               <Row
-                label="Created"
+                label={t('Created')}
                 value={
                   createdAt
                     ? new Date(createdAt).toLocaleDateString()
@@ -142,7 +144,7 @@ const SupplierInfo = ({ supplier }: { supplier: ISupplier }) => {
                 }
               />
               <Row
-                label="Updated"
+                label={t('Updated')}
                 value={
                   updatedAt
                     ? new Date(updatedAt).toLocaleDateString()
@@ -154,13 +156,13 @@ const SupplierInfo = ({ supplier }: { supplier: ISupplier }) => {
         </InfoCard.Content>
       </InfoCard>
 
-      <InfoCard title="POS">
+      <InfoCard title={t('POS')}>
         <InfoCard.Content className="shadow-none p-0 overflow-hidden">
           <Table>
             <Table.Body className="bt:[&_td]:px-2 bt:[&_tr:first-child_td]:border-t bt:[&_td]:h-10">
               <Table.Row>
                 <Table.Cell className="bg-sidebar p-2 w-40 h-auto min-h-10 text-muted-foreground">
-                  Supplier POS
+                  {t('Supplier POS')}
                 </Table.Cell>
                 <Table.Cell className="p-1 px-2 h-auto min-h-10 whitespace-normal">
                   <SelectSupplierPos
@@ -171,7 +173,7 @@ const SupplierInfo = ({ supplier }: { supplier: ISupplier }) => {
               </Table.Row>
               <Table.Row>
                 <Table.Cell className="bg-sidebar p-2 w-40 h-auto min-h-10 text-muted-foreground">
-                  Mushop POS
+                  {t('Mushop POS')}
                 </Table.Cell>
                 <Table.Cell className="p-1 px-2 h-auto min-h-10 whitespace-normal">
                   <SelectSupplierMushopPos
@@ -186,14 +188,14 @@ const SupplierInfo = ({ supplier }: { supplier: ISupplier }) => {
       </InfoCard>
 
       {(description || about) && (
-        <InfoCard title="About">
+        <InfoCard title={t('About')}>
           <InfoCard.Content className="shadow-none p-0 overflow-hidden">
             <Table>
               <Table.Body className="bt:[&_td]:px-2 bt:[&_tr:first-child_td]:border-t bt:[&_td]:h-10">
                 {description && (
-                  <HtmlPreview label="Description" html={description} />
+                  <HtmlPreview label={t('Description')} html={description} />
                 )}
-                {about && <HtmlPreview label="About" html={about} />}
+                {about && <HtmlPreview label={t('About')} html={about} />}
               </Table.Body>
             </Table>
           </InfoCard.Content>
@@ -201,7 +203,7 @@ const SupplierInfo = ({ supplier }: { supplier: ISupplier }) => {
       )}
 
       {Object.values(socialLinksWithoutTypename).some(Boolean) && (
-        <InfoCard title="Social Links">
+        <InfoCard title={t('Social Links')}>
           <InfoCard.Content className="shadow-none p-0 overflow-hidden">
             <Table>
               <Table.Body className="bt:[&_td]:px-2 bt:[&_tr:first-child_td]:border-t bt:[&_td]:h-10">
@@ -235,6 +237,7 @@ const SupplierInfo = ({ supplier }: { supplier: ISupplier }) => {
 const TABS = ['overview', 'activity'] as const;
 
 export const SupplierDetailSheet = () => {
+  const { t } = useTranslation('mushop');
   const [activeSupplierId, setActiveSupplierId] =
     useQueryState<string>('activeSupplierId');
   const [tab, setTab] = useQueryState<string>('supplierTab');
@@ -248,20 +251,20 @@ export const SupplierDetailSheet = () => {
       onOpenChange={() => setActiveSupplierId(null)}
     >
       <FocusSheet.View className="w-[50%] md:w-[50%]">
-        <FocusSheet.Header title={supplier?.name || 'Supplier Detail'} />
+        <FocusSheet.Header title={supplier?.name || t('Supplier Detail')} />
         <FocusSheet.Content className="flex flex-row flex-auto min-h-0 overflow-hidden">
           <FocusSheet.SideBar>
             <Sidebar.Content>
               <Sidebar.Group>
                 <Sidebar.GroupContent className="mt-2">
                   <Sidebar.Menu>
-                    {TABS.map((t) => (
-                      <Sidebar.MenuItem key={t}>
+                    {TABS.map((tabName) => (
+                      <Sidebar.MenuItem key={tabName}>
                         <Sidebar.MenuButton
-                          isActive={activeTab === t}
-                          onClick={() => setTab(t)}
+                          isActive={activeTab === tabName}
+                          onClick={() => setTab(tabName)}
                         >
-                          {t.charAt(0).toUpperCase() + t.slice(1)}
+                          {t(tabName.charAt(0).toUpperCase() + tabName.slice(1))}
                         </Sidebar.MenuButton>
                       </Sidebar.MenuItem>
                     ))}
@@ -289,7 +292,7 @@ export const SupplierDetailSheet = () => {
                   )}
                   {!loading && supplier && <SupplierInfo supplier={supplier} />}
                   {!loading && !supplier && (
-                    <div className="p-4">Supplier not found</div>
+                    <div className="p-4">{t('Supplier not found')}</div>
                   )}
                 </ScrollArea>
               </Tabs.Content>
@@ -314,7 +317,7 @@ export const SupplierDetailSheet = () => {
             <Sheet.Footer className="flex-none border-t">
               <Sheet.Close asChild>
                 <Button variant="secondary" className="bg-border">
-                  Close
+                  {t('Close')}
                 </Button>
               </Sheet.Close>
             </Sheet.Footer>

@@ -1,21 +1,30 @@
 import {
+  IconAlertTriangle,
   IconChartBar,
   IconCheck,
+  IconLink,
+  IconLock,
   IconPhoto,
+  IconTrash,
+  IconUsers,
   IconWorld,
 } from '@tabler/icons-react';
+import { SelectMember } from 'ui-modules';
 import {
   Badge,
+  Button,
+  Dialog,
   Input,
   type MultiSelectOption,
   MultipleSelector,
   Select,
-  // Switch,
   Textarea,
-  // ToggleGroup,
 } from 'erxes-ui';
+import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { LANGUAGES } from '../../../../constants';
 import {
+  CmsSettingsData,
   ClientPortalOption,
   SettingsFormState,
   UpdateSetting,
@@ -27,18 +36,70 @@ import {
 } from './SettingsField';
 import { SettingsSection } from './SettingsSection';
 import { Uploader } from './Uploader';
+import { buildPostPublicUrl } from '../../shared/utils';
 
-export const SettingsForm = ({
-  settings,
-  clientPortals,
-  updateSetting,
-}: {
+const POST_URL_FIELD_OPTIONS = [
+  { value: '_id', label: 'Post ID' },
+  { value: 'count', label: 'Post Count' },
+  { value: 'slug', label: 'Post Slug' },
+];
+
+const PREVIEW_POST = {
+  _id: 'fSY5zj2QmcnXUNSnF9sYo',
+  count: 1,
+  slug: 'my-first-post',
+};
+
+const DELETE_CONFIRMATION_PHRASE = 'delete my project';
+const DELETE_NAME_CONFIRMATION_INPUT_ID = 'delete-name-confirmation';
+const DELETE_PHRASE_CONFIRMATION_INPUT_ID = 'delete-phrase-confirmation';
+
+interface ISettingsFormProps {
+  cms?: CmsSettingsData;
+  isDeleting: boolean;
   settings: SettingsFormState;
   clientPortals: ClientPortalOption[];
   updateSetting: UpdateSetting;
-}) => {
+  onDelete: () => Promise<void> | void;
+}
+
+export const SettingsForm = ({
+  cms,
+  isDeleting,
+  settings,
+  clientPortals,
+  updateSetting,
+  onDelete,
+}: ISettingsFormProps) => {
+  const { t } = useTranslation('content');
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteNameConfirmation, setDeleteNameConfirmation] = useState('');
+  const [deletePhraseConfirmation, setDeletePhraseConfirmation] = useState('');
+
   const getLanguageLabel = (language: string) =>
     LANGUAGES.find((option) => option.value === language)?.label || language;
+
+  const cmsName =
+    cms?.name?.trim() || settings.websiteName.trim() || 'this CMS';
+  const selectedPostUrlField =
+    POST_URL_FIELD_OPTIONS.find(
+      (option) => option.value === settings.postUrlField,
+    ) || POST_URL_FIELD_OPTIONS[0];
+  const previewUrl = buildPostPublicUrl(
+    {
+      domain: settings.domain,
+      publicUrl: settings.publicUrl,
+      postUrlField: selectedPostUrlField.value,
+      postUrlPrefix: settings.postUrlPrefix,
+    },
+    PREVIEW_POST,
+    { allowRelative: true },
+  );
+  const canDeleteCMS =
+    Boolean(cms?._id) &&
+    deleteNameConfirmation.trim() === cmsName &&
+    deletePhraseConfirmation.trim() === DELETE_CONFIRMATION_PHRASE &&
+    !isDeleting;
 
   const selectedLanguageOptions = settings.languages.map((language) => ({
     value: language,
@@ -90,27 +151,32 @@ export const SettingsForm = ({
     updateSetting('metaKeywords', keywords);
   };
 
-  // const getPostUrlFieldLabel = (value: string) => {
-  //   if (value === '_id') {
-  //     return 'Post ID';
-  //   }
+  const handleDeleteDialogChange = (open: boolean) => {
+    setDeleteDialogOpen(open);
 
-  //   if (value === 'count') {
-  //     return 'Post count';
-  //   }
+    if (!open) {
+      setDeleteNameConfirmation('');
+      setDeletePhraseConfirmation('');
+    }
+  };
 
-  //   return 'Slug';
-  // };
+  const handleDelete = async () => {
+    if (!canDeleteCMS) {
+      return;
+    }
+
+    await onDelete();
+  };
 
   return (
     <div className="min-w-0 space-y-4 p-4">
       <SettingsSection
         id="general"
-        title="General"
-        badge={<Badge variant="secondary">Base info</Badge>}
+        title={t('general')}
+        badge={<Badge variant="secondary">{t('base-info')}</Badge>}
       >
         <div className="grid gap-4 md:grid-cols-2">
-          <Field id="websiteName" label="Website Name" required>
+          <Field id="websiteName" label={t('website-name')} required>
             <Input
               id="websiteName"
               value={settings.websiteName}
@@ -121,7 +187,7 @@ export const SettingsForm = ({
             />
           </Field>
 
-          <Field id="clientPortalKind" label="Client Portal (kind)">
+          <Field id="clientPortalKind" label={t('client-portal-kind')}>
             <Select
               value={settings.clientPortalKind}
               onValueChange={(value) =>
@@ -129,7 +195,7 @@ export const SettingsForm = ({
               }
             >
               <Select.Trigger id="clientPortalKind" className="bg-muted">
-                <Select.Value placeholder="Select portal" />
+                <Select.Value placeholder={t('select-portal')} />
               </Select.Trigger>
               <Select.Content>
                 {clientPortals.length ? (
@@ -150,8 +216,8 @@ export const SettingsForm = ({
 
         <Field
           id="shortDescription"
-          label="Short Description"
-          hint="Used as fallback meta description if none set in SEO Defaults."
+          label={t('short-description')}
+          hint={t('short-description-hint')}
           required
         >
           <Textarea
@@ -165,7 +231,7 @@ export const SettingsForm = ({
         </Field>
 
         <div className="grid gap-4 md:grid-cols-2">
-          <Field id="domain" label="Domain">
+          <Field id="domain" label={t('domain')}>
             <Input
               id="domain"
               value={settings.domain}
@@ -174,7 +240,7 @@ export const SettingsForm = ({
             />
           </Field>
 
-          <Field id="publicUrl" label="Public URL">
+          <Field id="publicUrl" label={t('public-url')}>
             <Input
               id="publicUrl"
               value={settings.publicUrl}
@@ -189,15 +255,15 @@ export const SettingsForm = ({
 
       <SettingsSection
         id="seo"
-        title="SEO"
-        badge={<Badge variant="success">New</Badge>}
+        title={t('seo')}
+        badge={<Badge variant="success">{t('new')}</Badge>}
       >
-        <SectionLabel>Defaults</SectionLabel>
+        <SectionLabel>{t('defaults')}</SectionLabel>
 
         <Field
           id="metaTitle"
-          label="Default Meta Title"
-          hint="Fallback for pages without an explicit title."
+          label={t('default-meta-title')}
+          hint={t('default-meta-title-hint')}
         >
           <Input
             id="metaTitle"
@@ -210,8 +276,8 @@ export const SettingsForm = ({
 
         <Field
           id="metaDescription"
-          label="Default Meta Description"
-          hint="Max 160 characters recommended."
+          label={t('default-meta-description')}
+          hint={t('default-meta-description-hint')}
         >
           <Textarea
             id="metaDescription"
@@ -226,51 +292,51 @@ export const SettingsForm = ({
           </div>
         </Field>
 
-        <Field id="defaultOgImage" label="Default OG Image">
+        <Field id="defaultOgImage" label={t('default-og-image')}>
           <Uploader
             icon={IconPhoto}
-            label="Open Graph Image"
-            hint="Recommended: 1200x630px, PNG or JPG"
+            label={t('open-graph-image')}
+            hint={t('og-image-hint')}
             value={settings.metaImage}
             onChange={(value) => updateSetting('metaImage', value)}
           />
         </Field>
 
-        <SectionLabel>Keywords</SectionLabel>
+        <SectionLabel>{t('keywords')}</SectionLabel>
 
         <Field
-          label="Meta Keywords"
-          hint="Injected into the meta keywords tag. Less critical for modern SEO but still used by some crawlers."
+          label={t('meta-keywords')}
+          hint={t('meta-keywords-hint')}
         >
           <MultipleSelector
             value={selectedKeywordOptions}
             options={selectedKeywordOptions}
-            placeholder="Select"
+            placeholder={t('select')}
             hidePlaceholderWhenSelected
-            emptyIndicator="Empty"
+            emptyIndicator={t('empty')}
             creatable
             inputProps={{ 'aria-label': 'Meta Keywords' }}
             onChange={handleKeywordChange}
           />
         </Field>
 
-        <SectionLabel>Robots & Indexing</SectionLabel>
+        <SectionLabel>{t('robots-indexing')}</SectionLabel>
 
         <Field
-          label="Search Engine Indexing"
-          hint="Sets the global robots meta tag. Individual pages can override this."
+          label={t('search-engine-indexing')}
+          hint={t('search-engine-indexing-hint')}
         >
           <div className="grid gap-2 md:grid-cols-2">
             <RobotsOption
               checked={settings.indexing === 'index'}
-              title="Index site"
-              description="Allow crawlers to index pages"
+              title={t('index-site')}
+              description={t('index-site-desc')}
               onClick={() => updateSetting('indexing', 'index')}
             />
             <RobotsOption
               checked={settings.indexing === 'noindex'}
-              title="No index"
-              description="Block all search engine crawling"
+              title={t('no-index')}
+              description={t('no-index-desc')}
               onClick={() => updateSetting('indexing', 'noindex')}
             />
           </div>
@@ -279,15 +345,15 @@ export const SettingsForm = ({
 
       <SettingsSection
         id="analytics"
-        title="Analytics"
-        badge={<Badge variant="success">New</Badge>}
+        title={t('analytics')}
+        badge={<Badge variant="success">{t('new')}</Badge>}
       >
-        <SectionLabel>Google Analytics</SectionLabel>
+        <SectionLabel>{t('google-analytics')}</SectionLabel>
 
         <Field
           id="gaTrackingId"
-          label="GA Tracking ID (gaTrackingId)"
-          hint="Supports both GA4 (G-XXXXXXX) and Universal Analytics (UA-XXXXX-X) formats."
+          label={t('ga-tracking-id')}
+          hint={t('ga-tracking-id-hint')}
         >
           <div className="relative">
             <IconChartBar className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -310,21 +376,21 @@ export const SettingsForm = ({
             </div>
             <div className="min-w-0">
               <div className="text-sm font-semibold text-success">
-                Google Analytics configured
+                {t('google-analytics-configured')}
               </div>
               <div className="truncate font-mono text-xs text-muted-foreground">
-                Tracking ID: {settings.gaTrackingId}
+                {t('tracking-id-value', { id: settings.gaTrackingId })}
               </div>
             </div>
           </div>
         ) : null}
 
-        <SectionLabel>Other Integrations</SectionLabel>
+        <SectionLabel>{t('other-integrations')}</SectionLabel>
 
         <Field
           id="googleTagManagerId"
-          label="Google Tag Manager ID"
-          hint="Optional. If set, GTM will be used instead of direct GA injection."
+          label={t('google-tag-manager-id')}
+          hint={t('google-tag-manager-id-hint')}
         >
           <Input
             id="googleTagManagerId"
@@ -339,8 +405,8 @@ export const SettingsForm = ({
 
         <Field
           id="customHeadScripts"
-          label="Custom Head Scripts"
-          hint="Injected into head on every page. Use with care."
+          label={t('custom-head-scripts')}
+          hint={t('custom-head-scripts-hint')}
         >
           <Textarea
             id="customHeadScripts"
@@ -357,97 +423,52 @@ export const SettingsForm = ({
         </Field>
       </SettingsSection>
 
-      {/* <SettingsSection id="content" title="Content">
-        <div className="grid gap-4 md:grid-cols-2">
-          <Field
-            label="Post URL Format (postUrlField)"
-            hint="How post URLs are generated."
+      <SettingsSection id="content" title={t('content')}>
+        <Field
+          id="postUrlPrefix"
+          label={t('post-url-path')}
+          hint={t('post-url-path-hint')}
+        >
+          <Input
+            id="postUrlPrefix"
+            value={settings.postUrlPrefix}
+            placeholder="/posts"
+            onChange={(event) =>
+              updateSetting('postUrlPrefix', event.target.value)
+            }
+            variant="secondary"
+          />
+        </Field>
+
+        <Field
+          id="postUrlField"
+          label={t('post-url-field')}
+          hint={t('post-url-field-hint')}
+        >
+          <Select
+            value={settings.postUrlField}
+            onValueChange={(value) => updateSetting('postUrlField', value)}
           >
-            <ToggleGroup
-              type="single"
-              variant="outline"
-              value={settings.postUrlField}
-              onValueChange={(value) =>
-                value && updateSetting('postUrlField', value)
-              }
-              className="justify-start"
-            >
-              {['slug', '_id', 'count'].map((value) => (
-                <ToggleGroup.Item
-                  key={value}
-                  value={value}
-                  className="h-7 px-3 text-xs"
-                >
-                  {getPostUrlFieldLabel(value)}
-                </ToggleGroup.Item>
+            <Select.Trigger id="postUrlField" className="bg-muted">
+              <Select.Value placeholder={t('select-post-url-field')} />
+            </Select.Trigger>
+            <Select.Content>
+              {POST_URL_FIELD_OPTIONS.map((option) => (
+                <Select.Item key={option.value} value={option.value}>
+                  {option.label}
+                </Select.Item>
               ))}
-            </ToggleGroup>
-          </Field>
+            </Select.Content>
+          </Select>
+          <div className="mt-2 flex items-center gap-2 rounded-md border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+            <IconLink className="size-4 shrink-0" />
+            <span className="min-w-0 truncate">{t('preview-url', { url: previewUrl })}</span>
+          </div>
+        </Field>
+      </SettingsSection>
 
-          <Field
-            id="postsPerPage"
-            label="Posts Per Page"
-            hint="Pagination chunk size."
-          >
-            <Select
-              value={settings.postsPerPage}
-              onValueChange={(value) => updateSetting('postsPerPage', value)}
-            >
-              <Select.Trigger id="postsPerPage" className="bg-muted">
-                <Select.Value />
-              </Select.Trigger>
-              <Select.Content>
-                {['10', '20', '50'].map((value) => (
-                  <Select.Item key={value} value={value}>
-                    {value}
-                  </Select.Item>
-                ))}
-              </Select.Content>
-            </Select>
-          </Field>
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-2">
-          <Field label="Default Post Status">
-            <ToggleGroup
-              type="single"
-              variant="outline"
-              value={settings.defaultPostStatus}
-              onValueChange={(value) =>
-                value && updateSetting('defaultPostStatus', value)
-              }
-              className="justify-start"
-            >
-              <ToggleGroup.Item value="draft" className="h-7 px-3 text-xs">
-                Draft
-              </ToggleGroup.Item>
-              <ToggleGroup.Item value="published" className="h-7 px-3 text-xs">
-                Published
-              </ToggleGroup.Item>
-            </ToggleGroup>
-          </Field>
-
-          <Field label="Comments">
-            <div className="flex items-center justify-between rounded-lg border bg-muted/30 p-3">
-              <div>
-                <div className="text-sm font-medium">Allow comments</div>
-                <div className="text-xs text-muted-foreground">
-                  Enable comment threads on posts
-                </div>
-              </div>
-              <Switch
-                checked={settings.allowComments}
-                onCheckedChange={(checked) =>
-                  updateSetting('allowComments', checked)
-                }
-              />
-            </div>
-          </Field>
-        </div>
-      </SettingsSection> */}
-
-      <SettingsSection id="languages" title="Languages">
-        <Field label="Supported Languages">
+      <SettingsSection id="languages" title={t('languages')}>
+        <Field label={t('supported-languages')}>
           <MultipleSelector
             defaultOptions={LANGUAGES}
             onSearchSync={(term) =>
@@ -460,15 +481,15 @@ export const SettingsForm = ({
             triggerSearchOnFocus
             value={selectedLanguageOptions}
             onChange={handleLanguagesChange}
-            placeholder="Select languages"
+            placeholder={t('select-languages')}
             commandProps={{ shouldFilter: false }}
           />
         </Field>
 
         <Field
           id="defaultLanguage"
-          label="Default Language"
-          hint="Used when no locale is specified in the URL."
+          label={t('default-language')}
+          hint={t('default-language-hint')}
         >
           <Select
             value={settings.defaultLanguage}
@@ -476,7 +497,7 @@ export const SettingsForm = ({
             disabled={availableDefaultLanguages.length === 0}
           >
             <Select.Trigger id="defaultLanguage" className="bg-muted">
-              <Select.Value placeholder="Select default language" />
+              <Select.Value placeholder={t('select-default-language')} />
             </Select.Trigger>
             <Select.Content>
               {availableDefaultLanguages.map((language) => (
@@ -491,29 +512,205 @@ export const SettingsForm = ({
 
       <SettingsSection
         id="appearance"
-        title="Appearance"
-        badge={<Badge variant="secondary">Optional</Badge>}
+        title={t('appearance')}
+        badge={<Badge variant="secondary">{t('optional')}</Badge>}
       >
-        <Field label="Site Logo">
+        <Field label={t('site-logo')}>
           <Uploader
             icon={IconPhoto}
-            label="Logo Image"
-            hint="SVG or PNG, transparent background preferred"
+            label={t('logo-image')}
+            hint={t('logo-image-hint')}
             value={settings.siteLogo}
             onChange={(value) => updateSetting('siteLogo', value)}
           />
         </Field>
 
-        <Field label="Favicon">
+        <Field label={t('favicon')}>
           <Uploader
             icon={IconWorld}
-            label="Favicon"
-            hint=".ico or 32x32 PNG"
+            label={t('favicon')}
+            hint={t('favicon-hint')}
             value={settings.favicon}
             onChange={(value) => updateSetting('favicon', value)}
           />
         </Field>
       </SettingsSection>
+
+      <SettingsSection
+        id="access"
+        title={t('access-control')}
+        badge={<Badge variant="secondary">{t('team')}</Badge>}
+      >
+        <Field
+          label={t('who-can-manage-cms')}
+          hint={t('who-can-manage-cms-hint')}
+        >
+          <div className="grid gap-2 md:grid-cols-2">
+            <RobotsOption
+              checked={settings.accessPolicy === 'open'}
+              title={t('open-access')}
+              description={t('open-access-desc')}
+              onClick={() => updateSetting('accessPolicy', 'open')}
+            />
+            <RobotsOption
+              checked={settings.accessPolicy === 'assigned'}
+              title={t('assigned-members-only')}
+              description={t('assigned-members-only-desc')}
+              onClick={() => updateSetting('accessPolicy', 'assigned')}
+            />
+          </div>
+        </Field>
+
+        {settings.accessPolicy === 'assigned' ? (
+          <Field
+            label={t('assigned-team-members')}
+            hint={t('assigned-team-members-hint')}
+          >
+            <SelectMember
+              mode="multiple"
+              value={settings.assignedMemberIds}
+              onValueChange={(value) =>
+                updateSetting(
+                  'assignedMemberIds',
+                  Array.isArray(value) ? value : value ? [value] : [],
+                )
+              }
+              placeholder={t('select-team-members')}
+            />
+            <div className="mt-2 flex items-center gap-2 rounded-md border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+              {settings.assignedMemberIds.length ? (
+                <>
+                  <IconUsers className="size-4 shrink-0" />
+                  <span>
+                    {settings.assignedMemberIds.length} member
+                    {settings.assignedMemberIds.length === 1 ? '' : 's'}{' '}
+                    assigned
+                  </span>
+                </>
+              ) : (
+                <>
+                  <IconLock className="size-4 shrink-0" />
+                  <span>
+                    {t('no-members-assigned-desc')}
+                  </span>
+                </>
+              )}
+            </div>
+          </Field>
+        ) : null}
+      </SettingsSection>
+
+      <SettingsSection
+        id="delete"
+        title={t('delete-cms')}
+        className="border-destructive/40"
+        contentClassName="space-y-0 p-0"
+      >
+        <div className="space-y-4 p-4">
+          <p className="text-sm text-muted-foreground">
+            {t('delete-cms-desc')}
+          </p>
+          <div className="rounded-md border bg-muted/30 p-3">
+            <div className="text-sm font-medium">{cmsName}</div>
+            <div className="text-xs text-muted-foreground">
+              {cms?.domain ||
+                cms?.publicUrl ||
+                settings.domain ||
+                settings.publicUrl ||
+                t('no-public-url-set')}
+            </div>
+          </div>
+        </div>
+        <div className="flex justify-end border-t border-destructive/20 bg-destructive/10 p-4">
+          <Button
+            type="button"
+            variant="destructive"
+            disabled={!cms?._id || isDeleting}
+            onClick={() => handleDeleteDialogChange(true)}
+          >
+            <IconTrash className="size-4" />
+            {t('delete-cms')}
+          </Button>
+        </div>
+      </SettingsSection>
+
+      <Dialog open={deleteDialogOpen} onOpenChange={handleDeleteDialogChange}>
+        <Dialog.Content className="max-w-xl gap-0 overflow-hidden p-0">
+          <Dialog.Header className="border-b p-6">
+            <Dialog.Title>{t('delete-cms')}</Dialog.Title>
+            <Dialog.Description>
+              {t('delete-cms-dialog-desc')}
+            </Dialog.Description>
+          </Dialog.Header>
+
+          <div className="space-y-5 p-6">
+            <div className="space-y-2">
+              <label
+                htmlFor={DELETE_NAME_CONFIRMATION_INPUT_ID}
+                className="block text-sm leading-5 text-muted-foreground"
+              >
+                {t('to-confirm-type')}{' '}
+                <span className="font-semibold text-foreground">
+                  &quot;{cmsName}&quot;
+                </span>
+              </label>
+              <Input
+                id={DELETE_NAME_CONFIRMATION_INPUT_ID}
+                value={deleteNameConfirmation}
+                onChange={(event) =>
+                  setDeleteNameConfirmation(event.target.value)
+                }
+                autoFocus
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label
+                htmlFor={DELETE_PHRASE_CONFIRMATION_INPUT_ID}
+                className="block text-sm leading-5 text-muted-foreground"
+              >
+                {t('to-confirm-type')}{' '}
+                <span className="font-semibold text-foreground">
+                  &quot;{DELETE_CONFIRMATION_PHRASE}&quot;
+                </span>
+              </label>
+              <Input
+                id={DELETE_PHRASE_CONFIRMATION_INPUT_ID}
+                value={deletePhraseConfirmation}
+                onChange={(event) =>
+                  setDeletePhraseConfirmation(event.target.value)
+                }
+              />
+            </div>
+          </div>
+
+          <div className="border-y border-destructive/20 p-4">
+            <div className="flex items-center gap-3 rounded-md bg-destructive/10 px-4 py-3 text-sm text-destructive">
+              <IconAlertTriangle className="size-5 shrink-0" />
+              <span>{t('deleting-cms-cannot-be-undone', { name: cmsName })}</span>
+            </div>
+          </div>
+
+          <Dialog.Footer className="flex-row items-center justify-between p-4 sm:justify-between sm:space-x-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => handleDeleteDialogChange(false)}
+              disabled={isDeleting}
+            >
+              {t('cancel')}
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={!canDeleteCMS}
+              onClick={handleDelete}
+            >
+              {isDeleting ? t('deleting') : t('delete-cms')}
+            </Button>
+          </Dialog.Footer>
+        </Dialog.Content>
+      </Dialog>
     </div>
   );
 };

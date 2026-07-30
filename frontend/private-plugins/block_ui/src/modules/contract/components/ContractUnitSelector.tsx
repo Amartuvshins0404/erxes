@@ -103,7 +103,6 @@ export const ContractUnitSelector = ({
                 const selected = units.find((u) => u._id === unitId);
                 if (selected?.unitType?.price != null) {
                   setValue('amount', Number(selected.unitType.price));
-                  setValue('amountType', 'perUnit');
                 }
               }}
               disabled={!zoningId}
@@ -114,11 +113,17 @@ export const ContractUnitSelector = ({
                 </Select.Trigger>
               </Form.Control>
               <Select.Content>
-                {units.map((u) => (
-                  <Select.Item key={u._id} value={u._id}>
-                    Unit {u.number}
-                  </Select.Item>
-                ))}
+                {units.map((u) => {
+                  const isSigned = u.activeContract?.statusType === 'signed';
+                  return (
+                    <Select.Item key={u._id} value={u._id} disabled={isSigned}>
+                      Unit {u.number}
+                      {isSigned && (
+                        <span className="ml-2 text-xs text-muted-foreground">(Signed)</span>
+                      )}
+                    </Select.Item>
+                  );
+                })}
               </Select.Content>
             </Select>
             <Form.Message />

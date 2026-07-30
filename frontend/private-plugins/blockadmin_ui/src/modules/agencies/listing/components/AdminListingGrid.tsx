@@ -1,17 +1,17 @@
-import { Spinner } from 'erxes-ui';
+import { Spinner, useMultiQueryState } from 'erxes-ui';
 import { useAdminListings } from '../hooks/useAdminListings';
 import { AdminListingCard } from './AdminListingCard';
-import { AdminListingFilter, IAdminListing } from '../types';
+import { AdminListingFilter, IAdminListing } from '../types/listingTypes';
 
-const PER_PAGE = 30;
-
-type Props = {
-  filter: AdminListingFilter;
-};
-
-export const AdminListingGrid = ({ filter }: Props) => {
+export const AdminListingGrid = () => {
+  const [queries] = useMultiQueryState<AdminListingFilter>([
+    'searchValue',
+    'city',
+    'district',
+    'status',
+  ]);
   const { list, loading } = useAdminListings({
-    variables: { limit: PER_PAGE, ...filter },
+    variables: queries,
   });
 
   if (loading) {
@@ -27,7 +27,7 @@ export const AdminListingGrid = ({ filter }: Props) => {
   }
 
   return (
-    <div className="grid grid-cols-1 ba:lg:grid-cols-2 ba:xl:grid-cols-3 gap-6 p-8">
+    <div className="grid grid-cols-1 ba:lg:grid-cols-2 ba:xl:grid-cols-3 ba:2xl:grid-cols-4 gap-6 m-3">
       {list.map((listing: IAdminListing) => (
         <AdminListingCard key={listing._id} {...listing} />
       ))}

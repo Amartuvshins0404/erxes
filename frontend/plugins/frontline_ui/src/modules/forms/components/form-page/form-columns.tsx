@@ -8,6 +8,7 @@ import {
   toast,
 } from 'erxes-ui';
 import { useNavigate } from 'react-router';
+import { useTranslation } from 'react-i18next';
 import {
   IconArrowBarToRight,
   IconCalendarEvent,
@@ -29,6 +30,7 @@ import { FormStatus } from './filters/FormStatus';
 import { FormInstallScript } from '../actions/install-form';
 import { RemoveForm } from '../actions/remove-form';
 import { OpenLiveForm } from '../actions/open-live-form';
+import { OpenSubmissionsAction } from '../actions/open-submissions';
 
 export function FormToggleStatus({
   formId,
@@ -39,6 +41,7 @@ export function FormToggleStatus({
   status: string;
   setOpen: (open: boolean) => void;
 }) {
+  const { t } = useTranslation('frontline');
   const { toggleStatus, loading } = useFormToggleStatus();
 
   const onSelect = () => {
@@ -52,7 +55,7 @@ export function FormToggleStatus({
       },
       onError: (error) => {
         toast({
-          title: 'Error',
+          title: t('error'),
           variant: 'destructive',
           description: error.message,
         });
@@ -63,7 +66,7 @@ export function FormToggleStatus({
   return (
     <DropdownMenu.Item onSelect={onSelect}>
       <IconSquareToggle />
-      {status === 'active' ? 'Archive' : 'Unarchive'}
+      {status === 'active' ? t('archive') : t('unarchive')}
     </DropdownMenu.Item>
   );
 }
@@ -81,6 +84,7 @@ export const MoveFormToChannel = ({
   name: string;
   type: string;
 }) => {
+  const { t } = useTranslation('frontline');
   const { editForm, loading } = useFormEdit();
 
   const onSelect = (id: string) => {
@@ -95,14 +99,14 @@ export const MoveFormToChannel = ({
       onCompleted: () => {
         setOpen(false);
         toast({
-          title: 'Success',
+          title: t('success'),
           variant: 'success',
-          description: 'Form moved successfully',
+          description: t('form-moved-successfully'),
         });
       },
       onError: (error) => {
         toast({
-          title: 'Error',
+          title: t('error'),
           variant: 'destructive',
           description: error.message,
         });
@@ -114,7 +118,7 @@ export const MoveFormToChannel = ({
     <DropdownMenu.Sub>
       <DropdownMenu.SubTrigger>
         <IconArrowBarToRight />
-        Move to Channel
+        {t('move-to-channel')}
       </DropdownMenu.SubTrigger>
       <DropdownMenu.Portal>
         <DropdownMenu.SubContent className="min-w-56" sideOffset={8}>
@@ -135,6 +139,7 @@ export const FormsMoreColumnCell = ({
 }: {
   cell: Cell<IForm, unknown>;
 }) => {
+  const { t } = useTranslation('frontline');
   const { _id, status, code, channelId } = cell.row.original;
   const navigate = useNavigate();
 
@@ -156,9 +161,10 @@ export const FormsMoreColumnCell = ({
             navigate(`/frontline/forms/${cell.row.original._id}`);
           }}
         >
-          <IconEdit /> Edit
+          <IconEdit /> {t('edit')}
         </DropdownMenu.Item>
         <OpenLiveForm formId={_id} channelId={channelId as string} />
+        <OpenSubmissionsAction formId={_id} />
         <FormToggleStatus formId={_id} status={status} setOpen={setOpen} />
         <MoveFormToChannel
           formId={_id}
@@ -185,7 +191,11 @@ export const formColumns: ColumnDef<IForm>[] = [
   {
     accessorKey: 'name',
     id: 'name',
-    header: () => <RecordTable.InlineHead label="Name" icon={IconLabel} />,
+    header: () => {
+      // eslint-disable-next-line react-hooks/rules-of-hooks
+      const { t } = useTranslation('frontline');
+      return <RecordTable.InlineHead label={t('col-name')} icon={IconLabel} />;
+    },
     cell: ({ cell }) => {
       const navigate = useNavigate();
 
@@ -206,9 +216,11 @@ export const formColumns: ColumnDef<IForm>[] = [
   {
     accessorKey: 'status',
     id: 'status',
-    header: () => (
-      <RecordTable.InlineHead label="Status" icon={IconToggleRight} />
-    ),
+    header: () => {
+      // eslint-disable-next-line react-hooks/rules-of-hooks
+      const { t } = useTranslation('frontline');
+      return <RecordTable.InlineHead label={t('status')} icon={IconToggleRight} />;
+    },
     cell: ({ cell }) => {
       return (
         <RecordTableInlineCell>
@@ -219,10 +231,17 @@ export const formColumns: ColumnDef<IForm>[] = [
   },
   {
     accessorKey: 'channelId',
-    header: () => <RecordTable.InlineHead label="Channel" icon={IconCircles} />,
+    header: () => {
+      // eslint-disable-next-line react-hooks/rules-of-hooks
+      const { t } = useTranslation('frontline');
+      return <RecordTable.InlineHead label={t('channel-label')} icon={IconCircles} />;
+    },
     id: 'channelId',
     cell: ({ cell }) => {
+      // eslint-disable-next-line react-hooks/rules-of-hooks
+      const { t } = useTranslation('frontline');
       const { channel, _id, name, type } = cell.row.original;
+      // eslint-disable-next-line react-hooks/rules-of-hooks
       const { editForm } = useFormEdit();
 
       const onValueChange = (value: string | string[]) => {
@@ -236,14 +255,14 @@ export const formColumns: ColumnDef<IForm>[] = [
           refetchQueries: [GET_FORMS_LIST],
           onCompleted: () => {
             toast({
-              title: 'Success',
+              title: t('success'),
               variant: 'success',
-              description: 'Form updated successfully',
+              description: t('form-updated-successfully'),
             });
           },
           onError: (error) => {
             toast({
-              title: 'Error',
+              title: t('error'),
               variant: 'destructive',
               description: error.message,
             });
@@ -262,7 +281,11 @@ export const formColumns: ColumnDef<IForm>[] = [
   {
     accessorKey: 'tagIds',
     id: 'tagIds',
-    header: () => <RecordTable.InlineHead label="Tags" icon={IconTag} />,
+    header: () => {
+      // eslint-disable-next-line react-hooks/rules-of-hooks
+      const { t } = useTranslation('frontline');
+      return <RecordTable.InlineHead label={t('tags')} icon={IconTag} />;
+    },
     cell: ({ cell }) => {
       return (
         <SelectTags.InlineCell
@@ -278,7 +301,11 @@ export const formColumns: ColumnDef<IForm>[] = [
   {
     accessorKey: 'createdUserId',
     id: 'createdUserId',
-    header: () => <RecordTable.InlineHead label="Created By" icon={IconUser} />,
+    header: () => {
+      // eslint-disable-next-line react-hooks/rules-of-hooks
+      const { t } = useTranslation('frontline');
+      return <RecordTable.InlineHead label={t('created-by')} icon={IconUser} />;
+    },
     cell: ({ cell }) => {
       return (
         <RecordTableInlineCell>
@@ -290,9 +317,11 @@ export const formColumns: ColumnDef<IForm>[] = [
   {
     accessorKey: 'createdDate',
     id: 'createdDate',
-    header: () => (
-      <RecordTable.InlineHead label="Created At" icon={IconCalendarEvent} />
-    ),
+    header: () => {
+      // eslint-disable-next-line react-hooks/rules-of-hooks
+      const { t } = useTranslation('frontline');
+      return <RecordTable.InlineHead label={t('created-at')} icon={IconCalendarEvent} />;
+    },
     cell: ({ cell }) => {
       return (
         <RecordTableInlineCell>

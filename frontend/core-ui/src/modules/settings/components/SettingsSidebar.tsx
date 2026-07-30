@@ -48,7 +48,7 @@ export function SettingsSidebar() {
     .filter((plugin) => {
       if (!plugin.settingsNavigation) return false;
       if (!isLoaded || isWildcard) return true;
-      return hasPluginPermission(plugin.name);
+      return hasPluginPermission(plugin.permissionName ?? plugin.name);
     })
     .map((plugin) => ({
       Navigation: plugin.settingsNavigation,

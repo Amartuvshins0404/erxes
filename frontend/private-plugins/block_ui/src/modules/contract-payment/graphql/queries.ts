@@ -4,6 +4,9 @@ export const GET_PROJECT_PAYMENTS = gql`
   query BlockGetProjectPayments(
     $projectId: String!
     $paid: Boolean
+    $contractNumber: String
+    $customerId: String
+    $unitNumber: String
     $limit: Int
     $cursor: String
     $direction: String
@@ -11,6 +14,9 @@ export const GET_PROJECT_PAYMENTS = gql`
     blockGetProjectPayments(
       projectId: $projectId
       paid: $paid
+      contractNumber: $contractNumber
+      customerId: $customerId
+      unitNumber: $unitNumber
       limit: $limit
       cursor: $cursor
       direction: $direction
@@ -28,10 +34,12 @@ export const GET_PROJECT_PAYMENTS = gql`
         dueDate
         amount
         currency
-        paid
+        status
         paidAmount
         paidDate
         note
+        penaltyAmount
+        overdueDays
         createdAt
         updatedAt
       }
@@ -70,10 +78,12 @@ export const GET_CONTRACT_PAYMENTS = gql`
         dueDate
         amount
         currency
-        paid
+        status
         paidAmount
         paidDate
         note
+        penaltyAmount
+        overdueDays
       }
       pageInfo {
         hasNextPage
@@ -82,6 +92,22 @@ export const GET_CONTRACT_PAYMENTS = gql`
         endCursor
       }
       totalCount
+    }
+  }
+`;
+
+export const GET_PAYMENT_TRANSACTIONS = gql`
+  query BlockGetPaymentTransactions($paymentId: String!) {
+    blockGetPaymentTransactions(paymentId: $paymentId) {
+      _id
+      paymentId
+      contractId
+      amount
+      date
+      note
+      paymentMethod
+      createdBy
+      createdAt
     }
   }
 `;

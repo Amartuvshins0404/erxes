@@ -23,6 +23,13 @@ export const supplierSchema = schemaWrapper(
   new Schema<IMushopSupplierDocument>(
     {
       _id: mongooseStringRandomId,
+      code: {
+        type: String,
+        label: 'Supplier code',
+        unique: true,
+        sparse: true,
+        immutable: true,
+      },
       name: { type: String, label: 'Name' },
       description: { type: String, label: 'Description' },
       about: { type: String, label: 'About' },
@@ -44,6 +51,8 @@ export const supplierSchema = schemaWrapper(
 
       dateFounded: { type: String },
       website: { type: String },
+
+      paymentId: { type: String, label: 'Payment method' },
 
       verificationStatus: {
         type: String,

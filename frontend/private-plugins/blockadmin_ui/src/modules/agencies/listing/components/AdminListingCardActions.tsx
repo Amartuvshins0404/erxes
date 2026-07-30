@@ -26,7 +26,7 @@ export const AdminListingCardActions = ({ _id, status, isFeatured }: Props) => {
         <Button
           variant="ghost"
           size="icon"
-          className="size-7 bg-black/40 hover:bg-black/60 text-white backdrop-blur-sm rounded-md"
+          className="size-6 bg-background/30 hover:bg-accent/30 text-foreground backdrop-blur-sm rounded"
           disabled={loading}
           onClick={stop}
         >

@@ -8,6 +8,7 @@ import {
   useQueryState,
 } from 'erxes-ui';
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 const PRODUCT_STATUS: Record<string, { text: string }> = {
   pending: { text: 'Pending' },
@@ -43,40 +44,45 @@ const Provider = ({
 );
 
 const Value = ({ placeholder }: { placeholder?: string }) => {
+  const { t } = useTranslation('mushop');
   const { value } = useCtx();
   if (!value)
     return (
       <span className="text-accent-foreground/80">
-        {placeholder || 'Select status...'}
+        {placeholder || t('Select status...')}
       </span>
     );
-  return <>{PRODUCT_STATUS[value]?.text || value}</>;
+  return <>{t(PRODUCT_STATUS[value]?.text || value)}</>;
 };
 
 const Item = ({ status, text }: { status: string; text: string }) => {
+  const { t } = useTranslation('mushop');
   const { value, onValueChange } = useCtx();
   return (
     <Command.Item
       value={status}
       onSelect={() => onValueChange(value === status ? '' : status)}
     >
-      {text}
+      {t(text)}
       <Combobox.Check checked={value === status} />
     </Command.Item>
   );
 };
 
-const Content = () => (
-  <Command id="product-status-command-menu">
-    <Command.Input placeholder="Select status" />
-    <Command.List>
-      <Command.Empty>No status found</Command.Empty>
-      {Object.entries(PRODUCT_STATUS).map(([key, s]) => (
-        <Item key={key} status={key} text={s.text} />
-      ))}
-    </Command.List>
-  </Command>
-);
+const Content = () => {
+  const { t } = useTranslation('mushop');
+  return (
+    <Command id="product-status-command-menu">
+      <Command.Input placeholder={t('Select status')} />
+      <Command.List>
+        <Command.Empty>{t('No status found')}</Command.Empty>
+        {Object.entries(PRODUCT_STATUS).map(([key, s]) => (
+          <Item key={key} status={key} text={s.text} />
+        ))}
+      </Command.List>
+    </Command>
+  );
+};
 
 const FilterView = ({ queryKey }: { queryKey?: string }) => {
   const [value, setValue] = useQueryState<string>(queryKey || 'status');

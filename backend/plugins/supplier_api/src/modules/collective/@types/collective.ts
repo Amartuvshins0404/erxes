@@ -50,6 +50,7 @@ export interface ICollective {
   phones?: string[];
   dateFounded?: string;
   website?: string;
+  paymentId?: string;
   verificationStatus?: string;
   verificationNote?: string;
   tierLevel?: number;

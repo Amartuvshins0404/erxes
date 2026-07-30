@@ -25,7 +25,7 @@ const getPosInitialCategoryIds = async (
       pluginName: 'core',
       module: 'productCategories',
       action: 'withChilds',
-      input: { _ids: config?.initialCategoryIds ?? [] },
+      input: { ids: config?.initialCategoryIds ?? [] },
       defaultValue: [],
     });
 
@@ -69,6 +69,11 @@ export const syncProductToPosclient = async ({
   const categoryIds = await getPosInitialCategoryIds(subdomain, posToken);
 
   if (!categoryIds.includes(product.categoryId)) {
+    await removeProductFromPosclient({
+      subdomain,
+      posToken,
+      productId: product._id,
+    });
     return;
   }
 
@@ -80,5 +85,26 @@ export const syncProductToPosclient = async ({
     });
   } catch (e) {
     console.error('syncProductToPosclient error:', e);
+  }
+};
+
+export const removeProductFromPosclient = async ({
+  subdomain,
+  posToken,
+  productId,
+}: {
+  subdomain: string;
+  posToken?: string;
+  productId: string;
+}): Promise<void> => {
+  if (!posToken) return;
+
+  try {
+    await crudData(subdomain, posToken, {
+      type: 'productsRemove',
+      productIds: [productId],
+    });
+  } catch (e) {
+    console.error('removeProductFromPosclient error:', e);
   }
 };

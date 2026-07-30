@@ -21,7 +21,14 @@
         "tsConfig": "backend/plugins/mushop_api/tsconfig.build.json",
         "outputPath": "backend/plugins/mushop_api/dist",
         "updateBuildableProjectDepsInPackageJson": true,
-        "buildableProjectDepsInPackageJsonType": "dependencies"
+        "buildableProjectDepsInPackageJsonType": "dependencies",
+        "assets": [
+          {
+            "input": "backend/plugins/mushop_api/src/locales",
+            "glob": "**/*.json",
+            "output": "src/locales"
+          }
+        ]
       }
     },
     "start": {

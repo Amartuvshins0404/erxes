@@ -8,6 +8,7 @@ import {
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useTranslation } from 'react-i18next';
 import { LoyaltyHotKeyScope } from '../../types/LoyaltyHotKeyScope';
 import {
   loyaltyScoreFormSchema,
@@ -23,6 +24,7 @@ const parseIds = (value: string | string[] | undefined): string[] => {
 };
 
 export const LoyaltyScoreEditSheet = () => {
+  const { t } = useTranslation('loyalty');
   const setHotkeyScope = useSetHotkeyScope();
   const [open, setOpen] = useState<boolean>(false);
   const { setHotkeyScopeAndMemorizePreviousScope } = usePreviousHotkeyScope();
@@ -34,6 +36,7 @@ export const LoyaltyScoreEditSheet = () => {
     defaultValues: {
       title: '',
       description: '',
+      order: undefined,
       conditions: {
         serviceName: '',
         productCategoryIds: [],
@@ -51,6 +54,7 @@ export const LoyaltyScoreEditSheet = () => {
       },
       add: { placeholder: '', currencyRatio: '' },
       subtract: { placeholder: '', currencyRatio: '' },
+      set: { placeholder: '', currencyRatio: '' },
       ownerType: '',
       onlyClientPortal: false,
       fieldGroupId: '',
@@ -75,6 +79,7 @@ export const LoyaltyScoreEditSheet = () => {
       form.reset({
         title: scoreDetail.title || '',
         description: scoreDetail.description || '',
+        order: scoreDetail.order,
         conditions: {
           serviceName: scoreDetail.serviceName || '',
           productCategoryIds: parseIds(restrictions.productCategoryIds),
@@ -108,6 +113,10 @@ export const LoyaltyScoreEditSheet = () => {
           placeholder: scoreDetail.subtract?.placeholder || '',
           currencyRatio: scoreDetail.subtract?.currencyRatio || '',
         },
+        set: {
+          placeholder: scoreDetail.set?.placeholder || '',
+          currencyRatio: scoreDetail.set?.currencyRatio || '',
+        },
         ownerType: scoreDetail.ownerType || '',
         onlyClientPortal: scoreDetail.onlyClientPortal ?? false,
         fieldGroupId: scoreDetail.fieldGroupId || '',
@@ -139,13 +148,13 @@ export const LoyaltyScoreEditSheet = () => {
   return (
     <Sheet onOpenChange={(open) => !open && onClose()} open={open} modal>
       <Sheet.View
-        className="sm:max-w-2xl p-0"
+        className="lg:max-w-1/2 md:max-w-2/3 sm:max-w-md p-0"
         onEscapeKeyDown={(e) => {
           e.preventDefault();
         }}
       >
         <Sheet.Header>
-          <Sheet.Title>Edit score campaign</Sheet.Title>
+          <Sheet.Title>{t('edit-score-campaign')}</Sheet.Title>
           <Sheet.Close />
         </Sheet.Header>
         <EditScoreForm

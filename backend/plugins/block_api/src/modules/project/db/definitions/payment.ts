@@ -16,7 +16,7 @@ export const paymentPlanSchema = new Schema(
     },
     downPaymentPercentage: { type: Number },
     interestPercentage: { type: Number },
-    advancePaymentPercentage: { type: Number },
+    completionPaymentPercentage: { type: Number },
     discountPercentage: { type: Number },
 
     description: { type: String },

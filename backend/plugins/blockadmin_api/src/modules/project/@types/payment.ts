@@ -5,7 +5,7 @@ export interface IProjectPaymentPlan extends IBlock {
   name?: string;
   type: BlockProjectPaymentPlanType;
   interestPercentage?: number;
-  advancePaymentPercentage?: number;
+  completionPaymentPercentage?: number;
   downPaymentPercentage?: number;
   discountPercentage?: number;
   project: string;
@@ -25,7 +25,6 @@ export interface IProjectPaymentPlanDocument
 }
 
 export enum BlockProjectPaymentPlanFrequency {
-  CUSTOM = 'CUSTOM',
   ONE_TIME = 'ONE_TIME',
   ONE_TIME_PER_MONTH = 'ONE_TIME_PER_MONTH',
   TWO_TIME_PER_MONTH = 'TWO_TIME_PER_MONTH',

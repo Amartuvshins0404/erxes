@@ -8,8 +8,11 @@ import {
   queries as CollectiveQueries,
   types as CollectiveTypes,
 } from '@/collective/graphql/schemas/collective';
+import { TypeExtensions } from './extensions';
 
 export const types = `
+  ${TypeExtensions}
+
   ${SupplierTypes}
   ${CollectiveTypes}
 `;

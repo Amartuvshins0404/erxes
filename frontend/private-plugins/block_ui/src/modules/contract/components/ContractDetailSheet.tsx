@@ -45,18 +45,16 @@ const CONTRACT_TABS = {
   PAYMENT_RECORDS: 'payment-records',
   ACTIVITY_LOG: 'activity-log',
 } as const;
+
 type ContractTab = (typeof CONTRACT_TABS)[keyof typeof CONTRACT_TABS];
 
 export const ContractDetailSheet = () => {
   const [activeContractId, setActiveContractId] = useAtom(
     contractDetailSheetState,
   );
-  const [activeTab, setActiveTab] = useQueryState<ContractTab>(
-    'contract_tab',
-    {
-      defaultValue: CONTRACT_TABS.OVERVIEW,
-    },
-  );
+  const [activeTab, setActiveTab] = useQueryState<ContractTab>('contract_tab', {
+    defaultValue: CONTRACT_TABS.OVERVIEW,
+  });
 
   const { contract, loading } = useContract(activeContractId || undefined);
 
@@ -150,7 +148,7 @@ export const ContractDetailSheet = () => {
                 : undefined
             }
             hookOptions={{
-              hiddenPlugins: ['sales', 'operation'],
+              hiddenPlugins: ['sales', 'operation', 'block'],
               hiddenModules: ['contract', 'company', 'ticket'],
             }}
           />

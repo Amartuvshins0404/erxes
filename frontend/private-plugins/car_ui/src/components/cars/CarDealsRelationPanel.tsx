@@ -17,6 +17,7 @@ import {
   Sheet,
   Spinner,
   TextOverflowTooltip,
+  Tooltip,
   toast,
   cn,
 } from 'erxes-ui';
@@ -399,11 +400,13 @@ const displayDealMeta = (
 
 const isDealPriority = (priority?: string | null): priority is DealPriority =>
   Boolean(
-    priority &&
-      (DEAL_PRIORITY_OPTIONS as readonly string[]).includes(priority),
+    priority && (DEAL_PRIORITY_OPTIONS as readonly string[]).includes(priority),
   );
 
-const displayDealPriority = (priority: string | null | undefined, t: TFunction) => {
+const displayDealPriority = (
+  priority: string | null | undefined,
+  t: TFunction,
+) => {
   if (!priority) {
     return '';
   }
@@ -579,7 +582,8 @@ const CarDealCard = ({ deal }: { deal: CarDeal }) => {
                 {item.quantity ? (
                   <span className="text-muted-foreground/70">
                     {' '}
-                    ({item.quantity} {item.uom || t('PC', { defaultValue: 'PC' })})
+                    ({item.quantity}{' '}
+                    {item.uom || t('PC', { defaultValue: 'PC' })})
                   </span>
                 ) : null}
                 {item.unitPrice ? (
@@ -617,10 +621,12 @@ const DealChooser = ({
   currentDealIds,
   onSelect,
   children,
+  showText = true,
 }: {
   currentDealIds: string[];
   onSelect: (dealIds: string[]) => Promise<void>;
   children?: ReactNode;
+  showText?: boolean;
 }) => {
   const { t } = useTranslation('car');
   const [open, setOpen] = useState(false);
@@ -704,16 +710,38 @@ const DealChooser = ({
         }
       }}
     >
-      <Sheet.Trigger asChild>
-        {children || (
+      {children ? (
+        <Sheet.Trigger asChild>{children}</Sheet.Trigger>
+      ) : showText ? (
+        <Sheet.Trigger asChild>
           <Button variant="secondary">
             <IconPointerUp />
             {t('Choose an existing deal', {
               defaultValue: 'Choose an existing deal',
             })}
           </Button>
-        )}
-      </Sheet.Trigger>
+        </Sheet.Trigger>
+      ) : (
+        <Tooltip>
+          <Tooltip.Trigger asChild>
+            <Button
+              variant="secondary"
+              size="icon"
+              aria-label={t('Choose existing deals', {
+                defaultValue: 'Choose existing deals',
+              })}
+              onClick={() => setOpen(true)}
+            >
+              <IconPointerUp />
+            </Button>
+          </Tooltip.Trigger>
+          <Tooltip.Content>
+            {t('Choose existing deals', {
+              defaultValue: 'Choose existing deals',
+            })}
+          </Tooltip.Content>
+        </Tooltip>
+      )}
       <Sheet.View className="sm:max-w-4xl">
         <Sheet.Header>
           <Sheet.Title>
@@ -971,7 +999,7 @@ const PipelineLabelsSelect = ({
 const CreateDealSheet = ({
   onCreate,
   children,
-  showText,
+  showText = true,
 }: {
   onCreate: (dealId: string) => Promise<void>;
   children?: ReactNode;
@@ -1059,16 +1087,32 @@ const CreateDealSheet = ({
         }
       }}
     >
-      <Sheet.Trigger asChild>
-        {children || (
+      {children ? (
+        <Sheet.Trigger asChild>{children}</Sheet.Trigger>
+      ) : showText ? (
+        <Sheet.Trigger asChild>
           <Button variant="secondary">
             <IconPlus />
-            {showText
-              ? t('Add a deal', { defaultValue: 'Add a deal' })
-              : null}
+            {t('Add a deal', { defaultValue: 'Add a deal' })}
           </Button>
-        )}
-      </Sheet.Trigger>
+        </Sheet.Trigger>
+      ) : (
+        <Tooltip>
+          <Tooltip.Trigger asChild>
+            <Button
+              variant="secondary"
+              size="icon"
+              aria-label={t('Add deal', { defaultValue: 'Add deal' })}
+              onClick={() => setOpen(true)}
+            >
+              <IconPlus />
+            </Button>
+          </Tooltip.Trigger>
+          <Tooltip.Content>
+            {t('Add deal', { defaultValue: 'Add deal' })}
+          </Tooltip.Content>
+        </Tooltip>
+      )}
       <Sheet.View className="w-full p-0 sm:max-w-3xl">
         <Form {...form}>
           <form
@@ -1076,7 +1120,9 @@ const CreateDealSheet = ({
             onSubmit={form.handleSubmit(handleSubmit)}
           >
             <Sheet.Header className="p-5">
-              <Sheet.Title>{t('Add deal', { defaultValue: 'Add deal' })}</Sheet.Title>
+              <Sheet.Title>
+                {t('Add deal', { defaultValue: 'Add deal' })}
+              </Sheet.Title>
               <Sheet.Description className="sr-only">
                 {t('Create a sales deal and link it to this car.', {
                   defaultValue: 'Create a sales deal and link it to this car.',
@@ -1091,9 +1137,11 @@ const CreateDealSheet = ({
                     <Form.Field
                       control={form.control}
                       name="name"
-                        render={({ field }) => (
+                      render={({ field }) => (
                         <Form.Item>
-                          <Form.Label>{t('Name', { defaultValue: 'Name' })}</Form.Label>
+                          <Form.Label>
+                            {t('Name', { defaultValue: 'Name' })}
+                          </Form.Label>
                           <Form.Control>
                             <Input
                               {...field}
@@ -1110,7 +1158,7 @@ const CreateDealSheet = ({
                     <Form.Field
                       control={form.control}
                       name="description"
-                        render={({ field }) => (
+                      render={({ field }) => (
                         <Form.Item>
                           <Form.Label>
                             {t('Description', { defaultValue: 'Description' })}
@@ -1235,7 +1283,9 @@ const CreateDealSheet = ({
                         render={({ field }) => (
                           <Form.Item>
                             <Form.Label>
-                              {t('Assigned to', { defaultValue: 'Assigned to' })}
+                              {t('Assigned to', {
+                                defaultValue: 'Assigned to',
+                              })}
                             </Form.Label>
                             <SelectMember.FormItem
                               mode="multiple"
@@ -1510,31 +1560,16 @@ export const CarDealsRelationPanel = ({
           {t('Deals', { defaultValue: 'Deals' })}
         </span>
         {access === 'write' ? (
-          <div className="flex items-center gap-2">
-            <CreateDealSheet onCreate={handleCreateDeal}>
-              <Button
-                variant="secondary"
-                size="icon"
-                aria-label={t('Add deal', { defaultValue: 'Add deal' })}
-              >
-                <IconPlus />
-              </Button>
-            </CreateDealSheet>
-            <DealChooser
-              currentDealIds={dealIds}
-              onSelect={handleAddExistingDeals}
-            >
-              <Button
-                variant="secondary"
-                size="icon"
-                aria-label={t('Choose existing deals', {
-                  defaultValue: 'Choose existing deals',
-                })}
-              >
-                <IconPointerUp />
-              </Button>
-            </DealChooser>
-          </div>
+          <Tooltip.Provider>
+            <div className="flex items-center gap-2">
+              <CreateDealSheet onCreate={handleCreateDeal} showText={false} />
+              <DealChooser
+                currentDealIds={dealIds}
+                onSelect={handleAddExistingDeals}
+                showText={false}
+              />
+            </div>
+          </Tooltip.Provider>
         ) : null}
       </div>
       {loading ? (

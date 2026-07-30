@@ -18,7 +18,7 @@ export const usePluginsModules = () => {
     if (pluginsMetaData) {
       const pluginsModules = Object.values(pluginsMetaData || {}).flatMap(
         (plugin) => {
-          if (isLoaded && !isWildcard && !hasPluginPermission(plugin.name)) {
+          if (isLoaded && !isWildcard && !hasPluginPermission(plugin.permissionName ?? plugin.name)) {
             return [];
           }
 

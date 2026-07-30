@@ -1,14 +1,20 @@
 import { IContext } from '~/connectionResolvers';
+import {
+  assertIdentifierAccess,
+  buildIdentifierAccessQuery,
+} from '~/modules/assistantOrg/permissions';
 import { ensureLegacyIdentifierLinks } from '../../../utils';
 
 const getIdentifiers = async (
   _root: undefined,
   { kind }: { kind?: string },
-  { models }: IContext,
+  { models, user }: IContext,
 ) => {
   await ensureLegacyIdentifierLinks(models);
 
-  const identifiers = await models.Identifier.find({})
+  const identifiers = await models.Identifier.find(
+    buildIdentifierAccessQuery(user),
+  )
     .sort({ createdAt: 1 })
     .lean();
 
@@ -47,15 +53,11 @@ const getIdentifiers = async (
 const getIdentifier = async (
   _root: undefined,
   { identifierId }: { identifierId: string },
-  { models }: IContext,
+  { models, user }: IContext,
 ) => {
   await ensureLegacyIdentifierLinks(models);
 
-  if (!identifierId) {
-    throw new Error('identifierId is required');
-  }
-
-  return models.Identifier.findById(identifierId).lean();
+  return assertIdentifierAccess(models, identifierId, user);
 };
 
 export const identifierQueries = {

@@ -55,7 +55,7 @@ export const providerSchema = new Schema(
       label: 'Contact Info',
     },
     facilities: { type: [String], label: 'Facilities' },
-    categoryIds: { type: [String], required: true, label: 'Category IDs' },
+    associationIds: { type: [String], required: true, label: 'Association IDs' },
     singleProviderLimit: {
       type: Number,
       label: 'Single Provider Limit',
@@ -84,6 +84,6 @@ export const providerSchema = new Schema(
 );
 
 providerSchema.index({ status: 1 });
-providerSchema.index({ categoryIds: 1 });
+providerSchema.index({ associationIds: 1 });
 providerSchema.index({ status: 1, isActive: 1 });
 providerSchema.index({ instanceId: 1 });

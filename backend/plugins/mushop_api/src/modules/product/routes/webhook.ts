@@ -11,24 +11,44 @@ router.post('/syncProduct', async (req: Request, res: Response) => {
 
     console.log('{subdomain, entityId}', {subdomain, entityId})
 
-    if (!subdomain) return res.status(400).json({ error: 'subdomain is required' });
-    if (!entityId) return res.status(400).json({ error: 'payload.entityId is required' });
+    if (!subdomain)
+      return res.status(400).json({ error: 'subdomain is required' });
 
     const models = await generateModels(subdomain);
 
-    console.log('action', action)
+    const supplier = await models.Supplier.findOne({ subdomain }).lean();
 
-    if (entityIds?.length && action === 'delete') {
-      await models.MushopProduct.deleteMany({ subdomain, entityId: { $in: entityIds } });
+    if (!supplier) {
+      console.log('Supplier not found for subdomain', subdomain);
+
+      return;
+    }
+
+    if (action === 'delete') {
+      const ids = entityIds?.length ? entityIds : entityId ? [entityId] : [];
+
+      if (!ids.length) {
+        return res
+          .status(400)
+          .json({ error: 'entityId or entityIds required for delete' });
+      }
+
+      await models.Product.deleteMany({
+        subdomain,
+        entityId: { $in: ids },
+      });
       return res.status(200).json({ success: true });
     }
 
-    console.log('product', product)
+    if (!entityId)
+      return res.status(400).json({ error: 'payload.entityId is required' });
 
-    await models.MushopProduct.syncProduct(
+    const { category, ...productRest } = product || {};
+
+    await models.Product.syncProduct(
       subdomain,
       entityId,
-      product,
+      { ...productRest, initialCategory: category ?? null },
       action,
     );
 
@@ -44,12 +64,15 @@ router.post('/syncProductCategory', async (req: Request, res: Response) => {
     const { entityId, data } = payload || {};
     const { category } = data || {};
 
-    if (!subdomain) return res.status(400).json({ error: 'subdomain is required' });
-    if (!entityId) return res.status(400).json({ error: 'payload.entityId is required' });
+    if (!subdomain)
+      return res.status(400).json({ error: 'subdomain is required' });
+
+    if (!entityId)
+      return res.status(400).json({ error: 'payload.entityId is required' });
 
     const models = await generateModels(subdomain);
 
-    await models.MushopProduct.findOneAndUpdate(
+    await models.Product.findOneAndUpdate(
       { subdomain, 'initialCategory._id': category._id },
       { $set: { initialCategory: category ?? null } },
     );

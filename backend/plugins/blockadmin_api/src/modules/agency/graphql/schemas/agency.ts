@@ -44,6 +44,8 @@ export const types = `
     socialLinks: JSON
     operationArea: BlockAdminAgencyOperationArea
     fieldsOfExpertise: BlockAdminAgencyFieldOfExpertise
+    messengerIntegrationId: String
+    widgetBundleUrl: String
     verificationStatus: String
     rejectionReasons: [String]
     rejectionNotes: String

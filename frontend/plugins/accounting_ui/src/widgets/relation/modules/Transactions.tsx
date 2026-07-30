@@ -8,27 +8,31 @@ import {
   Separator,
   Spinner,
 } from 'erxes-ui';
+import { useTranslation } from 'react-i18next';
 
 const RELATED_TRANSACTIONS_QUERY = gql`
-  query RelatedTransactions($contentType: String, $contentId: String) {
-    accTransactions(
+  query RelatedTransactions($contentType: String!, $contentId: String!) {
+    accTransactionsByContent(
       contentType: $contentType
       contentId: $contentId
       page: 1
       perPage: 20
     ) {
-      _id
-      parentId
-      number
-      ptrNumber
-      journal
-      status
-      sumDt
-      sumCt
-      details {
-        account {
-          code
-          name
+      totalCount
+      list {
+        _id
+        parentId
+        number
+        ptrNumber
+        journal
+        status
+        sumDt
+        sumCt
+        details {
+          account {
+            code
+            name
+          }
         }
       }
     }
@@ -65,9 +69,7 @@ const getAccounts = (transaction: RelatedTransaction) => {
   return (transaction.details || [])
     .map((detail) => detail.account)
     .filter((account): account is TransactionAccount => !!account)
-    .map((account) =>
-      [account.code, account.name].filter(Boolean).join(' - '),
-    )
+    .map((account) => [account.code, account.name].filter(Boolean).join(' - '))
     .filter((account) => {
       if (!account || accountKeys.has(account)) {
         return false;
@@ -84,17 +86,24 @@ export const Transactions = ({
   contentId: string;
   contentType: string;
 }) => {
+  const { t } = useTranslation('accounting');
   const { data, loading } = useQuery<{
-    accTransactions: RelatedTransaction[];
+    accTransactionsByContent: {
+      list: RelatedTransaction[];
+      totalCount: number;
+    };
   }>(RELATED_TRANSACTIONS_QUERY, {
     variables: {
       contentType,
       contentId,
     },
+    fetchPolicy: 'network-only',
     skip: !contentId || !contentType,
   });
 
-  const transactions = data?.accTransactions || [];
+  const transactionsByContent = data?.accTransactionsByContent;
+  const transactions = transactionsByContent?.list || [];
+  const totalCount = transactionsByContent?.totalCount || 0;
 
   if (loading) {
     return <Spinner containerClassName="py-20" />;
@@ -106,7 +115,11 @@ export const Transactions = ({
         <div className="border border-dashed p-6 bg-background rounded-xl">
           <IconReceipt />
         </div>
-        <span className="text-sm">No transactions to display.</span>
+        <span className="text-sm">
+          {totalCount
+            ? t('transaction-linked', { count: totalCount })
+            : t('no-transactions')}
+        </span>
       </div>
     );
   }
@@ -115,7 +128,7 @@ export const Transactions = ({
     <>
       <FocusSheet.SideContentHeader
         Icon={IconReceipt}
-        label="Transactions"
+        label={t('transactions-count', { count: totalCount })}
       />
       <ScrollArea className="flex-auto">
         <div className="flex flex-col gap-3 p-4">
@@ -132,7 +145,7 @@ export const Transactions = ({
                   <div className="truncate text-sm font-medium">
                     {transaction.ptrNumber ||
                       transaction.number ||
-                      'Transaction'}
+                      t('transaction')}
                   </div>
                   <div className="text-xs text-muted-foreground">
                     {[transaction.journal, transaction.status]
@@ -157,7 +170,7 @@ export const Transactions = ({
               <Separator className="my-2" />
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <div>
-                  <span className="text-muted-foreground">Debit</span>
+                  <span className="text-muted-foreground">{t('debit')}</span>
                   <div className="font-medium">
                     <CurrencyFormatedDisplay
                       currencyValue={{
@@ -168,7 +181,7 @@ export const Transactions = ({
                   </div>
                 </div>
                 <div>
-                  <span className="text-muted-foreground">Credit</span>
+                  <span className="text-muted-foreground">{t('credit')}</span>
                   <div className="font-medium">
                     <CurrencyFormatedDisplay
                       currencyValue={{

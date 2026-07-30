@@ -13,6 +13,11 @@ export const opencodeServerSchema = schemaWrapper(
       provider: { type: String, label: 'Provider' },
       serverId: { type: String, label: 'Server ID' },
       serverPassword: { type: String, label: 'Server password' },
+      transferredFromSubdomain: {
+        type: String,
+        label: 'Transferred from subdomain',
+      },
+      transferredAt: { type: Date, label: 'Transferred at' },
       status: { type: String, enum: SERVER_STATUSES.ALL, label: 'Status' },
     },
     {

@@ -19,16 +19,6 @@ export const CONTRACT_STATUS_COLORS = {
   [CONTRACT_STATUS.CANCELLED]: 'bg-red-100 text-red-800',
 };
 
-export const CONTRACT_AMOUNT_TYPE = {
-  PER_SIZE: 'perSize',
-  PER_UNIT: 'perUnit',
-} as const;
-
-export const CONTRACT_AMOUNT_TYPE_OPTIONS = [
-  { value: CONTRACT_AMOUNT_TYPE.PER_SIZE, label: 'Per Size' },
-  { value: CONTRACT_AMOUNT_TYPE.PER_UNIT, label: 'Per Unit' },
-];
-
 export const CONTRACT_PARTY_TYPE = {
   CUSTOMER: 'customer',
   COMPANY: 'company',

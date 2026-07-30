@@ -1,9 +1,16 @@
 import { AgentDeployScreen } from '../deploy/components/AgentDeployScreen';
+import { AgentTransferCredentialsDialog } from '../deploy/components/AgentTransferCredentialsDialog';
 import { useAgent } from './hooks/useAgent';
 import { useFixAndRestart } from '../detail/hooks/useFixAndRestart';
 import { useKimiKeyStatus } from '../detail/hooks/useKimiKey';
 import { Card, Spinner } from 'erxes-ui';
-import { IconKey, IconLibrary, IconRefresh, IconTrash } from '@tabler/icons-react';
+import {
+  IconKey,
+  IconLibrary,
+  IconRefresh,
+  IconTransfer,
+  IconTrash,
+} from '@tabler/icons-react';
 import { useToast } from 'erxes-ui';
 import { AddAgentTrigger } from '../detail/components/AddAgent';
 import { RestartServerDialog } from '../detail/components/RestartServerDialog';
@@ -29,10 +36,12 @@ export const AgentMain = () => {
   const [iframeKey, setIframeKey] = useState(0);
   const [restartOpen, setRestartOpen] = useState(false);
   const [destroyOpen, setDestroyOpen] = useState(false);
+  const [transferOpen, setTransferOpen] = useState(false);
   const refreshIframe = useCallback(() => setIframeKey((k) => k + 1), []);
 
+  const runtimeUrl = agent?.url?.trim().replace(/\/+$/, '');
   const isApproved =
-    !!agent && agent.status === SERVER_STATUSES.APPROVED;
+    !!agent && agent.status === SERVER_STATUSES.APPROVED && !!runtimeUrl;
   const { hasKey, refetch: refetchKimiKey } = useKimiKeyStatus(!isApproved);
   const [kimiKeyManualOpen, setKimiKeyManualOpen] = useState(false);
   const kimiKeyForced = isApproved && hasKey === false;
@@ -102,6 +111,13 @@ export const AgentMain = () => {
             <IconKey className="size-4" />
           </button>
           <button
+            onClick={() => setTransferOpen(true)}
+            className="p-1.5 rounded hover:bg-muted transition-colors"
+            title="Transfer credentials"
+          >
+            <IconTransfer className="size-4" />
+          </button>
+          <button
             onClick={() => setDestroyOpen(true)}
             disabled={destroying || deletingIdentifier}
             className="p-1.5 rounded text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50"
@@ -113,7 +129,7 @@ export const AgentMain = () => {
       </div>
       <iframe
         key={iframeKey}
-        src={`https://${agent.name}.assistant.erxes.io/#token=${agent.token}`}
+        src={`${runtimeUrl}/#token=${agent.token}`}
         title="Agent"
         className="w-full flex-1 border-0 transition-opacity duration-200 opacity-100"
         allow="clipboard-read; clipboard-write; microphone"
@@ -143,6 +159,10 @@ export const AgentMain = () => {
         }}
         loading={destroying || deletingIdentifier}
       />
+      <AgentTransferCredentialsDialog
+        open={transferOpen}
+        onOpenChange={setTransferOpen}
+      />
       <KimiKeyDialog
         open={kimiKeyOpen}
         onSuccess={() => {
@@ -150,9 +170,7 @@ export const AgentMain = () => {
           refetchKimiKey();
           refreshIframe();
         }}
-        onCancel={
-          kimiKeyForced ? undefined : () => setKimiKeyManualOpen(false)
-        }
+        onCancel={kimiKeyForced ? undefined : () => setKimiKeyManualOpen(false)}
       />
     </div>
   );

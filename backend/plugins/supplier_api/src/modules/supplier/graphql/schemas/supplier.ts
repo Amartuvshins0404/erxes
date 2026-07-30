@@ -33,6 +33,7 @@ export const types = `
 
   type Supplier {
     _id: String!
+    code: String
     name: String
     description: String
     about: String
@@ -48,6 +49,7 @@ export const types = `
     phones: [String]
     dateFounded: String
     website: String
+    paymentId: String
     verificationStatus: String
     verificationNote: String
     tierLevel: Int
@@ -79,6 +81,7 @@ export const types = `
     phones: [String]
     dateFounded: String
     website: String
+    paymentId: String
     socialLinks: JSON
   }
 `;
@@ -97,6 +100,7 @@ export const queries = `
   getSupplier: Supplier
   supplierDetail(_id: String!): Supplier
   suppliers(${supplierQueryParams}): SupplierListResponse
+  cpSupplierUsers(positionIds: [String]): [User]
 `;
 
 export const mutations = `

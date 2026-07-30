@@ -71,4 +71,5 @@ export const mutations = `
   mushopRemoveProduct(_id: String!): JSON
   mushopBulkRemoveProducts(ids: [String!]!): JSON
   mushopApproveProduct(_id: String!): MushopProduct
+  mushopSyncProductsToPosclient(supplierId: String, status: String): JSON
 `;

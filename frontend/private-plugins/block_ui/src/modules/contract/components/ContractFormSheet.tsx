@@ -10,9 +10,8 @@ import {
   CurrencyCode,
   DatePicker,
   toast,
-  Checkbox,
   Textarea,
-  InfoCard,
+  Sidebar,
 } from 'erxes-ui';
 import { useForm } from 'react-hook-form';
 import { useParams } from 'react-router-dom';
@@ -22,17 +21,28 @@ import {
   ContractFormData,
   contractSchema,
 } from '@/contract/constants/contractSchema';
-import {
-  CONTRACT_AMOUNT_TYPE_OPTIONS,
-  CONTRACT_PARTY_TYPE_OPTIONS,
-} from '@/contract/constants/contract';
+import { CONTRACT_PARTY_TYPE_OPTIONS } from '@/contract/constants/contract';
 import { PaymentPlanForm } from '@/pricing/components/PaymentPlanForm';
+import { PaymentScheduleEditor } from './PaymentScheduleEditor';
 import { ContractUnit } from './ContractUnit';
 import { ContractUnitSelector } from './ContractUnitSelector';
 import { useBlockContractStatusesByType } from '@/contract-status/hooks/useGetBlockContractStatuses';
 import { IUnit } from '@/unit/types/unitType';
+import { useEffect, useState } from 'react';
+import { useUnit } from '@/unit/hooks/useUnit';
 
 const TYPE_ORDER = ['reserved', 'draft', 'signed', 'lost', 'cancelled'];
+
+const FORM_TABS = {
+  GENERAL: 'general',
+  PAYMENT_PLAN: 'payment-plan',
+} as const;
+type FormTab = (typeof FORM_TABS)[keyof typeof FORM_TABS];
+
+const FORM_TAB_LABELS: Record<FormTab, string> = {
+  [FORM_TABS.GENERAL]: 'General',
+  [FORM_TABS.PAYMENT_PLAN]: 'Payment plan',
+};
 
 export const ContractFormSheet = ({
   defaultValues,
@@ -59,6 +69,7 @@ export const ContractFormSheet = ({
   }>();
   const projectId = projectIdParam || idParam || '';
   const { statuses = [] } = useBlockContractStatusesByType({ projectId });
+  const [activeTab, setActiveTab] = useState<FormTab>(FORM_TABS.GENERAL);
 
   const stages = [...statuses].sort((a, b) => {
     const ti = TYPE_ORDER.indexOf(a.type);
@@ -71,7 +82,6 @@ export const ContractFormSheet = ({
     resolver: zodResolver(contractSchema),
     defaultValues: {
       unit: unitIdFromUrl || '',
-      status: '',
       party: { type: 'customer', id: '' },
       currency: CurrencyCode.MNT,
       ...defaultValues,
@@ -79,10 +89,30 @@ export const ContractFormSheet = ({
   });
 
   const partyType = form.watch('party.type');
-  const isLifeTime = form.watch('isLifeTime');
+  const watchedUnitId = form.watch('unit');
+  const { unit: fetchedUnit } = useUnit(!unit ? watchedUnitId : null);
+  const activeUnit = unit || fetchedUnit;
+  const unitSize = activeUnit?.unitType?.size || 0;
+  const watchedAmount = form.watch('amount') || 0;
+  const ratePerSize = unitSize > 0 ? watchedAmount / unitSize : watchedAmount;
+
+  useEffect(() => {
+    if (!activeUnit || isEdit) return;
+    if (form.getValues('amount')) return;
+
+    const currency = form.getValues('currency');
+    const prices = activeUnit.unitType?.prices || [];
+    const match =
+      prices.find((p) => p.priceType === 'priceBySize' && p.currency === currency) ||
+      prices.find((p) => p.priceType === 'priceBySize');
+    const rate = match?.price ?? activeUnit.unitType?.price ?? 0;
+    if (rate) {
+      const size = activeUnit.unitType?.size || 0;
+      form.setValue('amount', size > 0 ? rate * size : rate);
+    }
+  }, [activeUnit?._id]);
 
   const onValidationError = (errors: any) => {
-    console.error('Contract form validation errors:', errors);
     const messages: string[] = [];
     const collect = (obj: any, prefix = '') => {
       if (!obj || typeof obj !== 'object') return;
@@ -103,32 +133,64 @@ export const ContractFormSheet = ({
     });
   };
 
+  const parseDateValue = (value: any) => {
+    if (!value) return undefined;
+    const num = Number(value);
+    const d = new Date(isNaN(num) ? value : num);
+    return isNaN(d.getTime()) ? undefined : d;
+  };
+
+  const handleDateChange = (
+    onChange: (value: string | undefined) => void,
+  ) => {
+    return (date: Date | Date[] | undefined) => {
+      const dateValue = Array.isArray(date) ? date[0] : date;
+      onChange(dateValue ? dateValue.toISOString() : undefined);
+    };
+  };
+
   return (
     <Form {...form}>
       <form
         onSubmit={form.handleSubmit(onSubmit, onValidationError)}
+        onKeyDown={(e) => { if (e.key === 'Enter' && (e.target as HTMLElement).tagName === 'INPUT') e.preventDefault(); }}
         className="flex flex-col flex-auto overflow-hidden"
       >
-        <Sheet.Content className="flex-auto overflow-hidden">
-          <ScrollArea className="h-full">
+        <Sheet.Content className="flex-auto overflow-hidden flex">
+          <Sidebar collapsible="none" className="flex-none border-r w-52">
+            <Sidebar.Group>
+              <Sidebar.GroupContent>
+                <Sidebar.Menu>
+                  {Object.values(FORM_TABS).map((tab) => (
+                    <Sidebar.MenuItem key={tab}>
+                      <Sidebar.MenuButton
+                        type="button"
+                        onClick={() => setActiveTab(tab)}
+                        isActive={activeTab === tab}
+                      >
+                        {FORM_TAB_LABELS[tab]}
+                      </Sidebar.MenuButton>
+                    </Sidebar.MenuItem>
+                  ))}
+                </Sidebar.Menu>
+              </Sidebar.GroupContent>
+            </Sidebar.Group>
+          </Sidebar>
+
+          <ScrollArea className="flex-auto h-full">
             <div className="flex flex-col gap-4 p-5">
-              {!hideUnitSection &&
-                (unitIdFromUrl ? (
-                  <ContractUnit />
-                ) : (
-                  <InfoCard title="Unit">
-                    <InfoCard.Content>
+              <div style={{ display: activeTab === FORM_TABS.GENERAL ? undefined : 'none' }} className="flex flex-col gap-4">
+                  {!hideUnitSection &&
+                    (unitIdFromUrl ? (
+                      <ContractUnit />
+                    ) : (
                       <ContractUnitSelector
                         control={form.control}
                         setValue={form.setValue}
                       />
-                    </InfoCard.Content>
-                  </InfoCard>
-                ))}
+                    ))}
 
-              {hideUnitSection && unit && (
-                <InfoCard title="Unit">
-                  <InfoCard.Content>
+                  {hideUnitSection && unit && (
                     <div className="grid grid-cols-3 gap-4 text-sm">
                       <div>
                         <div className="text-muted-foreground">Number</div>
@@ -151,39 +213,20 @@ export const ContractFormSheet = ({
                         </div>
                       )}
                     </div>
-                  </InfoCard.Content>
-                </InfoCard>
-              )}
+                  )}
 
-              <InfoCard title="Schedule">
-                <InfoCard.Content>
-                  <div className="gap-4 grid grid-cols-3 items-end">
+                  <div className="gap-4 grid grid-cols-3">
                     <Form.Field
-                      name="date"
+                      name="currency"
                       control={form.control}
                       render={({ field }) => (
                         <Form.Item>
-                          <Form.Label>Contract Date</Form.Label>
-                          <DatePicker
-                            placeholder="Select date"
-                            value={(() => {
-                              if (!field.value) return undefined;
-                              const num = Number(field.value);
-                              const d = new Date(
-                                isNaN(num) ? field.value : num,
-                              );
-                              return isNaN(d.getTime()) ? undefined : d;
-                            })()}
-                            onChange={(date) => {
-                              const dateValue = Array.isArray(date)
-                                ? date[0]
-                                : date;
-                              field.onChange(
-                                dateValue
-                                  ? dateValue.toISOString()
-                                  : undefined,
-                              );
-                            }}
+                          <Form.Label>Currency</Form.Label>
+                          <CurrencyField.SelectCurrency
+                            value={field.value as CurrencyCode}
+                            onChange={(value) =>
+                              field.onChange(value as CurrencyCode)
+                            }
                           />
                           <Form.Message />
                         </Form.Item>
@@ -191,99 +234,34 @@ export const ContractFormSheet = ({
                     />
 
                     <Form.Field
-                      name="startDate"
+                      name="amount"
                       control={form.control}
                       render={({ field }) => (
                         <Form.Item>
-                          <Form.Label>Start Date</Form.Label>
-                          <DatePicker
-                            placeholder="Select start date"
-                            value={(() => {
-                              if (!field.value) return undefined;
-                              const num = Number(field.value);
-                              const d = new Date(
-                                isNaN(num) ? field.value : num,
-                              );
-                              return isNaN(d.getTime()) ? undefined : d;
-                            })()}
-                            onChange={(date) => {
-                              const dateValue = Array.isArray(date)
-                                ? date[0]
-                                : date;
-                              field.onChange(
-                                dateValue
-                                  ? dateValue.toISOString()
-                                  : undefined,
-                              );
+                          <Form.Label>Rate per m²</Form.Label>
+                          <CurrencyField.ValueInput
+                            value={ratePerSize}
+                            onChange={(v) => {
+                              const rate = v || 0;
+                              field.onChange(unitSize > 0 ? rate * unitSize : rate);
                             }}
                           />
+                          {unitSize > 0 && (
+                            <p className="text-xs text-muted-foreground">
+                              Total: {(ratePerSize * unitSize).toLocaleString()} ({unitSize} m²)
+                            </p>
+                          )}
+                          {!unitSize && (
+                            <p className="text-xs text-destructive">
+                              Select a unit with a size first
+                            </p>
+                          )}
                           <Form.Message />
-                        </Form.Item>
-                      )}
-                    />
-
-                    {!isLifeTime && (
-                      <Form.Field
-                        name="endDate"
-                        control={form.control}
-                        render={({ field }) => (
-                          <Form.Item>
-                            <Form.Label>End Date</Form.Label>
-                            <DatePicker
-                              placeholder="Select end date"
-                              value={(() => {
-                                if (!field.value) return undefined;
-                                const num = Number(field.value);
-                                const d = new Date(
-                                  isNaN(num) ? field.value : num,
-                                );
-                                return isNaN(d.getTime()) ? undefined : d;
-                              })()}
-                              onChange={(date) => {
-                                const dateValue = Array.isArray(date)
-                                  ? date[0]
-                                  : date;
-                                field.onChange(
-                                  dateValue
-                                    ? dateValue.toISOString()
-                                    : undefined,
-                                );
-                              }}
-                            />
-                            <Form.Message />
-                          </Form.Item>
-                        )}
-                      />
-                    )}
-
-                    <Form.Field
-                      name="isLifeTime"
-                      control={form.control}
-                      render={({ field }) => (
-                        <Form.Item className="flex flex-row items-center space-x-3 space-y-0 h-8">
-                          <Form.Control>
-                            <Checkbox
-                              checked={field.value}
-                              onCheckedChange={(checked) => {
-                                field.onChange(checked);
-                                if (checked) {
-                                  form.setValue('endDate', undefined);
-                                }
-                              }}
-                            />
-                          </Form.Control>
-                          <Form.Label variant="peer">
-                            Lifetime Contract
-                          </Form.Label>
                         </Form.Item>
                       )}
                     />
                   </div>
-                </InfoCard.Content>
-              </InfoCard>
 
-              <InfoCard title="Basic Information">
-                <InfoCard.Content>
                   <div className="gap-4 grid grid-cols-2">
                     <Form.Field
                       name="number"
@@ -304,38 +282,16 @@ export const ContractFormSheet = ({
                     />
 
                     <Form.Field
-                      name="status"
+                      name="date"
                       control={form.control}
                       render={({ field }) => (
                         <Form.Item>
-                          <Form.Label>Status</Form.Label>
-                          <Select
-                            onValueChange={field.onChange}
-                            value={field.value || ''}
-                          >
-                            <Form.Control>
-                              <Select.Trigger className="h-8">
-                                <Select.Value placeholder="Select status" />
-                              </Select.Trigger>
-                            </Form.Control>
-                            <Select.Content>
-                              {stages.map((stage) => (
-                                <Select.Item key={stage._id} value={stage._id}>
-                                  <span className="flex items-center gap-2">
-                                    {stage.color && (
-                                      <span
-                                        className="rounded-full size-2"
-                                        style={{
-                                          backgroundColor: stage.color,
-                                        }}
-                                      />
-                                    )}
-                                    {stage.name}
-                                  </span>
-                                </Select.Item>
-                              ))}
-                            </Select.Content>
-                          </Select>
+                          <Form.Label>Contract Date</Form.Label>
+                          <DatePicker
+                            placeholder="Select date"
+                            value={parseDateValue(field.value)}
+                            onChange={handleDateChange(field.onChange)}
+                          />
                           <Form.Message />
                         </Form.Item>
                       )}
@@ -402,6 +358,44 @@ export const ContractFormSheet = ({
                     />
 
                     <Form.Field
+                      name="status"
+                      control={form.control}
+                      render={({ field }) => (
+                        <Form.Item>
+                          <Form.Label>Status</Form.Label>
+                          <Select
+                            onValueChange={field.onChange}
+                            value={field.value ?? ''}
+                          >
+                            <Form.Control>
+                              <Select.Trigger className="h-8">
+                                <Select.Value placeholder="Select status" />
+                              </Select.Trigger>
+                            </Form.Control>
+                            <Select.Content>
+                              {stages.map((stage) => (
+                                <Select.Item key={stage._id} value={stage._id}>
+                                  <span className="flex items-center gap-2">
+                                    {stage.color && (
+                                      <span
+                                        className="rounded-full size-2"
+                                        style={{
+                                          backgroundColor: stage.color,
+                                        }}
+                                      />
+                                    )}
+                                    {stage.name}
+                                  </span>
+                                </Select.Item>
+                              ))}
+                            </Select.Content>
+                          </Select>
+                          <Form.Message />
+                        </Form.Item>
+                      )}
+                    />
+
+                    <Form.Field
                       name="user"
                       control={form.control}
                       render={({ field }) => (
@@ -437,86 +431,20 @@ export const ContractFormSheet = ({
                       )}
                     />
                   </div>
-                </InfoCard.Content>
-              </InfoCard>
+              </div>
 
-              <InfoCard title="Amount">
-                <InfoCard.Content>
-                  <div className="gap-4 grid grid-cols-3">
-                    <Form.Field
-                      name="currency"
-                      control={form.control}
-                      render={({ field }) => (
-                        <Form.Item>
-                          <Form.Label>Currency</Form.Label>
-                          <CurrencyField.SelectCurrency
-                            value={field.value as CurrencyCode}
-                            onChange={(value) =>
-                              field.onChange(value as CurrencyCode)
-                            }
-                          />
-                          <Form.Message />
-                        </Form.Item>
-                      )}
-                    />
-
-                    <Form.Field
-                      name="amount"
-                      control={form.control}
-                      render={({ field }) => (
-                        <Form.Item>
-                          <Form.Label>Amount</Form.Label>
-                          <CurrencyField.ValueInput
-                            value={field.value}
-                            onChange={(value) => field.onChange(value)}
-                          />
-                          <Form.Message />
-                        </Form.Item>
-                      )}
-                    />
-
-                    <Form.Field
-                      name="amountType"
-                      control={form.control}
-                      render={({ field }) => (
-                        <Form.Item>
-                          <Form.Label>Amount Type</Form.Label>
-                          <Select
-                            onValueChange={field.onChange}
-                            value={field.value}
-                          >
-                            <Form.Control>
-                              <Select.Trigger className="h-8">
-                                <Select.Value placeholder="Select amount type" />
-                              </Select.Trigger>
-                            </Form.Control>
-                            <Select.Content>
-                              {CONTRACT_AMOUNT_TYPE_OPTIONS.map((option) => (
-                                <Select.Item
-                                  key={option.value}
-                                  value={option.value}
-                                >
-                                  {option.label}
-                                </Select.Item>
-                              ))}
-                            </Select.Content>
-                          </Select>
-                          <Form.Message />
-                        </Form.Item>
-                      )}
-                    />
-                  </div>
-                </InfoCard.Content>
-              </InfoCard>
-
-              <InfoCard title="Payment Plan">
-                <InfoCard.Content>
-                  <div className="gap-4 grid grid-cols-4">
-                    <PaymentPlanForm form={form} />
-                  </div>
-                </InfoCard.Content>
-              </InfoCard>
-
+              <div
+                style={{
+                  display:
+                    activeTab === FORM_TABS.PAYMENT_PLAN ? undefined : 'none',
+                }}
+                className="flex flex-col gap-4"
+              >
+                <div className="gap-4 grid grid-cols-4">
+                  <PaymentPlanForm form={form} />
+                </div>
+                <PaymentScheduleEditor form={form} />
+              </div>
             </div>
           </ScrollArea>
         </Sheet.Content>

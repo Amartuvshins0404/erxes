@@ -14,6 +14,7 @@ import {
   toast,
   useQueryState,
   validateFetchMore,
+  isUndefinedOrNull,
 } from 'erxes-ui';
 import {
   GET_DEALS,
@@ -25,10 +26,19 @@ import {
   useMutation,
   useQuery,
 } from '@apollo/client';
-import { useAtom, useAtomValue } from 'jotai';
+import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { useEffect, useMemo } from 'react';
+import { dealTotalCountAtom } from '@/deals/states/dealsTotalCountState';
+import { dealsViewAtom } from '@/deals/states/dealsViewState';
+import {
+  DealsBoardState,
+  useAllDealsMap,
+  useDealsBoard,
+} from '@/deals/states/dealsBoardState';
+import { useTranslation } from 'react-i18next';
 
 import { DEAL_LIST_CHANGED } from '@/deals/graphql/subscriptions/dealListChange';
+import { DEAL_CHANGED } from '@/deals/graphql/subscriptions/dealChanged';
 import { IDeal } from '@/deals/types/deals';
 import { PRODUCTS_DATA_CHANGED } from '@/deals/graphql/subscriptions/productsSubscriptions';
 import { currentUserState } from 'ui-modules';
@@ -51,10 +61,18 @@ interface ISalesProductsDataChangedPayload {
   };
 }
 
+interface ISalesDealChangedPayload {
+  salesDealChanged: {
+    action: string;
+    deal?: IDeal;
+  };
+}
+
 export const useDeals = (
   options?: QueryHookOptions<ICursorListResponse<IDeal>>,
   pipelineId?: string,
 ) => {
+  const { t } = useTranslation('sales');
   const { data, loading, fetchMore, subscribeToMore } = useQuery<
     ICursorListResponse<IDeal>
   >(GET_DEALS, {
@@ -64,7 +82,7 @@ export const useDeals = (
     fetchPolicy: 'cache-and-network',
     onError: (e) => {
       toast({
-        title: 'Error',
+        title: t('error'),
         description: e.message,
         variant: 'destructive',
       });
@@ -84,8 +102,7 @@ export const useDeals = (
       userId: currentUser?._id,
       filter: options?.variables,
     }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [lastPipelineId, currentUser?._id, JSON.stringify(options?.variables)],
+    [lastPipelineId, currentUser?._id, options?.variables],
   );
 
   useEffect(() => {
@@ -119,7 +136,9 @@ export const useDeals = (
           updatedList = currentList.map((item: IDeal) =>
             item._id === deal._id ? { ...item, ...deal } : item,
           );
-          updatedList.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+          updatedList.sort(
+            (a: IDeal, b: IDeal) => (a.order ?? 0) - (b.order ?? 0),
+          );
         }
 
         if (action === 'remove') {
@@ -145,8 +164,7 @@ export const useDeals = (
     });
 
     return unsubscribe;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [subscribeToMore, subscriptionVars]);
+  }, [currentUser?._id, subscribeToMore, subscriptionVars]);
 
   const handleFetchMore = ({
     direction,
@@ -180,6 +198,30 @@ export const useDeals = (
     });
   };
 
+  const view = useAtomValue(dealsViewAtom);
+  const setTotalCount = useSetAtom(dealTotalCountAtom);
+
+  useEffect(() => {
+    if (view === 'list') {
+      if (loading) {
+        setTotalCount(null);
+      } else {
+        const finalCount = isUndefinedOrNull(totalCount)
+          ? deals?.length || 0
+          : totalCount;
+        setTotalCount(finalCount);
+      }
+    }
+  }, [view, totalCount, loading, deals?.length, setTotalCount]);
+
+  useEffect(() => {
+    return () => {
+      if (view === 'list') {
+        setTotalCount(null);
+      }
+    };
+  }, [view, setTotalCount]);
+
   return {
     loading,
     deals,
@@ -207,6 +249,7 @@ export const useDealDetail = (
       _id: finalId,
     },
     skip: !finalId,
+    fetchPolicy: options?.fetchPolicy || 'cache-and-network',
   });
 
   useEffect(() => {
@@ -232,13 +275,58 @@ export const useDealDetail = (
     });
 
     return unsubscribe;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [salesItemId]);
+  }, [refetch, salesItemId, subscribeToMore]);
 
-  return { deal: data?.dealDetail, loading, error, refetch };
+  useEffect(() => {
+    if (!finalId) return;
+
+    const unsubscribe = subscribeToMore<ISalesDealChangedPayload>({
+      document: DEAL_CHANGED,
+      variables: { _id: finalId },
+      updateQuery: (prev, { subscriptionData }) => {
+        const changedDeal = subscriptionData?.data?.salesDealChanged?.deal;
+
+        if (!changedDeal) {
+          return prev;
+        }
+
+        const prevDeal = prev.dealDetail;
+        const isStageChanged =
+          changedDeal.stageId && changedDeal.stageId !== prevDeal?.stageId;
+
+        if (isStageChanged) {
+          refetch();
+        }
+
+        const pipelineId =
+          changedDeal.stage?.pipelineId ||
+          changedDeal.pipelineId ||
+          prevDeal?.pipelineId ||
+          prevDeal?.stage?.pipelineId;
+
+        return {
+          ...prev,
+          dealDetail: {
+            ...prevDeal,
+            ...changedDeal,
+            pipeline: changedDeal.pipeline || prevDeal?.pipeline,
+            pipelineId,
+            stage: changedDeal.stage || prevDeal?.stage,
+          },
+        };
+      },
+    });
+
+    return unsubscribe;
+  }, [finalId, refetch, subscribeToMore]);
+
+  const deal = data?.dealDetail;
+
+  return { deal, loading: loading && !deal, error, refetch };
 };
 
 export function useDealsEdit(options?: MutationHookOptions<any, any>) {
+  const { t } = useTranslation('sales');
   const [_id] = useAtom(dealDetailSheetState);
   const [salesItemId] = useQueryState('salesItemId');
 
@@ -260,15 +348,15 @@ export function useDealsEdit(options?: MutationHookOptions<any, any>) {
     awaitRefetchQueries: true,
     onCompleted: (...args) => {
       toast({
-        title: 'Successfully updated a deal',
+        title: t('deal-updated'),
         variant: 'success',
       });
       options?.onCompleted?.(...args);
     },
     onError: (err) => {
       toast({
-        title: 'Error',
-        description: err.message || 'Update failed',
+        title: t('error'),
+        description: err.message || t('update-failed'),
         variant: 'destructive',
       });
     },
@@ -282,6 +370,7 @@ export function useDealsEdit(options?: MutationHookOptions<any, any>) {
 }
 
 export function useDealsAdd(options?: MutationHookOptions<any, any>) {
+  const { t } = useTranslation('sales');
   const [_id] = useAtom(dealDetailSheetState);
   const [defaultValues] = useAtom(dealCreateDefaultValuesState);
 
@@ -296,15 +385,15 @@ export function useDealsAdd(options?: MutationHookOptions<any, any>) {
     awaitRefetchQueries: true,
     onCompleted: (...args) => {
       toast({
-        title: 'Successfully added a deal',
+        title: t('deal-added'),
         variant: 'default',
       });
       options?.onCompleted?.(...args);
     },
     onError: (err) => {
       toast({
-        title: 'Error',
-        description: err.message || 'Update failed',
+        title: t('error'),
+        description: err.message || t('update-failed'),
         variant: 'destructive',
       });
     },
@@ -318,6 +407,7 @@ export function useDealsAdd(options?: MutationHookOptions<any, any>) {
 }
 
 export function useDealsRemove(options?: MutationHookOptions<any, any>) {
+  const { t } = useTranslation('sales');
   const [_id] = useAtom(dealDetailSheetState);
 
   const [removeDeals, { loading, error }] = useMutation(REMOVE_DEALS, {
@@ -329,15 +419,15 @@ export function useDealsRemove(options?: MutationHookOptions<any, any>) {
     awaitRefetchQueries: true,
     onCompleted: (...args) => {
       toast({
-        title: 'Successfully removed a deal',
+        title: t('deal-removed'),
         variant: 'default',
       });
       options?.onCompleted?.(...args);
     },
     onError: (err) => {
       toast({
-        title: 'Error',
-        description: err.message || 'Update failed',
+        title: t('error'),
+        description: err.message || t('update-failed'),
         variant: 'destructive',
       });
     },
@@ -351,23 +441,23 @@ export function useDealsRemove(options?: MutationHookOptions<any, any>) {
 }
 
 export function useDealsChange(options?: MutationHookOptions<any, any>) {
+  const { t } = useTranslation('sales');
   const [changeDeals, { loading, error }] = useMutation(DEALS_CHANGE, {
     ...options,
     variables: {
       ...options?.variables,
     },
-    awaitRefetchQueries: true,
     onCompleted: (...args) => {
       toast({
-        title: 'Successfully updated deal order',
+        title: t('deal-order-updated'),
         variant: 'default',
       });
       options?.onCompleted?.(...args);
     },
     onError: (err) => {
       toast({
-        title: 'Error',
-        description: err.message || 'Update failed',
+        title: t('error'),
+        description: err.message || t('update-failed'),
         variant: 'destructive',
       });
     },
@@ -380,7 +470,108 @@ export function useDealsChange(options?: MutationHookOptions<any, any>) {
   };
 }
 
+export function useMoveDealStage(options?: MutationHookOptions<any, any>) {
+  const { changeDeals, loading, error } = useDealsChange(options);
+  const [boardState, setBoardState] = useDealsBoard();
+  const [allDealsMap, setAllDealsMap] = useAllDealsMap();
+
+  const moveDealStage = ({
+    deal,
+    stageId,
+    aboveItemId,
+    onCompleted,
+  }: {
+    deal: IDeal;
+    stageId: string | string[];
+    aboveItemId?: string;
+    onCompleted?: () => void;
+  }) => {
+    const destinationStageId = Array.isArray(stageId) ? stageId[0] : stageId;
+    const nextAboveItemId = aboveItemId ?? '';
+
+    if (!destinationStageId || destinationStageId === deal.stageId) {
+      onCompleted?.();
+      return Promise.resolve(null);
+    }
+
+    if (boardState) {
+      setBoardState((prev: DealsBoardState | null) => {
+        if (!prev) return prev;
+
+        const nextColumnItems = Object.fromEntries(
+          Object.entries(prev.columnItems).map(([columnId, itemIds]) => [
+            columnId,
+            (itemIds ?? []).filter((itemId: string) => itemId !== deal._id),
+          ]),
+        );
+
+        const destinationItems = nextColumnItems[destinationStageId] || [];
+        const insertIndex = nextAboveItemId
+          ? destinationItems.indexOf(nextAboveItemId) + 1
+          : 0;
+        const normalizedIndex = insertIndex > 0 ? insertIndex : 0;
+
+        destinationItems.splice(normalizedIndex, 0, deal._id);
+
+        return {
+          ...prev,
+          items: {
+            ...prev.items,
+            [deal._id]: {
+              ...(prev.items[deal._id] || deal),
+              ...deal,
+              stageId: destinationStageId,
+              columnId: destinationStageId,
+            },
+          },
+          columnItems: {
+            ...nextColumnItems,
+            [destinationStageId]: destinationItems,
+          },
+        };
+      });
+
+      setAllDealsMap((prev: Record<string, IDeal>) => ({
+        ...prev,
+        [deal._id]: {
+          ...(prev[deal._id] || deal),
+          ...deal,
+          stageId: destinationStageId,
+        },
+      }));
+    }
+
+    return changeDeals({
+      variables: {
+        itemId: deal._id,
+        destinationStageId,
+        sourceStageId: deal.stageId,
+        aboveItemId: nextAboveItemId,
+      },
+    })
+      .then((result) => {
+        onCompleted?.();
+        return result;
+      })
+      .catch((mutationError) => {
+        if (boardState) {
+          setBoardState(boardState);
+          setAllDealsMap(allDealsMap);
+        }
+
+        throw mutationError;
+      });
+  };
+
+  return {
+    moveDealStage,
+    loading,
+    error,
+  };
+}
+
 export function useDealsArchive(options?: MutationHookOptions<any, any>) {
+  const { t } = useTranslation('sales');
   const [archiveDealsBase, { loading, error }] = useMutation(DEALS_ARCHIVE, {
     ...options,
     variables: {
@@ -389,15 +580,15 @@ export function useDealsArchive(options?: MutationHookOptions<any, any>) {
     awaitRefetchQueries: true,
     onCompleted: (...args) => {
       toast({
-        title: 'Successfully archived deals',
+        title: t('deals-archived'),
         variant: 'default',
       });
       options?.onCompleted?.(...args);
     },
     onError: (err) => {
       toast({
-        title: 'Error',
-        description: err.message || 'Update failed',
+        title: t('error'),
+        description: err.message || t('update-failed'),
         variant: 'destructive',
       });
     },
@@ -416,6 +607,7 @@ export function useDealsArchive(options?: MutationHookOptions<any, any>) {
   };
 }
 export function useDealsCopy(options?: MutationHookOptions<any, any>) {
+  const { t } = useTranslation('sales');
   const [_id] = useAtom(dealDetailSheetState);
 
   const [copyDeals, { loading, error }] = useMutation(DEALS_COPY, {
@@ -427,15 +619,15 @@ export function useDealsCopy(options?: MutationHookOptions<any, any>) {
     awaitRefetchQueries: true,
     onCompleted: (...args) => {
       toast({
-        title: 'Successfully copied a deal',
+        title: t('deal-copied'),
         variant: 'default',
       });
       options?.onCompleted?.(...args);
     },
     onError: (err) => {
       toast({
-        title: 'Error',
-        description: err.message || 'Update failed',
+        title: t('error'),
+        description: err.message || t('update-failed'),
         variant: 'destructive',
       });
     },
@@ -449,6 +641,7 @@ export function useDealsCopy(options?: MutationHookOptions<any, any>) {
 }
 
 export function useDealsWatch(options?: MutationHookOptions<any, any>) {
+  const { t } = useTranslation('sales');
   const [_id] = useAtom(dealDetailSheetState);
 
   const [watchDeals, { loading, error }] = useMutation(DEALS_WATCH, {
@@ -460,15 +653,15 @@ export function useDealsWatch(options?: MutationHookOptions<any, any>) {
     awaitRefetchQueries: true,
     onCompleted: (...args) => {
       toast({
-        title: 'Successfully updated watch status',
+        title: t('watch-status-updated'),
         variant: 'default',
       });
       options?.onCompleted?.(...args);
     },
     onError: (err) => {
       toast({
-        title: 'Error',
-        description: err.message || 'Update failed',
+        title: t('error'),
+        description: err.message || t('update-failed'),
         variant: 'destructive',
       });
     },

@@ -1,7 +1,10 @@
 export type IUIConfig = {
   name: string;
+  /** Backend plugin name used for permission checks — only needed when it differs from `name` (e.g. dashes vs underscores). */
+  permissionName?: string;
   path: string;
   icon?: React.ElementType;
+  i18n?: boolean;
   hasFloatingWidget?: boolean;
   settingsNavigation?: () => React.ReactNode;
   navigationGroup?: {
@@ -18,6 +21,11 @@ export type IUIConfig = {
     }[];
     customerDetailWidgets?: {
       name: string;
+    }[];
+    formWidgets?: {
+      name: string;
+      contentType: string;
+      icon?: React.ElementType;
     }[];
   };
   modules?: {

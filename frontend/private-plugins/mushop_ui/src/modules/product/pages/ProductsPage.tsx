@@ -1,12 +1,14 @@
 import { IconPackage } from '@tabler/icons-react';
 import { Breadcrumb, Button, PageSubHeader, Separator } from 'erxes-ui';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { PageHeader } from 'ui-modules';
 import { ProductsFilter } from '../components/ProductsFilter';
 import { ProductsTable } from '../components/ProductsTable';
 import { ProductDetailSheet } from '../components/ProductDetailSheet';
 
 export const ProductsPage = () => {
+  const { t } = useTranslation('mushop');
   return (
     <div className="flex flex-col h-full">
       <PageHeader>
@@ -17,7 +19,7 @@ export const ProductsPage = () => {
                 <Button variant="ghost" asChild>
                   <Link to="/mushop/products">
                     <IconPackage />
-                    Products
+                    {t('Products')}
                   </Link>
                 </Button>
               </Breadcrumb.Item>

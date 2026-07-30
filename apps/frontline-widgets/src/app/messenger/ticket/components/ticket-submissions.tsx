@@ -64,11 +64,12 @@ export const TicketSubmissions = ({
       <div className="shrink-0">
         <Button
           type="button"
-          className="bg-primary flex-none shadow-2xs my-2 w-full"
+          variant={'secondary'}
+          className="bg-primary hover:bg-primary/70 text-primary-foreground flex-none shadow-2xs my-2 w-full"
           onClick={() => setPage('submit')}
         >
           <IconPlus size={16} />
-          Issue new ticket
+          Issue a new ticket
         </Button>
       </div>
     </div>
@@ -85,7 +86,7 @@ export const TicketSubmissionItem = ({
   return (
     <Collapsible
       key={ticket._id}
-      className="bg-background rounded-lg shadow-2xs"
+      className="bg-background rounded-lg shadow-2xs text-foreground"
       open={open}
       onOpenChange={setOpen}
     >

@@ -7,6 +7,7 @@ import {
   agencyIntroductionSchema,
   agencyOperationAreasSchema,
   agencySocialLinksSchema,
+  agencyIntegrationsSchema,
 } from '../schema';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -17,7 +18,8 @@ export const agencySchema = agencyIdentitySchema
   .merge(agencyDocuments)
   .merge(agencyFieldsOfExpertiseSchema)
   .merge(agencyOperationAreasSchema)
-  .merge(agencySocialLinksSchema);
+  .merge(agencySocialLinksSchema)
+  .merge(agencyIntegrationsSchema);
 
 export type AgencyProfileSchema = z.infer<typeof agencySchema>;
 
@@ -40,6 +42,8 @@ export const useAgencyForm = (defaultValues?: AgencyProfileSchema) => {
       fieldsOfExpertise: { propertyTypes: [], services: [], clientTypes: [] },
       operationArea: { city: '', district: '' },
       socialLinks: { facebook: '', instagram: '', linkedin: '' },
+      messengerIntegrationId: '',
+      widgetBundleUrl: '',
       ...defaultValues,
     },
   });

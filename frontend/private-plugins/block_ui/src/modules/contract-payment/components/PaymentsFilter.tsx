@@ -4,15 +4,20 @@ import {
   Command,
   Filter,
   PopoverScoped,
+  useMultiQueryState,
   useQueryState,
 } from 'erxes-ui';
 import {
   IconCheck,
   IconCircleX,
+  IconFileText,
+  IconHome,
   IconLabelFilled,
   IconRefresh,
+  IconUser,
 } from '@tabler/icons-react';
 import { useState } from 'react';
+import { SelectCustomer } from 'ui-modules';
 
 export type PaymentFilterValue = 'unpaid' | 'paid' | 'overdue';
 
@@ -116,8 +121,13 @@ const StatusFilterView = () => {
 };
 
 const PaymentsFilterPopover = () => {
-  const [value] = useQueryState<PaymentFilterValue>('payment_filter');
-  const hasFilters = value !== null;
+  const [queries] = useMultiQueryState<{
+    payment_filter: string;
+    payment_contractNumber: string;
+    payment_customerId: string;
+    payment_unitNumber: string;
+  }>(['payment_filter', 'payment_contractNumber', 'payment_customerId', 'payment_unitNumber']);
+  const hasFilters = Object.values(queries || {}).some((v) => v !== null);
 
   return (
     <Filter.Popover>
@@ -135,16 +145,39 @@ const PaymentsFilterPopover = () => {
                 <IconLabelFilled />
                 Status
               </Filter.Item>
+              <Command.Separator className="my-1" />
+              <Filter.Item value="payment_contractNumber" inDialog>
+                <IconFileText />
+                Contract Number
+              </Filter.Item>
+              <Filter.Item value="payment_unitNumber" inDialog>
+                <IconHome />
+                Unit Number
+              </Filter.Item>
+              <Filter.Item value="payment_customerId">
+                <IconUser />
+                Customer
+              </Filter.Item>
             </Command.List>
           </Command>
         </Filter.View>
         <StatusFilterView />
+        <SelectCustomer.FilterView filterKey="payment_customerId" mode="single" />
       </Combobox.Content>
     </Filter.Popover>
   );
 };
 
 export const PaymentsFilter = () => {
+  const [queries] = useMultiQueryState<{
+    payment_filter: string;
+    payment_contractNumber: string;
+    payment_customerId: string;
+    payment_unitNumber: string;
+  }>(['payment_filter', 'payment_contractNumber', 'payment_customerId', 'payment_unitNumber']);
+  const { payment_filter, payment_contractNumber, payment_customerId, payment_unitNumber } =
+    queries || {};
+
   return (
     <Filter id="payments-filter">
       <Filter.Bar>
@@ -155,8 +188,51 @@ export const PaymentsFilter = () => {
           </Filter.BarName>
           <StatusFilterBar />
         </Filter.BarItem>
+        {payment_contractNumber && (
+          <Filter.BarItem queryKey="payment_contractNumber">
+            <Filter.BarName>
+              <IconFileText />
+              Contract
+            </Filter.BarName>
+            <Filter.BarButton filterKey="payment_contractNumber" inDialog>
+              {payment_contractNumber}
+            </Filter.BarButton>
+          </Filter.BarItem>
+        )}
+        {payment_unitNumber && (
+          <Filter.BarItem queryKey="payment_unitNumber">
+            <Filter.BarName>
+              <IconHome />
+              Unit
+            </Filter.BarName>
+            <Filter.BarButton filterKey="payment_unitNumber" inDialog>
+              {payment_unitNumber}
+            </Filter.BarButton>
+          </Filter.BarItem>
+        )}
+        {payment_customerId && (
+          <Filter.BarItem queryKey="payment_customerId">
+            <Filter.BarName>
+              <IconUser />
+              Customer
+            </Filter.BarName>
+            <SelectCustomer.FilterBar
+              filterKey="payment_customerId"
+              label="Customer"
+              mode="single"
+            />
+          </Filter.BarItem>
+        )}
         <PaymentsFilterPopover />
       </Filter.Bar>
+      <Filter.Dialog>
+        <Filter.View filterKey="payment_contractNumber" inDialog>
+          <Filter.DialogStringView filterKey="payment_contractNumber" label="Contract Number" />
+        </Filter.View>
+        <Filter.View filterKey="payment_unitNumber" inDialog>
+          <Filter.DialogStringView filterKey="payment_unitNumber" label="Unit Number" />
+        </Filter.View>
+      </Filter.Dialog>
     </Filter>
   );
 };

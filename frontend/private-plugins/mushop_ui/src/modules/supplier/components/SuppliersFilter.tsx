@@ -5,9 +5,11 @@ import {
   IconSearch,
 } from '@tabler/icons-react';
 import { Combobox, Command, Filter, useMultiQueryState } from 'erxes-ui';
+import { useTranslation } from 'react-i18next';
 import { SelectSupplierStatus } from './SelectSupplierStatus';
 
 const SuppliersFilterPopover = () => {
+  const { t } = useTranslation('mushop');
   const [queries] = useMultiQueryState<{
     searchValue: string;
     status: string;
@@ -25,26 +27,26 @@ const SuppliersFilterPopover = () => {
           <Filter.View>
             <Command>
               <Filter.CommandInput
-                placeholder="Filter"
+                placeholder={t('Filter')}
                 variant="secondary"
                 className="bg-background"
               />
               <Command.List className="p-1">
                 <Filter.Item value="searchValue" inDialog>
                   <IconSearch />
-                  Search
+                  {t('Search')}
                 </Filter.Item>
                 <Filter.Item value="status">
                   <IconProgress />
-                  Verification
+                  {t('Verification')}
                 </Filter.Item>
                 <Filter.Item value="created">
                   <IconCalendarPlus />
-                  Created At
+                  {t('Created At')}
                 </Filter.Item>
                 <Filter.Item value="foundedAt">
                   <IconCalendarClock />
-                  Founded At
+                  {t('Founded At')}
                 </Filter.Item>
               </Command.List>
             </Command>
@@ -74,6 +76,7 @@ const SuppliersFilterPopover = () => {
 };
 
 export const SuppliersFilter = () => {
+  const { t } = useTranslation('mushop');
   const [queries] = useMultiQueryState<{
     searchValue: string;
   }>(['searchValue']);
@@ -84,7 +87,7 @@ export const SuppliersFilter = () => {
         <Filter.BarItem queryKey="searchValue">
           <Filter.BarName>
             <IconSearch />
-            Search
+            {t('Search')}
           </Filter.BarName>
           <Filter.BarButton filterKey="searchValue" inDialog>
             {queries?.searchValue || ''}
@@ -93,21 +96,21 @@ export const SuppliersFilter = () => {
         <Filter.BarItem queryKey="status">
           <Filter.BarName>
             <IconProgress />
-            Verification
+            {t('Verification')}
           </Filter.BarName>
           <SelectSupplierStatus.FilterBar />
         </Filter.BarItem>
         <Filter.BarItem queryKey="created">
           <Filter.BarName>
             <IconCalendarPlus />
-            Created At
+            {t('Created At')}
           </Filter.BarName>
           <Filter.Date filterKey="created" />
         </Filter.BarItem>
         <Filter.BarItem queryKey="foundedAt">
           <Filter.BarName>
             <IconCalendarClock />
-            Founded At
+            {t('Founded At')}
           </Filter.BarName>
           <Filter.Date filterKey="foundedAt" />
         </Filter.BarItem>

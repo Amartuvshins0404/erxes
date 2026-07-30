@@ -21,7 +21,7 @@ export const ContractEditSheet = () => {
           Edit
         </Button>
       </Sheet.Trigger>
-      <Sheet.View className="p-0 sm:max-w-5xl">
+      <Sheet.View className="p-0 sm:max-w-7xl">
         <Sheet.Header>
           <Sheet.Title>Edit contract</Sheet.Title>
           <Sheet.Close />
@@ -60,11 +60,7 @@ const ContractEditBody = ({
     currency: (contract.currency as CurrencyCode) || CurrencyCode.MNT,
     date: orUndef(contract.date),
     amount: orUndef(contract.amount),
-    amountType: orUndef(contract.amountType),
     status: orUndef(contract.status),
-    startDate: orUndef(contract.startDate),
-    endDate: orUndef(contract.endDate),
-    isLifeTime: contract.isLifeTime || false,
     user: orUndef(contract.user),
     party: contract.party
       ? {
@@ -74,15 +70,18 @@ const ContractEditBody = ({
       : { type: 'customer', id: '' },
     paymentPlan: contract.paymentPlan
       ? {
-          type: orUndef(contract.paymentPlan.type),
           downPaymentPercentage: orUndef(
             contract.paymentPlan.downPaymentPercentage,
           ),
+          downPaymentAmount: orUndef(contract.paymentPlan.downPaymentAmount),
+          barterPercentage: orUndef(contract.paymentPlan.barterPercentage),
+          barterAmount: orUndef(contract.paymentPlan.barterAmount),
           interestPercentage: orUndef(contract.paymentPlan.interestPercentage),
           interestType: orUndef(contract.paymentPlan.interestType),
-          advancePaymentPercentage: orUndef(
-            contract.paymentPlan.advancePaymentPercentage,
+          completionPaymentPercentage: orUndef(
+            contract.paymentPlan.completionPaymentPercentage,
           ),
+          completionPaymentAmount: orUndef(contract.paymentPlan.completionPaymentAmount),
           discountPercentage: orUndef(
             contract.paymentPlan.discountPercentage,
           ),
@@ -91,20 +90,26 @@ const ContractEditBody = ({
           frequency: orUndef(contract.paymentPlan.frequency),
           penaltyPercentage: orUndef(contract.paymentPlan.penaltyPercentage),
           vatIncluded: contract.paymentPlan.vatIncluded || false,
+          roundedInstallmentAmount: orUndef(contract.paymentPlan.roundedInstallmentAmount),
+          installmentAmounts: orUndef(contract.paymentPlan.installmentAmounts),
           paymentDates: orUndef(contract.paymentPlan.paymentDates),
+          paymentDueDates: orUndef(contract.paymentPlan.paymentDueDates),
+          firstPaymentDate: orUndef(contract.paymentPlan.firstPaymentDate),
+          downPaymentDate: orUndef(contract.paymentPlan.downPaymentDate),
+          completionPaymentDate: orUndef(contract.paymentPlan.completionPaymentDate),
         }
       : undefined,
   };
 
   const handleSubmit = async (data: ContractFormData) => {
-    const paymentPlan = data.paymentPlan?.type ? data.paymentPlan : undefined;
+    const paymentPlan = data.paymentPlan?.frequency ? data.paymentPlan : undefined;
     const party =
       data.party && data.party.id
         ? { type: data.party.type, id: data.party.id }
         : undefined;
     const amount =
       typeof data.amount === 'number' && !isNaN(data.amount)
-        ? Math.round(data.amount)
+        ? data.amount
         : undefined;
 
     try {
@@ -114,11 +119,7 @@ const ContractEditBody = ({
         currency: data.currency,
         date: data.date,
         amount,
-        amountType: data.amountType,
         status: data.status || undefined,
-        startDate: data.startDate,
-        endDate: data.endDate,
-        isLifeTime: data.isLifeTime,
         party,
         paymentPlan,
         user: data.user || undefined,

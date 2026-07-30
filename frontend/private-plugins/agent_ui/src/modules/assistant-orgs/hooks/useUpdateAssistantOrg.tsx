@@ -1,11 +1,9 @@
 import { useMutation } from '@apollo/client';
-import { GET_IDENTIFIERS } from '../graphql/queries';
+import { GET_IDENTIFIER, GET_IDENTIFIERS } from '../graphql/queries';
 import { UPDATE_IDENTIFIER } from '../graphql/mutations';
 
 export const useUpdateIdentifier = () => {
-  const [update, { loading }] = useMutation(UPDATE_IDENTIFIER, {
-    refetchQueries: [GET_IDENTIFIERS],
-  });
+  const [update, { loading }] = useMutation(UPDATE_IDENTIFIER);
 
   const updateIdentifier = async (
     identifierId: string,
@@ -17,6 +15,12 @@ export const useUpdateIdentifier = () => {
   ) => {
     await update({
       variables: { identifierId, input },
+      refetchQueries: [
+        { query: GET_IDENTIFIERS, variables: { kind: 'assistant' } },
+        { query: GET_IDENTIFIERS, variables: { kind: 'agent' } },
+        { query: GET_IDENTIFIER, variables: { identifierId } },
+      ],
+      awaitRefetchQueries: true,
       onCompleted: callbacks?.onCompleted,
       onError: callbacks?.onError,
     });

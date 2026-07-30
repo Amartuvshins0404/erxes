@@ -56,6 +56,8 @@ export const collectiveSchema = new Schema<ICollectiveDocument>(
     dateFounded: { type: String },
     website: { type: String },
 
+    paymentId: { type: String, label: 'Payment method' },
+
     socialLinks: { type: collectiveSocialLinkSchema },
 
     ownerUserId: { type: String, index: true },

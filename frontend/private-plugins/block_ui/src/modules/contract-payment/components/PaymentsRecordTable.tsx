@@ -1,7 +1,7 @@
 import { EnumCursorDirection, RecordTable, Spinner } from 'erxes-ui';
 import { paymentsColumns, PaymentsColumnOptions } from './PaymentsColumns';
 import { IContractPayment } from '@/contract-payment/types';
-import { useMemo, useRef } from 'react';
+import { useMemo } from 'react';
 
 export interface IPaymentsPageInfo {
   hasNextPage?: boolean;
@@ -9,24 +9,6 @@ export interface IPaymentsPageInfo {
   startCursor?: string | null;
   endCursor?: string | null;
 }
-
-const sortPayments = (payments: IContractPayment[]) => {
-  const now = Date.now();
-  const due = (p: IContractPayment) => {
-    const t = p.dueDate ? Number(new Date(p.dueDate)) : 0;
-    return Number.isFinite(t) ? t : 0;
-  };
-  return [...payments].sort((a, b) => {
-    // unpaid first, paid last
-    if (a.paid !== b.paid) return a.paid ? 1 : -1;
-    // among unpaid: earliest due first (overdue floats up naturally)
-    // among paid: by paidDate desc (most recent paid first)
-    if (!a.paid) return due(a) - due(b);
-    const ap = a.paidDate ? Number(new Date(a.paidDate)) : 0;
-    const bp = b.paidDate ? Number(new Date(b.paidDate)) : 0;
-    return bp - ap;
-  });
-};
 
 export const PaymentsRecordTable = ({
   payments,
@@ -53,37 +35,11 @@ export const PaymentsRecordTable = ({
     [showContract, showCustomer, showUnit],
   );
 
-  // Stable order: lock the order based on the initial snapshot for a given
-  // set of payment IDs. When a payment's `paid` flag toggles, the row keeps
-  // its place — only adding/removing rows triggers a re-sort. This matches
-  // the operation task table behaviour.
-  const lockedOrderRef = useRef<{ key: string; ids: string[] }>({
-    key: '',
-    ids: [],
-  });
-
-  const sorted = useMemo(() => {
-    const idsKey = payments
-      .map((p) => p._id)
-      .sort()
-      .join(',');
-    if (lockedOrderRef.current.key !== idsKey) {
-      lockedOrderRef.current = {
-        key: idsKey,
-        ids: sortPayments(payments).map((p) => p._id),
-      };
-    }
-    const byId = new Map(payments.map((p) => [p._id, p]));
-    return lockedOrderRef.current.ids
-      .map((id) => byId.get(id))
-      .filter(Boolean) as IContractPayment[];
-  }, [payments]);
-
   return (
     <div className={`flex flex-col overflow-hidden h-full ${className || ''}`}>
       <RecordTable.Provider
         columns={columns}
-        data={sorted.length ? sorted : loading ? [{} as IContractPayment] : []}
+        data={payments.length ? payments : loading ? [{} as IContractPayment] : []}
         className="m-3 h-full"
         stickyColumns={['status']}
         tableId={tableId}
@@ -92,7 +48,7 @@ export const PaymentsRecordTable = ({
           <RecordTable.CursorProvider
             hasPreviousPage={!!pageInfo?.hasPreviousPage}
             hasNextPage={!!pageInfo?.hasNextPage}
-            dataLength={sorted.length}
+            dataLength={payments.length}
             sessionKey={cursorSessionKey || tableId}
           >
             <RecordTable>

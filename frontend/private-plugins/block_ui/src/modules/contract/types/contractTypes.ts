@@ -5,11 +5,6 @@ export enum ContractPartyType {
   COMPANY = 'company',
 }
 
-export enum ContractAmountType {
-  PER_SIZE = 'perSize',
-  PER_UNIT = 'perUnit',
-}
-
 export enum ContractInterestType {
   SIMPLE = 'SIMPLE',
   FLAT = 'FLAT',
@@ -22,18 +17,28 @@ export interface IContractParty {
 }
 
 export interface IContractPaymentPlan {
-  type: string;
   downPaymentPercentage?: number;
+  downPaymentAmount?: number;
+  barterPercentage?: number;
+  barterAmount?: number;
   interestPercentage?: number;
   interestType?: ContractInterestType;
-  advancePaymentPercentage?: number;
+  completionPaymentPercentage?: number;
+  completionPaymentAmount?: number;
   discountPercentage?: number;
   description?: string;
   installment?: number;
   frequency?: string;
   penaltyPercentage?: number;
   vatIncluded?: boolean;
+  roundedInstallmentAmount?: number;
+  installmentAmounts?: number[];
   paymentDates?: number[];
+  paymentDueDates?: string[];
+  firstPaymentDate?: string;
+  downPaymentDate?: string;
+  completionPaymentDate?: string;
+  completionPaymentDateLabel?: string;
 }
 
 export interface IContractInput {
@@ -42,11 +47,7 @@ export interface IContractInput {
   currency?: CurrencyCode;
   date?: string;
   amount?: number;
-  amountType?: ContractAmountType;
   status?: string;
-  startDate?: string;
-  endDate?: string;
-  isLifeTime?: boolean;
   party?: IContractParty;
   paymentPlan?: IContractPaymentPlan;
   user?: string;

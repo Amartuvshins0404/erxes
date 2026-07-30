@@ -2,6 +2,7 @@ import {
   IconKey,
   IconLock,
   IconRefresh,
+  IconTransfer,
   IconTrash,
 } from '@tabler/icons-react';
 import { Spinner, useToast } from 'erxes-ui';
@@ -11,6 +12,7 @@ import { DestroyServerDialog } from '~/modules/deploy/components/DestroyServerDi
 import { RestartServerDialog } from '~/modules/detail/components/RestartServerDialog';
 import { RestartingOverlay } from '~/modules/detail/components/RestartingOverlay';
 import { OpencodeDeployScreen } from '../deploy/components/OpencodeDeployScreen';
+import { OpencodeTransferCredentialsDialog } from '../deploy/components/OpencodeTransferCredentialsDialog';
 import { useOpencodeDestroy } from '../deploy/hooks/useOpencodeDestroy';
 import { OpencodeApiKeyDialog } from '../detail/components/OpencodeApiKeyDialog';
 import { OpencodeCredentialsDialog } from '../detail/components/OpencodeCredentialsDialog';
@@ -34,6 +36,7 @@ export const OpencodeMain = () => {
   const [destroyOpen, setDestroyOpen] = useState(false);
   const [apiKeyOpen, setApiKeyOpen] = useState(false);
   const [credentialsOpen, setCredentialsOpen] = useState(false);
+  const [transferOpen, setTransferOpen] = useState(false);
   const refreshIframe = useCallback(() => setIframeKey((key) => key + 1), []);
 
   useEffect(() => {
@@ -121,6 +124,13 @@ export const OpencodeMain = () => {
             <IconLock className="size-4" />
           </button>
           <button
+            onClick={() => setTransferOpen(true)}
+            className="p-1.5 rounded hover:bg-muted transition-colors"
+            title="Transfer credentials"
+          >
+            <IconTransfer className="size-4" />
+          </button>
+          <button
             onClick={() => setDestroyOpen(true)}
             disabled={destroying || deletingIdentifier}
             className="p-1.5 rounded text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50"
@@ -184,6 +194,10 @@ export const OpencodeMain = () => {
       <OpencodeCredentialsDialog
         open={credentialsOpen}
         onOpenChange={setCredentialsOpen}
+      />
+      <OpencodeTransferCredentialsDialog
+        open={transferOpen}
+        onOpenChange={setTransferOpen}
       />
     </div>
   );

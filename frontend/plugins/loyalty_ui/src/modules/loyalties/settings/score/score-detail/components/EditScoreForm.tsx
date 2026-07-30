@@ -8,6 +8,7 @@ import {
   useQueryState,
 } from 'erxes-ui';
 import { UseFormReturn } from 'react-hook-form';
+import { useTranslation } from 'react-i18next';
 import { LoyaltyScoreFormValues } from '../../constants/formSchema';
 import { LoyaltyScoreAddCoreFields } from '../../add-score-campaign/components/LoyaltyScoreAddCoreFields';
 import { LoyaltyScoreAddMoreFields } from '../../add-score-campaign/components/LoyaltyScoreAddMoreFields';
@@ -20,6 +21,7 @@ type Props = {
 };
 
 export const EditScoreForm = ({ onOpenChange, form }: Props) => {
+  const { t } = useTranslation('loyalty');
   const { scoreDetail } = useScoreDetailWithQuery();
   const [, setEditScoreId] = useQueryState('editScoreId');
   const { toast } = useToast();
@@ -32,8 +34,8 @@ export const EditScoreForm = ({ onOpenChange, form }: Props) => {
     (data) => {
       if (!scoreDetail?._id) {
         toast({
-          title: 'Error',
-          description: 'Score campaign ID not found',
+          title: t('error'),
+          description: t('score-campaign-id-not-found'),
           variant: 'destructive',
         });
         return;
@@ -66,6 +68,7 @@ export const EditScoreForm = ({ onOpenChange, form }: Props) => {
           _id: scoreDetail._id,
           title: data.title,
           description: data.description || '',
+          order: data.order,
           serviceName: data.conditions.serviceName,
           restrictions,
           additionalConfig: {
@@ -74,6 +77,7 @@ export const EditScoreForm = ({ onOpenChange, form }: Props) => {
           },
           add: data.add,
           subtract: data.subtract,
+          set: data.set,
           ownerType: data.ownerType,
           onlyClientPortal: data.onlyClientPortal,
           fieldGroupId: data.fieldGroupId,
@@ -83,8 +87,8 @@ export const EditScoreForm = ({ onOpenChange, form }: Props) => {
         },
         onCompleted: () => {
           toast({
-            title: 'Success',
-            description: 'Score campaign updated successfully',
+            title: t('success'),
+            description: t('score-campaign-updated'),
             variant: 'default',
           });
           setEditScoreId(null);
@@ -92,7 +96,7 @@ export const EditScoreForm = ({ onOpenChange, form }: Props) => {
         },
         onError: (e: ApolloError) => {
           toast({
-            title: 'Error',
+            title: t('error'),
             description: e.message,
             variant: 'destructive',
           });
@@ -101,8 +105,8 @@ export const EditScoreForm = ({ onOpenChange, form }: Props) => {
     },
     () => {
       toast({
-        title: 'Validation Error',
-        description: 'Please fill in all required fields',
+        title: t('validation-error'),
+        description: t('fill-required-fields'),
         variant: 'destructive',
       });
     },
@@ -133,14 +137,14 @@ export const EditScoreForm = ({ onOpenChange, form }: Props) => {
               onOpenChange(false);
             }}
           >
-            Cancel
+            {t('cancel')}
           </Button>
           <Button
             type="submit"
             className="bg-primary text-primary-foreground hover:bg-primary/90"
             disabled={loading}
           >
-            {loading ? 'Updating...' : 'Update'}
+            {loading ? t('updating') : t('update')}
           </Button>
         </Sheet.Footer>
       </form>

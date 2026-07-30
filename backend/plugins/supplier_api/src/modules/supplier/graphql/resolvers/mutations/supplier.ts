@@ -1,6 +1,6 @@
 import { IContext } from '~/connectionResolvers';
 import { ISupplier } from '@/supplier/@types/supplier';
-import { sendMessage } from '~/modules/admin/utils';
+import { requestMessage, sendMessage } from '~/modules/admin/utils';
 
 export const supplierMutations = {
   supplierUpdateProfile: async (
@@ -11,13 +11,36 @@ export const supplierMutations = {
     const supplier = await models.Supplier.updateSupplier(user._id, input);
 
     if (supplier) {
+      const payload = {
+        entityId: supplier._id,
+        data: { input, userId: user._id },
+      };
+
+      try {
+        const res = await requestMessage<{ code?: string }>({
+          subdomain,
+          path: 'updateSupplier',
+          payload,
+          platform: 'mushop',
+        });
+
+        if (res?.code && !supplier.code) {
+          const withCode = await models.Supplier.findOneAndUpdate(
+            { _id: supplier._id },
+            { $set: { code: res.code } },
+            { new: true },
+          );
+          if (withCode) return withCode;
+        }
+      } catch (e) {
+        console.error('Failed to sync supplier code from mushop:', e);
+      }
+
       await sendMessage({
         subdomain,
         path: 'updateSupplier',
-        payload: {
-          entityId: supplier._id,
-          data: { input, userId: user._id },
-        },
+        payload,
+        platform: 'blockadmin',
       });
     }
 

@@ -1,21 +1,104 @@
-import { RecordTable } from 'erxes-ui';
+import { Button, RecordTable } from 'erxes-ui';
 import { IconShoppingCartX } from '@tabler/icons-react';
-import { checkSyncedDealsColumns } from './CheckSyncedDealsColumn';
+import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
+import {
+  getCheckSyncedDealsColumns,
+  isSyncableDeal,
+} from './CheckSyncedDealsColumn';
 
 import { CHECK_SYNCED_DEALS_CURSOR_SESSION_KEY } from '../constants/checkSyncedDealsCursorSessionKey';
 import { useCheckSyncedDeals } from '../hooks/useCheckSyncedDeals';
+import { ICheckSyncedDeals } from '../types/checkSyncedDeals';
+
+const CheckDealsButton = ({
+  deals,
+  checking,
+  syncing,
+  toSyncCount,
+  onCheck,
+  onSyncUnchecked,
+}: {
+  deals: ICheckSyncedDeals[];
+  checking: boolean;
+  syncing: boolean;
+  toSyncCount: number;
+  onCheck: (ids: string[]) => void;
+  onSyncUnchecked: () => void;
+}) => {
+  const { t } = useTranslation('mongolian');
+  const { table } = RecordTable.useRecordTable();
+  const selectedRows = table.getSelectedRowModel().rows;
+  const ids = selectedRows.map((row) => row.original._id).filter(Boolean);
+
+  return (
+    <div className="flex items-center justify-between gap-3 px-3 pt-3">
+      <div className="text-sm text-muted-foreground">
+        {t('selected-of-deals', { selected: selectedRows.length, total: deals.length })}
+      </div>
+      <Button onClick={() => onCheck(ids)} disabled={checking || !ids.length}>
+        {checking ? t('checking') : t('check-deals')}
+      </Button>
+      <Button
+        onClick={onSyncUnchecked}
+        disabled={syncing || !toSyncCount}
+        variant="outline"
+      >
+        {syncing ? t('syncing') : t('sync-selected', { count: toSyncCount })}
+      </Button>
+    </div>
+  );
+};
+
 export const CheckSyncedDealsRecordTable = () => {
-  const { Deals, handleFetchMore, loading, pageInfo } = useCheckSyncedDeals();
+  const { t } = useTranslation('mongolian');
+  const {
+    Deals,
+    checkDeals,
+    checking,
+    handleFetchMore,
+    loading,
+    pageInfo,
+    setAllDealsToSync,
+    setDealToSync,
+    syncUncheckedDeals,
+    syncSelectedDealIds,
+    syncing,
+    toSyncDealIds,
+  } = useCheckSyncedDeals();
 
   const { hasPreviousPage, hasNextPage } = pageInfo || {};
+  const syncableDealIds = useMemo(
+    () => (Deals || []).filter(isSyncableDeal).map((deal) => deal._id),
+    [Deals],
+  );
+  const columns = useMemo(
+    () =>
+      getCheckSyncedDealsColumns({
+        toSyncDealIds,
+        syncableDealIds,
+        onToggleToSync: setDealToSync,
+        onToggleAllToSync: setAllDealsToSync,
+        t,
+      }),
+    [setAllDealsToSync, setDealToSync, syncableDealIds, toSyncDealIds, t],
+  );
 
   return (
     <RecordTable.Provider
-      columns={checkSyncedDealsColumns || []}
+      columns={columns}
       data={Deals || []}
       className="m-3"
-      stickyColumns={['more', 'checkbox', 'createdAt']}
+      stickyColumns={['more', 'checkbox', 'toSync', 'createdAt']}
     >
+      <CheckDealsButton
+        deals={Deals || []}
+        checking={checking}
+        onCheck={checkDeals}
+        onSyncUnchecked={() => syncUncheckedDeals(syncSelectedDealIds)}
+        syncing={syncing}
+        toSyncCount={syncSelectedDealIds.length}
+      />
       <RecordTable.CursorProvider
         hasPreviousPage={hasPreviousPage}
         hasNextPage={hasNextPage}
@@ -42,10 +125,10 @@ export const CheckSyncedDealsRecordTable = () => {
                 <IconShoppingCartX size={48} className="text-gray-400" />
               </div>
               <h3 className="text-lg font-semibold text-gray-900">
-                No sync yet
+                {t('no-sync-yet')}
               </h3>
               <p className="mt-1 text-sm text-gray-500">
-                Get started by creating your first sync.
+                {t('create-first-sync')}
               </p>
             </div>
           </div>

@@ -3,7 +3,6 @@ import { format } from 'date-fns';
 import {
   IconCalendarEventFilled,
   IconHome,
-  IconCreditCard,
 } from '@tabler/icons-react';
 import { useAtomValue, useSetAtom, atom } from 'jotai';
 import {
@@ -35,9 +34,6 @@ export const ContractsBoardCard = ({ id }: BoardCardProps) => {
     number,
     _id,
     date,
-    startDate,
-    endDate,
-    isLifeTime,
     amount,
     currency,
     unit,
@@ -76,44 +72,12 @@ export const ContractsBoardCard = ({ id }: BoardCardProps) => {
   };
 
   const dateLabel = parseDate(date);
-  const startLabel = parseDate(startDate);
-  const endLabel = parseDate(endDate);
-
-  const planTypeLabel = paymentPlan?.type
-    ? String(paymentPlan.type).replace(/_/g, ' ').toLowerCase()
-    : null;
 
   return (
     <div
       onClick={() => setActiveContract(id)}
       className="blk:w-76 overflow-hidden cursor-pointer"
     >
-      <div className="h-9 flex items-center justify-between px-1.5">
-        <Button
-          variant="ghost"
-          size="sm"
-          className="text-muted-foreground px-1 hover:bg-background"
-        >
-          <IconCalendarEventFilled />
-          <span>
-            {startLabel ? format(startLabel, 'MMM dd, yyyy') : '—'}
-          </span>
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="text-muted-foreground px-1 hover:bg-background"
-        >
-          <IconCalendarEventFilled />
-          <span>
-            {isLifeTime
-              ? 'Lifetime'
-              : endLabel
-              ? format(endLabel, 'MMM dd, yyyy')
-              : '—'}
-          </span>
-        </Button>
-      </div>
       <Separator />
       <div className="flex flex-col gap-1 p-3">
         {number && (
@@ -141,12 +105,6 @@ export const ContractsBoardCard = ({ id }: BoardCardProps) => {
             <Badge variant="secondary">
               <IconHome className="size-3 mr-1" />
               Unit {unitDoc.number}
-            </Badge>
-          )}
-          {planTypeLabel && (
-            <Badge variant="secondary" className="capitalize">
-              <IconCreditCard className="size-3 mr-1" />
-              {planTypeLabel}
             </Badge>
           )}
           {amount ? <Badge>{formatAmount(amount)}</Badge> : null}

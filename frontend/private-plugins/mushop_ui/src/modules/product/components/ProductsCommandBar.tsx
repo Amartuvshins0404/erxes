@@ -13,7 +13,9 @@ import {
   Textarea,
 } from 'erxes-ui';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useMutation } from '@apollo/client';
+import { Can } from 'ui-modules';
 import {
   MUSHOP_BULK_UPDATE_PRODUCT_STATUS,
   MUSHOP_ASSIGN_PRODUCT_CATEGORY,
@@ -34,6 +36,7 @@ const BulkStatusSelect = ({
   selectedIds: string[];
   onDone: () => void;
 }) => {
+  const { t } = useTranslation('mushop');
   const [open, setOpen] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
   const [note, setNote] = useState('');
@@ -64,7 +67,7 @@ const BulkStatusSelect = ({
       <PopoverScoped open={open} onOpenChange={setOpen}>
         <Popover.Trigger asChild>
           <Button variant="secondary" size="sm" disabled={loading}>
-            Change status
+            {t('Change status')}
             <IconChevronDown className="ml-1 size-4" />
           </Button>
         </Popover.Trigger>
@@ -77,7 +80,7 @@ const BulkStatusSelect = ({
                   value={s.value}
                   onSelect={() => handleSelect(s.value)}
                 >
-                  {s.label}
+                  {t(s.label)}
                 </Command.Item>
               ))}
             </Command.List>
@@ -88,16 +91,16 @@ const BulkStatusSelect = ({
       <Dialog open={rejectOpen} onOpenChange={setRejectOpen}>
         <Dialog.Content className="sm:max-w-md">
           <Dialog.Header>
-            <Dialog.Title>Reject products</Dialog.Title>
+            <Dialog.Title>{t('Reject products')}</Dialog.Title>
             <Dialog.Description>
-              Provide a reason for rejection. This note will be sent to the suppliers.
+              {t('Provide a reason for rejection. This note will be sent to the suppliers.')}
             </Dialog.Description>
           </Dialog.Header>
           <div className="flex flex-col gap-2">
-            <Label htmlFor="bulk-reject-note">Note</Label>
+            <Label htmlFor="bulk-reject-note">{t('Note')}</Label>
             <Textarea
               id="bulk-reject-note"
-              placeholder="Enter rejection reason..."
+              placeholder={t('Enter rejection reason...')}
               value={note}
               onChange={(e) => setNote(e.target.value)}
               rows={4}
@@ -105,10 +108,10 @@ const BulkStatusSelect = ({
           </div>
           <Dialog.Footer>
             <Button variant="outline" onClick={() => setRejectOpen(false)}>
-              Cancel
+              {t('Cancel')}
             </Button>
             <Button variant="destructive" onClick={handleConfirmReject}>
-              Reject
+              {t('Reject')}
             </Button>
           </Dialog.Footer>
         </Dialog.Content>
@@ -124,6 +127,7 @@ const BulkCategorySelect = ({
   selectedIds: string[];
   onDone: () => void;
 }) => {
+  const { t } = useTranslation('mushop');
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const { categories, loading: loadingCats } = useCoreProductCategories();
@@ -154,20 +158,20 @@ const BulkCategorySelect = ({
     <PopoverScoped open={open} onOpenChange={setOpen}>
       <Popover.Trigger asChild>
         <Button variant="secondary" size="sm" disabled={loading}>
-          Assign category
+          {t('Assign category')}
           <IconChevronDown className="ml-1 size-4" />
         </Button>
       </Popover.Trigger>
       <Combobox.Content>
         <Command shouldFilter={false}>
           <Command.Input
-            placeholder="Search categories..."
+            placeholder={t('Search categories...')}
             value={search}
             onValueChange={setSearch}
           />
           <Command.List>
-            {loadingCats && <Command.Item disabled>Loading...</Command.Item>}
-            <Command.Empty>No categories found.</Command.Empty>
+            {loadingCats && <Command.Item disabled>{t('Loading...')}</Command.Item>}
+            <Command.Empty>{t('No categories found.')}</Command.Empty>
             {filtered.map((cat: IMushopProductCategory) => (
               <Command.Item
                 key={cat._id}
@@ -185,6 +189,7 @@ const BulkCategorySelect = ({
 };
 
 export const ProductsCommandBar = () => {
+  const { t } = useTranslation('mushop');
   const { table } = RecordTable.useRecordTable();
   const selected = table
     .getFilteredSelectedRowModel()
@@ -197,12 +202,19 @@ export const ProductsCommandBar = () => {
     <CommandBar open={selectedIds.length > 0}>
       <CommandBar.Bar>
         <CommandBar.Value onClose={clearSelection}>
-          {selectedIds.length} selected
+          {t('{{count}} selected', { count: selectedIds.length })}
         </CommandBar.Value>
         <Separator.Inline />
-        <BulkStatusSelect selectedIds={selectedIds} onDone={clearSelection} />
-        <Separator.Inline />
-        <BulkCategorySelect selectedIds={selectedIds} onDone={clearSelection} />
+        <Can action="mushopBulkUpdateProductStatus">
+          <BulkStatusSelect selectedIds={selectedIds} onDone={clearSelection} />
+          <Separator.Inline />
+        </Can>
+        <Can action="mushopAssignProductCategory">
+          <BulkCategorySelect
+            selectedIds={selectedIds}
+            onDone={clearSelection}
+          />
+        </Can>
       </CommandBar.Bar>
     </CommandBar>
   );

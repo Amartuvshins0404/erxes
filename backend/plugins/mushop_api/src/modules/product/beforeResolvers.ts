@@ -1,50 +1,49 @@
-import { BeforeResolverParams } from 'erxes-api-shared/utils';
+import {
+  BeforeResolverParams,
+  BeforeResolverResult,
+  BeforeResolversConfig,
+} from 'erxes-api-shared/utils';
 import { generateModels } from '~/connectionResolvers';
+import { getSupplierId } from '~/utils/getSupplierId';
 
-const resolvers = {
-  posclient: ['cpPoscProducts'],
-};
+export const productBeforeResolvers: BeforeResolversConfig = {
+  resolvers: { posclient: ['cpPoscProducts'] },
+  handler: async (
+    subdomain: string,
+    params: BeforeResolverParams,
+  ): Promise<BeforeResolverResult> => {
+    const { resolver, args = {}, headers } = params;
 
-export const beforeResolverHandlers = async (
-  subdomain: string,
-  params: BeforeResolverParams,
-) => {
-  const { resolver, args, headers } = params;
+    if (resolver !== 'cpPoscProducts') {
+      return args;
+    }
 
-  if (!resolvers.posclient.includes(resolver)) {
-    return args;
-  }
+    const supplierId = getSupplierId(headers);
 
-  console.log('resolver', resolver);
+    if (!supplierId) {
+      return args;
+    }
 
-  const supplierId = headers?.['erxes-supplier-id'];
+    const models = await generateModels(subdomain);
 
-  console.log('supplierId', supplierId);
+    const supplier = await models.Supplier.getSupplier(supplierId);
 
-  if (!supplierId) {
-    return args;
-  }
+    if (!supplier?.subdomain) {
+      return args;
+    }
 
-  const models = await generateModels(subdomain);
+    const products = await models.Product.find({
+      subdomain: supplier.subdomain,
+    })
+      .distinct('_id')
+      .lean();
 
-  const supplier = await models.Supplier.getSupplier(supplierId);
+    const productIds = Array.from(new Set(products.map((p) => p.toString())));
 
-  if (!supplier?.subdomain) {
-    return args;
-  }
+    if (!productIds.length) {
+      return { ...args, ids: [''] };
+    }
 
-  const products = await models.MushopProduct.find({
-    subdomain: supplier.subdomain,
-  })
-    .distinct('_id')
-    .lean();
-
-  const productIds = new Array(...new Set(products.map((p) => p.toString())));
-
-  return { ...args, ids: productIds.length ? productIds : [] };
-};
-
-export default {
-  resolvers,
-  handler: beforeResolverHandlers,
+    return { ...args, ids: productIds };
+  },
 };

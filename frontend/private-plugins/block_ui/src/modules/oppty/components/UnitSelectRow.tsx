@@ -113,11 +113,17 @@ export const UnitSelectRow = ({
               <Select.Value placeholder="Unit" />
             </Select.Trigger>
             <Select.Content>
-              {availableUnits.map((u) => (
-                <Select.Item key={u._id} value={u._id}>
-                  Unit {u.number}
-                </Select.Item>
-              ))}
+              {availableUnits.map((u) => {
+                const isSigned = u.activeContract?.statusType === 'signed';
+                return (
+                  <Select.Item key={u._id} value={u._id} disabled={isSigned}>
+                    Unit {u.number}
+                    {isSigned && (
+                      <span className="ml-2 text-xs text-muted-foreground">(Signed)</span>
+                    )}
+                  </Select.Item>
+                );
+              })}
             </Select.Content>
           </Select>
         )}

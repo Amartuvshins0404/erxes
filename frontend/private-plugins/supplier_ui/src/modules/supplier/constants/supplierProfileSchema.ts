@@ -42,6 +42,7 @@ export const supplierProfileSchema = z.object({
     short: z.string().optional(),
   }),
   dateFounded: z.string().optional(),
+  paymentId: z.string().optional(),
   primaryEmail: emailOrEmpty.optional(),
   primaryPhone: z.string().optional(),
   phones: z.array(z.string()).optional(),

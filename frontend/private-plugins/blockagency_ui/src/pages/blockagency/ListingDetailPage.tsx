@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import {
   Badge,
@@ -11,6 +11,7 @@ import {
   Sidebar,
   Spinner,
   toast,
+  useToast,
 } from 'erxes-ui';
 import { PageHeader } from 'ui-modules';
 import {
@@ -55,6 +56,7 @@ const STATUS_VARIANT: Record<
 export const ListingDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<TabKey>('info');
 
   const { listing, loading: detailLoading } = useGetListingDetail(id);
@@ -62,9 +64,12 @@ export const ListingDetailPage = () => {
   const { reset } = form;
   const { updateListing } = useUpdateListing();
 
+  const resetListingIdRef = useRef<string | undefined>(undefined);
+
   useEffect(() => {
-    if (listing) {
+    if (listing && resetListingIdRef.current !== listing._id) {
       reset(listing as unknown as Partial<IListing>);
+      resetListingIdRef.current = listing._id;
     }
   }, [listing, reset]);
 
@@ -77,6 +82,7 @@ export const ListingDetailPage = () => {
   );
 
   const { status: saveStatus } = useAutoSave({ form, onSave });
+  console.log('saveStatus', saveStatus);
 
   return (
     <PageContainer>
@@ -102,9 +108,6 @@ export const ListingDetailPage = () => {
           <Separator.Inline />
           <PageHeader.FavoriteToggleButton />
         </PageHeader.Start>
-        <PageHeader.End>
-          <SaveStatusIndicator status={saveStatus} />
-        </PageHeader.End>
       </PageHeader>
 
       {detailLoading ? (
@@ -120,10 +123,11 @@ export const ListingDetailPage = () => {
               </Badge>
             )}
             {listing?.type && (
-              <Badge variant="outline" className="capitalize">
+              <Badge variant="ghost" className="capitalize">
                 {listing.type}
               </Badge>
             )}
+            <SaveStatusIndicator status={saveStatus} />
           </div>
 
           <Form {...form}>
@@ -196,7 +200,7 @@ const SaveStatusIndicator = ({
   if (status === 'saved') {
     return (
       <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
-        <IconCheck size={14} className="text-green-500" />
+        <IconCheck size={14} className="text-success" />
         Saved
       </span>
     );

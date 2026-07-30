@@ -1,4 +1,4 @@
-import { Breadcrumb, Separator } from 'erxes-ui';
+import { Breadcrumb, Button, Separator } from 'erxes-ui';
 import { useParams } from 'react-router-dom';
 import { useAgencyDetail } from '../hooks/useAgencyDetail';
 
@@ -10,7 +10,9 @@ export const AgencyDetailBreadcrumb = () => {
   return (
     <>
       <Separator.Inline />
-      <Breadcrumb.Item>{agency?.name || 'Agency Detail'}</Breadcrumb.Item>
+      <Breadcrumb.Item>
+        <Button variant="ghost">{agency?.name || 'Agency Detail'}</Button>
+      </Breadcrumb.Item>
     </>
   );
 };

@@ -1,13 +1,5 @@
-import {
-  Badge,
-  Combobox,
-  Command,
-  PopoverScoped,
-  RecordTable,
-  RecordTableInlineCell,
-} from 'erxes-ui';
+import { Badge, RecordTable, RecordTableInlineCell } from 'erxes-ui';
 import { format } from 'date-fns';
-import { useState } from 'react';
 import { ColumnDef } from '@tanstack/table-core';
 import { useSetAtom } from 'jotai';
 import {
@@ -17,17 +9,13 @@ import {
   IconHash,
   IconHome,
   IconLabelFilled,
-  IconNote,
   IconUser,
 } from '@tabler/icons-react';
 import { useCustomerDetail } from 'ui-modules';
 import { IContractPayment } from '@/contract-payment/types';
-import {
-  useMarkPaymentPaid,
-  useMarkPaymentUnpaid,
-} from '@/contract-payment/hooks/usePayments';
 import { useUnit } from '@/unit/hooks/useUnit';
 import { contractDetailSheetState } from '@/contract/states/contractDetailSheetState';
+import { paymentSheetState } from '@/contract-payment/states/paymentSheetState';
 
 const parseDateLike = (value: any): Date | null => {
   if (!value) return null;
@@ -50,54 +38,31 @@ const formatAmount = (val?: number, currency = 'MNT') => {
   }).format(val);
 };
 
-const StatusCell = ({ payment }: { payment: IContractPayment }) => {
-  const [open, setOpen] = useState(false);
-  const { markPaid } = useMarkPaymentPaid();
-  const { markUnpaid } = useMarkPaymentUnpaid();
-
+const StatusBadge = ({ payment }: { payment: IContractPayment }) => {
   const isOverdue =
-    !payment.paid &&
+    payment.status !== 'paid' &&
     !!payment.dueDate &&
     (parseDateLike(payment.dueDate)?.getTime() || 0) < Date.now();
 
-  const label = payment.paid ? 'Paid' : isOverdue ? 'Overdue' : 'Unpaid';
-  const variant: 'success' | 'destructive' | 'secondary' = payment.paid
-    ? 'success'
-    : isOverdue
-    ? 'destructive'
-    : 'secondary';
+  const label =
+    payment.status === 'paid'
+      ? 'Paid'
+      : payment.status === 'partial'
+      ? 'Partial'
+      : isOverdue
+      ? 'Overdue'
+      : 'Unpaid';
 
-  const setPaid = async (next: boolean) => {
-    setOpen(false);
-    if (next && !payment.paid) await markPaid(payment._id);
-    if (!next && payment.paid) await markUnpaid(payment._id);
-  };
+  const variant: 'success' | 'destructive' | 'secondary' | 'warning' =
+    payment.status === 'paid'
+      ? 'success'
+      : payment.status === 'partial'
+      ? 'warning'
+      : isOverdue
+      ? 'destructive'
+      : 'secondary';
 
-  return (
-    <PopoverScoped
-      open={open}
-      onOpenChange={setOpen}
-      scope={`payment-status-${payment._id}`}
-    >
-      <RecordTableInlineCell.Trigger className="gap-1">
-        <Badge variant={variant}>{label}</Badge>
-      </RecordTableInlineCell.Trigger>
-      <RecordTableInlineCell.Content>
-        <Command>
-          <Command.List>
-            <Command.Item value="unpaid" onSelect={() => setPaid(false)}>
-              <Badge variant="secondary">Unpaid</Badge>
-              <Combobox.Check checked={!payment.paid} />
-            </Command.Item>
-            <Command.Item value="paid" onSelect={() => setPaid(true)}>
-              <Badge variant="success">Paid</Badge>
-              <Combobox.Check checked={!!payment.paid} />
-            </Command.Item>
-          </Command.List>
-        </Command>
-      </RecordTableInlineCell.Content>
-    </PopoverScoped>
-  );
+  return <Badge variant={variant}>{label}</Badge>;
 };
 
 const UnitCell = ({ unitId }: { unitId?: string }) => {
@@ -155,6 +120,20 @@ const ContractCell = ({ payment }: { payment: IContractPayment }) => {
       >
         {payment.contractNumber || payment.contractId}
       </RecordTableInlineCell.Anchor>
+    </RecordTableInlineCell>
+  );
+};
+
+const StatusCell = ({ payment }: { payment: IContractPayment }) => {
+  const setActivePayment = useSetAtom(paymentSheetState);
+  return (
+    <RecordTableInlineCell
+      onClick={(e) => {
+        e.stopPropagation();
+        setActivePayment(payment._id);
+      }}
+    >
+      <StatusBadge payment={payment} />
     </RecordTableInlineCell>
   );
 };
@@ -270,7 +249,7 @@ export const paymentsColumns = ({
       id: 'paidDate',
       accessorKey: 'paidDate',
       header: () => (
-        <RecordTable.InlineHead label="Paid Date" icon={IconCalendarFilled} />
+        <RecordTable.InlineHead label="Last Paid" icon={IconCalendarFilled} />
       ),
       cell: ({ row }) => (
         <RecordTableInlineCell>
@@ -278,17 +257,6 @@ export const paymentsColumns = ({
         </RecordTableInlineCell>
       ),
       size: 160,
-    },
-    {
-      id: 'note',
-      accessorKey: 'note',
-      header: () => <RecordTable.InlineHead label="Note" icon={IconNote} />,
-      cell: ({ row }) => (
-        <RecordTableInlineCell>
-          {row.original.note || '-'}
-        </RecordTableInlineCell>
-      ),
-      size: 240,
     },
   );
 

@@ -9,8 +9,17 @@ export interface IAgentServer {
 
   agentId: string;
   serverId: string;
+  transferredFromSubdomain?: string;
+  transferredAt?: Date;
 
   status: string;
+  provisioning?: {
+    stage?: string;
+    message?: string;
+    startedAt?: Date;
+    updatedAt?: Date;
+    error?: string;
+  };
 }
 
 export interface IAgentServerDocument extends IAgentServer, Document {

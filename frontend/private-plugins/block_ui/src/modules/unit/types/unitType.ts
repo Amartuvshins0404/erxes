@@ -35,6 +35,8 @@ export interface IUnitActiveContract {
   statusType?: string;
   statusLabel?: string;
   statusColor?: string;
+  partyId?: string;
+  partyType?: string;
 }
 
 export interface IUnit {

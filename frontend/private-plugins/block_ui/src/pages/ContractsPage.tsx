@@ -1,10 +1,10 @@
-import { ContractsBoard } from '@/contract/components/ContractsBoard';
 import { ContractsLayout } from '@/contract/components/ContractsLayout';
+import { ContractsView } from '@/contract/components/ContractsView';
 
 export const ContractsPage = () => {
   return (
     <ContractsLayout>
-      <ContractsBoard />
+      <ContractsView />
     </ContractsLayout>
   );
 };

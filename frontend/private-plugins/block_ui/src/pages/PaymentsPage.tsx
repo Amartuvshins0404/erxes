@@ -5,6 +5,7 @@ import {
   PageContainer,
   PageSubHeader,
   useQueryState,
+  useMultiQueryState,
 } from 'erxes-ui';
 import { Link, useParams } from 'react-router-dom';
 import { PageHeader } from 'ui-modules';
@@ -18,6 +19,7 @@ import {
 } from '@/contract-payment/components/PaymentsFilter';
 import { IContractPayment } from '@/contract-payment/types';
 import { contractDetailSheetState } from '@/contract/states/contractDetailSheetState';
+import { PaymentTransactionsSheet } from '@/contract-payment/components/PaymentTransactionsSheet';
 
 const ContractDetailSheet = lazy(() =>
   import('@/contract/components/ContractDetailSheet').then((m) => ({
@@ -49,9 +51,9 @@ const summarize = (payments: IContractPayment[]) => {
 
   for (const p of payments) {
     totalDue += p.amount || 0;
-    if (p.paid) {
+    totalPaid += p.paidAmount ?? 0;
+    if (p.status === 'paid') {
       paidCount += 1;
-      totalPaid += p.paidAmount ?? p.amount ?? 0;
     } else {
       unpaidCount += 1;
       const due = p.dueDate ? Number(new Date(p.dueDate)) : 0;
@@ -65,6 +67,11 @@ const summarize = (payments: IContractPayment[]) => {
 export const PaymentsPage = () => {
   const { projectId } = useParams();
   const [filter] = useQueryState<PaymentFilterValue>('payment_filter');
+  const [queries] = useMultiQueryState<{
+    payment_contractNumber: string;
+    payment_customerId: string;
+    payment_unitNumber: string;
+  }>(['payment_contractNumber', 'payment_customerId', 'payment_unitNumber']);
 
   const paidArg =
     filter === 'paid'
@@ -73,14 +80,20 @@ export const PaymentsPage = () => {
       ? false
       : undefined;
   const { payments, loading, pageInfo, handleFetchMore, totalCount } =
-    useProjectPayments(projectId, paidArg);
+    useProjectPayments(
+      projectId,
+      paidArg,
+      queries?.payment_contractNumber || undefined,
+      queries?.payment_customerId || undefined,
+      queries?.payment_unitNumber || undefined,
+    );
 
   if (!projectId) return null;
 
   const filtered =
     filter === 'overdue'
       ? payments.filter((p) => {
-          if (p.paid) return false;
+          if (p.status === 'paid') return false;
           const due = p.dueDate ? Number(new Date(p.dueDate)) : 0;
           return due && due < Date.now();
         })
@@ -141,6 +154,7 @@ export const PaymentsPage = () => {
         cursorSessionKey={`project_payments_${projectId}_${filter || 'all'}`}
       />
       <ContractDetailSheetMount />
+      <PaymentTransactionsSheet />
     </PageContainer>
   );
 };

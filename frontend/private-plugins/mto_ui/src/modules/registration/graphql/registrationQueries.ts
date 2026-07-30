@@ -69,6 +69,10 @@ export const MTO_REGISTRATION_APPLICATIONS = gql`
         status
         instanceId
         cpUserId
+        isRead
+        paymentStatus
+        invoiceId
+        membershipFeeAmount
       }
       totalCount
       pageInfo {
@@ -154,6 +158,10 @@ export const MTO_REGISTRATION_APPLICATION = gql`
       answers
       instanceId
       cpUserId
+      invoiceId
+      paymentStatus
+      membershipFeeAmount
+      invoice
     }
   }
 `;

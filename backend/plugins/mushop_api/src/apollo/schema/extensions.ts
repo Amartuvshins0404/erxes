@@ -15,7 +15,14 @@ export const TypeExtensions = `
 
   extend type CPUser @key(fields: "_id") {
     _id: String @external
-    isSubscribed: Boolean
-    subscription: MushopSubscription
+    isMembership: Boolean
+    membership: MushopMembership
+  }
+
+  extend type cpPoscProduct @key(fields: "_id") {
+    _id: String @external
+    supplier: MushopSupplier
+    moq: Float
+    prePaymentAmount: Float
   }
 `;

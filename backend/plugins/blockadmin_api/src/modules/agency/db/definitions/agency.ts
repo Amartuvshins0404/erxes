@@ -30,6 +30,8 @@ export const agencySchema = schemaWrapper(
         services: [{ type: String }],
         clientTypes: [{ type: String }],
       },
+      messengerIntegrationId: { type: String },
+      widgetBundleUrl: { type: String },
       verificationStatus: {
         type: String,
         label: 'Verification Status',

@@ -6,16 +6,19 @@ import {
   Separator,
 } from 'erxes-ui';
 import { Link, useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 
 import { AddDealSheet } from '@/deals/components/AddDealSheet';
+import { CommonDealSearch } from '@/deals/components/commonSearch';
 import { DealsView } from '@/deals/actionBar/components/DealViewControl';
-import { IconSandbox } from '@tabler/icons-react';
+import { IconSandbox, IconSettings } from '@tabler/icons-react';
 import MainActionBar from '@/deals/actionBar/components/MainActionBar';
 import { PageHeader } from 'ui-modules';
 import { SalesBreadCrumb } from '@/deals/components/breadcrumb/SalesBreadCrumb';
 import { SalesItemDetail } from '@/deals/cards/components/detail/SalesItemDetail';
 
 export const SalesIndexPage = () => {
+  const { t } = useTranslation('sales');
   const [searchParams] = useSearchParams();
   const boardId = searchParams.get('boardId');
   const pipelineId = searchParams.get('pipelineId');
@@ -29,9 +32,9 @@ export const SalesIndexPage = () => {
               <Breadcrumb.List className="gap-1">
                 <Breadcrumb.Item>
                   <Button variant="ghost" asChild>
-                    <Link to="/sales">
+                    <Link to="/sales/deal">
                       <IconSandbox />
-                      Sales Pipeline
+                      {t('sales-pipeline')}
                     </Link>
                   </Button>
                 </Breadcrumb.Item>
@@ -42,6 +45,15 @@ export const SalesIndexPage = () => {
               </Breadcrumb.List>
             </Breadcrumb>
           </PageHeader.Start>
+          <PageHeader.End>
+            <CommonDealSearch />
+            <Button variant="ghost" asChild>
+              <Link to={`/settings/sales/deals?activeBoardId=${boardId}`}>
+                <IconSettings />
+                {t('go-to-settings')}
+              </Link>
+            </Button>
+          </PageHeader.End>
           <AddDealSheet />
         </PageHeader>
 

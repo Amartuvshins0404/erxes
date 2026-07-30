@@ -4,12 +4,18 @@ import { IJobData } from '~/types';
 import { handleMongoChangeEvent } from '../mongo';
 import { handleAfterProcess } from '../afterProcess';
 import { AFTER_PROCESS_CONSTANTS } from '~/constants';
-import { LOG_STATUSES } from 'erxes-api-shared/utils';
+import {
+  LOG_STATUSES,
+  sanitizeLogDocument,
+  sanitizeLogTransportDocument,
+} from 'erxes-api-shared/utils';
 
 export const eventLogHandler = async (
   jobId: string | undefined,
   data: IJobData,
 ) => {
+  const transportData = sanitizeLogTransportDocument(data);
+  const sanitizedData = sanitizeLogDocument(transportData);
   const {
     subdomain,
     source,
@@ -19,7 +25,7 @@ export const eventLogHandler = async (
     action,
     status,
     processId,
-  } = data ?? {};
+  } = sanitizedData;
 
   try {
     const models = await generateModels(subdomain);
@@ -27,7 +33,7 @@ export const eventLogHandler = async (
     let result: ILogDocument | ILogDocument[];
 
     if (source === 'mongo') {
-      result = await handleMongoChangeEvent(models.Logs, data);
+      result = await handleMongoChangeEvent(models.Logs, sanitizedData);
     } else {
       const logDoc = {
         source,
@@ -42,6 +48,13 @@ export const eventLogHandler = async (
       result = await models.Logs.insertOne(logDoc);
     }
 
+    const afterProcessPayload =
+      typeof transportData.payload === 'object' &&
+      transportData.payload !== null &&
+      !Array.isArray(transportData.payload)
+        ? transportData.payload
+        : {};
+
     if (status === 'success') {
       const resultDoc = Array.isArray(result) ? result[0] : result;
 
@@ -49,8 +62,8 @@ export const eventLogHandler = async (
         source,
         action: resultDoc?.action || action,
         contentType,
-        payload: { ...payload, userId, processId },
-      }).catch((err) => {
+        payload: { ...afterProcessPayload, userId, processId },
+      }).catch((error: unknown) => {
         models.Logs.insertOne({
           source: 'afterProcess',
           action: AFTER_PROCESS_CONSTANTS[`${source}.${action}`],
@@ -61,12 +74,18 @@ export const eventLogHandler = async (
           processId,
         });
         console.error(
-          `Error occurred during afterProcess job ${jobId}: ${err.message}`,
+          `Error occurred during afterProcess job ${jobId}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
         );
       });
     }
-  } catch (error: any) {
-    console.error(`Error processing job ${jobId}: ${error.message}`);
+  } catch (error: unknown) {
+    console.error(
+      `Error processing job ${jobId}: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
     throw error;
   }
 };

@@ -17,6 +17,7 @@
 
     "build:packageJson": {
       "executor": "@nx/js:tsc",
+      "dependsOn": ["^build"],
       "options": {
         "main": "backend/services/logs/dist/src/main.js",
         "tsConfig": "backend/services/logs/tsconfig.build.json",
@@ -26,7 +27,13 @@
         "buildableProjectDepsInPackageJsonType": "dependencies"
       }
     },
-
+    "test": {
+      "executor": "@nx/jest:jest",
+      "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
+      "options": {
+        "jestConfig": "backend/services/logs/jest.config.ts"
+      }
+    },
     "start": {
       "executor": "nx:run-commands",
       "dependsOn": ["typecheck", "build"],

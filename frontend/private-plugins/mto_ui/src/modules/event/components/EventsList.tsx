@@ -185,7 +185,7 @@ export function EventsList({ filters }: EventsListProps) {
         const id = row.original._id as string;
 
         return (
-          <RecordTableInlineCell className="flex gap-2">
+          <RecordTableInlineCell className="flex justify-end items-center gap-2">
             <Button
               type="button"
               variant="outline"

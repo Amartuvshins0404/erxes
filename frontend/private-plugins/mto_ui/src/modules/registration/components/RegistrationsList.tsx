@@ -223,7 +223,7 @@ function GroupSection({
         const id = row.original._id as string;
         const status = row.original.status as string;
         return (
-          <RecordTableInlineCell className="flex justify-start items-center gap-2">
+          <RecordTableInlineCell className="flex justify-end items-center gap-2">
             <StatusChangeCell id={id} currentStatus={status} onChanged={refetch} />
             <Button
               type="button"
@@ -401,7 +401,7 @@ export function RegistrationsList({ filters }: RegistrationsListProps) {
         const id = row.original._id as string;
         const status = row.original.status as string;
         return (
-          <RecordTableInlineCell className="flex justify-start items-center gap-2">
+          <RecordTableInlineCell className="flex justify-end items-center gap-2">
             <StatusChangeCell id={id} currentStatus={status} onChanged={() => void refetch()} />
             <Button
               type="button"

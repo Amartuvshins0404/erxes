@@ -81,7 +81,7 @@ export function EventFormSheet({
   const [update, { loading: updating }] = useMutation(MTO_EVENT_UPDATE);
   const {
     loading: categoriesLoading,
-    mainCategories,
+    categories,
     getCategoryLabel,
   } = useEventCategoryOptions();
 
@@ -107,13 +107,13 @@ export function EventFormSheet({
         endDate: toDatetimeLocal(event.endDate),
         location: event.location ?? '',
         categoryIds: (event.categoryIds ?? []).filter((id: string) =>
-          mainCategories.some((category) => category._id === id),
+          categories.some((category) => category._id === id),
         ),
         status: (event.status as EventStatus) ?? 'draft',
         isActive: event.isActive ?? true,
       });
     }
-  }, [open, editId, editData, mainCategories]);
+  }, [open, editId, editData, categories]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -304,7 +304,7 @@ export function EventFormSheet({
               </div>
               <EventCategoryMultiSelect
                 label="Categories"
-                options={mainCategories}
+                options={categories}
                 selectedIds={form.categoryIds}
                 getLabel={getCategoryLabel}
                 placeholder="Select categories"

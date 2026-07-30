@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { IconKey } from '@tabler/icons-react';
+import { IconKey, IconLoader2 } from '@tabler/icons-react';
 import { AlertDialog, Button, Form, useToast } from 'erxes-ui';
 import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
@@ -80,11 +80,28 @@ export const LlmConnectionDialog = ({
           onSuccess(values.provider);
         },
         onError: (error) => {
-          toast({
-            variant: 'destructive',
-            title: 'Failed to update AI connection',
-            description: error.message,
-          });
+          // A timeout / 503 usually means the assistant is still restarting with
+          // the new key in the background — not a real failure. Guide the user to
+          // refresh rather than showing an alarming error.
+          const message = error.message || '';
+          const stillApplying =
+            /timeout|timed out|503|network|failed to fetch|gateway/i.test(
+              message,
+            );
+          toast(
+            stillApplying
+              ? {
+                  variant: 'default',
+                  title: 'Still applying your connection',
+                  description:
+                    'Your assistant is restarting with the new key. Give it a moment, then refresh to confirm.',
+                }
+              : {
+                  variant: 'destructive',
+                  title: 'Failed to update AI connection',
+                  description: message,
+                },
+          );
         },
       },
     );
@@ -107,49 +124,69 @@ export const LlmConnectionDialog = ({
             </AlertDialog.Description>
           </div>
         </AlertDialog.Header>
-        <Form {...form}>
-          <form
-            onSubmit={form.handleSubmit(onSubmit)}
-            className="flex max-h-[70vh] flex-col gap-5 overflow-y-auto pr-1"
-          >
-            <LlmProviderApiKeyFields
-              control={form.control}
-              providerName="provider"
-              modelName="model"
-              apiKeyName="apiKey"
-              providerOptions={providerOptions}
-              disabled={loading}
-              apiKeyPlaceholder="Paste your provider API key"
-              onProviderChange={(nextProvider) => {
-                form.setValue('apiKey', '', { shouldDirty: true });
-                form.setValue('model', getManagedAssistantModel(nextProvider), {
-                  shouldDirty: true,
-                  shouldValidate: true,
-                });
-              }}
-            />
-            {!managed && (
-              <p className="text-xs text-muted-foreground">
-                This legacy assistant supports Kimi For Coding only.
+        {loading ? (
+          <div className="flex flex-col items-center justify-center gap-4 px-4 py-12 text-center">
+            <IconLoader2 className="size-8 animate-spin text-primary" />
+            <div className="flex flex-col gap-1.5">
+              <p className="text-sm font-medium">
+                Applying your new AI connection…
               </p>
-            )}
-            <AlertDialog.Footer className="flex gap-2 sm:justify-end">
-              {onCancel && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={loading}
-                  onClick={onCancel}
-                >
-                  Cancel
-                </Button>
+              <p className="text-xs text-muted-foreground">
+                Your assistant is restarting with the new provider &amp; key.
+                This usually takes about a minute — please keep this window
+                open.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <Form {...form}>
+            <form
+              onSubmit={form.handleSubmit(onSubmit)}
+              className="flex max-h-[70vh] flex-col gap-5 overflow-y-auto pr-1"
+            >
+              <LlmProviderApiKeyFields
+                control={form.control}
+                providerName="provider"
+                modelName="model"
+                apiKeyName="apiKey"
+                providerOptions={providerOptions}
+                disabled={loading}
+                apiKeyPlaceholder="Paste your provider API key"
+                onProviderChange={(nextProvider) => {
+                  form.setValue('apiKey', '', { shouldDirty: true });
+                  form.setValue(
+                    'model',
+                    getManagedAssistantModel(nextProvider),
+                    {
+                      shouldDirty: true,
+                      shouldValidate: true,
+                    },
+                  );
+                }}
+              />
+              {!managed && (
+                <p className="text-xs text-muted-foreground">
+                  This legacy assistant supports Kimi For Coding only.
+                </p>
               )}
-              <Button type="submit" disabled={loading} className="min-w-36">
-                {loading ? 'Applying...' : 'Save connection'}
-              </Button>
-            </AlertDialog.Footer>
-          </form>
-        </Form>
+              <AlertDialog.Footer className="flex gap-2 sm:justify-end">
+                {onCancel && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={loading}
+                    onClick={onCancel}
+                  >
+                    Cancel
+                  </Button>
+                )}
+                <Button type="submit" disabled={loading} className="min-w-36">
+                  Save connection
+                </Button>
+              </AlertDialog.Footer>
+            </form>
+          </Form>
+        )}
       </AlertDialog.Content>
     </AlertDialog>
   );

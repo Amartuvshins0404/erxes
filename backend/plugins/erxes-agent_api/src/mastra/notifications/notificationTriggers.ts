@@ -14,6 +14,7 @@ import {
 const SERVICE = 'erxes-agent';
 const RUN_QUEUE = 'notification-run';
 const CHANNEL_PREFIX = 'notificationInserted:';
+const ACTIVITY_CHANNEL_PREFIX = 'activityLogInserted:';
 
 interface AgentNotification {
   _id: string;
@@ -25,6 +26,19 @@ interface AgentNotification {
   contentType?: string;
   contentTypeId?: string;
   metadata?: Record<string, unknown>;
+  createdAt?: string;
+}
+
+interface InternalNoteActivity {
+  _id: string;
+  activityType?: string;
+  targetId?: string;
+  targetType?: string;
+  actor?: { _id?: string };
+  metadata?: {
+    noteId?: unknown;
+    content?: unknown;
+  };
   createdAt?: string;
 }
 
@@ -57,6 +71,78 @@ const notificationFromMessage = (message: string): AgentNotification | null => {
   } catch {
     return null;
   }
+};
+
+const activityFromMessage = (message: string): InternalNoteActivity | null => {
+  try {
+    const parsed: unknown = JSON.parse(message);
+    if (!parsed || typeof parsed !== 'object') return null;
+    const envelope = parsed as Record<string, unknown>;
+    const candidate =
+      'activityLogInserted' in envelope
+        ? envelope.activityLogInserted
+        : envelope;
+    if (!candidate || typeof candidate !== 'object') return null;
+    const activity = candidate as Partial<InternalNoteActivity>;
+    return typeof activity._id === 'string' &&
+      activity.activityType === 'internalNote'
+      ? (activity as InternalNoteActivity)
+      : null;
+  } catch {
+    return null;
+  }
+};
+
+const activityChannelSubdomain = (channel: string): string | null => {
+  if (!channel.startsWith(ACTIVITY_CHANNEL_PREFIX)) return null;
+  return channel.slice(ACTIVITY_CHANNEL_PREFIX.length).split(':')[0] || null;
+};
+
+const mentionedUserIdsFromContent = (content: unknown): string[] => {
+  if (typeof content !== 'string' || content.length > 100_000) return [];
+  try {
+    const blocks: unknown = JSON.parse(content);
+    if (!Array.isArray(blocks)) return [];
+    const ids = new Set<string>();
+    for (const block of blocks) {
+      if (!block || typeof block !== 'object') continue;
+      const inlineContent = (block as Record<string, unknown>).content;
+      if (!Array.isArray(inlineContent)) continue;
+      for (const item of inlineContent) {
+        if (!item || typeof item !== 'object') continue;
+        const mention = item as Record<string, unknown>;
+        if (mention.type !== 'mention' || !mention.props) continue;
+        const userId = (mention.props as Record<string, unknown>)._id;
+        if (typeof userId === 'string' && userId.trim()) ids.add(userId.trim());
+      }
+    }
+    return [...ids];
+  } catch {
+    return [];
+  }
+};
+
+const notificationFromActivity = (
+  activity: InternalNoteActivity,
+): AgentNotification => {
+  const noteId = text(activity.metadata?.noteId, 200) || activity._id;
+  const contentType = text(activity.targetType, 300);
+  return {
+    _id: `internal-note:${noteId}`,
+    title: 'Internal note mention',
+    message: `You were mentioned in ${contentType || 'an internal note'}`,
+    action: 'mentioned',
+    notificationType: 'internalNote',
+    fromUserId: text(activity.actor?._id, 200),
+    contentType,
+    contentTypeId: text(activity.targetId, 300),
+    metadata: {
+      source: 'activityLogInserted',
+      activityLogId: activity._id,
+      noteId,
+    },
+    createdAt: activity.createdAt,
+  };
 };
 
 const channelRecipient = (
@@ -185,10 +271,26 @@ async function enqueueIfAgentRecipient(
   );
 }
 
+async function enqueueInternalNoteMentions(
+  subdomain: string,
+  activity: InternalNoteActivity,
+): Promise<void> {
+  const recipientUserIds = mentionedUserIdsFromContent(
+    activity.metadata?.content,
+  );
+  if (!recipientUserIds.length) return;
+  const notification = notificationFromActivity(activity);
+  await Promise.all(
+    recipientUserIds.map((recipientUserId) =>
+      enqueueIfAgentRecipient(subdomain, recipientUserId, notification),
+    ),
+  );
+}
+
 /**
- * Subscribe to core's existing per-recipient notification channel. Only a
- * notification whose recipient is an active AI team-member account is queued.
- * BullMQ job ids make delivery idempotent across service replicas.
+ * Subscribe to core's per-recipient notification events and internal-note
+ * activity events. Only an active, linked AI team member is queued; BullMQ job
+ * ids make delivery idempotent across service replicas.
  */
 export async function initNotificationTriggers(
   redis: RedisConnection,
@@ -206,17 +308,32 @@ export async function initNotificationTriggers(
   subscriber.on('pmessage', (_pattern, channel, message) => {
     const recipient = channelRecipient(channel);
     const notification = notificationFromMessage(message);
-    if (!recipient || !notification) return;
-    void enqueueIfAgentRecipient(
-      recipient.subdomain,
-      recipient.recipientUserId,
-      notification,
-    ).catch((error) =>
+    if (recipient && notification) {
+      void enqueueIfAgentRecipient(
+        recipient.subdomain,
+        recipient.recipientUserId,
+        notification,
+      ).catch((error) =>
+        console.error(
+          '[erxes-agent:notifications] failed to queue notification:',
+          (error as Error).message,
+        ),
+      );
+      return;
+    }
+
+    const subdomain = activityChannelSubdomain(channel);
+    const activity = activityFromMessage(message);
+    if (!subdomain || !activity) return;
+    void enqueueInternalNoteMentions(subdomain, activity).catch((error) =>
       console.error(
-        '[erxes-agent:notifications] failed to queue notification:',
+        '[erxes-agent:notifications] failed to queue internal-note mentions:',
         (error as Error).message,
       ),
     );
   });
-  await subscriber.psubscribe(`${CHANNEL_PREFIX}*:*`);
+  await subscriber.psubscribe(
+    `${CHANNEL_PREFIX}*:*`,
+    `${ACTIVITY_CHANNEL_PREFIX}*:*`,
+  );
 }

@@ -129,6 +129,7 @@ describe('cross-system AI team-member triggers', () => {
 
     expect(subscriber.psubscribe).toHaveBeenCalledWith(
       'notificationInserted:*:*',
+      'activityLogInserted:*:*',
     );
     expect(getAgentAccountByUserId).toHaveBeenCalledWith({
       userId: 'agent-user-1',
@@ -178,6 +179,95 @@ describe('cross-system AI team-member triggers', () => {
       }),
       expect.any(Object),
     );
+  });
+
+  it('queues a core internal-note mention from its activity event', async () => {
+    generateModels.mockResolvedValue({
+      MastraAgent: { exists: jest.fn().mockResolvedValue(true) },
+    });
+    const { redis, emit } = makeRedis();
+    await initNotificationTriggers(redis as never);
+
+    emit('activityLogInserted:acme:deal-1', {
+      activityLogInserted: {
+        _id: 'activity-1',
+        activityType: 'internalNote',
+        targetId: 'deal-1',
+        targetType: 'sales:deal',
+        actor: { _id: 'human-2' },
+        metadata: {
+          noteId: 'note-1',
+          content: JSON.stringify([
+            {
+              type: 'paragraph',
+              content: [
+                {
+                  type: 'mention',
+                  props: { _id: 'agent-user-1', label: 'AI teammate' },
+                },
+                {
+                  type: 'mention',
+                  props: { _id: 'agent-user-1', label: 'AI teammate' },
+                },
+              ],
+            },
+          ]),
+        },
+      },
+    });
+    await settleQueueing();
+
+    expect(queueAdd).toHaveBeenCalledTimes(1);
+    expect(queueAdd).toHaveBeenCalledWith(
+      'notification-run',
+      expect.objectContaining({
+        subdomain: 'acme',
+        recipientUserId: 'agent-user-1',
+        agentId: 'agent-profile-1',
+        notification: expect.objectContaining({
+          _id: 'internal-note:note-1',
+          action: 'mentioned',
+          notificationType: 'internalNote',
+          fromUserId: 'human-2',
+          contentType: 'sales:deal',
+          contentTypeId: 'deal-1',
+        }),
+      }),
+      expect.objectContaining({
+        jobId: expect.stringMatching(/^[a-f0-9]{64}$/),
+      }),
+    );
+  });
+
+  it('ignores malformed and mention-free internal-note activity', async () => {
+    generateModels.mockResolvedValue({
+      MastraAgent: { exists: jest.fn().mockResolvedValue(true) },
+    });
+    const { redis, emit } = makeRedis();
+    await initNotificationTriggers(redis as never);
+
+    emit('activityLogInserted:acme:deal-1', {
+      activityLogInserted: {
+        _id: 'activity-2',
+        activityType: 'internalNote',
+        metadata: { content: '{bad json' },
+      },
+    });
+    emit('activityLogInserted:acme:deal-1', {
+      activityLogInserted: {
+        _id: 'activity-3',
+        activityType: 'internalNote',
+        metadata: {
+          content: JSON.stringify([
+            { type: 'paragraph', content: [{ type: 'text', text: 'hello' }] },
+          ]),
+        },
+      },
+    });
+    await settleQueueing();
+
+    expect(queueAdd).not.toHaveBeenCalled();
+    expect(getAgentAccountByUserId).not.toHaveBeenCalled();
   });
 
   it('ignores unrelated notifications and non-agent recipients', async () => {

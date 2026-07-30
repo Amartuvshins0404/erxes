@@ -19,6 +19,7 @@ import {
   capabilityInventory,
 } from './tools/scope';
 import type { ToolPolicy } from './tools/scope';
+import { resolveAgentAllowedTools } from './tools/permissionCapabilities';
 import { resolveDestructiveOpsPolicy } from './tools/destructiveGuard';
 import type { DestructiveOpsPolicy } from './tools/destructiveGuard';
 import { writeAgentAction, AgentActionInput } from './auditLog';
@@ -33,7 +34,11 @@ import { createMakeSkillTool } from '@/skills/tools/makeSkill';
 import type { OperationRegistry } from './tools/operationRegistry';
 import type { IMastraProviderDocument } from '@/provider/@types/provider';
 import type { IMastraSettingsDocument } from '@/settings/@types/settings';
-import { resolveAgentGrantPolicy } from './tools/agentGrantPolicy';
+import {
+  AgentAccount,
+  agentAccountName,
+  getAgentAccount,
+} from './auth/servicePrincipal';
 
 // Cache agents by config ID + updatedAt + routing version.
 const agentCache = new Map<string, Agent>();
@@ -42,7 +47,7 @@ const agentCache = new Map<string, Agent>();
 // when a model outputs function calls as plain text instead of tool_calls.
 const toolsCache = new Map<string, ToolsInput>();
 
-// Increment this whenever routing, operation discovery, or provider logic changes.
+// Increment this whenever routing.ts, the meta-tools, or provider logic changes.
 const ROUTING_VERSION = 32;
 
 export interface AgentWithTools {
@@ -57,6 +62,7 @@ export interface GetOrCreateAgentOptions {
   // and the values are fetched here — getSettings() is process-cached anyway.
   providers?: IMastraProviderDocument[];
   settings?: IMastraSettingsDocument;
+  account?: AgentAccount;
 }
 
 /**
@@ -66,34 +72,19 @@ export interface GetOrCreateAgentOptions {
  * mirrors the original key exactly:
  *   • updatedAt + ROUTING_VERSION + inventory fingerprint rebuild on config /
  *     routing / installed-plugin changes.
- *   • resolved tool-policy mode + exact allowed identities ensure an agent
- *     cannot reuse stale grants whose inventories have the same count.
  *   • memory joins the subdomain only when advanced memory is on.
  *   • evaluation binds each tenant to its own Langfuse project (per-subdomain
  *     observability host) when on.
  *   • skills key the subdomain + allowlist so a cached agent can't be reused
  *     for another tenant with the wrong skills source.
  */
-/**
- * Unambiguous, allocation-light identity for the resolved server-side grant.
- * The resolver produces a stable allowlist order, so preserve it rather than
- * sorting and allocating a second array on every runtime lookup.
- */
-function policyCacheTag(policy: ToolPolicy): string {
-  let tag = `${policy.mode.length}:${policy.mode}`;
-  for (const identity of policy.allowed) {
-    tag += `:${identity.length}:${identity}`;
-  }
-  return tag;
-}
-
 function buildAgentCacheKey(params: {
   agentConfig: IMastraAgentDocument;
   subdomain?: string;
   useMemory: boolean;
   evaluationEnabled: boolean;
   inventoryFingerprint: string;
-  policy: ToolPolicy;
+  permissionFingerprint: string;
 }): string {
   const {
     agentConfig,
@@ -101,8 +92,9 @@ function buildAgentCacheKey(params: {
     useMemory,
     evaluationEnabled,
     inventoryFingerprint,
-    policy,
+    permissionFingerprint,
   } = params;
+
   const evalTag = evaluationEnabled ? subdomain || 'os' : 'off';
   const skillsTag = agentConfig.skills?.length
     ? `${subdomain || 'os'}:${agentConfig.skills.join('|')}`
@@ -110,15 +102,16 @@ function buildAgentCacheKey(params: {
 
   return `${agentConfig._id}:${
     agentConfig.updatedAt?.getTime?.() ?? 0
-  }:v${ROUTING_VERSION}:${inventoryFingerprint}:policy${policyCacheTag(
-    policy,
-  )}:mem${useMemory ? subdomain : 'off'}:eval${evalTag}:skills${skillsTag}`;
+  }:v${ROUTING_VERSION}:${inventoryFingerprint}:permissions${permissionFingerprint}:mem${
+    useMemory ? subdomain : 'off'
+  }:eval${evalTag}:skills${skillsTag}`;
 }
 
 /**
- * Assemble directly-bound support/builtin tools plus the policy-filtered erxes
- * operation catalog searched by ToolSearchProcessor. Also returns the ToolInfo
- * list that grounds the system prompt.
+ * Assemble the agent's tool map: erxes meta-tools (only when the policy grants
+ * an operation), policy-filtered builtins, the always-on fileReader, and — for
+ * skills-enabled agents — the make_skill tool. Also returns the ToolInfo list
+ * that grounds the system prompt.
  */
 function assembleAgentTools(params: {
   agentConfig: IMastraAgentDocument;
@@ -154,7 +147,7 @@ function assembleAgentTools(params: {
     writeAgentAction(models, {
       ...entry,
       source: 'chat',
-      agentId: agentConfig.agentId,
+      agentId: agentConfig._id,
     });
 
   const operationTools = hasErxes
@@ -201,10 +194,9 @@ function assembleAgentTools(params: {
     });
   }
 
-  // Skills-enabled agents can distill the current conversation into a SKILL.md
-  // draft via the makeSkill tool (the only creation path). Bound with the
-  // agent's own provider/model; the thread/user come from the request context.
-  if (agentConfig.skills?.length) {
+  // Personal skill creation is visible only when the AI team member has the
+  // corresponding skills permission and a human initiated this turn.
+  if (agentConfig.skills?.length && isBuiltinAllowed('make_skill', policy)) {
     const makeSkillTool = createMakeSkillTool({
       provider: agentConfig.provider,
       model: agentConfig.model,
@@ -300,21 +292,29 @@ export async function getOrCreateAgent(
           models.MastraProvider.find({ isEnabled: true }),
           models.MastraSettings.getSettings(),
         ]);
-
-  // Resolve the live server-side grant on every cache build. Missing groups,
-  // missing tenant context, and core lookup failures all produce zero tools.
-  const registry = await getOperationRegistry(settings);
-  const policy = await resolveAgentGrantPolicy({
-    subdomain,
-    grantGroupId: agentConfig.grantGroupId,
-    registry,
-  });
-
-  // Consent for irreversible deletes/merges. Defaults to 'block' (including
-  // legacy agents with no persisted field); direct operation tools enforce it.
   const destructiveOps = resolveDestructiveOpsPolicy(agentConfig);
 
-
+  // Core is authoritative for both identity and permissions. Reading the
+  // account here also makes permission changes invalidate the runtime cache
+  // even when they were made from the standard Team Members UI.
+  const account =
+    options.account ??
+    (await getAgentAccount({
+      userId: agentConfig._id,
+      subdomain: subdomain || 'os',
+    }));
+  const registry = await getOperationRegistry(settings);
+  const allowedTools = await resolveAgentAllowedTools({
+    subdomain: subdomain || 'os',
+    permissionGroupIds: account.permissionGroupIds ?? [],
+    customPermissions: account.customPermissions ?? [],
+    registry,
+  });
+  const permissionFingerprint = JSON.stringify([
+    account.permissionGroupIds ?? [],
+    account.customPermissions ?? [],
+  ]);
+  const policy: ToolPolicy = { mode: 'custom', allowed: allowedTools };
   // The installed-services inventory both grounds the system prompt AND keys
   // the cache: enabling/disabling a plugin changes the fingerprint, so the
   // agent (and its prompt) is rebuilt as soon as the registry refreshes.
@@ -331,7 +331,7 @@ export async function getOrCreateAgent(
     useMemory,
     evaluationEnabled,
     inventoryFingerprint: inventory.fingerprint,
-    policy,
+    permissionFingerprint,
   });
 
   const cached = agentCache.get(cacheKey);
@@ -418,8 +418,8 @@ export async function getOrCreateAgent(
   ];
 
   const agent = new Agent({
-    id: agentConfig.agentId,
-    name: agentConfig.name,
+    id: agentConfig._id,
+    name: agentAccountName(account),
     instructions: systemPrompt,
     model,
     tools: toolNames.length ? tools : undefined,

@@ -1,27 +1,21 @@
 import { useCallback, useMemo } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { ApolloCache, useMutation, useQuery } from '@apollo/client';
 import { ColumnDef, Row } from '@tanstack/react-table';
 import {
-  Icon,
+  IconAlignLeft,
+  IconCalendar,
+  IconCpu,
   IconPlus,
   IconRobot,
-  IconAlignLeft,
-  IconBuilding,
-  IconBuildingCommunity,
-  IconCalendar,
-  IconLock,
-  IconEye,
-  IconSitemap,
-  IconStack2,
+  IconShieldCheck,
+  IconToggleRight,
   IconTrash,
-  IconUsersGroup,
-  IconWorld,
 } from '@tabler/icons-react';
 import {
+  Badge,
   Button,
   CommandBar,
-  cn,
   RecordTable,
   RecordTableInlineCell,
   RelativeDateDisplay,
@@ -29,77 +23,46 @@ import {
   toast,
 } from 'erxes-ui';
 import { MASTRA_AGENT_REMOVE } from '~/graphql/mutations';
-import {
-  MASTRA_MY_AGENT_QUOTA_STATUS,
-  AGENT_FORM_BRANCHES,
-  AGENT_FORM_DEPARTMENTS,
-  AGENT_FORM_UNITS,
-} from '~/graphql/queries';
-import {
-  IdentityCell,
-  SortableHead,
-  enabledStatusColumn,
-} from '~/components/RecordTableShared';
-import { GroupByConfig } from '~/components/GroupedRowList';
+import { IdentityCell, SortableHead } from '~/components/RecordTableShared';
 import { SortState, SortValue, useTableSort } from '~/components/useTableSort';
 import { PermissionButton } from '~/components/PermissionButton';
 import { ResourceIndexLayout } from '~/components/ResourceIndexLayout';
-import { SplitBadge } from '~/components/SplitBadge';
 import { useConfirmedRemove } from '~/components/useConfirmedRemove';
 import { useMastraAgentList, IMastraAgentRow } from './useMastraAgentList';
 import {
   agentMutationError,
   showAgentPermissionError,
-  showAgentQuotaError,
   useAgentAccess,
 } from './hooks/useAgentAccess';
 import { useAgentsBasePath } from './hooks/useAgentsBasePath';
-import type { IMastraAgentQuotaStatus } from './types';
+import {
+  PERMISSION_GROUPS,
+  permissionGroupOptions,
+  type PermissionGroupsData,
+} from './graphql/access';
 
 type IAgent = IMastraAgentRow;
 
-// The per-agent detail workspace (tabs) is a console-shell feature. Under the
-// Settings shell (`/settings/erxes-agent/agents`) there is no detail route, so
-// agent rows there keep opening the plain edit form.
 const isConsoleShell = (basePath: string) => !basePath.startsWith('/settings');
 
-/** Where clicking an agent row goes: detail workspace in console, edit in settings. */
 const agentOpenPath = (basePath: string, id: string) =>
   isConsoleShell(basePath) ? `${basePath}/${id}` : `${basePath}/edit/${id}`;
 
-/** Deep-link to an agent workspace tab when the console shell provides one. */
-const agentTabPath = (basePath: string, id: string, tab: string) =>
-  isConsoleShell(basePath)
-    ? `${basePath}/${id}/${tab}`
-    : `${basePath}/edit/${id}`;
-
-// Refresh the agent lists after a row mutation without prop-drilling a refetch
-// through the table columns: invalidate every cached instance of both list
-// fields (paginated table + dropdown/chat list). Shared by remove + toggle.
 const agentListCacheUpdate = (cache: ApolloCache<unknown>) => {
   cache.evict({ fieldName: 'mastraAgentsMain' });
   cache.evict({ fieldName: 'mastraAgents' });
   cache.gc();
 };
 
-// ─── Create button (admin/owner only) ──────────────────────────────────────────
-
 const CreateAgentButton = ({ children }: { children: React.ReactNode }) => {
   const navigate = useNavigate();
   const basePath = useAgentsBasePath();
   const { canCreate } = useAgentAccess();
 
-  const { data: quotaData } = useQuery<{
-    mastraMyAgentQuotaStatus: IMastraAgentQuotaStatus;
-  }>(MASTRA_MY_AGENT_QUOTA_STATUS, { skip: !canCreate });
-
-  const atQuota = quotaData?.mastraMyAgentQuotaStatus?.atQuota ?? false;
-  const allowed = canCreate && !atQuota;
-
   return (
     <PermissionButton
-      allowed={allowed}
-      onDenied={atQuota ? showAgentQuotaError : showAgentPermissionError}
+      allowed={canCreate}
+      onDenied={showAgentPermissionError}
       onClick={() => navigate(`${basePath}/new`)}
     >
       {children}
@@ -107,95 +70,27 @@ const CreateAgentButton = ({ children }: { children: React.ReactNode }) => {
   );
 };
 
-// Compact per-agent workflow/skill counts link to their workspace tabs.
-
-const AgentResourcesCell = ({
-  agent,
-  basePath,
-}: {
-  agent: IAgent;
-  basePath: string;
-}) => {
-  const chips = [
-    {
-      icon: IconSitemap,
-      count: agent.workflowsCount ?? 0,
-      tab: 'workflows',
-      label: 'workflows',
-      allowed: agent.capabilities?.canReadWorkflows === true,
-    },
-  ].filter(({ allowed }) => allowed);
-
-  return (
-    <RecordTableInlineCell>
-      <div className="flex items-center gap-0.5">
-        {chips.map(({ icon: ChipIcon, count, tab, label }) => (
-          <Link
-            key={tab}
-            to={agentTabPath(basePath, agent._id, tab)}
-            onClick={(e) => e.stopPropagation()}
-            aria-label={`${count} ${label}`}
-            className={cn(
-              'inline-flex h-6 items-center gap-1 rounded px-1.5 text-xs transition-colors hover:bg-accent',
-              count === 0 && 'text-muted-foreground/50',
-            )}
-          >
-            <ChipIcon className="size-3.5 shrink-0" />
-            <span className="tabular-nums">{count}</span>
-          </Link>
-        ))}
-      </div>
-    </RecordTableInlineCell>
-  );
-};
-
-// Agent identity cell — name + id/description sub-line. The two nodes are
-// memoized so a memoized IdentityCell isn't handed fresh JSX every render.
-const AgentNameCell = ({ agent }: { agent: IAgent }) => {
-  const name = useMemo(
-    () => <span className="font-medium">{agent.name}</span>,
-    [agent.name],
-  );
-  const sub = useMemo(
-    () => (
-      <>
-        <span className="font-mono">{agent.agentId}</span>
-        {agent.description ? ` · ${agent.description}` : ''}
-      </>
-    ),
-    [agent.agentId, agent.description],
-  );
-  return <IdentityCell icon={IconRobot} tone="muted" name={name} sub={sub} />;
-};
-
-// ─── Bulk delete command bar ──────────────────────────────────────────────────
-
 const AgentBulkDeleteCommandBar = () => {
   const { table } = RecordTable.useRecordTable();
   const selectedRows = table.getFilteredSelectedRowModel()
     .rows as Row<IAgent>[];
   const { confirmRemove } = useConfirmedRemove();
   const { canRemoveAgent } = useAgentAccess();
-
   const [removeAgent] = useMutation(MASTRA_AGENT_REMOVE, {
     update: agentListCacheUpdate,
     onError: agentMutationError(),
   });
-
-  const removable = selectedRows.filter((r) => canRemoveAgent(r.original));
+  const removable = selectedRows.filter((row) => canRemoveAgent(row.original));
 
   const handleBulkDelete = () => {
     const count = removable.length;
     if (!count) return;
     confirmRemove(
       {
-        message: `Delete ${count} agent${
-          count !== 1 ? 's' : ''
-        }? This cannot be undone.`,
+        message: `Remove ${count} AI team member${
+          count === 1 ? '' : 's'
+        }? Their erxes accounts will be deactivated.`,
       },
-      // allSettled so one rejected mutation never blocks the rest: the
-      // selection resets regardless, deleted rows drop out, and a single
-      // summary toast covers any failures (each also toasts via onError).
       async () => {
         const results = await Promise.allSettled(
           removable.map((row) =>
@@ -203,13 +98,13 @@ const AgentBulkDeleteCommandBar = () => {
           ),
         );
         table.resetRowSelection();
-        const failed = results.filter((r) => r.status === 'rejected').length;
-        if (failed > 0) {
+        const failed = results.filter(
+          (result) => result.status === 'rejected',
+        ).length;
+        if (failed) {
           toast({
-            title: 'Some deletions failed',
-            description: `${failed} of ${count} agent${
-              count !== 1 ? 's' : ''
-            } could not be removed.`,
+            title: 'Some removals failed',
+            description: `${failed} of ${count} AI team members could not be removed.`,
             variant: 'destructive',
           });
         }
@@ -227,11 +122,11 @@ const AgentBulkDeleteCommandBar = () => {
         <Button
           variant="secondary"
           className="text-destructive"
-          disabled={removable.length === 0}
+          disabled={!removable.length}
           onClick={handleBulkDelete}
         >
           <IconTrash className="size-4" />
-          Delete
+          Remove
           {removable.length < selectedRows.length
             ? ` (${removable.length})`
             : ''}
@@ -241,104 +136,115 @@ const AgentBulkDeleteCommandBar = () => {
   );
 };
 
-// ─── Visibility meta + scope-name column ─────────────────────────────────────
-
-const VISIBILITY_META = {
-  org: { label: 'Org-wide', variant: 'success' },
-  team: { label: 'Branch', variant: 'secondary' },
-  department: { label: 'Department', variant: 'secondary' },
-  unit: { label: 'Team', variant: 'secondary' },
-  private: { label: 'Private', variant: 'secondary' },
-} as const;
-
-const VISIBILITY_ICONS: Record<keyof typeof VISIBILITY_META, Icon> = {
-  org: IconWorld,
-  team: IconBuildingCommunity,
-  department: IconBuilding,
-  unit: IconUsersGroup,
-  private: IconLock,
-};
-
-// Groups the list into collapsible sections by organization visibility, in
-// broad→narrow order (Org-wide first, Private last). Reuses VISIBILITY_META so
-// the section labels never drift from the visibility column's labels.
-const VISIBILITY_GROUP: GroupByConfig<IAgent> = {
-  getKey: (agent) => agent.visibility ?? 'private',
-  sections: (
-    Object.keys(VISIBILITY_META) as (keyof typeof VISIBILITY_META)[]
-  ).map((key) => ({
-    key,
-    label: VISIBILITY_META[key].label,
-    icon: VISIBILITY_ICONS[key],
-    variant: VISIBILITY_META[key].variant,
-  })),
-};
-
-// ─── Column builders ──────────────────────────────────────────────────────────
-
-const buildBaseColumns = (
-  scopeNames: Record<string, string>,
+const buildColumns = (
+  basePath: string,
+  permissionGroupNames: Record<string, string>,
   sort: SortState,
   onSort: (id: string) => void,
-  basePath: string,
-  canOpenAgent: (agent: IAgent) => boolean,
 ): ColumnDef<IAgent>[] => [
+  RecordTable.checkboxColumn as ColumnDef<IAgent>,
   {
     id: 'name',
-    accessorKey: 'name',
+    accessorKey: 'accountName',
     header: () => (
       <SortableHead
         icon={IconAlignLeft}
-        label="Agent"
+        label="Team member"
         columnId="name"
         sort={sort}
         onSort={onSort}
       />
     ),
-    // Plain text: opening the agent is handled by the whole-row click
-    // (see VISIBILITY_GROUP.onRowClick), not a per-name link.
-    cell: ({ row }) => <AgentNameCell agent={row.original} />,
-    size: 260,
-  },
-  {
-    id: 'resources',
-    header: () => (
-      <RecordTable.InlineHead icon={IconStack2} label="Resources" />
+    cell: ({ row }) => (
+      <IdentityCell
+        icon={IconRobot}
+        tone="primary"
+        name={
+          <Link
+            className="font-medium hover:underline"
+            to={agentOpenPath(basePath, row.original._id)}
+          >
+            {row.original.accountName}
+          </Link>
+        }
+        sub={row.original.accountDescription || 'AI team member'}
+      />
     ),
-    cell: ({ row }) =>
-      canOpenAgent(row.original) ? (
-        <AgentResourcesCell agent={row.original} basePath={basePath} />
-      ) : (
-        <RecordTableInlineCell>
-          <span className="text-muted-foreground">—</span>
-        </RecordTableInlineCell>
-      ),
+    size: 280,
   },
   {
-    id: 'visibility',
-    accessorKey: 'visibility',
-    header: () => <RecordTable.InlineHead icon={IconEye} label="Visibility" />,
+    id: 'permissions',
+    header: () => (
+      <RecordTable.InlineHead icon={IconShieldCheck} label="Permissions" />
+    ),
     cell: ({ row }) => {
-      const { visibility, teamId, departmentId, unitId } = row.original;
-      const { label, variant } = VISIBILITY_META[visibility ?? 'private'];
-      const scopeId =
-        visibility === 'team'
-          ? teamId
-          : visibility === 'department'
-          ? departmentId
-          : visibility === 'unit'
-          ? unitId
-          : undefined;
-      const scopeName = scopeId ? scopeNames[scopeId] : undefined;
+      const names = row.original.permissionGroupIds.map(
+        (id) => permissionGroupNames[id] || id,
+      );
       return (
         <RecordTableInlineCell>
-          <SplitBadge variant={variant} label={label} name={scopeName} />
+          {names.length ? (
+            <div className="flex min-w-0 items-center gap-1.5">
+              <Badge variant="secondary" className="max-w-40 truncate">
+                {names[0]}
+              </Badge>
+              {names.length > 1 && (
+                <span className="text-xs text-muted-foreground">
+                  +{names.length - 1}
+                </span>
+              )}
+            </div>
+          ) : (
+            <Badge variant="destructive">No permissions</Badge>
+          )}
         </RecordTableInlineCell>
       );
     },
-    size: 160,
+    size: 210,
   },
-  enabledStatusColumn<IAgent>({ sort, onSort }),
+  {
+    id: 'model',
+    accessorKey: 'model',
+    header: () => (
+      <SortableHead
+        icon={IconCpu}
+        label="Model"
+        columnId="model"
+        sort={sort}
+        onSort={onSort}
+      />
+    ),
+    cell: ({ row }) => (
+      <RecordTableInlineCell>
+        <div className="text-xs text-muted-foreground">
+          {row.original.provider}
+        </div>
+        <div className="font-mono text-xs">{row.original.model}</div>
+      </RecordTableInlineCell>
+    ),
+    size: 200,
+  },
+  {
+    id: 'status',
+    accessorKey: 'isActive',
+    header: () => (
+      <SortableHead
+        icon={IconToggleRight}
+        label="Account status"
+        columnId="status"
+        sort={sort}
+        onSort={onSort}
+      />
+    ),
+    cell: ({ cell }) => (
+      <RecordTableInlineCell>
+        <Badge variant={cell.getValue() ? 'success' : 'secondary'}>
+          {cell.getValue() ? 'Active' : 'Inactive'}
+        </Badge>
+      </RecordTableInlineCell>
+    ),
+    size: 130,
+  },
   {
     id: 'createdAt',
     accessorKey: 'createdAt',
@@ -362,105 +268,46 @@ const buildBaseColumns = (
   },
 ];
 
-// Column order: the selection checkbox leads (it drives the bulk-delete command
-// bar), then the data columns. No row-actions column — opening the row reaches
-// everything (chat, settings, enable/disable, delete) in the agent workspace,
-// and bulk delete lives on the selection command bar.
-const buildColumns = (
-  scopeNames: Record<string, string>,
-  sort: SortState,
-  onSort: (id: string) => void,
-  basePath: string,
-  canOpenAgent: (agent: IAgent) => boolean,
-  canRemove: boolean,
-): ColumnDef<IAgent>[] => [
-  ...(canRemove ? [RecordTable.checkboxColumn as ColumnDef<IAgent>] : []),
-  ...buildBaseColumns(scopeNames, sort, onSort, basePath, canOpenAgent),
-];
-
-// ─── Page ─────────────────────────────────────────────────────────────────────
-
 export const AgentsIndexPage = () => {
-  const navigate = useNavigate();
   const basePath = useAgentsBasePath();
   const { agentsList, loading, error, pageInfo, handleFetchMore, refetch } =
     useMastraAgentList();
-  const { canReadConfig, canReadConfigAgent, canRemove } = useAgentAccess();
-
-  // Fetch scope labels for the visibility column (branches, depts, units).
-  const { data: branchData } = useQuery<{
-    branches: { _id: string; title?: string | null }[];
-  }>(AGENT_FORM_BRANCHES, { skip: !canReadConfig });
-  const { data: deptData } = useQuery<{
-    departments: { _id: string; title?: string | null }[];
-  }>(AGENT_FORM_DEPARTMENTS, { skip: !canReadConfig });
-  const { data: unitData } = useQuery<{
-    units: { _id: string; title?: string | null }[];
-  }>(AGENT_FORM_UNITS, { skip: !canReadConfig });
-
-  const scopeNames = useMemo<Record<string, string>>(() => {
-    const map: Record<string, string> = {};
-    branchData?.branches?.forEach((b) => {
-      if (b.title) map[b._id] = b.title;
-    });
-    deptData?.departments?.forEach((d) => {
-      if (d.title) map[d._id] = d.title;
-    });
-    unitData?.units?.forEach((u) => {
-      if (u.title) map[u._id] = u.title;
-    });
-    return map;
-  }, [branchData, deptData, unitData]);
-
-  // Client-side sort over loaded rows. The agent list is offset-paginated, so
-  // this orders what's currently loaded (more pages append on scroll).
-  const getSortValue = useCallback((a: IAgent, id: string): SortValue => {
+  const { data: permissionData } =
+    useQuery<PermissionGroupsData>(PERMISSION_GROUPS);
+  const permissionGroupNames = useMemo(
+    () =>
+      Object.fromEntries(
+        permissionGroupOptions(permissionData).map((group) => [
+          group.id,
+          group.name,
+        ]),
+      ),
+    [permissionData],
+  );
+  const getSortValue = useCallback((agent: IAgent, id: string): SortValue => {
     switch (id) {
       case 'name':
-        return a.name;
+        return agent.accountName;
+      case 'model':
+        return `${agent.provider} ${agent.model}`;
       case 'status':
-        return a.isEnabled;
+        return agent.isActive;
       case 'createdAt':
-        return a.createdAt;
+        return agent.createdAt;
       default:
         return undefined;
     }
   }, []);
-
   const { sort, toggle, sorted } = useTableSort(agentsList, getSortValue);
-
   const columns = useMemo(
-    () =>
-      buildColumns(
-        scopeNames,
-        sort,
-        toggle,
-        basePath,
-        canReadConfigAgent,
-        canRemove,
-      ),
-    [scopeNames, sort, toggle, basePath, canReadConfigAgent, canRemove],
+    () => buildColumns(basePath, permissionGroupNames, sort, toggle),
+    [basePath, permissionGroupNames, sort, toggle],
   );
-
-  // Whole-row click opens the agent workspace (console) / edit form (settings).
-  // Built here (not at module scope) so it can navigate with the resolved base.
-  const groupBy = useMemo<GroupByConfig<IAgent>>(
-    () => ({
-      ...VISIBILITY_GROUP,
-      onRowClick: (agent) => {
-        if (canReadConfigAgent(agent)) {
-          navigate(agentOpenPath(basePath, agent._id));
-        }
-      },
-    }),
-    [navigate, basePath, canReadConfigAgent],
-  );
-
   const commandBar = useMemo(() => <AgentBulkDeleteCommandBar />, []);
   const headerExtra = useMemo(
     () => (
       <CreateAgentButton>
-        <IconPlus /> New Agent
+        <IconPlus /> Add AI Team Member
       </CreateAgentButton>
     ),
     [],
@@ -469,9 +316,9 @@ export const AgentsIndexPage = () => {
   return (
     <ResourceIndexLayout<IAgent>
       icon={IconRobot}
-      title="Agents"
+      title="AI Team Members"
       rootPath={basePath}
-      sessionKey="erxes_agent_agents"
+      sessionKey="erxes_agent_team_members"
       stickyColumns={['checkbox', 'name']}
       columns={columns}
       data={sorted}
@@ -479,23 +326,22 @@ export const AgentsIndexPage = () => {
       skeletonRows={20}
       pageInfo={pageInfo}
       onFetchMore={handleFetchMore}
-      groupBy={groupBy}
       commandBar={commandBar}
       headerExtra={headerExtra}
       empty={{
-        title: 'No agents yet',
-        description: 'Create your first Mastra AI agent to get started.',
+        title: 'No AI team members yet',
+        description: 'Add an AI team member and assign its erxes permissions.',
         action: (
           <CreateAgentButton>
-            <IconPlus /> Create Agent
+            <IconPlus /> Add AI Team Member
           </CreateAgentButton>
         ),
       }}
       error={
         error
           ? {
-              title: "Couldn't load agents",
-              description: 'Something went wrong while fetching your agents.',
+              title: "Couldn't load AI team members",
+              description: 'Something went wrong while fetching team members.',
               onRetry: () => {
                 void refetch().catch(() => undefined);
               },

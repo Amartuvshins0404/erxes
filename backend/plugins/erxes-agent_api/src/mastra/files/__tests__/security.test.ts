@@ -27,7 +27,7 @@ describe('fetchAttachmentBuffer — key is a storage key, never a URL (finding A
     expect(spy).not.toHaveBeenCalled();
   });
 
-  it('reads a real storage key through core\'s internal /read-file endpoint', async () => {
+  it("reads a real storage key through core's internal /read-file endpoint", async () => {
     const spy = jest.fn(async () => ({
       ok: true,
       status: 200,

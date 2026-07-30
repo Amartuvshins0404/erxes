@@ -67,9 +67,7 @@ export const useFavoriteAgents = () => {
 
   const toggleFavorite = useCallback(
     (agentId: string) => {
-      const label = agents.find(
-        (a) => a._id === agentId || a.agentId === agentId,
-      )?.name;
+      const label = agents.find((agent) => agent._id === agentId)?.accountName;
 
       return toggleFavoriteMutation({
         variables: {

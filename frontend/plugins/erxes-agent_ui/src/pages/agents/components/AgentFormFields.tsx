@@ -1,3 +1,5 @@
+import { useQuery } from '@apollo/client';
+import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { IconAlertTriangle, IconInfoCircle } from '@tabler/icons-react';
 import {
@@ -16,33 +18,47 @@ import {
 import { Trans, useTranslation } from 'react-i18next';
 import { UseFormReturn } from 'react-hook-form';
 import { ClampedNumberInput } from '~/components/ClampedNumberInput';
-import { Field, FormSection } from '~/components/FormLayout';
+import { Field } from '~/components/FormLayout';
 import {
   SelectModel,
   SelectProvider,
   useProviderOptions,
 } from '~/components/SelectProviderModel';
-import { AgentVisibilitySectionFields } from './AgentVisibilitySectionFields';
 import { AgentFormValues } from '../validations';
+import {
+  PERMISSION_GROUPS,
+  permissionGroupOptions,
+  type PermissionGroupsData,
+} from '../graphql/access';
+import { PermissionGroupSelector } from './PermissionGroupSelector';
 
 type AgentForm = UseFormReturn<AgentFormValues>;
 
-const BasicInfoSection = ({
-  form,
-  agentIdEditable,
-  onNameChange,
-  onAgentIdChange,
+const AgentFormSection = ({
+  title,
+  description,
+  children,
 }: {
-  form: AgentForm;
-  agentIdEditable: boolean;
-  onNameChange?: (value: string) => void;
-  onAgentIdChange?: (value: string) => void;
-}) => {
+  title: string;
+  description: string;
+  children: ReactNode;
+}) => (
+  <section className="grid gap-4 border-b py-4 last:border-b-0 md:grid-cols-[minmax(0,14rem)_minmax(0,1fr)] md:gap-6">
+    <header className="space-y-1">
+      <h2 className="text-sm font-semibold">{title}</h2>
+      <p className="text-sm leading-relaxed text-muted-foreground">
+        {description}
+      </p>
+    </header>
+    <div className="min-w-0 space-y-4">{children}</div>
+  </section>
+);
+
+const BasicInfoSection = ({ form }: { form: AgentForm }) => {
   const { t } = useTranslation('mastra');
 
   return (
-    <FormSection
-      step={1}
+    <AgentFormSection
       title={t('agent-settings-identity-title')}
       description={t('agent-settings-identity-description')}
     >
@@ -56,11 +72,6 @@ const BasicInfoSection = ({
               <Form.Control>
                 <Input
                   {...field}
-                  onChange={(event) =>
-                    onNameChange
-                      ? onNameChange(event.target.value)
-                      : field.onChange(event.target.value)
-                  }
                   placeholder={t('agent-settings-name-placeholder')}
                 />
               </Form.Control>
@@ -95,34 +106,6 @@ const BasicInfoSection = ({
 
       <Form.Field
         control={form.control}
-        name="agentId"
-        render={({ field }) => (
-          <Form.Item className="rounded-lg border bg-muted/20 p-3">
-            <Form.Label>{t('agent-settings-agent-id')}</Form.Label>
-            <Form.Control>
-              <Input
-                {...field}
-                disabled={!agentIdEditable}
-                onChange={(event) => {
-                  onAgentIdChange?.(event.target.value);
-                  field.onChange(event.target.value);
-                }}
-                placeholder="customer-support"
-                className="font-mono text-sm"
-              />
-            </Form.Control>
-            <Form.Description>
-              {agentIdEditable
-                ? t('agent-settings-agent-id-create-description')
-                : t('agent-settings-agent-id-edit-description')}
-            </Form.Description>
-            <Form.Message />
-          </Form.Item>
-        )}
-      />
-
-      <Form.Field
-        control={form.control}
         name="instructions"
         render={({ field }) => (
           <Form.Item>
@@ -141,7 +124,7 @@ const BasicInfoSection = ({
           </Form.Item>
         )}
       />
-    </FormSection>
+    </AgentFormSection>
   );
 };
 
@@ -151,8 +134,7 @@ const AiModelSection = ({ form }: { form: AgentForm }) => {
   const { providers: enabledProviders } = useProviderOptions();
 
   return (
-    <FormSection
-      step={2}
+    <AgentFormSection
       title={t('agent-settings-model-title')}
       description={t('agent-settings-model-description')}
     >
@@ -218,20 +200,49 @@ const AiModelSection = ({ form }: { form: AgentForm }) => {
           />
         </div>
       )}
-    </FormSection>
+    </AgentFormSection>
   );
 };
 
-const ExecutionSafetySection = ({ form }: { form: AgentForm }) => {
+const AgentAccessSection = ({ form }: { form: AgentForm }) => {
   const { t } = useTranslation('mastra');
   const destructiveOps = form.watch('destructiveOps');
+  const { data, loading, error } =
+    useQuery<PermissionGroupsData>(PERMISSION_GROUPS);
+  const groups = permissionGroupOptions(data);
 
   return (
-    <FormSection
-      step={3}
-      title={t('agent-settings-safety-title')}
-      description={t('agent-settings-safety-description')}
+    <AgentFormSection
+      title={t('agent-settings-access-title')}
+      description={t('agent-settings-access-description')}
     >
+      <Form.Field
+        control={form.control}
+        name="permissionGroupIds"
+        render={({ field }) => (
+          <Form.Item>
+            <Form.Control>
+              <PermissionGroupSelector
+                groups={groups}
+                value={field.value}
+                onChange={field.onChange}
+                loading={loading}
+              />
+            </Form.Control>
+            <Form.Message />
+          </Form.Item>
+        )}
+      />
+
+      {error && (
+        <Alert variant="warning">
+          <IconAlertTriangle className="size-4" />
+          <Alert.Description>{t('error')}</Alert.Description>
+        </Alert>
+      )}
+
+      <Separator />
+
       <Form.Field
         control={form.control}
         name="destructiveOps"
@@ -301,59 +312,68 @@ const ExecutionSafetySection = ({ form }: { form: AgentForm }) => {
           </Alert.Description>
         </Alert>
       )}
-    </FormSection>
+    </AgentFormSection>
   );
 };
 
-const BehaviorSection = ({ form, step }: { form: AgentForm; step: number }) => {
+const BehaviorSection = ({ form }: { form: AgentForm }) => {
   const { t } = useTranslation('mastra');
   const temperature = form.watch('temperature');
 
   return (
-    <FormSection
-      step={step}
+    <AgentFormSection
       title={t('agent-settings-behavior-title')}
       description={t('agent-settings-behavior-description')}
     >
-      <Form.Field
-        control={form.control}
-        name="isEnabled"
-        render={({ field }) => (
-          <Form.Item className="flex items-center justify-between gap-4 rounded-lg border p-4">
-            <div className="space-y-1">
-              <Form.Label>{t('agent-settings-availability-label')}</Form.Label>
-              <Form.Description>
-                {field.value
-                  ? t('agent-settings-availability-on-description')
-                  : t('agent-settings-availability-off-description')}
-              </Form.Description>
-            </div>
-            <Form.Control>
-              <Switch checked={field.value} onCheckedChange={field.onChange} />
-            </Form.Control>
-          </Form.Item>
-        )}
-      />
+      <div className="grid gap-2 md:grid-cols-2">
+        <Form.Field
+          control={form.control}
+          name="isActive"
+          render={({ field }) => (
+            <Form.Item className="flex items-center justify-between gap-3 rounded-lg border p-3">
+              <div className="space-y-1">
+                <Form.Label>
+                  {t('agent-settings-availability-label')}
+                </Form.Label>
+                <Form.Description>
+                  {field.value
+                    ? t('agent-settings-availability-on-description')
+                    : t('agent-settings-availability-off-description')}
+                </Form.Description>
+              </div>
+              <Form.Control>
+                <Switch
+                  checked={field.value}
+                  onCheckedChange={field.onChange}
+                />
+              </Form.Control>
+            </Form.Item>
+          )}
+        />
 
-      <Form.Field
-        control={form.control}
-        name="memoryEnabled"
-        render={({ field }) => (
-          <Form.Item className="flex items-center justify-between gap-4 rounded-lg border p-4">
-            <div className="space-y-1">
-              <Form.Label>{t('agent-settings-memory-label')}</Form.Label>
-              <Form.Description>
-                {field.value
-                  ? t('agent-settings-memory-on-description')
-                  : t('agent-settings-memory-off-description')}
-              </Form.Description>
-            </div>
-            <Form.Control>
-              <Switch checked={field.value} onCheckedChange={field.onChange} />
-            </Form.Control>
-          </Form.Item>
-        )}
-      />
+        <Form.Field
+          control={form.control}
+          name="memoryEnabled"
+          render={({ field }) => (
+            <Form.Item className="flex items-center justify-between gap-3 rounded-lg border p-3">
+              <div className="space-y-1">
+                <Form.Label>{t('agent-settings-memory-label')}</Form.Label>
+                <Form.Description>
+                  {field.value
+                    ? t('agent-settings-memory-on-description')
+                    : t('agent-settings-memory-off-description')}
+                </Form.Description>
+              </div>
+              <Form.Control>
+                <Switch
+                  checked={field.value}
+                  onCheckedChange={field.onChange}
+                />
+              </Form.Control>
+            </Form.Item>
+          )}
+        />
+      </div>
 
       <Collapsible className="overflow-hidden rounded-lg border">
         <Collapsible.TriggerButton
@@ -454,33 +474,12 @@ const BehaviorSection = ({ form, step }: { form: AgentForm; step: number }) => {
           />
         </Collapsible.Content>
       </Collapsible>
-    </FormSection>
+    </AgentFormSection>
   );
 };
 
-// Canonical agent form body — every field group, shared by the Agents settings
-// page (AgentFormPage) and the in-chat quick editor (EditAgentDialog). The two
-// only differ in chrome (page header vs modal footer) and save behaviour
-// (navigate-away vs stay-put), plus whether agentId is editable: on the create
-// page it's a writable slug, in edit contexts it keys the bot endpoint and
-// every persisted thread, so it stays read-only.
-export const AgentFormFields = ({
-  form,
-  agentIdEditable = false,
-  canShare = false,
-  onNameChange,
-  onAgentIdChange,
-}: {
-  form: AgentForm;
-  /** Create flow only — agentId is the bot-endpoint key, frozen once it exists. */
-  agentIdEditable?: boolean;
-  /** When true the audience section is shown. */
-  canShare?: boolean;
-  /** Lets the create page drive its auto-slug behaviour off the name field. */
-  onNameChange?: (value: string) => void;
-  /** Lets the create page stop auto-slugging once agentId is hand-edited. */
-  onAgentIdChange?: (value: string) => void;
-}) => {
+// Canonical AI team-member form body, shared by settings and chat.
+export const AgentFormFields = ({ form }: { form: AgentForm }) => {
   const { t } = useTranslation('mastra');
 
   return (
@@ -492,16 +491,10 @@ export const AgentFormFields = ({
           {t('agent-settings-intro-description')}
         </Alert.Description>
       </Alert>
-      <BasicInfoSection
-        form={form}
-        agentIdEditable={agentIdEditable}
-        onNameChange={onNameChange}
-        onAgentIdChange={onAgentIdChange}
-      />
+      <BasicInfoSection form={form} />
       <AiModelSection form={form} />
-      <ExecutionSafetySection form={form} />
-      {canShare && <AgentVisibilitySectionFields form={form} step={4} />}
-      <BehaviorSection form={form} step={canShare ? 5 : 4} />
+      <AgentAccessSection form={form} />
+      <BehaviorSection form={form} />
     </>
   );
 };

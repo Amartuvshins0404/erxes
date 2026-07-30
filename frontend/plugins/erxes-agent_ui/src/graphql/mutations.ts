@@ -41,36 +41,6 @@ export const MASTRA_AGENT_UPDATE = gql`
   ${AGENT_FIELDS}
 `;
 
-export const MASTRA_AGENT_SET_AUDIENCE = gql`
-  mutation MastraAgentSetAudience(
-    $_id: String!
-    $visibility: String!
-    $teamId: String
-    $departmentId: String
-    $unitId: String
-  ) {
-    mastraAgentSetAudience(
-      _id: $_id
-      visibility: $visibility
-      teamId: $teamId
-      departmentId: $departmentId
-      unitId: $unitId
-    ) {
-      ...AgentFields
-    }
-  }
-  ${AGENT_FIELDS}
-`;
-
-export const MASTRA_AGENT_SET_GRANT = gql`
-  mutation MastraAgentSetGrant($_id: String!, $grantGroupId: String) {
-    mastraAgentSetGrant(_id: $_id, grantGroupId: $grantGroupId) {
-      ...AgentFields
-    }
-  }
-  ${AGENT_FIELDS}
-`;
-
 export const MASTRA_AGENT_REMOVE = gql`
   mutation MastraAgentRemove($_id: String!) {
     mastraAgentRemove(_id: $_id)
@@ -106,16 +76,6 @@ export const MASTRA_SETTINGS_SAVE = gql`
       erxesApiToken
       defaultAgentId
       attachmentsEnabled
-      defaultAgentQuota
-    }
-  }
-`;
-
-export const MASTRA_USER_AGENT_QUOTA_SET = gql`
-  mutation MastraUserAgentQuotaSet($userId: String!, $quota: Int) {
-    mastraUserAgentQuotaSet(userId: $userId, quota: $quota) {
-      userId
-      agentQuota
     }
   }
 `;

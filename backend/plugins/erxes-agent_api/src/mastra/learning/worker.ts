@@ -27,6 +27,8 @@ import {
   getThreadTail,
   markThreadDistilled,
 } from '@/session/nativeStore';
+import { getAgentAccount } from '~/mastra/auth/servicePrincipal';
+import type { IMastraAgentDocument } from '@/agent/@types/agent';
 
 const SERVICE = 'erxes-agent';
 const SWEEP_QUEUE = 'learning-sweep';
@@ -54,17 +56,28 @@ async function resolveRuntime(
   subdomain: string,
 ): Promise<{ runtime: ExtractionRuntime; defaultAgentId: string } | null> {
   const settings = await models.MastraSettings.getSettings();
-  const agentConfig = settings?.defaultAgentId
-    ? await models.MastraAgent.findOne({
-        agentId: settings.defaultAgentId,
-        isEnabled: true,
-      })
-    : await models.MastraAgent.findOne({ isEnabled: true });
+  const profiles = settings?.defaultAgentId
+    ? [
+        await models.MastraAgent.findOne({ _id: settings.defaultAgentId }),
+      ].filter((profile): profile is NonNullable<typeof profile> =>
+        Boolean(profile),
+      )
+    : await models.MastraAgent.find({}).sort({ createdAt: 1 });
+  let agentConfig: IMastraAgentDocument | null = null;
+  for (const profile of profiles) {
+    try {
+      await getAgentAccount({ userId: profile._id, subdomain });
+      agentConfig = profile;
+      break;
+    } catch {
+      // Missing/inactive accounts are not eligible as the learning principal.
+    }
+  }
   if (!agentConfig) return null;
 
   const providers = await models.MastraProvider.find({ isEnabled: true });
   return {
-    defaultAgentId: agentConfig.agentId,
+    defaultAgentId: agentConfig._id,
     runtime: {
       provider: agentConfig.provider,
       model: agentConfig.model,
@@ -190,7 +203,6 @@ export async function runLearningSweep(
         );
         result.threads++;
       } catch (e) {
-        // eslint-disable-next-line no-console
         console.warn(
           `[erxes-agent:learning] thread "${thread.threadId}" skipped: ${
             e?.message || e
@@ -250,7 +262,6 @@ export async function initLearningSweep(redis: RedisConnection): Promise<void> {
     },
     redis,
     () => {
-      // eslint-disable-next-line no-console
       console.log('[erxes-agent:learning] sweep scheduler ready');
     },
   );
@@ -263,7 +274,6 @@ export async function initLearningSweep(redis: RedisConnection): Promise<void> {
       if (!subdomain) return 'skipped: no subdomain';
       const result = await runLearningSweep(subdomain);
       const errorSuffix = result.error ? `, error: ${result.error}` : '';
-      // eslint-disable-next-line no-console
       console.log(
         `[erxes-agent:learning] sweep "${subdomain}": ${result.threads} threads, +${result.created} created, ~${result.merged} merged, ↑${result.promoted} promoted, ✕${result.gated} gated, ↓${result.decayed} decayed, ${result.archived} archived${errorSuffix}`,
       );
@@ -271,7 +281,6 @@ export async function initLearningSweep(redis: RedisConnection): Promise<void> {
     },
     redis,
     () => {
-      // eslint-disable-next-line no-console
       console.log('[erxes-agent:learning] sweep worker ready');
     },
   );

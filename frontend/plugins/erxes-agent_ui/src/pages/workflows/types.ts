@@ -3,9 +3,22 @@
 
 /** A node in the workflow DSL. The shape is intentionally open: definitions are
  *  authored as free-form JSON, so we only constrain the keys this UI reads. */
+export interface IWorkflowBranch {
+  when?: string;
+  steps?: IWorkflowStep[];
+  [key: string]: unknown;
+}
+
 export interface IWorkflowStep {
   id?: string;
   type?: string;
+  operation?: string;
+  prompt?: string;
+  agentRef?: string;
+  branches?: IWorkflowBranch[];
+  else?: IWorkflowStep[];
+  steps?: IWorkflowStep[];
+  output?: Record<string, unknown>;
   [key: string]: unknown;
 }
 

@@ -2,7 +2,10 @@ jest.mock('@mastra/core/tools', () => ({
   createTool: (config: unknown) => config,
 }));
 
-const mockExecute = jest.fn(() => Promise.resolve({ _id: 'deal-1' }));
+const mockExecute = jest.fn((...args: unknown[]) => {
+  void args;
+  return Promise.resolve({ _id: 'deal-1' });
+});
 
 jest.mock('../erxesTools', () => ({
   executeErxesOperation: (...args: unknown[]) => mockExecute(...args),

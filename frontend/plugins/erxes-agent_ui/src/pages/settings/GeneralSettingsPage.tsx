@@ -1,38 +1,16 @@
 import { useEffect, useState } from 'react';
-import {
-  IconCheck,
-  IconCopy,
-  IconMicrophone,
-  IconPaperclip,
-} from '@tabler/icons-react';
-import {
-  Badge,
-  Button,
-  CopyText,
-  Form,
-  Input,
-  Skeleton,
-  cn,
-  toast,
-} from 'erxes-ui';
-import { ClampedNumberInput } from '~/components/ClampedNumberInput';
+import { IconCheck, IconCopy, IconPaperclip } from '@tabler/icons-react';
+import { Badge, Button, CopyText, Form, Input, cn, toast } from 'erxes-ui';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useGeneralSettings } from './hooks/useGeneralSettings';
-import { useSettingsStatus } from './hooks/useSettingsStatus';
 import {
   GENERAL_SETTINGS_DEFAULTS,
   GeneralSettingsValues,
   generalSettingsSchema,
 } from './validations';
-import { usePermissionCheck } from 'ui-modules';
-import { ERXES_AGENT_ACTIONS } from '~/permissions';
 
-const ManagedGeneralSettingsPage = ({
-  canManageQuotas,
-}: {
-  canManageQuotas: boolean;
-}) => {
+export const GeneralSettingsPage = () => {
   const { settings, agents, save, saving } = useGeneralSettings();
 
   // The bot webhook is served by the gateway at /pl:erxes-agent/* on this
@@ -40,9 +18,6 @@ const ManagedGeneralSettingsPage = ({
   // separate host/port on a split deployment. Derive it from the current
   // origin so it's correct wherever the console is served from. `origin` is
   // scheme+host+port with no trailing slash, so no trimming is needed.
-  // TODO: prefer a server-computed `settings.botEndpointUrl` once the backend
-  // exposes one, so a reverse-proxied / custom gateway host is reflected
-  // exactly rather than assumed to match the console origin.
   const botBase = typeof window !== 'undefined' ? window.location.origin : '';
   const botEndpointUrl = `${botBase}/pl:erxes-agent/bot`;
 
@@ -60,7 +35,6 @@ const ManagedGeneralSettingsPage = ({
         erxesApiToken: settings.erxesApiToken || '',
         defaultAgentId: settings.defaultAgentId || '',
         attachmentsEnabled: settings.attachmentsEnabled !== false,
-        defaultAgentQuota: settings.defaultAgentQuota ?? 0,
       });
     }
   }, [settings, form]);
@@ -68,13 +42,7 @@ const ManagedGeneralSettingsPage = ({
   // Detected upload storage (configured in core Settings → File upload).
   const attachmentStorage = settings?.attachmentStorage;
 
-  const onSubmit = async ({
-    defaultAgentQuota,
-    ...settingsDoc
-  }: GeneralSettingsValues) => {
-    const doc = canManageQuotas
-      ? { ...settingsDoc, defaultAgentQuota }
-      : settingsDoc;
+  const onSubmit = async (doc: GeneralSettingsValues) => {
     try {
       await save({ variables: { doc } });
       setSaved(true);
@@ -110,15 +78,13 @@ const ManagedGeneralSettingsPage = ({
                       onChange={(e) => field.onChange(e.target.value)}
                     >
                       <option value="">None</option>
-                      {agents.flatMap((a) =>
-                        a.isEnabled
-                          ? [
-                              <option key={a._id} value={a.agentId}>
-                                {a.name} ({a.agentId})
-                              </option>,
-                            ]
-                          : [],
-                      )}
+                      {agents
+                        .filter((agent) => agent.isActive)
+                        .map((agent) => (
+                          <option key={agent._id} value={agent._id}>
+                            {agent.accountName}
+                          </option>
+                        ))}
                     </select>
                   </Form.Control>
                   <Form.Description>
@@ -171,33 +137,6 @@ const ManagedGeneralSettingsPage = ({
                 </Form.Item>
               )}
             />
-
-            {canManageQuotas && (
-              <Form.Field
-                control={form.control}
-                name="defaultAgentQuota"
-                render={({ field }) => (
-                  <Form.Item>
-                    <Form.Label>Default agent creation quota</Form.Label>
-                    <Form.Control>
-                      <ClampedNumberInput
-                        field={field}
-                        min={0}
-                        max={10000}
-                        fallback={0}
-                        className="w-32"
-                      />
-                    </Form.Control>
-                    <Form.Description>
-                      Maximum agents a user may create (0 = unlimited). Shared /
-                      team-visible agents don't count toward this limit. Admins
-                      are always exempt.
-                    </Form.Description>
-                    <Form.Message />
-                  </Form.Item>
-                )}
-              />
-            )}
 
             <Form.Field
               control={form.control}
@@ -304,100 +243,4 @@ const ManagedGeneralSettingsPage = ({
       </div>
     </div>
   );
-};
-
-const GeneralSettingsStatusPage = () => {
-  const { attachmentStorage, voiceStatus, loading, error } =
-    useSettingsStatus();
-
-  const attachmentsConfigured = attachmentStorage?.configured === true;
-  const attachmentsEnabled = attachmentStorage?.enabled === true;
-  const voiceEnabled = voiceStatus?.enabled === true;
-
-  return (
-    <div className="h-full overflow-y-auto">
-      <div className="p-6 max-w-xl space-y-8">
-        <h1 className="text-2xl font-bold">General Settings</h1>
-
-        {error ? (
-          <p role="alert" className="text-sm text-destructive">
-            {error.message}
-          </p>
-        ) : loading ? (
-          <div className="space-y-3">
-            <Skeleton className="h-20 w-full rounded-lg" />
-            <Skeleton className="h-20 w-full rounded-lg" />
-          </div>
-        ) : (
-          <div className="space-y-3">
-            <div className="rounded-lg border p-4">
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-2">
-                  <IconPaperclip className="size-4 text-muted-foreground" />
-                  <span className="font-medium">Chat file attachments</span>
-                </div>
-                <Badge
-                  variant={
-                    !attachmentsConfigured
-                      ? 'destructive'
-                      : attachmentsEnabled
-                      ? 'success'
-                      : 'secondary'
-                  }
-                >
-                  {!attachmentsConfigured
-                    ? 'No storage'
-                    : attachmentsEnabled
-                    ? 'On'
-                    : 'Off'}
-                </Badge>
-              </div>
-              <p className="mt-2 pl-6 text-xs text-muted-foreground">
-                Detected storage:{' '}
-                <span className="font-mono">
-                  {attachmentStorage?.serviceType || 'unknown'}
-                </span>
-              </p>
-            </div>
-
-            <div className="rounded-lg border p-4">
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-2">
-                  <IconMicrophone className="size-4 text-muted-foreground" />
-                  <span className="font-medium">Voice mode</span>
-                </div>
-                <Badge variant={voiceEnabled ? 'success' : 'secondary'}>
-                  {voiceEnabled ? 'Ready' : 'Unavailable'}
-                </Badge>
-              </div>
-              <p className="mt-2 pl-6 text-xs text-muted-foreground">
-                {voiceEnabled
-                  ? 'Both directions are configured — voice mode is available in chat.'
-                  : 'Needs a usable STT and TTS token (per-workspace or environment) to appear in chat.'}
-              </p>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
-
-export const GeneralSettingsPage = () => {
-  const { hasActionPermission } = usePermissionCheck();
-  const canManageSettings = hasActionPermission(
-    ERXES_AGENT_ACTIONS.settings.manage,
-  );
-  const canReadSettingsStatus = hasActionPermission(
-    ERXES_AGENT_ACTIONS.settings.statusRead,
-  );
-  const canManageQuotas = hasActionPermission(
-    ERXES_AGENT_ACTIONS.settings.quotasManage,
-  );
-
-  if (canManageSettings) {
-    return <ManagedGeneralSettingsPage canManageQuotas={canManageQuotas} />;
-  }
-
-  return canReadSettingsStatus ? <GeneralSettingsStatusPage /> : null;
 };

@@ -1,11 +1,7 @@
 import { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { Icon, IconArrowLeft } from '@tabler/icons-react';
-import {
-  FieldValues,
-  SubmitHandler,
-  UseFormReturn,
-} from 'react-hook-form';
+import { FieldValues, SubmitHandler, UseFormReturn } from 'react-hook-form';
 import { Breadcrumb, Button, Form, Separator } from 'erxes-ui';
 import { PageHeader } from 'ui-modules';
 
@@ -21,6 +17,7 @@ interface ResourceFormLayoutProps<T extends FieldValues> {
   saveLabel: string;
   formId: string;
   submitDisabled?: boolean;
+  wide?: boolean;
   form: UseFormReturn<T>;
   onSubmit: SubmitHandler<T>;
   /** Mobile-only sticky footer (cancel/save); omitted for forms that lack one. */
@@ -46,6 +43,7 @@ export const ResourceFormLayout = <T extends FieldValues>({
   saveLabel,
   formId,
   submitDisabled,
+  wide = false,
   form,
   onSubmit,
   mobileFooter = false,
@@ -55,52 +53,48 @@ export const ResourceFormLayout = <T extends FieldValues>({
   <div className="flex flex-col h-full">
     {embedded ? (
       <div className="flex items-center justify-end gap-2 px-3 pt-3">
-        <Button
-          type="submit"
-          form={formId}
-          disabled={saving || submitDisabled}
-        >
+        <Button type="submit" form={formId} disabled={saving || submitDisabled}>
           {saving ? 'Saving…' : saveLabel}
         </Button>
       </div>
     ) : (
-    <PageHeader>
-      <PageHeader.Start>
-        <Breadcrumb>
-          <Breadcrumb.List className="gap-1">
-            <Breadcrumb.Item>
-              <Button variant="ghost" asChild>
-                <Link to={rootPath}>
-                  <Icon />
-                  {title}
-                </Link>
-              </Button>
-            </Breadcrumb.Item>
-            <Breadcrumb.Separator />
-            <Breadcrumb.Item>
-              <span className="text-muted-foreground">
-                {isEdit ? `Edit ${noun}` : `New ${noun}`}
-              </span>
-            </Breadcrumb.Item>
-          </Breadcrumb.List>
-        </Breadcrumb>
-        <Separator.Inline />
-      </PageHeader.Start>
-      <PageHeader.End>
-        <Button variant="outline" asChild>
-          <Link to={rootPath}>
-            <IconArrowLeft /> Back
-          </Link>
-        </Button>
-        <Button
-          type="submit"
-          form={formId}
-          disabled={saving || submitDisabled}
-        >
-          {saving ? 'Saving…' : saveLabel}
-        </Button>
-      </PageHeader.End>
-    </PageHeader>
+      <PageHeader>
+        <PageHeader.Start>
+          <Breadcrumb>
+            <Breadcrumb.List className="gap-1">
+              <Breadcrumb.Item>
+                <Button variant="ghost" asChild>
+                  <Link to={rootPath}>
+                    <Icon />
+                    {title}
+                  </Link>
+                </Button>
+              </Breadcrumb.Item>
+              <Breadcrumb.Separator />
+              <Breadcrumb.Item>
+                <span className="text-muted-foreground">
+                  {isEdit ? `Edit ${noun}` : `New ${noun}`}
+                </span>
+              </Breadcrumb.Item>
+            </Breadcrumb.List>
+          </Breadcrumb>
+          <Separator.Inline />
+        </PageHeader.Start>
+        <PageHeader.End>
+          <Button variant="outline" asChild>
+            <Link to={rootPath}>
+              <IconArrowLeft /> Back
+            </Link>
+          </Button>
+          <Button
+            type="submit"
+            form={formId}
+            disabled={saving || submitDisabled}
+          >
+            {saving ? 'Saving…' : saveLabel}
+          </Button>
+        </PageHeader.End>
+      </PageHeader>
     )}
 
     <div className="flex-1 overflow-auto p-4">
@@ -108,7 +102,7 @@ export const ResourceFormLayout = <T extends FieldValues>({
         <form
           id={formId}
           onSubmit={form.handleSubmit(onSubmit)}
-          className="max-w-2xl mx-auto space-y-4"
+          className={`${wide ? 'max-w-5xl' : 'max-w-2xl'} mx-auto space-y-4`}
         >
           {children}
 

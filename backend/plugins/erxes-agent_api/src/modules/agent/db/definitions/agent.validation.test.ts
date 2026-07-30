@@ -1,9 +1,9 @@
 import mongoose from 'mongoose';
 import { agentSchema } from './agent';
 
-// The `mastraAgentUpdate` mutation persists via findOneAndUpdate({ runValidators:
-// true }); update validators run the same schema-path validators exercised here,
-// so this guards exactly what that flag enforces without booting a database.
+// Agent account identity and visibility live on the canonical core User. This
+// suite covers only model/instruction/runtime settings persisted in this
+// plugin's profile document.
 const AgentModel =
   mongoose.models.AgentValidationTest ||
   mongoose.model('AgentValidationTest', agentSchema);
@@ -12,8 +12,10 @@ const expectPath = (doc: Record<string, unknown>, path: string) =>
   AgentModel.validate(doc, [path]);
 
 describe('agentSchema update validation', () => {
-  it('rejects an unknown visibility enum', async () => {
-    await expect(expectPath({ visibility: 'superadmin' }, 'visibility')).rejects.toThrow();
+  it('rejects an unknown destructive-operations policy', async () => {
+    await expect(
+      expectPath({ destructiveOps: 'always' }, 'destructiveOps'),
+    ).rejects.toThrow();
   });
 
   it('rejects an out-of-range maxSteps', async () => {
@@ -29,16 +31,32 @@ describe('agentSchema update validation', () => {
     await expect(expectPath({ model: null }, 'model')).rejects.toThrow();
   });
 
-  it('rejects an over-long name', async () => {
-    await expect(expectPath({ name: 'a'.repeat(201) }, 'name')).rejects.toThrow();
+  it('rejects over-long instructions', async () => {
+    await expect(
+      expectPath({ instructions: 'a'.repeat(20001) }, 'instructions'),
+    ).rejects.toThrow();
   });
 
   // Regression: a legitimate update must still pass validation.
-  it('accepts a valid update', async () => {
+  it('accepts a valid profile update', async () => {
     await expect(
       AgentModel.validate(
-        { visibility: 'org', maxSteps: 25, temperature: 1, name: 'Support agent', model: 'gpt-4o' },
-        ['visibility', 'maxSteps', 'temperature', 'name', 'model'],
+        {
+          instructions: 'Help the support team.',
+          provider: 'openai',
+          model: 'gpt-4o',
+          destructiveOps: 'ask',
+          maxSteps: 25,
+          temperature: 1,
+        },
+        [
+          'instructions',
+          'provider',
+          'model',
+          'destructiveOps',
+          'maxSteps',
+          'temperature',
+        ],
       ),
     ).resolves.toBeDefined();
   });

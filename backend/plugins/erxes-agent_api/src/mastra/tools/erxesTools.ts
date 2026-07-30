@@ -3,6 +3,7 @@ import {
   getPlugins,
   getPluginAddress,
 } from 'erxes-api-shared/utils';
+import { gql } from 'graphql-tag';
 import { getCurrentAuth } from '../requestContext';
 import type { OperationMeta } from './operationRegistry';
 import {
@@ -42,7 +43,7 @@ import {
 export type { GqlArgDef, GqlFieldDef, GqlTypeRef, SchemaMaps };
 export { graphqlTypeToString, sanitizeServerError };
 
-/** Connection settings for reaching the erxes gateway (API URL + app token). */
+/** Gateway settings used for schema discovery, not acting-user authentication. */
 export interface ErxesToolSettings {
   erxesApiUrl?: string;
   erxesApiToken?: string;
@@ -112,20 +113,36 @@ async function gqlCall<TData = Record<string, unknown>>(
 }
 
 /**
- * Gateway access the entity resolver needs, bound to this request's auth. Every
- * candidate lookup runs through the same `gqlCall` (Bearer + tenant hostname)
- * the operation itself uses. The cache scope carries subdomain AND userId —
- * entity visibility (pipelines, stages, customers) is per-user, so cached rows
- * must never cross users.
+ * Route permission-sensitive calls straight to their owning private subgraph.
+ * The gateway accepts only signed user tokens and must remain unchanged; direct
+ * service calls use erxes' existing trusted `user` header contract.
  */
-function makeResolverDeps(
-  apiUrl: string,
-  authHeaders: Record<string, string>,
-): EntityResolverDeps {
+function makeServiceExecutionContext(authHeaders: Record<string, string>): {
+  resolveAddress: (serviceName: string) => Promise<string | undefined>;
+  resolverDeps: EntityResolverDeps;
+} {
   const auth = getCurrentAuth();
+  const addressCache = new Map<string, Promise<string | undefined>>();
+  const resolveAddress = (serviceName: string): Promise<string | undefined> => {
+    let pending = addressCache.get(serviceName);
+    if (!pending) {
+      pending = getPluginAddress(serviceName)
+        .then((address) => address?.trim() || undefined)
+        .catch(() => undefined);
+      addressCache.set(serviceName, pending);
+    }
+    return pending;
+  };
+
   return {
-    runQuery: (query) => gqlCall(apiUrl, authHeaders, query),
-    scope: `${auth?.subdomain || ''}::${auth?.userId || ''}`,
+    resolveAddress,
+    resolverDeps: {
+      runQuery: async (query, ownerService) => {
+        const address = await resolveAddress(ownerService);
+        return address ? gqlCall(address, authHeaders, query) : null;
+      },
+      scope: `${auth?.subdomain || ''}::${auth?.principalUserId || ''}`,
+    },
   };
 }
 
@@ -164,32 +181,22 @@ export interface ErxesOperationRef {
 }
 
 /**
- * Auth headers for gateway calls: the calling user's login token as a Bearer,
- * otherwise the configured app token (bot/no-session calls). The decoded
- * `userHeader` is NEVER sent outbound — it stays in requestContext for INTERNAL
- * gating only (requireTeamMember, currentUserId, resource scoping). Exported so
- * the header contract can be unit-tested in isolation.
+ * Build headers for an internal subgraph call from the resolved principal.
+ * A bearer or configured App token is never accepted as an acting-user fallback.
  */
-export function buildAuthHeaders(
-  appToken: string,
-  processId?: string,
-): Record<string, string> {
+export function buildAuthHeaders(processId?: string): Record<string, string> {
   const reqAuth = getCurrentAuth();
-  const authHeaders: Record<string, string> = {};
-  // Forward identity as `Authorization: Bearer <token>` only (the gateway's
-  // userMiddleware resolves the request as that user); never a `user` header.
-  const bearer = reqAuth?.token || appToken;
-  if (bearer) {
-    authHeaders['Authorization'] = asBearer(bearer);
+  const userHeader = reqAuth?.userHeader?.trim();
+  const hostname = reqAuth?.subdomain?.trim();
+  if (!userHeader || !hostname) {
+    throw new Error('Agent principal unavailable');
   }
-  if (reqAuth?.subdomain) {
-    // The gateway resolves the tenant via getSubdomain(), which reads the
-    // 'hostname' header before falling back to the request host.
-    authHeaders['hostname'] = reqAuth.subdomain;
-  }
+
+  const authHeaders: Record<string, string> = {
+    user: userHeader,
+    hostname,
+  };
   if (processId) {
-    // Correlation id honored by the subgraph's request context, so every DB
-    // change this mutation makes is stamped with it (traceable / revertable).
     authHeaders['x-erxes-process-id'] = processId;
   }
   return authHeaders;
@@ -255,13 +262,12 @@ function secretRefRefusedResult() {
  *   • building a valid GraphQL operation + response selection,
  *   • turning "not found"/validation errors into actionable instructions.
  *
- * Auth is read from the async request context (the calling user's header) and
- * falls back to the configured app token for bot/no-session calls.
+ * Auth is read only from the resolved AI team-member request context.
  */
 export async function executeErxesOperation(
   op: ErxesOperationRef,
   rawArgs: Record<string, unknown>,
-  settings: ErxesToolSettings | null,
+  _settings: ErxesToolSettings | null,
   schemaMaps?: Partial<SchemaMaps>,
   processId?: string,
   requestedFields?: string[],
@@ -271,8 +277,6 @@ export async function executeErxesOperation(
   // on — never an exception that surfaces to the user as a raw stack message
   // and strands them.
   try {
-    const apiUrl = settings?.erxesApiUrl || 'http://localhost:4000';
-    const token = settings?.erxesApiToken || '';
     const erxesOperation = op.operation;
     const erxesOperationType = op.operationType;
     const args = op.graphqlArgs || [];
@@ -309,10 +313,15 @@ export async function executeErxesOperation(
       return secretRefRefusedResult();
     }
 
-    // Auth must be resolved first — needed for the entity-resolver lookups.
-    const authHeaders = buildAuthHeaders(token, processId);
-    const resolverDeps = makeResolverDeps(apiUrl, authHeaders);
-
+    // Auth is resolved before entity lookups. Every request stays on the
+    // private service network and runs as the validated AI team member.
+    const authHeaders = buildAuthHeaders(processId);
+    const execution = makeServiceExecutionContext(authHeaders);
+    const resolverDeps = execution.resolverDeps;
+    const operationAddress = await execution.resolveAddress(op.plugin);
+    if (!operationAddress) {
+      throw new Error(`Erxes service "${op.plugin}" is unavailable`);
+    }
     const idResolution = await resolveIdArgs(
       resolvedArgs,
       resolverDeps,
@@ -343,7 +352,10 @@ export async function executeErxesOperation(
         op.returnType,
         finalResponseFields,
       );
-      return gqlFetch<GraphqlEnvelope>(apiUrl, authHeaders, { query, variables });
+      return gqlFetch<GraphqlEnvelope>(operationAddress, authHeaders, {
+        query,
+        variables,
+      });
     };
 
     let data = await runCall(resolvedArgs);
@@ -469,17 +481,40 @@ export async function fetchInputSchemaMaps(
   };
 }
 
+const addPluginOperationsFromSdl = (
+  map: Map<string, string>,
+  plugin: string,
+  sdl: string,
+) => {
+  const document = gql(sdl);
+
+  for (const definition of document.definitions) {
+    if (
+      (definition.kind !== 'ObjectTypeDefinition' &&
+        definition.kind !== 'ObjectTypeExtension') ||
+      (definition.name.value !== 'Query' &&
+        definition.name.value !== 'Mutation')
+    ) {
+      continue;
+    }
+
+    for (const field of definition.fields || []) {
+      const operation = field.name.value;
+      if (/^(_|cp[A-Z])/.test(operation)) continue;
+      if (!map.has(operation)) map.set(operation, plugin);
+    }
+  }
+};
+
 // ─── Plugin ownership via live subgraph introspection ────────────────────────
 //
-// Source of truth for "which plugin owns this operation": introspect each
-// configured or gateway-active plugin's own subgraph (discovered through erxes
-// service discovery)
-// and record every Query/Mutation field it declares. This:
+// Source of truth for "which plugin owns this operation": fetch each configured
+// or gateway-active plugin's federation SDL from its internal subgraph and
+// record every Query/Mutation field it declares. This:
 //   • only ever sees enabled/running plugins (disabled ones aren't registered),
+//   • works while production GraphQL introspection remains disabled,
 //   • re-derives from the live schema on every call (auto-adapts to changes),
-//   • needs no static prefix lists and no supergraph SDL access.
-// (The gateway does not expose `{ _service { sdl } }`, so SDL parsing isn't an
-// option here.)
+//   • needs no static prefix lists or public supergraph SDL access.
 async function fetchPluginMap(token: string): Promise<Map<string, string>> {
   const map = new Map<string, string>();
   const authHeaders: Record<string, string> = token
@@ -508,26 +543,17 @@ async function fetchPluginMap(token: string): Promise<Map<string, string>> {
 
         const json = await gqlFetch<{
           data?: {
-            __schema?: {
-              queryType?: { fields?: Array<{ name?: string }> | null };
-              mutationType?: { fields?: Array<{ name?: string }> | null };
-            };
+            _service?: {
+              sdl?: string | null;
+            } | null;
           };
         }>(address, authHeaders, {
-          query:
-            '{ __schema { queryType { fields { name } } mutationType { fields { name } } } }',
+          query: '{ _service { sdl } }',
         });
-        const schema = json?.data?.__schema;
-        const fields = [
-          ...(schema?.queryType?.fields || []),
-          ...(schema?.mutationType?.fields || []),
-        ];
-        for (const field of fields) {
-          // Skip federation internals (_service/_entities) and ClientPortal ops.
-          // First subgraph to declare a field name wins.
-          if (!field?.name || /^(_|cp[A-Z])/.test(field.name)) continue;
-          if (!map.has(field.name)) map.set(field.name, name);
-        }
+        const sdl = json?.data?._service?.sdl;
+        if (!sdl) return;
+
+        addPluginOperationsFromSdl(map, name, sdl);
       } catch {
         // Plugin unreachable — its ops just won't be categorized via this map.
       }
@@ -608,7 +634,9 @@ export async function fetchAvailableErxesTools(
   try {
     [pluginMap, schemaData] = await Promise.all([
       fetchPluginMap(token),
-      gqlFetch<SchemaResult>(apiUrl, authHeaders, { query: introspectionQuery }),
+      gqlFetch<SchemaResult>(apiUrl, authHeaders, {
+        query: introspectionQuery,
+      }),
     ]);
   } catch {
     console.warn('[mastra] gateway introspection failed');
@@ -618,7 +646,7 @@ export async function fetchAvailableErxesTools(
 
   if (pluginMap.size === 0) {
     console.warn(
-      '[mastra] _service { sdl } returned no data — falling back to first-word detection',
+      '[mastra] subgraph federation SDL returned no data — falling back to first-word detection',
     );
   }
 

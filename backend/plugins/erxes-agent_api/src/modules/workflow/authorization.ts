@@ -2,11 +2,6 @@ import { IUserDocument } from 'erxes-api-shared/core-types';
 import { ExpectedError } from 'erxes-api-shared/utils';
 import { IModels } from '~/connectionResolvers';
 import { requireActionScope } from '@/_shared/authorization';
-import {
-  canUserAccessAgent,
-  getUserUnitIds,
-  visibilityFilter,
-} from '@/agent/utils';
 
 export const getWorkflowAgentAccess = async ({
   models,
@@ -22,25 +17,16 @@ export const getWorkflowAgentAccess = async ({
   scope: 'own' | 'group' | 'all';
   agentIds: string[];
 }> => {
-  const [scope, unitIds] = await Promise.all([
-    requireActionScope({ subdomain, user, action }),
-    getUserUnitIds(models, user._id),
-  ]);
+  const scope = await requireActionScope({ subdomain, user, action });
   const agents = await models.MastraAgent.find(
-    visibilityFilter(
-      user._id,
-      scope,
-      user.branchIds ?? [],
-      user.departmentIds ?? [],
-      unitIds,
-    ),
+    scope === 'own' ? { _id: user._id } : {},
   )
-    .select({ agentId: 1 })
+    .select({ _id: 1 })
     .lean();
 
   return {
     scope,
-    agentIds: agents.flatMap((agent) => (agent.agentId ? [agent.agentId] : [])),
+    agentIds: agents.map((agent) => String(agent._id)),
   };
 };
 
@@ -57,23 +43,12 @@ export const requireScopedWorkflowAgent = async ({
   action: string;
   agentId: string;
 }) => {
-  const [scope, unitIds, agent] = await Promise.all([
+  const [scope, agent] = await Promise.all([
     requireActionScope({ subdomain, user, action }),
-    getUserUnitIds(models, user._id),
-    models.MastraAgent.findOne({ agentId }),
+    models.MastraAgent.findById(agentId),
   ]);
 
-  if (
-    !agent ||
-    !canUserAccessAgent(
-      agent,
-      user._id,
-      scope,
-      user.branchIds ?? [],
-      user.departmentIds ?? [],
-      unitIds,
-    )
-  ) {
+  if (!agent || (scope === 'own' && String(agent._id) !== user._id)) {
     throw new ExpectedError('Workflow not found');
   }
 

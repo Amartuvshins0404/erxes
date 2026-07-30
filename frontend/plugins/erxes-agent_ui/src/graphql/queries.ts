@@ -3,39 +3,21 @@ import { gql } from '@apollo/client';
 export const AGENT_FIELDS = gql`
   fragment AgentFields on MastraAgent {
     _id
-    name
-    agentId
-    description
+    accountName
+    accountDescription
+    permissionGroupIds
     instructions
     provider
     model
-    grantGroupId
     skills
     destructiveOps
     memoryEnabled
     debug
     maxSteps
     temperature
-    isEnabled
-    visibility
-    teamId
-    departmentId
-    unitId
-    isOwnAgent
+    isActive
     createdAt
     updatedAt
-    capabilities {
-      canReadConfig
-      canChat
-      canEdit
-      canRemove
-      canShare
-      canTransferOwnership
-      canManageGrant
-      canReadWorkflows
-      canReadSkills
-      canReadLearnings
-    }
   }
 `;
 
@@ -48,17 +30,6 @@ export const WORKFLOW_FIELDS = gql`
     definition
     version
     isEnabled
-    approvalStatus
-    approvedByUserId
-    approvedAt
-    capabilities {
-      canUpdate
-      canRemove
-      canRun
-      canApprove
-      canSchedule
-      canReadRuns
-    }
     createdAt
     updatedAt
   }
@@ -82,29 +53,15 @@ export const MASTRA_AGENTS_MAIN = gql`
     ) {
       list {
         _id
-        name
-        agentId
-        description
-        isEnabled
-        visibility
-        teamId
-        departmentId
-        unitId
-        isOwnAgent
-        createdAt
+        accountName
+        accountDescription
+        provider
+        model
+        skills
+        permissionGroupIds
+        isActive
         workflowsCount
-        capabilities {
-          canReadConfig
-          canChat
-          canEdit
-          canRemove
-          canShare
-          canTransferOwnership
-          canManageGrant
-          canReadWorkflows
-          canReadSkills
-          canReadLearnings
-        }
+        createdAt
       }
       totalCount
     }
@@ -262,60 +219,12 @@ export const MASTRA_SETTINGS = gql`
       erxesApiToken
       defaultAgentId
       attachmentsEnabled
-      defaultAgentQuota
       attachmentStorage {
         configured
         serviceType
         enabled
       }
       advancedMemory
-    }
-  }
-`;
-
-export const MASTRA_MY_AGENT_QUOTA_STATUS = gql`
-  query MastraMyAgentQuotaStatus {
-    mastraMyAgentQuotaStatus {
-      count
-      quota
-      atQuota
-    }
-  }
-`;
-
-export const MASTRA_USER_AGENT_QUOTA = gql`
-  query MastraUserAgentQuota($userId: String!) {
-    mastraUserAgentQuota(userId: $userId) {
-      userId
-      agentQuota
-    }
-  }
-`;
-
-export const AGENT_FORM_BRANCHES = gql`
-  query AgentFormBranches {
-    branches {
-      _id
-      title
-    }
-  }
-`;
-
-export const AGENT_FORM_DEPARTMENTS = gql`
-  query AgentFormDepartments {
-    departments {
-      _id
-      title
-    }
-  }
-`;
-
-export const AGENT_FORM_UNITS = gql`
-  query AgentFormUnits {
-    units {
-      _id
-      title
-      departmentId
     }
   }
 `;

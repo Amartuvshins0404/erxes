@@ -6,9 +6,8 @@ export const resolveAgentsBasePath = (pathname: string): string =>
     ? '/settings/erxes-agent/agents'
     : '/erxes-agent/agents';
 
-// Names aren't unique, so same-named agents render as identical picker rows.
-// Return the set of names that appear more than once so those rows can be
-// tagged with their unique agentId.
+// Names are not unique, so callers can add an account-id suffix only where
+// two AI team members would otherwise render identically.
 export const duplicatedAgentNames = (names: string[]): Set<string> => {
   const counts = new Map<string, number>();
   const duplicates = new Set<string>();
@@ -19,12 +18,3 @@ export const duplicatedAgentNames = (names: string[]): Set<string> => {
   }
   return duplicates;
 };
-
-// Slugify a name into an agentId. Names with no ASCII alphanumerics (e.g.
-// "日本語", "!!!") would otherwise slug to an empty string and fail the
-// required-field check with no visible hint — fall back to a non-empty default.
-export const toSlug = (name: string, fallback = 'agent'): string =>
-  name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/(^-|-$)/g, '') || fallback;

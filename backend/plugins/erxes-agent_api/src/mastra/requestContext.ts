@@ -10,13 +10,15 @@ export interface ApprovedOp {
 }
 
 interface RequestAuth {
+  /** Base64-encoded acting user for trusted internal subgraph calls. */
   userHeader?: string;
+  /** Optional caller token for auxiliary flows; erxes operations ignore it. */
   token?: string;
-  /** Requesting user's id — used to resolve their own skills at request time. */
-  userId?: string;
-  /** Current chat thread — used by the makeSkill tool to read this turn's thread,
-   *  and to attribute generated artifacts (charts/documents) to the thread for
-   *  the Preview file list. */
+  /** Acting principal used by permission-sensitive caches and entity lookup. */
+  principalUserId?: string;
+  /** Human who initiated an interactive turn; absent for background events. */
+  initiatorUserId?: string;
+  /** Current thread, used for skills and generated artifacts. */
   threadId?: string;
   agentId?: string;
   /** Tenant of the request — required by tools that query tenant-partitioned stores. */
@@ -36,8 +38,8 @@ interface RequestAuth {
    *  otherwise-gated delete/merge only when it matches one of these. */
   approvedOps?: ApprovedOp[];
   /** True for unattended workflow or frontline-bot execution authenticated as
-   *  the agent's service user. Destructive operations then require impossible
-   *  live approval and remain blocked. */
+   *  the agent's linked core account. Destructive operations then require
+   *  impossible live approval and remain blocked. */
   background?: boolean;
 }
 

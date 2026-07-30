@@ -49,7 +49,7 @@ export async function persistTurn(params: {
       nativeAssistantId = await patchNativeTurn({
         subdomain: memCtx.subdomain,
         binding: prepared.memoryBinding,
-        agentId: agentConfig.agentId,
+        agentId: agentConfig._id,
         reply,
         attachments,
         reasoningSummaries,
@@ -60,7 +60,9 @@ export async function persistTurn(params: {
       });
     } catch (e) {
       console.warn(
-        `[native-chat-store] turn reconcile skipped: ${(e as Error)?.message || e}`,
+        `[native-chat-store] turn reconcile skipped: ${
+          (e as Error)?.message || e
+        }`,
       );
     }
   }
@@ -109,15 +111,14 @@ const RECOVERY_SKEW_MS = 5_000;
 // One short retry for when the row is simply still mid-write at recall time.
 const RECOVERY_RETRY_DELAY_MS = 500;
 
-const isFromTurn = (
-  m: NativeChatMessage,
-  turnStartedAt?: Date,
-): boolean => {
+const isFromTurn = (m: NativeChatMessage, turnStartedAt?: Date): boolean => {
   if (!turnStartedAt) return true;
   const at = m.createdAt ? new Date(m.createdAt).getTime() : NaN;
   // A row with no readable timestamp can't be verified — treat it as stale
   // rather than risk a mislink (unlinked degrades gracefully, mislinked not).
-  return Number.isFinite(at) && at >= turnStartedAt.getTime() - RECOVERY_SKEW_MS;
+  return (
+    Number.isFinite(at) && at >= turnStartedAt.getTime() - RECOVERY_SKEW_MS
+  );
 };
 
 function mergeErxesMeta(

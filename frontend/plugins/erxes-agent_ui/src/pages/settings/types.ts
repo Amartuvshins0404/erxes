@@ -69,7 +69,6 @@ export interface IMastraSettings {
   erxesApiToken?: string | null;
   defaultAgentId?: string | null;
   attachmentsEnabled?: boolean | null;
-  defaultAgentQuota?: number | null;
   attachmentStorage?: IAttachmentStorage | null;
   advancedMemory?: boolean | null;
 }
@@ -101,24 +100,14 @@ export interface IVoiceCatalogResponse {
   mastraVoiceCatalog: IMastraVoiceOption[];
 }
 
-export interface IMastraUserSettings {
-  userId: string;
-  agentQuota?: number | null;
-}
-
-export interface IUserAgentQuotaResponse {
-  mastraUserAgentQuota: IMastraUserSettings | null;
-}
-
 export interface ISettingsResponse {
   mastraSettings: IMastraSettings | null;
 }
 
 export interface ISettingsAgentOption {
   _id: string;
-  agentId: string;
-  name: string;
-  isEnabled: boolean;
+  accountName: string;
+  isActive: boolean;
 }
 
 export interface IAgentsResponse {

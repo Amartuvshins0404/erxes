@@ -30,7 +30,7 @@ export const triggerEnvelopeSchema = z.object({
 
 export type TriggerEnvelope = z.infer<typeof triggerEnvelopeSchema>;
 
-/** Builds the envelope for an on-demand (chat/UI) run with the user as actor. */
+/** Builds an on-demand run envelope with its human initiator for audit. */
 export function buildManualEnvelope(
   payload: Record<string, unknown>,
   userId?: string,

@@ -9,6 +9,8 @@
 // width/height of its subtree, lanes are centered under their parent, and the
 // chain resumes below the tallest lane.
 
+import type { IWorkflowDefinition, IWorkflowStep } from '../types';
+
 export const NODE_W = 240;
 export const NODE_H = 76;
 const V_GAP = 56;
@@ -46,8 +48,14 @@ export interface WfEdge {
   label?: string;
 }
 
-type StepDef = { id: string; type: string; [key: string]: any };
+type StepDef = IWorkflowStep & { id: string; type: string };
 type StepsSummary = Record<string, { status?: string; error?: string }>;
+
+const isStepDef = (value: IWorkflowStep): value is StepDef =>
+  typeof value.id === 'string' && typeof value.type === 'string';
+
+const stepDefs = (value?: IWorkflowStep[]): StepDef[] =>
+  (value ?? []).filter(isStepDef);
 
 // ── Node descriptions ─────────────────────────────────────────────────────────
 
@@ -94,7 +102,7 @@ function subtitleOf(step: StepDef): string | undefined {
   }
 }
 
-export function triggerSubtitle(definition: any): string {
+export function triggerSubtitle(definition: IWorkflowDefinition): string {
   const t = definition?.trigger;
   if (!t?.type) return 'manual';
   if (t.type === 'schedule' && t.config?.cron) return `cron: ${t.config.cron}`;
@@ -140,15 +148,17 @@ function measureChain(steps: StepDef[]): Size {
 // are kept — they become a labeled pass-through edge to the join point.
 function lanesOf(step: StepDef): { label?: string; steps: StepDef[] }[] | null {
   if (step.type === 'branch') {
-    const lanes = (step.branches || []).map((b: any) => ({
-      label: clip(b.when || '', 28),
-      steps: b.steps || [],
+    const lanes = (step.branches ?? []).map((branch) => ({
+      label: clip(branch.when ?? '', 28),
+      steps: stepDefs(branch.steps),
     }));
-    if (step.else) lanes.push({ label: 'else', steps: step.else });
+    if (step.else) lanes.push({ label: 'else', steps: stepDefs(step.else) });
     return lanes;
   }
   if (step.type === 'parallel') {
-    return (step.steps || []).map((s: StepDef) => ({ steps: [s] }));
+    return stepDefs(step.steps).map((parallelStep) => ({
+      steps: [parallelStep],
+    }));
   }
   return null;
 }
@@ -162,7 +172,7 @@ interface ChainResult {
 }
 
 export function buildWorkflowGraph(
-  definition: any,
+  definition: IWorkflowDefinition,
   stepsSummary?: StepsSummary | null,
 ): { nodes: WfNode[]; edges: WfEdge[] } {
   const nodes: WfNode[] = [];
@@ -253,9 +263,7 @@ export function buildWorkflowGraph(
     return { entryId, exits: prevExits };
   };
 
-  const steps: StepDef[] = Array.isArray(definition?.steps)
-    ? definition.steps
-    : [];
+  const steps = stepDefs(definition.steps);
   const chainSize = measureChain(steps);
   const centerX = Math.max(chainSize.width, NODE_W) / 2;
 

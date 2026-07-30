@@ -15,6 +15,19 @@ const jsonResponse = (body: unknown) =>
     headers: { 'content-type': 'application/json' },
   });
 
+const requestQuery = (init?: RequestInit): string => {
+  const payload: unknown = JSON.parse(String(init?.body));
+  if (
+    typeof payload !== 'object' ||
+    payload === null ||
+    !('query' in payload) ||
+    typeof payload.query !== 'string'
+  ) {
+    return '';
+  }
+  return payload.query;
+};
+
 describe('fetchAvailableErxesTools plugin discovery', () => {
   beforeEach(() => {
     getPlugins.mockReset();
@@ -23,21 +36,29 @@ describe('fetchAvailableErxesTools plugin discovery', () => {
     jest.restoreAllMocks();
   });
 
-  it('attributes operations using the gateway active-plugin list', async () => {
+  it('attributes sales operations from federation SDL when introspection is disabled', async () => {
     getPlugins.mockResolvedValue(['core', 'erxes-agent']);
-    getActivePlugins.mockResolvedValue(['core', 'frontline', 'erxes-agent']);
+    getActivePlugins.mockResolvedValue(['core', 'sales', 'erxes-agent']);
     getPluginAddress.mockImplementation(async (name: string) =>
-      name === 'frontline' ? 'http://frontline' : `http://${name}`,
+      name === 'sales' ? 'http://sales' : `http://${name}`,
     );
 
-    jest.spyOn(global, 'fetch').mockImplementation(async (input) => {
+    jest.spyOn(global, 'fetch').mockImplementation(async (input, init) => {
       const url = String(input);
-      if (url === 'http://frontline/graphql') {
+      if (url === 'http://sales/graphql') {
+        const query = requestQuery(init);
+        if (query.includes('__schema')) {
+          return jsonResponse({
+            errors: [{ extensions: { code: 'INTROSPECTION_DISABLED' } }],
+          });
+        }
         return jsonResponse({
           data: {
-            __schema: {
-              queryType: { fields: [{ name: 'conversations' }] },
-              mutationType: { fields: [] },
+            _service: {
+              sdl: `
+                type Query { deals: [Deal] }
+                extend type Mutation { dealsAdd: Deal }
+              `,
             },
           },
         });
@@ -49,26 +70,28 @@ describe('fetchAvailableErxesTools plugin discovery', () => {
               queryType: {
                 fields: [
                   {
-                    name: 'conversations',
+                    name: 'deals',
                     description: null,
                     args: [],
-                    type: { name: 'ConversationListResponse', kind: 'OBJECT' },
+                    type: { name: 'DealListResponse', kind: 'OBJECT' },
                   },
                 ],
               },
-              mutationType: { fields: [] },
+              mutationType: {
+                fields: [
+                  {
+                    name: 'dealsAdd',
+                    description: null,
+                    args: [],
+                    type: { name: 'Deal', kind: 'OBJECT' },
+                  },
+                ],
+              },
             },
           },
         });
       }
-      return jsonResponse({
-        data: {
-          __schema: {
-            queryType: { fields: [] },
-            mutationType: { fields: [] },
-          },
-        },
-      });
+      return jsonResponse({ data: { _service: { sdl: '' } } });
     });
 
     const tools = await fetchAvailableErxesTools({
@@ -77,11 +100,16 @@ describe('fetchAvailableErxesTools plugin discovery', () => {
 
     expect(tools).toEqual([
       expect.objectContaining({
-        operation: 'conversations',
-        plugin: 'frontline',
+        operation: 'deals',
+        plugin: 'sales',
+        pluginAttribution: 'subgraph',
+      }),
+      expect.objectContaining({
+        operation: 'dealsAdd',
+        plugin: 'sales',
         pluginAttribution: 'subgraph',
       }),
     ]);
-    expect(getPluginAddress).toHaveBeenCalledWith('frontline');
+    expect(getPluginAddress).toHaveBeenCalledWith('sales');
   });
 });

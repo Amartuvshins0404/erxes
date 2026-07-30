@@ -44,8 +44,14 @@ jest.mock('@/workflow/authorization', () => ({
     mockRequireScopedWorkflowAgent(...args),
 }));
 
-const mockGetSettings = jest.fn(() =>
-  Promise.resolve({ erxesApiUrl: 'https://gw' }),
+interface MockAgentSettings {
+  erxesApiUrl: string;
+  erxesApiToken?: string;
+}
+
+const mockGetSettings = jest.fn(
+  (): Promise<MockAgentSettings> =>
+    Promise.resolve({ erxesApiUrl: 'https://gw' }),
 );
 const mockCreateWorkflow = jest.fn((doc: Record<string, unknown>) =>
   Promise.resolve({
@@ -56,37 +62,55 @@ const mockCreateWorkflow = jest.fn((doc: Record<string, unknown>) =>
 );
 const mockGetWorkflows = jest.fn(() => Promise.resolve([]));
 const mockGetRuns = jest.fn(() => Promise.resolve([]));
-// Owning-agent lookups (existence check + enable-gate owner/destructiveOps).
-// Default: the agent exists, is enabled, has an owner and destructiveOps gated.
-// Individual tests set the stored agent via setAgent (missing → not found;
-// isEnabled:false → refused as the kill switch; 'allow' → refused).
+// Owning-agent profile lookup plus active-account verification.
+// Default: both exist and the account is active. Individual tests use setAgent
+// to model a missing profile or an inactive core account.
 type MockAgent = {
+  _id?: string;
   agentId: string;
   isEnabled?: boolean;
   createdBy?: string;
   destructiveOps?: 'allow' | 'ask' | 'block';
 } | null;
-// The STORED owning agent the FILTER-AWARE findOne resolves against. The mock
-// honors the resolver's `{ isEnabled: true }` clause so a disabled agent resolves
-// to null (the kill switch) — a blanket mock would hide that the lookup ever
-// filtered on isEnabled. setAgent defaults a passed agent to enabled unless it
-// explicitly carries isEnabled:false.
+// The canonical profile and core account are represented together in this
+// harness. Production verifies the profile by `_id`, then verifies that its
+// same-ID service-user account is active.
 let storedAgent: MockAgent = {
+  _id: 'agent-self',
   agentId: 'agent-self',
   isEnabled: true,
   createdBy: 'u1',
 };
-const setAgent = (a: MockAgent) => {
-  storedAgent = a && a.isEnabled === undefined ? { ...a, isEnabled: true } : a;
+const setAgent = (agent: MockAgent) => {
+  storedAgent = agent
+    ? {
+        ...agent,
+        _id: agent._id ?? agent.agentId,
+        isEnabled: agent.isEnabled ?? true,
+      }
+    : null;
 };
 const mockAgentFindOne = jest.fn<Promise<MockAgent>, [Record<string, unknown>]>(
-  (q: Record<string, unknown> = {}) => {
-    if (!storedAgent) return Promise.resolve(null);
-    if (q.isEnabled === true && storedAgent.isEnabled !== true)
+  (query: Record<string, unknown> = {}) => {
+    if (!storedAgent || query._id !== storedAgent._id) {
       return Promise.resolve(null);
+    }
     return Promise.resolve(storedAgent);
   },
 );
+const mockGetAgentAccount = jest.fn(({ userId }: { userId: string }) =>
+  storedAgent?._id === userId && storedAgent.isEnabled
+    ? Promise.resolve({
+        _id: userId,
+        isActive: true,
+        permissionGroupIds: ['group-1'],
+        customPermissions: [],
+      })
+    : Promise.reject(new Error('Agent account not found or inactive')),
+);
+jest.mock('../../auth/servicePrincipal', () => ({
+  getAgentAccount: (opts: { userId: string }) => mockGetAgentAccount(opts),
+}));
 // Existing-workflow reads for the update tool's schedule-enable gate; each test
 // sets the stored shape (isEnabled/owner/definition) it needs.
 const mockGetWorkflow = jest.fn();
@@ -293,6 +317,7 @@ beforeEach(() => {
   mockGetWorkflowAgentAccess.mockReset();
   mockRequireScopedWorkflow.mockReset();
   mockRequireScopedWorkflowAgent.mockReset();
+  mockGetAgentAccount.mockClear();
 
   mockGetWorkflowAgentAccess.mockResolvedValue({
     scope: 'own',
@@ -641,19 +666,14 @@ describe('workflowSaveTool', () => {
 });
 
 /**
- * The agent-facing builder tools must apply the SAME enable-time gate the
- * GraphQL mutations do: an enabled schedule-triggered workflow is a live cron,
- * so it may only be enabled when the erxes app token (Agent settings) is present
- * and it doesn't run destructive ops unattended. Since step 22 the run executes
- * as the agent's service user, so no human owner is required. The tools surface
- * the refusal as a structured { success: false, error } result (not a thrown
- * 500) so the agent gets an actionable message.
+ * The agent-facing builder tools apply the same enable-time gate as GraphQL:
+ * an enabled schedule is a live cron, so it requires an active owning AI team
+ * member with permissions and must refuse destructive operations. Failures are
+ * returned as structured results so the agent receives an actionable message.
  */
 describe('schedule-enable gate (agent builder tools)', () => {
-  const APP_TOKEN = 'sk_app-token';
-
   beforeEach(() => {
-    // Default: no app token in Agent settings → secure path NOT configured.
+    // Default registry settings; run identity does not depend on an app token.
     mockGetSettings.mockResolvedValue({ erxesApiUrl: 'https://gw' });
     mockCreateWorkflow.mockClear();
     mockUpdateWorkflow.mockClear();
@@ -682,7 +702,7 @@ describe('schedule-enable gate (agent builder tools)', () => {
       expect(mockCreateWorkflow).not.toHaveBeenCalled();
     });
 
-    it('saves a schedule workflow as a disabled draft without an app token', async () => {
+    it('saves a schedule workflow as a disabled draft', async () => {
       const res = await asTool<SaveResult>(workflowSaveTool).execute({
         name: 'Nightly draft',
         definition: scheduleDefinition(),
@@ -696,7 +716,12 @@ describe('schedule-enable gate (agent builder tools)', () => {
   });
 
   describe('workflowUpdateTool', () => {
-    it('refuses to flip isEnabled on an existing schedule workflow without the app token', async () => {
+    it('refuses to enable a schedule without an active AI team member', async () => {
+      setAgent({
+        agentId: 'agent-self',
+        createdBy: 'u1',
+        isEnabled: false,
+      });
       mockRequireScopedWorkflow.mockResolvedValue({
         _id: 'wf-1',
         isEnabled: false,
@@ -708,8 +733,8 @@ describe('schedule-enable gate (agent builder tools)', () => {
         enable: true,
       });
       expect(res.success).toBe(false);
-      expect(res.error).toMatch(/erxes app token/i);
-      expect(mockUpdateWorkflow).not.toHaveBeenCalled();
+      expect(res.error).toMatch(/missing or inactive/i);
+      expect(mockSetEnabled).not.toHaveBeenCalled();
     });
 
     it('returns edits to draft instead of treating an enabled workflow as still scheduled', async () => {
@@ -746,11 +771,7 @@ describe('schedule-enable gate (agent builder tools)', () => {
       expect(mockSetEnabled).not.toHaveBeenCalled();
     });
 
-    it('allows enabling a schedule workflow update once the app token is configured', async () => {
-      mockGetSettings.mockResolvedValue({
-        erxesApiUrl: 'https://gw',
-        erxesApiToken: APP_TOKEN,
-      });
+    it('allows enabling a schedule for an active permitted AI team member', async () => {
       mockRequireScopedWorkflow.mockResolvedValue({
         _id: 'wf-1',
         isEnabled: false,
@@ -814,8 +835,11 @@ describe('workflow ownership (agent builder tools)', () => {
     });
     expect(res.success).toBe(true);
     expect(mockAgentFindOne).toHaveBeenCalledWith({
-      agentId: 'agent-self',
-      isEnabled: true,
+      _id: 'agent-self',
+    });
+    expect(mockGetAgentAccount).toHaveBeenCalledWith({
+      userId: 'agent-self',
+      subdomain: 'os',
     });
     expect(mockRequireScopedWorkflowAgent).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -838,8 +862,11 @@ describe('workflow ownership (agent builder tools)', () => {
     });
     expect(res.success).toBe(true);
     expect(mockAgentFindOne).toHaveBeenCalledWith({
-      agentId: 'agent-other',
-      isEnabled: true,
+      _id: 'agent-other',
+    });
+    expect(mockGetAgentAccount).toHaveBeenCalledWith({
+      userId: 'agent-other',
+      subdomain: 'os',
     });
     expect(mockCreateWorkflow).toHaveBeenCalledWith(
       expect.objectContaining({ agentId: 'agent-other' }),
@@ -860,8 +887,8 @@ describe('workflow ownership (agent builder tools)', () => {
   });
 
   it('refuses to save when handing ownership to a DISABLED agent (kill switch)', async () => {
-    // The agent exists but is disabled — ownership can't be handed to one, so the
-    // filter-aware findOne resolves it to null and the tool refuses.
+    // The canonical profile still exists, but its same-ID core account is
+    // inactive, so ownership cannot be handed to it.
     setAgent({ agentId: 'agent-off', isEnabled: false, createdBy: 'u2' });
     const res = await asTool<SaveResult>(workflowSaveTool).execute({
       name: 'Handoff to disabled',
@@ -872,8 +899,11 @@ describe('workflow ownership (agent builder tools)', () => {
     expect(res.success).toBe(false);
     expect(res.error).toMatch(/not found or disabled/i);
     expect(mockAgentFindOne).toHaveBeenCalledWith({
-      agentId: 'agent-off',
-      isEnabled: true,
+      _id: 'agent-off',
+    });
+    expect(mockGetAgentAccount).toHaveBeenCalledWith({
+      userId: 'agent-off',
+      subdomain: 'os',
     });
     expect(mockCreateWorkflow).not.toHaveBeenCalled();
   });

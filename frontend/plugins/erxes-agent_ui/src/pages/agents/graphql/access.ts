@@ -1,99 +1,57 @@
 import { gql } from '@apollo/client';
 
-// Core's permission catalog + custom-group CRUD, reached over the federated
-// gateway. The Access tab is a self-contained action picker (core-ui's
-// PermissionModulesForm lives in a separate module-federation remote and can't
-// be imported cross-plugin) driving core's existing, permissionsManage-gated
-// group mutations — no core backend change.
+export interface PermissionGroupOption {
+  id: string;
+  name: string;
+  description?: string;
+  plugin?: string;
+  source: 'default' | 'custom';
+}
 
-/** The full action catalog, grouped plugin -> module -> actions. */
-export const PERMISSION_MODULES = gql`
-  query PermissionModules {
-    permissionModules {
-      plugin
-      modules {
-        name
-        description
-        scopes {
-          name
-          description
-        }
-        actions {
-          name
-          title
-          description
-          always
-          disabled
-          agentCallable
-        }
-      }
-    }
-  }
-`;
+export interface PermissionGroupsData {
+  permissionGroups: Array<{
+    _id: string;
+    name: string;
+    description?: string;
+  }>;
+  permissionDefaultGroups: Array<{
+    id: string;
+    name: string;
+    description?: string;
+    plugin: string;
+  }>;
+}
 
-/** A single group's current permissions — used to preselect the picker. */
-export const PERMISSION_GROUP_DETAIL = gql`
-  query PermissionGroupDetail($id: String!) {
-    permissionGroupDetail(id: $id) {
-      _id
-      name
-      permissions {
-        plugin
-        module
-        actions
-        scope
-      }
-    }
-  }
-`;
-
-/**
- * All custom groups (id + name) — used to ADOPT an existing
- * `agent-grant:<agentId>` group when the agent lost its grantGroupId, so a
- * retried save edits the same group instead of proliferating duplicates.
- */
 export const PERMISSION_GROUPS = gql`
-  query PermissionGroups {
+  query MastraPermissionGroups {
     permissionGroups {
       _id
       name
-      principalType
+      description
+    }
+    permissionDefaultGroups {
+      id
+      name
+      description
+      plugin
     }
   }
 `;
 
-export const PERMISSION_GROUP_ADD = gql`
-  mutation PermissionGroupAdd(
-    $name: String!
-    $description: String
-    $principalType: String
-    $permissions: [PermissionInput]!
-  ) {
-    permissionGroupAdd(
-      name: $name
-      description: $description
-      principalType: $principalType
-      permissions: $permissions
-    ) {
-      _id
-    }
-  }
-`;
-
-export const PERMISSION_GROUP_EDIT = gql`
-  mutation PermissionGroupEdit(
-    $_id: String!
-    $name: String
-    $principalType: String
-    $permissions: [PermissionInput]
-  ) {
-    permissionGroupEdit(
-      _id: $_id
-      name: $name
-      principalType: $principalType
-      permissions: $permissions
-    ) {
-      _id
-    }
-  }
-`;
+export const permissionGroupOptions = (
+  data?: PermissionGroupsData,
+): PermissionGroupOption[] => [
+  ...(data?.permissionDefaultGroups ?? []).map((group) => ({
+    id: group.id,
+    name: group.name,
+    description: group.description,
+    plugin: group.plugin,
+    source: 'default' as const,
+  })),
+  ...(data?.permissionGroups ?? []).map((group) => ({
+    id: group._id,
+    name: group.name,
+    description: group.description,
+    source: 'custom' as const,
+  })),
+];

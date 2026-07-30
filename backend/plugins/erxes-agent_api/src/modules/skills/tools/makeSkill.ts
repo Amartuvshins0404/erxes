@@ -42,7 +42,7 @@ export const createMakeSkillTool = (deps: MakeSkillDeps) =>
     }),
     execute: async ({ name, scope }) => {
       const auth = getCurrentAuth();
-      if (!auth?.userId || !auth.threadId || !auth.agentId) {
+      if (!auth?.initiatorUserId || !auth.threadId || !auth.agentId) {
         return {
           created: false,
           message:
@@ -56,7 +56,7 @@ export const createMakeSkillTool = (deps: MakeSkillDeps) =>
           subdomain: auth.subdomain || 'os',
           agentId: auth.agentId,
           threadId: auth.threadId,
-          userId: auth.userId,
+          userId: auth.initiatorUserId,
           userHeader: auth.userHeader,
           token: auth.token,
           provider: deps.provider,
@@ -65,10 +65,14 @@ export const createMakeSkillTool = (deps: MakeSkillDeps) =>
           nameHint: name,
           scopeHint: scope,
         });
-        const skill = await createSkill(auth.subdomain || 'os', auth.userId, {
-          ...content,
-          visibility: 'private',
-        });
+        const skill = await createSkill(
+          auth.subdomain || 'os',
+          auth.initiatorUserId,
+          {
+            ...content,
+            visibility: 'private',
+          },
+        );
         return {
           created: true,
           name: skill.name,

@@ -7,7 +7,6 @@ import {
   requireScopedWorkflowAgent,
 } from '@/workflow/authorization';
 import { ERXES_AGENT_ACTIONS } from '~/meta/permissionActions';
-import { canUserAccessAgent, getUserUnitIds } from '@/agent/utils';
 
 /** Queries over workflow definitions and their run history. */
 export const workflowQueries = {
@@ -94,24 +93,13 @@ export const workflowCustomResolvers = {
       };
       if (!user?._id || !workflow.agentId) return denied;
 
-      const [agent, unitIds] = await Promise.all([
-        models.MastraAgent.findOne({ agentId: workflow.agentId }),
-        getUserUnitIds(models, user._id),
-      ]);
+      const agent = await models.MastraAgent.findById(workflow.agentId);
       if (!agent) return denied;
 
       const canUse = async (action: string) => {
         const scope = await getGroupActionScope(subdomain, action, user);
         return Boolean(
-          scope &&
-            canUserAccessAgent(
-              agent,
-              user._id,
-              scope,
-              user.branchIds ?? [],
-              user.departmentIds ?? [],
-              unitIds,
-            ),
+          scope && (scope !== 'own' || String(agent._id) === user._id),
         );
       };
 

@@ -55,8 +55,8 @@ const AUTH_SESSION_OPERATIONS = new Set<string>([
   'usersResendInvitation',
 ]);
 
-// Password: anything that initiates or completes a password change/reset, which
-// is an account-takeover primitive.
+// Password: operations that initiate or complete a password change/reset,
+// which is an account-takeover primitive.
 const PASSWORD_OPERATIONS = new Set<string>([
   'forgotPassword',
   'resetPassword',

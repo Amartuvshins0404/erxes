@@ -1,6 +1,6 @@
 import './polyfills'; // must stay first — patches globals Mastra needs on Node 18
 import { redis, startPlugin } from 'erxes-api-shared/utils';
-import { createHash } from 'crypto';
+import { createHash } from 'node:crypto';
 import { typeDefs } from '~/apollo/typeDefs';
 import { resolvers } from '~/apollo/resolvers';
 import { generateModels } from './connectionResolvers';
@@ -8,8 +8,11 @@ import { router } from './routes';
 import { appRouter } from '~/trpc/init-trpc';
 import { automations } from '~/meta/automations';
 import { permissions } from '~/meta/permissions';
+import { migrateAgentAccounts } from '~/migrations/migrateAgentAccounts';
 import { initMastraScheduler } from '~/mastra/scheduler';
 import { backfillWorkflowAgents } from '~/mastra/workflows/agentBackfill';
+import { initLearningSweep } from '~/mastra/learning/worker';
+import { initNotificationTriggers } from '~/mastra/notifications/notificationTriggers';
 
 startPlugin({
   name: 'erxes-agent',
@@ -51,33 +54,33 @@ startPlugin({
         .digest('hex');
       const stored = await redis.get(HASH_KEY);
       if (stored !== current) {
-        for (const pattern of ['user_actions_*', 'user_action_scopes_*']) {
-          let cursor = 0;
-          do {
-            const [next, batch] = await redis.scan(
-              cursor,
-              'MATCH',
-              pattern,
-              'COUNT',
-              100,
-            );
-            cursor = parseInt(next, 10);
-            if (batch.length) await redis.del(...batch);
-          } while (cursor !== 0);
-        }
+        let cursor = 0;
+        do {
+          const [next, batch] = await redis.scan(
+            cursor,
+            'MATCH',
+            'user_actions_*',
+            'COUNT',
+            100,
+          );
+          cursor = parseInt(next, 10);
+          if (batch.length) await redis.del(...batch);
+        } while (cursor !== 0);
         await redis.set(HASH_KEY, current);
-        console.log(
-          '[erxes-agent] permissions changed — user action cache cleared',
-        );
       }
     }
 
-    // Agent learning (opt-in via ERXES_AGENT_LEARNING=enable): distillation +
-    // hygiene sweep scheduler + worker. Same lazy-load contract.
+    // Agent learning (opt-in via ERXES_AGENT_LEARNING=enable): distillation,
+    // hygiene sweep scheduler, and worker.
     if ((process.env.ERXES_AGENT_LEARNING ?? '').trim() === 'enable') {
-      const { initLearningSweep } = await import('~/mastra/learning/worker');
       await initLearningSweep(redis);
     }
+
+    // Canonicalize every legacy agent/service-user pair before any event or
+    // workflow can execute under an AI team-member identity.
+    await migrateAgentAccounts();
+
+    await initNotificationTriggers(redis);
 
     // Workflow ownership backfill (step 24): best-effort assign an owning agent
     // to every legacy workflow before the schedule reconciler runs, disabling

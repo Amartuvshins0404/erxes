@@ -6,7 +6,7 @@ import { generateModels } from './connectionResolvers';
 import { getOrCreateAgent } from './mastra/agentRuntime';
 import { isReasoningEffort } from './mastra/providers';
 import { runWithAuth, ApprovedOp } from './mastra/requestContext';
-import { resolveBackgroundPrincipal } from './mastra/auth/backgroundPrincipal';
+import { resolveAgentPrincipal } from './mastra/auth/backgroundPrincipal';
 import { isAdvancedMemoryEnabled } from './mastra/memory/config';
 import { scopedResource } from './mastra/memory/mastraMemory';
 import { augmentConvo } from './mastra/memory';
@@ -360,7 +360,7 @@ router.post('/bot/:conversationId', llmRouteLimiter, async (req, res) => {
       : undefined;
 
     // Shared learned digest (PII-free agent knowledge), separate from memory.
-    const digest = await readLearnedDigest(models, agentConfig.agentId);
+    const digest = await readLearnedDigest(models, agentConfig._id);
     const convo = augmentConvo({
       recentHistory: [],
       userMessage: userText,
@@ -368,17 +368,12 @@ router.post('/bot/:conversationId', llmRouteLimiter, async (req, res) => {
       learnedDigestBlock: digest?.block,
     });
 
-    // Bot requests have no user session — run as the agent's bound owner and
-    // fail closed when that principal can't be minted. NEVER falls back to the
-    // app token: doing so would silently escalate the bot to admin instead of
-    // stopping it. The app token (settings.erxesApiToken) is passed only as the
-    // CLIENT CREDENTIAL that authenticates to core's mint endpoint — the minted
-    // owner token, not the app token, is the acting principal for the run.
-    const principal = await resolveBackgroundPrincipal({
+    // Bot requests have no user session. They run as the linked AI team member
+    // through private subgraph calls and fail closed without that principal.
+    const principal = await resolveAgentPrincipal({
       agentConfig,
       subdomain,
-      appToken: settings?.erxesApiToken,
-      models,
+      background: true,
     });
     if (!principal.ok) {
       console.error(`[agent] bot run refused — ${principal.error}`);
@@ -411,7 +406,7 @@ router.post('/bot/:conversationId', llmRouteLimiter, async (req, res) => {
       await patchNativeTurn({
         subdomain,
         binding: memoryBinding,
-        agentId: agentConfig.agentId,
+        agentId: agentConfig._id,
         reply,
       }).catch(() => null);
     }

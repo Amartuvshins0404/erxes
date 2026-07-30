@@ -5,9 +5,8 @@ import type { TriggerEnvelope } from '~/mastra/workflows/envelope';
 export interface IMastraWorkflow {
   name: string;
   description?: string;
-  // The owning agent's business agentId (mirrors schedule.agentId). Optional on
-  // the base document because pre-backfill/legacy workflows may lack one; the
-  // create boundary enforces presence for new workflows.
+  // Canonical core user id of the owning AI team member. Optional only for
+  // legacy rows awaiting startup backfill; create/update boundaries require it.
   agentId?: string;
   // The declarative DSL document: { trigger, policy, bindings, limits, steps }.
   // Validated by validateDefinition before every save.

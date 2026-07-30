@@ -110,19 +110,10 @@ export const ChatPage = () => {
   const attachmentsEnabled = useAttachmentsEnabled();
   const voiceEnabled = useVoiceEnabled();
 
-  // The route accepts either the agent record id or business agentId.
   const selectedAgent = useMemo(
-    () =>
-      agentId
-        ? agents.find((a) => a._id === agentId || a.agentId === agentId) ?? null
-        : null,
+    () => agents.find((agent) => agent._id === agentId) ?? null,
     [agents, agentId],
   );
-
-  const canReadWorkflows =
-    selectedAgent?.capabilities?.canReadWorkflows === true;
-  const activeChatMode: ChatMode =
-    chatMode === 'workflow' && canReadWorkflows ? 'workflow' : 'chat';
 
   const view = useAgentChatView(agentId);
   const {
@@ -141,11 +132,7 @@ export const ChatPage = () => {
   // Active only when this agent's voice mode is on AND the backend has voice
   // configured; otherwise the hook is fully inert (no mic, no listeners).
   const voiceActive = !!voiceMode && voiceEnabled && !!selectedAgent;
-  const voice = useVoiceConversation(
-    agentId,
-    selectedAgent?.agentId,
-    voiceActive,
-  );
+  const voice = useVoiceConversation(agentId, selectedAgent?._id, voiceActive);
 
   // The persisted session list lives in the Apollo cache, not the chat store.
   // Paginated: older sessions load on demand as the sidebar scrolls.
@@ -157,13 +144,13 @@ export const ChatPage = () => {
     hasMore: hasMoreSessions,
     loadingMore: loadingMoreSessions,
     loadMore: loadMoreSessions,
-  } = useMastraThreads(selectedAgent?.agentId);
+  } = useMastraThreads(selectedAgent?._id);
   const sessionsLoaded = !!selectedAgent && !threadsLoading;
   const retrySessions = useCallback(() => {
     void refetchThreads().catch(() => undefined);
   }, [refetchThreads]);
   const { renameThread } = useRenameMastraThread();
-  const { removeThread } = useRemoveMastraThread(selectedAgent?.agentId);
+  const { removeThread } = useRemoveMastraThread(selectedAgent?._id);
 
   // Workflow mode lists only definitions owned by the selected agent.
   const {
@@ -171,10 +158,7 @@ export const ChatPage = () => {
     loading: workflowsLoading,
     error: workflowsError,
     refetch: refetchWorkflows,
-  } = useWorkflows(
-    selectedAgent?.agentId,
-    activeChatMode !== 'workflow' || !canReadWorkflows,
-  );
+  } = useWorkflows(selectedAgent?._id, chatMode !== 'workflow');
   const retryWorkflows = useCallback(() => {
     void refetchWorkflows().catch(() => undefined);
   }, [refetchWorkflows]);
@@ -190,15 +174,14 @@ export const ChatPage = () => {
     [setWorkflowParam],
   );
   useEffect(() => {
-    if (activeChatMode !== 'workflow' || workflowsLoading || selectedWorkflow)
-      return;
+    if (chatMode !== 'workflow' || workflowsLoading || selectedWorkflow) return;
     if (workflows.length === 0) {
       if (workflowParam) setWorkflowParam(undefined, true);
       return;
     }
     setWorkflowParam(workflows[0]._id, true);
   }, [
-    activeChatMode,
+    chatMode,
     workflowsLoading,
     selectedWorkflow,
     workflows,
@@ -225,7 +208,7 @@ export const ChatPage = () => {
   // ── Skills: composer /slash picker + make_skill draft preview ──
   const { canCreate: canCreateSkill } = useSkillAccess();
   const slash = useSkillSlashPicker({
-    agentId: selectedAgent?.agentId,
+    agentId: selectedAgent?._id,
     input,
     setInput,
   });
@@ -255,7 +238,7 @@ export const ChatPage = () => {
   const handleMakeSkill = () => {
     if (!selectedAgent || !activeThreadId) return;
     if (!canCreateSkill) return showSkillPermissionError('create');
-    makeSkill({ agentId: selectedAgent.agentId, threadId: activeThreadId });
+    makeSkill({ agentId: selectedAgent._id, threadId: activeThreadId });
   };
 
   // Activation is per-turn: drop the /slash pill and any dismissed-draft banner
@@ -338,7 +321,7 @@ export const ChatPage = () => {
   // SessionList / AgentRail skip re-rendering while a reply streams.
   const handleNewThread = useCallback(() => {
     if (!agentId || !selectedAgent) return;
-    chatStore.newDraft(apolloClient, agentId, selectedAgent.agentId);
+    chatStore.newDraft(apolloClient, agentId, selectedAgent._id);
     // A draft isn't persisted yet, so it has nothing to address — drop ?thread=
     // and let reload/back fall back to the agent's default (most-recent/draft).
     setThreadParam(undefined);
@@ -352,7 +335,7 @@ export const ChatPage = () => {
       chatStore.selectSession(
         apolloClient,
         agentId,
-        selectedAgent.agentId,
+        selectedAgent._id,
         threadId,
       );
       // Make the conversation addressable: push ?thread= so reload restores it
@@ -426,7 +409,7 @@ export const ChatPage = () => {
       chatStore.sendMessage(
         apolloClient,
         agentId,
-        selectedAgent.agentId,
+        selectedAgent._id,
         message,
         atts,
         approvedOperations,
@@ -490,7 +473,7 @@ export const ChatPage = () => {
   // rows depend on it not changing every chunk.
   const handleRegenerate = useCallback(() => {
     if (!agentId || !selectedAgent || chatLoading) return;
-    chatStore.regenerate(apolloClient, agentId, selectedAgent.agentId);
+    chatStore.regenerate(apolloClient, agentId, selectedAgent._id);
   }, [apolloClient, agentId, selectedAgent, chatLoading]);
 
   // Stable rating handler so the memoized message rows don't re-render per token.
@@ -530,15 +513,15 @@ export const ChatPage = () => {
   // Composer callback props, stabilized so the memoized Composer /
   // ReasoningEffortControl don't re-render on every streamed token.
   const handleReasoningEffortChange = useCallback(
-    (effort?: ReasoningEffort) =>
-      chatStore.setReasoningEffort(agentId!, effort),
+    (effort?: ReasoningEffort) => {
+      if (agentId) chatStore.setReasoningEffort(agentId, effort);
+    },
     [agentId],
   );
 
-  const handleVoiceModeToggle = useCallback(
-    () => chatStore.setVoiceMode(agentId!, !voiceMode),
-    [agentId, voiceMode],
-  );
+  const handleVoiceModeToggle = useCallback(() => {
+    if (agentId) chatStore.setVoiceMode(agentId, !voiceMode);
+  }, [agentId, voiceMode]);
 
   const handleVoiceSetup = useCallback(
     () => navigate('/settings/erxes-agent/voice'),
@@ -592,11 +575,11 @@ export const ChatPage = () => {
       {!voiceActive && (
         <ChatPageHeader
           hasAgent={!!selectedAgent}
-          agentName={selectedAgent?.name}
+          agentName={selectedAgent?.accountName}
           agentId={selectedAgent?._id}
           asDrawer={asDrawer}
           onToggleSidebar={() => setSidebarOpen((v) => !v)}
-          chatMode={activeChatMode}
+          chatMode={chatMode}
           activeThreadId={activeThreadId}
           isDraft={isDraft}
           onMakeSkill={handleMakeSkill}
@@ -619,8 +602,7 @@ export const ChatPage = () => {
             agentId={agentId}
             onAgentSelect={handleAgentSelect}
             hasAgent={!!selectedAgent}
-            chatMode={activeChatMode}
-            canReadWorkflows={canReadWorkflows}
+            chatMode={chatMode}
             onChatModeChange={setChatMode}
             threads={threads}
             sessionsLoaded={sessionsLoaded}
@@ -659,11 +641,8 @@ export const ChatPage = () => {
 
           {!selectedAgent ? (
             <SelectAgentEmpty />
-          ) : activeChatMode === 'workflow' ? (
-            <WorkflowChatView
-              workflow={selectedWorkflow}
-              onWorkflowChanged={retryWorkflows}
-            />
+          ) : chatMode === 'workflow' ? (
+            <WorkflowChatView workflow={selectedWorkflow} />
           ) : (
             <>
               <MessageList
@@ -749,7 +728,7 @@ export const ChatPage = () => {
                 chatLoading={chatLoading}
                 attachmentsEnabled={attachmentsEnabled}
                 attachments={attachments}
-                agentName={selectedAgent.name}
+                agentName={selectedAgent.accountName}
                 reasoningEffort={reasoningEffort}
                 onReasoningEffortChange={handleReasoningEffortChange}
                 voiceEnabled={voiceEnabled}
@@ -762,9 +741,11 @@ export const ChatPage = () => {
 
               {voiceActive && (
                 <VoiceOverlay
-                  agentName={selectedAgent.name}
+                  agentName={selectedAgent.accountName}
                   voice={voice}
-                  onExit={() => chatStore.setVoiceMode(agentId!, false)}
+                  onExit={() => {
+                    if (agentId) chatStore.setVoiceMode(agentId, false);
+                  }}
                 />
               )}
             </>
@@ -774,7 +755,7 @@ export const ChatPage = () => {
         {/* ── Artifact Preview panel (charts / generated documents) ── */}
         {previewOpen &&
           selectedAgent &&
-          activeChatMode === 'chat' &&
+          chatMode === 'chat' &&
           !previewFullscreen && (
             <PreviewResizer
               splitRef={splitRef}
@@ -782,7 +763,7 @@ export const ChatPage = () => {
               onSideCollapsedChange={setSideCollapsed}
             />
           )}
-        {previewOpen && selectedAgent && activeChatMode === 'chat' && (
+        {previewOpen && selectedAgent && chatMode === 'chat' && (
           <PreviewPanel threadId={activeThreadId} />
         )}
       </div>

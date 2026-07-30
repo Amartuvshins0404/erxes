@@ -5,6 +5,11 @@ import { fireEvent, render } from '@testing-library/react';
 import { ToolCallRow } from './ToolCallRow';
 import type { ToolPartView } from '~/modules/chat/lib/uiParts';
 
+jest.mock('erxes-ui', () => ({
+  cn: (...classes: Array<string | false | null | undefined>) =>
+    classes.filter(Boolean).join(' '),
+}));
+
 const softErrorCall: ToolPartView = {
   toolCallId: 'c1',
   toolName: 'do_thing',

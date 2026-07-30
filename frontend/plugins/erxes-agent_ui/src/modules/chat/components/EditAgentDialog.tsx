@@ -1,7 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
-import { Button, Dialog, Form, Skeleton, Tooltip } from 'erxes-ui';
+import { Button, Dialog, Form, Tooltip } from 'erxes-ui';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { AgentFormFields } from '~/pages/agents/components/AgentFormFields';
@@ -10,7 +9,6 @@ import {
   AgentFormValues,
   agentFormSchema,
 } from '~/pages/agents/validations';
-import { useAgent } from '~/pages/agents/hooks/useAgent';
 import { IChatAgent } from '~/modules/chat/hooks/useChatAgents';
 import { useUpdateAgent } from '~/modules/chat/hooks/useUpdateAgent';
 
@@ -30,143 +28,83 @@ export const EditAgentDialog = ({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) => {
-  const { t } = useTranslation('mastra');
-  const canOpenEditor =
-    agent.capabilities?.canReadConfig === true &&
-    agent.capabilities?.canEdit === true;
-  const {
-    agent: detailedAgent,
-    loading,
-    error,
-  } = useAgent(agent._id, !open || !canOpenEditor);
   const form = useForm<AgentFormValues>({
     resolver: zodResolver(agentFormSchema),
     defaultValues: AGENT_FORM_DEFAULTS,
   });
-  const [hydratedAgentId, setHydratedAgentId] = useState<string | null>(null);
 
   const model = form.watch('model');
-  const { saveAgent, saving } = useUpdateAgent(() => onOpenChange(false));
-  const hasDetailedAuthorization =
-    detailedAgent?.capabilities?.canReadConfig === true &&
-    detailedAgent?.capabilities?.canEdit === true;
+  const { saveAgent, saving } = useUpdateAgent(agent._id, () =>
+    onOpenChange(false),
+  );
 
+  // Populate from the target agent when the dialog mounts. The dialog is only
+  // mounted while open (lifted in AgentRail), so this runs once per open.
   useEffect(() => {
-    if (!detailedAgent) {
-      setHydratedAgentId(null);
-      return;
-    }
-    if (!hasDetailedAuthorization) {
-      onOpenChange(false);
-      return;
-    }
-
     form.reset({
-      name: detailedAgent.name || '',
-      agentId: detailedAgent.agentId || '',
-      description: detailedAgent.description || '',
-      instructions: detailedAgent.instructions || '',
-      provider: detailedAgent.provider || '',
-      model: detailedAgent.model || '',
-      destructiveOps:
-        detailedAgent.destructiveOps === 'allow' ? 'allow' : 'ask',
-      memoryEnabled: detailedAgent.memoryEnabled ?? true,
-      debug: detailedAgent.debug ?? false,
-      maxSteps: detailedAgent.maxSteps ?? 10,
-      temperature: detailedAgent.temperature ?? null,
-      isEnabled: detailedAgent.isEnabled ?? true,
-      visibility: detailedAgent.visibility ?? 'private',
-      teamId: detailedAgent.teamId ?? undefined,
-      departmentId: detailedAgent.departmentId ?? undefined,
-      unitId: detailedAgent.unitId ?? undefined,
+      name: agent.accountName,
+      description: agent.accountDescription || '',
+      instructions: agent.instructions || '',
+      provider: agent.provider || '',
+      model: agent.model || '',
+      permissionGroupIds: agent.permissionGroupIds,
+      destructiveOps: agent.destructiveOps === 'allow' ? 'allow' : 'ask',
+      memoryEnabled: agent.memoryEnabled ?? true,
+      debug: agent.debug ?? false,
+      maxSteps: agent.maxSteps ?? 10,
+      temperature: agent.temperature ?? null,
+      isActive: agent.isActive,
     });
-    setHydratedAgentId(detailedAgent._id);
-  }, [detailedAgent, form, hasDetailedAuthorization, onOpenChange]);
+  }, [agent, form]);
 
-  const formReady =
-    detailedAgent !== null &&
-    hasDetailedAuthorization &&
-    hydratedAgentId === detailedAgent._id;
-  const loadFailed = Boolean(error) || (!loading && !detailedAgent);
-
-  const onSubmit = async (doc: AgentFormValues) => {
-    if (!formReady || !detailedAgent) return;
-    await saveAgent(detailedAgent, doc);
-  };
-
-  if (!canOpenEditor) return null;
-  if (detailedAgent && !hasDetailedAuthorization) return null;
+  const onSubmit = (doc: AgentFormValues) => saveAgent(doc);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <Dialog.Content className="max-w-2xl gap-0 p-0">
         <Dialog.Header className="border-b px-5 py-3.5">
-          <Dialog.Title>Edit {agent.name}</Dialog.Title>
+          <Dialog.Title>Edit {agent.accountName}</Dialog.Title>
           <Dialog.Description>
             Change this agent's model, provider and behaviour. Changes apply to
             new messages right away.
           </Dialog.Description>
         </Dialog.Header>
 
-        {loadFailed ? (
-          <>
-            <p role="alert" className="px-5 py-8 text-sm text-destructive">
-              {error?.message ?? t('error')}
-            </p>
-            <Dialog.Footer className="border-t px-5 py-3.5">
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)}>
+            <div className="max-h-[65vh] space-y-4 overflow-y-auto px-5 py-4">
+              <AgentFormFields form={form} />
+            </div>
+
+            <Dialog.Footer className="flex items-center gap-2 border-t px-5 py-3.5">
+              <Tooltip.Provider>
+                <Tooltip>
+                  <Tooltip.Trigger asChild>
+                    <Button variant="ghost" size="sm" asChild>
+                      <Link
+                        to={`/settings/erxes-agent/agents/edit/${agent._id}`}
+                      >
+                        Open full editor
+                      </Link>
+                    </Button>
+                  </Tooltip.Trigger>
+                  <Tooltip.Content>
+                    Edit every setting on the Agents page
+                  </Tooltip.Content>
+                </Tooltip>
+              </Tooltip.Provider>
+              <div className="flex-1" />
               <Dialog.Close asChild>
                 <Button type="button" variant="outline" size="sm">
-                  {t('cancel')}
+                  Cancel
                 </Button>
               </Dialog.Close>
+              <Button type="submit" size="sm" disabled={saving || !model}>
+                {saving ? 'Saving…' : 'Save changes'}
+              </Button>
             </Dialog.Footer>
-          </>
-        ) : !formReady || !detailedAgent ? (
-          <div className="space-y-4 px-5 py-6">
-            <Skeleton className="h-20 w-full rounded-lg" />
-            <Skeleton className="h-32 w-full rounded-lg" />
-            <Skeleton className="h-20 w-full rounded-lg" />
-          </div>
-        ) : (
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)}>
-              <div className="max-h-[65vh] space-y-4 overflow-y-auto px-5 py-4">
-                <AgentFormFields
-                  form={form}
-                  canShare={detailedAgent.capabilities?.canShare === true}
-                />
-              </div>
-
-              <Dialog.Footer className="flex items-center gap-2 border-t px-5 py-3.5">
-                <Tooltip.Provider>
-                  <Tooltip>
-                    <Tooltip.Trigger asChild>
-                      <Button variant="ghost" size="sm" asChild>
-                        <Link
-                          to={`/settings/erxes-agent/agents/edit/${detailedAgent._id}`}
-                        >
-                          Open full editor
-                        </Link>
-                      </Button>
-                    </Tooltip.Trigger>
-                    <Tooltip.Content>
-                      Edit every setting on the Agents page
-                    </Tooltip.Content>
-                  </Tooltip>
-                </Tooltip.Provider>
-                <div className="flex-1" />
-                <Dialog.Close asChild>
-                  <Button type="button" variant="outline" size="sm">
-                    {t('cancel')}
-                  </Button>
-                </Dialog.Close>
-                <Button type="submit" size="sm" disabled={saving || !model}>
-                  {saving ? 'Saving…' : 'Save changes'}
-                </Button>
-              </Dialog.Footer>
-            </form>
-          </Form>
-        )}
+          </form>
+        </Form>
       </Dialog.Content>
     </Dialog>
   );

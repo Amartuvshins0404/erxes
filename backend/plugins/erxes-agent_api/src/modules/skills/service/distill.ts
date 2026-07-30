@@ -165,7 +165,7 @@ export const distillThreadToSkill = async (
   };
 
   const result = await runWithAuth(
-    { userHeader, token, userId, subdomain },
+    { userHeader, token, initiatorUserId: userId, subdomain },
     () => agent.generate([{ role: 'user', content: userContent }], { maxSteps: 1 }),
   );
 

@@ -30,11 +30,11 @@ export interface WorkflowChain {
   commit(): unknown;
 }
 
-interface MastraStepConfig {
+interface MastraStepConfig<TInput> {
   id: string;
   inputSchema: unknown;
   outputSchema: unknown;
-  execute: (args: { inputData: any }) => unknown;
+  execute: (args: { inputData: TInput }) => unknown;
 }
 
 interface MastraWorkflowConfig {
@@ -45,11 +45,10 @@ interface MastraWorkflowConfig {
 
 interface MastraWorkflowsModule {
   createWorkflow(config: MastraWorkflowConfig): WorkflowChain;
-  createStep(config: MastraStepConfig): unknown;
+  createStep<TInput>(config: MastraStepConfig<TInput>): unknown;
 }
 
 function loadMastraWorkflows(): MastraWorkflowsModule {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
   return require('@mastra/core/workflows') as MastraWorkflowsModule; // skipcq: JS-0359
 }
 
@@ -59,6 +58,6 @@ export function createWorkflow(config: MastraWorkflowConfig): WorkflowChain {
 }
 
 /** Creates a Mastra step; execute takes inputData typed by the caller. */
-export function createStep(config: MastraStepConfig): unknown {
+export function createStep<TInput>(config: MastraStepConfig<TInput>): unknown {
   return loadMastraWorkflows().createStep(config);
 }

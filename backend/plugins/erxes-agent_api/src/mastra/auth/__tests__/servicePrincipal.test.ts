@@ -101,6 +101,7 @@ describe('createAgentAccount', () => {
           isActive: true,
           appId: 'erxes-agent:agent-user-1',
           permissionGroupIds: ['group-1', 'group-2'],
+          customPermissions: [],
           'details.fullName': 'Sales Agent',
           'details.description': 'Handles sales',
         },

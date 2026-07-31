@@ -1,9 +1,18 @@
 import { Document } from 'mongoose';
 
+export type MastraAgentVisibility = 'private' | 'shared' | 'organization';
+export type MastraAgentPermissionMode = 'delegated' | 'managed';
+
 export interface IMastraAgent {
   instructions?: string;
   provider: string;
   model: string;
+  createdBy?: string;
+  visibility?: MastraAgentVisibility;
+  audienceUserIds?: string[];
+  audienceTeamIds?: string[];
+  audienceDepartmentIds?: string[];
+  permissionMode?: MastraAgentPermissionMode;
   // Skill allowlist: glob patterns matched against global skills' name (or
   // `category/name`), e.g. ['erxes-*', 'sales/*']. Empty/unset → no skills.
   skills?: string[];
@@ -23,6 +32,8 @@ export interface IMastraAgentInput extends Partial<IMastraAgent> {
   name?: string;
   description?: string;
   permissionGroupIds?: string[];
+  visibility?: MastraAgentVisibility;
+  audienceUserIds?: string[];
   isActive?: boolean;
 }
 

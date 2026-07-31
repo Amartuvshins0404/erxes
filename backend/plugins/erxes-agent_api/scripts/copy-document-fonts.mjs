@@ -2,19 +2,30 @@ import { cpSync, existsSync, mkdirSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
-// tsc compiles .ts only, so the embedded PDF fonts (TTFs used by
-// mastra/documents/pdf.ts for Cyrillic support) are not emitted into dist.
-// Copy them so the compiled build resolves __dirname/fonts at runtime, matching
-// the tsx-dev layout that serves straight from src/.
+// tsc compiles .ts only, so runtime assets are not emitted into dist. Copy the
+// embedded PDF fonts and plugin-owned locale JSON while preserving their source
+// layout for both compiled production code and tsx development.
 const pluginRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
-const src = join(pluginRoot, 'src/mastra/documents/fonts');
-const dest = join(pluginRoot, 'dist/src/mastra/documents/fonts');
+const assets = [
+  {
+    source: 'src/mastra/documents/fonts',
+    destination: 'dist/src/mastra/documents/fonts',
+  },
+  {
+    source: 'src/locales',
+    destination: 'dist/src/locales',
+  },
+];
 
-if (!existsSync(src)) {
-  console.warn(`[copy-document-fonts] no fonts at ${src}, skipping`);
-  process.exit(0);
+for (const asset of assets) {
+  const source = join(pluginRoot, asset.source);
+  const destination = join(pluginRoot, asset.destination);
+  if (!existsSync(source)) {
+    console.warn(`[copy-document-fonts] no assets at ${source}, skipping`);
+    continue;
+  }
+
+  mkdirSync(destination, { recursive: true });
+  cpSync(source, destination, { recursive: true });
+  console.log(`[copy-document-fonts] copied ${source} -> ${destination}`);
 }
-
-mkdirSync(dest, { recursive: true });
-cpSync(src, dest, { recursive: true });
-console.log(`[copy-document-fonts] copied ${src} -> ${dest}`);

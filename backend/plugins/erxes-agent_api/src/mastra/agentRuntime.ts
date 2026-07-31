@@ -1,10 +1,11 @@
 import { Agent } from '@mastra/core/agent';
 import { ToolSearchProcessor } from '@mastra/core/processors';
 import type { ToolsInput } from '@mastra/core/agent';
+import { ExpectedError } from 'erxes-api-shared/utils';
 import type { IModels } from '~/connectionResolvers';
 import type { IMastraAgentDocument } from '@/agent/@types/agent';
 import { BUILTIN_TOOLS } from './tools/builtins';
-import { buildModel } from './providers';
+import { buildModel, providerRuntimeFingerprint } from './providers';
 import { buildSystemPrompt, ToolInfo } from './instructions/routing';
 import { getOperationRegistry } from './tools/operationRegistry';
 import { buildErxesSupportTools } from './tools/metaTools';
@@ -20,6 +21,7 @@ import {
 } from './tools/scope';
 import type { ToolPolicy } from './tools/scope';
 import { resolveAgentAllowedTools } from './tools/permissionCapabilities';
+import type { GroupPermission } from './tools/actionsToAllowedTools';
 import { resolveDestructiveOpsPolicy } from './tools/destructiveGuard';
 import type { DestructiveOpsPolicy } from './tools/destructiveGuard';
 import { writeAgentAction, AgentActionInput } from './auditLog';
@@ -35,9 +37,10 @@ import type { OperationRegistry } from './tools/operationRegistry';
 import type { IMastraProviderDocument } from '@/provider/@types/provider';
 import type { IMastraSettingsDocument } from '@/settings/@types/settings';
 import {
-  AgentAccount,
   agentAccountName,
   getAgentAccount,
+  getCoreUserById,
+  type AgentAccount,
 } from './auth/servicePrincipal';
 
 // Cache agents by config ID + updatedAt + routing version.
@@ -46,6 +49,68 @@ const agentCache = new Map<string, Agent>();
 // Also cache the raw tools map so the resolver can execute them directly
 // when a model outputs function calls as plain text instead of tool_calls.
 const toolsCache = new Map<string, ToolsInput>();
+
+const PERMISSION_SCOPE_RANK = { own: 0, group: 1, all: 2 } as const;
+
+const safePermissionScope = (
+  scope: string | undefined,
+): keyof typeof PERMISSION_SCOPE_RANK =>
+  scope === 'all' || scope === 'group' ? scope : 'own';
+
+const intersectCustomPermissions = (
+  delegated: GroupPermission[],
+  current: GroupPermission[],
+): GroupPermission[] =>
+  delegated.flatMap((permission) => {
+    const live = current.find(
+      (candidate) =>
+        candidate.plugin === permission.plugin &&
+        candidate.module === permission.module,
+    );
+    const actions = (permission.actions ?? []).filter((action) =>
+      live?.actions?.includes(action),
+    );
+    if (!actions.length) return [];
+    const delegatedScope = safePermissionScope(permission.scope);
+    const liveScope = safePermissionScope(live?.scope);
+    const scope =
+      PERMISSION_SCOPE_RANK[delegatedScope] <= PERMISSION_SCOPE_RANK[liveScope]
+        ? delegatedScope
+        : liveScope;
+    return [{ ...permission, actions, scope }];
+  });
+
+const enforceDelegatedPermissionCeiling = async ({
+  account,
+  agentConfig,
+  subdomain,
+}: {
+  account: AgentAccount;
+  agentConfig: IMastraAgentDocument;
+  subdomain: string;
+}): Promise<AgentAccount> => {
+  if (agentConfig.permissionMode !== 'delegated') return account;
+  if (!agentConfig.createdBy) {
+    throw new ExpectedError('AI team member permission owner not found');
+  }
+  const creator = await getCoreUserById(subdomain, agentConfig.createdBy);
+  if (!creator || creator.isActive === false) {
+    throw new ExpectedError('AI team member permission owner is inactive');
+  }
+  if (creator.isOwner || creator.role === 'admin') return account;
+
+  const creatorGroupIds = new Set(creator.permissionGroupIds ?? []);
+  return {
+    ...account,
+    permissionGroupIds: (account.permissionGroupIds ?? []).filter((groupId) =>
+      creatorGroupIds.has(groupId),
+    ),
+    customPermissions: intersectCustomPermissions(
+      account.customPermissions ?? [],
+      creator.customPermissions ?? [],
+    ),
+  };
+};
 
 // Increment this whenever routing.ts, the meta-tools, or provider logic changes.
 const ROUTING_VERSION = 32;
@@ -85,6 +150,7 @@ function buildAgentCacheKey(params: {
   evaluationEnabled: boolean;
   inventoryFingerprint: string;
   permissionFingerprint: string;
+  providerFingerprint: string;
 }): string {
   const {
     agentConfig,
@@ -93,6 +159,7 @@ function buildAgentCacheKey(params: {
     evaluationEnabled,
     inventoryFingerprint,
     permissionFingerprint,
+    providerFingerprint,
   } = params;
 
   const evalTag = evaluationEnabled ? subdomain || 'os' : 'off';
@@ -102,7 +169,7 @@ function buildAgentCacheKey(params: {
 
   return `${agentConfig._id}:${
     agentConfig.updatedAt?.getTime?.() ?? 0
-  }:v${ROUTING_VERSION}:${inventoryFingerprint}:permissions${permissionFingerprint}:mem${
+  }:v${ROUTING_VERSION}:${inventoryFingerprint}:permissions${permissionFingerprint}:provider${providerFingerprint}:mem${
     useMemory ? subdomain : 'off'
   }:eval${evalTag}:skills${skillsTag}`;
 }
@@ -289,7 +356,7 @@ export async function getOrCreateAgent(
     options.providers && options.settings
       ? [options.providers, options.settings]
       : await Promise.all([
-          models.MastraProvider.find({ isEnabled: true }),
+          models.MastraProvider.getRuntimeProviders(),
           models.MastraSettings.getSettings(),
         ]);
   const destructiveOps = resolveDestructiveOpsPolicy(agentConfig);
@@ -297,12 +364,17 @@ export async function getOrCreateAgent(
   // Core is authoritative for both identity and permissions. Reading the
   // account here also makes permission changes invalidate the runtime cache
   // even when they were made from the standard Team Members UI.
-  const account =
+  const storedAccount =
     options.account ??
     (await getAgentAccount({
       userId: agentConfig._id,
       subdomain: subdomain || 'os',
     }));
+  const account = await enforceDelegatedPermissionCeiling({
+    account: storedAccount,
+    agentConfig,
+    subdomain: subdomain || 'os',
+  });
   const registry = await getOperationRegistry(settings);
   const allowedTools = await resolveAgentAllowedTools({
     subdomain: subdomain || 'os',
@@ -314,6 +386,7 @@ export async function getOrCreateAgent(
     account.permissionGroupIds ?? [],
     account.customPermissions ?? [],
   ]);
+  const providerFingerprint = providerRuntimeFingerprint(providers);
   const policy: ToolPolicy = { mode: 'custom', allowed: allowedTools };
   // The installed-services inventory both grounds the system prompt AND keys
   // the cache: enabling/disabling a plugin changes the fingerprint, so the
@@ -332,6 +405,7 @@ export async function getOrCreateAgent(
     evaluationEnabled,
     inventoryFingerprint: inventory.fingerprint,
     permissionFingerprint,
+    providerFingerprint,
   });
 
   const cached = agentCache.get(cacheKey);

@@ -1,12 +1,17 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { IconPlus, IconTrash, IconKey, IconCheck } from '@tabler/icons-react';
-import { Badge, Button, cn } from 'erxes-ui';
+import { Badge, Button, cn, Tabs } from 'erxes-ui';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useConfirmedRemove } from '~/components/useConfirmedRemove';
 import { useProviders } from './hooks/useProviders';
 import { ProviderForm } from './components/ProviderForm';
-import { IMastraProvider, IMastraProviderPreset } from './types';
+import {
+  IMastraProvider,
+  IMastraProviderPreset,
+  MastraProviderScope,
+} from './types';
 import {
   PROVIDER_FORM_DEFAULTS,
   ProviderFormValues,
@@ -15,16 +20,37 @@ import {
 import { parseHeaders, serializeHeaders } from './utils';
 import { usePermissionCheck } from 'ui-modules';
 import { ERXES_AGENT_ACTIONS } from '~/permissions';
+import { resolveAgentActionScope } from '~/pages/agents/hooks/agentActionScope';
 
 const CUSTOM_KEY = '__custom__';
 
 export const ProvidersPage = () => {
+  const { t } = useTranslation('erxes-agent');
   // `adding` holds the provider key being added/edited, or '__custom__' for a custom entry
   const [adding, setAdding] = useState<string | null>(null);
+  const [scope, setScope] = useState<MastraProviderScope>('personal');
   const { confirmRemove } = useConfirmedRemove();
-  const { hasActionPermission } = usePermissionCheck();
-  const canManage = hasActionPermission(ERXES_AGENT_ACTIONS.provider.manage);
-  const canRemove = hasActionPermission(ERXES_AGENT_ACTIONS.provider.remove);
+  const permissionCheck = usePermissionCheck();
+  const { hasActionPermission } = permissionCheck;
+  const configScope = resolveAgentActionScope(
+    permissionCheck,
+    ERXES_AGENT_ACTIONS.provider.configRead,
+  );
+  const manageScope = resolveAgentActionScope(
+    permissionCheck,
+    ERXES_AGENT_ACTIONS.provider.manage,
+  );
+  const removeScope = resolveAgentActionScope(
+    permissionCheck,
+    ERXES_AGENT_ACTIONS.provider.remove,
+  );
+  const canViewOrganization = configScope === 'all';
+  const canManage =
+    hasActionPermission(ERXES_AGENT_ACTIONS.provider.manage) &&
+    (scope === 'personal' || manageScope === 'all');
+  const canRemove =
+    hasActionPermission(ERXES_AGENT_ACTIONS.provider.remove) &&
+    (scope === 'personal' || removeScope === 'all');
 
   const {
     providers,
@@ -33,7 +59,7 @@ export const ProvidersPage = () => {
     saveProvider,
     removeProvider,
     saving,
-  } = useProviders(() => setAdding(null));
+  } = useProviders(() => setAdding(null), scope);
 
   const form = useForm<ProviderFormValues>({
     resolver: zodResolver(providerFormSchema),
@@ -51,7 +77,8 @@ export const ProvidersPage = () => {
       modelsEndpoint: existing?.modelsEndpoint || preset.modelsEndpoint || '',
       isOpenAICompatible:
         existing?.isOpenAICompatible ?? preset.isOpenAICompatible ?? false,
-      envKey: existing?.envKey || preset.envKey || '',
+      envKey:
+        scope === 'organization' ? existing?.envKey || preset.envKey || '' : '',
       // Header values are write-only: never pre-fill an existing provider's
       // stored headers (blank = keep them). Only seed a brand-new provider with
       // the preset's non-secret default headers.
@@ -87,18 +114,28 @@ export const ProvidersPage = () => {
     if (!adding) return;
     const providerKey = adding === CUSTOM_KEY ? values.provider : adding;
     if (!providerKey) return;
+    const existing = providers.some(
+      (provider) => provider.provider === providerKey,
+    );
+    if (scope === 'personal' && !existing && !values.apiKey.trim()) {
+      form.setError('apiKey', {
+        message: t('provider-personal-key-required'),
+      });
+      return;
+    }
 
     const preset = presets.find((c) => c.provider === providerKey);
     saveProvider({
       variables: {
         doc: {
           provider: providerKey,
+          scope,
           label: preset?.label || providerKey,
           apiKey: values.apiKey,
           baseUrl: values.baseUrl,
           modelsEndpoint: values.modelsEndpoint,
           isOpenAICompatible: values.isOpenAICompatible,
-          envKey: values.envKey,
+          envKey: scope === 'organization' ? values.envKey : '',
           headers: parseHeaders(values.headersText),
           isDefault: values.isDefault,
           isEnabled: values.isEnabled,
@@ -149,6 +186,16 @@ export const ProvidersPage = () => {
   // headers are already set without their secret values being exposed.
   const existingHeaderKeys = editingProvider?.headerKeys ?? [];
 
+  const handleScopeChange = (value: string) => {
+    const nextScope: MastraProviderScope =
+      value === 'organization' && canViewOrganization
+        ? 'organization'
+        : 'personal';
+    setScope(nextScope);
+    setAdding(null);
+    form.reset({ ...PROVIDER_FORM_DEFAULTS });
+  };
+
   return (
     <div className="h-full overflow-y-auto">
       <div className="p-6 max-w-3xl space-y-8">
@@ -159,6 +206,25 @@ export const ProvidersPage = () => {
             database and injected at agent runtime.
           </p>
         </div>
+
+        <Tabs value={scope} onValueChange={handleScopeChange}>
+          <Tabs.List>
+            <Tabs.Trigger value="personal">
+              {t('provider-scope-personal')}
+            </Tabs.Trigger>
+            {canViewOrganization && (
+              <Tabs.Trigger value="organization">
+                {t('provider-scope-organization')}
+              </Tabs.Trigger>
+            )}
+          </Tabs.List>
+        </Tabs>
+
+        <p className="text-sm text-muted-foreground">
+          {scope === 'personal'
+            ? t('provider-scope-personal-description')
+            : t('provider-scope-organization-description')}
+        </p>
 
         {providers.length > 0 && (
           <section>
@@ -240,6 +306,7 @@ export const ProvidersPage = () => {
                   title={editingLabel}
                   isEdit={isEdit}
                   isCustom={adding === CUSTOM_KEY}
+                  scope={scope}
                   existingKeyHint={existingKeyHint}
                   existingHeaderKeys={existingHeaderKeys}
                   saving={saving}

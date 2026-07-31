@@ -64,10 +64,7 @@ export const MastraSettings = () => {
       <Route path="/skills" element={<SkillsIndexPage />} />
       <Route path="/skills/new" element={<SkillFormPage />} />
       <Route path="/skills/edit/:id" element={<SkillFormPage />} />
-      <Route
-        path="/providers"
-        element={<AdminRoute element={<ProvidersPage />} />}
-      />
+      <Route path="/providers" element={<ProvidersPage />} />
       <Route
         path="/general"
         element={<AdminRoute element={<GeneralSettingsPage />} />}

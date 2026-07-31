@@ -130,7 +130,7 @@ export const skillMutations = {
     });
 
     const [providers, settings] = await Promise.all([
-      models.MastraProvider.find({ isEnabled: true }),
+      models.MastraProvider.getRuntimeProviders(userId),
       models.MastraSettings.findOne({}),
     ]);
 

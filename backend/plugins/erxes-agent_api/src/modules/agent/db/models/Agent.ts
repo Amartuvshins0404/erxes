@@ -10,6 +10,7 @@ export interface IMastraAgentListParams {
   perPage?: number;
   searchValue?: string;
   matchingAccountIds?: string[];
+  filter?: FilterQuery<IMastraAgentDocument>;
 }
 
 export interface IMastraAgentListResult {
@@ -19,7 +20,9 @@ export interface IMastraAgentListResult {
 
 export interface IMastraAgentModel extends Model<IMastraAgentDocument> {
   getAgent(_id: string): Promise<IMastraAgentDocument>;
-  getAgents(): Promise<IMastraAgentDocument[]>;
+  getAgents(
+    filter?: FilterQuery<IMastraAgentDocument>,
+  ): Promise<IMastraAgentDocument[]>;
   getAgentsList(
     params: IMastraAgentListParams,
   ): Promise<IMastraAgentListResult>;
@@ -44,8 +47,8 @@ export const loadAgentClass = (_models: IModels) => {
     }
 
     /** All AI profiles, newest first. */
-    public static getAgents() {
-      return _models.MastraAgent.find({}).sort({ createdAt: -1 });
+    public static getAgents(filter: FilterQuery<IMastraAgentDocument> = {}) {
+      return _models.MastraAgent.find(filter).sort({ createdAt: -1 });
     }
 
     // Offset-paginated AI-team-member list. Identity fields live in core, so
@@ -55,11 +58,12 @@ export const loadAgentClass = (_models: IModels) => {
       perPage = 30,
       searchValue,
       matchingAccountIds = [],
+      filter: accessFilter = {},
     }: IMastraAgentListParams) {
       const searchRe = searchValue
         ? new RegExp(escapeRegExp(searchValue), 'i')
         : null;
-      const filter: FilterQuery<IMastraAgentDocument> = searchRe
+      const searchFilter: FilterQuery<IMastraAgentDocument> = searchRe
         ? {
             $or: [
               { _id: { $in: matchingAccountIds } },
@@ -68,6 +72,9 @@ export const loadAgentClass = (_models: IModels) => {
             ],
           }
         : {};
+      const filter: FilterQuery<IMastraAgentDocument> = searchRe
+        ? { $and: [accessFilter, searchFilter] }
+        : accessFilter;
       const limit = Math.min(Math.max(perPage, 1), 100);
       const skip = (Math.max(page, 1) - 1) * limit;
 

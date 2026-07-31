@@ -3,6 +3,14 @@ import { IContext } from '~/connectionResolvers';
 import { prepareChatTurn, persistTurn, runAgentTurn } from '@/agent/turn';
 import { IMastraAgentDocument } from '@/agent/@types/agent';
 import {
+  agentAccessFilter,
+  requireScopedAgent,
+  resolveAgentAudienceTeamIds,
+} from '@/agent/authorization';
+import { requireActionScope } from '@/_shared/authorization';
+import { requireUserId } from '@/_shared/auth';
+import { ERXES_AGENT_ACTIONS } from '~/meta/permissionActions';
+import {
   agentAccountAppId,
   agentAccountName,
   agentIdForAccount,
@@ -33,6 +41,10 @@ const hydrateProfiles = async (
       {
         ...profile.toObject(),
         _id: profile._id,
+        visibility: profile.visibility ?? 'organization',
+        audienceUserIds: profile.audienceUserIds ?? [],
+        audienceTeamIds: profile.audienceTeamIds ?? [],
+        audienceDepartmentIds: profile.audienceDepartmentIds ?? [],
         accountName: agentAccountName(account),
         accountDescription: account.details?.description || '',
         permissionGroupIds: account.permissionGroupIds || [],
@@ -80,35 +92,55 @@ export const agentQueries = {
   mastraAgents: async (
     _parent: undefined,
     _args: undefined,
-    { models, subdomain, checkPermission }: IContext,
+    { models, subdomain, user, checkPermission }: IContext,
   ) => {
-    const [, profiles] = await Promise.all([
-      checkPermission('agentsView'),
-      models.MastraAgent.getAgents(),
-    ]);
+    await checkPermission(ERXES_AGENT_ACTIONS.agent.readSummary);
+    requireUserId(user);
+    const scope = await requireActionScope({
+      subdomain,
+      user,
+      action: ERXES_AGENT_ACTIONS.agent.readSummary,
+    });
+    const teamIds = await resolveAgentAudienceTeamIds(subdomain, user, scope);
+    const profiles = await models.MastraAgent.getAgents(
+      agentAccessFilter(user, scope, teamIds),
+    );
     return hydrateProfiles(profiles, subdomain);
   },
 
   mastraAgent: async (
     _parent: undefined,
     { _id }: { _id: string },
-    { models, subdomain, checkPermission }: IContext,
+    { models, subdomain, user, checkPermission }: IContext,
   ) => {
-    const [, profile] = await Promise.all([
-      checkPermission('agentsView'),
-      models.MastraAgent.getAgent(_id),
-    ]);
-    return hydrateProfile(profile, subdomain);
+    await checkPermission(ERXES_AGENT_ACTIONS.agent.readConfig);
+    requireUserId(user);
+    const { agent } = await requireScopedAgent({
+      models,
+      subdomain,
+      user,
+      action: ERXES_AGENT_ACTIONS.agent.readConfig,
+      agentId: _id,
+    });
+    return hydrateProfile(agent, subdomain);
   },
 
   mastraAgentsMain: async (
     _parent: undefined,
     params: { page?: number; perPage?: number; searchValue?: string },
-    { models, subdomain, checkPermission }: IContext,
+    { models, subdomain, user, checkPermission }: IContext,
   ) => {
-    await checkPermission('agentsView');
+    await checkPermission(ERXES_AGENT_ACTIONS.agent.readSummary);
+    requireUserId(user);
+    const scope = await requireActionScope({
+      subdomain,
+      user,
+      action: ERXES_AGENT_ACTIONS.agent.readSummary,
+    });
+    const teamIds = await resolveAgentAudienceTeamIds(subdomain, user, scope);
+    const filter = agentAccessFilter(user, scope, teamIds);
     const allProfiles = params.searchValue
-      ? await models.MastraAgent.getAgents()
+      ? await models.MastraAgent.getAgents(filter)
       : [];
     const matchingAccountIds = await findMatchingAccountIds(
       allProfiles,
@@ -118,6 +150,7 @@ export const agentQueries = {
     const result = await models.MastraAgent.getAgentsList({
       ...params,
       matchingAccountIds,
+      filter,
     });
     const list = await hydrateProfiles(result.list, subdomain);
     return { ...result, list };
@@ -132,9 +165,15 @@ export const agentQueries = {
     }: { agentId: string; message: string; threadId?: string },
     { models, user, subdomain, checkPermission }: IContext,
   ) => {
-    await checkPermission('agentsChat');
-    if (!user?._id) throw new ExpectedError('Login required');
-
+    await checkPermission(ERXES_AGENT_ACTIONS.agent.chat);
+    requireUserId(user);
+    await requireScopedAgent({
+      models,
+      subdomain,
+      user,
+      action: ERXES_AGENT_ACTIONS.agent.chat,
+      agentId,
+    });
     const prepared = await prepareChatTurn({
       models,
       subdomain,

@@ -1,6 +1,11 @@
 import { IContext } from '~/connectionResolvers';
 import { PROVIDER_PRESETS } from '~/mastra/providers';
 import { toPublicProvider } from '@/provider/utils/mask';
+import {
+  resolveProviderOwner,
+  requireProviderAccess,
+} from '@/provider/authorization';
+import type { MastraProviderScope } from '@/provider/@types/provider';
 import { ERXES_AGENT_ACTIONS } from '~/meta/permissionActions';
 
 // One entry of a provider's live model-listing response. Field names cover
@@ -18,23 +23,34 @@ interface ProviderModelEntry {
 export const providerQueries = {
   mastraProviders: async (
     _parent: undefined,
-    _args: undefined,
-    { models, checkPermission }: IContext,
+    { scope }: { scope?: MastraProviderScope },
+    { models, subdomain, user, checkPermission }: IContext,
   ) => {
     await checkPermission(ERXES_AGENT_ACTIONS.provider.configRead);
-    // Mask before the secret crosses the GraphQL boundary: callers get
-    // hasApiKey + a masked hint, never the raw apiKey.
-    const providers = await models.MastraProvider.getProviders();
+    const owner = await resolveProviderOwner({
+      subdomain,
+      user,
+      action: ERXES_AGENT_ACTIONS.provider.configRead,
+      requestedScope: scope,
+    });
+    const providers = await models.MastraProvider.getProviders(owner);
     return providers.map(toPublicProvider);
   },
 
   mastraProvider: async (
     _parent: undefined,
     { _id }: { _id: string },
-    { models, checkPermission }: IContext,
+    { models, subdomain, user, checkPermission }: IContext,
   ) => {
     await checkPermission(ERXES_AGENT_ACTIONS.provider.configRead);
-    return toPublicProvider(await models.MastraProvider.getProvider(_id));
+    const provider = await models.MastraProvider.getProvider(_id);
+    await requireProviderAccess({
+      provider,
+      subdomain,
+      user,
+      action: ERXES_AGENT_ACTIONS.provider.configRead,
+    });
+    return toPublicProvider(provider);
   },
 
   // Returns static presets for the provider administration form.
@@ -43,7 +59,7 @@ export const providerQueries = {
     _args: undefined,
     { checkPermission }: IContext,
   ) => {
-    await checkPermission(ERXES_AGENT_ACTIONS.provider.configRead);
+    await checkPermission(ERXES_AGENT_ACTIONS.provider.catalogRead);
     return PROVIDER_PRESETS;
   },
 
@@ -51,16 +67,12 @@ export const providerQueries = {
   mastraProviderCatalog: async (
     _parent: undefined,
     _args: undefined,
-    { models, checkPermission }: IContext,
+    { models, user, checkPermission }: IContext,
   ) => {
     await checkPermission(ERXES_AGENT_ACTIONS.provider.catalogRead);
-    const storedProviders = await models.MastraProvider.find({
-      isEnabled: true,
-    }).select({
-      provider: 1,
-      label: 1,
-      isOpenAICompatible: 1,
-    });
+    const storedProviders = await models.MastraProvider.getRuntimeProviders(
+      user?._id,
+    );
     const storedSet = new Set(storedProviders.map((stored) => stored.provider));
     const presetKeys = new Set(
       PROVIDER_PRESETS.map((preset) => preset.provider),
@@ -94,12 +106,15 @@ export const providerQueries = {
   mastraProviderModels: async (
     _parent: undefined,
     { provider }: { provider: string },
-    { models, checkPermission }: IContext,
+    { models, user, checkPermission }: IContext,
   ) => {
     await checkPermission(ERXES_AGENT_ACTIONS.provider.catalogRead);
-    // Prefer the stored DB doc (supports custom/unknown providers too)
-    const stored = await models.MastraProvider.findOne({ provider });
-
+    const storedProviders = await models.MastraProvider.getRuntimeProviders(
+      user?._id,
+    );
+    const stored = storedProviders.find(
+      (candidate) => candidate.provider === provider,
+    );
     // Fall back to preset data for missing fields
     const preset = PROVIDER_PRESETS.find(
       (entry) => entry.provider === provider,

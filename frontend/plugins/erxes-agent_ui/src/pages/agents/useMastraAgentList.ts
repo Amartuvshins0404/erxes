@@ -8,6 +8,9 @@ export interface IMastraAgentRow {
   _id: string;
   accountName: string;
   accountDescription?: string;
+  createdBy?: string;
+  visibility: 'private' | 'shared' | 'organization';
+  audienceUserIds: string[];
   provider: string;
   model: string;
   skills?: string[];

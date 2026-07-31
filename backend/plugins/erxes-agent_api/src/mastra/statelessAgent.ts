@@ -8,7 +8,10 @@
 // provider/model builder load only when an extraction actually runs.
 // ---------------------------------------------------------------------------
 
-import type { ProviderDocLike } from '~/mastra/providers';
+import {
+  providerRuntimeFingerprint,
+  type ProviderDocLike,
+} from '~/mastra/providers';
 import { createAgentCache } from '~/mastra/cachedAgent';
 
 // The minimal surface these paths need from a Mastra Agent. Keeping it local
@@ -36,7 +39,9 @@ export async function getStatelessAgent(
   const { id, name, instructions, provider, model, providers } = spec;
   // Include the processor count so an agent built with a different processor
   // pipeline (e.g. with vs. without the PIIDetector) is never reused.
-  const key = `${id}:${provider}:${model}:p${spec.outputProcessors?.length ?? 0}`;
+  const key = `${id}:${provider}:${model}:${providerRuntimeFingerprint(
+    providers,
+  )}:p${spec.outputProcessors?.length ?? 0}`;
   return agentCache.getOrBuild(key, ({ buildModel }) => ({
     id,
     name,

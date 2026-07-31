@@ -1,0 +1,22 @@
+{
+  "agent-settings-many": "Олон",
+  "agent-settings-many-description": "Нэг эсвэл хэд хэдэн хүн, баг эсвэл хэлтэстэй хуваалцана.",
+  "agent-settings-audience-title": "Хүрээг сонгох",
+  "agent-settings-audience-description": "Сонгосон хүн, баг эсвэл хэлтсийн аль нэгэнд хамаарах хүн ашиглах боломжтой. Үүсгэгч болон Agent Admin эрхтэй хүмүүс үргэлж хандах эрхтэй.",
+  "agent-settings-audience-people": "Хүмүүс",
+  "agent-settings-audience-people-description": "Сонгосон хүмүүс энэ агентыг ашиглах боломжтой.",
+  "agent-settings-audience-people-placeholder": "Хүмүүс сонгох…",
+  "agent-settings-audience-teams": "Багууд",
+  "agent-settings-audience-teams-description": "Сонгосон багийн гишүүд энэ агентыг ашиглах боломжтой.",
+  "agent-settings-audience-teams-placeholder": "Баг сонгох…",
+  "agent-settings-audience-search-teams": "Баг хайх…",
+  "agent-settings-audience-no-teams": "Баг тохируулаагүй байна.",
+  "agent-settings-audience-departments": "Хэлтсүүд",
+  "agent-settings-audience-departments-description": "Сонгосон хэлтэст харьяалагдах хүн бүр энэ агентыг ашиглах боломжтой.",
+  "agent-settings-audience-departments-placeholder": "Хэлтэс сонгох…",
+  "provider-scope-personal": "Хувийн түлхүүрүүд",
+  "provider-scope-organization": "Байгууллагын түлхүүрүүд",
+  "provider-scope-personal-description": "Зөвхөн таны хүсэлтүүд эдгээр нууц мэдээллийг ашиглана. Нууц утгыг браузер руу хэзээ ч буцаахгүй.",
+  "provider-scope-organization-description": "Хувийн түлхүүргүй хэрэглэгчид болон арын ажлын урсгалд байгууллагын нууц мэдээллийг нөөц байдлаар ашиглана.",
+  "provider-personal-key-required": "Хувийн provider-д API түлхүүр шаардлагатай"
+}

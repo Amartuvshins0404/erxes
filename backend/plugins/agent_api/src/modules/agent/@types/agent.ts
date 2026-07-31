@@ -11,6 +11,8 @@ export interface IAgentServer {
   serverId: string;
   provider?: string;
   providerModel?: string;
+  credentialMode?: 'api_key' | 'subscription';
+  credentialStatus?: 'pending' | 'connected' | 'failed';
   transferredFromSubdomain?: string;
   transferredAt?: Date;
 

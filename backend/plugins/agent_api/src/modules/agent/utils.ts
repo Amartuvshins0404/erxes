@@ -54,7 +54,8 @@ interface ManagedDeployPayload {
   serverName: string;
   provider: string;
   model: string;
-  apiKey: string;
+  credentialMode: 'api_key' | 'subscription';
+  apiKey?: string;
   description?: string;
   systemPrompt?: string;
 }

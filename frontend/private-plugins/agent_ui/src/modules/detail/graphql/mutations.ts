@@ -54,8 +54,21 @@ export const SET_AGENT_LLM_CONNECTION = gql`
       serverId
       provider
       model
+      credentialMode
+      credentialStatus
       status
       updatedAt
+    }
+  }
+`;
+
+export const START_AGENT_LLM_SUBSCRIPTION_AUTH = gql`
+  mutation StartAgentLlmSubscriptionAuth($identifierId: String!) {
+    startAgentLlmSubscriptionAuth(identifierId: $identifierId) {
+      ok
+      status
+      message
+      records
     }
   }
 `;

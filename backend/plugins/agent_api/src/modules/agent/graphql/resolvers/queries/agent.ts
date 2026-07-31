@@ -396,4 +396,46 @@ export const agentQueries = {
               : payload,
         }),
     }),
+
+  agentLlmSubscriptionAuthStatus: async (
+    _root: undefined,
+    { identifierId }: { identifierId: string },
+    { models, subdomain, user }: IContext,
+  ) => {
+    const result = await callManagedRuntimeOperation({
+      models,
+      user,
+      subdomain,
+      agentId: identifierId,
+      operation: 'agentLlmSubscriptionAuthStatus',
+      request: {
+        method: 'GET',
+        path: '/openclaw/subscription-auth/status',
+      },
+      message: 'Subscription sign-in status fetched',
+      mapResult: (payload) =>
+        mapRuntimePayload('Subscription sign-in status fetched', payload, {
+          records: payload,
+        }),
+    });
+
+    if (
+      result.status === 'connected' ||
+      result.status === 'failed' ||
+      result.status === 'expired'
+    ) {
+      await models.AgentServer.updateOne(
+        { identifierId, credentialMode: 'subscription' },
+        {
+          $set: {
+            credentialStatus:
+              result.status === 'connected' ? 'connected' : 'failed',
+            updatedAt: new Date(),
+          },
+        },
+      );
+    }
+
+    return result;
+  },
 };

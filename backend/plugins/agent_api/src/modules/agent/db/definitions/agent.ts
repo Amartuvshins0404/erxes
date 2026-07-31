@@ -16,6 +16,16 @@ export const agentServerSchema = schemaWrapper(
       serverId: { type: String, label: 'Server ID' },
       provider: { type: String, label: 'LLM provider' },
       providerModel: { type: String, label: 'LLM model' },
+      credentialMode: {
+        type: String,
+        enum: ['api_key', 'subscription'],
+        label: 'LLM credential mode',
+      },
+      credentialStatus: {
+        type: String,
+        enum: ['pending', 'connected', 'failed'],
+        label: 'LLM credential status',
+      },
       transferredFromSubdomain: {
         type: String,
         label: 'Transferred from subdomain',

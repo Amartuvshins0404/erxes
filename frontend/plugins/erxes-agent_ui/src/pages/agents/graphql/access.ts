@@ -21,15 +21,6 @@ export interface PermissionGroupsData {
     plugin: string;
   }>;
 }
-export interface AudienceTeamOption {
-  _id: string;
-  name: string;
-  description?: string;
-}
-
-export interface AudienceTeamsData {
-  getTeams?: AudienceTeamOption[];
-}
 
 export const PERMISSION_GROUPS = gql`
   query MastraPermissionGroups {
@@ -43,15 +34,6 @@ export const PERMISSION_GROUPS = gql`
       name
       description
       plugin
-    }
-  }
-`;
-export const AUDIENCE_TEAMS = gql`
-  query MastraAudienceTeams {
-    getTeams {
-      _id
-      name
-      description
     }
   }
 `;

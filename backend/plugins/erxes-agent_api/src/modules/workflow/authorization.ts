@@ -1,11 +1,6 @@
 import { IUserDocument } from 'erxes-api-shared/core-types';
 import { ExpectedError } from 'erxes-api-shared/utils';
 import { IModels } from '~/connectionResolvers';
-import {
-  agentAccessFilter,
-  requireScopedAgent,
-  resolveAgentAudienceTeamIds,
-} from '@/agent/authorization';
 import { requireActionScope } from '@/_shared/authorization';
 
 export const getWorkflowAgentAccess = async ({
@@ -23,9 +18,8 @@ export const getWorkflowAgentAccess = async ({
   agentIds: string[];
 }> => {
   const scope = await requireActionScope({ subdomain, user, action });
-  const teamIds = await resolveAgentAudienceTeamIds(subdomain, user._id, scope);
   const agents = await models.MastraAgent.find(
-    agentAccessFilter(user, scope, teamIds),
+    scope === 'own' ? { _id: user._id } : {},
   )
     .select({ _id: 1 })
     .lean();
@@ -49,13 +43,15 @@ export const requireScopedWorkflowAgent = async ({
   action: string;
   agentId: string;
 }) => {
-  const { agent, scope } = await requireScopedAgent({
-    models,
-    subdomain,
-    user,
-    action,
-    agentId,
-  });
+  const [scope, agent] = await Promise.all([
+    requireActionScope({ subdomain, user, action }),
+    models.MastraAgent.findById(agentId),
+  ]);
+
+  if (!agent || (scope === 'own' && String(agent._id) !== user._id)) {
+    throw new ExpectedError('Workflow not found');
+  }
+
   return { agent, scope };
 };
 

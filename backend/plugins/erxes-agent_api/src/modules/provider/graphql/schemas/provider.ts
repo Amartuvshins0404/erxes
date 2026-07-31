@@ -1,14 +1,8 @@
 export const types = `
-  enum MastraProviderScope {
-    organization
-    personal
-  }
-
   type MastraProvider {
     _id: String
     provider: String
     label: String
-    scope: MastraProviderScope!
     # apiKey is WRITE-ONLY: it is never returned. Reads expose only whether a
     # key is stored (hasApiKey) and a masked last-4 hint (apiKeyHint).
     hasApiKey: Boolean
@@ -27,7 +21,6 @@ export const types = `
 
   input MastraProviderInput {
     provider: String!
-    scope: MastraProviderScope!
     label: String
     # Send a non-empty value to set/replace the key; omit or send blank to leave
     # the stored secret unchanged (mirrors the voice BYOK module).
@@ -67,7 +60,7 @@ export const types = `
 `;
 
 export const queries = `
-  mastraProviders(scope: MastraProviderScope): [MastraProvider]
+  mastraProviders: [MastraProvider]
   mastraProvider(_id: String!): MastraProvider
   mastraProviderCatalog: [MastraProviderCatalogEntry]
   mastraProviderModels(provider: String!): [MastraProviderModel]

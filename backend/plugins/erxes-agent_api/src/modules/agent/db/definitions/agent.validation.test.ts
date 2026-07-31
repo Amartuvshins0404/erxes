@@ -12,17 +12,6 @@ const expectPath = (doc: Record<string, unknown>, path: string) =>
   AgentModel.validate(doc, [path]);
 
 describe('agentSchema update validation', () => {
-  it('leaves legacy access fields unset for compatibility fallbacks', () => {
-    const legacy = AgentModel.hydrate({
-      _id: 'legacy-agent',
-      provider: 'openai',
-      model: 'gpt-4o',
-    });
-
-    expect(legacy.visibility).toBeUndefined();
-    expect(legacy.permissionMode).toBeUndefined();
-  });
-
   it('rejects an unknown destructive-operations policy', async () => {
     await expect(
       expectPath({ destructiveOps: 'always' }, 'destructiveOps'),
@@ -30,16 +19,12 @@ describe('agentSchema update validation', () => {
   });
 
   it('rejects an out-of-range maxSteps', async () => {
-    await expect(
-      expectPath({ maxSteps: 999999999 }, 'maxSteps'),
-    ).rejects.toThrow();
+    await expect(expectPath({ maxSteps: 999999999 }, 'maxSteps')).rejects.toThrow();
     await expect(expectPath({ maxSteps: 0 }, 'maxSteps')).rejects.toThrow();
   });
 
   it('rejects an out-of-range temperature', async () => {
-    await expect(
-      expectPath({ temperature: 5 }, 'temperature'),
-    ).rejects.toThrow();
+    await expect(expectPath({ temperature: 5 }, 'temperature')).rejects.toThrow();
   });
 
   it('rejects nulling the required model', async () => {

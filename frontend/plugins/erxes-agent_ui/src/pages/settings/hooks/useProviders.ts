@@ -14,16 +14,12 @@ import {
   IProviderCatalogResponse,
   IProviderPresetsResponse,
   IProvidersResponse,
-  MastraProviderScope,
 } from '../types';
 import { usePermissionCheck } from 'ui-modules';
 import { ERXES_AGENT_ACTIONS } from '~/permissions';
 
 /** Provider list/presets/catalog plus save & remove mutations for the page. */
-export const useProviders = (
-  onSaved: () => void,
-  scope: MastraProviderScope,
-) => {
+export const useProviders = (onSaved: () => void) => {
   const { hasActionPermission, isLoaded } = usePermissionCheck();
   const canReadConfig =
     isLoaded && hasActionPermission(ERXES_AGENT_ACTIONS.provider.configRead);
@@ -31,23 +27,22 @@ export const useProviders = (
     isLoaded && hasActionPermission(ERXES_AGENT_ACTIONS.provider.catalogRead);
   const { data: providersData, refetch } = useQuery<IProvidersResponse>(
     MASTRA_PROVIDERS,
-    { variables: { scope }, skip: !canReadConfig },
+    { skip: !canReadConfig },
   );
   const { data: presetsData } = useQuery<IProviderPresetsResponse>(
     MASTRA_PROVIDER_PRESETS,
+    { skip: !canReadConfig },
+  );
+  const { data: catalogData } = useQuery<IProviderCatalogResponse>(
+    MASTRA_PROVIDER_CATALOG,
     { skip: !canReadCatalog },
   );
-  const { data: catalogData, refetch: refetchCatalog } =
-    useQuery<IProviderCatalogResponse>(MASTRA_PROVIDER_CATALOG, {
-      skip: !canReadCatalog,
-    });
 
   const [saveProvider, { loading: saving }] = useMutation(
     MASTRA_PROVIDER_SAVE,
     {
       onCompleted: () => {
         if (canReadConfig) void refetch();
-        if (canReadCatalog) void refetchCatalog();
         onSaved();
         toast({ title: 'Provider saved' });
       },
@@ -57,7 +52,6 @@ export const useProviders = (
   const [removeProvider] = useMutation(MASTRA_PROVIDER_REMOVE, {
     onCompleted: () => {
       if (canReadConfig) void refetch();
-      if (canReadCatalog) void refetchCatalog();
     },
     onError: toastError(),
   });

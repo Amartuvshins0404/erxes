@@ -124,8 +124,8 @@ const modules: IPermissionModule[] = [
         'Delete provider configuration',
       ),
     ],
-    'scope',
-    ['ownerId'],
+    null,
+    [],
   ),
   permissionModule(
     'settings',
@@ -327,20 +327,10 @@ export const permissions: IPermissionConfig = {
             ERXES_AGENT_ACTIONS.agent.create,
             ERXES_AGENT_ACTIONS.agent.update,
             ERXES_AGENT_ACTIONS.agent.remove,
-            ERXES_AGENT_ACTIONS.agent.share,
           ],
           'own',
         ),
         grant('provider', [ERXES_AGENT_ACTIONS.provider.catalogRead], 'group'),
-        grant(
-          'provider',
-          [
-            ERXES_AGENT_ACTIONS.provider.configRead,
-            ERXES_AGENT_ACTIONS.provider.manage,
-            ERXES_AGENT_ACTIONS.provider.remove,
-          ],
-          'own',
-        ),
         grant('settings', [ERXES_AGENT_ACTIONS.settings.statusRead], 'group'),
         grant(
           'workflow',

@@ -2,11 +2,6 @@ export interface IMastraAgent {
   _id: string;
   accountName: string;
   accountDescription?: string | null;
-  createdBy?: string | null;
-  visibility: 'private' | 'shared' | 'organization';
-  audienceUserIds: string[];
-  audienceTeamIds: string[];
-  audienceDepartmentIds: string[];
   permissionGroupIds: string[];
   instructions?: string | null;
   provider?: string | null;

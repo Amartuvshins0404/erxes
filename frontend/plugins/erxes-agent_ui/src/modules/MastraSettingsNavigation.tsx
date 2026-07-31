@@ -15,13 +15,13 @@ export const MastraSettingsNavigation = () => {
             path="/skills"
             name="Skills"
           />
-          <SettingsNavigationMenuLinkItem
-            pathPrefix="erxes-agent"
-            path="/providers"
-            name="Providers & Models"
-          />
           {isAdmin && (
             <>
+              <SettingsNavigationMenuLinkItem
+                pathPrefix="erxes-agent"
+                path="/providers"
+                name="Providers & Models"
+              />
               <SettingsNavigationMenuLinkItem
                 pathPrefix="erxes-agent"
                 path="/general"

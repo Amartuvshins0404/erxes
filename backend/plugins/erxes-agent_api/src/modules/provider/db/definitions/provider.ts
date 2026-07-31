@@ -4,15 +4,7 @@ import { mongooseStringRandomId } from 'erxes-api-shared/utils';
 export const providerSchema = new Schema(
   {
     _id: mongooseStringRandomId,
-    provider: { type: String, required: true, label: 'Provider' },
-    scope: {
-      type: String,
-      enum: ['organization', 'personal'],
-      default: 'organization',
-      required: true,
-      label: 'Credential Scope',
-    },
-    ownerId: { type: String, default: null, label: 'Credential Owner' },
+    provider: { type: String, required: true, unique: true, label: 'Provider' },
     label: { type: String, label: 'Display Name' },
     apiKey: { type: String, label: 'API Key' },
     baseUrl: { type: String, label: 'Base URL' },
@@ -27,5 +19,3 @@ export const providerSchema = new Schema(
   },
   { timestamps: true },
 );
-
-providerSchema.index({ provider: 1, ownerId: 1 }, { unique: true });

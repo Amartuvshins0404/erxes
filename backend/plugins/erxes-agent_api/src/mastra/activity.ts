@@ -20,15 +20,12 @@
 
 import type { Agent } from '@mastra/core/agent';
 import { trimEdgeChars } from '~/mastra/text';
-import {
-  providerRuntimeFingerprint,
-  type ProviderDocLike,
-} from '~/mastra/providers';
+import type { ProviderDocLike } from '~/mastra/providers';
 import { createAgentCache } from '~/mastra/cachedAgent';
 
 /** Auth context accepted by runWithAuth (the module itself loads lazily). */
 type AuthCtx = Parameters<
-  typeof import('~/mastra/requestContext')['runWithAuth']
+  (typeof import('~/mastra/requestContext'))['runWithAuth']
 >[0];
 
 export const ACTIVITY_INSTRUCTIONS = `You narrate what an AI agent is doing right now.
@@ -128,7 +125,7 @@ async function summarizerFor(
   model: string,
   providers: ProviderDocLike[],
 ): Promise<Agent> {
-  const key = `${provider}:${model}:${providerRuntimeFingerprint(providers)}`;
+  const key = `${provider}:${model}`;
   return summarizerCache.getOrBuild(key, ({ buildModel }) => ({
     id: 'mastra-activity-summarizer',
     name: 'Activity Summarizer',
@@ -244,7 +241,7 @@ async function summaryAgentFor(
   model: string,
   providers: ProviderDocLike[],
 ): Promise<Agent> {
-  const key = `${provider}:${model}:${providerRuntimeFingerprint(providers)}`;
+  const key = `${provider}:${model}`;
   return summaryAgentCache.getOrBuild(key, ({ buildModel }) => ({
     id: 'mastra-turn-summarizer',
     name: 'Turn Summarizer',
@@ -282,10 +279,7 @@ function buildCombinedPrompt(params: {
   if (steps.length) {
     const lines = steps.map(
       (s) =>
-        `[${s.index}] ${clip(
-          s.text.replace(/\s+/g, ' ').trim(),
-          STEP_INPUT_CHARS,
-        )}`,
+        `[${s.index}] ${clip(s.text.replace(/\s+/g, ' ').trim(), STEP_INPUT_CHARS)}`,
     );
     sections.push(`Reasoning steps:\n${lines.join('\n')}`);
   }
@@ -299,10 +293,7 @@ function buildCombinedPrompt(params: {
 
 /** Parse the "TURN:" + "[index]" lines back out, tolerating wrapped lines and
  *  stray prose. Each item degrades independently. Exported for unit tests. */
-export function parseCombined(
-  raw: string,
-  wantTurn: boolean,
-): TurnAndStepsResult {
+export function parseCombined(raw: string, wantTurn: boolean): TurnAndStepsResult {
   const turnLines: string[] = [];
   const stepLines = new Map<number, string[]>();
   let cur: { kind: 'turn' } | { kind: 'step'; index: number } | null = null;

@@ -90,12 +90,11 @@ interface TurnConfig {
 async function readTurnConfig(
   models: IModels,
   agentId: string,
-  providerOwnerId?: string,
 ): Promise<TurnConfig> {
   const [agentConfig, settings, providers] = await Promise.all([
     models.MastraAgent.findOne({ _id: agentId }),
     models.MastraSettings.getSettings(),
-    models.MastraProvider.getRuntimeProviders(providerOwnerId),
+    models.MastraProvider.find({ isEnabled: true }),
   ]);
   if (!agentConfig) {
     throw new ExpectedError(`AI team member "${agentId}" was not found`);
@@ -346,7 +345,6 @@ export async function prepareTurn(
   const { agentConfig, settings, providers } = await readTurnConfig(
     models,
     agentId,
-    identity.kind === 'user' ? identity.user?._id : undefined,
   );
 
   const sessionId = deriveSessionId(threadId);

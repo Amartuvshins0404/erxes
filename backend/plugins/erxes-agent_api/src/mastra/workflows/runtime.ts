@@ -21,7 +21,7 @@ import { writeAgentAction, makeAgentProcessId } from '../auditLog';
 import { getOperationRegistry } from '../tools/operationRegistry';
 import type { IModels } from '~/connectionResolvers';
 import type { IMastraAgentDocument } from '@/agent/@types/agent';
-import { providerRuntimeFingerprint, type ProviderDocLike } from '../providers';
+import type { ProviderDocLike } from '../providers';
 import type {
   IMastraWorkflowDocument,
   IMastraWorkflowRunDocument,
@@ -112,7 +112,7 @@ export function extractJsonObject(text: string): Record<string, unknown> {
 // Keyed by agent _id, holding the cached agent's version: a newer version
 // overwrites its single entry, so eviction is one Map.set instead of an O(n)
 // startsWith scan over every cached agent.
-const judgeCache = new Map<string, { version: string; judge: JudgeAgent }>();
+const judgeCache = new Map<string, { version: number; judge: JudgeAgent }>();
 
 /** The minimal Mastra Agent surface the judgment path invokes. */
 interface JudgeAgent {
@@ -126,11 +126,9 @@ function getJudgeAgent(
   agentConfig: IMastraAgentDocument,
   providers: ProviderDocLike[],
 ): JudgeAgent {
-  const version = `${
-    agentConfig.updatedAt?.getTime?.() ?? 0
-  }:${providerRuntimeFingerprint(providers)}`;
+  const version = agentConfig.updatedAt?.getTime?.() ?? 0;
   const hit = judgeCache.get(agentConfig._id);
-  if (hit?.version === version) return hit.judge;
+  if (hit && hit.version === version) return hit.judge;
 
   const { Agent } = require('@mastra/core/agent'); // skipcq: JS-0359
   const { buildModel } = require('../providers'); // skipcq: JS-0359
@@ -264,9 +262,7 @@ export async function buildRunDeps(
       usage.llmCalls += 1;
 
       const agentConfig = await models.MastraAgent.getAgent(agentBindingId);
-      const providers = await models.MastraProvider.getRuntimeProviders(
-        getCurrentAuth()?.initiatorUserId,
-      );
+      const providers = await models.MastraProvider.find({ isEnabled: true });
       const judge = getJudgeAgent(agentConfig, providers);
 
       const convo = [

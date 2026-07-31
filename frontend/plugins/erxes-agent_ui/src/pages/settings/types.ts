@@ -1,10 +1,7 @@
-export type MastraProviderScope = 'organization' | 'personal';
-
 export interface IMastraProvider {
   _id: string;
   provider: string;
   label?: string | null;
-  scope: MastraProviderScope;
   // apiKey is write-only: reads expose only these two secret-free fields.
   hasApiKey?: boolean | null;
   apiKeyHint?: string | null;
@@ -17,7 +14,6 @@ export interface IMastraProvider {
   // Header values are write-only; reads expose only the configured header names.
   headerKeys?: string[] | null;
   createdAt?: string;
-  updatedAt?: string;
 }
 
 export interface IMastraProviderPreset {

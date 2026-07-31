@@ -8,19 +8,14 @@ import { initTRPC } from '@trpc/server';
 import { createTRPCContext } from '../trpc';
 import { nanoid } from 'nanoid';
 import { z } from 'zod';
-import { sanitizeLogTransportDocument } from './sanitize';
 
-export * from './sanitize';
-
-type LogPayloadExtension = Record<string, unknown> | null | undefined;
-
-export const logHandler = async <T>(
-  resolver: () => Promise<T> | T,
+export const logHandler = async (
+  resolver: () => Promise<any> | any,
   logDoc: ILogDoc,
-  onSuccess?: LogPayloadExtension,
-  onError?: LogPayloadExtension,
+  onSuccess?: any,
+  onError?: any,
   skipSaveResult?: boolean,
-): Promise<T> => {
+) => {
   if (!(await checkServiceRunning('logs'))) {
     return await resolver();
   }
@@ -28,32 +23,24 @@ export const logHandler = async <T>(
   const payload = { ...(logDoc?.payload || {}) };
   const startDate = new Date();
   const startTime = performance.now();
-
   try {
     const result = await resolver();
+
     const endTime = performance.now();
-    const logToPersist: ILogDoc = {
-      ...logDoc,
-      payload: { ...payload, ...(onSuccess || {}) },
-      executionTime: {
-        startDate,
-        endDate: new Date(),
-        durationMs: endTime - startTime,
-      },
-      status: 'success',
-    };
-
+    const durationMs = endTime - startTime;
+    logDoc.payload = { ...payload, ...onSuccess };
     if (!skipSaveResult) {
-      logToPersist.payload.result = result;
+      logDoc.payload.result = result;
     }
-
-    sendWorkerQueue('logs', 'put_log').add(
-      'put_log',
-      sanitizeLogTransportDocument(logToPersist),
-      {
-        removeOnComplete: true,
-      },
-    );
+    logDoc.executionTime = {
+      startDate,
+      endDate: new Date(),
+      durationMs: durationMs,
+    };
+    logDoc.status = 'success';
+    sendWorkerQueue('logs', 'put_log').add('put_log', logDoc, {
+      removeOnComplete: true,
+    });
 
     return result;
   } catch (error) {
@@ -62,19 +49,12 @@ export const logHandler = async <T>(
       stack: error.stack || 'No stack available',
       name: error.name || 'Error',
     };
-    const logToPersist: ILogDoc = {
-      ...logDoc,
-      payload: { ...payload, ...(onError || {}), error: errorDetails },
-      status: 'failed',
-    };
 
-    sendWorkerQueue('logs', 'put_log').add(
-      'put_log',
-      sanitizeLogTransportDocument(logToPersist),
-      {
-        removeOnComplete: true,
-      },
-    );
+    logDoc.payload = { ...payload, ...onError, error: errorDetails };
+    logDoc.status = 'failed';
+    sendWorkerQueue('logs', 'put_log').add('put_log', logDoc, {
+      removeOnComplete: true,
+    });
 
     throw error;
   }

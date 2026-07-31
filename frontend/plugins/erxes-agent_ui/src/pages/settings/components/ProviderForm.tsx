@@ -1,8 +1,7 @@
 import { IconCheck } from '@tabler/icons-react';
-import { Button, Checkbox, Form, Input, Textarea } from 'erxes-ui';
+import { Button, Form, Input, Label, Textarea } from 'erxes-ui';
 import { UseFormReturn } from 'react-hook-form';
 import { ProviderFormValues } from '../validations';
-import { MastraProviderScope } from '../types';
 
 const EMPTY_HEADER_KEYS: string[] = [];
 
@@ -11,7 +10,6 @@ interface ProviderFormProps {
   title: string;
   isEdit: boolean;
   isCustom: boolean;
-  scope: MastraProviderScope;
   // Masked hint of the already-stored key (e.g. `••••a1b2`), or null when none.
   // The key field is write-only, so we only ever show the mask, never the key.
   existingKeyHint?: string | null;
@@ -29,7 +27,6 @@ export const ProviderForm = ({
   title,
   isEdit,
   isCustom,
-  scope,
   existingKeyHint,
   existingHeaderKeys = EMPTY_HEADER_KEYS,
   saving,
@@ -130,29 +127,27 @@ export const ProviderForm = ({
         )}
       />
 
-      {scope === 'organization' && (
-        <Form.Field
-          control={form.control}
-          name="envKey"
-          render={({ field }) => (
-            <Form.Item>
-              <Form.Label>Env Key</Form.Label>
-              <Form.Control>
-                <Input
-                  {...field}
-                  placeholder="MY_PROVIDER_API_KEY"
-                  className="font-mono text-sm"
-                />
-              </Form.Control>
-              <Form.Description>
-                Environment variable name for the API key (used when no DB key
-                is stored).
-              </Form.Description>
-              <Form.Message />
-            </Form.Item>
-          )}
-        />
-      )}
+      <Form.Field
+        control={form.control}
+        name="envKey"
+        render={({ field }) => (
+          <Form.Item>
+            <Form.Label>Env Key</Form.Label>
+            <Form.Control>
+              <Input
+                {...field}
+                placeholder="MY_PROVIDER_API_KEY"
+                className="font-mono text-sm"
+              />
+            </Form.Control>
+            <Form.Description>
+              Environment variable name for the API key (used when no DB key is
+              stored).
+            </Form.Description>
+            <Form.Message />
+          </Form.Item>
+        )}
+      />
 
       <Form.Field
         control={form.control}
@@ -192,18 +187,16 @@ export const ProviderForm = ({
         control={form.control}
         name="isOpenAICompatible"
         render={({ field }) => (
-          <Form.Item className="flex items-center gap-3 space-y-0">
-            <Form.Control>
-              <Checkbox
-                id="providerOpenAI"
-                checked={field.value}
-                onCheckedChange={(checked) => field.onChange(checked === true)}
-              />
-            </Form.Control>
-            <Form.Label htmlFor="providerOpenAI">
-              OpenAI-compatible API
-            </Form.Label>
-          </Form.Item>
+          <div className="flex items-center gap-3">
+            <input
+              type="checkbox"
+              id="providerOpenAI"
+              aria-label="OpenAI-compatible API"
+              checked={field.value}
+              onChange={(e) => field.onChange(e.target.checked)}
+            />
+            <Label htmlFor="providerOpenAI">OpenAI-compatible API</Label>
+          </div>
         )}
       />
 
@@ -211,18 +204,16 @@ export const ProviderForm = ({
         control={form.control}
         name="isDefault"
         render={({ field }) => (
-          <Form.Item className="flex items-center gap-3 space-y-0">
-            <Form.Control>
-              <Checkbox
-                id="providerDefault"
-                checked={field.value}
-                onCheckedChange={(checked) => field.onChange(checked === true)}
-              />
-            </Form.Control>
-            <Form.Label htmlFor="providerDefault">
-              Set as default provider
-            </Form.Label>
-          </Form.Item>
+          <div className="flex items-center gap-3">
+            <input
+              type="checkbox"
+              id="providerDefault"
+              aria-label="Set as default provider"
+              checked={field.value}
+              onChange={(e) => field.onChange(e.target.checked)}
+            />
+            <Label htmlFor="providerDefault">Set as default provider</Label>
+          </div>
         )}
       />
 
@@ -230,16 +221,16 @@ export const ProviderForm = ({
         control={form.control}
         name="isEnabled"
         render={({ field }) => (
-          <Form.Item className="flex items-center gap-3 space-y-0">
-            <Form.Control>
-              <Checkbox
-                id="providerEnabled"
-                checked={field.value}
-                onCheckedChange={(checked) => field.onChange(checked === true)}
-              />
-            </Form.Control>
-            <Form.Label htmlFor="providerEnabled">Enabled</Form.Label>
-          </Form.Item>
+          <div className="flex items-center gap-3">
+            <input
+              type="checkbox"
+              id="providerEnabled"
+              aria-label="Enabled"
+              checked={field.value}
+              onChange={(e) => field.onChange(e.target.checked)}
+            />
+            <Label htmlFor="providerEnabled">Enabled</Label>
+          </div>
         )}
       />
 

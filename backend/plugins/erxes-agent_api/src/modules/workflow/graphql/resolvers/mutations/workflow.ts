@@ -14,11 +14,6 @@ import type { IMastraWorkflow } from '@/workflow/@types/workflow';
 import { requireUserId } from '@/_shared/auth';
 import { syncTenantSchedules } from '~/mastra/scheduleSync';
 import { getAgentAccount } from '~/mastra/auth/servicePrincipal';
-import { ERXES_AGENT_ACTIONS } from '~/meta/permissionActions';
-import {
-  requireScopedWorkflow,
-  requireScopedWorkflowAgent,
-} from '@/workflow/authorization';
 
 // Every workflow owner is an AI team member: a profile plus an active core
 // account. Account deactivation is the background execution kill switch.
@@ -42,7 +37,6 @@ const assertOwningAgentExists = async (
       `Owning AI team member "${userId}" is missing or inactive.`,
     );
   }
-  return userId;
 };
 
 // Save-time validation runs with the LIVE operation registry, so a definition
@@ -66,20 +60,10 @@ export const workflowMutations = {
     { doc }: { doc: IMastraWorkflow },
     { models, subdomain, user, checkPermission }: IContext,
   ) => {
-    await checkPermission(ERXES_AGENT_ACTIONS.workflow.createDraft);
+    await checkPermission('workflowsCreate');
     const userId = requireUserId(user);
-    const agentId = await assertOwningAgentExists(
-      models,
-      subdomain,
-      doc.agentId,
-    );
-    await requireScopedWorkflowAgent({
-      models,
-      subdomain,
-      user,
-      action: ERXES_AGENT_ACTIONS.workflow.createDraft,
-      agentId,
-    });
+    // Every workflow is owned by an agent — required, and it must exist.
+    await assertOwningAgentExists(models, subdomain, doc.agentId);
     await validateWithRegistry(models, doc.definition);
     // The owning agent is the workflow's bound background principal — validate
     // the schedule-enable preconditions (from THAT agent) when creating enabled.
@@ -87,13 +71,12 @@ export const workflowMutations = {
       await assertWorkflowSchedulable({
         models,
         subdomain,
-        agentId,
+        agentId: doc.agentId,
         definition: doc.definition,
       });
     }
     const created = await models.MastraWorkflow.createWorkflow({
       ...doc,
-      agentId,
       createdByUserId: userId,
     });
     await syncTenantSchedules(models, subdomain);
@@ -105,31 +88,18 @@ export const workflowMutations = {
     { _id, doc }: { _id: string; doc: Partial<IMastraWorkflow> },
     { models, subdomain, user, checkPermission }: IContext,
   ) => {
-    await checkPermission(ERXES_AGENT_ACTIONS.workflow.updateDraft);
+    await checkPermission('workflowsEdit');
     requireUserId(user);
-    const existing = await requireScopedWorkflow({
-      models,
-      subdomain,
-      user,
-      action: ERXES_AGENT_ACTIONS.workflow.updateDraft,
-      workflowId: _id,
-    });
     // An update may only change agentId to another EXISTING agent (never clear
     // it) — the owning agent is the workflow's identity and can't be dropped.
     if (doc.agentId !== undefined) {
       await assertOwningAgentExists(models, subdomain, doc.agentId);
-      await requireScopedWorkflowAgent({
-        models,
-        subdomain,
-        user,
-        action: ERXES_AGENT_ACTIONS.workflow.updateDraft,
-        agentId: doc.agentId,
-      });
     }
     if (doc.definition) await validateWithRegistry(models, doc.definition);
     // Re-check the schedule-enable preconditions whenever the resulting workflow
     // is enabled — this update may enable it, repoint its trigger to a schedule,
     // reassign the owning agent, or flip the owning agent's destructiveOps.
+    const existing = await models.MastraWorkflow.getWorkflow(_id);
     const willBeEnabled =
       doc.isEnabled !== undefined ? doc.isEnabled : existing.isEnabled;
     if (willBeEnabled) {
@@ -151,15 +121,8 @@ export const workflowMutations = {
     { _id }: { _id: string },
     { models, subdomain, user, checkPermission }: IContext,
   ) => {
-    await checkPermission(ERXES_AGENT_ACTIONS.workflow.remove);
+    await checkPermission('workflowsRemove');
     requireUserId(user);
-    await requireScopedWorkflow({
-      models,
-      subdomain,
-      user,
-      action: ERXES_AGENT_ACTIONS.workflow.remove,
-      workflowId: _id,
-    });
     const removed = await models.MastraWorkflow.removeWorkflow(_id);
     await syncTenantSchedules(models, subdomain);
     return removed;
@@ -170,22 +133,12 @@ export const workflowMutations = {
     { _id, isEnabled }: { _id: string; isEnabled: boolean },
     { models, subdomain, user, checkPermission }: IContext,
   ) => {
-    const action = isEnabled
-      ? ERXES_AGENT_ACTIONS.workflow.schedule
-      : ERXES_AGENT_ACTIONS.workflow.updateDraft;
-    await checkPermission(action);
+    await checkPermission('workflowsEdit');
     requireUserId(user);
-    const scopedWorkflow = await requireScopedWorkflow({
-      models,
-      subdomain,
-      user,
-      action,
-      workflowId: _id,
-    });
     // Enabling a schedule-triggered workflow makes the cron live — gate it on
     // the secure background preconditions.
     if (isEnabled) {
-      const workflow = scopedWorkflow;
+      const workflow = await models.MastraWorkflow.getWorkflow(_id);
       await assertWorkflowSchedulable({
         models,
         subdomain,
@@ -206,7 +159,7 @@ export const workflowMutations = {
     { definition }: { definition: unknown },
     { models, user, checkPermission }: IContext,
   ) => {
-    await checkPermission(ERXES_AGENT_ACTIONS.workflow.read);
+    await checkPermission('workflowsView');
     requireUserId(user);
     const settings = await models.MastraSettings.getSettings();
     const registry = await getOperationRegistry(settings);
@@ -221,15 +174,9 @@ export const workflowMutations = {
     { _id, input }: { _id: string; input?: Record<string, unknown> },
     { models, subdomain, user, checkPermission }: IContext,
   ) => {
-    await checkPermission(ERXES_AGENT_ACTIONS.workflow.run);
+    await checkPermission('workflowsRun');
     const initiatorUserId = requireUserId(user);
-    const workflow = await requireScopedWorkflow({
-      models,
-      subdomain,
-      user,
-      action: ERXES_AGENT_ACTIONS.workflow.run,
-      workflowId: _id,
-    });
+    const workflow = await models.MastraWorkflow.getWorkflow(_id);
     const agentId = workflow.agentId?.trim();
     const agentConfig = agentId
       ? await models.MastraAgent.findOne({ _id: agentId })

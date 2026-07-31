@@ -8,7 +8,6 @@ import {
   generateTaskFields,
 } from '~/modules/fields/fieldUtils';
 import { taskTrpcRouter } from '~/modules/task/trpc/task';
-import { teamTrpcRouter } from '~/modules/team/trpc/team';
 
 export type OperationTRPCContext = ITRPCContext<{ models: IModels }>;
 
@@ -23,7 +22,6 @@ export const appRouter = t.mergeRouters(
     },
   }),
   taskTrpcRouter,
-  teamTrpcRouter,
   t.router({
     fields: t.router({
       getFieldList: t.procedure

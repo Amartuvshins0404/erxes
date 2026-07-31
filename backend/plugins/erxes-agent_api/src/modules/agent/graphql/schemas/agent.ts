@@ -1,19 +1,8 @@
 export const types = `
-  enum MastraAgentVisibility {
-    private
-    shared
-    organization
-  }
-
   type MastraAgent {
     _id: String
     accountName: String!
     accountDescription: String
-    createdBy: String
-    visibility: MastraAgentVisibility!
-    audienceUserIds: [String!]!
-    audienceTeamIds: [String!]!
-    audienceDepartmentIds: [String!]!
     instructions: String
     provider: String
     model: String
@@ -33,10 +22,6 @@ export const types = `
   input MastraAgentInput {
     name: String
     description: String
-    visibility: MastraAgentVisibility
-    audienceUserIds: [String!]
-    audienceTeamIds: [String!]
-    audienceDepartmentIds: [String!]
     instructions: String
     provider: String
     model: String

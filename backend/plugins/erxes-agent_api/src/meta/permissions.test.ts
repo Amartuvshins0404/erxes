@@ -61,7 +61,7 @@ describe('erxes-agent human permission roles', () => {
     ).toBeUndefined();
     expect(
       actionScope('erxes-agent:user', ERXES_AGENT_ACTIONS.agent.share),
-    ).toBe('own');
+    ).toBeUndefined();
     expect(
       actionScope('erxes-agent:user', ERXES_AGENT_ACTIONS.settings.manage),
     ).toBeUndefined();

@@ -17,7 +17,6 @@ import {
   patchNativeTurn,
   TurnAgent,
 } from '@/agent/turn';
-import { requireScopedAgent } from '@/agent/authorization';
 import { IMastraChatAttachment } from '@/session/@types/session';
 import { attachmentStorageStatus } from '@/settings/graphql/resolvers/queries/settings';
 import { registerVoiceRoutes } from './mastra/voice/routes';
@@ -227,17 +226,6 @@ router.post('/chat/stream', llmRouteLimiter, async (req, res) => {
   }
 
   const models = await generateModels(subdomain);
-  try {
-    await requireScopedAgent({
-      models,
-      subdomain,
-      user,
-      action: ERXES_AGENT_ACTIONS.agent.chat,
-      agentId: parsed.value.agentId,
-    });
-  } catch {
-    return res.status(404).json({ error: 'AI team member not found' });
-  }
 
   // Attachments require the instance's upload storage — reject early (the UI
   // hides the attach button in this state, so this is defense in depth).

@@ -5,11 +5,6 @@ export const AGENT_FIELDS = gql`
     _id
     accountName
     accountDescription
-    createdBy
-    visibility
-    audienceUserIds
-    audienceTeamIds
-    audienceDepartmentIds
     permissionGroupIds
     instructions
     provider
@@ -60,9 +55,6 @@ export const MASTRA_AGENTS_MAIN = gql`
         _id
         accountName
         accountDescription
-        createdBy
-        visibility
-        audienceUserIds
         provider
         model
         skills
@@ -166,12 +158,11 @@ export const MASTRA_VOICE_CATALOG = gql`
 `;
 
 export const MASTRA_PROVIDERS = gql`
-  query MastraProviders($scope: MastraProviderScope) {
-    mastraProviders(scope: $scope) {
+  query MastraProviders {
+    mastraProviders {
       _id
       provider
       label
-      scope
       hasApiKey
       apiKeyHint
       baseUrl
@@ -182,7 +173,6 @@ export const MASTRA_PROVIDERS = gql`
       envKey
       headerKeys
       createdAt
-      updatedAt
     }
   }
 `;

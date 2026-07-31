@@ -30,7 +30,6 @@ export interface AgentAccountInput {
   name: string;
   description?: string;
   permissionGroupIds: string[];
-  customPermissions?: GroupPermission[];
   isActive?: boolean;
 }
 
@@ -132,11 +131,6 @@ const updateCoreUser = (
     defaultValue: null,
   });
 
-export const getCoreUserById = (
-  subdomain: string,
-  userId: string,
-): Promise<AgentAccount | null> => findCoreUser(subdomain, { _id: userId });
-
 export async function getAgentAccount(opts: {
   userId: string;
   subdomain: string;
@@ -211,7 +205,6 @@ export async function createAgentAccount(opts: {
           isActive: input.isActive !== false,
           appId: agentAccountAppId(agentId),
           permissionGroupIds,
-          customPermissions: input.customPermissions ?? [],
           'details.fullName': input.name.trim(),
           'details.description': input.description?.trim() || '',
         },
@@ -255,17 +248,11 @@ export async function updateAgentAccount(opts: {
       input.permissionGroupIds,
     );
   }
-  if (input.customPermissions !== undefined) {
-    set.customPermissions = input.customPermissions;
-  }
   if (input.isActive !== undefined) set.isActive = input.isActive;
 
   if (Object.keys(set).length) {
     await updateCoreUser(subdomain, { _id: account._id }, { $set: set });
-    if (
-      input.permissionGroupIds !== undefined ||
-      input.customPermissions !== undefined
-    ) {
+    if (input.permissionGroupIds !== undefined) {
       await clearGroupActionsCache({ subdomain, userId: account._id });
     }
   }

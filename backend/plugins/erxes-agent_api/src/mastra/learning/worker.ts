@@ -75,7 +75,7 @@ async function resolveRuntime(
   }
   if (!agentConfig) return null;
 
-  const providers = await models.MastraProvider.getRuntimeProviders();
+  const providers = await models.MastraProvider.find({ isEnabled: true });
   return {
     defaultAgentId: agentConfig._id,
     runtime: {

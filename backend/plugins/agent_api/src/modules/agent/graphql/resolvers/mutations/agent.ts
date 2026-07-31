@@ -2,6 +2,9 @@ import { IContext } from '~/connectionResolvers';
 import { SERVER_STATUSES } from '~/modules/agent/constants';
 import {
   MANAGED_LLM_PROVIDERS,
+  managedLlmSubscriptionNeedsToken,
+  managedLlmSubscriptionUsesDeviceCode,
+  resolveManagedLlmCredentialMode,
   resolveManagedLlmConnection,
 } from '~/modules/agent/managedLlmProviders';
 import { assertIdentifierManageAccess } from '~/modules/assistantOrg/permissions';
@@ -25,6 +28,7 @@ import {
   assertSafeRuntimeIdentifier,
   assertSafeRuntimeVersion,
   callManagedRuntimeOperation,
+  fetchManagedRuntimeOperation,
   mapRuntimePayload,
 } from '~/modules/agent/runtimeClient';
 import {
@@ -102,9 +106,11 @@ const runManagedDeployment = async ({
   };
   serverMongoId: string;
   input: {
-    apiKey: string;
+    apiKey?: string;
     provider: string;
     model: string;
+    credentialMode: 'api_key' | 'subscription';
+    subscriptionToken?: string;
     description?: string;
     systemPrompt?: string;
   };
@@ -140,6 +146,9 @@ const runManagedDeployment = async ({
           status: SERVER_STATUSES.PENDING,
           provider: input.provider,
           providerModel: input.model,
+          credentialMode: input.credentialMode,
+          credentialStatus:
+            input.credentialMode === 'subscription' ? 'pending' : 'connected',
           name: expectedServerName,
           url: `https://${expectedServerName}.assistant.erxes.io`,
           ...provisioningSet('server_lookup'),
@@ -154,10 +163,28 @@ const runManagedDeployment = async ({
       serverName: expectedServerName,
       provider: input.provider,
       model: input.model,
+      credentialMode: input.credentialMode,
       apiKey: input.apiKey,
       description,
       systemPrompt,
     });
+
+    if (
+      input.credentialMode === 'subscription' &&
+      managedLlmSubscriptionNeedsToken(input.provider)
+    ) {
+      const subscriptionToken = input.subscriptionToken?.trim();
+
+      if (!subscriptionToken) {
+        throw new Error('Subscription credential is required');
+      }
+
+      await fetchManagedRuntimeOperation(server.url, {
+        method: 'POST',
+        path: '/openclaw/subscription-auth/token',
+        body: { provider: input.provider, token: subscriptionToken },
+      });
+    }
 
     const updated = await models.AgentServer.findOneAndUpdate(
       { _id: serverMongoId },
@@ -168,6 +195,11 @@ const runManagedDeployment = async ({
           url: server.url,
           token: server.gatewayToken,
           serverId: String(server.serverId),
+          credentialStatus:
+            input.credentialMode === 'subscription' &&
+            managedLlmSubscriptionUsesDeviceCode(input.provider)
+              ? 'pending'
+              : 'connected',
           status: SERVER_STATUSES.APPROVED,
           ...provisioningSet('approved'),
           updatedAt: new Date(),
@@ -294,30 +326,52 @@ export const agentMutations = {
         kimiApiKey?: string;
         provider?: string;
         model?: string;
+        credentialMode?: string;
         description?: string;
         systemPrompt?: string;
+        subscriptionToken?: string;
       };
     },
     { models, subdomain, user }: IContext,
   ) => {
+    const credentialMode = resolveManagedLlmCredentialMode(
+      input?.credentialMode,
+    );
     const apiKey = input?.apiKey?.trim() || input?.kimiApiKey?.trim();
 
-    if (!apiKey) {
-      throw new Error('apiKey is required');
+    if (credentialMode === 'api_key' && !apiKey) {
+      throw new Error('apiKey is required for API-key connections');
     }
 
-    if (apiKey.length > 4096) {
+    if (apiKey && apiKey.length > 4096) {
       throw new Error('apiKey is too long');
     }
 
     const connection = resolveManagedLlmConnection(
       input?.provider,
       input?.model,
+      credentialMode,
     );
+
+    const subscriptionToken = input?.subscriptionToken?.trim();
+    if (
+      credentialMode === 'subscription' &&
+      managedLlmSubscriptionNeedsToken(connection.provider) &&
+      !subscriptionToken
+    ) {
+      throw new Error('Subscription credential is required');
+    }
+
+    if (subscriptionToken && subscriptionToken.length > 8192) {
+      throw new Error('Subscription credential is too long');
+    }
+
     const managedInput = {
       apiKey,
       provider: connection.provider,
       model: connection.model,
+      credentialMode,
+      subscriptionToken,
       description: input?.description,
       systemPrompt: input?.systemPrompt,
     };
@@ -351,6 +405,9 @@ export const agentMutations = {
               agentId: identifier.slug,
               provider: connection.provider,
               providerModel: connection.model,
+              credentialMode,
+              credentialStatus:
+                credentialMode === 'subscription' ? 'pending' : 'connected',
               status: SERVER_STATUSES.PENDING,
               provisioning: {
                 ...provisioningUpdate('preparing'),
@@ -397,6 +454,9 @@ export const agentMutations = {
       serverId: '',
       provider: connection.provider,
       providerModel: connection.model,
+      credentialMode,
+      credentialStatus:
+        credentialMode === 'subscription' ? 'pending' : 'connected',
       status: SERVER_STATUSES.PENDING,
       provisioning: {
         ...provisioningUpdate('preparing'),
@@ -896,24 +956,47 @@ export const agentMutations = {
       input,
     }: {
       identifierId: string;
-      input: { provider: string; model: string; apiKey: string };
+      input: {
+        provider: string;
+        model: string;
+        credentialMode?: string;
+        apiKey?: string;
+        subscriptionToken?: string;
+      };
     },
     { models, subdomain, user }: IContext,
   ) => {
+    const credentialMode = resolveManagedLlmCredentialMode(
+      input?.credentialMode,
+    );
     const apiKey = input?.apiKey?.trim();
 
-    if (!apiKey) {
-      throw new Error('apiKey is required');
+    if (credentialMode === 'api_key' && !apiKey) {
+      throw new Error('apiKey is required for API-key connections');
     }
 
-    if (apiKey.length > 4096) {
+    if (apiKey && apiKey.length > 4096) {
       throw new Error('apiKey is too long');
     }
 
     const connection = resolveManagedLlmConnection(
       input?.provider,
       input?.model,
+      credentialMode,
     );
+    const subscriptionToken = input?.subscriptionToken?.trim();
+
+    if (
+      credentialMode === 'subscription' &&
+      managedLlmSubscriptionNeedsToken(connection.provider) &&
+      !subscriptionToken
+    ) {
+      throw new Error('Subscription credential is required');
+    }
+
+    if (subscriptionToken && subscriptionToken.length > 8192) {
+      throw new Error('Subscription credential is too long');
+    }
 
     await ensureLegacyIdentifierLinks(models);
     const identifier = await assertIdentifierManageAccess(
@@ -940,6 +1023,12 @@ export const agentMutations = {
     );
 
     if (!isManagedAssistant) {
+      if (credentialMode === 'subscription') {
+        throw new Error(
+          'Subscription sign-in is available only for managed assistants',
+        );
+      }
+
       if (
         connection.provider !== 'kimi' ||
         connection.model !== MANAGED_LLM_PROVIDERS.kimi.defaultModel
@@ -950,7 +1039,7 @@ export const agentMutations = {
       }
 
       try {
-        await setKimiApiKey(server.name, apiKey);
+        await setKimiApiKey(server.name, apiKey || '');
       } catch {
         throw new Error(
           'Could not apply the Kimi connection. Verify the API key and try again.',
@@ -994,8 +1083,23 @@ export const agentMutations = {
         serverName: server.name,
         provider: connection.provider,
         model: connection.model,
+        credentialMode,
         apiKey,
       });
+
+      if (
+        credentialMode === 'subscription' &&
+        managedLlmSubscriptionNeedsToken(connection.provider)
+      ) {
+        await fetchManagedRuntimeOperation(deployed.url, {
+          method: 'POST',
+          path: '/openclaw/subscription-auth/token',
+          body: {
+            provider: connection.provider,
+            token: subscriptionToken || '',
+          },
+        });
+      }
 
       const updatedServer = await models.AgentServer.findOneAndUpdate(
         { _id: server._id },
@@ -1007,6 +1111,12 @@ export const agentMutations = {
             serverId: String(deployed.serverId),
             provider: connection.provider,
             providerModel: connection.model,
+            credentialMode,
+            credentialStatus:
+              credentialMode === 'subscription' &&
+              managedLlmSubscriptionUsesDeviceCode(connection.provider)
+                ? 'pending'
+                : 'connected',
             status: SERVER_STATUSES.APPROVED,
             ...provisioningSet('approved'),
             updatedAt: new Date(),
@@ -1025,7 +1135,9 @@ export const agentMutations = {
       };
     } catch {
       throw new Error(
-        'Could not apply the AI connection. Verify the API key and selected model, then try again.',
+        credentialMode === 'subscription'
+          ? 'Could not apply the subscription connection. Verify the provider sign-in details and try again.'
+          : 'Could not apply the AI connection. Verify the API key and selected model, then try again.',
       );
     } finally {
       managedDeploymentsInProgress.delete(identifierId);
@@ -1179,5 +1291,54 @@ export const agentMutations = {
           records: payload,
         }),
     });
+  },
+
+  startAgentLlmSubscriptionAuth: async (
+    _root: undefined,
+    { identifierId }: { identifierId: string },
+    { models, subdomain, user }: IContext,
+  ) => {
+    const server = await models.AgentServer.findOne({ identifierId }).lean();
+
+    if (
+      !server ||
+      server.credentialMode !== 'subscription' ||
+      !managedLlmSubscriptionUsesDeviceCode(server.provider || '')
+    ) {
+      throw new Error(
+        'Device-code subscription sign-in is not configured for this assistant',
+      );
+    }
+
+    const result = await callManagedRuntimeOperation({
+      models,
+      user,
+      subdomain,
+      agentId: identifierId,
+      operation: 'startAgentLlmSubscriptionAuth',
+      request: {
+        method: 'POST',
+        path: '/openclaw/subscription-auth/start',
+        body: { provider: server.provider },
+      },
+      message: 'Subscription sign-in started',
+      mapResult: (payload) =>
+        mapRuntimePayload('Subscription sign-in started', payload, {
+          records: payload,
+        }),
+    });
+
+    await models.AgentServer.updateOne(
+      { identifierId },
+      {
+        $set: {
+          credentialStatus:
+            result.status === 'failed' ? 'failed' : 'pending',
+          updatedAt: new Date(),
+        },
+      },
+    );
+
+    return result;
   },
 };

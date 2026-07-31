@@ -12,6 +12,8 @@ export const GET_AGENT = gql`
       serverId
       provider
       model
+      credentialMode
+      credentialStatus
       createdAt
       updatedAt
       status
@@ -22,6 +24,17 @@ export const GET_AGENT = gql`
         updatedAt
         error
       }
+    }
+  }
+`;
+
+export const AGENT_LLM_SUBSCRIPTION_AUTH_STATUS = gql`
+  query AgentLlmSubscriptionAuthStatus($identifierId: String!) {
+    agentLlmSubscriptionAuthStatus(identifierId: $identifierId) {
+      ok
+      status
+      message
+      records
     }
   }
 `;

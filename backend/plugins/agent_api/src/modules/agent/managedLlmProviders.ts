@@ -58,11 +58,46 @@ export const MANAGED_LLM_PROVIDERS = {
   },
 } as const satisfies Record<string, ManagedLlmProviderConfig>;
 
-export type ManagedLlmProvider = keyof typeof MANAGED_LLM_PROVIDERS;
+export type ManagedLlmApiKeyProvider = keyof typeof MANAGED_LLM_PROVIDERS;
+export type ManagedLlmCredentialMode = 'api_key' | 'subscription';
+
+export const MANAGED_LLM_SUBSCRIPTION_PROVIDERS = {
+  openai: {
+    defaultModel: 'openai/gpt-5.6-sol',
+    authKind: 'device_code',
+  },
+  anthropic: {
+    defaultModel: 'anthropic/claude-sonnet-4-6',
+    authKind: 'setup_token',
+  },
+  'github-copilot': {
+    defaultModel: 'github-copilot/claude-opus-4.7',
+    authKind: 'device_code',
+  },
+  'minimax-portal': {
+    defaultModel: 'minimax-portal/MiniMax-M3',
+    authKind: 'device_code',
+  },
+  qwen: {
+    defaultModel: 'qwen/qwen3.7-plus',
+    authKind: 'plan_key',
+  },
+  zai: {
+    defaultModel: 'zai/glm-5.2',
+    authKind: 'plan_key',
+  },
+} as const;
+
+export type ManagedLlmSubscriptionProvider =
+  keyof typeof MANAGED_LLM_SUBSCRIPTION_PROVIDERS;
+export type ManagedLlmProvider =
+  | ManagedLlmApiKeyProvider
+  | ManagedLlmSubscriptionProvider;
 
 export interface ManagedLlmConnection {
   provider: ManagedLlmProvider;
   model: string;
+  credentialMode: ManagedLlmCredentialMode;
 }
 
 export interface ManagedLlmModel {
@@ -80,10 +115,23 @@ interface ProviderModelEntry {
 
 const isManagedLlmProvider = (
   provider: string,
-): provider is ManagedLlmProvider => provider in MANAGED_LLM_PROVIDERS;
+): provider is ManagedLlmApiKeyProvider => provider in MANAGED_LLM_PROVIDERS;
+
+export const isManagedLlmSubscriptionProvider = (
+  provider: string,
+): provider is ManagedLlmSubscriptionProvider =>
+  provider in MANAGED_LLM_SUBSCRIPTION_PROVIDERS;
+
+export const managedLlmSubscriptionNeedsToken = (provider: string) =>
+  isManagedLlmSubscriptionProvider(provider) &&
+  MANAGED_LLM_SUBSCRIPTION_PROVIDERS[provider].authKind !== 'device_code';
+
+export const managedLlmSubscriptionUsesDeviceCode = (provider: string) =>
+  isManagedLlmSubscriptionProvider(provider) &&
+  MANAGED_LLM_SUBSCRIPTION_PROVIDERS[provider].authKind === 'device_code';
 
 const normalizeModelReference = (
-  provider: ManagedLlmProvider,
+  provider: ManagedLlmApiKeyProvider,
   modelId: string,
 ) => {
   const normalizedId = modelId.trim().replace(/^models\//, '');
@@ -103,8 +151,41 @@ const hasControlCharacters = (value: string) =>
 export const resolveManagedLlmConnection = (
   provider?: string,
   model?: string,
+  credentialMode: ManagedLlmCredentialMode = 'api_key',
 ): ManagedLlmConnection => {
   const normalizedProvider = (provider || 'kimi').trim().toLowerCase();
+
+  if (credentialMode === 'subscription') {
+    if (!isManagedLlmSubscriptionProvider(normalizedProvider)) {
+      throw new Error('Subscription sign-in is not supported for this provider');
+    }
+
+    const subscriptionConfig =
+      MANAGED_LLM_SUBSCRIPTION_PROVIDERS[normalizedProvider];
+    const normalizedModel =
+      model?.trim() || subscriptionConfig.defaultModel;
+
+    if (model?.trim() && normalizedModel !== subscriptionConfig.defaultModel) {
+      throw new Error(
+        'Subscription connections must use the supported subscription model',
+      );
+    }
+
+    if (
+      normalizedModel.length > 512 ||
+      hasControlCharacters(normalizedModel) ||
+      !normalizedModel.startsWith(`${normalizedProvider}/`) ||
+      normalizedModel.length === normalizedProvider.length + 1
+    ) {
+      throw new Error('Model must belong to the selected LLM provider');
+    }
+
+    return {
+      provider: normalizedProvider,
+      model: normalizedModel,
+      credentialMode,
+    };
+  }
 
   if (!isManagedLlmProvider(normalizedProvider)) {
     throw new Error('Unsupported LLM provider');
@@ -123,7 +204,19 @@ export const resolveManagedLlmConnection = (
     throw new Error('Model must belong to the selected LLM provider');
   }
 
-  return { provider: validProvider, model: normalizedModel };
+  return { provider: validProvider, model: normalizedModel, credentialMode };
+};
+
+export const resolveManagedLlmCredentialMode = (
+  value?: string,
+): ManagedLlmCredentialMode => {
+  const normalized = value?.trim().toLowerCase() || 'api_key';
+
+  if (normalized !== 'api_key' && normalized !== 'subscription') {
+    throw new Error('credentialMode must be api_key or subscription');
+  }
+
+  return normalized;
 };
 
 export const fetchManagedLlmModels = async (

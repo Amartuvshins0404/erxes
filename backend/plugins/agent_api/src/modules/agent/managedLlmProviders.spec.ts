@@ -3,6 +3,9 @@ import test, { afterEach } from 'node:test';
 
 import {
   fetchManagedLlmModels,
+  managedLlmSubscriptionNeedsToken,
+  managedLlmSubscriptionUsesDeviceCode,
+  resolveManagedLlmCredentialMode,
   resolveManagedLlmConnection,
 } from './managedLlmProviders';
 
@@ -16,6 +19,7 @@ test('resolveManagedLlmConnection accepts live models from the selected provider
   assert.deepEqual(resolveManagedLlmConnection('openai', 'openai/gpt-5.4'), {
     provider: 'openai',
     model: 'openai/gpt-5.4',
+    credentialMode: 'api_key',
   });
 });
 
@@ -28,6 +32,68 @@ test('resolveManagedLlmConnection rejects a model from another provider', () => 
     () => resolveManagedLlmConnection('openai', 'openai/'),
     /selected LLM provider/,
   );
+});
+
+test('subscription mode supports OpenClaw subscription providers but not Gemini OAuth', () => {
+  assert.deepEqual(
+    resolveManagedLlmConnection('openai', undefined, 'subscription'),
+    {
+      provider: 'openai',
+      model: 'openai/gpt-5.6-sol',
+      credentialMode: 'subscription',
+    },
+  );
+  assert.equal(
+    resolveManagedLlmConnection('anthropic', undefined, 'subscription').model,
+    'anthropic/claude-sonnet-4-6',
+  );
+  assert.equal(
+    resolveManagedLlmConnection('github-copilot', undefined, 'subscription')
+      .model,
+    'github-copilot/claude-opus-4.7',
+  );
+  assert.equal(
+    resolveManagedLlmConnection('minimax-portal', undefined, 'subscription')
+      .model,
+    'minimax-portal/MiniMax-M3',
+  );
+  assert.equal(
+    resolveManagedLlmConnection('qwen', undefined, 'subscription').model,
+    'qwen/qwen3.7-plus',
+  );
+  assert.equal(
+    resolveManagedLlmConnection('zai', undefined, 'subscription').model,
+    'zai/glm-5.2',
+  );
+  assert.equal(managedLlmSubscriptionUsesDeviceCode('openai'), true);
+  assert.equal(managedLlmSubscriptionUsesDeviceCode('github-copilot'), true);
+  assert.equal(managedLlmSubscriptionUsesDeviceCode('minimax-portal'), true);
+  assert.equal(managedLlmSubscriptionNeedsToken('anthropic'), true);
+  assert.equal(managedLlmSubscriptionNeedsToken('qwen'), true);
+  assert.equal(managedLlmSubscriptionNeedsToken('zai'), true);
+  assert.throws(
+    () => resolveManagedLlmConnection('google', undefined, 'subscription'),
+    /not supported for this provider/,
+  );
+  assert.throws(
+    () => resolveManagedLlmConnection('qwen', undefined, 'api_key'),
+    /Unsupported LLM provider/,
+  );
+  assert.throws(
+    () => resolveManagedLlmConnection('github-copilot', undefined, 'api_key'),
+    /Unsupported LLM provider/,
+  );
+  assert.throws(
+    () =>
+      resolveManagedLlmConnection(
+        'anthropic',
+        'anthropic/claude-opus-4-6',
+        'subscription',
+      ),
+    /supported subscription model/,
+  );
+  assert.equal(resolveManagedLlmCredentialMode(), 'api_key');
+  assert.throws(() => resolveManagedLlmCredentialMode('oauth'));
 });
 
 test('fetchManagedLlmModels loads, prefixes, de-duplicates, and sorts live models', async () => {

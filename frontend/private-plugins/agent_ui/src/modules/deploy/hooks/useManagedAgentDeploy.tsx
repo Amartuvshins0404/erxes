@@ -33,7 +33,9 @@ export const useManagedAgentDeploy = (identifierId?: string) => {
       identifierId?: string;
       provider?: string;
       model?: string;
-      apiToken: string;
+      credentialMode?: 'api_key' | 'subscription';
+      apiToken?: string;
+      subscriptionToken?: string;
       description?: string;
       systemPrompt?: string;
     },
@@ -52,7 +54,9 @@ export const useManagedAgentDeploy = (identifierId?: string) => {
         input: {
           provider: input.provider || 'kimi',
           model: input.model,
-          apiKey: input.apiToken.trim(),
+          credentialMode: input.credentialMode || 'api_key',
+          apiKey: input.apiToken?.trim() || undefined,
+          subscriptionToken: input.subscriptionToken?.trim() || undefined,
           description: input.description?.trim() || undefined,
           systemPrompt: input.systemPrompt?.trim() || undefined,
         },

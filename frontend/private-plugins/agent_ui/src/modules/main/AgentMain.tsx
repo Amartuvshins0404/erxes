@@ -49,7 +49,10 @@ export const AgentMain = () => {
     !shouldCheckKimiKey,
   );
   const [llmConnectionManualOpen, setLlmConnectionManualOpen] = useState(false);
-  const llmConnectionForced = shouldCheckKimiKey && hasKey === false;
+  const llmConnectionForced =
+    (shouldCheckKimiKey && hasKey === false) ||
+    (agent?.credentialMode === 'subscription' &&
+      agent?.credentialStatus !== 'connected');
   const llmConnectionOpen = llmConnectionForced || llmConnectionManualOpen;
 
   if (loading) {
@@ -119,8 +122,8 @@ export const AgentMain = () => {
             variant="ghost"
             size="icon"
             onClick={() => setLlmConnectionManualOpen(true)}
-            aria-label="Change AI provider, model, or API key"
-            title="Change AI provider, model, or API key"
+            aria-label="Change API key or provider subscription"
+            title="Change API key or provider subscription"
           >
             <IconKey className="size-4" />
           </Button>
@@ -189,6 +192,7 @@ export const AgentMain = () => {
         open={llmConnectionOpen}
         currentProvider={agent.provider}
         currentModel={agent.model}
+        currentCredentialMode={agent.credentialMode}
         managed={isManagedAssistantAgent(agent)}
         onSuccess={(provider) => {
           setLlmConnectionManualOpen(false);

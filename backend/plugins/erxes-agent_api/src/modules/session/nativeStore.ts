@@ -15,6 +15,7 @@ import {
   scopedResource,
 } from '~/mastra/memory/mastraMemory';
 import { clampPage } from '@/_shared/auth';
+import { findMessagePairIds } from '@/session/messagePair';
 
 // ── Minimal native shapes we read (Mastra's own types are wider). ───────────
 interface NativeThread {
@@ -73,6 +74,7 @@ interface NativeMemoryFacade {
     title: string;
     metadata?: Record<string, unknown>;
   }): Promise<NativeThread>;
+  deleteMessages(messageIds: string[]): Promise<void>;
   deleteThread(threadId: string): Promise<unknown>;
 }
 
@@ -500,6 +502,41 @@ export async function renameOwnedThread(
     metadata: { ...(thread.metadata ?? {}), titleSource: 'manual' },
   });
   return toErxesThread(updated);
+}
+
+export interface RemovedMessagePair {
+  deletedIds: string[];
+  remainingCount: number;
+}
+
+/** Delete one owned user prompt and its following assistant reply. */
+export async function removeOwnedMessagePair(
+  subdomain: string,
+  userId: string,
+  threadId: string,
+  messageId: string,
+): Promise<RemovedMessagePair> {
+  const memory = await getNativeMemory(subdomain);
+  const resourceId = scopedResource(subdomain, userId);
+  const thread = await memory.getThreadById({ threadId, resourceId });
+  if (!thread) throw new ExpectedError('Thread not found');
+
+  const recalled = await memory.recall({
+    threadId,
+    resourceId,
+    perPage: false,
+    page: 0,
+    orderBy: { field: 'createdAt', direction: 'ASC' },
+  });
+  const messages = (recalled?.messages ?? []).map(toErxesMessage);
+  const deletedIds = findMessagePairIds(messages, messageId);
+  if (!deletedIds) throw new ExpectedError('Message not found');
+  await memory.deleteMessages(deletedIds);
+
+  return {
+    deletedIds,
+    remainingCount: Math.max(0, messages.length - deletedIds.length),
+  };
 }
 
 /** Delete a thread the caller owns (and its messages + vectors). */

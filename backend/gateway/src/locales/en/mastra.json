@@ -145,5 +145,15 @@
   "agent-access-scope-group": "Group",
   "agent-access-profile-error": "Could not resolve the agent access profile",
   "agent-access-scope-all": "All",
-  "error": "Error"
+  "error": "Error",
+  "delete": "Delete",
+  "deleting": "Deleting…",
+  "delete-session-title": "Delete this session?",
+  "delete-session-description": "This permanently deletes the session and all of its messages. This can’t be undone.",
+  "delete-prompt-and-reply": "Delete prompt and reply",
+  "delete-prompt-title": "Delete this prompt and reply?",
+  "delete-prompt-description": "This permanently deletes the prompt and the assistant reply that follows it. This can’t be undone.",
+  "prompt-reply-deleted": "Prompt and reply deleted",
+  "delete-failed": "Could not delete",
+  "delete-failed-description": "Please try again."
 }

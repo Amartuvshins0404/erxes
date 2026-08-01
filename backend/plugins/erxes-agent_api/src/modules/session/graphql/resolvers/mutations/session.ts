@@ -1,5 +1,9 @@
 import { IContext } from '~/connectionResolvers';
-import { renameOwnedThread, removeOwnedThread } from '@/session/nativeStore';
+import {
+  removeOwnedMessagePair,
+  removeOwnedThread,
+  renameOwnedThread,
+} from '@/session/nativeStore';
 import { cancelActiveRun } from '~/mastra/runRegistry';
 import { requireUserId } from '@/_shared/auth';
 import { ERXES_AGENT_ACTIONS } from '~/meta/permissionActions';
@@ -18,10 +22,45 @@ export const sessionMutations = {
   mastraThreadRemove: async (
     _parent: undefined,
     { threadId }: { threadId: string },
-    { user, subdomain, checkPermission }: IContext,
+    { user, subdomain, models, checkPermission }: IContext,
   ) => {
     await checkPermission(ERXES_AGENT_ACTIONS.agent.chat);
-    return removeOwnedThread(subdomain, requireUserId(user), threadId);
+    const result = await removeOwnedThread(
+      subdomain,
+      requireUserId(user),
+      threadId,
+    );
+    // The native delete is authoritative; auxiliary cleanup must not turn an
+    // already-completed deletion into a client-visible failure.
+    await Promise.allSettled([
+      models.MastraFeedback.deleteMany({ threadId }),
+      models.MastraArtifact.deleteMany({ threadId }),
+    ]);
+    return result;
+  },
+
+  mastraMessagePairRemove: async (
+    _parent: undefined,
+    { threadId, messageId }: { threadId: string; messageId: string },
+    { user, subdomain, models, checkPermission }: IContext,
+  ) => {
+    await checkPermission(ERXES_AGENT_ACTIONS.agent.chat);
+    const result = await removeOwnedMessagePair(
+      subdomain,
+      requireUserId(user),
+      threadId,
+      messageId,
+    );
+    // Keep the same authoritative-delete behavior for linked auxiliary rows.
+    await Promise.allSettled([
+      models.MastraFeedback.deleteMany({
+        messageId: { $in: result.deletedIds },
+      }),
+      models.MastraArtifact.deleteMany({
+        messageId: { $in: result.deletedIds },
+      }),
+    ]);
+    return result;
   },
 
   // Explicit cancel for an in-flight streaming turn on one of the user's own

@@ -1,15 +1,14 @@
 import { useTranslation } from 'react-i18next';
 import { AlertDialog } from 'erxes-ui';
 
-// Confirm-before-delete for a chat session (replaces the native window.confirm).
-export const DeleteSessionDialog = ({
+export const DeleteMessagePairDialog = ({
   open,
   loading,
   onOpenChange,
   onConfirm,
 }: {
-  loading: boolean;
   open: boolean;
+  loading: boolean;
   onOpenChange: (open: boolean) => void;
   onConfirm: () => void;
 }) => {
@@ -19,9 +18,9 @@ export const DeleteSessionDialog = ({
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialog.Content>
         <AlertDialog.Header>
-          <AlertDialog.Title>{t('delete-session-title')}</AlertDialog.Title>
+          <AlertDialog.Title>{t('delete-prompt-title')}</AlertDialog.Title>
           <AlertDialog.Description>
-            {t('delete-session-description')}
+            {t('delete-prompt-description')}
           </AlertDialog.Description>
         </AlertDialog.Header>
         <AlertDialog.Footer>

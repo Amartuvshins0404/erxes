@@ -5,7 +5,9 @@ import {
   IconPencil,
   IconRefresh,
   IconRepeat,
+  IconTrash,
 } from '@tabler/icons-react';
+import { useTranslation } from 'react-i18next';
 import { Tooltip } from 'erxes-ui';
 import { AgentUIMessage, ChatAttachment } from '~/modules/chat/types';
 import { asToolPart, messageText } from '~/modules/chat/lib/uiParts';
@@ -79,6 +81,8 @@ export const MessageBubble = memo(function MessageBubble({
   onRate,
   onEditMessage,
   onResendMessage,
+  persistedMessageId,
+  onDeleteMessage,
   storeArtifacts,
   debug,
 }: {
@@ -92,6 +96,8 @@ export const MessageBubble = memo(function MessageBubble({
   onEditMessage: (text: string) => void;
   // Send a past user message again as a new turn (text + its attachments).
   onResendMessage: (text: string, attachments: ChatAttachment[]) => void;
+  persistedMessageId?: string;
+  onDeleteMessage: (uiMessageId: string, persistedMessageId: string) => void;
   // Persisted artifacts for this message — used when the live tool parts are
   // gone (after a reload), so the inline cards reappear.
   storeArtifacts?: Artifact[];
@@ -99,6 +105,7 @@ export const MessageBubble = memo(function MessageBubble({
   // timeline; off shows only the turn summary + short thoughts.
   debug?: boolean;
 }) {
+  const { t } = useTranslation('mastra');
   const text = messageText(msg);
 
   if (msg.role === 'user') {
@@ -117,25 +124,39 @@ export const MessageBubble = memo(function MessageBubble({
             <p className="text-sm whitespace-pre-wrap break-words leading-relaxed">
               {text}
             </p>
-            <p className="text-[10px] mt-1 text-primary-foreground/60">{time}</p>
+            <p className="text-[10px] mt-1 text-primary-foreground/60">
+              {time}
+            </p>
           </div>
         ) : (
           <p className="text-[10px] text-muted-foreground pr-1">{time}</p>
         )}
-        {hasText && (
+        {(hasText || persistedMessageId) && (
           <div className="flex items-center gap-0.5 pr-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-            <MessageAction
-              icon={<IconPencil className="size-3.5" />}
-              label="Edit message"
-              onClick={() => onEditMessage(text)}
-            />
-            <MessageAction
-              icon={<IconRepeat className="size-3.5" />}
-              label="Resend message"
-              onClick={() => onResendMessage(text, attachments ?? [])}
-              disabled={chatLoading}
-            />
-            <CopyButton text={text} />
+            {hasText && (
+              <>
+                <MessageAction
+                  icon={<IconPencil className="size-3.5" />}
+                  label="Edit message"
+                  onClick={() => onEditMessage(text)}
+                />
+                <MessageAction
+                  icon={<IconRepeat className="size-3.5" />}
+                  label="Resend message"
+                  onClick={() => onResendMessage(text, attachments ?? [])}
+                  disabled={chatLoading}
+                />
+                <CopyButton text={text} />
+              </>
+            )}
+            {persistedMessageId && (
+              <MessageAction
+                icon={<IconTrash className="size-3.5" />}
+                label={t('delete-prompt-and-reply')}
+                onClick={() => onDeleteMessage(msg.id, persistedMessageId)}
+                disabled={chatLoading}
+              />
+            )}
           </div>
         )}
       </div>
@@ -164,9 +185,7 @@ export const MessageBubble = memo(function MessageBubble({
   const rescuedCount = artifacts.length - liveArtifacts.length;
   const visibleFailures = failedArtifactTools
     .filter((t) => t.isError)
-    .concat(
-      failedArtifactTools.filter((t) => !t.isError).slice(rescuedCount),
-    );
+    .concat(failedArtifactTools.filter((t) => !t.isError).slice(rescuedCount));
   const canRegenerate = isLast && !chatLoading;
   // A settled assistant turn that produced neither prose nor any artifact —
   // render an explicit interrupted/empty notice with a retry instead of a blank
@@ -189,8 +208,11 @@ export const MessageBubble = memo(function MessageBubble({
       {/* A borderless reading column (no bubble) so long answers read like a
           document. Hold full width during streaming so it doesn't snap wider
           when the first artifact tool call lands mid-turn. */}
-      <div className={`min-w-0 px-1 py-1 ${streaming || artifacts.length > 0 ? 'w-full' : 'w-auto max-w-full'}`}>
-
+      <div
+        className={`min-w-0 px-1 py-1 ${
+          streaming || artifacts.length > 0 ? 'w-full' : 'w-auto max-w-full'
+        }`}
+      >
         {activeSkills && activeSkills.length > 0 && (
           <div className="flex flex-wrap items-center gap-1 mb-1.5">
             {activeSkills.map((name) => (
@@ -296,7 +318,10 @@ export const MessageBubble = memo(function MessageBubble({
                 />
               )}
               {handleRate && (
-                <FeedbackButtons rating={msg.metadata?.rating} onRate={handleRate} />
+                <FeedbackButtons
+                  rating={msg.metadata?.rating}
+                  onRate={handleRate}
+                />
               )}
               <CopyButton text={text} />
             </div>

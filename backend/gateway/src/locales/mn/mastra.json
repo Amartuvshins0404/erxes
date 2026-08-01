@@ -145,5 +145,15 @@
   "agent-access-scope-group": "Бүлэг",
   "agent-access-profile-error": "Агентын хандалтын профайлыг тодорхойлж чадсангүй",
   "agent-access-scope-all": "Бүгд",
-  "error": "Алдаа"
+  "error": "Алдаа",
+  "delete": "Устгах",
+  "deleting": "Устгаж байна…",
+  "delete-session-title": "Энэ сессийг устгах уу?",
+  "delete-session-description": "Сесс болон бүх зурвас бүрмөсөн устна. Энэ үйлдлийг буцаах боломжгүй.",
+  "delete-prompt-and-reply": "Асуулт болон хариултыг устгах",
+  "delete-prompt-title": "Энэ асуулт болон хариултыг устгах уу?",
+  "delete-prompt-description": "Асуулт болон түүний дараах агентын хариулт бүрмөсөн устна. Энэ үйлдлийг буцаах боломжгүй.",
+  "prompt-reply-deleted": "Асуулт болон хариултыг устгалаа",
+  "delete-failed": "Устгаж чадсангүй",
+  "delete-failed-description": "Дахин оролдоно уу."
 }

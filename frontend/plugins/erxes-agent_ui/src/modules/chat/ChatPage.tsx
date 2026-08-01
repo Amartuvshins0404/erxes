@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useApolloClient } from '@apollo/client';
+import { useTranslation } from 'react-i18next';
+import { useToast } from 'erxes-ui';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { IconArrowDown } from '@tabler/icons-react';
 import type {
@@ -33,6 +35,7 @@ import { useIsNarrow } from '~/modules/chat/hooks/useIsNarrow';
 import { ChatPageHeader } from '~/modules/chat/components/ChatPageHeader';
 import { ChatSidePanel } from '~/modules/chat/components/ChatSidePanel';
 import { DeleteSessionDialog } from '~/modules/chat/components/DeleteSessionDialog';
+import { DeleteMessagePairDialog } from '~/modules/chat/components/DeleteMessagePairDialog';
 import {
   AmbientBackdrop,
   ChatErrorBanner,
@@ -48,6 +51,8 @@ import { PreviewResizer } from '~/modules/chat/components/PreviewResizer';
 import { PreviewPanel } from '~/modules/chat/preview/PreviewPanel';
 import { previewStore } from '~/modules/chat/preview/previewStore';
 import { pendingApproval } from '~/modules/chat/lib/uiParts';
+import { MASTRA_MESSAGE_PAIR_REMOVE } from '~/graphql/mutations';
+import { refetchThreadArtifactsIntoCache } from '~/modules/chat/threadsCache';
 import { associateArtifacts } from '~/modules/chat/lib/artifacts';
 import { useSkillSlashPicker } from '~/modules/skills/hooks/useSkillSlashPicker';
 import { useSkillFromThread } from '~/modules/skills/hooks/useSkillFromThread';
@@ -63,12 +68,29 @@ import { VoiceOverlay } from '~/modules/chat/voice/components/VoiceOverlay';
 import { useVoiceConversation } from '~/modules/chat/voice/hooks/useVoiceConversation';
 import '~/modules/chat/chat.css';
 
+interface PendingMessagePairDelete {
+  threadId: string;
+  uiMessageId: string;
+  persistedMessageId: string;
+}
+
+interface MastraMessagePairRemoveResponse {
+  mastraMessagePairRemove?: {
+    deletedIds?: unknown;
+  };
+}
+const isStringArray = (value: unknown): value is string[] =>
+  Array.isArray(value) &&
+  value.every((item: unknown) => typeof item === 'string');
+
 // Distance (px) from the bottom under which we keep following streamed output.
 const SCROLL_PIN_THRESHOLD = 120;
 // Distance (px) from the bottom past which the "Latest" jump button appears.
 const SCROLL_BUTTON_THRESHOLD = 280;
 
 export const ChatPage = () => {
+  const { t } = useTranslation('mastra');
+  const { toast } = useToast();
   const { agentId } = useParams<{ agentId: string }>();
   const navigate = useNavigate();
   // The active conversation is addressable via ?thread=<id>. Selecting a session
@@ -104,6 +126,9 @@ export const ChatPage = () => {
   // Thread id awaiting delete confirmation — drives the styled AlertDialog that
   // replaced the native window.confirm().
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
+  const [pendingMessageDelete, setPendingMessageDelete] =
+    useState<PendingMessagePairDelete | null>(null);
+  const [messageDeleteLoading, setMessageDeleteLoading] = useState(false);
   const apolloClient = useApolloClient();
 
   const { agents, loading: agentsLoading } = useChatAgents();
@@ -150,7 +175,9 @@ export const ChatPage = () => {
     void refetchThreads().catch(() => undefined);
   }, [refetchThreads]);
   const { renameThread } = useRenameMastraThread();
-  const { removeThread } = useRemoveMastraThread(selectedAgent?._id);
+  const { removeThread, loading: sessionDeleteLoading } = useRemoveMastraThread(
+    selectedAgent?._id,
+  );
 
   // Workflow mode lists only definitions owned by the selected agent.
   const {
@@ -356,18 +383,83 @@ export const ChatPage = () => {
     [agentId, selectedAgent],
   );
 
-  const confirmDelete = useCallback(() => {
+  const confirmDelete = useCallback(async () => {
     if (!agentId || !pendingDelete) return;
+    const result = await removeThread(pendingDelete).catch(() => null);
+    if (!result?.data?.mastraThreadRemove) return;
+
     // The cached list filter (hook) + local state teardown (store); the
     // bootstrap effect re-selects the next session if this one was active.
     const wasActive = pendingDelete === activeThreadId;
-    removeThread(pendingDelete);
     chatStore.discardThread(agentId, pendingDelete);
     setPendingDelete(null);
     // Drop the deleted thread from the URL so it doesn't point at a dead session
     // and the bootstrap effect is free to re-home to the next one.
     if (wasActive) setThreadParam(undefined, true);
   }, [agentId, pendingDelete, activeThreadId, removeThread, setThreadParam]);
+
+  const handleDeleteMessage = useCallback(
+    (uiMessageId: string, persistedMessageId: string) => {
+      if (!activeThreadId || chatLoading) return;
+      setPendingMessageDelete({
+        threadId: activeThreadId,
+        uiMessageId,
+        persistedMessageId,
+      });
+    },
+    [activeThreadId, chatLoading],
+  );
+
+  const confirmDeleteMessage = useCallback(() => {
+    if (!agentId || !pendingMessageDelete || messageDeleteLoading) return;
+    setMessageDeleteLoading(true);
+    void apolloClient
+      .mutate<MastraMessagePairRemoveResponse>({
+        mutation: MASTRA_MESSAGE_PAIR_REMOVE,
+        variables: {
+          threadId: pendingMessageDelete.threadId,
+          messageId: pendingMessageDelete.persistedMessageId,
+        },
+      })
+      .then(({ data }) => {
+        const deletedIds = data?.mastraMessagePairRemove?.deletedIds;
+        if (!isStringArray(deletedIds)) {
+          throw new Error(t('delete-failed-description'));
+        }
+        chatStore.discardMessagePair(
+          agentId,
+          pendingMessageDelete.threadId,
+          pendingMessageDelete.uiMessageId,
+          deletedIds,
+        );
+        void refetchThreads().catch(() => undefined);
+        void refetchThreadArtifactsIntoCache(
+          apolloClient,
+          pendingMessageDelete.threadId,
+        );
+        setPendingMessageDelete(null);
+        toast({ title: t('prompt-reply-deleted') });
+      })
+      .catch((error: unknown) => {
+        toast({
+          title: t('delete-failed'),
+          description:
+            error instanceof Error
+              ? error.message
+              : t('delete-failed-description'),
+          variant: 'destructive',
+        });
+      })
+      .finally(() => setMessageDeleteLoading(false));
+  }, [
+    agentId,
+    apolloClient,
+    messageDeleteLoading,
+    pendingMessageDelete,
+    refetchThreads,
+    t,
+    toast,
+  ]);
 
   const handleRenameSession = useCallback(
     (id: string, threadId: string, title: string) => {
@@ -663,6 +755,7 @@ export const ChatPage = () => {
                 onRate={handleRate}
                 onEditMessage={handleEditMessage}
                 onResendMessage={handleResendMessage}
+                onDeleteMessage={handleDeleteMessage}
                 storeArtifactsByMessage={storeArtifactsByMessage}
                 debug={selectedAgent.debug}
               />
@@ -776,9 +869,17 @@ export const ChatPage = () => {
       />
 
       <DeleteSessionDialog
+        loading={sessionDeleteLoading}
         open={!!pendingDelete}
         onOpenChange={(open) => !open && setPendingDelete(null)}
         onConfirm={confirmDelete}
+      />
+
+      <DeleteMessagePairDialog
+        open={!!pendingMessageDelete}
+        loading={messageDeleteLoading}
+        onOpenChange={(open) => !open && setPendingMessageDelete(null)}
+        onConfirm={confirmDeleteMessage}
       />
     </div>
   );

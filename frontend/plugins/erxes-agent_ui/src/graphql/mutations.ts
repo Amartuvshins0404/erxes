@@ -17,6 +17,12 @@ export const MASTRA_THREAD_REMOVE = gql`
   }
 `;
 
+export const MASTRA_MESSAGE_PAIR_REMOVE = gql`
+  mutation MastraMessagePairRemove($threadId: String!, $messageId: String!) {
+    mastraMessagePairRemove(threadId: $threadId, messageId: $messageId)
+  }
+`;
+
 export const MASTRA_CHAT_CANCEL = gql`
   mutation MastraChatCancel($threadId: String!) {
     mastraChatCancel(threadId: $threadId)

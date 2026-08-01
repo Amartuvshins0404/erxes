@@ -21,6 +21,7 @@ export const MessageList = ({
   onRate,
   onEditMessage,
   onResendMessage,
+  onDeleteMessage,
   storeArtifactsByMessage,
   debug,
 }: {
@@ -38,6 +39,7 @@ export const MessageList = ({
   onRate: (messageId: string, rating: 1 | -1) => void;
   onEditMessage: (text: string) => void;
   onResendMessage: (text: string, attachments: ChatAttachment[]) => void;
+  onDeleteMessage: (uiMessageId: string, persistedMessageId: string) => void;
   // Persisted artifacts per assistant message id — re-renders inline cards on
   // reload (the live message's own tool parts take priority while streaming).
   storeArtifactsByMessage?: Map<string, Artifact[]>;
@@ -114,6 +116,13 @@ export const MessageList = ({
                 onRate={onRate}
                 onEditMessage={onEditMessage}
                 onResendMessage={onResendMessage}
+                persistedMessageId={
+                  msg.metadata?.messageId ??
+                  (visible[i + 1]?.role === 'assistant'
+                    ? visible[i + 1].metadata?.messageId
+                    : undefined)
+                }
+                onDeleteMessage={onDeleteMessage}
                 storeArtifacts={
                   msg.metadata?.messageId
                     ? storeArtifactsByMessage?.get(msg.metadata.messageId)

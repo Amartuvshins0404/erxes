@@ -5,16 +5,15 @@ import { MASTRA_THREAD_REMOVE } from '~/graphql/mutations';
 import { updateThreadsCache } from '~/modules/chat/threadsCache';
 
 interface MastraThreadRemoveResponse {
-  mastraThreadRemove: boolean;
+  mastraThreadRemove: { ok: number };
 }
 
 // Remove a session, optimistically filtering it out of the cached list so it
 // disappears from the sidebar instantly (Apollo restores it on error).
 export const useRemoveMastraThread = (mastraAgentId?: string) => {
   const { toast } = useToast();
-  const [removeThread, { loading }] = useMutation<MastraThreadRemoveResponse>(
-    MASTRA_THREAD_REMOVE,
-  );
+  const [removeThread, { loading }] =
+    useMutation<MastraThreadRemoveResponse>(MASTRA_THREAD_REMOVE);
 
   // Stable identity so callers can pass it into memoized children without
   // breaking their memo on every parent (streamed-token) re-render.
@@ -22,7 +21,7 @@ export const useRemoveMastraThread = (mastraAgentId?: string) => {
     (threadId: string) =>
       removeThread({
         variables: { threadId },
-        optimisticResponse: { mastraThreadRemove: true },
+        optimisticResponse: { mastraThreadRemove: { ok: 1 } },
         update: (cache) => {
           if (!mastraAgentId) return;
           updateThreadsCache(cache, mastraAgentId, (list) =>

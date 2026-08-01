@@ -135,6 +135,12 @@ interface ChatStoreState {
   ) => Promise<void>;
   // Drop a removed thread's Chat + signals. The cached session list is filtered
   // by useRemoveMastraThread; this only clears store-side state.
+  discardMessagePair: (
+    agentKey: string,
+    threadId: string,
+    uiMessageId: string,
+    deletedIds: string[],
+  ) => void;
   discardThread: (agentKey: string, threadId: string) => void;
   stop: (client: Client, agentKey: string) => void;
   sendMessage: (
@@ -151,11 +157,7 @@ interface ChatStoreState {
     activeSkillNames?: string[],
   ) => void;
   // Re-ask the question that produced the last reply (with its attachments).
-  regenerate: (
-    client: Client,
-    agentKey: string,
-    mastraAgentId: string,
-  ) => void;
+  regenerate: (client: Client, agentKey: string, mastraAgentId: string) => void;
 }
 
 export const useChatStore = create<ChatStoreState>((set, get) => {
@@ -550,6 +552,18 @@ export const useChatStore = create<ChatStoreState>((set, get) => {
       }
     },
 
+    discardMessagePair: (agentKey, threadId, uiMessageId, deletedIds) => {
+      const chat = get().chats[threadKey(agentKey, threadId)];
+      if (!chat) return;
+      const removed = new Set(deletedIds);
+      chat.messages = chat.messages.filter(
+        (message) =>
+          message.id !== uiMessageId &&
+          !removed.has(message.id) &&
+          !removed.has(message.metadata?.messageId ?? ''),
+      );
+    },
+
     discardThread: (agentKey, threadId) => {
       const key = threadKey(agentKey, threadId);
       void get().chats[key]?.stop();
@@ -728,6 +742,7 @@ type StoreActionKey =
   | 'newDraft'
   | 'selectSession'
   | 'rateMessage'
+  | 'discardMessagePair'
   | 'discardThread'
   | 'stop'
   | 'sendMessage'
@@ -743,6 +758,7 @@ const ACTION_KEYS: StoreActionKey[] = [
   'newDraft',
   'selectSession',
   'rateMessage',
+  'discardMessagePair',
   'discardThread',
   'stop',
   'sendMessage',

@@ -80,26 +80,8 @@ export const MASTRA_SETTINGS_SAVE = gql`
     mastraSettingsSave(doc: $doc) {
       _id
       erxesApiUrl
-      erxesApiToken
-      defaultAgentId
+      memoryEnabled
       attachmentsEnabled
-    }
-  }
-`;
-
-export const MASTRA_VOICE_CONFIG_SAVE = gql`
-  mutation MastraVoiceConfigSave($doc: MastraVoiceConfigInput!) {
-    mastraVoiceConfigSave(doc: $doc) {
-      enabled
-      sttEnabled
-      ttsEnabled
-      sttConfigured
-      ttsConfigured
-      sttSource
-      ttsSource
-      ttsVoice
-      ttsSampleRate
-      isEnabled
     }
   }
 `;

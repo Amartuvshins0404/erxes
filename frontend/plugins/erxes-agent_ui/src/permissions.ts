@@ -20,7 +20,6 @@ export const ERXES_AGENT_ACTIONS = {
     statusRead: 'erxesAgentSettingsStatusRead',
     manage: 'erxesAgentSettingsManage',
     quotasManage: 'erxesAgentQuotasManage',
-    voiceManage: 'erxesAgentVoiceManage',
   },
   workflow: {
     read: 'erxesAgentWorkflowsRead',

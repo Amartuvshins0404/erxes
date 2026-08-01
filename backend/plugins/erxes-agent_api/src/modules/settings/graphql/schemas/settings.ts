@@ -8,30 +8,17 @@ export const types = `
     enabled: Boolean
   }
 
-  # Whether voice mode (Chimege Mongolian STT + TTS) is usable: a CHIMEGE_TOKEN
-  # resolves AND the feature is not disabled. When false the chat UI hides
-  # the voice mode entry point.
-  type MastraVoiceStatus {
-    enabled: Boolean
-  }
-
   type MastraSettings {
     _id: String
     erxesApiUrl: String
-    hasErxesApiToken: Boolean
-    defaultAgentId: String
+    memoryEnabled: Boolean
     attachmentsEnabled: Boolean
     attachmentStorage: MastraAttachmentStorageStatus
-
-    # Read-only: the "Advanced memory feature" is controlled by the
-    # ERXES_AGENT_MEMORY env var, not by app data. Surfaced for display only.
-    advancedMemory: Boolean
   }
 
   input MastraSettingsInput {
     erxesApiUrl: String
-    erxesApiToken: String
-    defaultAgentId: String
+    memoryEnabled: Boolean
     attachmentsEnabled: Boolean
   }
 `;
@@ -39,7 +26,6 @@ export const types = `
 export const queries = `
   mastraSettings: MastraSettings
   mastraAttachmentStorageStatus: MastraAttachmentStorageStatus
-  mastraVoiceStatus: MastraVoiceStatus
 `;
 
 export const mutations = `

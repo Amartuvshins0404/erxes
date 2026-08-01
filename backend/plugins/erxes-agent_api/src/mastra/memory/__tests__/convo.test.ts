@@ -1,4 +1,4 @@
-import { augmentConvo, deriveResourceId, deriveBotResourceId } from '../convo';
+import { augmentConvo, deriveResourceId } from '../convo';
 
 describe('convo assembly', () => {
   const history = [
@@ -52,15 +52,5 @@ describe('convo assembly', () => {
     expect(deriveResourceId({ user: { _id: 'u1' }, agentId: 'a' })).toBe('u1');
     expect(deriveResourceId({ user: null, agentId: 'a' })).toBe('agent:a');
     expect(deriveResourceId({ agentId: 'a' })).toBe('agent:a');
-  });
-
-  it('AM-CONV-6: deriveBotResourceId prefers customer id, else per-conversation', () => {
-    expect(
-      deriveBotResourceId({ customerId: 'c1', conversationId: 'cv' }),
-    ).toBe('c1');
-    expect(deriveBotResourceId({ conversationId: 'cv' })).toBe('bot:cv');
-    expect(
-      deriveBotResourceId({ customerId: null, conversationId: 'cv' }),
-    ).toBe('bot:cv');
   });
 });

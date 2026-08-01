@@ -13,7 +13,7 @@
  *
  * Loaded by the `mastra` CLI via the conventional `src/mastra/index.ts` re-export.
  * Requires the same reachable MONGO_URL erxes uses; full-reuse agents also need
- * the gateway (:4000) for tools, and ERXES_AGENT_MEMORY=enable for memory.
+ * the gateway (:4000) for tools. Memory follows the tenant's General Settings.
  */
 import { Mastra } from '@mastra/core';
 import { Agent } from '@mastra/core/agent';

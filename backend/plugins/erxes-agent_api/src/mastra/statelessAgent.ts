@@ -57,7 +57,7 @@ export async function getStatelessAgent(
 export async function runStateless(
   agent: StatelessAgent,
   userContent: string,
-  authCtx: { userHeader?: string; token?: string; subdomain?: string },
+  authCtx: { userHeader?: string; subdomain?: string },
 ): Promise<string> {
   const { runWithAuth } = await import('~/mastra/requestContext');
   const msgs = [{ role: 'user', content: userContent }];

@@ -1,4 +1,6 @@
-jest.mock('@mastra/core/tools', () => ({ createTool: (config: unknown) => config }));
+jest.mock('@mastra/core/tools', () => ({
+  createTool: (config: unknown) => config,
+}));
 
 const mockExecute = jest.fn((...args: unknown[]) => {
   void args;
@@ -14,7 +16,9 @@ import { runWithAuth } from '../../requestContext';
 import type { OperationRegistry, OperationMeta } from '../operationRegistry';
 import type { AgentActionInput } from '../../auditLog';
 
-const makeRegistry = (ops: Array<Partial<OperationMeta>>): OperationRegistry => {
+const makeRegistry = (
+  ops: Array<Partial<OperationMeta>>,
+): OperationRegistry => {
   const list = ops.map(
     (operation) =>
       ({
@@ -25,10 +29,12 @@ const makeRegistry = (ops: Array<Partial<OperationMeta>>): OperationRegistry => 
         description: '',
         graphqlArgs: [],
         returnType: null,
-      }) as OperationMeta,
+      } as OperationMeta),
   );
   return {
-    operations: new Map(list.map((operation) => [operation.operation, operation])),
+    operations: new Map(
+      list.map((operation) => [operation.operation, operation]),
+    ),
     list,
     inputTypesMap: {},
     objectFieldsMap: {},
@@ -52,7 +58,6 @@ const build = (
   const registry = makeRegistry([operation]);
   const tools = buildErxesOperationTools({
     registry,
-    settings: {},
     policy: { mode: 'all', allowed: [] },
     destructiveOps,
     recordAction: (entry) => calls.push(entry),
@@ -93,7 +98,9 @@ describe('typed operation guard and audit', () => {
     );
 
     const result = await runWithAuth(
-      { approvedOps: [{ operation: 'customersRemove', args: { _ids: ['c1'] } }] },
+      {
+        approvedOps: [{ operation: 'customersRemove', args: { _ids: ['c1'] } }],
+      },
       () => tool.execute({ _ids: ['c1'] }),
     );
 
@@ -117,7 +124,7 @@ describe('typed operation guard and audit', () => {
     await tool.execute({});
 
     expect(mockExecute).toHaveBeenCalledTimes(1);
-    const sentProcessId = mockExecute.mock.calls[0]?.[4];
+    const sentProcessId = mockExecute.mock.calls[0]?.[3];
     expect(sentProcessId).toEqual(expect.any(String));
     expect(sentProcessId).toMatch(/^agt_/);
     expect(calls[0]).toMatchObject({
@@ -129,7 +136,10 @@ describe('typed operation guard and audit', () => {
   });
 
   it('records a failed mutation', async () => {
-    mockExecute.mockResolvedValueOnce({ success: false, error: 'boom' } as never);
+    mockExecute.mockResolvedValueOnce({
+      success: false,
+      error: 'boom',
+    } as never);
     const calls: AgentActionInput[] = [];
     const tool = build(
       { operation: 'dealsEdit', operationType: 'mutation' },
@@ -153,7 +163,7 @@ describe('typed operation guard and audit', () => {
     await tool.execute({});
 
     expect(mockExecute).toHaveBeenCalledTimes(1);
-    expect(mockExecute.mock.calls[0][4]).toBeUndefined();
+    expect(mockExecute.mock.calls[0][3]).toBeUndefined();
     expect(calls).toHaveLength(0);
   });
 });

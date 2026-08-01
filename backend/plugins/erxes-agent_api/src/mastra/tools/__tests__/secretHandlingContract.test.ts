@@ -37,9 +37,6 @@ import { runWithAuth } from '../../requestContext';
 
 const mockSend = sendTRPCMessage as unknown as jest.Mock;
 
-// Unreachable internal subgraph: a real network attempt fails fast after guards.
-const SETTINGS = { erxesApiUrl: 'http://gateway.invalid', erxesApiToken: '' };
-
 // -----------------------------------------------------------------------------
 // SECTION 3 (foundational): isSecretName — the name-level predicate.
 // -----------------------------------------------------------------------------
@@ -358,7 +355,7 @@ describe('executeErxesOperation — secret-reference reject-guard', () => {
         principalUserId: 'u1',
         subdomain: 'os',
       },
-      () => executeErxesOperation(op, args, SETTINGS),
+      () => executeErxesOperation(op, args),
     );
     return { result, fetched: mockFetch.mock.calls.length > 0 };
   };

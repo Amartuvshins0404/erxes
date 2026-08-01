@@ -29,7 +29,11 @@ export interface IMastraLearningModel extends Model<IMastraLearningDocument> {
   // record the (hashed) contributor, keep the higher confidence estimate.
   mergeEvidence(
     _id: string,
-    args: { confidence?: number; sourceHash?: string },
+    args: {
+      agentId: string;
+      confidence?: number;
+      sourceHash?: string;
+    },
   ): Promise<IMastraLearningDocument | null>;
   setStatus(
     _id: string,
@@ -83,7 +87,11 @@ export const loadLearningClass = (_models: IModels) => {
     /** Count re-derived evidence and keep the higher confidence estimate. */
     public static mergeEvidence(
       _id: string,
-      args: { confidence?: number; sourceHash?: string },
+      args: {
+        agentId: string;
+        confidence?: number;
+        sourceHash?: string;
+      },
     ) {
       const update: UpdateQuery<IMastraLearningDocument> = {
         $inc: { evidenceCount: 1 },
@@ -93,9 +101,13 @@ export const loadLearningClass = (_models: IModels) => {
       if (typeof args.confidence === 'number') {
         update.$max = { confidence: Math.min(1, Math.max(0, args.confidence)) };
       }
-      return _models.MastraLearning.findOneAndUpdate({ _id }, update, {
-        new: true,
-      });
+      return _models.MastraLearning.findOneAndUpdate(
+        { _id, agentId: args.agentId },
+        update,
+        {
+          new: true,
+        },
+      );
     }
 
     /** Move a learning through its review lifecycle, stamping the reviewer. */

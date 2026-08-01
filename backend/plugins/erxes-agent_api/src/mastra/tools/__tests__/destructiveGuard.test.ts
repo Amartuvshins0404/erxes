@@ -11,7 +11,7 @@ import type { OperationMeta } from '../operationRegistry';
 const op = (
   operation: string,
   operationType: 'query' | 'mutation',
-): OperationMeta => ({ operation, operationType }) as OperationMeta;
+): OperationMeta => ({ operation, operationType } as OperationMeta);
 
 describe('isDestructiveOperation', () => {
   it('flags remove/delete/merge/destroy mutations', () => {
@@ -53,7 +53,9 @@ describe('resolveDestructiveOpsPolicy', () => {
   });
 
   it("defaults to 'ask' for missing, invalid, or legacy configs", () => {
-    expect(resolveDestructiveOpsPolicy({ destructiveOps: 'block' })).toBe('ask');
+    expect(resolveDestructiveOpsPolicy({ destructiveOps: 'block' })).toBe(
+      'ask',
+    );
     expect(resolveDestructiveOpsPolicy({})).toBe('ask');
     expect(resolveDestructiveOpsPolicy(null)).toBe('ask');
     expect(resolveDestructiveOpsPolicy({ destructiveOps: 'yes' })).toBe('ask');
@@ -66,7 +68,7 @@ describe('destructiveOpsPreapproved (background defense-in-depth)', () => {
   });
 
   it("blocks 'allow' in a background run — unattended deletes are impossible", () => {
-    // The whole point: a scheduled/bot/automation run configured 'allow' still
+    // The whole point: an unattended background run configured 'allow' still
     // cannot destroy data, because it can never carry a per-op approval.
     expect(destructiveOpsPreapproved('allow', true)).toBe(false);
   });

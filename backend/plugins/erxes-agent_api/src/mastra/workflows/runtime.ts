@@ -105,9 +105,8 @@ export function extractJsonObject(text: string): Record<string, unknown> {
  * Judgment agents are built BARE — the bound agent's persona and model, but NO
  * tools and a single step. Going through getOrCreateAgent would bind the
  * agent's own search/execute meta-tools, letting the model run erxes
- * operations mid-judgment OUTSIDE the workflow's declared policy (and, on
- * schedule/automation runs, with the app token). The workflow policy is the
- * security boundary; judgment is classification only.
+ * operations mid-judgment OUTSIDE the workflow's declared policy. The workflow
+ * policy is the security boundary; judgment is classification only.
  */
 // Keyed by agent _id, holding the cached agent's version: a newer version
 // overwrites its single entry, so eviction is one Map.set instead of an O(n)
@@ -159,7 +158,7 @@ function judgmentInstruction(outputSpec: Record<string, string>): string {
 
 /**
  * Builds the two effect handlers a compiled workflow needs, bound to this
- * run's models/settings and metered against the definition's limits.
+ * run's models and metered against the definition's limits.
  *
  * - executeOperation re-checks the workflow policy at execution time (defense
  *   in depth — same double-check as the chat meta-tools), then runs the op
@@ -226,7 +225,6 @@ export async function buildRunDeps(
       const result = await executeErxesOperation(
         meta,
         args || {},
-        settings,
         registry,
         processId,
       );
@@ -393,8 +391,8 @@ export async function runWorkflow(args: {
  *
  * A workflow with no owning agent (or one pointing at a deleted agent) has no
  * identity to run under, so it fails closed and records a failed run without
- * executing. A token-mint failure fails the same way; operation steps never
- * fall through to the configured app token.
+ * executing. A principal-resolution failure fails the same way; operation steps
+ * never fall through to an unattended credential.
  */
 export async function runBackgroundWorkflow(args: {
   models: IModels;

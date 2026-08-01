@@ -14,13 +14,12 @@ jest.mock('@mastra/core/tools', () => ({
 interface MockAuth {
   subdomain?: string;
   userHeader?: string;
-  token?: string;
   agentId?: string;
 }
 
 // Default: an authenticated team member (userHeader present) whose turn is being
 // run by agent 'agent-self' — the workflows they build default to owning it.
-// Individual tests flip this to simulate the anonymous bot path.
+// Individual tests clear userHeader to model an unauthenticated context.
 const mockAuth: { current: MockAuth | undefined } = {
   current: {
     subdomain: 'os',
@@ -46,7 +45,6 @@ jest.mock('@/workflow/authorization', () => ({
 
 interface MockAgentSettings {
   erxesApiUrl: string;
-  erxesApiToken?: string;
 }
 
 const mockGetSettings = jest.fn(
@@ -337,7 +335,7 @@ beforeEach(() => {
   });
 });
 
-describe('team-member gate (anonymous bot path)', () => {
+describe('team-member gate', () => {
   afterEach(() => {
     mockAuth.current = {
       subdomain: 'os',
@@ -347,9 +345,8 @@ describe('team-member gate (anonymous bot path)', () => {
   });
 
   it('denies every builder tool when no userHeader is on the auth context', async () => {
-    // The frontline bot webhook runs with { token, subdomain } but NO
-    // userHeader — a customer must not reach these tools.
-    mockAuth.current = { subdomain: 'os', token: 'app-token' };
+    // An auth context without userHeader must not reach team-member tools.
+    mockAuth.current = { subdomain: 'os' };
 
     const denial = /only available to logged-in team members/;
     // The guide tool's execute is synchronous up to the gate, so it throws
@@ -673,7 +670,7 @@ describe('workflowSaveTool', () => {
  */
 describe('schedule-enable gate (agent builder tools)', () => {
   beforeEach(() => {
-    // Default registry settings; run identity does not depend on an app token.
+    // Default registry settings.
     mockGetSettings.mockResolvedValue({ erxesApiUrl: 'https://gw' });
     mockCreateWorkflow.mockClear();
     mockUpdateWorkflow.mockClear();

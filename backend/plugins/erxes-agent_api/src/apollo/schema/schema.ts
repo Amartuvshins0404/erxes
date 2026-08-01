@@ -33,11 +33,6 @@ import {
   queries as skillQueriesSchema,
   mutations as skillMutationsSchema,
 } from '@/skills/graphql/schemas/skills';
-import {
-  types as voiceTypes,
-  queries as voiceQueriesSchema,
-  mutations as voiceMutationsSchema,
-} from '@/voice/graphql/schemas/voice';
 
 export const types = `
   ${agentTypes}
@@ -47,7 +42,6 @@ export const types = `
   ${workflowTypes}
   ${learningTypes}
   ${skillTypes}
-  ${voiceTypes}
 `;
 
 export const queries = `
@@ -58,7 +52,6 @@ export const queries = `
   ${workflowQueries}
   ${learningQueries}
   ${skillQueriesSchema}
-  ${voiceQueriesSchema}
 `;
 
 export const mutations = `
@@ -69,5 +62,4 @@ export const mutations = `
   ${workflowMutations}
   ${learningMutations}
   ${skillMutationsSchema}
-  ${voiceMutationsSchema}
 `;

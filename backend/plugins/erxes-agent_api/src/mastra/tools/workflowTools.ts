@@ -74,12 +74,11 @@ const tool = createTool as unknown as (cfg: WorkflowToolConfig) => MastraTool;
 const tenant = () => getCurrentAuth()?.subdomain || 'os';
 
 /**
- * TEAM MEMBERS ONLY. The frontline bot webhook runs agents for ANONYMOUS
- * customers under the privileged app token (runWithAuth carries `token` but no
- * `userHeader`). Without this gate, a Facebook/IG customer could prompt the
- * bot into building, reading, or RUNNING workflows with admin privilege.
- * Every builder tool calls this first; the thrown message is surfaced to the
- * model so it answers honestly instead of retrying.
+ * TEAM MEMBERS ONLY. Noninteractive contexts can run agents without a
+ * propagated `userHeader`. Without this gate, an untrusted caller could prompt
+ * an agent into building, reading, or running workflows with team-member
+ * privilege. Every builder tool calls this first; the thrown message is
+ * surfaced to the model so it answers honestly instead of retrying.
  */
 const requireTeamMember = () => {
   if (!getCurrentAuth()?.userHeader) {

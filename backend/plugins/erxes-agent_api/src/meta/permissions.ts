@@ -129,27 +129,22 @@ const modules: IPermissionModule[] = [
   ),
   permissionModule(
     'settings',
-    'Agent plugin status, settings, quotas, and voice configuration',
+    'Agent plugin status, settings, and quotas',
     [
       action(
         ERXES_AGENT_ACTIONS.settings.statusRead,
         'View feature status',
-        'Read secret-free attachment, voice, and feature status',
+        'Read secret-free attachment and feature status',
       ),
       action(
         ERXES_AGENT_ACTIONS.settings.manage,
         'Manage settings',
-        'Update plugin-wide settings with write-only credentials',
+        'Update plugin-wide settings',
       ),
       action(
         ERXES_AGENT_ACTIONS.settings.quotasManage,
         'Manage agent quotas',
         'Set organization and per-user agent quotas',
-      ),
-      action(
-        ERXES_AGENT_ACTIONS.settings.voiceManage,
-        'Manage voice configuration',
-        'Update write-only speech provider credentials',
       ),
     ],
     null,

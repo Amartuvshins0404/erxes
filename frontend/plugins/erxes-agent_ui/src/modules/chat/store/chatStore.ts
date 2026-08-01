@@ -71,20 +71,6 @@ const loadReasoningEffort = (agentKey: string): ReasoningEffort | undefined => {
   }
 };
 
-/** localStorage key holding whether voice mode is on for one agent's chat. */
-const voiceModeStorageKey = (agentKey: string) =>
-  `erxes-agent:voiceMode:${agentKey}`;
-
-// Best-effort read of the persisted voice-mode flag — same contract as
-// loadReasoningEffort (read once at agent-slice creation, never in a selector).
-const loadVoiceMode = (agentKey: string): boolean => {
-  try {
-    return localStorage.getItem(voiceModeStorageKey(agentKey)) === 'on';
-  } catch {
-    return false;
-  }
-};
-
 // Status-subscription teardowns, keyed by `${agentKey}:${threadId}`. Kept out of
 // zustand (no reactivity needed) so the Chat refs in state stay opaque.
 const statusUnsubs = new Map<string, () => void>();
@@ -119,7 +105,6 @@ interface ChatStoreState {
     agentKey: string,
     effort: ReasoningEffort | undefined,
   ) => void;
-  setVoiceMode: (agentKey: string, on: boolean) => void;
   newDraft: (client: Client, agentKey: string, mastraAgentId: string) => void;
   selectSession: (
     client: Client,
@@ -423,10 +408,6 @@ export const useChatStore = create<ChatStoreState>((set, get) => {
           ...(attachments?.length ? { attachments } : {}),
           ...(approvedOperations?.length ? { approvedOperations } : {}),
           ...(skillNames ? { activeSkillNames: skillNames } : {}),
-          // Voice mode replaces the composer, so any turn sent while it is on
-          // originates from speech. Flag it so the agent answers short and
-          // conversational (spoken style); typed chat is unaffected.
-          ...(agent.voiceMode ? { voiceMode: true } : {}),
         },
       },
     );
@@ -451,7 +432,6 @@ export const useChatStore = create<ChatStoreState>((set, get) => {
         if (!get().agents[agentId]) {
           patchAgent(agentId, {
             reasoningEffort: loadReasoningEffort(agentId),
-            voiceMode: loadVoiceMode(agentId),
           });
         }
       }
@@ -473,18 +453,6 @@ export const useChatStore = create<ChatStoreState>((set, get) => {
         // localStorage unavailable — the in-memory patch below still applies.
       }
       patchAgent(agentKey, { reasoningEffort: effort });
-    },
-
-    // Persist the hands-free voice-mode choice for this agent's chat view.
-    setVoiceMode: (agentKey, on) => {
-      try {
-        const key = voiceModeStorageKey(agentKey);
-        if (on) localStorage.setItem(key, 'on');
-        else localStorage.removeItem(key);
-      } catch {
-        // localStorage unavailable — the in-memory patch below still applies.
-      }
-      patchAgent(agentKey, { voiceMode: on });
     },
 
     newDraft: (client, agentKey, mastraAgentId) => {
@@ -738,7 +706,6 @@ type StoreActionKey =
   | 'setCurrentAgent'
   | 'markRead'
   | 'setReasoningEffort'
-  | 'setVoiceMode'
   | 'newDraft'
   | 'selectSession'
   | 'rateMessage'
@@ -754,7 +721,6 @@ const ACTION_KEYS: StoreActionKey[] = [
   'setCurrentAgent',
   'markRead',
   'setReasoningEffort',
-  'setVoiceMode',
   'newDraft',
   'selectSession',
   'rateMessage',

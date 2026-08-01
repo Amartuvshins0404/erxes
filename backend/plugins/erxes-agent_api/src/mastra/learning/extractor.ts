@@ -174,7 +174,7 @@ export interface ExtractionRuntime {
   provider: string;
   model: string;
   providers: ProviderDocLike[];
-  authCtx: { userHeader?: string; token?: string; subdomain?: string };
+  authCtx: { subdomain: string };
 }
 
 /** Distill one transcript into candidate learnings. Throws on LLM failure. */

@@ -2,7 +2,6 @@ import { createTool, type Tool } from '@mastra/core/tools';
 import { z } from 'zod';
 import type { AgentActionInput } from '../auditLog';
 import type { DestructiveOpsPolicy } from './destructiveGuard';
-import type { ErxesToolSettings } from './erxesTools';
 import { executePolicyScopedOperation } from './metaTools';
 import { getStaticOperationHints } from './operationHints';
 import type { OperationMeta, OperationRegistry } from './operationRegistry';
@@ -18,7 +17,6 @@ const RESPONSE_FIELDS_ARG = '__responseFields';
 
 export interface BuildErxesOperationToolsParams {
   registry: OperationRegistry;
-  settings: ErxesToolSettings | null;
   policy: ToolPolicy;
   destructiveOps: DestructiveOpsPolicy;
   recordAction?: (entry: AgentActionInput) => void;
@@ -222,7 +220,6 @@ function operationToolDescription(
  */
 export function buildErxesOperationTools({
   registry,
-  settings,
   policy,
   destructiveOps,
   recordAction,
@@ -257,7 +254,6 @@ export function buildErxesOperationTools({
           operation,
           args,
           responseFields,
-          settings,
           registry,
           policy,
           destructiveOps,

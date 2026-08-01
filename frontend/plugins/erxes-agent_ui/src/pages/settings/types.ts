@@ -55,65 +55,21 @@ export interface IAttachmentStorage {
   enabled?: boolean | null;
 }
 
-export interface IMastraVoiceStatus {
-  enabled?: boolean | null;
-}
-
 export interface IAttachmentStorageStatusResponse {
   mastraAttachmentStorageStatus: IAttachmentStorage | null;
-}
-
-export interface IVoiceStatusResponse {
-  mastraVoiceStatus: IMastraVoiceStatus | null;
 }
 
 export interface IMastraSettings {
   _id?: string;
   erxesApiUrl?: string | null;
-  erxesApiToken?: string | null;
-  defaultAgentId?: string | null;
+  memoryEnabled?: boolean | null;
   attachmentsEnabled?: boolean | null;
-  attachmentStorage?: IAttachmentStorage | null;
-  advancedMemory?: boolean | null;
-}
-
-export interface IMastraVoiceConfigStatus {
-  enabled?: boolean | null;
-  sttEnabled?: boolean | null;
-  ttsEnabled?: boolean | null;
-  sttConfigured?: boolean | null;
-  ttsConfigured?: boolean | null;
-  sttSource?: 'db' | 'env' | 'none' | null;
-  ttsSource?: 'db' | 'env' | 'none' | null;
-  ttsVoice?: string | null;
-  ttsSampleRate?: number | null;
-  isEnabled?: boolean | null;
-}
-
-export interface IMastraVoiceOption {
-  id: string;
-  label: string;
-  gender: 'female' | 'male';
-}
-
-export interface IVoiceConfigResponse {
-  mastraVoiceConfig: IMastraVoiceConfigStatus | null;
-}
-
-export interface IVoiceCatalogResponse {
-  mastraVoiceCatalog: IMastraVoiceOption[];
+  attachmentStorage?: Pick<
+    IAttachmentStorage,
+    'configured' | 'serviceType'
+  > | null;
 }
 
 export interface ISettingsResponse {
   mastraSettings: IMastraSettings | null;
-}
-
-export interface ISettingsAgentOption {
-  _id: string;
-  accountName: string;
-  isActive: boolean;
-}
-
-export interface IAgentsResponse {
-  mastraAgents: ISettingsAgentOption[];
 }

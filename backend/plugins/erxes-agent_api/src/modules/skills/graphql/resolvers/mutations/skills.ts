@@ -129,10 +129,7 @@ export const skillMutations = {
       agentId,
     });
 
-    const [providers, settings] = await Promise.all([
-      models.MastraProvider.getRuntimeProviders(userId),
-      models.MastraSettings.findOne({}),
-    ]);
+    const providers = await models.MastraProvider.getRuntimeProviders(userId);
 
     const content = await distillThreadToSkill({
       subdomain,
@@ -140,7 +137,6 @@ export const skillMutations = {
       threadId,
       userId,
       userHeader: Buffer.from(JSON.stringify(user)).toString('base64'),
-      token: settings?.erxesApiToken,
       provider: agent.provider,
       model: agent.model,
       providers,

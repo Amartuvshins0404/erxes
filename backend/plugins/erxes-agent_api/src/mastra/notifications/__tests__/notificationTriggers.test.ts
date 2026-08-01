@@ -331,7 +331,6 @@ describe('cross-system AI team-member triggers', () => {
       convo: [{ role: 'user', content: 'notification' }],
       authCtx: {
         principalUserId: 'agent-user-1',
-        token: 'agent-token',
       },
       memoryBinding: { thread: 'notification-thread' },
     });
@@ -367,7 +366,6 @@ describe('cross-system AI team-member triggers', () => {
       expect.objectContaining({
         authCtx: expect.objectContaining({
           principalUserId: 'agent-user-1',
-          token: 'agent-token',
         }),
       }),
     );

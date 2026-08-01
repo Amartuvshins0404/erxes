@@ -3,7 +3,7 @@ import { IUserDocument } from 'erxes-api-shared/core-types';
 import { ExpectedError } from 'erxes-api-shared/utils';
 import { IModels } from '~/connectionResolvers';
 import { getOrCreateAgent } from '~/mastra/agentRuntime';
-import { isAdvancedMemoryEnabled } from '~/mastra/memory/config';
+import { isWorkspaceMemoryEnabled } from '~/mastra/memory/config';
 import { scopedResource } from '~/mastra/memory/mastraMemory';
 import { deriveResourceId, augmentConvo, MemoryContext } from '~/mastra/memory';
 import { readLearnedDigest } from '~/mastra/learning/digest';
@@ -24,12 +24,11 @@ import {
   TurnMessage,
 } from '@/agent/types';
 
-// Turn setup: everything a chat turn needs before the model runs — agent +
-// tools, thread ownership check, replayed history, advanced-memory blocks, and
-// the auth context tools execute under. One spine shared by all four callers
-// (in-app chat, the GraphQL resolver, the frontline bot webhook, scheduled
-// runs); `identity` (see TurnIdentity) is the single knob that varies — it
-// decides resource scoping, auth, ownership gating, and the memory toggle.
+// Turn setup: everything a typed chat turn or scheduled run needs before the
+// model runs — agent + tools, thread ownership check, replayed history,
+// advanced-memory blocks, and the auth context tools execute under. `identity`
+// (see TurnIdentity) is the single knob that varies — it decides resource
+// scoping, auth, ownership gating, and the memory toggle.
 // Throws user-facing errors on bad agent/thread.
 
 // Per-identity resource id and memory toggle. API authorization is resolved
@@ -38,7 +37,6 @@ function resolveIdentity(
   identity: TurnIdentity,
   agentId: string,
   advanced: boolean,
-  message: string,
 ): {
   resourceId: string;
   useMemory: boolean;
@@ -48,11 +46,6 @@ function resolveIdentity(
       return {
         resourceId: deriveResourceId({ user: identity.user, agentId }),
         useMemory: advanced,
-      };
-    case 'bot':
-      return {
-        resourceId: identity.resourceKey,
-        useMemory: advanced && Boolean(message.trim()),
       };
     case 'schedule':
       return {
@@ -116,23 +109,21 @@ interface TurnMemory {
 function resolveTurnMemory(args: {
   identity: TurnIdentity;
   agentConfig: IMastraAgentDocument;
+  settings: IMastraSettingsDocument;
   agentId: string;
-  message: string;
   subdomain: string;
   sessionId: string;
 }): TurnMemory {
-  const { identity, agentConfig, agentId, message, subdomain, sessionId } =
+  const { identity, agentConfig, settings, agentId, subdomain, sessionId } =
     args;
 
   const useHistory = agentConfig.memoryEnabled !== false;
-  // Advanced memory rides on the agent's own memory toggle.
-  const advanced = isAdvancedMemoryEnabled() && useHistory;
+  const advanced = isWorkspaceMemoryEnabled(settings) && useHistory;
 
   const { resourceId, useMemory } = resolveIdentity(
     identity,
     agentId,
     advanced,
-    message,
   );
 
   const memCtx: MemoryContext = {
@@ -205,7 +196,7 @@ async function buildAgentAndGateMemory(args: {
   ]);
 
   // Continued threads must belong to the caller. A thread under another
-  // resource is reported as not found; bot resources are synthetic/self-scoped.
+  // resource is reported as not found.
   if (
     priorThread &&
     memoryBinding &&
@@ -317,9 +308,8 @@ export interface PrepareTurnParams {
   threadId?: string;
   attachments?: IMastraChatAttachment[];
   approvedOperations?: ApprovedOp[];
-  // Weave the tenant's learned digest into the convo (and stamp its ids onto
-  // the turn). On for chat/bot; off for scheduled runs (whose prompt is run
-  // verbatim, the pre-generalization behaviour).
+  // Weave the tenant's learned digest into typed chat turns (and stamp its ids
+  // onto the turn). Scheduled runs keep their prompt verbatim.
   weaveDigest?: boolean;
   // Skill names the user explicitly slash-activated for THIS turn.
   activeSkillNames?: string[];
@@ -355,8 +345,8 @@ export async function prepareTurn(
     resolveTurnMemory({
       identity,
       agentConfig,
+      settings,
       agentId,
-      message,
       subdomain,
       sessionId,
     });

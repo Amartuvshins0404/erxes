@@ -12,8 +12,6 @@ export interface ApprovedOp {
 interface RequestAuth {
   /** Base64-encoded acting user for trusted internal subgraph calls. */
   userHeader?: string;
-  /** Optional caller token for auxiliary flows; erxes operations ignore it. */
-  token?: string;
   /** Acting principal used by permission-sensitive caches and entity lookup. */
   principalUserId?: string;
   /** Human who initiated an interactive turn; absent for background events. */
@@ -37,9 +35,9 @@ interface RequestAuth {
   /** Destructive ops the user approved for THIS turn — the execute guard runs an
    *  otherwise-gated delete/merge only when it matches one of these. */
   approvedOps?: ApprovedOp[];
-  /** True for unattended workflow or frontline-bot execution authenticated as
-   *  the agent's linked core account. Destructive operations then require
-   *  impossible live approval and remain blocked. */
+  /** True for unattended workflow execution authenticated as the agent's linked
+   *  core account. Destructive operations then require impossible live approval
+   *  and remain blocked. */
   background?: boolean;
 }
 

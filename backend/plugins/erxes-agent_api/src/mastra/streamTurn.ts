@@ -24,15 +24,14 @@ import {
 } from '@/agent/turn';
 import { IMastraChatAttachment } from '@/session/@types/session';
 import { UITurnAccumulator } from '@/agent/uiTurn';
-import { buildTurnSystem } from './voice/voicePrompt';
 import { ReasoningBurstCollector } from './reasoningBursts';
 
 // A Mastra stream may expose `traceId` as a value or a promise — sniff and
 // resolve it, accepting only a string (a non-string truthy value would slip past
 // the falsy guard in pushUserScore and ship bad data to Langfuse).
-async function resolveTraceId(
-  stream: { traceId?: unknown },
-): Promise<string | undefined> {
+async function resolveTraceId(stream: {
+  traceId?: unknown;
+}): Promise<string | undefined> {
   const tid = stream.traceId;
   const resolved =
     tid && typeof (tid as PromiseLike<unknown>).then === 'function'
@@ -53,9 +52,6 @@ export interface ChatStreamRequest {
   approvedOperations: ApprovedOp[];
   // Skill names the user slash-activated in the composer for THIS message.
   activeSkillNames: string[];
-  // True when this turn originated from hands-free voice mode: the reply is
-  // read aloud by TTS, so the agent should answer short and conversational.
-  voiceMode: boolean;
 }
 
 // Everything streamAgentTurn needs from the route handler. Dependencies are
@@ -81,7 +77,6 @@ async function foldModelStream(params: {
   controller: AbortController;
   prepared: PreparedTurn;
   reasoningOptions: ReasoningProviderOptions | undefined;
-  turnSystem: string | undefined;
   acc: UITurnAccumulator;
   bursts: ReasoningBurstCollector;
   activity: ActivityTracker | null;
@@ -91,7 +86,6 @@ async function foldModelStream(params: {
     controller,
     prepared,
     reasoningOptions,
-    turnSystem,
     acc,
     bursts,
     activity,
@@ -105,11 +99,12 @@ async function foldModelStream(params: {
         abortSignal: controller.signal,
         ...(memoryBinding ? { memory: memoryBinding } : {}),
         ...(reasoningOptions ? { providerOptions: reasoningOptions } : {}),
-        // Per-turn system additions (additive to the agent's base instructions +
-        // the native SkillsProcessor metadata): a voice-mode brevity directive
-        // when the turn came from speech, plus an explicitly slash-activated
-        // skill's full instructions.
-        ...(turnSystem ? { system: turnSystem } : {}),
+        // Per-turn system additions are the explicitly slash-activated skill's
+        // full instructions, additive to the agent's base instructions and
+        // native SkillsProcessor metadata.
+        ...(prepared.activeSkillInstructions
+          ? { system: prepared.activeSkillInstructions }
+          : {}),
       });
       langfuseTraceId = await resolveTraceId(
         modelStream as { traceId?: unknown },
@@ -360,7 +355,9 @@ async function finalizeTurn(params: {
 // summarize, persist/reconcile). Writes to `writer` and persists; observable
 // behavior (chunk order, finish metadata, persistence, client-gone handling,
 // abort semantics) matches the former inline route closure exactly.
-export async function streamAgentTurn(deps: StreamAgentTurnDeps): Promise<void> {
+export async function streamAgentTurn(
+  deps: StreamAgentTurnDeps,
+): Promise<void> {
   const { writer, models, subdomain, user, controller, clientGone, request } =
     deps;
   const {
@@ -371,7 +368,6 @@ export async function streamAgentTurn(deps: StreamAgentTurnDeps): Promise<void> 
     attachments,
     approvedOperations,
     activeSkillNames,
-    voiceMode,
   } = request;
 
   // Folds the model's UIMessage chunks into the erxes-only turn artifacts we
@@ -392,14 +388,6 @@ export async function streamAgentTurn(deps: StreamAgentTurnDeps): Promise<void> 
       attachments,
       approvedOperations,
       activeSkillNames,
-    });
-
-    // Per-turn system message: voice brevity directive (voice turns only) + any
-    // slash-activated skill instructions. Undefined leaves the agent's base
-    // instructions untouched (the typed-chat path).
-    const turnSystem = buildTurnSystem({
-      voiceMode,
-      activeSkillInstructions: prepared.activeSkillInstructions,
     });
 
     // Per-conversation reasoning override → provider-specific options, resolved
@@ -440,7 +428,6 @@ export async function streamAgentTurn(deps: StreamAgentTurnDeps): Promise<void> 
       controller,
       prepared,
       reasoningOptions,
-      turnSystem,
       acc,
       bursts,
       activity,

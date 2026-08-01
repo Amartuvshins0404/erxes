@@ -23,12 +23,6 @@ import { executeErxesOperation, type ErxesOperationRef } from '../erxesTools';
 import { REDACTED } from '../secretRedaction';
 import { buildErxesSupportTools } from '../metaTools';
 
-// A direct subgraph address that fails fast (ECONNREFUSED) when the guard allows.
-const UNREACHABLE = {
-  erxesApiUrl: 'http://gateway.invalid',
-  erxesApiToken: '',
-};
-
 const mkOp = (
   name: string,
   argName: string,
@@ -55,7 +49,6 @@ describe('secret-reference reject-guard', () => {
       {
         configsMap: { CLOUDFLARE_API_TOKEN: '{{secret:CLOUDFLARE_API_TOKEN}}' },
       },
-      UNREACHABLE,
     );
     expect(res).toMatchObject({ success: false, error: REFUSAL });
   });
@@ -64,7 +57,6 @@ describe('secret-reference reject-guard', () => {
     const res = await executeErxesOperation(
       mkOp('configsUpdate', 'value', 'String'),
       { value: '{{keep}}' },
-      UNREACHABLE,
     );
     expect(res).toMatchObject({ success: false, error: REFUSAL });
   });
@@ -73,10 +65,7 @@ describe('secret-reference reject-guard', () => {
     const res = await executeErxesOperation(
       mkOp('emailTemplatesAdd', 'content', 'String'),
       { content: 'Hello {{customer.name}}' },
-      UNREACHABLE,
     );
-    // Passed the guard → attempted execution → failed on the unreachable gateway,
-    // which is NOT the secret-reference refusal.
     expect(getError(res)).not.toBe(REFUSAL);
   });
 
@@ -87,7 +76,6 @@ describe('secret-reference reject-guard', () => {
     const res = await executeErxesOperation(
       mkOp('configsUpdate', 'configsMap', 'JSON'),
       { configsMap: { AWS_SECRET_ACCESS_KEY: REDACTED } },
-      UNREACHABLE,
     );
     expect(res).toMatchObject({ success: false, error: REFUSAL });
   });

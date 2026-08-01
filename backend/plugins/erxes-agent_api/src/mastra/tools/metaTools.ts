@@ -1,10 +1,7 @@
 import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
 import { sendTRPCMessage } from 'erxes-api-shared/utils';
-import {
-  executeErxesOperation,
-  type ErxesToolSettings,
-} from './erxesTools';
+import { executeErxesOperation } from './erxesTools';
 import { parseJsonPreprocess } from './schemaIntrospect';
 import type { OperationMeta, OperationRegistry } from './operationRegistry';
 import { isOperationAllowed, type ToolPolicy } from './scope';
@@ -39,8 +36,7 @@ export interface ArgSpec extends ArgFieldSpec {
 }
 
 function coerceArgs(value: unknown): Record<string, unknown> {
-  const parsed =
-    typeof value === 'string' ? parseJsonPreprocess(value) : value;
+  const parsed = typeof value === 'string' ? parseJsonPreprocess(value) : value;
   return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
     ? (parsed as Record<string, unknown>)
     : {};
@@ -68,7 +64,6 @@ export interface ExecutePolicyScopedOperationParams {
   operation: OperationMeta;
   args: Record<string, unknown>;
   responseFields?: string[];
-  settings: ErxesToolSettings | null;
   registry: OperationRegistry;
   policy: ToolPolicy;
   destructiveOps: DestructiveOpsPolicy;
@@ -84,7 +79,6 @@ export async function executePolicyScopedOperation({
   operation,
   args,
   responseFields,
-  settings,
   registry,
   policy,
   destructiveOps,
@@ -140,7 +134,6 @@ export async function executePolicyScopedOperation({
   const result = await executeErxesOperation(
     operation,
     callArgs,
-    settings,
     registry,
     processId,
     responseFields?.length ? responseFields : undefined,
@@ -246,6 +239,8 @@ export function buildErxesSupportTools(params: {
 
   return {
     ...(policy.mode === 'all' ? { list_config_keys: listConfigKeys } : {}),
-    ...(destructiveOps !== 'allow' ? { request_approval: requestApproval } : {}),
+    ...(destructiveOps !== 'allow'
+      ? { request_approval: requestApproval }
+      : {}),
   };
 }

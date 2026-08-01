@@ -58,7 +58,6 @@ export const createMakeSkillTool = (deps: MakeSkillDeps) =>
           threadId: auth.threadId,
           userId: auth.initiatorUserId,
           userHeader: auth.userHeader,
-          token: auth.token,
           provider: deps.provider,
           model: deps.model,
           providers: deps.providers,

@@ -12,7 +12,7 @@ import { previewStore } from '~/modules/chat/preview/previewStore';
 import { AgentFavoriteToggle } from '~/modules/navigation/components/AgentFavoriteToggle';
 
 // Chat page top bar: breadcrumb + (when an agent is picked and in chat mode) the
-// Files / Make skill / New chat actions. Rendered only outside voice mode.
+// Files / Make skill / New chat actions.
 export const ChatPageHeader = ({
   hasAgent,
   agentName,

@@ -50,19 +50,12 @@ export interface LearningSweepResult {
   error?: string;
 }
 
-/** The extraction runtime: the default agent's provider/model + app token. */
+/** The extraction runtime uses the oldest linked agent's provider/model. */
 async function resolveRuntime(
   models: IModels,
   subdomain: string,
-): Promise<{ runtime: ExtractionRuntime; defaultAgentId: string } | null> {
-  const settings = await models.MastraSettings.getSettings();
-  const profiles = settings?.defaultAgentId
-    ? [
-        await models.MastraAgent.findOne({ _id: settings.defaultAgentId }),
-      ].filter((profile): profile is NonNullable<typeof profile> =>
-        Boolean(profile),
-      )
-    : await models.MastraAgent.find({}).sort({ createdAt: 1 });
+): Promise<{ runtime: ExtractionRuntime; fallbackAgentId: string } | null> {
+  const profiles = await models.MastraAgent.find({}).sort({ createdAt: 1 });
   let agentConfig: IMastraAgentDocument | null = null;
   for (const profile of profiles) {
     try {
@@ -77,12 +70,12 @@ async function resolveRuntime(
 
   const providers = await models.MastraProvider.getRuntimeProviders();
   return {
-    defaultAgentId: agentConfig._id,
+    fallbackAgentId: agentConfig._id,
     runtime: {
       provider: agentConfig.provider,
       model: agentConfig.model,
       providers,
-      authCtx: { token: settings?.erxesApiToken, subdomain },
+      authCtx: { subdomain },
     },
   };
 }
@@ -183,7 +176,7 @@ export async function runLearningSweep(
         if (tail.length) {
           const distilled = await distillThread({
             models,
-            agentId: thread.agentId || resolved.defaultAgentId,
+            agentId: thread.agentId || resolved.fallbackAgentId,
             ownerResourceId: thread.resourceId,
             messages: tail,
             runtime: resolved.runtime,

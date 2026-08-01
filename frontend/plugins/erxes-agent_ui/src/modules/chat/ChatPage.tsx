@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useApolloClient } from '@apollo/client';
 import { useTranslation } from 'react-i18next';
 import { useToast } from 'erxes-ui';
+import { usePermissionCheck } from 'ui-modules';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { IconArrowDown } from '@tabler/icons-react';
 import type {
@@ -13,7 +14,6 @@ import { chatStore } from '~/modules/chat/store/chatStore';
 import {
   useChatAgents,
   useAttachmentsEnabled,
-  useVoiceEnabled,
 } from '~/modules/chat/hooks/useChatAgents';
 import { useAgentChatView } from '~/modules/chat/hooks/useChatView';
 import { useMastraThreads } from '~/modules/chat/hooks/useMastraThreads';
@@ -52,6 +52,7 @@ import { PreviewPanel } from '~/modules/chat/preview/PreviewPanel';
 import { previewStore } from '~/modules/chat/preview/previewStore';
 import { pendingApproval } from '~/modules/chat/lib/uiParts';
 import { MASTRA_MESSAGE_PAIR_REMOVE } from '~/graphql/mutations';
+import { ERXES_AGENT_ACTIONS } from '~/permissions';
 import { refetchThreadArtifactsIntoCache } from '~/modules/chat/threadsCache';
 import { associateArtifacts } from '~/modules/chat/lib/artifacts';
 import { useSkillSlashPicker } from '~/modules/skills/hooks/useSkillSlashPicker';
@@ -64,8 +65,6 @@ import { SkillSlashPicker } from '~/modules/skills/components/SkillSlashPicker';
 import { SkillActivePill } from '~/modules/skills/components/SkillActivePill';
 import { SkillDraftPreviewDialog } from '~/modules/skills/components/SkillDraftPreviewDialog';
 import { findDraftSkillFromMessages } from '~/modules/skills/utils';
-import { VoiceOverlay } from '~/modules/chat/voice/components/VoiceOverlay';
-import { useVoiceConversation } from '~/modules/chat/voice/hooks/useVoiceConversation';
 import '~/modules/chat/chat.css';
 
 interface PendingMessagePairDelete {
@@ -91,6 +90,10 @@ const SCROLL_BUTTON_THRESHOLD = 280;
 export const ChatPage = () => {
   const { t } = useTranslation('mastra');
   const { toast } = useToast();
+  const { hasActionPermission } = usePermissionCheck();
+  const canReadWorkflows = hasActionPermission(
+    ERXES_AGENT_ACTIONS.workflow.read,
+  );
   const { agentId } = useParams<{ agentId: string }>();
   const navigate = useNavigate();
   // The active conversation is addressable via ?thread=<id>. Selecting a session
@@ -133,31 +136,23 @@ export const ChatPage = () => {
 
   const { agents, loading: agentsLoading } = useChatAgents();
   const attachmentsEnabled = useAttachmentsEnabled();
-  const voiceEnabled = useVoiceEnabled();
 
   const selectedAgent = useMemo(
     () => agents.find((agent) => agent._id === agentId) ?? null,
     [agents, agentId],
   );
+  const view = useAgentChatView(selectedAgent?._id);
 
-  const view = useAgentChatView(agentId);
   const {
     activeThreadId,
     isDraft,
     reasoningEffort,
-    voiceMode,
     messages,
     loading: chatLoading,
     messagesLoading,
     error: chatError,
     retry,
   } = view;
-
-  // Hands-free voice loop (mic → STT → existing send flow → spoken reply).
-  // Active only when this agent's voice mode is on AND the backend has voice
-  // configured; otherwise the hook is fully inert (no mic, no listeners).
-  const voiceActive = !!voiceMode && voiceEnabled && !!selectedAgent;
-  const voice = useVoiceConversation(agentId, selectedAgent?._id, voiceActive);
 
   // The persisted session list lives in the Apollo cache, not the chat store.
   // Paginated: older sessions load on demand as the sidebar scrolls.
@@ -611,15 +606,6 @@ export const ChatPage = () => {
     [agentId],
   );
 
-  const handleVoiceModeToggle = useCallback(() => {
-    if (agentId) chatStore.setVoiceMode(agentId, !voiceMode);
-  }, [agentId, voiceMode]);
-
-  const handleVoiceSetup = useCallback(
-    () => navigate('/settings/erxes-agent/voice'),
-    [navigate],
-  );
-
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     // The /slash skill picker claims arrow/Enter/Tab/Esc while it's open.
     if (slash.handleKeyDown(e)) return;
@@ -664,60 +650,56 @@ export const ChatPage = () => {
 
   return (
     <div className="flex flex-col h-full">
-      {!voiceActive && (
-        <ChatPageHeader
-          hasAgent={!!selectedAgent}
-          agentName={selectedAgent?.accountName}
-          agentId={selectedAgent?._id}
-          asDrawer={asDrawer}
-          onToggleSidebar={() => setSidebarOpen((v) => !v)}
-          chatMode={chatMode}
-          activeThreadId={activeThreadId}
-          isDraft={isDraft}
-          onMakeSkill={handleMakeSkill}
-          making={making}
-          chatLoading={chatLoading}
-          onNewThread={handleNewThread}
-        />
-      )}
+      <ChatPageHeader
+        hasAgent={!!selectedAgent}
+        agentName={selectedAgent?.accountName}
+        agentId={selectedAgent?._id}
+        asDrawer={asDrawer}
+        onToggleSidebar={() => setSidebarOpen((v) => !v)}
+        chatMode={chatMode}
+        activeThreadId={activeThreadId}
+        isDraft={isDraft}
+        onMakeSkill={handleMakeSkill}
+        making={making}
+        chatLoading={chatLoading}
+        onNewThread={handleNewThread}
+      />
 
       <div ref={splitRef} className="flex flex-1 overflow-hidden relative">
-        {/* ── Side panel: AgentRail ↔ SessionList slide (hidden in voice mode) ── */}
-        {!voiceActive && (
-          <ChatSidePanel
-            asDrawer={asDrawer}
-            sidebarOpen={sidebarOpen}
-            onCloseSidebar={() => setSidebarOpen(false)}
-            showAgentRail={showAgentRail}
-            agents={agents}
-            agentsLoading={agentsLoading}
-            agentId={agentId}
-            onAgentSelect={handleAgentSelect}
-            hasAgent={!!selectedAgent}
-            chatMode={chatMode}
-            onChatModeChange={setChatMode}
-            threads={threads}
-            sessionsLoaded={sessionsLoaded}
-            isDraft={isDraft}
-            activeThreadId={activeThreadId}
-            hasMoreSessions={hasMoreSessions}
-            loadingMoreSessions={loadingMoreSessions}
-            onLoadMore={loadMoreSessions}
-            onSelectSession={handleSelectSession}
-            onNewThread={handleNewThread}
-            onDeleteSession={handleDeleteSession}
-            onRenameSession={handleRenameSession}
-            onRailOpen={handleRailOpen}
-            sessionsError={!!threadsError}
-            onRetrySessions={retrySessions}
-            workflows={workflows}
-            workflowsLoading={workflowsLoading}
-            workflowsError={!!workflowsError}
-            onRetryWorkflows={retryWorkflows}
-            workflowParam={workflowParam}
-            onSelectWorkflow={handleSelectWorkflow}
-          />
-        )}
+        <ChatSidePanel
+          asDrawer={asDrawer}
+          sidebarOpen={sidebarOpen}
+          onCloseSidebar={() => setSidebarOpen(false)}
+          showAgentRail={showAgentRail}
+          agents={agents}
+          agentsLoading={agentsLoading}
+          agentId={agentId}
+          onAgentSelect={handleAgentSelect}
+          hasAgent={!!selectedAgent}
+          chatMode={chatMode}
+          canReadWorkflows={canReadWorkflows}
+          onChatModeChange={setChatMode}
+          threads={threads}
+          sessionsLoaded={sessionsLoaded}
+          isDraft={isDraft}
+          activeThreadId={activeThreadId}
+          hasMoreSessions={hasMoreSessions}
+          loadingMoreSessions={loadingMoreSessions}
+          onLoadMore={loadMoreSessions}
+          onSelectSession={handleSelectSession}
+          onNewThread={handleNewThread}
+          onDeleteSession={handleDeleteSession}
+          onRenameSession={handleRenameSession}
+          onRailOpen={handleRailOpen}
+          sessionsError={!!threadsError}
+          onRetrySessions={retrySessions}
+          workflows={workflows}
+          workflowsLoading={workflowsLoading}
+          workflowsError={!!workflowsError}
+          onRetryWorkflows={retryWorkflows}
+          workflowParam={workflowParam}
+          onSelectWorkflow={handleSelectWorkflow}
+        />
 
         {/* ── Chat area ── */}
         <div
@@ -824,23 +806,9 @@ export const ChatPage = () => {
                 agentName={selectedAgent.accountName}
                 reasoningEffort={reasoningEffort}
                 onReasoningEffortChange={handleReasoningEffortChange}
-                voiceEnabled={voiceEnabled}
-                voiceMode={!!voiceMode}
-                onVoiceModeToggle={handleVoiceModeToggle}
-                onVoiceSetup={handleVoiceSetup}
                 textareaRef={textareaRef}
                 fileInputRef={fileInputRef}
               />
-
-              {voiceActive && (
-                <VoiceOverlay
-                  agentName={selectedAgent.accountName}
-                  voice={voice}
-                  onExit={() => {
-                    if (agentId) chatStore.setVoiceMode(agentId, false);
-                  }}
-                />
-              )}
             </>
           )}
         </div>

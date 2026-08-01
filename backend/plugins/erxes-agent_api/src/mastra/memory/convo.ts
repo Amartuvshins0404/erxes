@@ -48,14 +48,3 @@ export function deriveResourceId(args: {
 }): string {
   return args.user?._id || `agent:${args.agentId}`;
 }
-
-/**
- * Resource id for the messenger bot path. Prefer the customer id (so memory
- * follows a customer across conversations); fall back to per-conversation.
- */
-export function deriveBotResourceId(args: {
-  customerId?: string | null;
-  conversationId: string;
-}): string {
-  return args.customerId || `bot:${args.conversationId}`;
-}

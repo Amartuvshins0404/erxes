@@ -34,7 +34,7 @@ describe('AI team-member subgraph authentication', () => {
 
   it('forwards the validated principal through the internal user contract', async () => {
     await runWithAuth(
-      { userHeader: USER_HEADER, token: 'must-not-leak', subdomain: 'os' },
+      { userHeader: USER_HEADER, subdomain: 'os' },
       async () => {
         const headers = buildAuthHeaders();
         expect(headers).toEqual({
@@ -47,12 +47,9 @@ describe('AI team-member subgraph authentication', () => {
   });
 
   it('fails closed without both the principal header and tenant', async () => {
-    await runWithAuth(
-      { token: 'not-a-fallback', subdomain: 'os' },
-      async () => {
-        expect(() => buildAuthHeaders()).toThrow('Agent principal unavailable');
-      },
-    );
+    await runWithAuth({ subdomain: 'os' }, async () => {
+      expect(() => buildAuthHeaders()).toThrow('Agent principal unavailable');
+    });
     await runWithAuth({ userHeader: USER_HEADER }, async () => {
       expect(() => buildAuthHeaders()).toThrow('Agent principal unavailable');
     });
@@ -121,15 +118,7 @@ describe('AI team-member subgraph authentication', () => {
         principalUserId: 'agent-user-1',
         subdomain: 'os',
       },
-      () =>
-        executeErxesOperation(
-          operation,
-          { customerId: 'Ada' },
-          {
-            erxesApiUrl: 'http://public-gateway.invalid',
-            erxesApiToken: 'app-token-is-not-a-principal',
-          },
-        ),
+      () => executeErxesOperation(operation, { customerId: 'Ada' }),
     );
 
     expect(result).toBe('created');

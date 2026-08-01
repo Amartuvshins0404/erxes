@@ -87,7 +87,7 @@ const makeCtx = (profileExists = true) => {
   const getWorkflow = jest.fn().mockResolvedValue(workflowDoc());
   const getSettings = jest
     .fn()
-    .mockResolvedValue({ erxesApiToken: 'app-token' });
+    .mockResolvedValue({ erxesApiUrl: 'https://gw' });
   requireScopedWorkflow.mockImplementation(() => getWorkflow());
   requireScopedWorkflowAgent.mockResolvedValue({
     agent: { _id: 'agent-user-1' },
@@ -127,7 +127,6 @@ beforeEach(() => {
   requireScopedWorkflowAgent.mockReset();
   assertWorkflowSchedulable.mockReset().mockResolvedValue(undefined);
   const authCtx = {
-    token: 'agent-run-token',
     userHeader: 'encoded-agent-user',
     principalUserId: 'agent-user-1',
     subdomain: 'os',

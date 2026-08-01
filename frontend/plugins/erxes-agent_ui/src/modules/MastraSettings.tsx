@@ -15,12 +15,6 @@ const GeneralSettingsPage = lazy(() =>
   })),
 );
 
-const VoiceSettingsPage = lazy(() =>
-  import('~/pages/settings/VoiceSettingsPage').then((m) => ({
-    default: m.VoiceSettingsPage,
-  })),
-);
-
 const AgentsIndexPage = lazy(() =>
   import('~/pages/agents/AgentsIndexPage').then((m) => ({
     default: m.AgentsIndexPage,
@@ -68,10 +62,6 @@ export const MastraSettings = () => {
       <Route
         path="/general"
         element={<AdminRoute element={<GeneralSettingsPage />} />}
-      />
-      <Route
-        path="/voice"
-        element={<AdminRoute element={<VoiceSettingsPage />} />}
       />
     </PluginRoutesShell>
   );

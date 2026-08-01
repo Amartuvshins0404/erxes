@@ -1,8 +1,5 @@
-import { IContext } from '~/connectionResolvers';
-import { isAdvancedMemoryEnabled } from '~/mastra/memory/config';
+import { IContext, IModels } from '~/connectionResolvers';
 import { getStorageStatus } from '~/mastra/files/storage';
-import { resolveVoiceStatusForTenant } from '~/mastra/voice/resolveConfig';
-import { IModels } from '~/connectionResolvers';
 import { IMastraSettings } from '@/settings/@types/settings';
 
 // configured (core storage) AND the plugin toggle → attachments usable in chat.
@@ -21,7 +18,7 @@ export async function attachmentStorageStatus(
   };
 }
 
-/** Queries for plugin settings plus their derived feature-status blocks. */
+/** Settings queries and the attachment feature-status block. */
 export const settingsQueries = {
   // Lightweight status for the chat UI: decides whether the attach button shows.
   mastraAttachmentStorageStatus: (
@@ -32,23 +29,13 @@ export const settingsQueries = {
     return attachmentStorageStatus(models, subdomain);
   },
 
-  // Lightweight status for the chat UI: decides whether the voice mode entry
-  // point shows. Per-tenant (the tenant's stored Chimege tokens win over env),
-  // no secrets exposed — just the round-trip `enabled` boolean.
-  mastraVoiceStatus: (
-    _parent: undefined,
-    _args: undefined,
-    { subdomain }: IContext,
-  ) => resolveVoiceStatusForTenant(subdomain),
-
   mastraSettings: async (
     _parent: undefined,
     _args: undefined,
     { models, subdomain, checkPermission }: IContext,
   ) => {
-    // Settings spread includes secrets (e.g. erxesApiToken) — gate the read.
-    // The lightweight, secret-free mastraAttachmentStorageStatus stays open for
-    // the chat UI.
+    // The lightweight attachment status stays open for the chat composer;
+    // editing and reading persisted settings remains permission-gated.
     await checkPermission('settingsView');
     const doc = await models.MastraSettings.getSettings();
     const obj: IMastraSettings = doc?.toObject ? doc.toObject() : doc;
@@ -56,8 +43,6 @@ export const settingsQueries = {
     return {
       ...obj,
       attachmentStorage: await attachmentStorageStatus(models, subdomain),
-      // Read-only, env-derived flag surfaced for display only.
-      advancedMemory: isAdvancedMemoryEnabled(),
     };
   },
 };

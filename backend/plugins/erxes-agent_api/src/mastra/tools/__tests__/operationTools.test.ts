@@ -84,7 +84,6 @@ const build = (
 ) =>
   buildErxesOperationTools({
     registry,
-    settings: {},
     policy,
     destructiveOps: 'allow',
   });
@@ -193,7 +192,6 @@ describe('typed erxes operation tools', () => {
     expect(mockExecute).toHaveBeenCalledWith(
       operation,
       { name: 'Enterprise' },
-      {},
       registry,
       expect.any(String),
       ['_id', 'name'],

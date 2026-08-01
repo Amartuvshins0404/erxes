@@ -5,7 +5,7 @@
 // to focused modules and re-exported.
 // ---------------------------------------------------------------------------
 
-export { augmentConvo, deriveResourceId, deriveBotResourceId } from './convo';
+export { augmentConvo, deriveResourceId } from './convo';
 export {
   readWorkingMemory,
   refreshWorkingMemory,

@@ -71,7 +71,7 @@ this is an operator.
 | Agent runtime + providers              | `src/mastra/agentRuntime.ts`, `providers.ts`                 | **Judgment.** Any DB-configured provider/model powers judgment steps.                                                                                                  |
 | erxes automations service              | `backend/services/automations`, plugin `meta/automations.ts` | **Events.** The existing tenant-wide event bus: entity create/update events from every plugin, plus plugin-specific triggers. We consume it; we do not rebuild it.     |
 | Mastra 1.x workflows + Mongo snapshots | verified live (§7)                                           | **Time + Humans.** Durable runs, suspend/resume across process restarts.                                                                                               |
-| Thread/session ownership, bot bridge   | `src/modules/session/*`, `src/routes.ts`                     | Run provenance; conversational entry point.                                                                                                                            |
+| Thread/session ownership               | `src/modules/session/*`, `src/routes.ts`                     | Run provenance; conversational entry point.                                                                                                                            |
 | Knowledge RAG + memory                 | `src/mastra/knowledge/*`, `src/mastra/memory/*`              | Judgment steps ground decisions in company data with existing permission filters.                                                                                      |
 
 **Gap:** Mastra workflows are _code_; ours must be _data_ an LLM can author,
@@ -130,8 +130,8 @@ run, parent workflow — is normalized into one envelope before the run starts:
   "channelRef": {
     // OPTIONAL — only conversational sources
     "kind": "frontline:conversation",
-    "id": "<conversationId>",
-  },
+    "id": "<conversationId>"
+  }
 }
 ```
 
@@ -153,15 +153,18 @@ not a kernel concept (see 4.4).
   "policy": { "mode": "custom", "allowed": [] }, // scope.ts grammar, mandatory
   "bindings": {
     // named refs → tenant-local ids
-    "supportAgent": { "kind": "agent", "id": "<mongo-id>" },
+    "supportAgent": { "kind": "agent", "id": "<mongo-id>" }
   },
   "limits": { "maxLlmCalls": 10 },
-  "steps": [],
+  "steps": []
 }
 ```
 
 Bindings exist so definitions never embed raw tenant ids inline → portable as
 templates across tenants (§11.6).
+
+The workflow record stores its owning `agentId` separately from the portable
+definition. That linked agent supplies the principal for every run (§8).
 
 ### 4.3 Step types (the complete kernel set)
 
@@ -196,8 +199,8 @@ notification — all already in the registry). What remains in the kernel is onl
 sugar: when an `operation` step's args contain `{{trigger.channelRef}}`, the
 compiler resolves it to the concrete target. The builder agent knows the idiom
 "if the trigger is conversational and the user asked for a response, add the
-appropriate send-message operation targeting `channelRef`." Support bots get
-their replies; the kernel stays domain-free.
+appropriate send-message operation targeting `channelRef`." Conversational
+automations get their replies; the kernel stays domain-free.
 
 ### 4.5 Conditions — deterministic by default, judgment by exception
 
@@ -246,13 +249,9 @@ The kernel consumes events; it never defines domain-specific ones.
 | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----- |
 | `manual`                | UI / master agent / `simulate_workflow`                                                                                                                                                                                                                                                                                                                                                                                                                            | 1     |
 | `automation:*`          | **One generic action** — "Run agent workflow" — registered in `meta/automations.ts`. Inherits the _entire_ existing trigger ecosystem: every entity create/update event from every plugin, frontline fb/ig/inbox messages, ticket events, segment entry. Contract verified (§11.4): `action.config.workflowId` selects the definition; `execution.target` becomes `trigger.payload`; fire-and-forget v1, `waitCondition` reserved for a "wait for workflow" toggle | 2     |
-| `schedule`              | Mastra's native workflow scheduler — shared by workflow triggers and recurring agent prompts, with persisted recurrence, atomic claiming, and trigger history                                                                                                                                                                                                                                                                                                     | 2     |
+| `schedule`              | Mastra's native workflow scheduler — shared by workflow triggers and recurring agent prompts, with persisted recurrence, atomic claiming, and trigger history                                                                                                                                                                                                                                                                                                      | 2     |
 | `webhook`               | `POST /workflow/:id/hook` + per-workflow secret                                                                                                                                                                                                                                                                                                                                                                                                                    | 3     |
 | `workflow` / agent-tool | composition (§4.3)                                                                                                                                                                                                                                                                                                                                                                                                                                                 | 3     |
-
-The direct frontline bot bridge (`/bot/:conversationId`) remains as a
-low-latency _conversational agent_ path; conversational _workflows_ ride the
-automations bus like everything else.
 
 Positioning: erxes automations = deterministic, UI-configured. Agent workflows =
 NL-authored, judgment-capable, durable. They compose: an automation starts a
@@ -295,9 +294,11 @@ workflow; a workflow does anything any plugin exposes.
 2. **Auto-inserted human gates** before destructive patterns (`*Remove`,
    `*Delete`, `*Merge`, payment-creating ops above a threshold). Removing one
    requires explicit admin override, recorded on the definition (audit trail).
-3. **Auth principal:** runs execute as a dedicated per-workflow credential
-   (settings `erxesApiToken` v0; scoped tokens later). Never the triggering
-   actor's identity implicitly.
+3. **Auth principal:** every workflow has an owning agent. Runs execute as that
+   agent's active linked AI team-member account, forwarding the validated
+   internal `user` identity and tenant `hostname` to private subgraphs. They
+   never inherit the triggering actor's identity implicitly, and fail closed
+   when the owner or linked account is unavailable.
 4. **Tenant isolation:** definitions, runs, snapshots, approvals, the Mastra
    instance, storage dbName, and the operation registry are all per-tenant.
 5. **Injection containment:** trigger payloads are untrusted. They reach LLMs
@@ -313,9 +314,10 @@ workflow; a workflow does anything any plugin exposes.
 ## 9. Data model (new `workflow` module)
 
 ```
-MastraWorkflow         name, description, definition (JSON), version, isEnabled,
-                       policy, trigger{type,config}, bindings, limits,
-                       createdByUserId, approvalOverrides[], timestamps
+MastraWorkflow         name, description, agentId (owning linked agent),
+                       definition (JSON), version, isEnabled, policy,
+                       trigger{type,config}, bindings, limits, createdByUserId,
+                       approvalOverrides[], timestamps
 
 MastraWorkflowRun      workflowId, version, runId, status, triggerEnvelope,
                        stepsSummary, error?, usage{tokens,llmCalls},

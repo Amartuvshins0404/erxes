@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { Button, Dialog, Form, Tooltip } from 'erxes-ui';
 import { useForm } from 'react-hook-form';
@@ -28,6 +29,7 @@ export const EditAgentDialog = ({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) => {
+  const { t } = useTranslation('erxes-agent');
   const form = useForm<AgentFormValues>({
     resolver: zodResolver(agentFormSchema),
     defaultValues: AGENT_FORM_DEFAULTS,
@@ -44,6 +46,10 @@ export const EditAgentDialog = ({
     form.reset({
       name: agent.accountName,
       description: agent.accountDescription || '',
+      visibility: agent.visibility ?? 'organization',
+      audienceUserIds: agent.audienceUserIds,
+      audienceTeamIds: agent.audienceTeamIds,
+      audienceDepartmentIds: agent.audienceDepartmentIds,
       instructions: agent.instructions || '',
       provider: agent.provider || '',
       model: agent.model || '',
@@ -63,10 +69,11 @@ export const EditAgentDialog = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <Dialog.Content className="max-w-2xl gap-0 p-0">
         <Dialog.Header className="border-b px-5 py-3.5">
-          <Dialog.Title>Edit {agent.accountName}</Dialog.Title>
+          <Dialog.Title>
+            {t('agent-edit-dialog-title', { name: agent.accountName })}
+          </Dialog.Title>
           <Dialog.Description>
-            Change this agent's model, provider and behaviour. Changes apply to
-            new messages right away.
+            {t('agent-edit-dialog-description')}
           </Dialog.Description>
         </Dialog.Header>
 
@@ -84,23 +91,25 @@ export const EditAgentDialog = ({
                       <Link
                         to={`/settings/erxes-agent/agents/edit/${agent._id}`}
                       >
-                        Open full editor
+                        {t('agent-edit-dialog-open-full')}
                       </Link>
                     </Button>
                   </Tooltip.Trigger>
                   <Tooltip.Content>
-                    Edit every setting on the Agents page
+                    {t('agent-edit-dialog-open-full-description')}
                   </Tooltip.Content>
                 </Tooltip>
               </Tooltip.Provider>
               <div className="flex-1" />
               <Dialog.Close asChild>
                 <Button type="button" variant="outline" size="sm">
-                  Cancel
+                  {t('agent-edit-dialog-cancel')}
                 </Button>
               </Dialog.Close>
               <Button type="submit" size="sm" disabled={saving || !model}>
-                {saving ? 'Saving…' : 'Save changes'}
+                {saving
+                  ? t('agent-edit-dialog-saving')
+                  : t('agent-edit-dialog-save')}
               </Button>
             </Dialog.Footer>
           </form>

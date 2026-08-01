@@ -25,7 +25,7 @@ import type { GroupPermission } from './tools/actionsToAllowedTools';
 import { resolveDestructiveOpsPolicy } from './tools/destructiveGuard';
 import type { DestructiveOpsPolicy } from './tools/destructiveGuard';
 import { writeAgentAction, AgentActionInput } from './auditLog';
-import { isAdvancedMemoryEnabled } from './memory/config';
+import { isWorkspaceMemoryEnabled } from './memory/config';
 import { getMastraMemory } from './memory/mastraMemory';
 import { ToolCallSignalFilter } from './memory/toolCallSignalFilter';
 import { isEvaluationEnabled } from './scoring/config';
@@ -185,7 +185,6 @@ function assembleAgentTools(params: {
   models: IModels;
   providers: IMastraProviderDocument[];
   registry: OperationRegistry;
-  settings: IMastraSettingsDocument;
   policy: ToolPolicy;
   destructiveOps: DestructiveOpsPolicy;
   hasErxes: boolean;
@@ -199,7 +198,6 @@ function assembleAgentTools(params: {
     models,
     providers,
     registry,
-    settings,
     policy,
     destructiveOps,
     hasErxes,
@@ -220,7 +218,6 @@ function assembleAgentTools(params: {
   const operationTools = hasErxes
     ? buildErxesOperationTools({
         registry,
-        settings,
         policy,
         destructiveOps,
         recordAction,
@@ -344,13 +341,6 @@ export async function getOrCreateAgent(
   subdomain?: string,
   options: GetOrCreateAgentOptions = {},
 ): Promise<AgentWithTools> {
-  // Mastra Memory (persistence + semantic recall + working memory) is attached
-  // whenever advanced memory is on and the agent hasn't opted out. An unknown
-  // tenant must NOT detach memory — that would stop the turn from being
-  // persisted (and lose the session); scopedResource defaults an empty subdomain
-  // to the "os" scope.
-  const useMemory =
-    isAdvancedMemoryEnabled() && agentConfig.memoryEnabled !== false;
   // Reuse the caller's already-fetched config when present; otherwise load it.
   const [providers, settings] =
     options.providers && options.settings
@@ -359,6 +349,11 @@ export async function getOrCreateAgent(
           models.MastraProvider.getRuntimeProviders(),
           models.MastraSettings.getSettings(),
         ]);
+  // Mastra Memory (chat persistence + semantic recall + working memory) is
+  // attached only when both the workspace setting and this agent allow it.
+  // Missing workspace settings default to enabled for existing tenants.
+  const useMemory =
+    isWorkspaceMemoryEnabled(settings) && agentConfig.memoryEnabled !== false;
   const destructiveOps = resolveDestructiveOpsPolicy(agentConfig);
 
   // Core is authoritative for both identity and permissions. Reading the
@@ -432,7 +427,6 @@ export async function getOrCreateAgent(
     models,
     providers,
     registry,
-    settings,
     policy,
     destructiveOps,
     hasErxes,

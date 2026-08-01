@@ -75,23 +75,16 @@ export interface MemoryBinding {
   resource: string;
 }
 
-// Who/what is driving a turn — the one knob that varies across the four
-// callers (in-app chat, the GraphQL resolver, the frontline bot webhook, and
-// scheduled runs). It decides resource scoping, the auth context, ownership
-// gating, and whether memory rides on the agent's history toggle or on the
-// message being non-empty. The rest of prepareTurn is shared.
+// Who/what is driving a turn — the one knob that varies across typed chat and
+// scheduled runs. It decides resource scoping, the auth context, ownership
+// gating, and whether memory rides on the agent's history toggle. The rest of
+// prepareTurn is shared.
 export type TurnIdentity =
   | {
       // In-app user — the SSE route and the mastraAgentChat resolver. Threads
       // are owned/listed by the user's resource; ownership is enforced.
       kind: 'user';
       user: IUserDocument;
-    }
-  | {
-      // The frontline bot webhook — a synthetic resource kept out of users'
-      // chat lists. No ownership gate; memory rides on a non-empty message.
-      kind: 'bot';
-      resourceKey: string;
     }
   | {
       // A scheduled run — a schedule-scoped resource. No ownership gate; the

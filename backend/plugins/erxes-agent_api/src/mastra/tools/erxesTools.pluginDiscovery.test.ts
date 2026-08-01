@@ -44,6 +44,7 @@ describe('fetchAvailableErxesTools plugin discovery', () => {
     );
 
     jest.spyOn(global, 'fetch').mockImplementation(async (input, init) => {
+      expect(new Headers(init?.headers).has('Authorization')).toBe(false);
       const url = String(input);
       if (url === 'http://sales/graphql') {
         const query = requestQuery(init);

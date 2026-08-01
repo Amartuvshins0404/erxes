@@ -43,10 +43,9 @@ import {
 export type { GqlArgDef, GqlFieldDef, GqlTypeRef, SchemaMaps };
 export { graphqlTypeToString, sanitizeServerError };
 
-/** Gateway settings used for schema discovery, not acting-user authentication. */
+/** Gateway URL used for schema discovery, not acting-user authentication. */
 export interface ErxesToolSettings {
   erxesApiUrl?: string;
-  erxesApiToken?: string;
 }
 
 /** Minimal GraphQL HTTP response envelope. */
@@ -63,11 +62,6 @@ interface IntrospectedNamedType {
   fields?: GqlFieldDef[] | null;
   enumValues?: Array<{ name: string }> | null;
 }
-
-// The gateway's userMiddleware only accepts `Authorization: Bearer <token>`
-// (raw tokens silently fall through to anonymous → "Login required").
-export const asBearer = (token?: string | null): string =>
-  !token ? '' : /^Bearer\s/i.test(token) ? token : `Bearer ${token}`;
 
 // ---------------------------------------------------------------------------
 // Auto-resolution helpers
@@ -181,8 +175,7 @@ export interface ErxesOperationRef {
 }
 
 /**
- * Build headers for an internal subgraph call from the resolved principal.
- * A bearer or configured App token is never accepted as an acting-user fallback.
+ * Build headers for an internal subgraph call from the resolved principal only.
  */
 export function buildAuthHeaders(processId?: string): Record<string, string> {
   const reqAuth = getCurrentAuth();
@@ -267,7 +260,6 @@ function secretRefRefusedResult() {
 export async function executeErxesOperation(
   op: ErxesOperationRef,
   rawArgs: Record<string, unknown>,
-  _settings: ErxesToolSettings | null,
   schemaMaps?: Partial<SchemaMaps>,
   processId?: string,
   requestedFields?: string[],
@@ -411,8 +403,6 @@ async function introspectSchemaTypes(
   selection: string,
 ): Promise<IntrospectedNamedType[]> {
   const apiUrl = settings?.erxesApiUrl || 'http://localhost:4000';
-  const token = settings?.erxesApiToken || '';
-
   const query = `{
     __schema {
       types {
@@ -426,7 +416,7 @@ async function introspectSchemaTypes(
   try {
     const data = await gqlFetch<{
       data?: { __schema?: { types?: IntrospectedNamedType[] } };
-    }>(apiUrl, token ? { Authorization: asBearer(token) } : {}, { query });
+    }>(apiUrl, {}, { query });
     return data?.data?.__schema?.types || [];
   } catch {
     return [];
@@ -515,11 +505,8 @@ const addPluginOperationsFromSdl = (
 //   • works while production GraphQL introspection remains disabled,
 //   • re-derives from the live schema on every call (auto-adapts to changes),
 //   • needs no static prefix lists or public supergraph SDL access.
-async function fetchPluginMap(token: string): Promise<Map<string, string>> {
+async function fetchPluginMap(): Promise<Map<string, string>> {
   const map = new Map<string, string>();
-  const authHeaders: Record<string, string> = token
-    ? { Authorization: asBearer(token) }
-    : {};
 
   let plugins: string[] = [];
   try {
@@ -547,9 +534,13 @@ async function fetchPluginMap(token: string): Promise<Map<string, string>> {
               sdl?: string | null;
             } | null;
           };
-        }>(address, authHeaders, {
-          query: '{ _service { sdl } }',
-        });
+        }>(
+          address,
+          {},
+          {
+            query: '{ _service { sdl } }',
+          },
+        );
         const sdl = json?.data?._service?.sdl;
         if (!sdl) return;
 
@@ -589,10 +580,6 @@ export async function fetchAvailableErxesTools(
   settings: ErxesToolSettings | null,
 ): Promise<OperationMeta[]> {
   const apiUrl = settings?.erxesApiUrl || 'http://localhost:4000';
-  const token = settings?.erxesApiToken || '';
-  const authHeaders: Record<string, string> = token
-    ? { Authorization: asBearer(token) }
-    : {};
 
   const introspectionQuery = `{
     __schema {
@@ -633,10 +620,14 @@ export async function fetchAvailableErxesTools(
   let schemaData: SchemaResult;
   try {
     [pluginMap, schemaData] = await Promise.all([
-      fetchPluginMap(token),
-      gqlFetch<SchemaResult>(apiUrl, authHeaders, {
-        query: introspectionQuery,
-      }),
+      fetchPluginMap(),
+      gqlFetch<SchemaResult>(
+        apiUrl,
+        {},
+        {
+          query: introspectionQuery,
+        },
+      ),
     ]);
   } catch {
     console.warn('[mastra] gateway introspection failed');

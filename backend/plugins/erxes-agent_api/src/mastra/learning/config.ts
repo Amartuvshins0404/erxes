@@ -41,8 +41,7 @@ export interface LearningTuning {
 
 /**
  * The master switch. Learning is enabled ONLY when ERXES_AGENT_LEARNING is
- * exactly "enable" — same unambiguous contract as ERXES_AGENT_MEMORY,
- * independent of it.
+ * exactly "enable"; it remains an instance-level background-worker control.
  */
 export function isLearningEnabled(env: Env = process.env): boolean {
   return enabledBy(env, 'ERXES_AGENT_LEARNING');

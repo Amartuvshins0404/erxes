@@ -53,11 +53,6 @@ import {
   IMastraArtifactModel,
 } from '@/artifact/db/models/Artifact';
 import { IMastraArtifactDocument } from '@/artifact/@types/artifact';
-import {
-  loadVoiceConfigClass,
-  IMastraVoiceConfigModel,
-} from '@/voice/db/models/VoiceConfig';
-import { IMastraVoiceConfigDocument } from '@/voice/@types/voice';
 
 export interface IModels {
   MastraAgent: IMastraAgentModel;
@@ -70,7 +65,6 @@ export interface IModels {
   MastraLearning: IMastraLearningModel;
   MastraFeedback: IMastraFeedbackModel;
   MastraArtifact: IMastraArtifactModel;
-  MastraVoiceConfig: IMastraVoiceConfigModel;
 }
 
 export interface IContext extends IMainContext {
@@ -132,10 +126,6 @@ export const loadClasses = (db: mongoose.Connection): IModels => {
     IMastraArtifactDocument,
     IMastraArtifactModel
   >('mastra_artifacts', loadArtifactClass(models));
-  models.MastraVoiceConfig = db.model<
-    IMastraVoiceConfigDocument,
-    IMastraVoiceConfigModel
-  >('mastra_voice_config', loadVoiceConfigClass(models));
 
   return models;
 };

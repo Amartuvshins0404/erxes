@@ -104,17 +104,21 @@ export async function distillThread(params: {
 
   for (const candidate of candidates) {
     try {
-      // 3. Dedupe against candidates AND approved lessons by normalized
-      //    statement — a re-derived lesson phrased the same way merges
-      //    (evidence++, contributor recorded) instead of duplicating, which is
-      //    also what feeds the k-anonymity counter. Mongo can't normalize
-      //    server-side without a stored field, so match case-insensitively on
-      //    the raw statement (catches the common identical re-derivation) and
-      //    confirm against the normalized form in memory.
+      // 3. Dedupe against this agent's candidates and approved lessons by
+      //    normalized statement. A re-derived lesson phrased the same way
+      //    merges evidence instead of duplicating, without allowing one agent's
+      //    conversations to reinforce or promote another agent's guidance.
+      //    Mongo can't normalize server-side without a stored field, so match
+      //    case-insensitively on the raw statement and confirm the normalized
+      //    form in memory.
       const normalized = normalizeStatement(candidate.statement);
       const existing = await models.MastraLearning.findOne({
         status: { $in: ['candidate', 'approved'] },
-        statement: { $regex: `^${escapeRegExp(candidate.statement)}$`, $options: 'i' },
+        agentId,
+        statement: {
+          $regex: `^${escapeRegExp(candidate.statement)}$`,
+          $options: 'i',
+        },
       });
       const similarId =
         existing && normalizeStatement(existing.statement) === normalized
@@ -123,6 +127,7 @@ export async function distillThread(params: {
 
       if (similarId) {
         const merged = await models.MastraLearning.mergeEvidence(similarId, {
+          agentId,
           confidence: candidate.confidence,
           sourceHash,
         });

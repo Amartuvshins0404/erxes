@@ -92,7 +92,9 @@ const parseSkillDraft = (raw: string, nameHint?: string): ISkillContent => {
   );
   const instructions = String(obj.instructions ?? '').trim();
   if (!instructions) {
-    throw new ExpectedError('Could not distill skill instructions from this conversation');
+    throw new ExpectedError(
+      'Could not distill skill instructions from this conversation',
+    );
   }
   return { name, description, instructions };
 };
@@ -103,7 +105,6 @@ export interface DistillThreadParams {
   threadId: string;
   userId: string;
   userHeader?: string;
-  token?: string;
   provider: string;
   model: string;
   providers: ProviderDocLike[];
@@ -120,7 +121,6 @@ export const distillThreadToSkill = async (
     threadId,
     userId,
     userHeader,
-    token,
     provider,
     model,
     providers,
@@ -165,8 +165,9 @@ export const distillThreadToSkill = async (
   };
 
   const result = await runWithAuth(
-    { userHeader, token, initiatorUserId: userId, subdomain },
-    () => agent.generate([{ role: 'user', content: userContent }], { maxSteps: 1 }),
+    { userHeader, initiatorUserId: userId, subdomain },
+    () =>
+      agent.generate([{ role: 'user', content: userContent }], { maxSteps: 1 }),
   );
 
   const draft = parseSkillDraft(result?.text ?? '', nameHint);

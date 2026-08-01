@@ -40,9 +40,9 @@ export function resolveDestructiveOpsPolicy(
 
 /**
  * Whether a destructive mutation may run WITHOUT a per-op approval. True only
- * when the config grants 'allow' AND the run is attended. Unattended workflow
- * and frontline-bot runs can never carry approval, so destructive operations
- * remain gated regardless of configuration.
+ * when the config grants 'allow' AND the run is attended. Unattended background
+ * runs can never carry approval, so destructive operations remain gated
+ * regardless of configuration.
  */
 export function destructiveOpsPreapproved(
   policy: DestructiveOpsPolicy,

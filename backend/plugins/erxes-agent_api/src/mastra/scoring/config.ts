@@ -25,8 +25,7 @@ export interface LangfuseConfig {
 
 /**
  * The master switch. Evaluation is enabled ONLY when ERXES_AGENT_EVALUATION is
- * exactly "enable" (whitespace-trimmed) — every other value is off, mirroring
- * isAdvancedMemoryEnabled so the flag is unambiguous.
+ * exactly "enable" (whitespace-trimmed); every other value is off.
  */
 export function isEvaluationEnabled(env: Env = process.env): boolean {
   return enabledBy(env, 'ERXES_AGENT_EVALUATION');

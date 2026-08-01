@@ -1,10 +1,9 @@
-jest.mock('erxes-ui', () => ({
-  REACT_APP_API_URL: 'http://localhost:4000',
-}));
-
 import { Chat } from '@ai-sdk/react';
 import { chatStore, useChatStore } from '~/modules/chat/store/chatStore';
 import type { AgentUIMessage } from '~/modules/chat/types';
+jest.mock('erxes-ui', () => ({
+  REACT_APP_API_URL: 'http://localhost:4000',
+}));
 
 const message = (
   id: string,

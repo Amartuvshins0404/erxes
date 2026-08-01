@@ -151,6 +151,7 @@ async function resolveSource(params: {
   );
 }
 
+
 export const removeImageBackgroundTool = createTool({
   id: 'remove-image-background',
   description:
@@ -199,12 +200,13 @@ export const removeImageBackgroundTool = createTool({
       .optional(),
   }),
   execute: async ({ key, url, artifactId, title }) => {
-    if ((process.env.ERXES_AGENT_BG_REMOVAL ?? '').trim() === 'disable') {
+    const auth = getCurrentAuth();
+    const subdomain = auth?.subdomain || 'localhost';
+    if (auth?.backgroundRemovalEnabled === false) {
       throw new ExpectedError(
-        'Background removal is disabled on this instance.',
+        'Background removal is disabled for this workspace.',
       );
     }
-    const subdomain = getCurrentAuth()?.subdomain || 'localhost';
     const source = await resolveSource({ subdomain, url, key, artifactId });
 
     const mediaType = resolveImageMime(source.name, source.contentType);

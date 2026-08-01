@@ -6,18 +6,17 @@ import {
 } from '../config';
 
 describe('isLearningEnabled', () => {
-  it('is on ONLY for the exact value "enable"', () => {
-    expect(isLearningEnabled({ ERXES_AGENT_LEARNING: 'enable' })).toBe(true);
-    expect(isLearningEnabled({ ERXES_AGENT_LEARNING: ' enable ' })).toBe(true);
-    expect(isLearningEnabled({ ERXES_AGENT_LEARNING: 'true' })).toBe(false);
-    expect(isLearningEnabled({ ERXES_AGENT_LEARNING: 'ENABLE' })).toBe(false);
+  it('is on only for an explicit persisted true value', () => {
+    expect(isLearningEnabled({ learningEnabled: true })).toBe(true);
+    expect(isLearningEnabled({ learningEnabled: false })).toBe(false);
     expect(isLearningEnabled({})).toBe(false);
+    expect(isLearningEnabled()).toBe(false);
   });
 });
 
 describe('resolveLearningTuning', () => {
   it('has safe defaults', () => {
-    const tuning = resolveLearningTuning({});
+    const tuning = resolveLearningTuning();
     expect(tuning.autoPromoteMinSources).toBe(3);
     expect(tuning.autoPromoteMinConfidence).toBe(0.75);
     expect(tuning.idleMinutes).toBe(30);
@@ -26,9 +25,9 @@ describe('resolveLearningTuning', () => {
 
   it('reads overrides and ignores invalid values', () => {
     const tuning = resolveLearningTuning({
-      ERXES_AGENT_LEARNING_K: '5',
-      ERXES_AGENT_LEARNING_MIN_CONF: '0.9',
-      ERXES_AGENT_LEARNING_IDLE_MINUTES: '-3',
+      learningAutoPromoteMinSources: 5,
+      learningAutoPromoteMinConfidence: 0.9,
+      learningIdleMinutes: -3,
     });
     expect(tuning.autoPromoteMinSources).toBe(5);
     expect(tuning.autoPromoteMinConfidence).toBe(0.9);

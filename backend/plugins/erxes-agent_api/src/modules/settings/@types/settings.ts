@@ -8,6 +8,23 @@ export interface IMastraSettings {
   // (S3/R2/Azure/GCS/local, configured in core). Defaults to on; only
   // effective when that storage is actually configured.
   attachmentsEnabled?: boolean;
+  // Runtime feature controls. Defaults mirror the previous environment-backed
+  // behavior: learning/evaluation off, background removal on, summarizer falls
+  // back to each agent's own model.
+  learningEnabled?: boolean;
+  learningAutoPromoteMinSources?: number;
+  learningAutoPromoteMinConfidence?: number;
+  learningDigestMaxChars?: number;
+  learningDigestMaxEntries?: number;
+  learningIdleMinutes?: number;
+  learningDecayDays?: number;
+  learningDecayFactor?: number;
+  learningArchiveBelowConfidence?: number;
+  evaluationEnabled?: boolean;
+  evaluationDsn?: string;
+  backgroundRemovalEnabled?: boolean;
+  summarizerProvider?: string;
+  summarizerModel?: string;
 }
 
 export interface IMastraSettingsDocument extends IMastraSettings, Document {

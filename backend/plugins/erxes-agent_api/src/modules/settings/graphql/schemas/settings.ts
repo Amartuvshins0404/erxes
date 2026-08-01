@@ -14,12 +14,40 @@ export const types = `
     memoryEnabled: Boolean
     attachmentsEnabled: Boolean
     attachmentStorage: MastraAttachmentStorageStatus
+    learningEnabled: Boolean
+    learningAutoPromoteMinSources: Int
+    learningAutoPromoteMinConfidence: Float
+    learningDigestMaxChars: Int
+    learningDigestMaxEntries: Int
+    learningIdleMinutes: Int
+    learningDecayDays: Int
+    learningDecayFactor: Float
+    learningArchiveBelowConfidence: Float
+    evaluationEnabled: Boolean
+    evaluationDsnConfigured: Boolean
+    backgroundRemovalEnabled: Boolean
+    summarizerProvider: String
+    summarizerModel: String
   }
 
   input MastraSettingsInput {
     erxesApiUrl: String
     memoryEnabled: Boolean
     attachmentsEnabled: Boolean
+    learningEnabled: Boolean
+    learningAutoPromoteMinSources: Int
+    learningAutoPromoteMinConfidence: Float
+    learningDigestMaxChars: Int
+    learningDigestMaxEntries: Int
+    learningIdleMinutes: Int
+    learningDecayDays: Int
+    learningDecayFactor: Float
+    learningArchiveBelowConfidence: Float
+    evaluationEnabled: Boolean
+    evaluationDsn: String
+    backgroundRemovalEnabled: Boolean
+    summarizerProvider: String
+    summarizerModel: String
   }
 `;
 

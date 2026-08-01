@@ -1,5 +1,6 @@
 import { Jimp } from 'jimp';
 import { ExpectedError } from 'erxes-api-shared/utils';
+import { runWithAuth } from '~/mastra/requestContext';
 
 // ---------------------------------------------------------------------------
 // remove-image-background — unit tests with the inference lib, persistence and
@@ -11,7 +12,7 @@ import { ExpectedError } from 'erxes-api-shared/utils';
 //   • oversized inputs are downscaled BEFORE inference (memory guard),
 //   • inline (data:) persistence yields NO attachment (a data: URL must never
 //     be written into a product attachment),
-//   • the ERXES_AGENT_BG_REMOVAL=disable kill-switch,
+//   • the persisted workspace background-removal switch,
 //   • inferences are serialized process-wide (one at a time).
 // ---------------------------------------------------------------------------
 
@@ -74,13 +75,22 @@ type ToolResult = {
   };
   attachment?: { url: string; name: string; type: string; size: number };
 };
+interface ImageToolExecutor {
+  execute(input: Record<string, unknown>): Promise<ToolResult>;
+}
 
-const execute = (input: Record<string, unknown>): Promise<ToolResult> =>
-  (
-    removeImageBackgroundTool as unknown as {
-      execute: (input: Record<string, unknown>) => Promise<ToolResult>;
-    }
-  ).execute(input);
+// Mastra's generic tool type erases the concrete execute result in tests.
+const imageToolExecutor =
+  removeImageBackgroundTool as unknown as ImageToolExecutor;
+
+
+const execute = (
+  input: Record<string, unknown>,
+  backgroundRemovalEnabled = true,
+): Promise<ToolResult> =>
+  runWithAuth({ subdomain: 'os', backgroundRemovalEnabled }, () =>
+    imageToolExecutor.execute(input),
+  );
 
 const png = (width: number, height: number): Promise<Buffer> =>
   new Jimp({ width, height, color: 0x3366ccff }).getBuffer('image/png');
@@ -88,7 +98,6 @@ const png = (width: number, height: number): Promise<Buffer> =>
 describe('remove-image-background', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
-    delete process.env.ERXES_AGENT_BG_REMOVAL;
     removeBackgroundMock.mockResolvedValue(new Blob([await png(4, 4)]));
     persistGeneratedFileMock.mockResolvedValue({
       fileKey: 'private/agent/photo-nobg.png',
@@ -198,11 +207,10 @@ describe('remove-image-background', () => {
     expect(result.attachment).toBeUndefined();
   });
 
-  it('is disabled by ERXES_AGENT_BG_REMOVAL=disable', async () => {
-    process.env.ERXES_AGENT_BG_REMOVAL = 'disable';
-    await expect(execute({ key: 'uploads/photo.png' })).rejects.toThrow(
-      ExpectedError,
-    );
+  it('is disabled by the persisted workspace setting', async () => {
+    await expect(
+      execute({ key: 'uploads/photo.png' }, false),
+    ).rejects.toThrow(ExpectedError);
     expect(removeBackgroundMock).not.toHaveBeenCalled();
   });
 

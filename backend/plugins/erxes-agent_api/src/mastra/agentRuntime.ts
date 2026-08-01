@@ -28,8 +28,14 @@ import { writeAgentAction, AgentActionInput } from './auditLog';
 import { isWorkspaceMemoryEnabled } from './memory/config';
 import { getMastraMemory } from './memory/mastraMemory';
 import { ToolCallSignalFilter } from './memory/toolCallSignalFilter';
-import { isEvaluationEnabled } from './scoring/config';
-import { buildAgentScorers } from './scoring/scorers';
+import {
+  evaluationConfigFingerprint,
+  isEvaluationEnabled,
+} from './scoring/config';
+import {
+  buildAgentScorers,
+  type AgentScorerEntry,
+} from './scoring/scorers';
 import { getObservabilityHost } from './scoring/observability';
 import { getSkillsWorkspace } from '@/skills/store/skillsWorkspace';
 import { createMakeSkillTool } from '@/skills/tools/makeSkill';
@@ -145,9 +151,10 @@ export interface GetOrCreateAgentOptions {
  */
 function buildAgentCacheKey(params: {
   agentConfig: IMastraAgentDocument;
+  backgroundRemovalEnabled: boolean;
   subdomain?: string;
   useMemory: boolean;
-  evaluationEnabled: boolean;
+  evaluationFingerprint: string;
   inventoryFingerprint: string;
   permissionFingerprint: string;
   providerFingerprint: string;
@@ -155,14 +162,15 @@ function buildAgentCacheKey(params: {
   const {
     agentConfig,
     subdomain,
+    backgroundRemovalEnabled,
     useMemory,
-    evaluationEnabled,
+    evaluationFingerprint,
     inventoryFingerprint,
     permissionFingerprint,
     providerFingerprint,
   } = params;
 
-  const evalTag = evaluationEnabled ? subdomain || 'os' : 'off';
+  const evalTag = evaluationFingerprint;
   const skillsTag = agentConfig.skills?.length
     ? `${subdomain || 'os'}:${agentConfig.skills.join('|')}`
     : 'off';
@@ -171,7 +179,9 @@ function buildAgentCacheKey(params: {
     agentConfig.updatedAt?.getTime?.() ?? 0
   }:v${ROUTING_VERSION}:${inventoryFingerprint}:permissions${permissionFingerprint}:provider${providerFingerprint}:mem${
     useMemory ? subdomain : 'off'
-  }:eval${evalTag}:skills${skillsTag}`;
+  }:eval${evalTag}:bg${
+    backgroundRemovalEnabled ? 'on' : 'off'
+  }:skills${skillsTag}`;
 }
 
 /**
@@ -188,6 +198,7 @@ function assembleAgentTools(params: {
   policy: ToolPolicy;
   destructiveOps: DestructiveOpsPolicy;
   hasErxes: boolean;
+  settings: IMastraSettingsDocument;
 }): {
   tools: ToolsInput;
   operationTools: ErxesOperationTools;
@@ -201,6 +212,7 @@ function assembleAgentTools(params: {
     policy,
     destructiveOps,
     hasErxes,
+    settings,
   } = params;
 
   const tools: ToolsInput = {};
@@ -237,6 +249,12 @@ function assembleAgentTools(params: {
   // Standalone builtin tools, filtered by policy.
   for (const [key, tool] of Object.entries(BUILTIN_TOOLS)) {
     if (!isBuiltinAllowed(key, policy)) continue;
+    if (
+      key === 'removeImageBackground' &&
+      settings.backgroundRemovalEnabled === false
+    ) {
+      continue;
+    }
     tools[key] = tool;
     builtinInfos.push({
       id: key,
@@ -310,11 +328,12 @@ function resolveMaxSteps(
 async function wireAgentObservability(params: {
   agent: Agent;
   subdomain?: string;
-  scorers?: ReturnType<typeof buildAgentScorers>;
+  scorers?: Record<string, AgentScorerEntry>;
+  settings: IMastraSettingsDocument;
 }): Promise<void> {
-  const { agent, subdomain, scorers } = params;
+  const { agent, subdomain, scorers, settings } = params;
 
-  const host = await getObservabilityHost(subdomain);
+  const host = await getObservabilityHost(subdomain, settings);
   if (!host) return;
 
   const register = (
@@ -388,16 +407,17 @@ export async function getOrCreateAgent(
   // agent (and its prompt) is rebuilt as soon as the registry refreshes.
   const inventory = capabilityInventory(registry.list, policy);
 
-  // Evaluation is process-wide (env), but the observability host is per-tenant
-  // — so when it's on, the subdomain joins the cache key to keep each tenant's
-  // agent bound to its own Langfuse project (serviceName).
-  const evaluationEnabled = isEvaluationEnabled();
+  // Evaluation is persisted per tenant. Its secret-safe fingerprint forces an
+  // immediate cache rebuild when either the switch or Langfuse DSN changes.
+  const evaluationEnabled = isEvaluationEnabled(settings);
+  const evaluationFingerprint = evaluationConfigFingerprint(settings);
 
   const cacheKey = buildAgentCacheKey({
     agentConfig,
     subdomain,
     useMemory,
-    evaluationEnabled,
+    evaluationFingerprint,
+    backgroundRemovalEnabled: settings.backgroundRemovalEnabled !== false,
     inventoryFingerprint: inventory.fingerprint,
     permissionFingerprint,
     providerFingerprint,
@@ -427,6 +447,7 @@ export async function getOrCreateAgent(
     models,
     providers,
     registry,
+    settings,
     policy,
     destructiveOps,
     hasErxes,
@@ -458,9 +479,8 @@ export async function getOrCreateAgent(
   // advanced memory.
   const memory = useMemory ? await getMastraMemory(subdomain) : undefined;
 
-  // Quality scorers (heuristic + LLM-judge using this agent's own model) — only
-  // when ERXES_AGENT_EVALUATION=enable. Results export to Langfuse via the host
-  // registered below.
+  // Quality scorers (heuristic + LLM-judge using this agent's own model) are
+  // controlled by the tenant's runtime settings and export through Langfuse.
   const scorers = evaluationEnabled ? buildAgentScorers(model) : undefined;
 
   // Native Mastra skills: a per-subdomain Workspace (Mongo-backed SkillSource +
@@ -505,7 +525,7 @@ export async function getOrCreateAgent(
   } as never);
 
   if (evaluationEnabled) {
-    await wireAgentObservability({ agent, subdomain, scorers });
+    await wireAgentObservability({ agent, subdomain, scorers, settings });
   }
 
   const executableTools = { ...tools, ...operationTools };

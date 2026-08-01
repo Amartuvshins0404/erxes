@@ -3,7 +3,28 @@ import {
   sanitizeActivity,
   createActivityTracker,
   parseCombined,
+  summarizerTarget,
 } from '../activity';
+
+describe('summarizerTarget', () => {
+  it('uses the persisted model and optional provider immediately', () => {
+    expect(
+      summarizerTarget('openai', 'gpt-agent', {
+        summarizerProvider: 'groq',
+        summarizerModel: ' llama-fast ',
+      }),
+    ).toEqual({ provider: 'groq', model: 'llama-fast' });
+  });
+
+  it('falls back to the active agent when no summarizer model is configured', () => {
+    expect(
+      summarizerTarget('openai', 'gpt-agent', {
+        summarizerProvider: 'groq',
+        summarizerModel: ' ',
+      }),
+    ).toEqual({ provider: 'openai', model: 'gpt-agent' });
+  });
+});
 
 describe('parseCombined', () => {
   it('extracts the turn headline and each indexed step summary', () => {

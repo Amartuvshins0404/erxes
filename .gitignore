@@ -47,6 +47,7 @@ Thumbs.db
 .nx/workspace-data
 .nx
 .env
+.env.agent
 
 # Agent skills and configuration
 .agents/*

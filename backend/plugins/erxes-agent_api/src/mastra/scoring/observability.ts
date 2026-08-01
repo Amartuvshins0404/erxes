@@ -16,13 +16,18 @@
 import { Mastra } from '@mastra/core';
 import { Observability } from '@mastra/observability';
 import { LangfuseExporter } from '@mastra/langfuse';
-import { langfuseConfig, isEvaluationEnabled } from './config';
+import {
+  evaluationConfigFingerprint,
+  langfuseConfig,
+  isEvaluationEnabled,
+} from './config';
 import { getMastraStore } from '~/mastra/memory/mastraMemory';
+import type { IMastraSettings } from '@/settings/@types/settings';
 
-// subdomain → host (or null sentinel = "tried, not available"). Map.has lets us
-// distinguish "not yet built" from "built to null" so we don't rebuild on miss.
+// Tenant + secret-safe config fingerprint → host. A settings change selects a
+// new entry immediately; resetObservabilityHosts releases obsolete entries.
 const hosts = new Map<string, Mastra | null>();
-let warnedMissingConfig = false;
+const warnedMissingConfigs = new Set<string>();
 
 /**
  * The shared observability host for a tenant, or null when central export is
@@ -37,27 +42,29 @@ let warnedMissingConfig = false;
  * this host's observability → Langfuse.
  */
 export async function getObservabilityHost(
-  subdomain?: string,
+  subdomain: string | undefined,
+  settings: IMastraSettings,
 ): Promise<Mastra | null> {
-  if (!isEvaluationEnabled()) return null;
-  const lf = langfuseConfig();
+  if (!isEvaluationEnabled(settings)) return null;
+  const lf = langfuseConfig(settings);
+  const tenant = (subdomain || 'os').trim() || 'os';
+  const fingerprint = evaluationConfigFingerprint(settings);
+  const key = `${tenant}:${fingerprint}`;
   if (!lf) {
     // Evaluation is ON but the (separately-hosted) Langfuse DSN is missing or
     // invalid — scores still compute locally, nothing is exported. Warn ONCE so
     // this is visible rather than a silent black hole.
-    if (!warnedMissingConfig) {
-      warnedMissingConfig = true;
+    if (!warnedMissingConfigs.has(key)) {
+      warnedMissingConfigs.add(key);
       // eslint-disable-next-line no-console
       console.warn(
-        '[mastra:scoring] ERXES_AGENT_EVALUATION=enable but ' +
-          'ERXES_AGENT_EVALUATION_DSN is unset/invalid — scores are computed ' +
-          'but NOT exported to the central server.',
+        `[mastra:scoring] evaluation enabled for "${tenant}" without a valid ` +
+          'Langfuse DSN; scores are computed but not exported.',
       );
     }
     return null;
   }
 
-  const key = (subdomain || 'os').trim() || 'os';
   if (hosts.has(key)) return hosts.get(key) ?? null;
 
   try {
@@ -72,7 +79,7 @@ export async function getObservabilityHost(
     const observability = new Observability({
       configs: {
         default: {
-          serviceName: `erxes-agent:${key}`,
+          serviceName: `erxes-agent:${tenant}`,
           exporters: [exporter],
         },
       },
@@ -87,7 +94,9 @@ export async function getObservabilityHost(
     // A bad key / unreachable Langfuse must never break chat — log and disable.
     // eslint-disable-next-line no-console
     console.error(
-      `[mastra:scoring] observability host disabled for "${key}": ${(err as Error).message}`,
+      `[mastra:scoring] observability host disabled for "${tenant}": ${
+        (err as Error).message
+      }`,
     );
     hosts.set(key, null);
     return null;
@@ -97,4 +106,5 @@ export async function getObservabilityHost(
 /** Drop cached hosts (e.g. after a settings/env change or in tests). */
 export function resetObservabilityHosts(): void {
   hosts.clear();
+  warnedMissingConfigs.clear();
 }

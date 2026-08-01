@@ -70,11 +70,9 @@ startPlugin({
       }
     }
 
-    // Agent learning (opt-in via ERXES_AGENT_LEARNING=enable): distillation,
-    // hygiene sweep scheduler, and worker.
-    if ((process.env.ERXES_AGENT_LEARNING ?? '').trim() === 'enable') {
-      await initLearningSweep(redis);
-    }
+    // Runtime-controlled agent learning. The scheduler stays lightweight while
+    // disabled tenants enqueue no sweep jobs; completed jobs are not retained.
+    await initLearningSweep(redis);
 
     // Canonicalize every legacy agent/service-user pair before any event or
     // workflow can execute under an AI team-member identity.

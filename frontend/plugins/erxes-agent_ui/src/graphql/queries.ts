@@ -193,6 +193,20 @@ export const MASTRA_SETTINGS = gql`
       erxesApiUrl
       memoryEnabled
       attachmentsEnabled
+      learningEnabled
+      learningAutoPromoteMinSources
+      learningAutoPromoteMinConfidence
+      learningDigestMaxChars
+      learningDigestMaxEntries
+      learningIdleMinutes
+      learningDecayDays
+      learningDecayFactor
+      learningArchiveBelowConfidence
+      evaluationEnabled
+      evaluationDsnConfigured
+      backgroundRemovalEnabled
+      summarizerProvider
+      summarizerModel
       attachmentStorage {
         configured
         serviceType

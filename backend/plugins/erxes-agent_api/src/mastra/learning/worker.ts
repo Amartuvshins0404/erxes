@@ -16,9 +16,11 @@ import {
 } from 'erxes-api-shared/utils';
 import { generateModels, IModels } from '~/connectionResolvers';
 import {
+  isLearningEnabled,
   learningSweepCron,
   learningTenant,
   resolveLearningTuning,
+  type LearningTuning,
 } from './config';
 import { distillThread } from './distill';
 import { ExtractionRuntime } from './extractor';
@@ -83,8 +85,8 @@ async function resolveRuntime(
 /** Decay stale lessons and archive the ones that fell below the floor. */
 async function runHygiene(
   models: IModels,
+  tuning: LearningTuning,
 ): Promise<{ decayed: number; archived: number }> {
-  const tuning = resolveLearningTuning();
   const now = Date.now();
   const staleCutoff = new Date(now - tuning.decayDays * DAY_MS);
   const dailyCutoff = new Date(now - DAY_MS);
@@ -141,12 +143,14 @@ export async function runLearningSweep(
     if (!tenant) return { ...result, error: 'no tenant' };
 
     const models = await generateModels(subdomain);
+    const settings = await models.MastraSettings.getSettings();
+    if (!isLearningEnabled(settings)) return result;
 
     const resolved = await resolveRuntime(models, subdomain);
     if (!resolved)
       return { ...result, error: 'no enabled agent for extraction' };
 
-    const tuning = resolveLearningTuning();
+    const tuning = resolveLearningTuning(settings);
     const idleCutoff = Date.now() - tuning.idleMinutes * 60 * 1000;
 
     // Idle threads with an undistilled tail, from the native store. Native
@@ -180,6 +184,7 @@ export async function runLearningSweep(
             ownerResourceId: thread.resourceId,
             messages: tail,
             runtime: resolved.runtime,
+            tuning,
           });
           result.created += distilled.created;
           result.merged += distilled.merged;
@@ -204,7 +209,7 @@ export async function runLearningSweep(
       }
     }
 
-    const hygiene = await runHygiene(models);
+    const hygiene = await runHygiene(models, tuning);
     result.decayed = hygiene.decayed;
     result.archived = hygiene.archived;
     return result;
@@ -213,21 +218,45 @@ export async function runLearningSweep(
   }
 }
 
-/** Queue one sweep job per tenant (saas: every org; non-saas: the single tenant). */
+const SWEEP_JOB_OPTIONS = {
+  removeOnComplete: true,
+  removeOnFail: true,
+} as const;
+
+/** Queue a sweep only for tenants that enabled learning at runtime. */
+async function enqueueTenantIfEnabled(subdomain: string): Promise<void> {
+  try {
+    const models = await generateModels(subdomain);
+    const settings = await models.MastraSettings.getSettings();
+    if (!isLearningEnabled(settings)) return;
+
+    await sendWorkerQueue(SERVICE, SWEEP_QUEUE).add(
+      SWEEP_QUEUE,
+      { subdomain },
+      { ...SWEEP_JOB_OPTIONS, jobId: subdomain },
+    );
+  } catch (error) {
+    console.warn(
+      `[erxes-agent:learning] could not schedule "${subdomain}": ${
+        (error as Error).message
+      }`,
+    );
+  }
+}
+
+/** Queue one enabled tenant per sweep without retaining completed Redis jobs. */
 async function enqueueSweepPerTenant() {
   const VERSION = getEnv({ name: 'VERSION' });
 
   if (VERSION === 'saas') {
     const orgs = await getSaasOrganizations();
     for (const org of orgs) {
-      sendWorkerQueue(SERVICE, SWEEP_QUEUE).add(SWEEP_QUEUE, {
-        subdomain: org.subdomain,
-      });
+      await enqueueTenantIfEnabled(org.subdomain);
     }
     return;
   }
 
-  sendWorkerQueue(SERVICE, SWEEP_QUEUE).add(SWEEP_QUEUE, { subdomain: 'os' });
+  await enqueueTenantIfEnabled('os');
 }
 
 // The shared Redis connection type, extracted from the MQ helper so this
@@ -243,7 +272,13 @@ export async function initLearningSweep(redis: RedisConnection): Promise<void> {
   await schedulerQueue.upsertJobScheduler(
     `${SERVICE}-learning-sweep-cron`,
     { pattern: learningSweepCron(), tz: 'UTC' },
-    { name: SCHEDULER_QUEUE },
+    {
+      name: SCHEDULER_QUEUE,
+      opts: {
+        removeOnComplete: true,
+        removeOnFail: { age: 24 * 60 * 60, count: 20 },
+      },
+    },
   );
 
   createMQWorkerWithListeners(
@@ -255,7 +290,7 @@ export async function initLearningSweep(redis: RedisConnection): Promise<void> {
     },
     redis,
     () => {
-      console.log('[erxes-agent:learning] sweep scheduler ready');
+      console.info('[erxes-agent:learning] sweep scheduler ready');
     },
   );
 
@@ -266,15 +301,11 @@ export async function initLearningSweep(redis: RedisConnection): Promise<void> {
       const { subdomain } = job?.data ?? {};
       if (!subdomain) return 'skipped: no subdomain';
       const result = await runLearningSweep(subdomain);
-      const errorSuffix = result.error ? `, error: ${result.error}` : '';
-      console.log(
-        `[erxes-agent:learning] sweep "${subdomain}": ${result.threads} threads, +${result.created} created, ~${result.merged} merged, ↑${result.promoted} promoted, ✕${result.gated} gated, ↓${result.decayed} decayed, ${result.archived} archived${errorSuffix}`,
-      );
       return result;
     },
     redis,
     () => {
-      console.log('[erxes-agent:learning] sweep worker ready');
+      console.info('[erxes-agent:learning] sweep worker ready');
     },
   );
 

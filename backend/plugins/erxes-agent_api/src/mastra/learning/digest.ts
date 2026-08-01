@@ -10,6 +10,7 @@
 
 import { IModels } from '~/connectionResolvers';
 import { isLearningEnabled, resolveLearningTuning } from './config';
+import type { IMastraSettings } from '@/settings/@types/settings';
 
 export interface LearnedDigest {
   block: string;
@@ -68,10 +69,11 @@ export function buildDigestBlock(
 export async function readLearnedDigest(
   models: IModels,
   agentId: string,
+  settings?: IMastraSettings,
 ): Promise<LearnedDigest | null> {
-  if (!isLearningEnabled()) return null;
+  if (!isLearningEnabled(settings)) return null;
   try {
-    const tuning = resolveLearningTuning();
+    const tuning = resolveLearningTuning(settings);
     const docs = await models.MastraLearning.find({
       status: 'approved',
       // null matches both missing and explicit-null agentId (tenant-wide).

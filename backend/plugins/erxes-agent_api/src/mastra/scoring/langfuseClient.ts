@@ -9,23 +9,30 @@
 // reads it back and calls pushUserScore here.
 // ---------------------------------------------------------------------------
 import { Langfuse } from 'langfuse';
-import { langfuseConfig } from './config';
+import {
+  evaluationConfigFingerprint,
+  isEvaluationEnabled,
+  langfuseConfig,
+} from './config';
+import type { IMastraSettings } from '@/settings/@types/settings';
 
-// Langfuse is configured by ONE global DSN, so a single shared client serves
-// every tenant — no per-subdomain fan-out. (undefined = not yet resolved;
-// null = configured-absent sentinel.)
-let client: Langfuse | null | undefined;
+// One client per secret-safe tenant configuration fingerprint.
+const clients = new Map<string, Langfuse | null>();
 
-function getClient(): Langfuse | null {
-  if (client !== undefined) return client;
-  const lf = langfuseConfig();
-  client = lf
+function getClient(settings: IMastraSettings): Langfuse | null {
+  if (!isEvaluationEnabled(settings)) return null;
+  const key = evaluationConfigFingerprint(settings);
+  if (clients.has(key)) return clients.get(key) ?? null;
+
+  const lf = langfuseConfig(settings);
+  const client = lf
     ? new Langfuse({
         publicKey: lf.publicKey,
         secretKey: lf.secretKey,
         baseUrl: lf.baseUrl,
       })
     : null;
+  clients.set(key, client);
   return client;
 }
 
@@ -39,9 +46,10 @@ export async function pushUserScore(params: {
   name: string;
   value: number;
   comment?: string;
+  settings: IMastraSettings;
 }): Promise<void> {
   if (!params.traceId) return;
-  const lf = getClient();
+  const lf = getClient(params.settings);
   if (!lf) return;
   try {
     lf.score({
@@ -60,7 +68,7 @@ export async function pushUserScore(params: {
   }
 }
 
-/** Drop the cached client (e.g. after an env change or in tests). */
+/** Drop cached clients after settings changes and in tests. */
 export function resetLangfuseClients(): void {
-  client = undefined;
+  clients.clear();
 }

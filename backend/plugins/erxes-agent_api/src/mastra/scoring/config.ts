@@ -1,21 +1,10 @@
 // ---------------------------------------------------------------------------
-// Live evaluation + central observability — configuration (pure, env-driven).
-//
-// Deliberately a SMALL env surface — only two vars, on the client side:
-//
-//   ERXES_AGENT_EVALUATION=enable                 ← the single master switch
-//   ERXES_AGENT_EVALUATION_DSN=https://<pk>:<sk>@langfuse.your-domain.com
-//                                                 ← one string: URL + both keys
-//
-// The DSN (Sentry-style) is parsed into the Langfuse base URL + public/secret
-// keys, so pointing every client at the one central server is a single
-// copy-paste. Langfuse is a SEPARATE, central deployment — there is no
-// "same host" default. Everything is OFF until the switch is `enable`.
-// ---------------------------------------------------------------------------
+// Live evaluation + central observability — persisted per-tenant runtime
+// configuration. The DSN is write-only in GraphQL and parsed here into the
+// Langfuse connection.
 
-import { Env, val, enabledBy } from '~/mastra/configEnv';
-
-export type { Env };
+import { createHash } from 'node:crypto';
+import type { IMastraSettings } from '@/settings/@types/settings';
 
 export interface LangfuseConfig {
   baseUrl: string;
@@ -23,23 +12,21 @@ export interface LangfuseConfig {
   secretKey: string;
 }
 
-/**
- * The master switch. Evaluation is enabled ONLY when ERXES_AGENT_EVALUATION is
- * exactly "enable" (whitespace-trimmed); every other value is off.
- */
-export function isEvaluationEnabled(env: Env = process.env): boolean {
-  return enabledBy(env, 'ERXES_AGENT_EVALUATION');
+/** Evaluation is tenant-controlled and changes take effect without a restart. */
+export function isEvaluationEnabled(
+  settings?: Pick<IMastraSettings, 'evaluationEnabled'>,
+): boolean {
+  return settings?.evaluationEnabled === true;
 }
 
 /**
- * Parse ERXES_AGENT_EVALUATION_DSN (`https://<publicKey>:<secretKey>@host[:port][/path]`)
- * into the Langfuse connection, or null when unset/invalid. No localhost
- * fallback: Langfuse is a remote central server, so without a valid DSN export
- * is simply off (scorers still compute; the caller warns) — we never silently
- * ship data nowhere.
+ * Parse a persisted Langfuse DSN
+ * (`https://<publicKey>:<secretKey>@host[:port][/path]`) into the connection.
  */
-export function langfuseConfig(env: Env = process.env): LangfuseConfig | null {
-  const dsn = val(env, 'ERXES_AGENT_EVALUATION_DSN');
+export function langfuseConfig(
+  settings?: Pick<IMastraSettings, 'evaluationDsn'>,
+): LangfuseConfig | null {
+  const dsn = settings?.evaluationDsn?.trim();
   if (!dsn) return null;
   try {
     const u = new URL(dsn);
@@ -54,8 +41,24 @@ export function langfuseConfig(env: Env = process.env): LangfuseConfig | null {
   }
 }
 
-/** True when evaluation is on AND a valid Langfuse DSN is set (i.e. scores will
- *  actually be exported centrally, not just computed locally). */
-export function isExportConfigured(env: Env = process.env): boolean {
-  return isEvaluationEnabled(env) && langfuseConfig(env) !== null;
+/** True when evaluation is on and scores can be exported centrally. */
+export function isExportConfigured(
+  settings?: Pick<IMastraSettings, 'evaluationEnabled' | 'evaluationDsn'>,
+): boolean {
+  return isEvaluationEnabled(settings) && langfuseConfig(settings) !== null;
+}
+
+/** Secret-safe cache dimension for evaluation behavior and Langfuse routing. */
+export function evaluationConfigFingerprint(
+  settings?: Pick<IMastraSettings, 'evaluationEnabled' | 'evaluationDsn'>,
+): string {
+  if (!isEvaluationEnabled(settings)) return 'off';
+  const config = langfuseConfig(settings);
+  if (!config) return 'local';
+  return createHash('sha256')
+    .update(
+      JSON.stringify([config.baseUrl, config.publicKey, config.secretKey]),
+    )
+    .digest('hex')
+    .slice(0, 16);
 }

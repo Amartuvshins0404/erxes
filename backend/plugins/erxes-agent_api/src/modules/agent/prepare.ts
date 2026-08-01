@@ -248,7 +248,9 @@ async function buildTurnConvo(args: {
 }): Promise<{ convo: TurnMessage[]; learningIds: string[] }> {
   const { models, agentId, message, weaveDigest, attachments, settings } = args;
 
-  const digest = weaveDigest ? await readLearnedDigest(models, agentId) : null;
+  const digest = weaveDigest
+    ? await readLearnedDigest(models, agentId, settings)
+    : null;
 
   // Mastra Memory replays recent history + recall itself, so generate() gets
   // ONLY the new user message (+ the learned digest). Passing replayed history
@@ -406,6 +408,7 @@ export async function prepareTurn(
     turnId: randomUUID(),
     turnStartedAt: new Date(),
     turnPrompt: (message || '').slice(0, 200),
+    backgroundRemovalEnabled: settings.backgroundRemovalEnabled !== false,
     resourceId,
     approvedOps: approvedOperations,
   };

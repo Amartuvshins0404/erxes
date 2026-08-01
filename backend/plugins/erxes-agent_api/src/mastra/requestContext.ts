@@ -39,6 +39,8 @@ interface RequestAuth {
    *  core account. Destructive operations then require impossible live approval
    *  and remain blocked. */
   background?: boolean;
+  /** Workspace runtime gate for the memory-heavy image background tool. */
+  backgroundRemovalEnabled?: boolean;
 }
 
 const authStorage = new AsyncLocalStorage<RequestAuth>();

@@ -172,16 +172,24 @@ export const learningMutations = {
       learningIdsInContext: learningIds,
     });
 
-    // Plan B: mirror the human thumbs into Langfuse as a score on this turn's
-    // trace (the SDK, never the CLI). Only AFTER the feedback is persisted, so a
-    // failed save never emits a phantom score. Fire-and-forget + self-guarding:
-    // no trace id or no Langfuse configured → no-op, feedback still succeeds.
-    void pushUserScore({
-      traceId: langfuseTraceId,
-      name: 'user-feedback',
-      value: args.rating,
-      comment: args.comment,
-    });
+    // Mirror the human thumbs into this tenant's configured Langfuse project.
+    // Fully off-path: neither settings reads nor exporter failures delay the
+    // persisted feedback response.
+    void models.MastraSettings.getSettings()
+      .then((settings) =>
+        pushUserScore({
+          traceId: langfuseTraceId,
+          name: 'user-feedback',
+          value: args.rating,
+          comment: args.comment,
+          settings,
+        }),
+      )
+      .catch((error) =>
+        console.warn(
+          `[mastra:scoring] feedback export skipped: ${(error as Error).message}`,
+        ),
+      );
 
     // Net reinforcement: undo the previous vote's delta when re-voting.
     if (learningIds.length) {

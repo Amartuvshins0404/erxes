@@ -64,6 +64,20 @@ export interface IMastraSettings {
   erxesApiUrl?: string | null;
   memoryEnabled?: boolean | null;
   attachmentsEnabled?: boolean | null;
+  learningEnabled?: boolean | null;
+  learningAutoPromoteMinSources?: number | null;
+  learningAutoPromoteMinConfidence?: number | null;
+  learningDigestMaxChars?: number | null;
+  learningDigestMaxEntries?: number | null;
+  learningIdleMinutes?: number | null;
+  learningDecayDays?: number | null;
+  learningDecayFactor?: number | null;
+  learningArchiveBelowConfidence?: number | null;
+  evaluationEnabled?: boolean | null;
+  evaluationDsnConfigured?: boolean | null;
+  backgroundRemovalEnabled?: boolean | null;
+  summarizerProvider?: string | null;
+  summarizerModel?: string | null;
   attachmentStorage?: Pick<
     IAttachmentStorage,
     'configured' | 'serviceType'

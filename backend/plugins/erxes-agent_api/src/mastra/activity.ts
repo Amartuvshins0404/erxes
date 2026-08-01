@@ -25,6 +25,7 @@ import {
   type ProviderDocLike,
 } from '~/mastra/providers';
 import { createAgentCache } from '~/mastra/cachedAgent';
+import type { IMastraSettings } from '@/settings/@types/settings';
 
 /** Auth context accepted by runWithAuth (the module itself loads lazily). */
 type AuthCtx = Parameters<
@@ -147,15 +148,23 @@ export async function summarizeActivity(params: {
   model: string;
   providers: ProviderDocLike[];
   authCtx: AuthCtx;
+  settings?:
+    | Pick<IMastraSettings, 'summarizerProvider' | 'summarizerModel'>
+    | null;
   snapshot: ActivitySnapshot;
 }): Promise<string | null> {
-  const { provider, model, providers, authCtx, snapshot } = params;
+  const { provider, model, providers, authCtx, snapshot, settings } = params;
   try {
     const context = buildActivityContext(snapshot);
     if (!context) return null;
 
     const { runWithAuth } = await import('~/mastra/requestContext');
-    const summarizer = await summarizerFor(provider, model, providers);
+    const target = summarizerTarget(provider, model, settings);
+    const summarizer = await summarizerFor(
+      target.provider,
+      target.model,
+      providers,
+    );
     const prompt = `${context}\n\nOutput the status line.`;
     const result = await runWithAuth(
       authCtx,
@@ -220,18 +229,19 @@ const TURN_SUMMARY_REPLY_CHARS = 1200;
 // How much of each burst the batched summarizer sees — substance is up front.
 const STEP_INPUT_CHARS = 800;
 
-/** Optional cheaper/faster model for the (off-path) summarization, via env. Both
- *  vars are optional; with neither set, summaries run on the agent's own model so
- *  nothing breaks out of the box (set AGENT_SUMMARIZER_MODEL, and optionally
- *  AGENT_SUMMARIZER_PROVIDER, to point them at a small fast model). */
-function summarizerTarget(
+/** Optional cheaper/faster model for activity and turn summaries. A blank model
+ * falls back to the active agent; provider alone never changes routing. */
+export function summarizerTarget(
   agentProvider: string,
   agentModel: string,
+  settings?:
+    | Pick<IMastraSettings, 'summarizerProvider' | 'summarizerModel'>
+    | null,
 ): { provider: string; model: string } {
-  const model = process.env.AGENT_SUMMARIZER_MODEL?.trim();
+  const model = settings?.summarizerModel?.trim();
   if (!model) return { provider: agentProvider, model: agentModel };
   return {
-    provider: process.env.AGENT_SUMMARIZER_PROVIDER?.trim() || agentProvider,
+    provider: settings?.summarizerProvider?.trim() || agentProvider,
     model,
   };
 }
@@ -346,17 +356,28 @@ export async function summarizeTurnAndSteps(params: {
   model: string;
   providers: ProviderDocLike[];
   authCtx: AuthCtx;
+  settings?:
+    | Pick<IMastraSettings, 'summarizerProvider' | 'summarizerModel'>
+    | null;
   userMessage: string;
   reply: string | null;
   steps: ReasoningStepInput[];
 }): Promise<TurnAndStepsResult> {
-  const { provider, model, providers, authCtx, userMessage, steps } = params;
+  const {
+    provider,
+    model,
+    providers,
+    authCtx,
+    userMessage,
+    steps,
+    settings,
+  } = params;
   const reply = (params.reply || '').replace(/\s+/g, ' ').trim();
   const wantTurn = !!reply;
   if (!wantTurn && steps.length === 0) return { turn: null, steps: [] };
   try {
     const { runWithAuth } = await import('~/mastra/requestContext');
-    const target = summarizerTarget(provider, model);
+    const target = summarizerTarget(provider, model, settings);
     const agent = await summaryAgentFor(
       target.provider,
       target.model,

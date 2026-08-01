@@ -13,7 +13,11 @@
 
 import { IModels } from '~/connectionResolvers';
 import { IMastraLearningDocument } from '@/learning/@types/learning';
-import { hashSource, resolveLearningTuning } from './config';
+import {
+  hashSource,
+  resolveLearningTuning,
+  type LearningTuning,
+} from './config';
 import {
   buildTranscript,
   extractCandidates,
@@ -53,9 +57,9 @@ export interface DistillResult {
 async function maybeAutoPromote(
   models: IModels,
   learning: IMastraLearningDocument | null,
+  tuning: LearningTuning,
 ): Promise<boolean> {
   if (!learning || learning.status !== 'candidate') return false;
-  const tuning = resolveLearningTuning();
   const distinctSources = learning.sourceHashes?.length ?? 0;
   if (
     distinctSources < tuning.autoPromoteMinSources ||
@@ -79,9 +83,10 @@ export async function distillThread(params: {
   messages: TranscriptMessage[];
   runtime: ExtractionRuntime;
   outcome?: string;
+  tuning?: LearningTuning;
 }): Promise<DistillResult> {
-  const { models, agentId, ownerResourceId, messages, runtime, outcome } =
-    params;
+  const { models, agentId, ownerResourceId, messages, runtime, outcome } = params;
+  const tuning = params.tuning ?? resolveLearningTuning();
   const result: DistillResult = {
     extracted: 0,
     gated: 0,
@@ -132,7 +137,7 @@ export async function distillThread(params: {
           sourceHash,
         });
         result.merged++;
-        if (await maybeAutoPromote(models, merged)) result.promoted++;
+        if (await maybeAutoPromote(models, merged, tuning)) result.promoted++;
         continue;
       }
 

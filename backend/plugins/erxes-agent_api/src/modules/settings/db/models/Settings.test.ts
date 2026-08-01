@@ -40,14 +40,27 @@ const createSettingsModelMocks = (
         erxesApiUrl: 'http://localhost:4000',
         memoryEnabled: true,
         attachmentsEnabled: true,
+        learningEnabled: false,
+        learningAutoPromoteMinSources: 3,
+        learningAutoPromoteMinConfidence: 0.75,
+        learningDigestMaxChars: 2400,
+        learningDigestMaxEntries: 12,
+        learningIdleMinutes: 30,
+        learningDecayDays: 30,
+        learningDecayFactor: 0.9,
+        learningArchiveBelowConfidence: 0.2,
+        evaluationEnabled: false,
+        backgroundRemovalEnabled: true,
+        summarizerProvider: '',
+        summarizerModel: '',
         ...settings,
       },
       'created-settings',
     ),
   );
-  const findOne = jest.fn(() => ({
-    lean: jest.fn(async () => getDocument),
-  }));
+  const lean = jest.fn(async () => getDocument);
+  const select = jest.fn(() => ({ lean }));
+  const findOne = jest.fn(() => ({ select }));
   const findOneAndUpdate = jest.fn(
     async (
       _filter: Record<string, unknown>,
@@ -97,11 +110,19 @@ describe('MastraSettings model', () => {
     expect(defaults.erxesApiUrl).toBe('http://localhost:4000');
     expect(defaults.memoryEnabled).toBe(true);
     expect(defaults.attachmentsEnabled).toBe(true);
+    expect(defaults.learningEnabled).toBe(false);
+    expect(defaults.evaluationEnabled).toBe(false);
+    expect(defaults.backgroundRemovalEnabled).toBe(true);
+    expect(defaults.summarizerProvider).toBe('');
+    expect(defaults.summarizerModel).toBe('');
     expect(mocks.create).toHaveBeenCalledWith({});
     expect(settings).toMatchObject({
       erxesApiUrl: 'http://localhost:4000',
       memoryEnabled: true,
       attachmentsEnabled: true,
+      learningEnabled: false,
+      evaluationEnabled: false,
+      backgroundRemovalEnabled: true,
     });
   });
 
@@ -154,6 +175,9 @@ describe('MastraSettings model', () => {
 
     expect(mocks.findOneAndUpdate).not.toHaveBeenCalled();
     expect(mocks.hydrate).toHaveBeenCalledWith(stored);
+    expect(mocks.findOne.mock.results[0].value.select).toHaveBeenCalledWith(
+      '+evaluationDsn',
+    );
   });
 
   it('unsets legacy settings when found and on every explicit save', async () => {
@@ -164,7 +188,7 @@ describe('MastraSettings model', () => {
       }),
       erxesApiToken: 'legacy-token',
       defaultAgentId: 'legacy-agent',
-    } as IMastraSettingsDocument;
+    } as unknown as IMastraSettingsDocument;
     const mocks = createSettingsModelMocks(stored);
     const settings = getSettingsStatics(mocks.models);
 
@@ -192,7 +216,7 @@ describe('MastraSettings model', () => {
           defaultAgentId: 1,
         },
       },
-      { new: true, strict: false },
+      { new: true, strict: false, runValidators: true },
     );
   });
 

@@ -1,20 +1,10 @@
 // ---------------------------------------------------------------------------
-// Agent Learning — configuration (pure, env-driven).
-//
-// Injectable `env` map, no I/O. Learning is Mongo-backed (the MastraLearning
-// collection is the source of truth); it has its own master switch and tuning
-// knobs. No vector store is involved.
-// ---------------------------------------------------------------------------
+// Agent Learning — persisted runtime tuning plus deployment-only identity,
+// scheduling, and hashing configuration.
 
 import { createHmac } from 'crypto';
-import {
-  Env,
-  val,
-  parsePositiveInt,
-  parseScore,
-  enabledBy,
-  canonicalTenant,
-} from '~/mastra/configEnv';
+import { Env, val, canonicalTenant } from '~/mastra/configEnv';
+import type { IMastraSettings } from '@/settings/@types/settings';
 
 export type { Env };
 
@@ -39,44 +29,51 @@ export interface LearningTuning {
   feedbackDownDelta: number;
 }
 
-/**
- * The master switch. Learning is enabled ONLY when ERXES_AGENT_LEARNING is
- * exactly "enable"; it remains an instance-level background-worker control.
- */
-export function isLearningEnabled(env: Env = process.env): boolean {
-  return enabledBy(env, 'ERXES_AGENT_LEARNING');
+/** Learning is tenant-controlled and changes take effect without a restart. */
+export function isLearningEnabled(
+  settings?: Pick<IMastraSettings, 'learningEnabled'>,
+): boolean {
+  return settings?.learningEnabled === true;
 }
 
-/** All learning knobs with safe defaults; invalid env values are ignored. */
-export function resolveLearningTuning(env: Env = process.env): LearningTuning {
+const positiveInteger = (value: number | undefined, fallback: number): number =>
+  Number.isInteger(value) && Number(value) > 0 ? Number(value) : fallback;
+
+const score = (value: number | undefined, fallback: number): number =>
+  typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1
+    ? value
+    : fallback;
+
+/** All learning knobs with safe defaults; malformed persisted values fall back. */
+export function resolveLearningTuning(
+  settings?: Pick<
+    IMastraSettings,
+    | 'learningAutoPromoteMinSources'
+    | 'learningAutoPromoteMinConfidence'
+    | 'learningDigestMaxChars'
+    | 'learningDigestMaxEntries'
+    | 'learningIdleMinutes'
+    | 'learningDecayDays'
+    | 'learningDecayFactor'
+    | 'learningArchiveBelowConfidence'
+  >,
+): LearningTuning {
   return {
-    autoPromoteMinSources: parsePositiveInt(
-      val(env, 'ERXES_AGENT_LEARNING_K'),
+    autoPromoteMinSources: positiveInteger(
+      settings?.learningAutoPromoteMinSources,
       3,
     ),
-    autoPromoteMinConfidence: parseScore(
-      val(env, 'ERXES_AGENT_LEARNING_MIN_CONF'),
+    autoPromoteMinConfidence: score(
+      settings?.learningAutoPromoteMinConfidence,
       0.75,
     ),
-    digestMaxChars: parsePositiveInt(
-      val(env, 'ERXES_AGENT_LEARNING_DIGEST_CHARS'),
-      2400,
-    ),
-    digestMaxEntries: parsePositiveInt(
-      val(env, 'ERXES_AGENT_LEARNING_DIGEST_ENTRIES'),
-      12,
-    ),
-    idleMinutes: parsePositiveInt(
-      val(env, 'ERXES_AGENT_LEARNING_IDLE_MINUTES'),
-      30,
-    ),
-    decayDays: parsePositiveInt(
-      val(env, 'ERXES_AGENT_LEARNING_DECAY_DAYS'),
-      30,
-    ),
-    decayFactor: parseScore(val(env, 'ERXES_AGENT_LEARNING_DECAY_FACTOR'), 0.9),
-    archiveBelowConfidence: parseScore(
-      val(env, 'ERXES_AGENT_LEARNING_ARCHIVE_BELOW'),
+    digestMaxChars: positiveInteger(settings?.learningDigestMaxChars, 2400),
+    digestMaxEntries: positiveInteger(settings?.learningDigestMaxEntries, 12),
+    idleMinutes: positiveInteger(settings?.learningIdleMinutes, 30),
+    decayDays: positiveInteger(settings?.learningDecayDays, 30),
+    decayFactor: score(settings?.learningDecayFactor, 0.9),
+    archiveBelowConfidence: score(
+      settings?.learningArchiveBelowConfidence,
       0.2,
     ),
     feedbackUpDelta: 0.05,

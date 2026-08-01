@@ -39,9 +39,11 @@ export const settingsQueries = {
     await checkPermission('settingsView');
     const doc = await models.MastraSettings.getSettings();
     const obj: IMastraSettings = doc?.toObject ? doc.toObject() : doc;
+    const { evaluationDsn, ...safeSettings } = obj;
 
     return {
-      ...obj,
+      ...safeSettings,
+      evaluationDsnConfigured: Boolean(evaluationDsn?.trim()),
       attachmentStorage: await attachmentStorageStatus(models, subdomain),
     };
   },

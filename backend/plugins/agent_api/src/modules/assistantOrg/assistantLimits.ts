@@ -100,6 +100,31 @@ const readLimitNumber = (value: unknown): number => {
     : 0;
 };
 
+const getBusinessSchoolAssistantLimitFromDescriptor = (descriptor: string) => {
+  if (
+    descriptor.includes('business school') &&
+    descriptor.includes('25 people')
+  ) {
+    return 25;
+  }
+
+  if (
+    descriptor.includes('business school') &&
+    descriptor.includes('10 people')
+  ) {
+    return 10;
+  }
+
+  if (
+    descriptor.includes('business school') &&
+    descriptor.includes('3 people')
+  ) {
+    return 3;
+  }
+
+  return 0;
+};
+
 const isAssistantLimitKey = (key: string) => {
   const normalized = normalizeKey(key);
 
@@ -139,6 +164,13 @@ const getFallbackAssistantLimitFromDescriptor = (value: string) => {
     return 0;
   }
 
+  const businessSchoolLimit =
+    getBusinessSchoolAssistantLimitFromDescriptor(descriptor);
+
+  if (businessSchoolLimit > 0) {
+    return businessSchoolLimit;
+  }
+
   if (descriptor.includes('gold')) {
     return 3;
   }
@@ -155,14 +187,17 @@ const getFallbackAssistantLimitFromDescriptor = (value: string) => {
 };
 
 const getActiveAddonAssistantLimit = (addon: ISaasAddon): number => {
-  const snapshotLimit = getSnapshotAssistantLimit(addon.bundle?.pluginsLimits);
-
-  const fallbackLimit = getFallbackAssistantLimitFromDescriptor(
+  const descriptor = normalizeText(
     `${addon.kind || ''} ${addon.bundle?.title || ''} ${
       addon.bundle?.type || ''
     }`,
   );
-  const baseLimit = snapshotLimit || fallbackLimit;
+  const businessSchoolLimit =
+    getBusinessSchoolAssistantLimitFromDescriptor(descriptor);
+  const snapshotLimit = getSnapshotAssistantLimit(addon.bundle?.pluginsLimits);
+
+  const fallbackLimit = getFallbackAssistantLimitFromDescriptor(descriptor);
+  const baseLimit = businessSchoolLimit || snapshotLimit || fallbackLimit;
   const quantity =
     typeof addon.quantity === 'number' && Number.isFinite(addon.quantity)
       ? Math.max(0, Math.floor(addon.quantity))
@@ -184,6 +219,18 @@ const isHistoryCurrent = (history: ISaasOrganizationPlanHistory) => {
 const getHistoryAssistantLimit = (
   history: ISaasOrganizationPlanHistory,
 ): number => {
+  const bundleDescriptor = normalizeText(
+    `${history.bundle?.title || ''} ${history.bundle?.type || ''}`,
+  );
+  const businessSchoolLimit =
+    normalizeText(history.source) === 'gift'
+      ? 0
+      : getBusinessSchoolAssistantLimitFromDescriptor(bundleDescriptor);
+
+  if (businessSchoolLimit > 0) {
+    return businessSchoolLimit;
+  }
+
   // Admin-gifted dynamic assistant count takes precedence over everything else.
   if (
     typeof history.assistantLimit === 'number' &&
@@ -348,9 +395,7 @@ const getAssistantPlanHistory = (
       getHistoryAssistantLimit(history) > 0,
   );
   const giftHistory = activeHistories
-    .filter(
-      (history) => normalizeText(history.source) === 'gift',
-    )
+    .filter((history) => normalizeText(history.source) === 'gift')
     .sort(
       (left, right) =>
         getHistoryTime(right, 'startsAt') - getHistoryTime(left, 'startsAt'),
@@ -446,9 +491,7 @@ const getBillingState = (history?: ISaasOrganizationPlanHistory | null) => {
   const overdueDays = graceStart
     ? Math.max(
         0,
-        Math.ceil(
-          (Date.now() - graceStart.getTime()) / (24 * 60 * 60 * 1000),
-        ),
+        Math.ceil((Date.now() - graceStart.getTime()) / (24 * 60 * 60 * 1000)),
       )
     : 0;
 

@@ -57,6 +57,24 @@ export function RegistrationFilters({
       contentClassName="w-[36rem] max-w-[calc(100vw-2rem)]"
       bodyClassName="grid grid-cols-2 gap-4"
     >
+      <FilterField label="Client portal">
+        <ClientPortalRemoteSelect
+          value={cpPortalRemoteId}
+          onValueChange={(id) => {
+            setCpPortalRemoteId(id);
+            handleChange('cpUserId', undefined);
+          }}
+          placeholder="Бүх портал"
+        />
+      </FilterField>
+      <FilterField label="CP хэрэглэгч">
+        <ClientPortalUserSelect
+          clientPortalIdFilter={cpPortalRemoteId}
+          value={filters.cpUserId}
+          onValueChange={(user) => handleChange('cpUserId', user?._id)}
+          placeholder="Бүх CP хэрэглэгч"
+        />
+      </FilterField>
       <FilterField label="Төрөл">
         <Select
           value={filters.membershipTypeId || '__all__'}
@@ -157,7 +175,7 @@ export function RegistrationFilters({
           }
         />
       </FilterField>
-      <FilterField label="Архив">
+      <FilterField label="Архив" className="col-span-2">
         <Select
           value={filters.archived ? 'archived' : '__active__'}
           onValueChange={(v) =>
@@ -175,24 +193,6 @@ export function RegistrationFilters({
             ))}
           </Select.Content>
         </Select>
-      </FilterField>
-      <FilterField label="Client portal">
-        <ClientPortalRemoteSelect
-          value={cpPortalRemoteId}
-          onValueChange={(id) => {
-            setCpPortalRemoteId(id);
-            handleChange('cpUserId', undefined);
-          }}
-          placeholder="Бүх портал"
-        />
-      </FilterField>
-      <FilterField label="CP хэрэглэгч" className="col-span-2">
-        <ClientPortalUserSelect
-          clientPortalIdFilter={cpPortalRemoteId}
-          value={filters.cpUserId}
-          onValueChange={(user) => handleChange('cpUserId', user?._id)}
-          placeholder="Бүх CP хэрэглэгч"
-        />
       </FilterField>
     </MtoFilterBase>
   );

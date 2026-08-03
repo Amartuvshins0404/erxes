@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from '@apollo/client';
-import { Badge, Button, Label, Select, Sheet, Spinner, toast } from 'erxes-ui';
+import { Badge, Button, Label, Select, Sheet, Spinner, toast, useConfirm } from 'erxes-ui';
 import { useEffect, useMemo, useState } from 'react';
 import {
   MTO_REGISTRATION_APPLICATION,
@@ -7,6 +7,7 @@ import {
 } from '@/registration/graphql/registrationQueries';
 import {
   MTO_REGISTRATION_APPLICATION_PAYMENT_URL,
+  MTO_REGISTRATION_APPLICATION_REMOVE,
   MTO_REGISTRATION_APPLICATION_UPDATE,
   MTO_REGISTRATION_APPLICATION_VERIFY_MANUAL_PAYMENT,
 } from '@/registration/graphql/registrationMutations';
@@ -75,6 +76,7 @@ export function RegistrationDetailSheet({
   onOpenChange,
   onSaved,
 }: RegistrationDetailSheetProps) {
+  const { confirm } = useConfirm();
   const { data, loading, error, refetch } = useQuery(
     MTO_REGISTRATION_APPLICATION,
     {
@@ -91,6 +93,9 @@ export function RegistrationDetailSheet({
   );
   const [getPaymentUrl, { loading: paymentUrlLoading }] = useMutation(
     MTO_REGISTRATION_APPLICATION_PAYMENT_URL,
+  );
+  const [removeApplication, { loading: removeLoading }] = useMutation(
+    MTO_REGISTRATION_APPLICATION_REMOVE,
   );
 
   const row = data?.mtoRegistrationApplication;
@@ -193,6 +198,33 @@ export function RegistrationDetailSheet({
         variant: 'destructive',
       });
     }
+  }
+
+  function handleRemove() {
+    if (!applicationId) return;
+
+    void confirm({
+      message: 'Та энэ бүртгэлийг устгахдаа итгэлтэй байна уу?',
+      options: { confirmationValue: 'delete' },
+    }).then(async () => {
+      try {
+        await removeApplication({ variables: { _id: applicationId } });
+        onOpenChange(false);
+        onSaved?.();
+        toast({
+          title: 'Амжилттай',
+          description: 'Бүртгэл устгагдлаа',
+        });
+      } catch (e: unknown) {
+        const message =
+          e instanceof Error ? e.message : 'Устгахад алдаа гарлаа';
+        toast({
+          title: 'Алдаа',
+          description: message,
+          variant: 'destructive',
+        });
+      }
+    });
   }
 
   const paymentStatus = row?.paymentStatus as string | undefined;
@@ -379,14 +411,25 @@ export function RegistrationDetailSheet({
                   }}
                 />
 
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => onOpenChange(false)}
-                >
-                  Хаах
-                </Button>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onOpenChange(false)}
+                  >
+                    Хаах
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="sm"
+                    disabled={removeLoading}
+                    onClick={handleRemove}
+                  >
+                    Устгах
+                  </Button>
+                </div>
               </>
             )}
           </div>

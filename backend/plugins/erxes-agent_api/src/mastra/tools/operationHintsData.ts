@@ -15,6 +15,8 @@
  * map — it is version controlled, not learned at runtime. Keep each string
  * tight: it ships in model context with every matching search result.
  *
+ *   purpose:      concise semantic correction when the operation name is ambiguous
+ *   defaultResponseFields: bounded fields needed for the operation's common use
  *   required:     args the server requires even though the schema marks them nullable
  *   enums:        arg → closed, known token set the server enforces (schema is String)
  *   rules:        one-line cross-field / conditional / format constraints
@@ -29,6 +31,8 @@
  */
 
 export interface OperationHint {
+  purpose?: string;
+  defaultResponseFields?: string[];
   required?: string[];
   enums?: Record<string, string[]>;
   rules?: string[];
@@ -74,7 +78,20 @@ export const OPERATION_HINTS: Record<string, OperationHint> = {
     ],
   },
   customers: {
-    rules: ['dateFilters must be a valid JSON-encoded object of {field:{gte,lte}}'],
+    purpose:
+      'List contacts or count customer, lead, and visitor states from totalCount',
+    rules: [
+      'dateFilters must be a valid JSON-encoded object of {field:{gte,lte}}',
+      'type filters contact state: customer, lead, or visitor',
+      'for latest records use orderBy {"createdAt":-1} and a bounded limit',
+      'for exact customer, lead, or visitor counts call customers once per type and read totalCount; run those independent reads together',
+    ],
+  },
+  customersCount: {
+    purpose: 'Group tag or brand relationships',
+    rules: [
+      'groups contacts by TAG or BRAND only; it does not count customer, lead, or visitor states',
+    ],
   },
   usersSetActiveStatus: {
     rules: ['_id cannot be your own user id'],
@@ -643,7 +660,71 @@ export const OPERATION_HINTS: Record<string, OperationHint> = {
     ],
   },
 
+  // products
+  productCategories: {
+    defaultResponseFields: ['_id', 'name', 'status'],
+    rules: [
+      'request productCount only for an explicit empty-category audit because it runs a count for each returned category',
+    ],
+  },
+  products: {
+    defaultResponseFields: [
+      '_id',
+      'name',
+      'status',
+      'type',
+      'code',
+      'unitPrice',
+      'categoryId',
+    ],
+    rules: [
+      'for catalog hygiene use one bounded sample and derive missing code, missing price, and zero price from that sample',
+    ],
+  },
+  productCategoriesTotalCount: {
+    rules: [
+      'the status filter can include categories with no status; use category records to count explicitly active and statusless categories',
+    ],
+  },
+  productsTotalCount: {
+    rules: [
+      'for a catalog audit use at most three exact count calls for the requested total, type, or status distinctions; use one bounded products sample for missing code, missing price, and zero price',
+      'do not repeat a count call with unchanged arguments',
+    ],
+  },
+
   // sales_api
+  salesBoards: {
+    defaultResponseFields: [
+      '_id',
+      'name',
+      'pipelines._id',
+      'pipelines.name',
+      'pipelines.itemsTotalCount',
+    ],
+    rules: [
+      'request pipelines._id, pipelines.name, and pipelines.itemsTotalCount to get each board pipeline and its deal count in one read',
+    ],
+  },
+  salesBoardCounts: {
+    rules: [
+      'count is the number of pipelines on the board, not the number of deals',
+    ],
+  },
+  salesPipelines: {
+    defaultResponseFields: ['_id', 'name', 'boardId', 'itemsTotalCount'],
+    rules: [
+      'itemsTotalCount is the deal count for each pipeline',
+      'for cross-board coverage use isAll true with a bounded limit instead of one call per board',
+    ],
+  },
+  salesStages: {
+    defaultResponseFields: ['_id', 'name', 'pipelineId', 'itemsTotalCount'],
+    rules: [
+      'itemsTotalCount is the deal count for each stage',
+      'pass pipelineIds together instead of one call per pipeline',
+    ],
+  },
   salesPipelinesAdd: {
     enums: {
       visibility: ['public', 'private'],

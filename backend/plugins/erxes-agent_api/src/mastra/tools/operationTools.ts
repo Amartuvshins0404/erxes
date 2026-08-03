@@ -64,16 +64,6 @@ const ACTION_SEARCH_ALIASES: Record<string, readonly string[]> = {
   detail: ['get', 'find', 'view', 'show'],
 };
 
-const QUERY_SEARCH_ALIASES = [
-  'list',
-  'find',
-  'get',
-  'fetch',
-  'search',
-  'view',
-  'show',
-] as const;
-
 function splitSearchTerms(value: string): string[] {
   return value
     .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
@@ -99,7 +89,11 @@ function singularSearchTerm(term: string): string | undefined {
 }
 
 function operationSearchTerms(operation: OperationMeta): string {
-  const terms = new Set<string>();
+  const terms = new Set<string>([
+    operation.operation,
+    operation.plugin,
+    operation.module,
+  ]);
 
   for (const term of [
     ...splitSearchTerms(operation.operation),
@@ -112,10 +106,6 @@ function operationSearchTerms(operation: OperationMeta): string {
     for (const alias of ACTION_SEARCH_ALIASES[term] ?? []) {
       terms.add(alias);
     }
-  }
-
-  if (operation.operationType === 'query') {
-    for (const alias of QUERY_SEARCH_ALIASES) terms.add(alias);
   }
 
   return [...terms].join(' ');
@@ -168,6 +158,24 @@ function operationInputSchema(
   });
 }
 
+function splitOperationInput(
+  operation: OperationMeta,
+  operationInput: Record<string, unknown>,
+) {
+  const requestedFields = Array.isArray(operationInput[RESPONSE_FIELDS_ARG])
+    ? operationInput[RESPONSE_FIELDS_ARG].map(String)
+    : undefined;
+  const args = { ...operationInput };
+  delete args[RESPONSE_FIELDS_ARG];
+
+  return {
+    args,
+    responseFields: requestedFields?.length
+      ? requestedFields
+      : getStaticOperationHints(operation.operation)?.defaultResponseFields,
+  };
+}
+
 function operationToolDescription(
   operation: OperationMeta,
   registry: OperationRegistry,
@@ -196,9 +204,10 @@ function operationToolDescription(
     registry.objectFieldsMap,
   );
   const searchTerms = operationSearchTerms(operation);
+  const defaults = hints?.defaultResponseFields;
 
   return [
-    `${operation.description || operation.operation} (${
+    `${hints?.purpose || operation.description || operation.operation} (${
       operation.operationType
     } in ${operation.plugin}/${operation.module}).`,
     `Search terms: ${searchTerms}.`,
@@ -206,6 +215,7 @@ function operationToolDescription(
     required,
     enumRules ? ` Allowed values: ${enumRules}.` : '',
     rules.length ? ` Rules: ${rules.join('; ')}.` : '',
+    defaults?.length ? ` Default response fields: ${defaults.join(', ')}.` : '',
     selectable
       ? ` Optional ${RESPONSE_FIELDS_ARG} menu: ${JSON.stringify(selectable)}.`
       : '',
@@ -241,19 +251,15 @@ export function buildErxesOperationTools({
       outputSchema: z.unknown(),
       execute: async (input) => {
         // Mastra validates this value against operationInputSchema first.
-        const operationInput = input as Record<string, unknown>;
-        const responseFields = Array.isArray(
-          operationInput[RESPONSE_FIELDS_ARG],
-        )
-          ? operationInput[RESPONSE_FIELDS_ARG].map(String)
-          : undefined;
-        const args = { ...operationInput };
-        delete args[RESPONSE_FIELDS_ARG];
+        const call = splitOperationInput(
+          operation,
+          input as Record<string, unknown>,
+        );
 
         return executePolicyScopedOperation({
           operation,
-          args,
-          responseFields,
+          args: call.args,
+          responseFields: call.responseFields,
           registry,
           policy,
           destructiveOps,

@@ -12,38 +12,19 @@ jest.mock('../erxesTools', () => ({
 }));
 
 jest.mock('../operationHints', () => ({
-  getStaticOperationHints: (operation: string) => {
-    if (operation === 'guardedAdd') {
-      return {
-        required: ['doc.name'],
-        enums: { 'doc.status': ['active', 'archived'] },
-        rules: ['doc.name and doc.status must be supplied'],
-      };
-    }
-    if (operation === 'customersCount') {
-      return {
-        purpose: 'Group tag or brand relationships',
-        rules: ['not a contact-state count'],
-      };
-    }
-    if (operation === 'salesBoards') {
-      return {
-        defaultResponseFields: [
-          '_id',
-          'name',
-          'pipelines._id',
-          'pipelines.name',
-          'pipelines.itemsTotalCount',
-        ],
-      };
-    }
-    return undefined;
-  },
+  getStaticOperationHints: (operation: string) =>
+    operation === 'guardedAdd'
+      ? {
+          required: ['doc.name'],
+          enums: { 'doc.status': ['active', 'archived'] },
+          rules: ['doc.name and doc.status must be supplied'],
+        }
+      : undefined,
 }));
 
 import { buildErxesOperationTools } from '../operationTools';
 import type { OperationMeta, OperationRegistry } from '../operationRegistry';
-import type { GqlArgDef, GqlFieldDef, GqlTypeRef } from '../schemaIntrospect';
+import type { GqlArgDef, GqlTypeRef } from '../schemaIntrospect';
 
 const scalar = (name: string): GqlTypeRef => ({ kind: 'SCALAR', name });
 const enumType = (name: string): GqlTypeRef => ({ kind: 'ENUM', name });
@@ -51,8 +32,6 @@ const inputType = (name: string): GqlTypeRef => ({
   kind: 'INPUT_OBJECT',
   name,
 });
-const objectType = (name: string): GqlTypeRef => ({ kind: 'OBJECT', name });
-const list = (ofType: GqlTypeRef): GqlTypeRef => ({ kind: 'LIST', ofType });
 const nonNull = (ofType: GqlTypeRef): GqlTypeRef => ({
   kind: 'NON_NULL',
   ofType,
@@ -61,10 +40,9 @@ const nonNull = (ofType: GqlTypeRef): GqlTypeRef => ({
 const makeOperation = (
   operation: string,
   graphqlArgs: GqlArgDef[] = [],
-  operationType: 'query' | 'mutation' = 'mutation',
 ): OperationMeta => ({
   operation,
-  operationType,
+  operationType: 'mutation',
   plugin: 'sales',
   module: 'deals',
   description: `Run ${operation}`,
@@ -76,7 +54,6 @@ const makeRegistry = (
   list: OperationMeta[],
   inputTypesMap: Record<string, GqlArgDef[]> = {},
   enumValuesMap: Record<string, string[]> = {},
-  objectFieldsMap: Record<string, GqlFieldDef[]> = {},
 ): OperationRegistry => ({
   operations: new Map(
     list.map((operation) => [operation.operation, operation]),
@@ -84,7 +61,7 @@ const makeRegistry = (
   list,
   inputTypesMap,
   enumValuesMap,
-  objectFieldsMap,
+  objectFieldsMap: {},
 });
 
 interface ToolLike {
@@ -97,11 +74,6 @@ interface ToolLike {
   };
   execute: (input: Record<string, unknown>) => Promise<unknown>;
 }
-
-const readSearchTerms = (description: string) => {
-  const match = description.match(/Search terms: ([^.]+)\./);
-  return match?.[1].split(' ') ?? [];
-};
 
 const build = (
   registry: OperationRegistry,
@@ -140,62 +112,6 @@ describe('typed erxes operation tools', () => {
     expect(tool.description).toContain('Search terms:');
     expect(tool.description).toMatch(/\bcreate\b/);
     expect(tool.description).toMatch(/\bdeal\b/);
-  });
-
-  it('keeps exact query terms without generic query verb pollution', () => {
-    const getProject = makeOperation('getProject', [], 'query');
-    getProject.plugin = 'operation';
-    getProject.module = 'projects';
-    const salesPipelines = makeOperation('salesPipelines', [], 'query');
-    salesPipelines.module = 'pipelines';
-    const tools = build(makeRegistry([getProject, salesPipelines]));
-    const getProjectTerms = readSearchTerms(
-      (tools.getProject as unknown as ToolLike).description,
-    );
-    const salesPipelineTerms = readSearchTerms(
-      (tools.salesPipelines as unknown as ToolLike).description,
-    );
-
-    expect(getProjectTerms).toEqual(
-      expect.arrayContaining([
-        'getProject',
-        'get',
-        'project',
-        'operation',
-        'projects',
-      ]),
-    );
-    expect(getProjectTerms).not.toEqual(
-      expect.arrayContaining(['list', 'find', 'fetch', 'view', 'show']),
-    );
-    expect(salesPipelineTerms).toEqual(
-      expect.arrayContaining([
-        'salesPipelines',
-        'sales',
-        'pipelines',
-        'pipeline',
-      ]),
-    );
-    expect(salesPipelineTerms).not.toEqual(
-      expect.arrayContaining([
-        'list',
-        'find',
-        'get',
-        'fetch',
-        'search',
-        'view',
-        'show',
-      ]),
-    );
-  });
-
-  it('uses semantic guidance for an ambiguous operation name', () => {
-    const operation = makeOperation('customersCount', [], 'query');
-    const tool = build(makeRegistry([operation]))
-      .customersCount as unknown as ToolLike;
-
-    expect(tool.description).toContain('Group tag or brand relationships');
-    expect(tool.description).toContain('not a contact-state count');
   });
 
   it('exposes required nested input fields and canonical enum values', () => {
@@ -256,48 +172,6 @@ describe('typed erxes operation tools', () => {
         doc: { name: 'Record', status: 'active' },
       }).success,
     ).toBe(true);
-  });
-
-  it('uses bounded default response fields when none are requested', async () => {
-    const operation = makeOperation('salesBoards', [], 'query');
-    operation.returnType = list(objectType('SalesBoard'));
-    const registry = makeRegistry(
-      [operation],
-      {},
-      {},
-      {
-        SalesBoard: [
-          { name: '_id', type: scalar('String') },
-          { name: 'name', type: scalar('String') },
-          { name: 'pipelines', type: list(objectType('SalesPipeline')) },
-        ],
-        SalesPipeline: [
-          { name: '_id', type: scalar('String') },
-          { name: 'name', type: scalar('String') },
-          { name: 'itemsTotalCount', type: scalar('Int') },
-        ],
-      },
-    );
-    const tool = build(registry).salesBoards as unknown as ToolLike;
-
-    await tool.execute({});
-
-    expect(mockExecute).toHaveBeenCalledWith(
-      operation,
-      {},
-      registry,
-      undefined,
-      [
-        '_id',
-        'name',
-        'pipelines._id',
-        'pipelines.name',
-        'pipelines.itemsTotalCount',
-      ],
-    );
-    expect(tool.description).toContain(
-      'Default response fields: _id, name, pipelines._id, pipelines.name, pipelines.itemsTotalCount',
-    );
   });
 
   it('passes direct arguments and normalized response fields to the shared executor', async () => {

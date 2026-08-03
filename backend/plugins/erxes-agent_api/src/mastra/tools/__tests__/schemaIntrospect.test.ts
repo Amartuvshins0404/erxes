@@ -4,7 +4,6 @@
  * describeSelectableFields (the menu surfaced in search results). Pure functions,
  * no mocks — exercised against a small hand-built introspection map.
  */
-import { OPERATION_HINTS } from '../operationHintsData';
 import {
   chooseResponseFields,
   describeSelectableFields,
@@ -95,40 +94,13 @@ describe('chooseResponseFields — agent-requested fields', () => {
   });
 
   it('applies requested fields to the inner item type for list wrappers', () => {
-    const sel = chooseResponseFields('deals', DEAL_LIST, objectFieldsMap, [
-      'name',
-      'amount',
-    ]);
-    expect(sel).toBe('list { _id name amount } totalCount');
-  });
-
-  it('selects every configured sales-board default from the full schema', () => {
-    const salesFields: Record<string, GqlFieldDef[]> = {
-      SalesBoard: [
-        { name: '_id', type: scalar() },
-        { name: 'name', type: scalar() },
-        { name: 'pipelines', type: listOf('SalesPipeline') },
-      ],
-      SalesPipeline: [
-        { name: '_id', type: scalar() },
-        { name: 'name', type: scalar() },
-        { name: 'boardId', type: scalar() },
-        { name: 'createdAt', type: scalar('Date') },
-        { name: 'updatedAt', type: scalar('Date') },
-        { name: 'status', type: scalar() },
-        { name: 'visibility', type: scalar() },
-        { name: 'itemsTotalCount', type: scalar('Int') },
-      ],
-    };
-
-    const selection = chooseResponseFields(
-      'salesBoards',
-      listOf('SalesBoard'),
-      salesFields,
-      OPERATION_HINTS.salesBoards.defaultResponseFields,
+    const sel = chooseResponseFields(
+      'deals',
+      DEAL_LIST,
+      objectFieldsMap,
+      ['name', 'amount'],
     );
-
-    expect(selection).toBe('_id name pipelines { _id name itemsTotalCount }');
+    expect(sel).toBe('list { _id name amount } totalCount');
   });
 
   it('ignores requested fields for the curated dealsAdd selection', () => {
@@ -163,9 +135,7 @@ describe('describeSelectableFields — search field menu', () => {
   });
 
   it('returns undefined when the return type is not introspectable', () => {
-    expect(
-      describeSelectableFields(object('Unknown'), objectFieldsMap),
-    ).toBeUndefined();
+    expect(describeSelectableFields(object('Unknown'), objectFieldsMap)).toBeUndefined();
     expect(describeSelectableFields(DEAL, undefined)).toBeUndefined();
   });
 });

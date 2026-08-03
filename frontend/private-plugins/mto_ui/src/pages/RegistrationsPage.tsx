@@ -1,6 +1,6 @@
-import { useApolloClient, useQuery } from '@apollo/client';
+import { useApolloClient, useLazyQuery, useQuery } from '@apollo/client';
 import { useState } from 'react';
-import { Button, Dialog, ScrollArea, Spinner } from 'erxes-ui';
+import { Button, Dialog, ScrollArea, Spinner, toast } from 'erxes-ui';
 import { MtoListPageLayout } from '~/components/MtoListPageLayout';
 import { RegistrationFilters } from '@/registration/components/RegistrationFilters';
 import { RegistrationsList } from '@/registration/components/RegistrationsList';
@@ -8,8 +8,19 @@ import { RegistrationFilters as RegistrationFiltersType } from '@/registration/t
 import { RegistrationFormSheet } from '@/registration/components/RegistrationFormSheet';
 import {
   MTO_REGISTRATION_APPLICATIONS,
+  MTO_REGISTRATION_APPLICATIONS_EXPORT,
   MTO_REGISTRATION_MEMBERSHIP_SUMMARIES,
 } from '@/registration/graphql/registrationQueries';
+
+function downloadCsv(content: string, filename: string) {
+  const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
 
 export function RegistrationsPage() {
   const client = useApolloClient();
@@ -19,6 +30,9 @@ export function RegistrationsPage() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [selectedTypeId, setSelectedTypeId] = useState<string | null>(null);
   const [selectedTitle, setSelectedTitle] = useState<string | undefined>();
+  const [exportCsv, { loading: exportLoading }] = useLazyQuery(
+    MTO_REGISTRATION_APPLICATIONS_EXPORT,
+  );
 
   const fillFormTypes = (data?.mtoRegistrationMembershipSummaries ?? []).slice(
     0,
@@ -43,6 +57,26 @@ export function RegistrationsPage() {
     }
   }
 
+  async function handleExport() {
+    try {
+      const result = await exportCsv({ variables: { ...filters } });
+      const csv = result.data?.mtoRegistrationApplicationsExport;
+      if (typeof csv !== 'string') {
+        throw new Error('Export returned empty data');
+      }
+      const date = new Date().toISOString().slice(0, 10);
+      downloadCsv(csv, `registrations-${date}.csv`);
+    } catch (e: unknown) {
+      const message =
+        e instanceof Error ? e.message : 'CSV export амжилтгүй боллоо';
+      toast({
+        title: 'Алдаа',
+        description: message,
+        variant: 'destructive',
+      });
+    }
+  }
+
   return (
     <>
       <MtoListPageLayout
@@ -52,15 +86,26 @@ export function RegistrationsPage() {
         filtersComponent={RegistrationFilters}
         listComponent={RegistrationsList}
         headerActions={
-          <Button
-            variant="outline"
-            size="sm"
-            type="button"
-            onClick={() => setChooserOpen(true)}
-            disabled={loading || !fillFormTypes.length}
-          >
-            Бүртгэл нэмэх
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              type="button"
+              onClick={() => void handleExport()}
+              disabled={exportLoading}
+            >
+              {exportLoading ? 'Export...' : 'Export CSV'}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              type="button"
+              onClick={() => setChooserOpen(true)}
+              disabled={loading || !fillFormTypes.length}
+            >
+              Бүртгэл нэмэх
+            </Button>
+          </div>
         }
       />
 

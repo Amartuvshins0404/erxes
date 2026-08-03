@@ -68,6 +68,7 @@ interface RegistrationDetailSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSaved?: () => void;
+  hideArchive?: boolean;
 }
 
 export function RegistrationDetailSheet({
@@ -75,6 +76,7 @@ export function RegistrationDetailSheet({
   open,
   onOpenChange,
   onSaved,
+  hideArchive,
 }: RegistrationDetailSheetProps) {
   const { confirm } = useConfirm();
   const { data, loading, error, refetch } = useQuery(
@@ -204,8 +206,8 @@ export function RegistrationDetailSheet({
     if (!applicationId) return;
 
     void confirm({
-      message: 'Та энэ бүртгэлийг устгахдаа итгэлтэй байна уу?',
-      options: { confirmationValue: 'delete' },
+      message: 'Та энэ бүртгэлийг архивлахдаа итгэлтэй байна уу?',
+      options: { confirmationValue: 'archive' },
     }).then(async () => {
       try {
         await removeApplication({ variables: { _id: applicationId } });
@@ -213,11 +215,11 @@ export function RegistrationDetailSheet({
         onSaved?.();
         toast({
           title: 'Амжилттай',
-          description: 'Бүртгэл устгагдлаа',
+          description: 'Бүртгэл архивлагдлаа',
         });
       } catch (e: unknown) {
         const message =
-          e instanceof Error ? e.message : 'Устгахад алдаа гарлаа';
+          e instanceof Error ? e.message : 'Архивлахад алдаа гарлаа';
         toast({
           title: 'Алдаа',
           description: message,
@@ -420,15 +422,17 @@ export function RegistrationDetailSheet({
                   >
                     Хаах
                   </Button>
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    size="sm"
-                    disabled={removeLoading}
-                    onClick={handleRemove}
-                  >
-                    Устгах
-                  </Button>
+                  {!hideArchive && !row?.archivedAt && (
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="sm"
+                      disabled={removeLoading}
+                      onClick={handleRemove}
+                    >
+                      Архивлах
+                    </Button>
+                  )}
                 </div>
               </>
             )}

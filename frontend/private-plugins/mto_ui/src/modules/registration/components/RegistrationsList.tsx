@@ -163,9 +163,11 @@ function MarkReadCell({
 function RemoveApplicationButton({
   id,
   onRemoved,
+  disabled,
 }: {
   id: string;
   onRemoved: () => void;
+  disabled?: boolean;
 }) {
   const { confirm } = useConfirm();
   const [removeApplication, { loading }] = useMutation(
@@ -174,8 +176,8 @@ function RemoveApplicationButton({
 
   const handleRemove = () => {
     void confirm({
-      message: 'Та энэ бүртгэлийг устгахдаа итгэлтэй байна уу?',
-      options: { confirmationValue: 'delete' },
+      message: 'Та энэ бүртгэлийг архивлахдаа итгэлтэй байна уу?',
+      options: { confirmationValue: 'archive' },
     }).then(() => {
       void removeApplication({ variables: { _id: id } }).then(onRemoved);
     });
@@ -186,9 +188,9 @@ function RemoveApplicationButton({
       type="button"
       variant="destructive"
       size="icon"
-      disabled={loading}
+      disabled={loading || disabled}
       onClick={handleRemove}
-      title="Устгах"
+      title="Архивлах"
     >
       <IconTrash size={16} />
     </Button>
@@ -200,11 +202,13 @@ function GroupSection({
   registrations,
   refetch,
   onOpenDetail,
+  hideArchive,
 }: {
   cpUserId: string | null;
   registrations: Record<string, unknown>[];
   refetch: () => void;
   onOpenDetail: (id: string) => void;
+  hideArchive?: boolean;
 }) {
   const { user } = useCpUser(cpUserId);
 
@@ -273,7 +277,9 @@ function GroupSection({
             >
               Дэлгэрэнгүй
             </Button>
-            <RemoveApplicationButton id={id} onRemoved={refetch} />
+            {!hideArchive && (
+              <RemoveApplicationButton id={id} onRemoved={refetch} />
+            )}
           </RecordTableInlineCell>
         );
       },
@@ -317,10 +323,12 @@ function GroupedRegistrationsView({
   groups,
   refetch,
   onOpenDetail,
+  hideArchive,
 }: {
   groups: [string | null, Record<string, unknown>[]][];
   refetch: () => void;
   onOpenDetail: (id: string) => void;
+  hideArchive?: boolean;
 }) {
   return (
     <div className="m-3 space-y-2">
@@ -331,6 +339,7 @@ function GroupedRegistrationsView({
           registrations={regs}
           refetch={refetch}
           onOpenDetail={onOpenDetail}
+          hideArchive={hideArchive}
         />
       ))}
     </div>
@@ -359,12 +368,19 @@ function statusBadgeVariant(status: string) {
 }
 
 export function RegistrationsList({ filters }: RegistrationsListProps) {
-  const { registrations, handleFetchMore, loading, pageInfo, refetch } =
-    useRegistrations(filters);
+  const {
+    registrations,
+    handleFetchMore,
+    loading,
+    pageInfo,
+    totalCount,
+    refetch,
+  } = useRegistrations(filters);
 
   const [detailId, setDetailId] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [groupByUser, setGroupByUser] = useState(false);
+  const hideArchive = Boolean(filters?.archived);
 
   const grouped = useMemo(() => {
     if (!groupByUser || !registrations) return [];
@@ -455,10 +471,12 @@ export function RegistrationsList({ filters }: RegistrationsListProps) {
             >
               Дэлгэрэнгүй
             </Button>
-            <RemoveApplicationButton
-              id={id}
-              onRemoved={() => void refetch()}
-            />
+            {!hideArchive && (
+              <RemoveApplicationButton
+                id={id}
+                onRemoved={() => void refetch()}
+              />
+            )}
           </RecordTableInlineCell>
         );
       },
@@ -487,6 +505,7 @@ export function RegistrationsList({ filters }: RegistrationsListProps) {
             setDetailId(id);
             setDetailOpen(true);
           }}
+          hideArchive={hideArchive}
         />
       ) : (
         <RecordTable.Provider
@@ -517,6 +536,10 @@ export function RegistrationsList({ filters }: RegistrationsListProps) {
         </RecordTable.Provider>
       )}
 
+      <div className="px-3 pb-3 text-sm text-muted-foreground">
+        Нийт: {totalCount ?? 0}
+      </div>
+
       <RegistrationDetailSheet
         applicationId={detailId}
         open={detailOpen}
@@ -527,6 +550,7 @@ export function RegistrationsList({ filters }: RegistrationsListProps) {
         onSaved={() => {
           void refetch();
         }}
+        hideArchive={hideArchive}
       />
     </>
   );

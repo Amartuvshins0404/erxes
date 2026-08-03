@@ -410,6 +410,10 @@ export const registrationMutations: Record<string, Resolver> = {
 
     assertApplicationInstanceMatches(existing, instanceId);
 
+    if (existing.archivedAt) {
+      throw new Error('Application is already archived');
+    }
+
     await models.RegistrationApplication.removeApplicationById(_id, subdomain);
     return { success: true };
   },

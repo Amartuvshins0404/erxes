@@ -19,4 +19,5 @@ export interface IRegistrationApplication {
   invoiceId?: string;
   paymentStatus?: RegistrationPaymentStatus;
   membershipFeeAmount?: number;
+  archivedAt?: Date | null;
 }

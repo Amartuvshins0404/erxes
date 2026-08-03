@@ -1,4 +1,4 @@
-import { IconCircleFilled, IconMailOpened, IconSelector, IconUsers } from '@tabler/icons-react';
+import { IconCircleFilled, IconMailOpened, IconSelector, IconTrash, IconUsers } from '@tabler/icons-react';
 import { ColumnDef } from '@tanstack/table-core';
 import {
   Badge,
@@ -8,6 +8,7 @@ import {
   RecordTable,
   RecordTableInlineCell,
   RelativeDateDisplay,
+  useConfirm,
 } from 'erxes-ui';
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery } from '@apollo/client';
@@ -17,7 +18,11 @@ import { RegistrationFilters as RegistrationFiltersType } from '@/registration/t
 import { RegistrationDetailSheet } from '@/registration/components/RegistrationDetailSheet';
 import { GET_CLIENT_PORTAL_USER_FOR_SELECT } from '@/registration/graphql/clientPortalUsersQueries';
 import { IClientPortalUserRow } from '@/registration/components/ClientPortalUserSelect';
-import { MTO_REGISTRATION_APPLICATION_UPDATE, MTO_REGISTRATION_APPLICATION_MARK_READ } from '@/registration/graphql/registrationMutations';
+import {
+  MTO_REGISTRATION_APPLICATION_MARK_READ,
+  MTO_REGISTRATION_APPLICATION_REMOVE,
+  MTO_REGISTRATION_APPLICATION_UPDATE,
+} from '@/registration/graphql/registrationMutations';
 
 function formatCpUserLabel(u: IClientPortalUserRow): string {
   const name = [u.firstName, u.lastName].filter(Boolean).join(' ').trim();
@@ -155,6 +160,41 @@ function MarkReadCell({
   );
 }
 
+function RemoveApplicationButton({
+  id,
+  onRemoved,
+}: {
+  id: string;
+  onRemoved: () => void;
+}) {
+  const { confirm } = useConfirm();
+  const [removeApplication, { loading }] = useMutation(
+    MTO_REGISTRATION_APPLICATION_REMOVE,
+  );
+
+  const handleRemove = () => {
+    void confirm({
+      message: 'Та энэ бүртгэлийг устгахдаа итгэлтэй байна уу?',
+      options: { confirmationValue: 'delete' },
+    }).then(() => {
+      void removeApplication({ variables: { _id: id } }).then(onRemoved);
+    });
+  };
+
+  return (
+    <Button
+      type="button"
+      variant="destructive"
+      size="icon"
+      disabled={loading}
+      onClick={handleRemove}
+      title="Устгах"
+    >
+      <IconTrash size={16} />
+    </Button>
+  );
+}
+
 function GroupSection({
   cpUserId,
   registrations,
@@ -233,6 +273,7 @@ function GroupSection({
             >
               Дэлгэрэнгүй
             </Button>
+            <RemoveApplicationButton id={id} onRemoved={refetch} />
           </RecordTableInlineCell>
         );
       },
@@ -414,6 +455,10 @@ export function RegistrationsList({ filters }: RegistrationsListProps) {
             >
               Дэлгэрэнгүй
             </Button>
+            <RemoveApplicationButton
+              id={id}
+              onRemoved={() => void refetch()}
+            />
           </RecordTableInlineCell>
         );
       },

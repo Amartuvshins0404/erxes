@@ -109,4 +109,7 @@ export const mutations = `
   mtoRegistrationApplicationPaymentUrl(
     _id: String!
   ): String
+  mtoRegistrationApplicationRemove(
+    _id: String!
+  ): JSON
 `;

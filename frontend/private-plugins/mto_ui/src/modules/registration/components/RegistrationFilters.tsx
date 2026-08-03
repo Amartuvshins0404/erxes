@@ -51,7 +51,12 @@ export function RegistrationFilters({
   }
 
   return (
-    <MtoFilterBase filters={filters} onFiltersChange={onFiltersChange}>
+    <MtoFilterBase
+      filters={filters}
+      onFiltersChange={onFiltersChange}
+      contentClassName="w-[36rem] max-w-[calc(100vw-2rem)]"
+      bodyClassName="grid grid-cols-2 gap-4"
+    >
       <FilterField label="Төрөл">
         <Select
           value={filters.membershipTypeId || '__all__'}
@@ -181,7 +186,7 @@ export function RegistrationFilters({
           placeholder="Бүх портал"
         />
       </FilterField>
-      <FilterField label="CP хэрэглэгч">
+      <FilterField label="CP хэрэглэгч" className="col-span-2">
         <ClientPortalUserSelect
           clientPortalIdFilter={cpPortalRemoteId}
           value={filters.cpUserId}

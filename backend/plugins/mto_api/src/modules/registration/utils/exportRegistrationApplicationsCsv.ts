@@ -1,5 +1,7 @@
+import { FlattenMaps } from 'mongoose';
 import { IModels } from '~/connectionResolvers';
 import { getRegistrationFormDefinition } from '@/registration/schemas/registry';
+import { IRegistrationApplicationDocument } from '@/registration/@types/registrationApplicationDocument';
 
 const EXPORT_LIMIT = 5000;
 
@@ -90,30 +92,35 @@ export async function exportRegistrationApplicationsCsv(
   const rows: string[] = [header.join(',')];
 
   for (const doc of docs) {
-    const answers = (doc.answers ?? {}) as Record<string, unknown>;
-    const membershipTypeId = String(doc.membershipTypeId ?? '');
-    const schemaVersion = String(doc.schemaVersion ?? '');
+    const record = doc as FlattenMaps<IRegistrationApplicationDocument> & {
+      _id: string;
+      createdAt?: Date | string;
+    };
+    const answers = (record.answers ?? {}) as Record<string, unknown>;
+    const membershipTypeId = String(record.membershipTypeId ?? '');
+    const schemaVersion = String(record.schemaVersion ?? '');
     const def = await getRegistrationFormDefinition(
       models,
       membershipTypeId,
       schemaVersion,
     );
 
+    const createdAt =
+      record.createdAt instanceof Date
+        ? record.createdAt.toISOString()
+        : record.createdAt;
+
     rows.push(
       [
-        csvEscape(doc._id),
+        csvEscape(record._id),
         csvEscape(membershipTypeId),
         csvEscape(def?.title ?? membershipTypeId),
-        csvEscape(doc.status),
+        csvEscape(record.status),
         csvEscape(resolveName(answers)),
         csvEscape(answerString(answers, 'registration_number')),
         csvEscape(answerString(answers, 'contact_email')),
-        csvEscape(doc.paymentStatus),
-        csvEscape(
-          doc.createdAt instanceof Date
-            ? doc.createdAt.toISOString()
-            : doc.createdAt,
-        ),
+        csvEscape(record.paymentStatus),
+        csvEscape(createdAt),
         csvEscape(resolveActivityCategories(answers)),
       ].join(','),
     );

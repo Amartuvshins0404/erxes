@@ -20,4 +20,6 @@ export interface IRegistrationApplication {
   paymentStatus?: RegistrationPaymentStatus;
   membershipFeeAmount?: number;
   archivedAt?: Date | null;
+  createdAt?: Date;
+  modifiedAt?: Date;
 }

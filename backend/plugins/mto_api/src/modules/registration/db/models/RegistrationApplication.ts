@@ -32,7 +32,7 @@ export interface IRegistrationApplicationModel extends Model<IRegistrationApplic
   removeApplicationById(
     _id: string,
     subdomain: string,
-  ): Promise<{ deletedCount?: number }>;
+  ): Promise<IRegistrationApplicationDocument | null>;
 }
 
 export const loadRegistrationApplicationClass = (models: IModels) => {
@@ -123,7 +123,11 @@ export const loadRegistrationApplicationClass = (models: IModels) => {
     }
 
     public static async removeApplicationById(_id: string, subdomain: string) {
-      return models.RegistrationApplication.deleteOne({ _id, subdomain });
+      return models.RegistrationApplication.findOneAndUpdate(
+        { _id, subdomain },
+        { $set: { archivedAt: new Date(), modifiedAt: new Date() } },
+        { new: true },
+      );
     }
   }
 

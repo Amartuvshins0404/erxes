@@ -1,7 +1,9 @@
 import { useMutation, useQuery } from '@apollo/client';
 import {
+  Badge,
   Button,
   Checkbox,
+  Collapsible,
   Input,
   Label,
   ScrollArea,
@@ -31,6 +33,7 @@ import {
   createEmptyField,
   createEmptyOption,
   createEmptySection,
+  getLatestSchemaVersion,
   moveItem,
   normalizeSectionsFromUnknown,
   validateSchemaSections,
@@ -119,7 +122,10 @@ export function RegistrationSchemasBuilderPage() {
     MTO_REGISTRATION_FORM_SCHEMA_REMOVE,
   );
 
-  const rows: SchemaRow[] = data?.mtoRegistrationFormSchemas ?? [];
+  const rows: SchemaRow[] = useMemo(
+    () => data?.mtoRegistrationFormSchemas ?? [],
+    [data?.mtoRegistrationFormSchemas],
+  );
   const [sheetOpen, setSheetOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [membershipTypeId, setMembershipTypeId] = useState('');
@@ -164,6 +170,37 @@ export function RegistrationSchemasBuilderPage() {
     }
     return map;
   }, [summariesData]);
+
+  const groupedSchemas = useMemo(() => {
+    const map = new Map<string, SchemaRow[]>();
+    for (const row of rows) {
+      const key = row.membershipTypeId;
+      const existing = map.get(key);
+      if (existing) {
+        existing.push(row);
+      } else {
+        map.set(key, [row]);
+      }
+    }
+
+    return Array.from(map.entries()).sort(([aId], [bId]) => {
+      const aTitle = membershipTypeTitleById.get(aId) ?? aId;
+      const bTitle = membershipTypeTitleById.get(bId) ?? bId;
+      return aTitle.localeCompare(bTitle);
+    });
+  }, [rows, membershipTypeTitleById]);
+
+  const latestSchemaVersionForType = useMemo(() => {
+    if (!membershipTypeId) return null;
+    const versions = rows
+      .filter(
+        (row) =>
+          row.membershipTypeId === membershipTypeId &&
+          row._id !== selectedId,
+      )
+      .map((row) => row.schemaVersion);
+    return getLatestSchemaVersion(versions);
+  }, [rows, membershipTypeId, selectedId]);
 
   const hasUsedApplications = (selected?.applicationsCount ?? 0) > 0;
   const mutationLoading = creating || updating || removing;
@@ -310,21 +347,48 @@ export function RegistrationSchemasBuilderPage() {
 
         <ScrollArea className="flex-auto">
           <div className="space-y-2 px-6 pb-6">
-            {rows.map((row) => (
-              <button
-                key={row._id}
-                type="button"
-                className="w-full border rounded-md p-3 text-left"
-                onClick={() => openEditSheet(row)}
-              >
-                <p className="font-medium">{row.title}</p>
-                <p className="text-xs text-muted-foreground">
-                  {membershipTypeTitleById.get(row.membershipTypeId) ??
-                    row.membershipTypeId}{' '}
-                  / {row.schemaVersion}
-                </p>
-              </button>
-            ))}
+            {groupedSchemas.map(([typeId, schemas]) => {
+              const typeTitle =
+                membershipTypeTitleById.get(typeId) ?? typeId;
+
+              return (
+                <Collapsible
+                  key={typeId}
+                  defaultOpen
+                  className="border rounded-md overflow-hidden"
+                >
+                  <Collapsible.Trigger asChild>
+                    <button
+                      type="button"
+                      className="w-full flex items-center gap-3 px-3 py-2 bg-muted/50 hover:bg-muted text-sm font-medium text-left"
+                    >
+                      <Collapsible.TriggerIcon size={14} />
+                      <span className="flex-1 truncate">{typeTitle}</span>
+                      <Badge variant="secondary" className="shrink-0">
+                        {schemas.length}
+                      </Badge>
+                    </button>
+                  </Collapsible.Trigger>
+                  <Collapsible.Content>
+                    <div className="space-y-2 p-2">
+                      {schemas.map((row) => (
+                        <button
+                          key={row._id}
+                          type="button"
+                          className="w-full border rounded-md p-3 text-left hover:bg-muted/40"
+                          onClick={() => openEditSheet(row)}
+                        >
+                          <p className="font-medium">{row.title}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {row.schemaVersion}
+                          </p>
+                        </button>
+                      ))}
+                    </div>
+                  </Collapsible.Content>
+                </Collapsible>
+              );
+            })}
           </div>
         </ScrollArea>
       </div>
@@ -377,6 +441,12 @@ export function RegistrationSchemasBuilderPage() {
                     onChange={(e) => setSchemaVersion(e.target.value)}
                     placeholder="schemaVersion"
                   />
+                  {latestSchemaVersionForType ? (
+                    <p className="text-xs text-muted-foreground">
+                      Must be greater than the latest version (
+                      {latestSchemaVersionForType})
+                    </p>
+                  ) : null}
                 </div>
               </div>
               <Input

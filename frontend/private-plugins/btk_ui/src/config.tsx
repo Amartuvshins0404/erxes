@@ -13,6 +13,11 @@ export const CONFIG: IUIConfig = {
   path: 'btk',
   modules: [
     {
+      name: 'companies',
+      icon: IconBusinessplan,
+      path: 'btk/companies',
+    },
+    {
       name: 'btk',
       icon: IconBusinessplan,
       path: 'btk',

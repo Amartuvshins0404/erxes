@@ -20,6 +20,11 @@ export const CONFIG: IUIConfig = {
   hasFloatingWidget: true,
   modules: [
     {
+      name: 'developer info',
+      icon: IconBlocks,
+      path: 'block/developer-info',
+    },
+    {
       name: 'block',
       icon: IconBlocks,
       path: 'block',

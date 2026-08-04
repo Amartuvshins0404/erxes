@@ -11,6 +11,7 @@ import {
   isRealToolData,
   isSearchResult,
 } from '@/agent/fallback';
+import { ensureWebsiteDeliveryReply } from '@/agent/websiteDelivery';
 
 // Turn execution (blocking). Runs a single agent turn over the full
 // conversation array and returns the reply text (or null). With native
@@ -37,21 +38,35 @@ export async function runAgentTurn(params: {
       agent.generate(input, genOpts),
     );
 
-    if (result.text) return result.text;
-
-    // Collect tool results from all steps, deduplicated.
     const uniqueResults = dedupeToolResults([
       ...(result.toolResults || []),
       ...(result.steps || []).flatMap((step) => step.toolResults || []),
     ]);
+    const publishAttempted = uniqueResults.some(
+      (toolResult) =>
+        (toolResult.toolName || toolResult.name) === 'publishWebsite',
+    );
+
+    if (result.text) {
+      return ensureWebsiteDeliveryReply({
+        reply: result.text,
+        publishAttempted,
+        websiteArtifactCount: authCtx.websiteArtifactCount,
+      });
+    }
 
     if (!uniqueResults.length) return null;
 
-    return await synthesizeFromToolResults({
+    const reply = await synthesizeFromToolResults({
       agent,
       message,
       authCtx,
       toolResults: uniqueResults,
+    });
+    return ensureWebsiteDeliveryReply({
+      reply,
+      publishAttempted,
+      websiteArtifactCount: authCtx.websiteArtifactCount,
     });
   } catch (err) {
     throw toUserFacingError(err);

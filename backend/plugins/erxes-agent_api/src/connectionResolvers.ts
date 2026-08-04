@@ -53,6 +53,11 @@ import {
   IMastraArtifactModel,
 } from '@/artifact/db/models/Artifact';
 import { IMastraArtifactDocument } from '@/artifact/@types/artifact';
+import {
+  IMastraSandboxSessionDocument,
+  IMastraSandboxSessionModel,
+} from '@/sandbox/@types/session';
+import { sandboxSessionSchema } from '@/sandbox/db/definitions/session';
 
 export interface IModels {
   MastraAgent: IMastraAgentModel;
@@ -65,6 +70,7 @@ export interface IModels {
   MastraLearning: IMastraLearningModel;
   MastraFeedback: IMastraFeedbackModel;
   MastraArtifact: IMastraArtifactModel;
+  MastraSandboxSession: IMastraSandboxSessionModel;
 }
 
 export interface IContext extends IMainContext {
@@ -126,6 +132,11 @@ export const loadClasses = (db: mongoose.Connection): IModels => {
     IMastraArtifactDocument,
     IMastraArtifactModel
   >('mastra_artifacts', loadArtifactClass(models));
+
+  models.MastraSandboxSession = db.model<
+    IMastraSandboxSessionDocument,
+    IMastraSandboxSessionModel
+  >('mastra_sandbox_sessions', sandboxSessionSchema);
 
   return models;
 };

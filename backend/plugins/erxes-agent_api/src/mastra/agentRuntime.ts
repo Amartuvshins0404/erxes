@@ -29,16 +29,23 @@ import { isWorkspaceMemoryEnabled } from './memory/config';
 import { getMastraMemory } from './memory/mastraMemory';
 import { ToolCallSignalFilter } from './memory/toolCallSignalFilter';
 import {
+  ProviderCompletionGuard,
+  shouldGuardProviderOutput,
+} from './providerOutputGuard';
+import { resolveTurnExecutionPolicy } from './executionPolicy';
+import {
   evaluationConfigFingerprint,
   isEvaluationEnabled,
 } from './scoring/config';
-import {
-  buildAgentScorers,
-  type AgentScorerEntry,
-} from './scoring/scorers';
+import { buildAgentScorers, type AgentScorerEntry } from './scoring/scorers';
 import { getObservabilityHost } from './scoring/observability';
 import { getSkillsWorkspace } from '@/skills/store/skillsWorkspace';
 import { createMakeSkillTool } from '@/skills/tools/makeSkill';
+import { createTerminalTool } from './tools/terminalTool';
+import {
+  createPublishWebsiteTool,
+  createWorkspaceWriteTool,
+} from './tools/workspaceTools';
 import type { OperationRegistry } from './tools/operationRegistry';
 import type { IMastraProviderDocument } from '@/provider/@types/provider';
 import type { IMastraSettingsDocument } from '@/settings/@types/settings';
@@ -119,7 +126,7 @@ const enforceDelegatedPermissionCeiling = async ({
 };
 
 // Increment this whenever routing.ts, the meta-tools, or provider logic changes.
-const ROUTING_VERSION = 33;
+const ROUTING_VERSION = 36;
 
 export interface AgentWithTools {
   agent: Agent;
@@ -263,6 +270,43 @@ function assembleAgentTools(params: {
     });
   }
 
+  if (isBuiltinAllowed('terminal', policy)) {
+    const terminalTool = createTerminalTool({
+      models,
+      agentId: agentConfig._id,
+    });
+    const workspaceWriteTool = createWorkspaceWriteTool({
+      models,
+      agentId: agentConfig._id,
+    });
+    const publishWebsiteTool = createPublishWebsiteTool({
+      models,
+      agentId: agentConfig._id,
+    });
+    Object.assign(tools, {
+      terminal: terminalTool,
+      workspaceWrite: workspaceWriteTool,
+      publishWebsite: publishWebsiteTool,
+    });
+    builtinInfos.push(
+      {
+        id: 'terminal',
+        name: 'terminal',
+        description: terminalTool.description,
+      },
+      {
+        id: 'workspaceWrite',
+        name: 'workspaceWrite',
+        description: workspaceWriteTool.description,
+      },
+      {
+        id: 'publishWebsite',
+        name: 'publishWebsite',
+        description: publishWebsiteTool.description,
+      },
+    );
+  }
+
   // file_reader is bound regardless of policy: the agent must always be able to
   // open a file the user attached or one it generated. (It only reads files from
   // this instance's own storage / artifacts — no external reach.)
@@ -293,26 +337,6 @@ function assembleAgentTools(params: {
   }
 
   return { tools, operationTools, builtinInfos };
-}
-
-/**
- * Step budget for a turn. Workflow builds are 20+ steps (guide → searches →
- * validate → simulate → save → run), so workflow-capable agents floor at 32.
- * Pure chat/search/chart agents only ever need ~5 steps — use the configured
- * value with a floor of 8 so they don't waste LLM round-trips. Tool-less agents
- * take the configured value verbatim.
- */
-function resolveMaxSteps(
-  agentConfig: IMastraAgentDocument,
-  toolNames: string[],
-  hasErxes: boolean,
-): number {
-  const configuredSteps = agentConfig.maxSteps || 8;
-  const hasWorkflowTools = toolNames.some((k) => k.startsWith('workflow'));
-  const stepFloor = hasWorkflowTools ? 32 : 8;
-  return toolNames.length || hasErxes
-    ? Math.max(configuredSteps, stepFloor)
-    : configuredSteps;
 }
 
 /**
@@ -394,11 +418,13 @@ export async function getOrCreateAgent(
     subdomain: subdomain || 'os',
     permissionGroupIds: account.permissionGroupIds ?? [],
     customPermissions: account.customPermissions ?? [],
+    additionalTools: agentConfig.additionalTools,
     registry,
   });
   const permissionFingerprint = JSON.stringify([
     account.permissionGroupIds ?? [],
     account.customPermissions ?? [],
+    agentConfig.additionalTools ?? [],
   ]);
   const providerFingerprint = providerRuntimeFingerprint(providers);
   const policy: ToolPolicy = { mode: 'custom', allowed: allowedTools };
@@ -464,7 +490,10 @@ export async function getOrCreateAgent(
     builtins: builtinInfos,
   });
 
-  const maxSteps = resolveMaxSteps(agentConfig, toolNames, hasErxes);
+  const executionPolicy = resolveTurnExecutionPolicy({
+    configuredMaxSteps: agentConfig.maxSteps,
+    hasTools: toolNames.length > 0 || hasErxes,
+  });
 
   // Configured sampling temperature. Unset → provider/SDK default (the legacy
   // loop hardcodes 0, which models like Kimi thinking — "only 1 is allowed" —
@@ -492,6 +521,11 @@ export async function getOrCreateAgent(
     ? getSkillsWorkspace(subdomain || 'os', agentConfig.skills)
     : undefined;
 
+  const completionGuard =
+    toolNames.length > 0 && shouldGuardProviderOutput(agentConfig.model)
+      ? new ProviderCompletionGuard()
+      : null;
+
   const inputProcessors = [
     ...(hasErxes
       ? [
@@ -503,7 +537,9 @@ export async function getOrCreateAgent(
         ]
       : []),
     ...(memory ? [new ToolCallSignalFilter()] : []),
+    ...(completionGuard ? [completionGuard] : []),
   ];
+  const outputProcessors = completionGuard ? [completionGuard] : [];
 
   const agent = new Agent({
     id: agentConfig._id,
@@ -513,13 +549,17 @@ export async function getOrCreateAgent(
     tools: toolNames.length ? tools : undefined,
     ...(memory ? { memory } : {}),
     ...(inputProcessors.length ? { inputProcessors } : {}),
+    ...(outputProcessors.length
+      ? { outputProcessors, maxProcessorRetries: 8 }
+      : {}),
     ...(scorers ? { scorers } : {}),
     ...(skillsWorkspace ? { workspace: skillsWorkspace } : {}),
     // generate()/stream() read defaultOptions. Temperature is only set when the
     // agent configures it — otherwise the provider default applies (sending an
     // explicit 0 is what reasoning models like Kimi reject).
     defaultOptions: {
-      maxSteps,
+      maxSteps: executionPolicy.maxSteps,
+      toolCallConcurrency: executionPolicy.toolCallConcurrency,
       ...(hasTemperature ? { modelSettings: { temperature } } : {}),
     },
   } as never);

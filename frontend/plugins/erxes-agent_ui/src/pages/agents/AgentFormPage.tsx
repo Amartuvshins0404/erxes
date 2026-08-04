@@ -54,6 +54,7 @@ export const AgentFormPage = ({
       provider: record.provider || '',
       model: record.model || '',
       permissionGroupIds: record.permissionGroupIds,
+      additionalTools: record.additionalTools || [],
       destructiveOps: record.destructiveOps === 'allow' ? 'allow' : 'ask',
       memoryEnabled: record.memoryEnabled ?? true,
       debug: record.debug ?? false,

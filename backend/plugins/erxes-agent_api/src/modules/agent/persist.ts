@@ -19,7 +19,10 @@ export async function persistTurn(params: {
   // One-line "what this turn accomplished" headline for the collapsed trace.
   turnSummary?: string;
   assistantMessageId?: string;
+  // Replace native intermediate text blocks with the guarded final reply.
+  replaceNativeText?: boolean;
   interrupted?: boolean;
+  hasArtifacts?: boolean;
 }): Promise<{
   titlePromise: Promise<string | null>;
   assistantMessageId: string | null;
@@ -31,6 +34,8 @@ export async function persistTurn(params: {
     reasoningSummaries,
     turnSummary,
     interrupted,
+    hasArtifacts,
+    replaceNativeText,
   } = params;
   const { useMemory, memCtx, agentConfig, attachments } = prepared;
 
@@ -57,6 +62,7 @@ export async function persistTurn(params: {
         assistantMessageId,
         turnStartedAt: prepared.authCtx?.turnStartedAt,
         interrupted,
+        replaceNativeText,
       });
     } catch (e) {
       console.warn(
@@ -67,28 +73,26 @@ export async function persistTurn(params: {
     }
   }
 
-  // Link this turn's generated artifacts to the assistant message so the chat
-  // can re-render their inline cards on reload (the dedicated store survives,
-  // unlike the native-store message meta). Best-effort.
+  // Link only turns that actually persisted artifacts. Ordinary chat turns
+  // otherwise issued an unproductive updateMany against the artifact store.
   const turnId = prepared.authCtx?.turnId;
-  if (nativeAssistantId && turnId) {
-    await params.models.MastraArtifact.linkTurnToMessage(
-      turnId,
-      nativeAssistantId,
-    ).catch((e) =>
+  if (hasArtifacts) {
+    if (nativeAssistantId && turnId) {
+      await params.models.MastraArtifact.linkTurnToMessage(
+        turnId,
+        nativeAssistantId,
+      ).catch((e) =>
+        console.warn(
+          `[artifact-store] turn→message link skipped: ${
+            (e as Error)?.message || e
+          }`,
+        ),
+      );
+    } else if (turnId) {
       console.warn(
-        `[artifact-store] turn→message link skipped: ${
-          (e as Error)?.message || e
-        }`,
-      ),
-    );
-  } else if (turnId) {
-    // The turn produced artifacts (turnId stamped) but we never recovered the
-    // assistant message id, so their inline cards can't be re-attached on reload.
-    // Surface it — this is the one thing that silently breaks the card rehydration.
-    console.warn(
-      '[artifact-store] turn→message link skipped: no assistant message id recovered',
-    );
+        '[artifact-store] turn→message link skipped: no assistant message id recovered',
+      );
+    }
   }
 
   return { titlePromise, assistantMessageId: nativeAssistantId };
@@ -121,6 +125,27 @@ const isFromTurn = (m: NativeChatMessage, turnStartedAt?: Date): boolean => {
   );
 };
 
+function replaceNativeAssistantText(
+  content: NativeChatMessage['content'],
+  reply: string,
+): Record<string, unknown> {
+  const base = (content ?? {}) as Record<string, unknown>;
+  const parts = Array.isArray(base.parts) ? base.parts : [];
+  return {
+    ...base,
+    content: reply,
+    parts: [
+      ...parts.filter(
+        (part) =>
+          !part ||
+          typeof part !== 'object' ||
+          (part as { type?: unknown }).type !== 'text',
+      ),
+      { type: 'text', text: reply },
+    ],
+  };
+}
+
 function mergeErxesMeta(
   content: NativeChatMessage['content'],
   erxes: Record<string, unknown>,
@@ -145,10 +170,16 @@ export async function patchNativeTurn(params: {
   assistantMessageId?: string;
   turnStartedAt?: Date;
   interrupted?: boolean;
+  replaceNativeText?: boolean;
 }): Promise<string | null> {
   const { subdomain, binding, agentId, reply, attachments } = params;
-  const { reasoningSummaries, turnSummary, assistantMessageId, interrupted } =
-    params;
+  const {
+    reasoningSummaries,
+    turnSummary,
+    assistantMessageId,
+    interrupted,
+    replaceNativeText,
+  } = params;
   const { turnStartedAt } = params;
 
   // The erxes-meta fields to stamp onto the assistant message (only the present
@@ -169,7 +200,9 @@ export async function patchNativeTurn(params: {
   );
 
   const wantUser = Boolean(attachments?.length);
-  const wantAssistant = Object.keys(assistantMeta).length > 0;
+  const wantAssistant =
+    Object.keys(assistantMeta).length > 0 ||
+    Boolean(replaceNativeText && reply);
 
   if (!wantUser && !wantAssistant && (assistantMessageId || !reply)) {
     return assistantMessageId ?? null;
@@ -229,10 +262,14 @@ export async function patchNativeTurn(params: {
   }
 
   if (wantAssistant && assistantMsg) {
+    const content =
+      replaceNativeText && reply
+        ? replaceNativeAssistantText(assistantMsg.content, reply)
+        : assistantMsg.content;
     await patchNativeMessages(subdomain, [
       {
         id: assistantMsg.id,
-        content: mergeErxesMeta(assistantMsg.content, assistantMeta),
+        content: mergeErxesMeta(content, assistantMeta),
       },
     ]);
   }

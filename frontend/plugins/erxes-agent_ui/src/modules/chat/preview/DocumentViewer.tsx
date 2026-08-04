@@ -1,250 +1,245 @@
-import { useEffect, useRef, useState } from 'react';
-import { IconDownload, IconLoader2 } from '@tabler/icons-react';
-import { Button } from 'erxes-ui';
-import '@js-preview/excel/lib/index.css';
+import { useEffect, useState, type ReactNode } from 'react';
+import { IconCode, IconEye, IconLoader2 } from '@tabler/icons-react';
 import {
-  DocumentArtifact,
+  audioPlugin,
+  imagePlugin,
+  officePlugin,
+  pdfPlugin,
+  textPlugin,
+  videoPlugin,
+} from '@open-file-viewer/core';
+import type { PreviewPlugin } from '@open-file-viewer/core';
+import '@open-file-viewer/core/style.css';
+import { FileViewer } from '@open-file-viewer/react';
+import { Tabs } from 'erxes-ui';
+import { useTranslation } from 'react-i18next';
+import { useIsDark } from '~/lib/useIsDark';
+import {
   documentUrl,
-  slideUrls,
+  websiteUrl,
+  type DocumentArtifact,
+  type WebsiteArtifact,
 } from '~/modules/chat/lib/artifacts';
 
-// Inline document rendering in the Preview panel — fully client-side (no
-// external service, no CDN), so private files never leave the instance:
-//   • PDF  → fetch bytes → same-origin blob: URL → native <iframe> viewer.
-//   • DOCX → docx-preview (jszip + DOM, browser-native, no Node polyfills).
-//   • XLSX → @js-preview/excel (x-data-spreadsheet grid).
-//   • PPTX → @aiden0z/pptx-renderer (parses OOXML → HTML/SVG, browser-native).
-// The heavy renderers are loaded on demand (dynamic import).
+const pdfOptions = {
+  workerSrc: new URL(
+    'pdfjs-dist/build/pdf.worker.min.mjs',
+    import.meta.url,
+  ).toString(),
+};
 
-type Phase = 'loading' | 'ready' | 'error';
+const previewPlugins: PreviewPlugin[] = [
+  imagePlugin(),
+  pdfPlugin(pdfOptions),
+  officePlugin({ pdf: pdfOptions }),
+  textPlugin(),
+  audioPlugin(),
+  videoPlugin(),
+];
 
-interface DocPreviewer {
-  preview: (src: ArrayBuffer | Blob | string) => Promise<unknown>;
-  destroy: () => void;
-}
+const DocumentFileViewer = ({
+  artifact,
+}: {
+  artifact: DocumentArtifact | WebsiteArtifact;
+}) => {
+  const isDark = useIsDark();
 
-interface Disposable {
-  destroy?: () => void;
-  dispose?: () => void;
-}
-
-// A generated pptx deck arrives as per-slide PNGs (artifact.slides). Render them
-// directly as framed cards — no OOXML parsing, pixel-faithful to the backend's
-// render — and keep @aiden0z as the fallback for older decks with no slides.
-const SlideImageDeck = ({ artifact }: { artifact: DocumentArtifact }) => {
-  const urls = slideUrls(artifact);
   return (
-    <div className="ea-scroll ea-pptx-stage h-full w-full overflow-auto">
-      <div className="ea-pptx-deck">
-        {urls.map((url, i) => (
-          <img
-            key={url}
-            src={url}
-            alt={`Slide ${i + 1}`}
-            className="ea-slide-img"
-            loading="lazy"
-            draggable={false}
-          />
-        ))}
-      </div>
-    </div>
+    <FileViewer
+      key={`${artifact.id}:${artifact.fileKey}`}
+      file={documentUrl(artifact)}
+      fileName={artifact.fileName}
+      mimeType={artifact.mimeType}
+      width="100%"
+      height="100%"
+      fit="contain"
+      plugins={previewPlugins}
+      fallback="inline"
+      theme={isDark ? 'dark' : 'light'}
+      toolbar={{
+        zoom: true,
+        rotate: true,
+        fullscreen: true,
+        print: true,
+        search: true,
+        download: true,
+      }}
+      className="h-full min-h-0 w-full"
+      style={{ minHeight: 0 }}
+    />
   );
 };
 
-export const DocumentViewer = ({ artifact }: { artifact: DocumentArtifact }) => {
-  if (artifact.format === 'pptx' && artifact.slides?.length) {
-    return <SlideImageDeck artifact={artifact} />;
-  }
-  return <DocumentRenderer artifact={artifact} />;
+type HtmlDocumentView = 'code' | 'preview';
+type HtmlPreviewStatus = 'idle' | 'loading' | 'ready' | 'error';
+
+const ViewerTabs = ({
+  view,
+  onViewChange,
+  code,
+  preview,
+}: {
+  view: HtmlDocumentView;
+  onViewChange: (view: HtmlDocumentView) => void;
+  code: ReactNode;
+  preview: ReactNode;
+}) => {
+  const { t } = useTranslation('erxes-agent');
+
+  return (
+    <Tabs
+      value={view}
+      onValueChange={(value) =>
+        onViewChange(value === 'preview' ? 'preview' : 'code')
+      }
+      className="flex h-full min-h-0 flex-col"
+    >
+      <div className="shrink-0 border-b px-3 py-2">
+        <Tabs.List>
+          <Tabs.Trigger value="code">
+            <IconCode className="mr-1.5 size-4" />
+            {t('artifact-html-code')}
+          </Tabs.Trigger>
+          <Tabs.Trigger value="preview">
+            <IconEye className="mr-1.5 size-4" />
+            {t('artifact-html-preview')}
+          </Tabs.Trigger>
+        </Tabs.List>
+      </div>
+
+      <Tabs.Content
+        value="code"
+        className="m-0 min-h-0 flex-1 data-[state=active]:flex"
+      >
+        {code}
+      </Tabs.Content>
+      <Tabs.Content
+        value="preview"
+        className="m-0 min-h-0 flex-1 data-[state=active]:flex"
+      >
+        {preview}
+      </Tabs.Content>
+    </Tabs>
+  );
 };
 
-type DocSource =
-  | { kind: 'pdf'; blob: Blob }
-  | { kind: 'buffer'; buffer: ArrayBuffer };
+const isHtmlDocument = (artifact: DocumentArtifact): boolean => {
+  const format = artifact.format.toLowerCase();
+  const mimeType = artifact.mimeType.toLowerCase();
 
-// The one network read for a document artifact. Lives outside React so no raw
-// fetch runs inside an effect; the AbortSignal wires cancellation through.
-const fetchDocumentSource = async (
-  artifact: DocumentArtifact,
-  signal: AbortSignal,
-): Promise<DocSource> => {
-  const res = await fetch(documentUrl(artifact), {
-    credentials: 'include',
-    signal,
-  });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  if (artifact.format === 'pdf') return { kind: 'pdf', blob: await res.blob() };
-  return { kind: 'buffer', buffer: await res.arrayBuffer() };
+  return (
+    format === 'html' ||
+    format === 'htm' ||
+    mimeType === 'text/html' ||
+    /\.html?$/i.test(artifact.fileName)
+  );
 };
 
-interface DocSourceState {
-  source: DocSource | null;
-  error: boolean;
-}
-
-// Data-fetching hook: fetches the artifact bytes with abort-on-unmount and
-// no double-fire/race leak. Rendering the bytes stays in the component.
-const useDocumentSource = (artifact: DocumentArtifact): DocSourceState => {
-  const [state, setState] = useState<DocSourceState>({
-    source: null,
-    error: false,
-  });
-
-  const [prevArtifact, setPrevArtifact] = useState(artifact);
-  if (artifact !== prevArtifact) {
-    setPrevArtifact(artifact);
-    setState({ source: null, error: false });
-  }
+const HtmlDocumentViewer = ({ artifact }: { artifact: DocumentArtifact }) => {
+  const { t } = useTranslation('erxes-agent');
+  const [view, setView] = useState<HtmlDocumentView>('preview');
+  const [html, setHtml] = useState<string | null>(null);
+  const [previewStatus, setPreviewStatus] = useState<HtmlPreviewStatus>('idle');
+  const sourceUrl = documentUrl(artifact);
 
   useEffect(() => {
-    const controller = new AbortController();
+    if (view !== 'preview' || html !== null) {
+      return;
+    }
 
-    fetchDocumentSource(artifact, controller.signal)
-      .then((source) => {
-        if (!controller.signal.aborted) setState({ source, error: false });
+    const controller = new AbortController();
+    setPreviewStatus('loading');
+
+    fetch(sourceUrl, {
+      credentials: 'include',
+      signal: controller.signal,
+    })
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(`HTML preview request failed: ${response.status}`);
+        }
+
+        return response.text();
       })
-      .catch(() => {
-        if (!controller.signal.aborted) setState({ source: null, error: true });
+      .then((source) => {
+        setHtml(source);
+        setPreviewStatus('ready');
+      })
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === 'AbortError') {
+          return;
+        }
+
+        setPreviewStatus('error');
       });
 
     return () => controller.abort();
-  }, [artifact]);
-
-  return state;
-};
-
-const DocumentRenderer = ({ artifact }: { artifact: DocumentArtifact }) => {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [phase, setPhase] = useState<Phase>('loading');
-  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
-  const { source, error } = useDocumentSource(artifact);
-
-  useEffect(() => {
-    if (error) {
-      setPhase('error');
-      return;
-    }
-    if (!source) {
-      setPhase('loading');
-      setPdfUrl(null);
-      return;
-    }
-
-    if (source.kind === 'pdf') {
-      const objectUrl = URL.createObjectURL(source.blob);
-      setPdfUrl(objectUrl);
-      setPhase('ready');
-      return () => URL.revokeObjectURL(objectUrl);
-    }
-
-    const container = containerRef.current;
-    if (!container) return;
-    let cancelled = false;
-    let viewer: DocPreviewer | null = null;
-    let pptxViewer: Disposable | null = null;
-    container.innerHTML = '';
-    setPhase('loading');
-
-    (async () => {
-      try {
-        const { buffer } = source;
-        if (artifact.format === 'docx') {
-          const { renderAsync } = await import('docx-preview');
-          // Library options make it flow to the container width (responsive)
-          // instead of a fixed A4 page that overflows/clips the panel.
-          await renderAsync(buffer, container, undefined, {
-            inWrapper: false,
-            ignoreWidth: true,
-            ignoreHeight: true,
-            breakPages: false,
-          });
-        } else if (artifact.format === 'pptx') {
-          const { PptxViewer, RECOMMENDED_ZIP_LIMITS } = await import(
-            '@aiden0z/pptx-renderer'
-          );
-          // Renders the actual .pptx (OOXML → HTML/SVG) — no server/LibreOffice.
-          pptxViewer = (await PptxViewer.open(buffer, container, {
-            zipLimits: RECOMMENDED_ZIP_LIMITS,
-          })) as Disposable;
-        } else {
-          const { default: jsPreviewExcel } = await import('@js-preview/excel');
-          viewer = jsPreviewExcel.init(container);
-          await viewer.preview(buffer);
-        }
-        if (!cancelled) setPhase('ready');
-      } catch {
-        if (!cancelled) setPhase('error');
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-      try {
-        viewer?.destroy();
-        pptxViewer?.destroy?.();
-        pptxViewer?.dispose?.();
-      } catch {
-        /* viewer already torn down */
-      }
-      if (container) container.innerHTML = '';
-    };
-  }, [source, error, artifact.format]);
+  }, [html, sourceUrl, view]);
 
   return (
-    <div className="relative h-full w-full bg-white">
-      {artifact.format === 'pdf'
-        ? pdfUrl && (
-            <iframe
-              src={pdfUrl}
-              title={artifact.title}
-              className="h-full w-full border-0"
-              sandbox="allow-same-origin allow-popups allow-downloads"
-            />
-          )
-        : null}
-      {artifact.format === 'pptx' && (
-        // Slide deck: a calm brand stage with each slide framed as a card. The
-        // renderer draws into the inner "deck" (width-capped + centered); the
-        // card styling and the no-clip width rule live in chat.css. We must NOT
-        // put max-width on the slides themselves or their layout collapses.
-        <div className="ea-scroll ea-pptx-stage h-full w-full overflow-auto">
-          <div ref={containerRef} className="ea-pptx-deck" />
-        </div>
-      )}
-      {artifact.format !== 'pdf' && artifact.format !== 'pptx' && (
-        <div
-          ref={containerRef}
-          className={
-            artifact.format === 'docx'
-              ? 'ea-scroll h-full w-full overflow-auto px-6 py-5 text-sm leading-relaxed [&_*]:max-w-full'
-              : 'ea-scroll h-full w-full overflow-auto'
-          }
-        />
-      )}
-
-      {phase === 'loading' && (
-        <div className="absolute inset-0 flex items-center justify-center bg-background/60">
-          <IconLoader2 className="size-6 animate-spin text-muted-foreground" />
-        </div>
-      )}
-      {phase === 'error' && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-8 text-center">
-          <p className="text-sm text-muted-foreground">
-            Couldn’t render this preview.
-          </p>
-          <Button asChild>
-            <a
-              href={documentUrl(artifact)}
-              download={artifact.fileName}
-              target="_blank"
-              rel="noreferrer"
+    <ViewerTabs
+      view={view}
+      onViewChange={setView}
+      code={<DocumentFileViewer artifact={artifact} />}
+      preview={
+        <>
+          {previewStatus === 'loading' && (
+            <div
+              className="flex h-full w-full items-center justify-center"
+              aria-label={t('artifact-html-preview-loading')}
             >
-              <IconDownload className="size-4" />
-              Download {artifact.format.toUpperCase()}
-            </a>
-          </Button>
-        </div>
-      )}
-    </div>
+              <IconLoader2 className="size-6 animate-spin text-muted-foreground" />
+            </div>
+          )}
+          {previewStatus === 'error' && (
+            <div className="flex h-full w-full items-center justify-center p-6 text-center text-sm text-destructive">
+              {t('artifact-html-preview-error')}
+            </div>
+          )}
+          {previewStatus === 'ready' && html !== null && (
+            <iframe
+              title={t('artifact-html-preview-frame-title', {
+                name: artifact.fileName,
+              })}
+              srcDoc={html}
+              sandbox="allow-scripts"
+              referrerPolicy="no-referrer"
+              className="h-full w-full border-0 bg-white"
+            />
+          )}
+        </>
+      }
+    />
   );
 };
+
+export const WebsiteViewer = ({ artifact }: { artifact: WebsiteArtifact }) => {
+  const { t } = useTranslation('erxes-agent');
+  const [view, setView] = useState<HtmlDocumentView>('preview');
+
+  return (
+    <ViewerTabs
+      view={view}
+      onViewChange={setView}
+      code={<DocumentFileViewer artifact={artifact} />}
+      preview={
+        <iframe
+          title={t('artifact-website-frame-title', {
+            name: artifact.title,
+          })}
+          src={websiteUrl(artifact)}
+          sandbox="allow-scripts"
+          referrerPolicy="no-referrer"
+          className="h-full w-full border-0 bg-white"
+        />
+      }
+    />
+  );
+};
+
+export const DocumentViewer = ({ artifact }: { artifact: DocumentArtifact }) =>
+  isHtmlDocument(artifact) ? (
+    <HtmlDocumentViewer key={artifact.id} artifact={artifact} />
+  ) : (
+    <DocumentFileViewer artifact={artifact} />
+  );

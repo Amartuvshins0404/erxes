@@ -15,6 +15,7 @@ export const AGENT_FIELDS = gql`
     provider
     model
     skills
+    additionalTools
     destructiveOps
     memoryEnabled
     debug
@@ -23,6 +24,12 @@ export const AGENT_FIELDS = gql`
     isActive
     createdAt
     updatedAt
+  }
+`;
+
+export const MASTRA_AGENT_ADDITIONAL_TOOLS = gql`
+  query MastraAgentAdditionalTools {
+    mastraAgentAdditionalTools
   }
 `;
 
@@ -207,6 +214,9 @@ export const MASTRA_SETTINGS = gql`
       backgroundRemovalEnabled
       summarizerProvider
       summarizerModel
+      openSandboxApiUrl
+      hasOpenSandboxApiKey
+      openSandboxApiKeyHint
       attachmentStorage {
         configured
         serviceType

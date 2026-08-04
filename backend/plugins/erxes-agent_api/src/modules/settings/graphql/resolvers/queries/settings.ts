@@ -1,6 +1,6 @@
 import { IContext, IModels } from '~/connectionResolvers';
 import { getStorageStatus } from '~/mastra/files/storage';
-import { IMastraSettings } from '@/settings/@types/settings';
+import { toPublicSettings } from '@/settings/publicSettings';
 
 // configured (core storage) AND the plugin toggle → attachments usable in chat.
 export async function attachmentStorageStatus(
@@ -38,12 +38,10 @@ export const settingsQueries = {
     // editing and reading persisted settings remains permission-gated.
     await checkPermission('settingsView');
     const doc = await models.MastraSettings.getSettings();
-    const obj: IMastraSettings = doc?.toObject ? doc.toObject() : doc;
-    const { evaluationDsn, ...safeSettings } = obj;
+    const safeSettings = toPublicSettings(doc);
 
     return {
       ...safeSettings,
-      evaluationDsnConfigured: Boolean(evaluationDsn?.trim()),
       attachmentStorage: await attachmentStorageStatus(models, subdomain),
     };
   },

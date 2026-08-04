@@ -403,6 +403,7 @@ export async function prepareTurn(
 
   const authCtx = {
     ...principal.authCtx,
+    erxesApiUrl: settings.erxesApiUrl || 'http://localhost:4000',
     initiatorUserId,
     threadId: sessionId,
     turnId: randomUUID(),

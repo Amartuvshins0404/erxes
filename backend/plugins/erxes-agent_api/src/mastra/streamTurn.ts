@@ -25,6 +25,11 @@ import {
 import { IMastraChatAttachment } from '@/session/@types/session';
 import { UITurnAccumulator } from '@/agent/uiTurn';
 import { ReasoningBurstCollector } from './reasoningBursts';
+import {
+  resolveGuardedReply,
+  shouldGuardProviderOutput,
+} from './providerOutputGuard';
+import { ensureWebsiteDeliveryReply } from '@/agent/websiteDelivery';
 
 // A Mastra stream may expose `traceId` as a value or a promise — sniff and
 // resolve it, accepting only a string (a non-string truthy value would slip past
@@ -80,6 +85,7 @@ async function foldModelStream(params: {
   acc: UITurnAccumulator;
   bursts: ReasoningBurstCollector;
   activity: ActivityTracker | null;
+  bufferProviderText: boolean;
 }): Promise<{ langfuseTraceId: string | undefined }> {
   const {
     writer,
@@ -89,6 +95,7 @@ async function foldModelStream(params: {
     acc,
     bursts,
     activity,
+    bufferProviderText,
   } = params;
   const { agent, convo, authCtx, memoryBinding } = prepared;
 
@@ -147,7 +154,12 @@ async function foldModelStream(params: {
           default:
             break;
         }
-        writer.write(chunk);
+        if (
+          !bufferProviderText ||
+          !['text-start', 'text-delta', 'text-end'].includes(chunk.type)
+        ) {
+          writer.write(chunk);
+        }
       }
       // Flush a burst still open when the model ended on reasoning.
       bursts.close();
@@ -176,6 +188,8 @@ async function finalizeTurn(params: {
   bursts: ReasoningBurstCollector;
   message: string;
   langfuseTraceId: string | undefined;
+  bufferProviderText: boolean;
+  guardProviderText: boolean;
 }): Promise<void> {
   const {
     writer,
@@ -187,13 +201,22 @@ async function finalizeTurn(params: {
     bursts,
     message,
     langfuseTraceId,
+    bufferProviderText,
+    guardProviderText,
   } = params;
   const { agent, authCtx } = prepared;
 
   const interrupted = controller.signal.aborted;
-  let reply: string | null = acc.text || null;
+  const guarded = guardProviderText
+    ? resolveGuardedReply({
+        latestText: acc.latestText,
+        allText: acc.text,
+      })
+    : undefined;
+  let reply: string | null = guarded ? guarded.text : acc.text || null;
+  let emitReply = bufferProviderText;
 
-  if (!acc.text) {
+  if (!reply) {
     // No answer text streamed. When the turn ran to completion the model ended
     // on tool calls without prose — synthesize a summary from the tool results
     // (synthesizeFromToolResults skips synthesis when nothing real came back, so
@@ -221,6 +244,24 @@ async function finalizeTurn(params: {
         ? 'This response was interrupted before it finished. Please tap retry to continue.'
         : "I couldn't produce a response for that. Please try again.";
     }
+    emitReply = true;
+  }
+
+  let deliveryCorrected = false;
+  if (!interrupted) {
+    const corrected = ensureWebsiteDeliveryReply({
+      reply,
+      publishAttempted: acc.toolCalls.some(
+        (toolCall) => toolCall.toolName === 'publishWebsite',
+      ),
+      websiteArtifactCount: authCtx.websiteArtifactCount,
+    });
+    deliveryCorrected = corrected !== reply;
+    reply = corrected;
+    emitReply ||= deliveryCorrected;
+  }
+
+  if (emitReply) {
     const id = interrupted ? `interrupt-${Date.now()}` : `synth-${Date.now()}`;
     writer.write({ type: 'text-start', id });
     writer.write({ type: 'text-delta', id, delta: reply });
@@ -253,6 +294,7 @@ async function finalizeTurn(params: {
   let turnSummary: string | null = null;
   let reasoningSummaryList: (string | null)[] | undefined;
   const wantSummaries =
+    !bufferProviderText &&
     !interrupted &&
     !!reply &&
     (acc.toolCalls.length > 0 || bursts.bursts.length > 0);
@@ -303,6 +345,8 @@ async function finalizeTurn(params: {
     // Mastra's assigned id for this turn's assistant row, captured off the
     // stream's `start` chunk — the id the client rates without a reload.
     assistantMessageId: acc.messageId,
+    replaceNativeText: bufferProviderText || deliveryCorrected,
+    hasArtifacts: (prepared.authCtx.artifactCount ?? 0) > 0,
   });
 
   if (clientGone()) {
@@ -398,10 +442,16 @@ export async function streamAgentTurn(
       prepared.agentConfig.provider,
       reasoningEffort,
     );
+    const guardProviderText = shouldGuardProviderOutput(
+      prepared.agentConfig.model,
+    );
+    const bufferProviderText =
+      guardProviderText ||
+      Object.prototype.hasOwnProperty.call(prepared.tools, 'publishWebsite');
 
-    // Narrates "what is the agent doing" while the turn runs — throttled
-    // summaries of the live reasoning/tool signals, pushed as transient
-    // `data-activity` parts.
+    // Narrates live tool signals and, for normal providers, summarizes
+    // reasoning. Guarded Kimi gateways already spend a large reasoning budget;
+    // do not run the same model again in parallel just to label that reasoning.
     activity = createActivityTracker({
       userMessage: message,
       emit: (text) => {
@@ -414,15 +464,17 @@ export async function streamAgentTurn(
       },
       // Tool steps narrate instantly (no LLM); reasoning bursts use the model.
       toolSignal: toolStatusLine,
-      summarize: (snapshot) =>
-        summarizeActivity({
-          provider: prepared.agentConfig.provider,
-          model: prepared.agentConfig.model,
-          providers: prepared.providers,
-          settings: prepared.settings,
-          authCtx: prepared.authCtx,
-          snapshot,
-        }),
+      summarize: bufferProviderText
+        ? async () => null
+        : (snapshot) =>
+            summarizeActivity({
+              provider: prepared.agentConfig.provider,
+              model: prepared.agentConfig.model,
+              providers: prepared.providers,
+              settings: prepared.settings,
+              authCtx: prepared.authCtx,
+              snapshot,
+            }),
     });
 
     const { langfuseTraceId } = await foldModelStream({
@@ -433,6 +485,7 @@ export async function streamAgentTurn(
       acc,
       bursts,
       activity,
+      bufferProviderText,
     });
 
     activity.stop();
@@ -447,6 +500,8 @@ export async function streamAgentTurn(
       bursts,
       message,
       langfuseTraceId,
+      bufferProviderText,
+      guardProviderText,
     });
   } finally {
     activity?.stop();

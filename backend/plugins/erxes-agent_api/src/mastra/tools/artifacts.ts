@@ -5,10 +5,10 @@ import { chartSpecSchema } from '~/mastra/charts/chartSpec';
 // ---------------------------------------------------------------------------
 // Artifact — the structured, previewable result a tool returns in its output.
 //
-// The chat UI detects `output.artifact` on a tool result, shows an inline
-// ArtifactCard, and renders it in the Preview panel (chart → interactive
-// ECharts; document → inline PDF or a download card). Artifacts ride the normal
-// tool-result stream, so they persist and rehydrate with the message for free.
+// The chat UI detects `output.artifact` or `output.artifacts` on a tool result,
+// shows inline ArtifactCards, and renders them in the Preview panel (charts →
+// interactive ECharts; documents → browser-native multi-format preview).
+// Artifacts ride the normal tool-result stream and persist with the message.
 //
 // Keep this contract in sync with the frontend reader at
 // frontend/plugins/erxes-agent_ui/src/modules/chat/lib/artifacts.ts
@@ -34,7 +34,7 @@ export const chartArtifactSchema = z.object({
 export const documentArtifactSchema = z.object({
   id: z.string(),
   kind: z.literal('document'),
-  format: z.enum(DOCUMENT_FORMATS),
+  format: z.string().min(1),
   title: z.string(),
   fileName: z.string(),
   mimeType: z.string(),
@@ -73,22 +73,42 @@ export const imageArtifactSchema = z.object({
   height: z.number().optional(),
 });
 
+export const websiteArtifactSchema = z.object({
+  id: z.string(),
+  kind: z.literal('website'),
+  title: z.string(),
+  entryPath: z.string(),
+  fileCount: z.number().int().positive(),
+  contentHash: z.string().length(64),
+  previewToken: z.string(),
+  // The entry document is also retained as a regular storage reference so the
+  // Code tab and file-reader can inspect it without loading the whole site.
+  fileName: z.string(),
+  mimeType: z.string(),
+  fileKey: z.string(),
+  inline: z.boolean().optional(),
+  // Total bytes across the published static site.
+  size: z.number().optional(),
+});
+
 export const artifactSchema = z.discriminatedUnion('kind', [
   chartArtifactSchema,
   documentArtifactSchema,
   diagramArtifactSchema,
   imageArtifactSchema,
+  websiteArtifactSchema,
 ]);
 
 export type ChartArtifact = z.infer<typeof chartArtifactSchema>;
 export type DocumentArtifact = z.infer<typeof documentArtifactSchema>;
 export type DiagramArtifact = z.infer<typeof diagramArtifactSchema>;
 export type ImageArtifact = z.infer<typeof imageArtifactSchema>;
+export type WebsiteArtifact = z.infer<typeof websiteArtifactSchema>;
 export type Artifact = z.infer<typeof artifactSchema>;
 
 /** Short, collision-free artifact id (e.g. "chart_ab12cd"). */
 export function newArtifactId(
-  prefix: 'chart' | 'doc' | 'diagram' | 'img',
+  prefix: 'chart' | 'doc' | 'diagram' | 'img' | 'site',
 ): string {
   return `${prefix}_${randomUUID().slice(0, 8)}`;
 }

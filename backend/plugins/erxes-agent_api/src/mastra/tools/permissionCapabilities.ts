@@ -1,6 +1,6 @@
 import { getPlugin, getPlugins, sendTRPCMessage } from 'erxes-api-shared/utils';
 import { ERXES_AGENT_ACTIONS } from '~/meta/permissionActions';
-import { BUILTIN_TOOLS } from './builtins';
+import { normalizeAdditionalToolKeys } from './additionalTools';
 import {
   actionsToAllowedTools,
   assertAllowedToolsInvariant,
@@ -20,26 +20,11 @@ interface DefaultPermissionGroup {
   plugin?: string;
 }
 
-const WORKFLOW_TOOL_KEYS = new Set([
-  'workflowGuide',
-  'workflowValidate',
-  'workflowSimulate',
-  'workflowSave',
-  'workflowUpdate',
-  'workflowList',
-  'workflowRuns',
-  'workflowRunNow',
-]);
 
-const safeBuiltinEntries = (): string[] =>
-  Object.keys(BUILTIN_TOOLS)
-    .filter(
-      (key) =>
-        key !== 'webSearch' &&
-        key !== 'fetchUrl' &&
-        !WORKFLOW_TOOL_KEYS.has(key),
-    )
-    .map((key) => `builtin:${key}`);
+const additionalBuiltinEntries = (
+  additionalTools?: string[],
+): string[] =>
+  normalizeAdditionalToolKeys(additionalTools).map((key) => `builtin:${key}`);
 
 const permissionActions = (permissions: GroupPermission[]): Set<string> =>
   new Set(permissions.flatMap((permission) => permission.actions ?? []));
@@ -173,13 +158,14 @@ export async function resolveAgentPermissions(opts: {
 export function deriveAgentAllowedTools(
   permissions: GroupPermission[],
   registry: RegistryView,
+  additionalTools?: string[],
 ): string[] {
   const erxesTools = actionsToAllowedTools(permissions, registry);
   assertAllowedToolsInvariant(erxesTools, permissions, registry);
   return [
     ...new Set([
       ...erxesTools,
-      ...safeBuiltinEntries(),
+      ...additionalBuiltinEntries(additionalTools),
       ...permissionBuiltinEntries(permissions),
     ]),
   ].sort((a, b) => a.localeCompare(b));
@@ -189,8 +175,13 @@ export async function resolveAgentAllowedTools(opts: {
   subdomain: string;
   permissionGroupIds: string[];
   customPermissions?: GroupPermission[];
+  additionalTools?: string[];
   registry: RegistryView;
 }): Promise<string[]> {
   const { permissions } = await resolveAgentPermissions(opts);
-  return deriveAgentAllowedTools(permissions, opts.registry);
+  return deriveAgentAllowedTools(
+    permissions,
+    opts.registry,
+    opts.additionalTools,
+  );
 }

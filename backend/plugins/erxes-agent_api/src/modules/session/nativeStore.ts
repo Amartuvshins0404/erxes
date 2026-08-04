@@ -16,6 +16,7 @@ import {
 } from '~/mastra/memory/mastraMemory';
 import { clampPage } from '@/_shared/auth';
 import { findMessagePairIds } from '@/session/messagePair';
+import { sanitizePersistedProviderOutput } from '~/mastra/providerOutputGuard';
 
 // ── Minimal native shapes we read (Mastra's own types are wider). ───────────
 interface NativeThread {
@@ -213,12 +214,19 @@ function toErxesMessage(m: NativeMessage): ErxesMessage {
   };
   const attachments = erxes.attachments ?? null;
   delete erxes.attachments;
+  const content =
+    typeof m.content?.content === 'string' ? m.content.content : '';
+  const parts = Array.isArray(m.content?.parts) ? m.content.parts : [];
+  const safe =
+    m.role === 'assistant'
+      ? sanitizePersistedProviderOutput(content, parts)
+      : { content, parts };
   return {
     _id: m.id,
     threadId: m.threadId ?? null,
     role: m.role,
-    content: typeof m.content?.content === 'string' ? m.content.content : '',
-    parts: Array.isArray(m.content?.parts) ? m.content.parts : null,
+    content: safe.content,
+    parts: safe.parts.length ? safe.parts : null,
     meta: Object.keys(erxes).length ? erxes : null,
     attachments,
     createdAt: m.createdAt ?? null,

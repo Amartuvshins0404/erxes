@@ -48,6 +48,14 @@ export const generalSettingsSchema = z.object({
   backgroundRemovalEnabled: z.boolean(),
   summarizerProvider: z.string(),
   summarizerModel: z.string(),
+  openSandboxApiUrl: z
+    .string()
+    .max(2048)
+    .refine(
+      (value) => !value || /^https?:\/\//i.test(value),
+      'OpenSandbox API URL must start with http:// or https://',
+    ),
+  openSandboxApiKey: z.string().max(512),
 });
 
 export type GeneralSettingsValues = z.infer<typeof generalSettingsSchema>;
@@ -71,4 +79,6 @@ export const GENERAL_SETTINGS_DEFAULTS: GeneralSettingsValues = {
   backgroundRemovalEnabled: true,
   summarizerProvider: '',
   summarizerModel: '',
+  openSandboxApiUrl: '',
+  openSandboxApiKey: '',
 };

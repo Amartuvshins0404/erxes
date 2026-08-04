@@ -14,7 +14,6 @@ interface SettingsStatics {
 
 interface SettingsModelMocks {
   create: jest.Mock;
-  exists: jest.Mock;
   findOne: jest.Mock;
   findOneAndUpdate: jest.Mock;
   hydrate: jest.Mock;
@@ -62,20 +61,19 @@ const createSettingsModelMocks = (
   const select = jest.fn(() => ({ lean }));
   const findOne = jest.fn(() => ({ select }));
   const findOneAndUpdate = jest.fn(
-    async (
-      _filter: Record<string, unknown>,
-      update: { $set?: IMastraSettings },
-    ) => (update.$set ? savedDocument : getDocument),
-  );
-  const exists = jest.fn(async () =>
-    getDocument ? { _id: getDocument._id } : null,
+    (_filter: Record<string, unknown>, update: { $set?: IMastraSettings }) => {
+      const result = Promise.resolve(update.$set ? savedDocument : getDocument);
+      return {
+        select: jest.fn(() => result),
+        then: result.then.bind(result),
+      };
+    },
   );
   const hydrate = jest.fn((settings: IMastraSettingsDocument) => settings);
   const models = {
     MastraSettings: {
       db: { name: `settings-model-test-${tenantNumber++}` },
       create,
-      exists,
       findOne,
       findOneAndUpdate,
       hydrate,
@@ -84,7 +82,6 @@ const createSettingsModelMocks = (
 
   return {
     create,
-    exists,
     findOne,
     findOneAndUpdate,
     hydrate,
@@ -208,7 +205,7 @@ describe('MastraSettings model', () => {
     );
     expect(mocks.findOneAndUpdate).toHaveBeenNthCalledWith(
       2,
-      { _id: 'settings-id' },
+      {},
       {
         $set: { attachmentsEnabled: false },
         $unset: {
@@ -216,11 +213,20 @@ describe('MastraSettings model', () => {
           defaultAgentId: 1,
         },
       },
-      { new: true, strict: false, runValidators: true },
+      {
+        new: true,
+        upsert: true,
+        strict: false,
+        runValidators: true,
+        setDefaultsOnInsert: true,
+      },
     );
+    expect(
+      mocks.findOneAndUpdate.mock.results[1].value.select,
+    ).toHaveBeenCalledWith('+evaluationDsn');
   });
 
-  it('invalidates the tenant cache after saving settings', async () => {
+  it('refreshes the tenant cache from the single settings upsert', async () => {
     const initial = makeDocument({
       erxesApiUrl: 'https://tenant.example.com',
       attachmentsEnabled: true,
@@ -235,9 +241,10 @@ describe('MastraSettings model', () => {
     await settings.getSettings();
     await settings.getSettings();
     await settings.saveSettings({ attachmentsEnabled: false });
-    await settings.getSettings();
+    const cached = await settings.getSettings();
 
-    expect(mocks.findOne).toHaveBeenCalledTimes(2);
+    expect(cached).toBe(saved);
+    expect(mocks.findOne).toHaveBeenCalledTimes(1);
     expect(mocks.findOneAndUpdate).toHaveBeenCalledTimes(1);
   });
 });

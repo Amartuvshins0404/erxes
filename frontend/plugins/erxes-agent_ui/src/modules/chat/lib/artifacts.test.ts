@@ -4,9 +4,9 @@ import {
   artifactOutcomes,
   associateArtifacts,
   mergeArtifacts,
+  websiteUrl,
   type Artifact,
 } from '~/modules/chat/lib/artifacts';
-
 // artifacts.ts pulls REACT_APP_API_URL and card icons for the non-logic
 // helpers; stub both so the pure readers under test load under node.
 jest.mock('erxes-ui', () => ({ REACT_APP_API_URL: 'http://localhost:4000' }));
@@ -24,6 +24,16 @@ const chart = (id: string): Artifact => ({
   spec: { title: id, series: [], data: [] } as never,
 });
 
+const document = (id: string, fileName: string): Artifact => ({
+  id,
+  kind: 'document',
+  title: fileName,
+  format: fileName.split('.').pop() || 'application/octet-stream',
+  fileName,
+  mimeType: 'application/octet-stream',
+  fileKey: `files/${fileName}`,
+});
+
 const renderChartPart = (
   state: string,
   extra: Record<string, unknown> = {},
@@ -35,7 +45,7 @@ const renderChartPart = (
     state,
     input: { title: 'Sales' },
     ...extra,
-  }) as unknown as MessagePart;
+  } as unknown as MessagePart);
 
 describe('artifactOutcomes', () => {
   it('reports a settled artifact from a finished tool part', () => {
@@ -63,14 +73,32 @@ describe('artifactOutcomes', () => {
     expect(artifactOutcomes(parts, false).failures).toHaveLength(0);
     expect(artifactOutcomes(parts).failures).toHaveLength(0);
   });
+
+  it('collects every file artifact published by a terminal result', () => {
+    const part = {
+      type: 'dynamic-tool',
+      toolName: 'terminal',
+      toolCallId: 'call-terminal',
+      state: 'output-available',
+      input: { command: 'build' },
+      output: {
+        artifacts: [
+          document('doc_1', 'report.pdf'),
+          document('doc_2', 'data.csv'),
+        ],
+      },
+    } as unknown as MessagePart;
+
+    expect(artifactOutcomes([part]).artifacts.map((a) => a.id)).toEqual([
+      'doc_1',
+      'doc_2',
+    ]);
+  });
 });
 
 describe('mergeArtifacts', () => {
   it('unions live and store, deduped by id, live first', () => {
-    const merged = mergeArtifacts(
-      [chart('a')],
-      [chart('a'), chart('b')],
-    );
+    const merged = mergeArtifacts([chart('a')], [chart('a'), chart('b')]);
     expect(merged.map((m) => m.id)).toEqual(['a', 'b']);
   });
 
@@ -145,5 +173,26 @@ describe('associateArtifacts', () => {
     ]);
     // Present exactly once — the prompt matcher must not double-attach it.
     expect(result.get('m2')?.map((a) => a.id)).toEqual(['chart_2']);
+  });
+});
+
+describe('websiteUrl', () => {
+  it('encodes the capability token and each entry path segment', () => {
+    const artifact: Extract<Artifact, { kind: 'website' }> = {
+      id: 'site_1',
+      kind: 'website',
+      title: 'Site',
+      entryPath: 'pages/About us?#.html',
+      fileCount: 2,
+      contentHash: 'a'.repeat(64),
+      previewToken: 'token/with ?#',
+      fileName: 'About us?#.html',
+      mimeType: 'text/html',
+      fileKey: 'websites/site_1/pages/About us?#.html',
+    };
+
+    expect(websiteUrl(artifact)).toBe(
+      'http://localhost:4000/pl:erxes-agent/websites/site_1/token%2Fwith%20%3F%23/pages/About%20us%3F%23.html',
+    );
   });
 });

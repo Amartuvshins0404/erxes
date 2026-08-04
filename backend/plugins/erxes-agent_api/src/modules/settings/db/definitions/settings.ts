@@ -62,4 +62,6 @@ export const settingsSchema = new Schema({
   backgroundRemovalEnabled: { type: Boolean, default: true },
   summarizerProvider: { type: String, trim: true, maxlength: 100, default: '' },
   summarizerModel: { type: String, trim: true, maxlength: 200, default: '' },
+  openSandboxApiUrl: { type: String, maxlength: 2048 },
+  openSandboxApiKey: { type: String, maxlength: 512 },
 });

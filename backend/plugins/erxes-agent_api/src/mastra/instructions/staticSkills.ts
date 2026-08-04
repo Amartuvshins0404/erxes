@@ -133,6 +133,30 @@ The same chart then appears identically in chat and in the file.
 `.trim(),
 };
 
+const WEBSITE_CREATION_SKILL: StaticSkill = {
+  name: 'website-creation',
+  description:
+    'Build and publish a complete static website from the isolated workspace.',
+  triggerTools: ['workspaceWrite', 'publishWebsite'],
+  instructions: `
+When the user asks for a website, deliver one complete static site with this
+bounded workflow:
+1. Research first only when the requested content requires current facts.
+2. Call **workspaceWrite ONCE** with all complete source files. Never write source
+   through terminal commands, shell heredocs, base64, printf, or repeated patches.
+3. Call **terminal** only for one short build or validation command when needed.
+   Static HTML/CSS/JavaScript that needs no build should skip terminal entirely.
+4. Call **publishWebsite ONCE**, only after every file is ready. Pass the
+   workspace-relative site root and its HTML entry. Do not start a web server.
+
+After publishWebsite succeeds, tell the user in one plain sentence that the site
+is ready in Preview and Files. A tool result is not delivery evidence: only the
+returned website artifact is success. If publishWebsite fails, STOP, report that
+the preview was not delivered and describe the actionable failure. Never retry
+publishWebsite in the same turn and never claim the site is ready after an error.
+`.trim(),
+};
+
 const PRODUCT_IMAGE_SKILL: StaticSkill = {
   name: 'product-image-cleanup',
   description:
@@ -168,6 +192,7 @@ preview + attachment) and keep the user posted on progress.
 
 export const STATIC_SKILLS: StaticSkill[] = [
   DOCUMENT_CREATION_SKILL,
+  WEBSITE_CREATION_SKILL,
   PRODUCT_IMAGE_SKILL,
 ];
 

@@ -21,6 +21,10 @@ interface RequestAuth {
   agentId?: string;
   /** Tenant of the request — required by tools that query tenant-partitioned stores. */
   subdomain?: string;
+  /** Core API base URL configured for file operations in this turn. */
+  erxesApiUrl?: string;
+  /** Once direct private storage fails, reuse core as this turn's storage authority. */
+  preferCoreFileUpload?: boolean;
   /** Unique id for THIS turn — artifacts created in the turn share it, so they
    *  can be grouped per chat instance and linked to the assistant message. */
   turnId?: string;
@@ -30,6 +34,10 @@ interface RequestAuth {
   turnStartedAt?: Date;
   /** The user's message that drove this turn — the Files-list group header. */
   turnPrompt?: string;
+  /** Successfully persisted artifacts produced during this turn. */
+  artifactCount?: number;
+  /** Persisted website artifacts produced during this turn. */
+  websiteArtifactCount?: number;
   /** Owner (scoped) resource id — stamped on artifacts for ownership scoping. */
   resourceId?: string;
   /** Destructive ops the user approved for THIS turn — the execute guard runs an
@@ -56,4 +64,18 @@ export function runWithAuth<T>(
 /** The auth context of the current async chain, when inside runWithAuth. */
 export function getCurrentAuth(): RequestAuth | undefined {
   return authStorage.getStore();
+}
+
+/** Track persisted artifacts on the active turn without another database read. */
+export function recordStoredArtifacts(count: number): void {
+  const auth = authStorage.getStore();
+  if (!auth || count < 1) return;
+  auth.artifactCount = (auth.artifactCount ?? 0) + count;
+}
+
+/** Track website delivery separately from other generated files. */
+export function recordStoredWebsiteArtifacts(count: number): void {
+  const auth = authStorage.getStore();
+  if (!auth || count < 1) return;
+  auth.websiteArtifactCount = (auth.websiteArtifactCount ?? 0) + count;
 }

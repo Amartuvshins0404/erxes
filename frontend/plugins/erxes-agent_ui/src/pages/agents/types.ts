@@ -12,6 +12,7 @@ export interface IMastraAgent {
   provider?: string | null;
   model?: string | null;
   skills?: string[] | null;
+  additionalTools?: string[] | null;
   destructiveOps?: 'allow' | 'ask' | null;
   memoryEnabled?: boolean | null;
   debug?: boolean | null;

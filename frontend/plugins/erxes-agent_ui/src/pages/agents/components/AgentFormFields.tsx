@@ -33,6 +33,7 @@ import {
   SelectProvider,
   useProviderOptions,
 } from '~/components/SelectProviderModel';
+import { MASTRA_AGENT_ADDITIONAL_TOOLS } from '~/graphql/queries';
 import { AgentFormValues } from '../validations';
 import {
   AUDIENCE_TEAMS,
@@ -47,6 +48,10 @@ import { ERXES_AGENT_ACTIONS } from '~/permissions';
 import { resolveAgentActionScope } from '../hooks/agentActionScope';
 
 type AgentForm = UseFormReturn<AgentFormValues>;
+
+interface AdditionalToolsData {
+  mastraAgentAdditionalTools: string[];
+}
 
 const AgentFormSection = ({
   title,
@@ -405,6 +410,82 @@ const AiModelSection = ({ form }: { form: AgentForm }) => {
   );
 };
 
+const AdditionalToolsSection = ({ form }: { form: AgentForm }) => {
+  const { t } = useTranslation('mastra');
+  const { data, loading, error } = useQuery<AdditionalToolsData>(
+    MASTRA_AGENT_ADDITIONAL_TOOLS,
+  );
+  const tools = data?.mastraAgentAdditionalTools ?? [];
+
+  return (
+    <AgentFormSection
+      title={t('agent-settings-tools-title')}
+      description={t('agent-settings-tools-description')}
+    >
+      {loading ? (
+        <p className="text-sm text-muted-foreground">
+          {t('agent-settings-tools-loading')}
+        </p>
+      ) : error ? (
+        <Alert variant="warning">
+          <IconAlertTriangle className="size-4" />
+          <Alert.Description>
+            {t('agent-settings-tools-error')}
+          </Alert.Description>
+        </Alert>
+      ) : (
+        <Form.Field
+          control={form.control}
+          name="additionalTools"
+          render={({ field }) => (
+            <Form.Item>
+              <Form.Control>
+                <div className="grid gap-3 md:grid-cols-2">
+                  {tools.map((key) => {
+                    const enabled = field.value.includes(key);
+                    const label = t(`agent-settings-tool-${key}-label`);
+                    return (
+                      <div
+                        key={key}
+                        className={`flex items-start justify-between gap-4 rounded-lg border p-4 transition-colors ${
+                          enabled
+                            ? 'border-primary bg-primary/5'
+                            : 'hover:bg-muted/40'
+                        }`}
+                      >
+                        <div className="min-w-0 space-y-1">
+                          <p className="text-sm font-medium">{label}</p>
+                          <p className="text-xs leading-relaxed text-muted-foreground">
+                            {t(`agent-settings-tool-${key}-description`)}
+                          </p>
+                        </div>
+                        <Switch
+                          checked={enabled}
+                          onCheckedChange={(checked) =>
+                            field.onChange(
+                              checked
+                                ? [...field.value, key]
+                                : field.value.filter(
+                                    (selected) => selected !== key,
+                                  ),
+                            )
+                          }
+                          aria-label={label}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </Form.Control>
+              <Form.Message />
+            </Form.Item>
+          )}
+        />
+      )}
+    </AgentFormSection>
+  );
+};
+
 const AgentAccessSection = ({ form }: { form: AgentForm }) => {
   const { t } = useTranslation('mastra');
   const destructiveOps = form.watch('destructiveOps');
@@ -711,6 +792,7 @@ export const AgentFormFields = ({ form }: { form: AgentForm }) => {
       <BasicInfoSection form={form} />
       <AgentSharingSection form={form} />
       <AiModelSection form={form} />
+      <AdditionalToolsSection form={form} />
       <AgentAccessSection form={form} />
       <BehaviorSection form={form} />
     </>

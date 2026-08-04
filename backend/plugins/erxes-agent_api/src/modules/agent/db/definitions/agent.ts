@@ -1,5 +1,6 @@
 import { Schema } from 'mongoose';
 import { mongooseStringRandomId } from 'erxes-api-shared/utils';
+import { ADDITIONAL_TOOL_KEYS } from '~/mastra/tools/additionalTools';
 
 export const agentSchema = new Schema(
   {
@@ -32,6 +33,12 @@ export const agentSchema = new Schema(
     // "category/name"); the requesting user's own published skills are always
     // added on top. Empty/unset → the agent has no skills attached.
     skills: [{ type: String }],
+    additionalTools: [
+      {
+        type: String,
+        enum: ADDITIONAL_TOOL_KEYS,
+      },
+    ],
     // Consent for irreversible deletes/merges (remove/delete/merge mutations).
     //   'ask' (default) → the agent asks the user to approve each one in chat.
     //   'allow'         → they run without asking.

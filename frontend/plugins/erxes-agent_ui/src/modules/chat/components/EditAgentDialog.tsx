@@ -54,6 +54,7 @@ export const EditAgentDialog = ({
       provider: agent.provider || '',
       model: agent.model || '',
       permissionGroupIds: agent.permissionGroupIds,
+      additionalTools: agent.additionalTools || [],
       destructiveOps: agent.destructiveOps === 'allow' ? 'allow' : 'ask',
       memoryEnabled: agent.memoryEnabled ?? true,
       debug: agent.debug ?? false,

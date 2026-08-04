@@ -32,7 +32,6 @@ import {
   ProviderCompletionGuard,
   shouldGuardProviderOutput,
 } from './providerOutputGuard';
-import { resolveTurnExecutionPolicy } from './executionPolicy';
 import {
   evaluationConfigFingerprint,
   isEvaluationEnabled,
@@ -490,10 +489,6 @@ export async function getOrCreateAgent(
     builtins: builtinInfos,
   });
 
-  const executionPolicy = resolveTurnExecutionPolicy({
-    configuredMaxSteps: agentConfig.maxSteps,
-    hasTools: toolNames.length > 0 || hasErxes,
-  });
 
   // Configured sampling temperature. Unset → provider/SDK default (the legacy
   // loop hardcodes 0, which models like Kimi thinking — "only 1 is allowed" —
@@ -558,8 +553,10 @@ export async function getOrCreateAgent(
     // agent configures it — otherwise the provider default applies (sending an
     // explicit 0 is what reasoning models like Kimi reject).
     defaultOptions: {
-      maxSteps: executionPolicy.maxSteps,
-      toolCallConcurrency: executionPolicy.toolCallConcurrency,
+      // Continue tool loops until the model returns a final answer. An empty
+      // stop-condition list removes AI SDK's default one-step cutoff.
+      stopWhen: [],
+      toolCallConcurrency: 1,
       ...(hasTemperature ? { modelSettings: { temperature } } : {}),
     },
   } as never);

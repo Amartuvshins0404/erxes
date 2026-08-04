@@ -58,7 +58,6 @@ export const AgentFormPage = ({
       destructiveOps: record.destructiveOps === 'allow' ? 'allow' : 'ask',
       memoryEnabled: record.memoryEnabled ?? true,
       debug: record.debug ?? false,
-      maxSteps: record.maxSteps ?? 10,
       temperature: record.temperature ?? null,
       isActive: record.isActive,
     }),

@@ -148,8 +148,6 @@
   "agent-settings-advanced-description": "Зөвхөн алдаа оношлох эсвэл тодорхой загварыг нарийвчлан тохируулах үед өөрчилнө үү.",
   "agent-settings-debug-label": "Хэрэгслийн үйл ажиллагааг чатад харуулах",
   "agent-settings-debug-description": "Зөвхөн товч хураангуй биш, веб хайлт, татсан хуудас болон erxes үйлдлүүдийг харуулна.",
-  "agent-settings-max-steps-label": "Хэрэгслийн алхмын дээд хязгаар",
-  "agent-settings-max-steps-description": "Нэг хариултад дараалан хийх хэрэгслийн дуудлагын дээд тоо (1–50). Агент тогтмол дутуу зогсвол нэмэгдүүлнэ.",
   "agent-settings-temperature-label": "Хариултын хэлбэлзэл",
   "agent-settings-temperature-description": "Бага утга илүү тогтвортой, их утга илүү олон янзын хариулт өгнө. Зарим загвар тогтмол утга шаарддаг.",
   "agent-settings-default": "Үндсэн",

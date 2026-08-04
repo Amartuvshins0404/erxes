@@ -34,7 +34,6 @@ const ownedAgent: CachedChatAgent = {
   destructiveOps: 'ask',
   memoryEnabled: true,
   debug: false,
-  maxSteps: 10,
   temperature: null,
   isActive: true,
   createdAt: '2026-08-01T00:00:00.000Z',

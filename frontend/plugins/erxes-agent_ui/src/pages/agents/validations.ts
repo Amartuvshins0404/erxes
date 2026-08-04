@@ -19,7 +19,6 @@ export const agentFormSchema = z
     destructiveOps: z.enum(['allow', 'ask']),
     memoryEnabled: z.boolean(),
     debug: z.boolean(),
-    maxSteps: z.number().int().min(1).max(50),
     temperature: z.number().nullable(),
     isActive: z.boolean(),
   })
@@ -55,7 +54,6 @@ export const AGENT_FORM_DEFAULTS: AgentFormValues = {
   destructiveOps: 'ask',
   memoryEnabled: true,
   debug: false,
-  maxSteps: 10,
   temperature: null,
   isActive: true,
 };

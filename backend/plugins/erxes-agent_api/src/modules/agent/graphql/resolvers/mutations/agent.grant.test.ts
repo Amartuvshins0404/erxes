@@ -50,7 +50,6 @@ const profileInput = (overrides: Partial<IMastraAgentInput> = {}) => ({
   destructiveOps: 'ask' as const,
   memoryEnabled: true,
   debug: false,
-  maxSteps: 10,
   isActive: true,
   ...overrides,
 });
@@ -65,7 +64,6 @@ const profileDocument = (overrides: Partial<IMastraAgent> = {}) => {
     destructiveOps: 'ask' as const,
     memoryEnabled: true,
     debug: false,
-    maxSteps: 10,
     createdAt: new Date('2026-01-01'),
     updatedAt: new Date('2026-01-01'),
     ...overrides,
@@ -287,7 +285,6 @@ describe('AI team member account lifecycle', () => {
         doc: profileInput({
           name: 'Revenue Agent',
           permissionGroupIds: ['group-1', 'group-2'],
-          maxSteps: 12,
         }),
       },
       ctx,
@@ -303,7 +300,7 @@ describe('AI team member account lifecycle', () => {
     });
     expect(updateAgent).toHaveBeenCalledWith(
       USER_ID,
-      expect.objectContaining({ maxSteps: 12 }),
+      expect.objectContaining({ destructiveOps: 'ask' }),
     );
     expect(updateAgent.mock.calls[0][1]).not.toHaveProperty('name');
     expect(updateAgent.mock.calls[0][1]).not.toHaveProperty(

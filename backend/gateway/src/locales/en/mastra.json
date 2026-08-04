@@ -148,8 +148,6 @@
   "agent-settings-advanced-description": "Only change these when troubleshooting or tuning a specific model.",
   "agent-settings-debug-label": "Show tool activity in chat",
   "agent-settings-debug-description": "Show web searches, fetched pages, and erxes operations instead of only a short turn summary.",
-  "agent-settings-max-steps-label": "Maximum tool steps",
-  "agent-settings-max-steps-description": "The most consecutive tool calls allowed in one turn (1–50). Increase this only if the agent regularly stops before finishing.",
   "agent-settings-temperature-label": "Response variation",
   "agent-settings-temperature-description": "Lower values are more consistent; higher values are more varied. Some models require a fixed value.",
   "agent-settings-default": "Default",

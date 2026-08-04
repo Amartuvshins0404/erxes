@@ -26,7 +26,6 @@ import {
   SelectMember,
   usePermissionCheck,
 } from 'ui-modules';
-import { ClampedNumberInput } from '~/components/ClampedNumberInput';
 import { Field } from '~/components/FormLayout';
 import {
   SelectModel,
@@ -707,27 +706,6 @@ const BehaviorSection = ({ form }: { form: AgentForm }) => {
                   />
                 </Form.Control>
               </Form.Item>
-            )}
-          />
-
-          <Separator />
-
-          <Form.Field
-            control={form.control}
-            name="maxSteps"
-            render={({ field }) => (
-              <Field
-                label={t('agent-settings-max-steps-label')}
-                hint={t('agent-settings-max-steps-description')}
-              >
-                <ClampedNumberInput
-                  field={field}
-                  min={1}
-                  max={50}
-                  fallback={10}
-                  className="w-24"
-                />
-              </Field>
             )}
           />
 

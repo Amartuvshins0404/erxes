@@ -23,17 +23,20 @@ describe('agentSchema update validation', () => {
     expect(legacy.permissionMode).toBeUndefined();
   });
 
+  it('drops the obsolete maxSteps setting', () => {
+    const agent = new AgentModel({
+      provider: 'openai',
+      model: 'gpt-4o',
+      maxSteps: 10,
+    });
+
+    expect(agent.toObject()).not.toHaveProperty('maxSteps');
+  });
+
   it('rejects an unknown destructive-operations policy', async () => {
     await expect(
       expectPath({ destructiveOps: 'always' }, 'destructiveOps'),
     ).rejects.toThrow();
-  });
-
-  it('rejects an out-of-range maxSteps', async () => {
-    await expect(
-      expectPath({ maxSteps: 999999999 }, 'maxSteps'),
-    ).rejects.toThrow();
-    await expect(expectPath({ maxSteps: 0 }, 'maxSteps')).rejects.toThrow();
   });
 
   it('rejects an out-of-range temperature', async () => {
@@ -61,17 +64,9 @@ describe('agentSchema update validation', () => {
           provider: 'openai',
           model: 'gpt-4o',
           destructiveOps: 'ask',
-          maxSteps: 25,
           temperature: 1,
         },
-        [
-          'instructions',
-          'provider',
-          'model',
-          'destructiveOps',
-          'maxSteps',
-          'temperature',
-        ],
+        ['instructions', 'provider', 'model', 'destructiveOps', 'temperature'],
       ),
     ).resolves.toBeDefined();
   });

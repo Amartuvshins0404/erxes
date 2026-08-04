@@ -22,7 +22,6 @@ export const types = `
     destructiveOps: String
     memoryEnabled: Boolean
     debug: Boolean
-    maxSteps: Int
     temperature: Float
     permissionGroupIds: [String!]!
     isActive: Boolean!
@@ -46,7 +45,6 @@ export const types = `
     destructiveOps: String
     memoryEnabled: Boolean
     debug: Boolean
-    maxSteps: Int
     temperature: Float
     permissionGroupIds: [String!]
     isActive: Boolean

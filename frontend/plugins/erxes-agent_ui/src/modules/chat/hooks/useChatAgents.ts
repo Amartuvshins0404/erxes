@@ -26,7 +26,6 @@ export interface IChatAgent {
   // When on, the chat shows this agent's full tool-call trace; off (default)
   // shows only the turn summary that expands to the short thoughts.
   debug?: boolean;
-  maxSteps?: number;
   temperature?: number | null;
   isActive: boolean;
 }

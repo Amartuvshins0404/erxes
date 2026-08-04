@@ -19,7 +19,6 @@ export const AGENT_FIELDS = gql`
     destructiveOps
     memoryEnabled
     debug
-    maxSteps
     temperature
     isActive
     createdAt

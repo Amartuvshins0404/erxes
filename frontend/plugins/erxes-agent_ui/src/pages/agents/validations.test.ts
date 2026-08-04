@@ -68,4 +68,13 @@ describe('agentFormSchema', () => {
       expect(result.data).not.toHaveProperty('allowedTools');
     }
   });
+
+  it('strips the obsolete maxSteps setting from submissions', () => {
+    const result = agentFormSchema.parse({
+      ...validForm(),
+      maxSteps: 10,
+    });
+
+    expect(result).not.toHaveProperty('maxSteps');
+  });
 });

@@ -16,7 +16,6 @@ export interface IMastraAgent {
   destructiveOps?: 'allow' | 'ask' | null;
   memoryEnabled?: boolean | null;
   debug?: boolean | null;
-  maxSteps?: number | null;
   temperature?: number | null;
   isActive: boolean;
   createdAt?: string;

@@ -25,7 +25,6 @@ export interface IMastraAgent {
   memoryEnabled?: boolean;
   // Debug view: surface the full tool-call trace in chat (default off).
   debug?: boolean;
-  maxSteps?: number;
   temperature?: number;
 }
 

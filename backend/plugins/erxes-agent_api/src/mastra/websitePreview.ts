@@ -14,7 +14,6 @@ import { generateModels } from '~/connectionResolvers';
 import { openWebsiteFile } from '~/mastra/files/websiteFileStore';
 import type { IWebsiteFileReference } from '@/artifact/@types/artifact';
 
-const PUBLIC_WEBSITE_ROUTE = '/pl:erxes-agent/websites';
 const READ_TIMEOUT_MS = 30_000;
 const MAX_CONCURRENT_RESPONSES = 64;
 const MAX_RESPONSE_BYTES = 20 * 1024 * 1024;
@@ -93,6 +92,12 @@ export const websitePathCandidates = (
   return [...new Set(candidates)];
 };
 
+export const websiteRelativeBase = (filePath: string): string => {
+  const directory = path.dirname(filePath);
+  if (directory === '.') return './';
+  return '../'.repeat(directory.split('/').filter(Boolean).length);
+};
+
 const localhostOriginPattern =
   /https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?\//gi;
 const rootAttributePattern =
@@ -100,6 +105,62 @@ const rootAttributePattern =
 const rootSrcsetPattern = /(\bsrcset\s*=\s*["'])([^"']*)(["'])/gi;
 const rootCssUrlPattern = /(url\(\s*["']?)\/(?!\/)/gi;
 const rootCssImportPattern = /(@import\s+["'])\/(?!\/)/gi;
+const WEBSITE_NAVIGATION_MESSAGE = 'erxes-agent:website-preview:navigate';
+
+const websiteNavigationBridge = (siteBase: string): string => `<script>
+(() => {
+  const previewBase = ${JSON.stringify(siteBase)};
+  document.addEventListener('click', (event) => {
+    if (
+      event.defaultPrevented ||
+      event.button !== 0 ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.altKey
+    ) {
+      return;
+    }
+
+    const element = event.target instanceof Element ? event.target : null;
+    const anchor = element?.closest('a[href]');
+    if (!anchor || anchor.hasAttribute('download')) return;
+
+    try {
+      const base = new URL(previewBase, document.baseURI);
+      const target = new URL(anchor.href, document.baseURI);
+      if (
+        target.origin !== base.origin ||
+        !target.pathname.startsWith(base.pathname)
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+      const href =
+        target.pathname.slice(base.pathname.length) +
+        target.search +
+        target.hash;
+      window.parent.postMessage(
+        { type: '${WEBSITE_NAVIGATION_MESSAGE}', href },
+        '*',
+      );
+    } catch {
+      // Leave malformed or non-HTTP links to the browser.
+    }
+  }, true);
+})();
+</script>`;
+
+const injectWebsiteNavigationBridge = (
+  source: string,
+  siteBase: string,
+): string => {
+  const bridge = websiteNavigationBridge(siteBase);
+  return /<\/body\s*>/i.test(source)
+    ? source.replace(/<\/body\s*>/i, `${bridge}</body>`)
+    : `${source}${bridge}`;
+};
 
 export const rewriteWebsiteText = (
   source: string,
@@ -117,8 +178,13 @@ export const rewriteWebsiteText = (
           `${start}${value.replace(/(^|,\s*)\/(?!\/)/g, `$1${base}`)}${end}`,
       )
       .replace(rootCssUrlPattern, `$1${base}`)
-      .replace(rootCssImportPattern, `$1${base}`);
-  } else if (mimeType.startsWith('text/css')) {
+      .replace(rootCssImportPattern, `$1${base}`)
+      .replace(localhostOriginPattern, base);
+
+    return injectWebsiteNavigationBridge(rewritten, base);
+  }
+
+  if (mimeType.startsWith('text/css')) {
     rewritten = rewritten
       .replace(rootCssUrlPattern, `$1${base}`)
       .replace(rootCssImportPattern, `$1${base}`);
@@ -262,9 +328,7 @@ export const registerWebsitePreviewRoutes = (router: Router): void => {
         "sandbox; default-src 'none'; style-src 'unsafe-inline'; img-src data: blob:",
       );
 
-      const siteBase = `${PUBLIC_WEBSITE_ROUTE}/${encodeURIComponent(
-        artifact.artifactId,
-      )}/${encodeURIComponent(artifact.previewToken)}/`;
+      const siteBase = websiteRelativeBase(file.path);
       if (file.mimeType.startsWith('text/html')) {
         res.setHeader(
           'Content-Security-Policy',

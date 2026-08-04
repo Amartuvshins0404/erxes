@@ -5,7 +5,11 @@ jest.mock('~/connectionResolvers', () => ({
   generateModels: jest.fn(),
 }));
 
-import { rewriteWebsiteText, websitePathCandidates } from './websitePreview';
+import {
+  rewriteWebsiteText,
+  websitePathCandidates,
+  websiteRelativeBase,
+} from './websitePreview';
 
 describe('website preview paths', () => {
   const entryPath = 'index.html';
@@ -51,13 +55,19 @@ describe('website preview paths', () => {
   it('rejects malformed encoded paths', () => {
     expect(websitePathCandidates('%E0%A4%A', entryPath)).toEqual([]);
   });
+
+  it('keeps rewritten site roots independent of gateway mount prefixes', () => {
+    expect(websiteRelativeBase('index.html')).toBe('./');
+    expect(websiteRelativeBase('pages/about.html')).toBe('../');
+    expect(websiteRelativeBase('pages/team/index.html')).toBe('../../');
+  });
 });
 
 describe('website preview URL rewriting', () => {
   const siteBase = '/pl:erxes-agent/websites/artifact-1/token-1';
   const base = `${siteBase}/`;
 
-  it('rewrites localhost and root-relative HTML URLs into the capability route', () => {
+  it('rewrites local HTML URLs and installs the parent navigation bridge', () => {
     const html = [
       '<a href="http://localhost:5173/docs?tab=api#top">Docs</a>',
       '<form action="/submit"><img src="/assets/logo.svg" poster="/poster.jpg"></form>',
@@ -66,7 +76,13 @@ describe('website preview URL rewriting', () => {
       '<script src="http://127.0.0.1:3000/app.js"></script>',
     ].join('');
 
-    expect(rewriteWebsiteText(html, 'text/html; charset=utf-8', siteBase)).toBe(
+    const rewritten = rewriteWebsiteText(
+      html,
+      'text/html; charset=utf-8',
+      siteBase,
+    );
+
+    expect(rewritten).toContain(
       [
         `<a href="${base}docs?tab=api#top">Docs</a>`,
         `<form action="${base}submit"><img src="${base}assets/logo.svg" poster="${base}poster.jpg"></form>`,
@@ -75,6 +91,8 @@ describe('website preview URL rewriting', () => {
         `<script src="${base}app.js"></script>`,
       ].join(''),
     );
+    expect(rewritten).toContain('erxes-agent:website-preview:navigate');
+    expect(rewritten).toContain(`const previewBase = "${base}"`);
   });
 
   it('rewrites root-relative and localhost CSS resources without touching external URLs', () => {

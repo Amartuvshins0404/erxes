@@ -226,15 +226,39 @@ export const documentUrl = (
   );
 };
 
+/** Capability URL root shared by every member of a website artifact. */
+export const websiteBaseUrl = (artifact: WebsiteArtifact): string =>
+  `${REACT_APP_API_URL}/pl:erxes-agent/websites/${encodeURIComponent(
+    artifact.id,
+  )}/${encodeURIComponent(artifact.previewToken)}/`;
+
 /** Capability URL for a website entry document served by the plugin route. */
 export const websiteUrl = (artifact: WebsiteArtifact): string => {
   const entryPath = artifact.entryPath
     .split('/')
     .map(encodeURIComponent)
     .join('/');
-  return `${REACT_APP_API_URL}/pl:erxes-agent/websites/${encodeURIComponent(
-    artifact.id,
-  )}/${encodeURIComponent(artifact.previewToken)}/${entryPath}`;
+  return `${websiteBaseUrl(artifact)}${entryPath}`;
+};
+
+/** Accept only navigation targets contained by the current website capability. */
+export const websiteNavigationUrl = (
+  artifact: WebsiteArtifact,
+  href: string,
+): string | null => {
+  try {
+    const base = new URL(websiteBaseUrl(artifact));
+    const target = new URL(href, base);
+    if (
+      target.origin !== base.origin ||
+      !target.pathname.startsWith(base.pathname)
+    ) {
+      return null;
+    }
+    return target.href;
+  } catch {
+    return null;
+  }
 };
 
 /**

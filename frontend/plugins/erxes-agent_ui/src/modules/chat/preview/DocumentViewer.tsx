@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { IconCode, IconEye, IconLoader2 } from '@tabler/icons-react';
 import {
   audioPlugin,
@@ -16,6 +16,7 @@ import { useTranslation } from 'react-i18next';
 import { useIsDark } from '~/lib/useIsDark';
 import {
   documentUrl,
+  websiteNavigationUrl,
   websiteUrl,
   type DocumentArtifact,
   type WebsiteArtifact,
@@ -213,9 +214,49 @@ const HtmlDocumentViewer = ({ artifact }: { artifact: DocumentArtifact }) => {
   );
 };
 
+const WEBSITE_NAVIGATION_MESSAGE = 'erxes-agent:website-preview:navigate';
+
+interface WebsiteNavigationMessage {
+  type: typeof WEBSITE_NAVIGATION_MESSAGE;
+  href: string;
+}
+
+const isWebsiteNavigationMessage = (
+  value: unknown,
+): value is WebsiteNavigationMessage => {
+  if (typeof value !== 'object' || value === null) return false;
+  const message = value as Record<string, unknown>;
+  return (
+    message.type === WEBSITE_NAVIGATION_MESSAGE &&
+    typeof message.href === 'string'
+  );
+};
+
 export const WebsiteViewer = ({ artifact }: { artifact: WebsiteArtifact }) => {
   const { t } = useTranslation('erxes-agent');
   const [view, setView] = useState<HtmlDocumentView>('preview');
+  const entryUrl = websiteUrl(artifact);
+  const [previewUrl, setPreviewUrl] = useState(entryUrl);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+
+  useEffect(() => setPreviewUrl(entryUrl), [entryUrl]);
+
+  useEffect(() => {
+    const handleNavigation = (event: MessageEvent<unknown>) => {
+      if (
+        event.source !== iframeRef.current?.contentWindow ||
+        !isWebsiteNavigationMessage(event.data)
+      ) {
+        return;
+      }
+
+      const target = websiteNavigationUrl(artifact, event.data.href);
+      if (target) setPreviewUrl(target);
+    };
+
+    window.addEventListener('message', handleNavigation);
+    return () => window.removeEventListener('message', handleNavigation);
+  }, [artifact]);
 
   return (
     <ViewerTabs
@@ -224,10 +265,11 @@ export const WebsiteViewer = ({ artifact }: { artifact: WebsiteArtifact }) => {
       code={<DocumentFileViewer artifact={artifact} />}
       preview={
         <iframe
+          ref={iframeRef}
           title={t('artifact-website-frame-title', {
             name: artifact.title,
           })}
-          src={websiteUrl(artifact)}
+          src={previewUrl}
           sandbox="allow-scripts"
           referrerPolicy="no-referrer"
           className="h-full w-full border-0 bg-white"

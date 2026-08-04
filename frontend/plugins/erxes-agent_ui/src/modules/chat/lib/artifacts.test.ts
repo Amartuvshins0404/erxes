@@ -4,6 +4,8 @@ import {
   artifactOutcomes,
   associateArtifacts,
   mergeArtifacts,
+  websiteBaseUrl,
+  websiteNavigationUrl,
   websiteUrl,
   type Artifact,
 } from '~/modules/chat/lib/artifacts';
@@ -194,5 +196,38 @@ describe('websiteUrl', () => {
     expect(websiteUrl(artifact)).toBe(
       'http://localhost:4000/pl:erxes-agent/websites/site_1/token%2Fwith%20%3F%23/pages/About%20us%3F%23.html',
     );
+  });
+});
+
+describe('websiteNavigationUrl', () => {
+  const artifact: Extract<Artifact, { kind: 'website' }> = {
+    id: 'site_1',
+    kind: 'website',
+    title: 'Site',
+    entryPath: 'index.html',
+    fileCount: 2,
+    contentHash: 'a'.repeat(64),
+    previewToken: 'token-1',
+    fileName: 'index.html',
+    mimeType: 'text/html',
+    fileKey: 'websites/site_1/index.html',
+  };
+
+  it('accepts pages and fragments within the website capability', () => {
+    expect(websiteBaseUrl(artifact)).toBe(
+      'http://localhost:4000/pl:erxes-agent/websites/site_1/token-1/',
+    );
+    expect(websiteNavigationUrl(artifact, 'about.html#team')).toBe(
+      'http://localhost:4000/pl:erxes-agent/websites/site_1/token-1/about.html#team',
+    );
+  });
+
+  it.each([
+    'https://example.com/about.html',
+    'http://localhost:4000/pl:erxes-agent/websites/site_1/other-token/about.html',
+    'http://localhost:4000/gateway/graphql',
+    'http://[',
+  ])('rejects a target outside the website capability: %s', (href) => {
+    expect(websiteNavigationUrl(artifact, href)).toBeNull();
   });
 });

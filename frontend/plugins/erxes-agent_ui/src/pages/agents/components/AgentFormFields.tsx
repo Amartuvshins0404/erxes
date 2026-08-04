@@ -21,11 +21,9 @@ import {
 import { Trans, useTranslation } from 'react-i18next';
 import { UseFormReturn, useWatch } from 'react-hook-form';
 import {
-  currentUserState,
   pluginsConfigState,
   SelectDepartments,
   SelectMember,
-  usePermissionCheck,
 } from 'ui-modules';
 import { Field } from '~/components/FormLayout';
 import {
@@ -35,17 +33,10 @@ import {
 } from '~/components/SelectProviderModel';
 import { MASTRA_AGENT_ADDITIONAL_TOOLS } from '~/graphql/queries';
 import { AgentFormValues } from '../validations';
-import {
-  AUDIENCE_TEAMS,
-  type AudienceTeamsData,
-  PERMISSION_GROUPS,
-  permissionGroupOptions,
-  type PermissionGroupsData,
-} from '../graphql/access';
+import { AUDIENCE_TEAMS, type AudienceTeamsData } from '../graphql/access';
 import { PermissionGroupSelector } from './PermissionGroupSelector';
 import { AudienceTeamSelector } from './AudienceTeamSelector';
-import { ERXES_AGENT_ACTIONS } from '~/permissions';
-import { resolveAgentActionScope } from '../hooks/agentActionScope';
+import { useAgentPermissionGroups } from '../hooks/useAgentPermissionGroups';
 
 type AgentForm = UseFormReturn<AgentFormValues>;
 
@@ -495,25 +486,7 @@ const AdditionalToolsSection = ({ form }: { form: AgentForm }) => {
 const AgentAccessSection = ({ form }: { form: AgentForm }) => {
   const { t } = useTranslation('mastra');
   const destructiveOps = form.watch('destructiveOps');
-  const { data, loading, error } =
-    useQuery<PermissionGroupsData>(PERMISSION_GROUPS);
-  const currentUser = useAtomValue(currentUserState);
-  const permissionCheck = usePermissionCheck();
-  const canAssignAnyGroup =
-    resolveAgentActionScope(
-      permissionCheck,
-      ERXES_AGENT_ACTIONS.agent.create,
-    ) === 'all' ||
-    resolveAgentActionScope(
-      permissionCheck,
-      ERXES_AGENT_ACTIONS.agent.update,
-    ) === 'all';
-  const availableGroups = permissionGroupOptions(data);
-  const groups = canAssignAnyGroup
-    ? availableGroups
-    : availableGroups.filter((group) =>
-        currentUser?.permissionGroupIds?.includes(group.id),
-      );
+  const { groups, loading, error } = useAgentPermissionGroups();
 
   return (
     <AgentFormSection

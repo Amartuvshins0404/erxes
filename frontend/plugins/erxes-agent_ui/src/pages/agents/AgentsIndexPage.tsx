@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ApolloCache, useMutation, useQuery } from '@apollo/client';
+import { ApolloCache, useMutation } from '@apollo/client';
 import { ColumnDef, Row } from '@tanstack/react-table';
 import {
   IconAlignLeft,
@@ -37,11 +37,7 @@ import {
   useAgentAccess,
 } from './hooks/useAgentAccess';
 import { useAgentsBasePath } from './hooks/useAgentsBasePath';
-import {
-  PERMISSION_GROUPS,
-  permissionGroupOptions,
-  type PermissionGroupsData,
-} from './graphql/access';
+import { useAgentPermissionGroups } from './hooks/useAgentPermissionGroups';
 
 type IAgent = IMastraAgentRow;
 type Visibility = IAgent['visibility'];
@@ -303,17 +299,13 @@ export const AgentsIndexPage = () => {
   const basePath = useAgentsBasePath();
   const { agentsList, loading, error, pageInfo, handleFetchMore, refetch } =
     useMastraAgentList();
-  const { data: permissionData } =
-    useQuery<PermissionGroupsData>(PERMISSION_GROUPS);
+  const { groups: permissionGroups } = useAgentPermissionGroups();
   const permissionGroupNames = useMemo(
     () =>
       Object.fromEntries(
-        permissionGroupOptions(permissionData).map((group) => [
-          group.id,
-          group.name,
-        ]),
+        permissionGroups.map((group) => [group.id, group.name]),
       ),
-    [permissionData],
+    [permissionGroups],
   );
   const visibilityLabels = useMemo<VisibilityLabels>(
     () => ({

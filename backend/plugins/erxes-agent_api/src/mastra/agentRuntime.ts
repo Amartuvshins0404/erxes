@@ -119,7 +119,7 @@ const enforceDelegatedPermissionCeiling = async ({
 };
 
 // Increment this whenever routing.ts, the meta-tools, or provider logic changes.
-const ROUTING_VERSION = 32;
+const ROUTING_VERSION = 33;
 
 export interface AgentWithTools {
   agent: Agent;

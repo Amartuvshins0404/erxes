@@ -8,10 +8,9 @@ import {
 
 export interface IMastraArtifactModel extends Model<IMastraArtifactDocument> {
   recordArtifact(doc: IMastraArtifact): Promise<IMastraArtifactDocument>;
+  recordArtifacts(docs: IMastraArtifact[]): Promise<void>;
   listByThread(threadId: string): Promise<IMastraArtifactDocument[]>;
-  getByArtifactId(
-    artifactId: string,
-  ): Promise<IMastraArtifactDocument | null>;
+  getByArtifactId(artifactId: string): Promise<IMastraArtifactDocument | null>;
   linkTurnToMessage(turnId: string, messageId: string): Promise<void>;
 }
 
@@ -27,9 +26,28 @@ export const loadArtifactClass = (_models: IModels) => {
       );
     }
 
+    // Batch terminal previews into one MongoDB round-trip.
+    public static async recordArtifacts(docs: IMastraArtifact[]) {
+      if (!docs.length) return;
+      await _models.MastraArtifact.bulkWrite(
+        docs.map(({ artifactId, createdAt, ...rest }) => ({
+          updateOne: {
+            filter: { artifactId },
+            update: {
+              $set: { artifactId, ...rest },
+              $setOnInsert: { createdAt: createdAt ?? new Date() },
+            },
+            upsert: true,
+          },
+        })),
+      );
+    }
+
     // A thread's artifacts, oldest → newest (creation order).
     public static async listByThread(threadId: string) {
-      return _models.MastraArtifact.find({ threadId }).sort({ createdAt: 1 });
+      return _models.MastraArtifact.find({ threadId })
+        .select('-websiteFiles -initiatorUserId')
+        .sort({ createdAt: 1 });
     }
 
     // One artifact by its public id — lets file_reader read back a chart/

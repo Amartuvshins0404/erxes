@@ -33,6 +33,21 @@ interface PersistedSettings extends IMastraSettings {
   defaultAgentId?: unknown;
 }
 
+/** Keep the OpenSandbox key write-only and preserve it when the UI sends blank. */
+export const buildSettingsUpdate = (doc: IMastraSettings): IMastraSettings => {
+  const { openSandboxApiKey, ...rest } = doc;
+  const update: IMastraSettings = { ...rest };
+  if (typeof openSandboxApiKey === 'string' && openSandboxApiKey.trim()) {
+    update.openSandboxApiKey = openSandboxApiKey.trim();
+  }
+  if (typeof update.openSandboxApiUrl === 'string') {
+    update.openSandboxApiUrl = update.openSandboxApiUrl
+      .trim()
+      .replace(/\/+$/, '');
+  }
+  return update;
+};
+
 export const loadSettingsClass = (_models: IModels) => {
   // Resolved lazily inside the static methods: the model isn't assigned onto
   // `_models` until after loadSettingsClass returns, but by request time it is.
@@ -80,22 +95,32 @@ export const loadSettingsClass = (_models: IModels) => {
     }
 
     public static async saveSettings(doc: IMastraSettings) {
-      _settingsCacheByTenant.delete(tenantKey()); // bust this tenant's cache on save so edits take effect immediately
-      const existing = await _models.MastraSettings.exists({});
-      if (existing) {
-        return _models.MastraSettings.findOneAndUpdate(
-          { _id: existing._id },
-          {
-            $set: doc,
-            $unset: {
-              erxesApiToken: 1,
-              defaultAgentId: 1,
-            },
+      const update = buildSettingsUpdate(doc);
+      const key = tenantKey();
+      _settingsCacheByTenant.delete(key);
+      const saved = await _models.MastraSettings.findOneAndUpdate(
+        {},
+        {
+          $set: update,
+          $unset: {
+            erxesApiToken: 1,
+            defaultAgentId: 1,
           },
-          { new: true, strict: false, runValidators: true },
-        );
-      }
-      return _models.MastraSettings.create(doc);
+        },
+        {
+          new: true,
+          upsert: true,
+          strict: false,
+          runValidators: true,
+          setDefaultsOnInsert: true,
+        },
+      ).select('+evaluationDsn');
+      if (!saved) throw new Error('Mastra settings could not be saved');
+      _settingsCacheByTenant.set(key, {
+        doc: saved,
+        expiresAt: Date.now() + SETTINGS_CACHE_TTL,
+      });
+      return saved;
     }
   }
 

@@ -8,6 +8,7 @@ import {
   IconFileTypeXls,
   IconHierarchy,
   IconPhoto,
+  IconWorldWww,
 } from '@tabler/icons-react';
 import type { AgentUIMessage } from '~/modules/chat/types';
 import type { ArtifactGroup } from '~/modules/chat/hooks/useThreadArtifacts';
@@ -23,6 +24,7 @@ import {
   type Artifact,
   type DocumentArtifact,
   type ImageArtifact,
+  type WebsiteArtifact,
 } from '~/modules/chat/lib/artifactNormalize';
 
 // The artifact contract + normalizer live in ./artifactNormalize (pure and
@@ -37,16 +39,42 @@ export type {
   DocumentArtifact,
   DocumentFormat,
   ImageArtifact,
+  WebsiteArtifact,
 } from '~/modules/chat/lib/artifactNormalize';
 
-/** Pull a valid artifact off a tool result, or null when there isn't one. */
-export const asArtifact = (output: unknown): Artifact | null =>
-  normalizeArtifact((output as { artifact?: unknown })?.artifact);
+/** Pull every valid artifact off a tool result, including terminal file batches. */
+export const asArtifacts = (output: unknown): Artifact[] => {
+  if (!output || typeof output !== 'object') return [];
+  const result = output as { artifact?: unknown; artifacts?: unknown };
+  const candidates = [
+    result.artifact,
+    ...(Array.isArray(result.artifacts) ? result.artifacts : []),
+  ];
+  const artifacts: Artifact[] = [];
+  const seen = new Set<string>();
+  for (const candidate of candidates) {
+    const artifact = normalizeArtifact(candidate);
+    if (artifact && !seen.has(artifact.id)) {
+      seen.add(artifact.id);
+      artifacts.push(artifact);
+    }
+  }
+  return artifacts;
+};
 
-/** The artifact carried by a tool part's output (settled tool calls only). */
+/** Pull the first valid artifact off a tool result, or null when absent. */
+export const asArtifact = (output: unknown): Artifact | null =>
+  asArtifacts(output)[0] ?? null;
+
+/** The artifacts carried by a settled tool part. */
 export const asArtifactPart = (call: ToolPartView): Artifact | null => {
   if (call.isError || call.state !== 'output-available') return null;
   return asArtifact(call.output);
+};
+
+const asArtifactParts = (call: ToolPartView): Artifact[] => {
+  if (call.isError || call.state !== 'output-available') return [];
+  return asArtifacts(call.output);
 };
 
 /**
@@ -70,9 +98,9 @@ export const artifactOutcomes = (
   for (const part of parts) {
     const tool = asToolPart(part);
     if (!tool) continue;
-    const artifact = asArtifactPart(tool);
-    if (artifact) {
-      artifacts.push(artifact);
+    const partArtifacts = asArtifactParts(tool);
+    if (partArtifacts.length) {
+      artifacts.push(...partArtifacts);
     } else if (
       toolKind(tool.toolName) === 'artifact' &&
       (tool.state === 'output-available' ||
@@ -175,22 +203,38 @@ export const associateArtifacts = (
 
 /** Canonical icon component for any artifact kind/format. */
 export const artifactIcon = (a: Artifact) => {
-  if (a.kind === 'chart')   return IconChartBar;
+  if (a.kind === 'chart') return IconChartBar;
   if (a.kind === 'diagram') return IconHierarchy;
-  if (a.kind === 'image')   return IconPhoto;
-  if (a.format === 'pdf')   return IconFileTypePdf;
-  if (a.format === 'docx')  return IconFileTypeDocx;
-  if (a.format === 'pptx')  return IconFileTypePpt;
-  if (a.format === 'xlsx')  return IconFileTypeXls;
+  if (a.kind === 'image') return IconPhoto;
+  if (a.kind === 'website') return IconWorldWww;
+  if (a.format === 'pdf') return IconFileTypePdf;
+  if (a.format === 'docx') return IconFileTypeDocx;
+  if (a.format === 'pptx') return IconFileTypePpt;
+  if (a.format === 'xlsx') return IconFileTypeXls;
   return IconFile;
 };
 
 /** A URL the browser can open/download for a file-backed artifact. */
 export const documentUrl = (
-  artifact: DocumentArtifact | ImageArtifact,
+  artifact: DocumentArtifact | ImageArtifact | WebsiteArtifact,
 ): string => {
   if (artifact.inline) return artifact.fileKey;
-  return resolveStorageRef(artifact.fileKey, REACT_APP_API_URL, artifact.fileName);
+  return resolveStorageRef(
+    artifact.fileKey,
+    REACT_APP_API_URL,
+    artifact.fileName,
+  );
+};
+
+/** Capability URL for a website entry document served by the plugin route. */
+export const websiteUrl = (artifact: WebsiteArtifact): string => {
+  const entryPath = artifact.entryPath
+    .split('/')
+    .map(encodeURIComponent)
+    .join('/');
+  return `${REACT_APP_API_URL}/pl:erxes-agent/websites/${encodeURIComponent(
+    artifact.id,
+  )}/${encodeURIComponent(artifact.previewToken)}/${entryPath}`;
 };
 
 /**

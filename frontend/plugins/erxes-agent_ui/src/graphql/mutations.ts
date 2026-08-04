@@ -96,6 +96,9 @@ export const MASTRA_SETTINGS_SAVE = gql`
       backgroundRemovalEnabled
       summarizerProvider
       summarizerModel
+      openSandboxApiUrl
+      hasOpenSandboxApiKey
+      openSandboxApiKeyHint
     }
   }
 `;

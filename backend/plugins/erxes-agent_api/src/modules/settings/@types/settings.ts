@@ -25,6 +25,10 @@ export interface IMastraSettings {
   backgroundRemovalEnabled?: boolean;
   summarizerProvider?: string;
   summarizerModel?: string;
+  // OpenSandbox connection used by the optional per-agent terminal tool.
+  // The API key is write-only at the GraphQL boundary.
+  openSandboxApiUrl?: string;
+  openSandboxApiKey?: string;
 }
 
 export interface IMastraSettingsDocument extends IMastraSettings, Document {

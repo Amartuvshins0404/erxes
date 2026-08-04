@@ -21,31 +21,47 @@ export class UITurnAccumulator {
   thinking = '';
   toolCalls: IMastraToolCall[] = [];
   parts: IMastraTurnPart[] = [];
+  private textParts: string[] = [];
   // Mastra's assigned id for this turn's assistant message — emitted on the
   // `start` chunk and reused when it persists the row. Carried to persistTurn so
   // the client can rate the reply (feedback resolves this native id) without a
   // reload. Meta itself is persisted by the output processor, not via this id.
   messageId?: string;
   private thinkingOpen = false;
+  private textOpen = false;
+
+  /** Final text block from the last model step, excluding earlier narration. */
+  get latestText(): string {
+    for (let index = this.textParts.length - 1; index >= 0; index -= 1) {
+      if (this.textParts[index].trim()) return this.textParts[index];
+    }
+    return '';
+  }
 
   fold(chunk: UIMessageChunk): void {
     switch (chunk.type) {
       case 'start':
-        if (
-          typeof (chunk as { messageId?: unknown }).messageId === 'string'
-        ) {
+        if (typeof (chunk as { messageId?: unknown }).messageId === 'string') {
           this.messageId = (chunk as { messageId: string }).messageId;
         }
         break;
-      case 'text-delta':
-        this.text += chunk.delta ?? '';
+      case 'text-start':
+        this.textParts.push('');
+        this.textOpen = true;
         this.thinkingOpen = false;
         break;
+      case 'text-delta':
+        this.appendText(chunk.delta ?? '');
+        this.thinkingOpen = false;
+        break;
+      case 'text-end':
+        this.textOpen = false;
+        break;
       case 'reasoning-delta':
+        this.textOpen = false;
         this.appendThinking(chunk.delta ?? '');
         break;
       case 'reasoning-end':
-      case 'text-start':
         this.thinkingOpen = false;
         break;
       case 'tool-input-available':
@@ -75,6 +91,18 @@ export class UITurnAccumulator {
       default:
         break;
     }
+  }
+
+  private appendText(text: string): void {
+    if (!text) return;
+    this.text += text;
+    if (!this.textOpen) {
+      this.textParts.push(text);
+      this.textOpen = true;
+      return;
+    }
+    const lastIndex = this.textParts.length - 1;
+    this.textParts[lastIndex] = `${this.textParts[lastIndex] ?? ''}${text}`;
   }
 
   private appendThinking(text: string): void {

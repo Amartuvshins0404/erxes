@@ -17,6 +17,10 @@ import {
   findCoreUsers,
   isAgentAccount,
 } from '~/mastra/auth/servicePrincipal';
+import {
+  ADDITIONAL_TOOL_KEYS,
+  normalizeAdditionalToolKeys,
+} from '~/mastra/tools/additionalTools';
 
 const hydrateProfiles = async (
   profiles: IMastraAgentDocument[],
@@ -45,6 +49,7 @@ const hydrateProfiles = async (
         audienceUserIds: profile.audienceUserIds ?? [],
         audienceTeamIds: profile.audienceTeamIds ?? [],
         audienceDepartmentIds: profile.audienceDepartmentIds ?? [],
+        additionalTools: normalizeAdditionalToolKeys(profile.additionalTools),
         accountName: agentAccountName(account),
         accountDescription: account.details?.description || '',
         permissionGroupIds: account.permissionGroupIds || [],
@@ -89,6 +94,14 @@ const hydrateProfile = async (
 };
 
 export const agentQueries = {
+  mastraAgentAdditionalTools: async (
+    _parent: undefined,
+    _args: undefined,
+    { checkPermission }: IContext,
+  ) => {
+    await checkPermission(ERXES_AGENT_ACTIONS.agent.readSummary);
+    return ADDITIONAL_TOOL_KEYS;
+  },
   mastraAgents: async (
     _parent: undefined,
     _args: undefined,
@@ -192,7 +205,12 @@ export const agentQueries = {
       memory: memoryBinding,
     });
 
-    await persistTurn({ models, prepared, reply });
+    await persistTurn({
+      models,
+      prepared,
+      reply,
+      hasArtifacts: (prepared.authCtx.artifactCount ?? 0) > 0,
+    });
     return reply;
   },
 };

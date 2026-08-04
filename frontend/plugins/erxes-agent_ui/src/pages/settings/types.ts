@@ -78,6 +78,9 @@ export interface IMastraSettings {
   backgroundRemovalEnabled?: boolean | null;
   summarizerProvider?: string | null;
   summarizerModel?: string | null;
+  openSandboxApiUrl?: string | null;
+  hasOpenSandboxApiKey?: boolean | null;
+  openSandboxApiKeyHint?: string | null;
   attachmentStorage?: Pick<
     IAttachmentStorage,
     'configured' | 'serviceType'

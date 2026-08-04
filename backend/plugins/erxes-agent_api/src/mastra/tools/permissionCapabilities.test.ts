@@ -90,6 +90,24 @@ describe('permission-derived agent capabilities', () => {
     expect(result).not.toContain('builtin:workflowRunNow');
   });
 
+  it('adds only the optional tools explicitly selected for an agent', () => {
+    const result = deriveAgentAllowedTools([], registry, [
+      'webSearch',
+      'terminal',
+    ]);
+
+    expect(result).toEqual(
+      expect.arrayContaining([
+        'dealsView',
+        'builtin:webSearch',
+        'builtin:terminal',
+      ]),
+    );
+    expect(result).not.toContain('builtin:calculator');
+    expect(result).not.toContain('builtin:generatePdf');
+    expect(result).not.toContain('builtin:fetchUrl');
+  });
+
   it('gates workflow run history separately from workflow definitions', () => {
     const permissions = [
       {

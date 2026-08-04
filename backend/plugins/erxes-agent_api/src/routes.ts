@@ -14,9 +14,11 @@ import { makeIpRateLimiter } from './utils/rateLimit';
 import { registerActiveRun } from './mastra/runRegistry';
 import { ERXES_AGENT_ACTIONS } from './meta/permissionActions';
 import { registerAgentLocaleRoutes } from './locales';
+import { registerWebsitePreviewRoutes } from './mastra/websitePreview';
 
 export const router: Router = Router();
 registerAgentLocaleRoutes(router);
+registerWebsitePreviewRoutes(router);
 
 // Generous per-IP throttle on the LLM-backed endpoints — normal chat traffic
 // stays well under it; it only blunts abnormal high-frequency bursts and their

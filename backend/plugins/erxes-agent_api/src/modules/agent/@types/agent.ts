@@ -16,6 +16,9 @@ export interface IMastraAgent {
   // Skill allowlist: glob patterns matched against global skills' name (or
   // `category/name`), e.g. ['erxes-*', 'sales/*']. Empty/unset → no skills.
   skills?: string[];
+  // Explicit allowlist for optional non-erxes capabilities (web, document,
+  // image, and isolated terminal tools). Empty means none.
+  additionalTools?: string[];
   // Consent for irreversible deletes/merges. 'ask' (default) prompts the user;
   // 'allow' runs without asking. ('block' is a tolerated legacy value → 'ask'.)
   destructiveOps?: 'allow' | 'ask' | 'block';

@@ -22,6 +22,7 @@ import {
 import { resolveAgentPermissions } from '~/mastra/tools/permissionCapabilities';
 import { ERXES_AGENT_ACTIONS } from '~/meta/permissionActions';
 import { toUserFacingAgentError } from './agentErrors';
+import { normalizeAdditionalToolKeys } from '~/mastra/tools/additionalTools';
 
 const assertPermissionGroupsExist = async (
   subdomain: string,
@@ -172,6 +173,7 @@ const toAgentView = (profile: IMastraAgentDocument, account: AgentAccount) => ({
   accountDescription: account.details?.description || '',
   permissionGroupIds: account.permissionGroupIds || [],
   isActive: account.isActive !== false,
+  additionalTools: normalizeAdditionalToolKeys(profile.additionalTools),
 });
 
 const splitInput = (doc: IMastraAgentInput) => {
@@ -242,6 +244,10 @@ export const agentMutations = {
           audienceUserIds: audience.audienceUserIds,
           audienceTeamIds: audience.audienceTeamIds,
           audienceDepartmentIds: audience.audienceDepartmentIds,
+          additionalTools: normalizeAdditionalToolKeys(
+            profile.additionalTools ?? [],
+            [],
+          ),
           permissionMode: grant.mode,
         },
       );
@@ -296,6 +302,12 @@ export const agentMutations = {
     }
 
     const nextProfile: Partial<IMastraAgent> = { ...profile };
+    if (profile.additionalTools !== undefined) {
+      nextProfile.additionalTools = normalizeAdditionalToolKeys(
+        profile.additionalTools,
+        [],
+      );
+    }
     const sharingChanged =
       profile.visibility !== undefined ||
       profile.audienceUserIds !== undefined ||

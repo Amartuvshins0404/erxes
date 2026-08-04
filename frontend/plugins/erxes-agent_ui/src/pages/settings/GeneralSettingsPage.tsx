@@ -5,9 +5,11 @@ import {
   IconBrain,
   IconCheck,
   IconDatabase,
+  IconKey,
   IconPaperclip,
   IconPhoto,
   IconSparkles,
+  IconTerminal2,
 } from '@tabler/icons-react';
 import { Badge, Button, Card, Form, Input, Switch, toast } from 'erxes-ui';
 import { useForm } from 'react-hook-form';
@@ -127,6 +129,8 @@ export const GeneralSettingsPage = () => {
         settings.backgroundRemovalEnabled !== false,
       summarizerProvider: settings.summarizerProvider || '',
       summarizerModel: settings.summarizerModel || '',
+      openSandboxApiUrl: settings.openSandboxApiUrl || '',
+      openSandboxApiKey: '',
     });
   }, [settings, form]);
 
@@ -137,6 +141,10 @@ export const GeneralSettingsPage = () => {
     t('general-settings-storage-service-unknown');
   const evaluationDsnConfigured =
     settings?.evaluationDsnConfigured === true && !clearEvaluationDsn;
+  const sandboxConfigured =
+    Boolean(settings?.openSandboxApiUrl) &&
+    settings?.hasOpenSandboxApiKey === true;
+  const sandboxKeyHint = settings?.openSandboxApiKeyHint || '';
 
   const onSubmit = async (doc: GeneralSettingsValues) => {
     const { evaluationDsn, clearEvaluationDsn, ...runtimeSettings } = doc;
@@ -215,6 +223,96 @@ export const GeneralSettingsPage = () => {
                     </Form.Item>
                   )}
                 />
+
+                <div className="space-y-4 border-t pt-5">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="flex min-w-0 flex-1 items-start gap-3">
+                      <IconTerminal2
+                        aria-hidden
+                        className="mt-0.5 size-4 shrink-0 text-muted-foreground"
+                      />
+                      <div className="min-w-0">
+                        <h3 className="text-base font-semibold">
+                          {t('general-settings-sandbox-title')}
+                        </h3>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          {t('general-settings-sandbox-description')}
+                        </p>
+                      </div>
+                    </div>
+                    <Badge
+                      aria-live="polite"
+                      variant={sandboxConfigured ? 'success' : 'secondary'}
+                    >
+                      {sandboxConfigured
+                        ? t('general-settings-sandbox-configured')
+                        : t('general-settings-sandbox-not-configured')}
+                    </Badge>
+                  </div>
+
+                  <Form.Field
+                    control={form.control}
+                    name="openSandboxApiUrl"
+                    render={({ field }) => (
+                      <Form.Item>
+                        <Form.Label>
+                          {t('general-settings-sandbox-url-label')}
+                        </Form.Label>
+                        <Form.Control>
+                          <Input
+                            {...field}
+                            inputMode="url"
+                            placeholder={t(
+                              'general-settings-sandbox-url-placeholder',
+                            )}
+                          />
+                        </Form.Control>
+                        <Form.Description>
+                          {t('general-settings-sandbox-url-description')}
+                        </Form.Description>
+                        <Form.Message />
+                      </Form.Item>
+                    )}
+                  />
+
+                  <Form.Field
+                    control={form.control}
+                    name="openSandboxApiKey"
+                    render={({ field }) => (
+                      <Form.Item>
+                        <Form.Label>
+                          {t('general-settings-sandbox-key-label')}
+                        </Form.Label>
+                        <Form.Control>
+                          <div className="relative">
+                            <IconKey
+                              aria-hidden
+                              className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                            />
+                            <Input
+                              {...field}
+                              type="password"
+                              autoComplete="new-password"
+                              className="pl-9"
+                              placeholder={
+                                sandboxKeyHint ||
+                                t('general-settings-sandbox-key-placeholder')
+                              }
+                            />
+                          </div>
+                        </Form.Control>
+                        <Form.Description>
+                          {settings?.hasOpenSandboxApiKey
+                            ? t(
+                                'general-settings-sandbox-key-preserve-description',
+                              )
+                            : t('general-settings-sandbox-key-description')}
+                        </Form.Description>
+                        <Form.Message />
+                      </Form.Item>
+                    )}
+                  />
+                </div>
 
                 <Form.Field
                   control={form.control}

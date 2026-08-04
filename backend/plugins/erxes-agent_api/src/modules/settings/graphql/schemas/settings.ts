@@ -28,6 +28,9 @@ export const types = `
     backgroundRemovalEnabled: Boolean
     summarizerProvider: String
     summarizerModel: String
+    openSandboxApiUrl: String
+    hasOpenSandboxApiKey: Boolean!
+    openSandboxApiKeyHint: String
   }
 
   input MastraSettingsInput {
@@ -48,6 +51,9 @@ export const types = `
     backgroundRemovalEnabled: Boolean
     summarizerProvider: String
     summarizerModel: String
+    openSandboxApiUrl: String
+    # Write-only. Blank preserves the currently stored key.
+    openSandboxApiKey: String
   }
 `;
 

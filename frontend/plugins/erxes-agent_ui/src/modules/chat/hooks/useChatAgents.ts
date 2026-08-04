@@ -20,6 +20,7 @@ export interface IChatAgent {
   // "Edit agent" modal so it can populate without a second fetch.
   instructions?: string;
   permissionGroupIds: string[];
+  additionalTools?: string[] | null;
   destructiveOps?: 'allow' | 'ask';
   memoryEnabled?: boolean;
   // When on, the chat shows this agent's full tool-call trace; off (default)

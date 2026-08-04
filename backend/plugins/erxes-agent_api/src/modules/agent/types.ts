@@ -39,6 +39,10 @@ export interface TurnAuthCtx {
   turnId?: string;
   turnStartedAt?: Date;
   turnPrompt?: string;
+  /** Successfully persisted artifacts produced during this turn. */
+  artifactCount?: number;
+  /** Persisted website artifacts produced during this turn. */
+  websiteArtifactCount?: number;
   resourceId?: string;
   background?: boolean;
 }

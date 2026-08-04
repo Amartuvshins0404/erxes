@@ -10,6 +10,7 @@ import {
 interface CachedChatAgent extends IChatAgent {
   __typename: 'MastraAgent';
   skills: string[];
+  additionalTools: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -29,6 +30,7 @@ const ownedAgent: CachedChatAgent = {
   provider: 'openai',
   model: 'gpt-4.1',
   skills: [],
+  additionalTools: [],
   destructiveOps: 'ask',
   memoryEnabled: true,
   debug: false,

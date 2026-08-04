@@ -1,5 +1,5 @@
 import { ICursorPaginateParams, Resolver } from 'erxes-api-shared/core-types';
-import { markResolvers } from 'erxes-api-shared/utils';
+import { markResolvers, sendTRPCMessage } from 'erxes-api-shared/utils';
 import { IContext } from '~/connectionResolvers';
 import { EventStatus } from '@/event/constants';
 import { InvitationStatus } from '@/invitation/constants';
@@ -27,9 +27,23 @@ export const invitationClientPortalQueries: Record<string, Resolver> = {
   async cpEventInvitations(
     _root: undefined,
     _params: undefined,
-    { models, cpUser }: IContext,
+    { models, subdomain, cpUser }: IContext,
   ) {
-    return models.Invitations.listForCpUser(cpUser._id);
+    const customer = await sendTRPCMessage({
+      subdomain,
+      pluginName: 'core',
+      method: 'query',
+      module: 'customers',
+      action: 'findOne',
+      input: { query: { _id: cpUser.erxesCustomerId } },
+      defaultValue: null,
+    });
+
+    if (!customer) {
+      throw new Error('Customer not found');
+    }
+
+    return models.Invitations.listForCpUser(customer._id);
   },
 
   async cpEventAttendees(

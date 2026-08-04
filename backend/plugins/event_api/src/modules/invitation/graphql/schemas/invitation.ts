@@ -52,6 +52,7 @@ export const queries = `
   eventAttendanceSummary(eventId: String!): EventAttendanceSummary
 
   cpEventInvitations: [EventInvitation]
+  cpEventAttendees(eventId: String!): [EventInvitation]
 `;
 
 export const mutations = `

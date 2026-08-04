@@ -22,6 +22,7 @@ import { Trans, useTranslation } from 'react-i18next';
 import { UseFormReturn, useWatch } from 'react-hook-form';
 import {
   currentUserState,
+  pluginsConfigState,
   SelectDepartments,
   SelectMember,
   usePermissionCheck,
@@ -150,8 +151,14 @@ const AgentSharingSection = ({ form }: { form: AgentForm }) => {
   const { t } = useTranslation('mastra');
   const { t: tAgent } = useTranslation('erxes-agent');
   const visibility = useWatch({ control: form.control, name: 'visibility' });
+  const pluginsConfig = useAtomValue(pluginsConfigState);
+  const isOperationPluginEnabled = Object.values(pluginsConfig ?? {}).some(
+    ({ name }) => name === 'operation',
+  );
   const { data: audienceTeamsData, loading: teamsLoading } =
-    useQuery<AudienceTeamsData>(AUDIENCE_TEAMS);
+    useQuery<AudienceTeamsData>(AUDIENCE_TEAMS, {
+      skip: visibility !== 'shared' || !isOperationPluginEnabled,
+    });
   const teamOptions = audienceTeamsData?.getTeams ?? [];
   const visibilityOptions = [
     {

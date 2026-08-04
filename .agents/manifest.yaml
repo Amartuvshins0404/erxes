@@ -214,6 +214,11 @@ skills:
 
 plugins:
   frontend:
+    - name: "event"
+      nx_name: "event_ui"
+      path: "frontend/private-plugins/event_ui"
+      port: 3015
+      status: "active"
     - name: "content"
       nx_name: "content_ui"
       path: "frontend/plugins/content_ui"
@@ -256,6 +261,11 @@ plugins:
       path: "frontend/plugins/mongolian_ui"
       status: "active"
   backend:
+    - name: "event"
+      nx_name: "event_api"
+      path: "backend/plugins/event_api"
+      port: 33017
+      status: "active"
     - name: "content"
       nx_name: "content_api"
       path: "backend/plugins/content_api"

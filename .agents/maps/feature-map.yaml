@@ -183,6 +183,27 @@ core:
 # ─────────────────────────────────────────────────────────────────────────────
 plugins:
 
+  # ── EVENT ──────────────────────────────────────────────────────────────────
+  # Keywords stay narrow on purpose: bare "event"/"trigger"/"log" collide with
+  # the automation trigger system and activity logs.
+  - id: events
+    keywords: event, events, club event, agenda, venue, event capacity, event published, upcoming event
+    plugin: event
+    scope: both
+    frontend: frontend/private-plugins/event_ui/src/modules/events
+    backend: backend/plugins/event_api/src/modules/event
+    reference_table: frontend/private-plugins/event_ui/src/modules/events/components/EventsRecordTable.tsx
+    related: [event-attendance]
+
+  - id: event-attendance
+    keywords: rsvp, attendance, going, maybe, declined, event invitation, attendee, event response
+    plugin: event
+    scope: both
+    frontend: frontend/private-plugins/event_ui/src/modules/events/components/AttendanceDonut.tsx
+    backend: backend/plugins/event_api/src/modules/invitation
+    reference_table: frontend/private-plugins/event_ui/src/modules/events/components/EventsRecordTable.tsx
+    related: [events]
+
   # ── SALES ──────────────────────────────────────────────────────────────────
   - id: deals
     keywords: deal, deals, opportunity, opportunities, sales, crm, won, lost, revenue forecast, sales report

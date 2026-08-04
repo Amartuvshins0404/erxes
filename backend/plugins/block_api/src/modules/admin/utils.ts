@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import { Resolver } from 'erxes-api-shared/core-types';
 import fetch from 'node-fetch';
+import { IModels } from '~/connectionResolvers';
 
 const { BLOCK_ADMIN_API_URL, BLOCK_ADMIN_SECRET } = process.env;
 
@@ -54,7 +55,7 @@ const buildPayload = (
   return payload;
 };
 
-const sendMessage = ({ subdomain, path, payload }: SendMessagePayload) => {
+export const sendMessage = ({ subdomain, path, payload }: SendMessagePayload) => {
   const API_ENDPOINT = `${BLOCK_ADMIN_API_URL}/webhook/${path}`;
 
   if (!BLOCK_ADMIN_API_URL || !BLOCK_ADMIN_SECRET) {
@@ -84,6 +85,65 @@ const sendMessage = ({ subdomain, path, payload }: SendMessagePayload) => {
   } catch (e) {
     console.error(`Failed to send message to block-admin: ${e}`);
   }
+};
+
+const signBody = (body: string) => {
+  return crypto
+    .createHmac('sha256', BLOCK_ADMIN_SECRET as string)
+    .update(body)
+    .digest('hex');
+};
+
+export const sendMessageAwait = async ({
+  subdomain,
+  path,
+  payload,
+}: SendMessagePayload): Promise<any> => {
+  const API_ENDPOINT = `${BLOCK_ADMIN_API_URL}/webhook/${path}`;
+
+  if (!BLOCK_ADMIN_API_URL || !BLOCK_ADMIN_SECRET) {
+    console.error('BLOCK_ADMIN_API_URL or BLOCK_ADMIN_SECRET is not set');
+    return null;
+  }
+
+  try {
+    const body = JSON.stringify({ subdomain, payload });
+
+    const response = await fetch(API_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Signature': `sha256=${signBody(body)}`,
+      },
+      body,
+    });
+
+    return await response.json();
+  } catch (e) {
+    console.error(`Failed to send message to block-admin: ${e}`);
+    return null;
+  }
+};
+
+export const syncCustomerToBlockAdmin = async (
+  subdomain: string,
+  customerId: string,
+  models: IModels,
+) => {
+  const response = await sendMessageAwait({
+    subdomain,
+    path: 'customerSync',
+    payload: {
+      entityId: customerId,
+      data: {},
+    },
+  });
+
+  if (!response?.blockAdminId) {
+    throw new Error('Failed to sync customer to block admin');
+  }
+
+  return models.CustomerSync.setCustomerSync(customerId, response.blockAdminId);
 };
 
 export const wrapMutationResolver = (mutations: Record<string, Resolver>) => {

@@ -37,10 +37,6 @@ export const ContractAddForm = ({ onClose }: { onClose: () => void }) => {
 
   const handleSubmit = (data: ContractFormData) => {
     const paymentPlan = data.paymentPlan?.type ? data.paymentPlan : undefined;
-    const party =
-      data.party && data.party.id
-        ? { type: data.party.type, id: data.party.id }
-        : undefined;
     const amount =
       typeof data.amount === 'number' && !isNaN(data.amount)
         ? data.amount
@@ -57,7 +53,7 @@ export const ContractAddForm = ({ onClose }: { onClose: () => void }) => {
           date: data.date || new Date().toISOString(),
           amount,
           status: data.status || undefined,
-          party,
+          customerId: data.customerId || undefined,
           paymentPlan,
           user: data.user || undefined,
         },
@@ -84,7 +80,7 @@ export const ContractAddForm = ({ onClose }: { onClose: () => void }) => {
     <ContractFormSheet
       defaultValues={{
         unit: unitId || '',
-        party: { type: 'customer', id: '' },
+        customerId: '',
         currency: CurrencyCode.MNT,
       }}
       onSubmit={handleSubmit}

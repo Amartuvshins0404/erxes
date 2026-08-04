@@ -20,24 +20,14 @@ export default {
     return contract?.number || null;
   },
 
-  partyId: async (
+  customerId: async (
     payment: IContractPaymentDocument,
     _args: undefined,
     { models }: IContext,
   ) => {
-    if (payment.partyId) return payment.partyId;
+    if (payment.customerId) return payment.customerId;
     const contract = await loadContract(payment, models);
-    return contract?.party?.id || null;
-  },
-
-  partyType: async (
-    payment: IContractPaymentDocument,
-    _args: undefined,
-    { models }: IContext,
-  ) => {
-    if (payment.partyType) return payment.partyType;
-    const contract = await loadContract(payment, models);
-    return contract?.party?.type || null;
+    return contract?.customerId || null;
   },
 
   unit: async (

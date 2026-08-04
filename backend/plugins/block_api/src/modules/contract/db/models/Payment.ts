@@ -131,8 +131,7 @@ export const loadContractPaymentClass = (models: IModels) => {
       if (!force && stage?.type !== 'signed') return [];
 
       const contractNumber = contract.number;
-      const partyId = contract.party?.id;
-      const partyType = contract.party?.type;
+      const customerId = contract.customerId;
 
       const projectId = await (async () => {
         if (!contract.unit) return undefined;
@@ -231,8 +230,7 @@ export const loadContractPaymentClass = (models: IModels) => {
       const commonFields = {
         contractId,
         contractNumber,
-        partyId,
-        partyType,
+        customerId,
         projectId: projectId?.toString(),
         unit: contract.unit,
         currency,

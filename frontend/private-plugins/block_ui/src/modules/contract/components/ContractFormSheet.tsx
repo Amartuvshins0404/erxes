@@ -16,12 +16,11 @@ import {
 import { useForm } from 'react-hook-form';
 import { useParams } from 'react-router-dom';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { SelectCustomer, SelectCompany, SelectMember } from 'ui-modules';
+import { SelectCustomer, SelectMember } from 'ui-modules';
 import {
   ContractFormData,
   contractSchema,
 } from '@/contract/constants/contractSchema';
-import { CONTRACT_PARTY_TYPE_OPTIONS } from '@/contract/constants/contract';
 import { PaymentPlanForm } from '@/pricing/components/PaymentPlanForm';
 import { PaymentScheduleEditor } from './PaymentScheduleEditor';
 import { ContractUnit } from './ContractUnit';
@@ -82,13 +81,12 @@ export const ContractFormSheet = ({
     resolver: zodResolver(contractSchema),
     defaultValues: {
       unit: unitIdFromUrl || '',
-      party: { type: 'customer', id: '' },
+      customerId: '',
       currency: CurrencyCode.MNT,
       ...defaultValues,
     },
   });
 
-  const partyType = form.watch('party.type');
   const watchedUnitId = form.watch('unit');
   const { unit: fetchedUnit } = useUnit(!unit ? watchedUnitId : null);
   const activeUnit = unit || fetchedUnit;
@@ -298,59 +296,17 @@ export const ContractFormSheet = ({
                     />
 
                     <Form.Field
-                      name="party.type"
+                      name="customerId"
                       control={form.control}
                       render={({ field }) => (
                         <Form.Item>
-                          <Form.Label>Party Type</Form.Label>
-                          <Select
-                            onValueChange={(value) => {
-                              field.onChange(value);
-                              form.setValue('party.id', '');
-                            }}
-                            value={field.value}
-                          >
-                            <Form.Control>
-                              <Select.Trigger className="h-8">
-                                <Select.Value placeholder="Select party type" />
-                              </Select.Trigger>
-                            </Form.Control>
-                            <Select.Content>
-                              {CONTRACT_PARTY_TYPE_OPTIONS.map((option) => (
-                                <Select.Item
-                                  key={option.value}
-                                  value={option.value}
-                                >
-                                  {option.label}
-                                </Select.Item>
-                              ))}
-                            </Select.Content>
-                          </Select>
-                          <Form.Message />
-                        </Form.Item>
-                      )}
-                    />
-
-                    <Form.Field
-                      name="party.id"
-                      control={form.control}
-                      render={({ field }) => (
-                        <Form.Item>
-                          <Form.Label>Party</Form.Label>
+                          <Form.Label>Customer</Form.Label>
                           <Form.Control>
-                            {partyType === 'customer' ? (
-                              <SelectCustomer.FormItem
-                                value={field.value}
-                                onValueChange={field.onChange}
-                                mode="single"
-                              />
-                            ) : (
-                              <SelectCompany
-                                value={field.value}
-                                onValueChange={field.onChange}
-                                mode="single"
-                              />
-                            )}
+                            <SelectCustomer.FormItem
+                              value={field.value || ''}
+                              onValueChange={field.onChange}
+                              mode="single"
+                            />
                           </Form.Control>
                           <Form.Message />
                         </Form.Item>

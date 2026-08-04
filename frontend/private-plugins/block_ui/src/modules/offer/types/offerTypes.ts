@@ -35,10 +35,7 @@ export interface IOffer {
   currency: CurrencyCode;
   date: string;
   endDate: string;
-  party: {
-    type: string;
-    id: string;
-  };
+  customerId: string;
   paymentPlan?: IOfferPaymentPlan;
   user: string;
 }
@@ -49,7 +46,7 @@ export interface IOfferInput {
   currency: CurrencyCode;
   date?: Date;
   endDate?: Date;
-  party?: { type: string; id: string };
+  customerId?: string;
   paymentPlan?: IOfferPaymentPlan;
   user?: string;
   status?: 'draft' | 'sent';

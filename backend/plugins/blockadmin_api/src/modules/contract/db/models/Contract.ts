@@ -13,6 +13,11 @@ export interface IContractModel extends Model<IContractDocument> {
     entityId: string,
     input: IContract,
   ): Promise<IContractDocument>;
+  markContractSigned(
+    subdomain: string,
+    entityId: string,
+    data: { customerId?: string; signedAt: Date },
+  ): Promise<IContractDocument>;
   deleteContract(
     subdomain: string,
     entityId: string,
@@ -48,6 +53,20 @@ export const loadContractClass = (models: IModels) => {
       return models.Contract.findOneAndUpdate({ _id }, input, {
         new: true,
       });
+    }
+
+    public static async markContractSigned(
+      subdomain: string,
+      entityId: string,
+      data: { customerId?: string; signedAt: Date },
+    ) {
+      const { _id } = await models.Contract.getContract(subdomain, entityId);
+
+      return models.Contract.findOneAndUpdate(
+        { _id },
+        { $set: data },
+        { new: true },
+      );
     }
 
     public static async deleteContract(subdomain: string, entityId: string) {

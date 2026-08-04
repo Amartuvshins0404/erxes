@@ -5,16 +5,6 @@ import {
 import { Document } from 'mongoose';
 import { IBlock } from '~/types';
 
-export enum OfferPartyType {
-  CUSTOMER = 'customer',
-  COMPANY = 'company',
-}
-
-export interface IOfferParty {
-  type: OfferPartyType;
-  id: string;
-}
-
 export interface IOfferPaymentPlan {
   type: BlockProjectPaymentPlanType;
   downPaymentPercentage: number;
@@ -54,7 +44,7 @@ export interface IOffer extends IBlock {
   currency: string;
   status: OfferStatus;
   endDate: Date;
-  party: IOfferParty;
+  customerId: string;
   paymentPlan: IOfferPaymentPlan;
   user: string;
   description: string;

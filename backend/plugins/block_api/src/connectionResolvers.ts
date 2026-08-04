@@ -65,6 +65,11 @@ import { IUnitTypeDocument } from '@/unit/@types/unitType';
 import { IUnitModel, loadUnitClass } from '@/unit/db/models/Unit';
 import { IUnitLeadModel, loadUnitLeadClass } from '@/unit/db/models/UnitLead';
 import { IUnitTypeModel, loadUnitTypeClass } from '@/unit/db/models/UnitType';
+import { ICustomerSyncDocument } from '@/admin/@types/customerSync';
+import {
+  ICustomerSyncModel,
+  loadCustomerSyncClass,
+} from '@/admin/db/models/CustomerSync';
 import { ScopedEventHandlers } from 'erxes-api-shared/core-modules';
 import { IMainContext } from 'erxes-api-shared/core-types';
 import { createGenerateModels } from 'erxes-api-shared/utils';
@@ -94,6 +99,7 @@ export interface IModels {
   ContractStatus: IContractStatusModel;
   ContractPayment: IContractPaymentModel;
   ContractPaymentTransaction: IContractPaymentTransactionModel;
+  CustomerSync: ICustomerSyncModel;
 }
 
 export interface IContext extends IMainContext {
@@ -157,6 +163,7 @@ export const loadClasses = (
     'block_contracts',
     loadContractClass(
       models,
+      subdomain,
       blockEventHandlers?.('block', 'contracts') as any,
     ),
   );
@@ -216,6 +223,11 @@ export const loadClasses = (
   models.ContractStatus = db.model<IContractStatusDocument, IContractStatusModel>(
     'block_contract_statuses',
     loadContractStatusClass(models),
+  );
+
+  models.CustomerSync = db.model<ICustomerSyncDocument, ICustomerSyncModel>(
+    'block_customer_syncs',
+    loadCustomerSyncClass(models),
   );
 
   return models;

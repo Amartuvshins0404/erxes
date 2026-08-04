@@ -1,9 +1,4 @@
 export const types = `
-  enum BlockAdminOfferPartyType {
-    customer
-    company
-  }
-
   enum BlockAdminOfferInterestType {
     SIMPLE
     FLAT
@@ -50,14 +45,9 @@ export const types = `
     amount: Float
     amountType: BlockAdminOfferAmountType
     endDate: String
-    party: BlockAdminOfferParty
+    customerId: String
     paymentPlan: BlockAdminOfferPaymentPlan
     user: String
-  }
-
-  type BlockAdminOfferParty {
-    type: BlockAdminOfferPartyType
-    id: String
   }
 
   enum BlockAdminOfferStatus {

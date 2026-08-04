@@ -1,6 +1,5 @@
 import {
   ContractAmountType,
-  ContractPartyType,
   ContractStatus,
 } from '@/contract/@types/contract';
 import { Schema } from 'mongoose';
@@ -11,18 +10,6 @@ import {
   BlockProjectPaymentPlanType,
 } from '@/project/@types/payment';
 import { schemaWrapper } from '~/utils';
-
-const contractPartySchema = new Schema(
-  {
-    type: {
-      type: String,
-      enum: Object.values(ContractPartyType),
-      required: true,
-    },
-    id: { type: String, required: true },
-  },
-  { _id: false },
-);
 
 const contractPaymentPlanSchema = new Schema(
   {
@@ -63,11 +50,12 @@ export const contractSchema = schemaWrapper(
         default: ContractStatus.DRAFT,
       },
       isLifeTime: { type: Boolean, default: false },
-      party: { type: contractPartySchema, required: true },
       description: { type: String },
       paymentPlan: { type: contractPaymentPlanSchema, required: true },
       paymentDates: { type: [Number] },
       user: { type: String },
+      customerId: { type: String, required: true },
+      signedAt: { type: Date },
     },
     { timestamps: true },
   ),

@@ -12,10 +12,7 @@ export const CREATE_CONTRACT = gql`
       status
 
 
-      party {
-        type
-        id
-      }
+      customerId
       paymentPlan {
         type
         downPaymentPercentage
@@ -67,10 +64,7 @@ export const UPDATE_CONTRACT = gql`
       status
 
 
-      party {
-        type
-        id
-      }
+      customerId
       paymentPlan {
         type
         downPaymentPercentage

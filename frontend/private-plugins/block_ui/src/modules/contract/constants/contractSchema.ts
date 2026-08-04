@@ -8,12 +8,7 @@ export const contractSchema = z.object({
   amount: z.number().nullish(),
   status: z.string().nullish(),
   user: z.string().nullish(),
-  party: z
-    .object({
-      type: z.enum(['customer', 'company']).nullish(),
-      id: z.string().nullish(),
-    })
-    .optional(),
+  customerId: z.string().nullish(),
   paymentPlan: z
     .object({
       downPaymentPercentage: z.number().nullish(),

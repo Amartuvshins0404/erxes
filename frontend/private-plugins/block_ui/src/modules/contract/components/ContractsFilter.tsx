@@ -16,6 +16,7 @@ import {
   useQueryState,
 } from 'erxes-ui';
 import { useParams } from 'react-router-dom';
+import { SelectCustomer } from 'ui-modules';
 
 const ContractsFilterPopover = () => {
   const { projectId: projectIdParam, id } = useParams<{
@@ -28,9 +29,9 @@ const ContractsFilterPopover = () => {
   const [queries] = useMultiQueryState<{
     searchValue: string;
     status: string;
-    partyType: string;
+    customerId: string;
     currency: string;
-  }>(['searchValue', 'status', 'partyType', 'currency']);
+  }>(['searchValue', 'status', 'customerId', 'currency']);
 
   const hasFilters = Object.values(queries || {}).some(
     (value) => value !== null,
@@ -58,9 +59,9 @@ const ContractsFilterPopover = () => {
                   <IconProgressCheck />
                   Status
                 </Filter.Item>
-                <Filter.Item value="partyType">
+                <Filter.Item value="customerId">
                   <IconUser />
-                  Party Type
+                  Customer
                 </Filter.Item>
                 <Filter.Item value="currency">
                   <IconCoin />
@@ -70,7 +71,7 @@ const ContractsFilterPopover = () => {
             </Command>
           </Filter.View>
           <ContractStatusFilterView statuses={statuses || []} />
-          <PartyTypeFilterView />
+          <SelectCustomer.FilterView filterKey="customerId" mode="single" />
           <CurrencyFilterView />
         </Combobox.Content>
       </Filter.Popover>
@@ -106,35 +107,6 @@ const ContractStatusFilterView = ({
               />
               {s.name}
               {status === s._id && (
-                <span className="ml-auto text-primary">&#10003;</span>
-              )}
-            </Command.Item>
-          ))}
-        </Command.List>
-      </Command>
-    </Filter.View>
-  );
-};
-
-const PartyTypeFilterView = () => {
-  const [partyType, setPartyType] = useQueryState<string>('partyType');
-  const options = [
-    { value: 'customer', label: 'Customer' },
-    { value: 'company', label: 'Company' },
-  ];
-
-  return (
-    <Filter.View filterKey="partyType">
-      <Command>
-        <Command.List className="p-1">
-          {options.map((opt) => (
-            <Command.Item
-              key={opt.value}
-              value={opt.value}
-              onSelect={() => setPartyType(opt.value)}
-            >
-              {opt.label}
-              {partyType === opt.value && (
                 <span className="ml-auto text-primary">&#10003;</span>
               )}
             </Command.Item>
@@ -185,10 +157,10 @@ export const ContractsFilter = () => {
   const [queries] = useMultiQueryState<{
     searchValue: string;
     status: string;
-    partyType: string;
+    customerId: string;
     currency: string;
-  }>(['searchValue', 'status', 'partyType', 'currency']);
-  const { searchValue } = queries || {};
+  }>(['searchValue', 'status', 'customerId', 'currency']);
+  const { searchValue, customerId } = queries || {};
 
   const statusDoc = statuses?.find((s) => s._id === queries?.status);
 
@@ -229,15 +201,19 @@ export const ContractsFilter = () => {
             )}
           </Filter.BarButton>
         </Filter.BarItem>
-        <Filter.BarItem queryKey="partyType">
-          <Filter.BarName>
-            <IconUser />
-            Party Type
-          </Filter.BarName>
-          <Filter.BarButton filterKey="partyType">
-            {queries?.partyType === 'customer' ? 'Customer' : 'Company'}
-          </Filter.BarButton>
-        </Filter.BarItem>
+        {customerId && (
+          <Filter.BarItem queryKey="customerId">
+            <Filter.BarName>
+              <IconUser />
+              Customer
+            </Filter.BarName>
+            <SelectCustomer.FilterBar
+              filterKey="customerId"
+              label="Customer"
+              mode="single"
+            />
+          </Filter.BarItem>
+        )}
         <Filter.BarItem queryKey="currency">
           <Filter.BarName>
             <IconCoin />

@@ -1,9 +1,4 @@
 export const types = `
-  enum BlockAdminContractPartyType {
-    customer
-    company
-  }
-
   enum BlockAdminContractStatus {
     draft
     signed
@@ -47,14 +42,9 @@ export const types = `
     amountType: BlockAdminContractAmountType
     status: BlockAdminContractStatus
     isLifeTime: Boolean
-    party: BlockAdminContractParty
+    customerId: String
     paymentPlan: BlockAdminContractPaymentPlan
     user: String
-  }
-
-  type BlockAdminContractParty {
-    type: BlockAdminContractPartyType
-    id: String
   }
 `;
 

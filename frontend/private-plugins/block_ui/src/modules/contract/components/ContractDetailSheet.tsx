@@ -13,7 +13,6 @@ import { useContract } from '@/contract/hooks/useContracts';
 import { contractDetailSheetState } from '@/contract/states/contractDetailSheetState';
 import { ContractEditSheet } from './ContractEditSheet';
 import { RelationWidgetSideTabs } from 'ui-modules';
-import { ContractPartyType } from '@/contract/types/contractTypes';
 
 const ContractOverviewBody = lazy(() =>
   import('./contract-detail/ContractOverviewBody').then((m) => ({
@@ -142,11 +141,7 @@ export const ContractDetailSheet = () => {
           <RelationWidgetSideTabs
             contentId={activeContractId || ''}
             contentType="block:contract"
-            customerId={
-              contract?.party?.type === ContractPartyType.CUSTOMER
-                ? contract.party.id
-                : undefined
-            }
+            customerId={contract?.customerId}
             hookOptions={{
               hiddenPlugins: ['sales', 'operation', 'block'],
               hiddenModules: ['contract', 'company', 'ticket'],

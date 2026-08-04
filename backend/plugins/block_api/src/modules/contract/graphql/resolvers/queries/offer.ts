@@ -7,7 +7,7 @@ export interface IOfferFilter {
   unit?: string;
   search?: string;
   status?: string;
-  partyType?: string;
+  customerId?: string;
   currency?: string;
   dateFrom?: string;
   dateTo?: string;
@@ -113,8 +113,8 @@ export const offerQueries = {
       if (filter.status) {
         query.status = filter.status;
       }
-      if (filter.partyType) {
-        query['party.type'] = filter.partyType;
+      if (filter.customerId) {
+        query.customerId = filter.customerId;
       }
       if (filter.currency) {
         query.currency = filter.currency;

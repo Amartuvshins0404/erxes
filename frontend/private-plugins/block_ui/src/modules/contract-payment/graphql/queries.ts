@@ -25,8 +25,7 @@ export const GET_PROJECT_PAYMENTS = gql`
         _id
         contractId
         contractNumber
-        partyId
-        partyType
+        customerId
         projectId
         unit
         index
@@ -71,8 +70,7 @@ export const GET_CONTRACT_PAYMENTS = gql`
         _id
         contractId
         contractNumber
-        partyId
-        partyType
+        customerId
         index
         label
         dueDate

@@ -27,6 +27,11 @@ import {
   loadContractClass,
 } from '@/contract/db/models/Contract';
 import { IOfferModel, loadOfferClass } from '@/contract/db/models/Offer';
+import { IBlockCustomerDocument } from '@/blockCustomer/@types/blockCustomer';
+import {
+  IBlockCustomerModel,
+  loadBlockCustomerClass,
+} from '@/blockCustomer/db/models/BlockCustomer';
 import { IBlockDeveloperDocument } from '@/developer/db/@types/developer';
 import {
   IBlockDeveloperModel,
@@ -92,6 +97,7 @@ export interface IModels extends ISupplierModels, IMembershipModels {
   BlockAttachment: IBlockAttachmentModel;
   Developer: IBlockDeveloperModel;
   Contract: IContractModel;
+  BlockCustomer: IBlockCustomerModel;
   ProjectMember: IProjectMemberModel;
   Offer: IOfferModel;
   Invoice: IInvoiceModel;
@@ -165,6 +171,11 @@ export const loadClasses = (db: mongoose.Connection): IModels => {
     'block_admin_contracts',
     loadContractClass(models),
   );
+
+  models.BlockCustomer = db.model<
+    IBlockCustomerDocument,
+    IBlockCustomerModel
+  >('block_admin_customers', loadBlockCustomerClass(models));
 
   models.ProjectMember = db.model<IProjectMemberDocument, IProjectMemberModel>(
     'block_admin_project_members',

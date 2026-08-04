@@ -19,16 +19,6 @@ export const CONTRACT_STATUS_COLORS = {
   [CONTRACT_STATUS.CANCELLED]: 'bg-red-100 text-red-800',
 };
 
-export const CONTRACT_PARTY_TYPE = {
-  CUSTOMER: 'customer',
-  COMPANY: 'company',
-} as const;
-
-export const CONTRACT_PARTY_TYPE_OPTIONS = [
-  { value: CONTRACT_PARTY_TYPE.CUSTOMER, label: 'Customer' },
-  { value: CONTRACT_PARTY_TYPE.COMPANY, label: 'Company' },
-];
-
 export const CONTRACT_INTEREST_TYPE = {
   SIMPLE: 'SIMPLE',
   FLAT: 'FLAT',

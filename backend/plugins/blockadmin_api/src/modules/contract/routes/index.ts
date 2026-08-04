@@ -6,3 +6,5 @@ const router: Router = Router();
 
 router.use(contractRoutes);
 router.use(offerRoutes);
+
+export { router };

@@ -6,6 +6,7 @@ import { IModels } from '~/connectionResolvers';
 import { contractSchema } from '@/contract/db/definitions/contract';
 import { EventDispatcherReturn } from 'erxes-api-shared/core-modules';
 import { generateContractUpdateActivityLogs } from '../../meta/activity-log';
+import { handleContractSigned } from '@/contract/utils/signedStatus';
 
 export interface IContractModel extends Model<IContractDocument> {
   createContract(input: IContract): Promise<IContractDocument>;
@@ -21,6 +22,7 @@ export interface IContractModel extends Model<IContractDocument> {
 
 export const loadContractClass = (
   models: IModels,
+  subdomain: string,
   eventHandlers?: EventDispatcherReturn,
 ) => {
   const createActivityLog = eventHandlers?.createActivityLog;
@@ -28,10 +30,19 @@ export const loadContractClass = (
   class Contract {
     public static async createContract(input: IContract) {
       const created = await models.Contract.create(input);
+
       if (created) {
         await models.ContractPayment.regenerateForContract(
           created._id.toString(),
         );
+
+        const status = created.status
+          ? await models.ContractStatus.findOne({ _id: created.status })
+          : null;
+
+        if (status?.type === 'signed') {
+          await handleContractSigned(created, models, subdomain);
+        }
       }
       return created;
     }
@@ -49,10 +60,7 @@ export const loadContractClass = (
       const currentStage = prev.status
         ? await models.ContractStatus.findOne({ _id: prev.status })
         : null;
-      if (
-        currentStage?.type === 'signed' &&
-        !withinRevertWindow
-      ) {
+      if (currentStage?.type === 'signed' && !withinRevertWindow) {
         throw new Error('Signed contracts cannot be edited');
       }
 
@@ -70,6 +78,16 @@ export const loadContractClass = (
 
       if (updated) {
         await models.ContractPayment.regenerateForContract(_id);
+
+        if (input.status && String(input.status) !== String(prev.status)) {
+          const newStatus = await models.ContractStatus.findOne({
+            _id: input.status,
+          });
+
+          if (newStatus?.type === 'signed') {
+            await handleContractSigned(updated, models, subdomain);
+          }
+        }
       }
 
       return updated;
@@ -130,10 +148,14 @@ export const loadContractClass = (
       }
 
       if (updated && newStage.type === 'signed') {
+        await handleContractSigned(updated, models, subdomain);
+
         await models.ContractPayment.regenerateForContract(_id, true);
 
         if (updated.unit) {
-          const cancelledStage = await models.ContractStatus.findOne({ type: 'cancelled' });
+          const cancelledStage = await models.ContractStatus.findOne({
+            type: 'cancelled',
+          });
           if (cancelledStage) {
             await models.Contract.updateMany(
               {

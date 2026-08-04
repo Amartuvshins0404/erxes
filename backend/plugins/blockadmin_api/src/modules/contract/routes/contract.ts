@@ -67,4 +67,35 @@ router.post(
   },
 );
 
+router.post(
+  '/contractSigned',
+  async (
+    req: IRequest<{}, { customerId?: string }>,
+    res: IResponse,
+  ) => {
+    const { models } = res.locals as IContext;
+
+    try {
+      const { subdomain, payload } = req.body || {};
+
+      const { entityId, data } = payload || {};
+
+      const { customerId } = data || ({} as any);
+
+      await models.Contract.markContractSigned(subdomain, entityId, {
+        customerId,
+        signedAt: new Date(),
+      });
+
+      return res.status(200).json({
+        success: true,
+      });
+    } catch (error) {
+      return res.status(400).json({
+        error: error.message,
+      });
+    }
+  },
+);
+
 export { router };

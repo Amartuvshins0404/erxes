@@ -22,7 +22,7 @@ import {
   RecordTableInlineCell,
 } from 'erxes-ui';
 import { format } from 'date-fns';
-import { CustomersInline, CompaniesInline, MembersInline } from 'ui-modules';
+import { CustomersInline, MembersInline } from 'ui-modules';
 import { useSetAtom } from 'jotai';
 
 const parseDate = (value: any) => {
@@ -75,29 +75,22 @@ export const offersColumns = (): ColumnDef<IOffer>[] => {
       size: 110,
     },
     {
-      id: 'party',
-      accessorKey: 'party',
-      header: () => <RecordTable.InlineHead label="Party" icon={IconUser} />,
+      id: 'customerId',
+      accessorKey: 'customerId',
+      header: () => <RecordTable.InlineHead label="Customer" icon={IconUser} />,
       cell: ({ cell }) => {
-        const party = cell.getValue() as IOffer['party'];
+        const customerId = cell.getValue() as IOffer['customerId'];
         return (
           <RecordTableInlineCell>
-            {!party?.id ? (
+            {!customerId ? (
               <span className="text-muted-foreground">-</span>
-            ) : party.type === 'customer' ? (
-              <CustomersInline.Provider customerIds={[party.id]}>
+            ) : (
+              <CustomersInline.Provider customerIds={[customerId]}>
                 <span className="inline-flex items-center gap-2 overflow-hidden">
                   <CustomersInline.Avatar />
                   <CustomersInline.Title />
                 </span>
               </CustomersInline.Provider>
-            ) : (
-              <CompaniesInline.Provider companyIds={[party.id]}>
-                <span className="inline-flex items-center gap-2 overflow-hidden">
-                  <CompaniesInline.Avatar />
-                  <CompaniesInline.Title />
-                </span>
-              </CompaniesInline.Provider>
             )}
           </RecordTableInlineCell>
         );

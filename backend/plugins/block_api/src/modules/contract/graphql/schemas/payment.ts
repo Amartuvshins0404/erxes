@@ -3,8 +3,7 @@ export const types = `
     _id: String!
     contractId: String!
     contractNumber: String
-    partyId: String
-    partyType: String
+    customerId: String
     projectId: String
     unit: String
     index: Int!

@@ -20,20 +20,27 @@ export const contractMutations = {
       }
     }
     if (input.paymentPlan) {
-      input.paymentPlan = stripNulls(input.paymentPlan) as typeof input.paymentPlan;
+      input.paymentPlan = stripNulls(
+        input.paymentPlan,
+      ) as typeof input.paymentPlan;
     }
+
     return models.Contract.createContract(input);
   },
+
   blockUpdateContract: async (
     _parent: undefined,
     { _id, input }: { _id: string; input: IContract },
     { models }: IContext,
   ) => {
     if (input.paymentPlan) {
-      input.paymentPlan = stripNulls(input.paymentPlan) as typeof input.paymentPlan;
+      input.paymentPlan = stripNulls(
+        input.paymentPlan,
+      ) as typeof input.paymentPlan;
     }
     return models.Contract.updateContract(_id, input);
   },
+
   blockUpdateContractStatus: async (
     _parent: undefined,
     { _id, status }: { _id: string; status: string },

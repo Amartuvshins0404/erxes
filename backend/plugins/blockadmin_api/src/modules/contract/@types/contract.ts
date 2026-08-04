@@ -5,19 +5,9 @@ import {
 import { Document } from 'mongoose';
 import { IBlock } from '~/types';
 
-export enum ContractPartyType {
-  CUSTOMER = 'customer',
-  COMPANY = 'company',
-}
-
 export enum ContractAmountType {
   PER_SIZE = 'perSize',
   PER_UNIT = 'perUnit',
-}
-
-export interface IContractParty {
-  type: ContractPartyType;
-  id: string;
 }
 
 export enum ContractStatus {
@@ -52,10 +42,11 @@ export interface IContract extends IBlock {
   currency: string;
   status: ContractStatus;
   isLifeTime: boolean;
-  party: IContractParty;
   paymentPlan: IContractPaymentPlan;
   user: string;
   description: string;
+  customerId?: string;
+  signedAt?: Date;
 }
 
 export interface IContractDocument extends IContract, Document {

@@ -11,7 +11,6 @@ import { Model } from 'mongoose';
 import { IModels } from '~/connectionResolvers';
 import { generateOpptyUpdateActivityLogs } from '../../meta/activity-log';
 import { DEFAULT_STATUS_TYPES } from '@/oppty/constants';
-import { ContractPartyType } from '@/contract/@types/contract';
 import { BlockProjectPaymentPlanType } from '@/project/@types/payment';
 
 export interface IOpptyModel extends Model<IOpptyDocument> {
@@ -138,9 +137,7 @@ export const loadOpptyClass = (
           date: new Date(),
           amount: 0,
           status: reservedStage?._id,
-          party: customerId
-            ? { type: ContractPartyType.CUSTOMER, id: customerId }
-            : undefined,
+          customerId,
           paymentPlan: { type: BlockProjectPaymentPlanType.SALE },
           user: updatedOppty.assignedUserId,
         });

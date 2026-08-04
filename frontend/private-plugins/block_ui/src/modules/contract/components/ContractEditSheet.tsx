@@ -62,12 +62,7 @@ const ContractEditBody = ({
     amount: orUndef(contract.amount),
     status: orUndef(contract.status),
     user: orUndef(contract.user),
-    party: contract.party
-      ? {
-          type: contract.party.type,
-          id: contract.party.id,
-        }
-      : { type: 'customer', id: '' },
+    customerId: contract.customerId || '',
     paymentPlan: contract.paymentPlan
       ? {
           downPaymentPercentage: orUndef(
@@ -103,10 +98,6 @@ const ContractEditBody = ({
 
   const handleSubmit = async (data: ContractFormData) => {
     const paymentPlan = data.paymentPlan?.frequency ? data.paymentPlan : undefined;
-    const party =
-      data.party && data.party.id
-        ? { type: data.party.type, id: data.party.id }
-        : undefined;
     const amount =
       typeof data.amount === 'number' && !isNaN(data.amount)
         ? data.amount
@@ -120,7 +111,7 @@ const ContractEditBody = ({
         date: data.date,
         amount,
         status: data.status || undefined,
-        party,
+        customerId: data.customerId || undefined,
         paymentPlan,
         user: data.user || undefined,
       });

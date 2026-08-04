@@ -39,6 +39,13 @@ export const CONFIG: IUIConfig = {
   },
   modules: [
     {
+      // The activity rail uses the first module as its click target and uses
+      // module paths to match nested routes back to their owning plugin.
+      name: 'erxes AI Agents',
+      icon: IconRobot,
+      path: 'erxes-agent',
+    },
+    {
       name: 'agents',
       icon: IconRobot,
       path: 'erxes-agent/agents',

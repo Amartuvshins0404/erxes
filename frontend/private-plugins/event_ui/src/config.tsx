@@ -16,6 +16,7 @@ export const CONFIG: IUIConfig = {
       name: 'event',
       icon: IconCalendarEvent,
       path: 'event',
+      hasAutomation: true,
     },
   ],
 };

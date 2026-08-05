@@ -27,6 +27,7 @@ src/modules/Main.tsx                            <Routes>, named export
 src/modules/MainNavigation.tsx                  sidebar entry
 src/lib/                                        csv, datetime, constants
 src/types/event.ts                              shared interfaces
+src/widgets/automations/components/             AI agent automations widget (see below)
 ```
 
 Aliases: `~/*` → `src`, `@/*` → `src/modules`.
@@ -113,3 +114,31 @@ pnpm exec tsc --noEmit -p frontend/private-plugins/event_ui/tsconfig.app.json
 
 Note `.agents/scripts/validate-scaffold.sh` hardcodes `frontend/plugins/…` and
 cannot see this plugin — the commands above are the validation.
+
+## AI agent automations widget
+
+`config.tsx`'s `modules[0]` (`name: 'event'`) sets `hasAutomation: true`, and
+`module-federation.config.ts` exposes `./automationsWidget` →
+`src/widgets/automations/components/AutomationRemoteEntry.tsx`. Together these
+let core-ui's AI Agent settings panel load this plugin's remote and offer
+"Events" as a selectable knowledge source — the same platform contract
+`frontline_ui`'s knowledgebase module uses.
+
+- `AutomationRemoteEntry.tsx` exports **named** `AutomationRemoteEntries`
+  (no default export — `resolveRemoteComponent` on the host matches that
+  literal name). It only handles `moduleName === 'event'`; there is no
+  per-module dispatch table because this plugin integrates exactly one
+  automations module.
+- It routes `componentType: 'aiKnowledgeSourceSelector'` to
+  `EventKnowledgeSourceSelector.tsx`, a `Command`-based picker that reuses the
+  existing `EVENTS` query (`~/modules/events/graphql/queries`) filtered to
+  `status: 'published'` — no new GraphQL operation was added.
+- The backend half of this contract (`pluginName: 'event', moduleName:
+  'event', key: 'event.event'`, `sourceSelector: 'remote-module'`) lives in
+  `backend/plugins/event_api/src/meta/automations.ts` — see that plugin's
+  `AGENTS.md` for the indexing/refresh details. The two `moduleName`s must
+  stay in sync (`'event'`) or the picker never mounts.
+- This plugin has no i18n setup (`react-i18next` is not wired up anywhere in
+  `event_ui`), so the selector's copy is plain English, matching the rest of
+  this plugin rather than the `useTranslation('automations')` pattern
+  `frontline_ui`'s equivalent selector uses.

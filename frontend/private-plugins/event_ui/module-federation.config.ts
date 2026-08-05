@@ -17,6 +17,8 @@ const config: ModuleFederationConfig = {
   exposes: {
     './config': './src/config.tsx',
     './event': './src/modules/Main.tsx',
+    './automationsWidget':
+      './src/widgets/automations/components/AutomationRemoteEntry.tsx',
   },
 
   shared: (libraryName, defaultConfig) => {

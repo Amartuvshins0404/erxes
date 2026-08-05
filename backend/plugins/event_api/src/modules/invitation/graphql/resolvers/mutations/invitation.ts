@@ -2,6 +2,7 @@ import { Resolver } from 'erxes-api-shared/core-types';
 import { markResolvers, sendTRPCMessage } from 'erxes-api-shared/utils';
 import { IContext } from '~/connectionResolvers';
 import { EventStatus } from '@/event/constants';
+import { refreshEventKnowledgeSource } from '@/event/meta/automations';
 import { InvitationStatus } from '@/invitation/constants';
 import { sendEventInvitations } from '@/invitation/sendInvitations';
 
@@ -49,11 +50,15 @@ export const invitationClientPortalMutations: Record<string, Resolver> = {
       throw new Error('Customer not found');
     }
 
-    return models.Invitations.respond(
+    const invitation = await models.Invitations.respond(
       eventId,
       customer._id,
       status,
     );
+
+    await refreshEventKnowledgeSource({ subdomain, eventId });
+
+    return invitation;
   },
 };
 

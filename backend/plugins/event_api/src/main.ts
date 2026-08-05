@@ -3,6 +3,7 @@ import { resolvers } from '~/apollo/resolvers';
 import { typeDefs } from '~/apollo/typeDefs';
 import { appRouter } from '~/trpc/init-trpc';
 import { generateModels } from '~/connectionResolvers';
+import { automations } from '~/meta/automations';
 import { notifications } from '~/meta/notifications';
 import { permissions } from '~/meta/permissions';
 
@@ -33,5 +34,6 @@ startPlugin({
   meta: {
     permissions,
     notifications,
+    automations,
   },
 });

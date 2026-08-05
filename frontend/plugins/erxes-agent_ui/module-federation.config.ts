@@ -22,6 +22,10 @@ export const config: ModuleFederationConfig = {
     './automationsWidget':
       './src/widgets/automations/components/AutomationRemoteEntry.tsx',
   },
+  // Nx only calls `shared` for dependencies discovered in its project graph.
+  // Force both router packages into the share scope so this remote's descendant
+  // Routes consume the host Router context instead of bundling a private copy.
+  additionalShared: ['react-router', 'react-router-dom'],
   shared: (libraryName, defaultConfig) => {
     if (coreLibraries.has(libraryName)) {
       return defaultConfig;

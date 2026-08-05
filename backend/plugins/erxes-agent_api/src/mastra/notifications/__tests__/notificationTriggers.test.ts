@@ -457,6 +457,9 @@ describe('cross-system AI team-member triggers', () => {
 
   it('runs the linked profile in a locked record-scoped thread', async () => {
     const agent = { _id: 'agent-profile-1' };
+    const createNote = jest
+      .fn<Promise<unknown>, [Record<string, unknown>]>()
+      .mockResolvedValue({ _id: 'note-2' });
     generateModels.mockResolvedValue({
       MastraAgent: { findOne: jest.fn().mockResolvedValue(agent) },
     });
@@ -465,6 +468,7 @@ describe('cross-system AI team-member triggers', () => {
       convo: [{ role: 'user', content: 'notification' }],
       authCtx: { principalUserId: 'agent-user-1' },
       memoryBinding: { thread: 'notification-thread' },
+      tools: { createNote: { execute: createNote } },
     });
     runAgentTurn.mockResolvedValue('Handled');
     const { redis } = makeRedis();
@@ -506,6 +510,12 @@ describe('cross-system AI team-member triggers', () => {
     expect(prompt).toContain(
       '"mentionText":"@Agent inspect the latest customer request"',
     );
+    expect(prompt).toContain(
+      'this hidden run relays your final assistant text to the originating record',
+    );
+    expect(prompt).toContain(
+      'Do not create a note, comment, or message solely to report progress',
+    );
     expect(runAgentTurn).toHaveBeenCalledWith(
       expect.objectContaining({
         authCtx: expect.objectContaining({
@@ -514,7 +524,114 @@ describe('cross-system AI team-member triggers', () => {
       }),
     );
     expect(redis.eval).toHaveBeenCalledTimes(1);
-    expect(result).toEqual({ status: 'completed', reply: 'Handled' });
+    expect(createNote).toHaveBeenCalledWith({
+      content:
+        '[{"type":"paragraph","content":[{"type":"text","text":"Handled","styles":{}}]}]',
+      contentId: 'task-1',
+      mentions: [],
+    });
+    expect(result).toEqual({
+      status: 'completed',
+      reply: 'Handled',
+      inlineReply: 'posted',
+    });
+  });
+
+  it('relays a final reply through shared internal notes in other plugins', async () => {
+    const internalNotesAdd = jest
+      .fn<Promise<unknown>, [Record<string, unknown>]>()
+      .mockResolvedValue({ _id: 'note-3' });
+    generateModels.mockResolvedValue({
+      MastraAgent: {
+        findOne: jest.fn().mockResolvedValue({ _id: 'agent-profile-1' }),
+      },
+    });
+    prepareTurn.mockResolvedValue({
+      agent: { id: 'runtime-agent' },
+      convo: [],
+      authCtx: { principalUserId: 'agent-user-1' },
+      memoryBinding: undefined,
+      tools: { internalNotesAdd: { execute: internalNotesAdd } },
+    });
+    runAgentTurn.mockResolvedValue('Reviewed the deal and updated its owner.');
+    const { redis } = makeRedis();
+    await initNotificationTriggers(redis as never);
+
+    const result = await processor?.({
+      data: {
+        subdomain: 'acme',
+        recipientUserId: 'agent-user-1',
+        agentId: 'agent-profile-1',
+        notification: {
+          _id: 'notification-sales-1',
+          fromUserId: 'human-2',
+          contentType: 'sales:deal',
+          contentTypeId: 'deal-1',
+        },
+      },
+    });
+
+    expect(internalNotesAdd).toHaveBeenCalledWith({
+      contentType: 'sales:deal',
+      contentTypeId: 'deal-1',
+      content:
+        '[{"type":"paragraph","content":[{"type":"text","text":"Reviewed the deal and updated its owner.","styles":{}}]}]',
+      mentionedUserIds: [],
+    });
+    expect(result).toEqual({
+      status: 'completed',
+      reply: 'Reviewed the deal and updated its owner.',
+      inlineReply: 'posted',
+    });
+  });
+
+  it('relays a final reply as an internal message in frontline conversations', async () => {
+    const conversationMessageAdd = jest
+      .fn<Promise<unknown>, [Record<string, unknown>]>()
+      .mockResolvedValue({ _id: 'message-2' });
+    generateModels.mockResolvedValue({
+      MastraAgent: {
+        findOne: jest.fn().mockResolvedValue({ _id: 'agent-profile-1' }),
+      },
+    });
+    prepareTurn.mockResolvedValue({
+      agent: { id: 'runtime-agent' },
+      convo: [],
+      authCtx: { principalUserId: 'agent-user-1' },
+      memoryBinding: undefined,
+      tools: {
+        conversationMessageAdd: { execute: conversationMessageAdd },
+      },
+    });
+    runAgentTurn.mockResolvedValue('The customer request is ready for review.');
+    const { redis } = makeRedis();
+    await initNotificationTriggers(redis as never);
+
+    const result = await processor?.({
+      data: {
+        subdomain: 'acme',
+        recipientUserId: 'agent-user-1',
+        agentId: 'agent-profile-1',
+        notification: {
+          _id: 'notification-inbox-1',
+          fromUserId: 'human-2',
+          contentType: 'frontline:conversation',
+          contentTypeId: 'conversation-1',
+        },
+      },
+    });
+
+    expect(conversationMessageAdd).toHaveBeenCalledWith({
+      conversationId: 'conversation-1',
+      content: 'The customer request is ready for review.',
+      mentionedUserIds: [],
+      internal: true,
+    });
+    expect(result).toEqual({
+      status: 'completed',
+      reply: 'The customer request is ready for review.',
+      inlineReply: 'posted',
+    });
   });
 
   it('defers a second run while the same record thread is active', async () => {
@@ -536,6 +653,9 @@ describe('cross-system AI team-member triggers', () => {
   });
 
   it('does not retry an uncertain agent execution failure', async () => {
+    const createNote = jest
+      .fn<Promise<unknown>, [Record<string, unknown>]>()
+      .mockResolvedValue({ _id: 'note-failure' });
     generateModels.mockResolvedValue({
       MastraAgent: {
         findOne: jest.fn().mockResolvedValue({ _id: 'agent-profile-1' }),
@@ -546,6 +666,7 @@ describe('cross-system AI team-member triggers', () => {
       convo: [],
       authCtx: {},
       memoryBinding: undefined,
+      tools: { createNote: { execute: createNote } },
     });
     runAgentTurn.mockRejectedValue(
       new Error('provider failed after tool call'),
@@ -567,6 +688,13 @@ describe('cross-system AI team-member triggers', () => {
     expect(result).toEqual({
       status: 'failed',
       reason: 'agent-run-failed',
+      inlineReply: 'posted',
+    });
+    expect(createNote).toHaveBeenCalledWith({
+      content:
+        '[{"type":"paragraph","content":[{"type":"text","text":"I could not complete this request because the agent run failed. Please try again.","styles":{}}]}]',
+      contentId: 'task-1',
+      mentions: [],
     });
   });
 

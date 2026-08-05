@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import { Resolver } from 'erxes-api-shared/core-types';
+import { sendTRPCMessage } from 'erxes-api-shared/utils';
 import fetch from 'node-fetch';
 import { IModels } from '~/connectionResolvers';
 
@@ -130,17 +131,33 @@ export const syncCustomerToBlockAdmin = async (
   customerId: string,
   models: IModels,
 ) => {
+  const customer = await sendTRPCMessage({
+    subdomain,
+    pluginName: 'core',
+    module: 'customers',
+    action: 'findOne',
+    input: { _id: customerId },
+    defaultValue: null,
+  });
+
+  if (!customer) {
+    throw new Error('Customer not found');
+  }
+
   const response = await sendMessageAwait({
     subdomain,
     path: 'customerSync',
     payload: {
       entityId: customerId,
-      data: {},
+      data: {
+        email: customer.primaryEmail,
+        phone: customer.primaryPhone,
+      },
     },
   });
 
   if (!response?.blockAdminId) {
-    throw new Error('Failed to sync customer to block admin');
+    throw new Error(response?.error || 'Failed to sync customer to block admin');
   }
 
   return models.CustomerSync.setCustomerSync(customerId, response.blockAdminId);

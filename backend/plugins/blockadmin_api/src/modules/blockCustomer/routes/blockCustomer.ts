@@ -1,21 +1,26 @@
 import { Router } from 'express';
 import { IContext } from '~/connectionResolvers';
 import { IRequest, IResponse } from '~/types';
-import { syncCustomerFromCore } from '../utils';
+import { ICustomerSyncData, resolveBlockCustomer } from '../utils';
 
 const router: Router = Router();
 
 router.post(
   '/customerSync',
-  async (req: IRequest<{}, {}>, res: IResponse) => {
+  async (req: IRequest<{}, ICustomerSyncData>, res: IResponse) => {
     const { models } = res.locals as IContext;
 
     try {
       const { subdomain, payload } = req.body || {};
 
-      const { entityId } = payload || {};
+      const { entityId, data } = payload || {};
 
-      const customer = await syncCustomerFromCore(subdomain, entityId, models);
+      const customer = await resolveBlockCustomer(
+        subdomain,
+        entityId,
+        data,
+        models,
+      );
 
       return res.status(200).json({
         success: true,

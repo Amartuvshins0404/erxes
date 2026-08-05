@@ -1,31 +1,36 @@
-import { sendTRPCMessage } from 'erxes-api-shared/utils';
 import { IModels } from '~/connectionResolvers';
 
-export const syncCustomerFromCore = async (
+export interface ICustomerSyncData {
+  email?: string;
+  phone?: string;
+}
+
+export const resolveBlockCustomer = async (
   subdomain: string,
   entityId: string,
+  data: ICustomerSyncData,
   models: IModels,
 ) => {
-  const customer = await sendTRPCMessage({
-    subdomain,
-    pluginName: 'core',
-    module: 'customers',
-    action: 'findOne',
-    input: { _id: entityId },
-    defaultValue: null,
-  });
-
-  if (!customer) {
-    throw new Error('Customer not found');
-  }
-
-  return models.BlockCustomer.upsertCustomer(subdomain, entityId, {
+  const byEntity = await models.BlockCustomer.findOne({
     subdomain,
     entityId,
-    customerId: entityId,
-    firstName: customer.firstName,
-    lastName: customer.lastName,
-    email: customer.primaryEmail,
-    phone: customer.primaryPhone,
-  });
+  }).lean();
+
+  if (byEntity) {
+    return byEntity;
+  }
+
+  const { email, phone } = data || {};
+
+  const byIdentity =
+    (email || phone) &&
+    (await models.BlockCustomer.findOne({
+      $or: [...(email ? [{ email }] : []), ...(phone ? [{ phone }] : [])],
+    }).lean());
+
+  if (byIdentity) {
+    return byIdentity;
+  }
+
+  throw new Error('Customer not registered in block');
 };

@@ -5,6 +5,10 @@ import {
 } from '@/integrations/facebook/helpers';
 import { IReplyParams } from '@/integrations/facebook/@types/utils';
 import { sendReply } from '@/integrations/facebook/utils';
+import {
+  ICreatePostArgs,
+  publishPagePost,
+} from '@/integrations/facebook/postService';
 import { sendNotifications } from '@/inbox/graphql/resolvers/mutations/conversations';
 import { TCreateBotInputDoc } from '../../db/models/Bots';
 export const facebookMutations = {
@@ -105,6 +109,13 @@ export const facebookMutations = {
     } catch (e) {
       throw new Error(e.message);
     }
+  },
+  async facebookCreatePost(
+    _root,
+    args: ICreatePostArgs,
+    { models, subdomain, user }: IContext,
+  ) {
+    return publishPagePost(models, subdomain, args, user?._id);
   },
   async facebookMessengerAddBot(_root, args, { models, user }: IContext) {
     return await models.FacebookBots.addBot(args, {

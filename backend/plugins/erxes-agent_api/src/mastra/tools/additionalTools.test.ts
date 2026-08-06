@@ -1,12 +1,12 @@
 import {
-  LEGACY_ADDITIONAL_TOOL_KEYS,
+  DEFAULT_ADDITIONAL_TOOL_KEYS,
   normalizeAdditionalToolKeys,
 } from './additionalTools';
 
 describe('additional tool selection', () => {
-  it('preserves the legacy safe capabilities when a stored profile is missing the field', () => {
+  it('enables safe capabilities when a tool selection is missing', () => {
     expect(normalizeAdditionalToolKeys(undefined)).toEqual(
-      LEGACY_ADDITIONAL_TOOL_KEYS,
+      DEFAULT_ADDITIONAL_TOOL_KEYS,
     );
     expect(normalizeAdditionalToolKeys(undefined)).not.toContain('webSearch');
     expect(normalizeAdditionalToolKeys(undefined)).not.toContain('terminal');

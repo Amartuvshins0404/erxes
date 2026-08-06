@@ -34,10 +34,9 @@ const additionalToolKeys: Record<AdditionalToolKey, true> = {
   terminal: true,
 };
 
-// Preserve the capabilities legacy agents already had before per-agent
-// additional-tool selection existed. Network access and terminal execution were
-// not previously granted and therefore remain opt-in after the backfill.
-export const LEGACY_ADDITIONAL_TOOL_KEYS: AdditionalToolKey[] = [
+// Enable safe local capabilities for new and legacy agents. Network access and
+// terminal execution remain opt-in.
+export const DEFAULT_ADDITIONAL_TOOL_KEYS: AdditionalToolKey[] = [
   'calculator',
   'renderChart',
   'renderDiagram',
@@ -50,7 +49,7 @@ export const LEGACY_ADDITIONAL_TOOL_KEYS: AdditionalToolKey[] = [
 
 export const normalizeAdditionalToolKeys = (
   keys: string[] | undefined,
-  fallback: readonly AdditionalToolKey[] = LEGACY_ADDITIONAL_TOOL_KEYS,
+  fallback: readonly AdditionalToolKey[] = DEFAULT_ADDITIONAL_TOOL_KEYS,
 ): AdditionalToolKey[] => {
   const requested = keys ?? [...fallback];
   const normalized = [...new Set(requested.map((key) => key.trim()))].filter(

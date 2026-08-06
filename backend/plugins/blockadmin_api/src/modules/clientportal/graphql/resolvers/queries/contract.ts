@@ -16,7 +16,6 @@ export const cpContractQueries = {
     }
 
     const blockCustomer = await models.BlockCustomer.findOne({
-      subdomain,
       customerId,
     }).lean();
 
@@ -25,7 +24,6 @@ export const cpContractQueries = {
     }
 
     return models.Contract.find({
-      subdomain,
       customerId: blockCustomer.entityId,
     }).lean();
   },

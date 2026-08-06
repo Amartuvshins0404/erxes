@@ -171,7 +171,7 @@ export const loadClasses = (
   models.ContractPayment = db.model<
     IContractPaymentDocument,
     IContractPaymentModel
-  >('block_contract_payments', loadContractPaymentClass(models));
+  >('block_contract_payments', loadContractPaymentClass(models, subdomain));
 
   models.ContractPaymentTransaction = db.model<
     IContractPaymentTransactionDocument,

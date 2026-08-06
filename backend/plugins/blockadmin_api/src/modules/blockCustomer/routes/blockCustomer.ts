@@ -25,7 +25,7 @@ router.post(
 
       return res.status(200).json({
         success: true,
-        blockAdminId: customer._id,
+        blockAdminId: customer.customerId,
       });
     } catch (error) {
       return res.status(400).json({

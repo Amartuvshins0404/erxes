@@ -6,7 +6,11 @@ export interface ICustomerSyncData {
   phone?: string;
 }
 
-const findCoreCustomer = async (subdomain: string, email?: string, phone?: string) => {
+const findCoreCustomer = async (
+  subdomain: string,
+  email?: string,
+  phone?: string,
+) => {
   if (email) {
     const customer = await sendTRPCMessage({
       subdomain,
@@ -46,15 +50,6 @@ export const resolveBlockCustomer = async (
   data: ICustomerSyncData,
   models: IModels,
 ) => {
-  const byEntity = await models.BlockCustomer.findOne({
-    subdomain,
-    entityId,
-  }).lean();
-
-  if (byEntity) {
-    return byEntity;
-  }
-
   const { email, phone } = data || {};
 
   const customer = await findCoreCustomer(subdomain, email, phone);
@@ -69,7 +64,7 @@ export const resolveBlockCustomer = async (
       $set: {
         subdomain,
         entityId,
-        customerId: entityId,
+        customerId: customer._id,
       },
     },
     { upsert: true, new: true },

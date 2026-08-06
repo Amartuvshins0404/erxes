@@ -9,6 +9,8 @@ export const cpContractQueries = {
   ) => {
     const customerId = cpUser?.erxesCustomerId;
 
+    console.log('cpBlockAdminGetContracts', { customerId, subdomain });
+
     if (!customerId) {
       return [];
     }

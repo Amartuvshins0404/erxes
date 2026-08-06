@@ -244,10 +244,7 @@ export const agentMutations = {
           audienceUserIds: audience.audienceUserIds,
           audienceTeamIds: audience.audienceTeamIds,
           audienceDepartmentIds: audience.audienceDepartmentIds,
-          additionalTools: normalizeAdditionalToolKeys(
-            profile.additionalTools ?? [],
-            [],
-          ),
+          additionalTools: normalizeAdditionalToolKeys(profile.additionalTools),
           permissionMode: grant.mode,
         },
       );

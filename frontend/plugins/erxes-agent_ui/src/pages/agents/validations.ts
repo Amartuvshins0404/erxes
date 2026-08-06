@@ -1,5 +1,18 @@
 import { z } from 'zod';
 
+// Safe local tools are on for new agents. Network access and terminal stay
+// opt-in.
+const DEFAULT_ADDITIONAL_TOOLS = [
+  'calculator',
+  'renderChart',
+  'renderDiagram',
+  'generatePdf',
+  'generateDocx',
+  'generateXlsx',
+  'generatePptx',
+  'removeImageBackground',
+];
+
 export const agentFormSchema = z
   .object({
     name: z.string().min(1, 'Name is required').max(200, 'Name is too long'),
@@ -49,7 +62,7 @@ export const AGENT_FORM_DEFAULTS: AgentFormValues = {
   instructions: '',
   provider: '',
   model: '',
-  additionalTools: [],
+  additionalTools: [...DEFAULT_ADDITIONAL_TOOLS],
   permissionGroupIds: [],
   destructiveOps: 'ask',
   memoryEnabled: true,

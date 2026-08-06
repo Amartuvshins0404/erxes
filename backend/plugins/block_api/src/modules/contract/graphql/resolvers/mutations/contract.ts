@@ -29,7 +29,6 @@ export const contractMutations = {
     { input }: { input: IContract },
     { models }: IContext,
   ) => {
-    console.log(input);
     if (input.unit) {
       const unit = await models.Unit.findOne({ _id: input.unit });
       if (unit?.locked) {
@@ -69,9 +68,37 @@ export const contractMutations = {
 
   blockUpdateContractStatus: async (
     _parent: undefined,
-    { _id, status }: { _id: string; status: string },
+    args: { _id: string; status: string; input?: IContract },
     { models }: IContext,
   ) => {
-    return models.Contract.updateContractStatus(_id, status);
+    const updated = await models.Contract.updateContractStatus(
+      args._id,
+      args.status,
+    );
+
+    if (updated) {
+      const contractStatus = await models.ContractStatus.findOne({
+        _id: updated.status,
+      });
+
+      // block-admin has no route for blockUpdateContractStatus's original
+      // {_id, status} shape, so reshape the mirrored payload to match
+      // blockCreateContract/blockUpdateContract's {input: {...}} shape.
+      args.input = {
+        _id: updated._id,
+        unit: String(updated.unit),
+        number: updated.number,
+        currency: updated.currency,
+        date: updated.date,
+        amount: updated.amount,
+        customerId: updated.customerId,
+        paymentPlan: updated.paymentPlan,
+        user: updated.user,
+        description: updated.description,
+        status: contractStatus?.type as IContract['status'],
+      };
+    }
+
+    return updated;
   },
 };

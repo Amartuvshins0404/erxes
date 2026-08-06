@@ -13,6 +13,11 @@ export interface IContractModel extends Model<IContractDocument> {
     entityId: string,
     input: IContract,
   ): Promise<IContractDocument>;
+  upsertSignedContract(
+    subdomain: string,
+    entityId: string,
+    input: IContract,
+  ): Promise<IContractDocument>;
   markContractSigned(
     subdomain: string,
     entityId: string,
@@ -53,6 +58,34 @@ export const loadContractClass = (models: IModels) => {
       return models.Contract.findOneAndUpdate({ _id }, input, {
         new: true,
       });
+    }
+
+    // Only signed contracts get mirrored into block-admin, and a contract
+    // may become signed via create, edit, or a board status-drag — any of
+    // which can be the first time block-admin ever hears about it — so this
+    // upserts rather than requiring a prior create.
+    public static async upsertSignedContract(
+      subdomain: string,
+      entityId: string,
+      input: IContract,
+    ) {
+      const existing = await models.Contract.findOne({
+        subdomain,
+        entityId,
+      });
+
+      return models.Contract.findOneAndUpdate(
+        { subdomain, entityId },
+        {
+          $set: {
+            ...input,
+            subdomain,
+            entityId,
+            signedAt: existing?.signedAt || new Date(),
+          },
+        },
+        { upsert: true, new: true },
+      );
     }
 
     public static async markContractSigned(

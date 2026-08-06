@@ -22,7 +22,10 @@ export const cpContractQueries = {
       return [];
     }
 
-    return models.Contract.find({ subdomain, customerId }).lean();
+    return models.Contract.find({
+      subdomain,
+      customerId: blockCustomer.entityId,
+    }).lean();
   },
 };
 

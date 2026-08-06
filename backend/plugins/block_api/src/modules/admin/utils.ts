@@ -56,7 +56,11 @@ const buildPayload = (
   return payload;
 };
 
-export const sendMessage = ({ subdomain, path, payload }: SendMessagePayload) => {
+export const sendMessage = ({
+  subdomain,
+  path,
+  payload,
+}: SendMessagePayload) => {
   const API_ENDPOINT = `${BLOCK_ADMIN_API_URL}/webhook/${path}`;
 
   if (!BLOCK_ADMIN_API_URL || !BLOCK_ADMIN_SECRET) {
@@ -106,6 +110,7 @@ export const sendMessageAwait = async ({
     console.error('BLOCK_ADMIN_API_URL or BLOCK_ADMIN_SECRET is not set');
     return null;
   }
+  console.log('sendMessageAwait', { subdomain, path, payload });
 
   try {
     const body = JSON.stringify({ subdomain, payload });
@@ -157,7 +162,9 @@ export const syncCustomerToBlockAdmin = async (
   });
 
   if (!response?.blockAdminId) {
-    throw new Error(response?.error || 'Failed to sync customer to block admin');
+    throw new Error(
+      response?.error || 'Failed to sync customer to block admin',
+    );
   }
 
   return models.CustomerSync.setCustomerSync(customerId, response.blockAdminId);

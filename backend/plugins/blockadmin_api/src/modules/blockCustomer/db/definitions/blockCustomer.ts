@@ -12,4 +12,5 @@ export const customerSchema = schemaWrapper(
     },
     { timestamps: true },
   ),
+  { entityIdType: String },
 );

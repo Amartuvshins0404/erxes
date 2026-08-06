@@ -8,6 +8,7 @@ const router: Router = Router();
 router.post(
   '/customerSync',
   async (req: IRequest<{}, ICustomerSyncData>, res: IResponse) => {
+    console.log('customerSync', req.body);
     const { models } = res.locals as IContext;
 
     try {

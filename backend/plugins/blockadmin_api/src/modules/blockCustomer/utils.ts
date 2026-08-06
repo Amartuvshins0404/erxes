@@ -1,9 +1,44 @@
+import { sendTRPCMessage } from 'erxes-api-shared/utils';
 import { IModels } from '~/connectionResolvers';
 
 export interface ICustomerSyncData {
   email?: string;
   phone?: string;
 }
+
+const findCoreCustomer = async (subdomain: string, email?: string, phone?: string) => {
+  if (email) {
+    const customer = await sendTRPCMessage({
+      subdomain,
+      pluginName: 'core',
+      module: 'customers',
+      action: 'findOne',
+      input: { customerPrimaryEmail: email },
+      defaultValue: null,
+    });
+
+    if (customer?._id) {
+      return customer;
+    }
+  }
+
+  if (phone) {
+    const customer = await sendTRPCMessage({
+      subdomain,
+      pluginName: 'core',
+      module: 'customers',
+      action: 'findOne',
+      input: { customerPrimaryPhone: phone },
+      defaultValue: null,
+    });
+
+    if (customer?._id) {
+      return customer;
+    }
+  }
+
+  return null;
+};
 
 export const resolveBlockCustomer = async (
   subdomain: string,
@@ -22,15 +57,25 @@ export const resolveBlockCustomer = async (
 
   const { email, phone } = data || {};
 
-  const byIdentity =
-    (email || phone) &&
-    (await models.BlockCustomer.findOne({
-      $or: [...(email ? [{ email }] : []), ...(phone ? [{ phone }] : [])],
-    }).lean());
+  const customer = await findCoreCustomer(subdomain, email, phone);
 
-  if (byIdentity) {
-    return byIdentity;
+  if (!customer) {
+    throw new Error('Customer not registered in block');
   }
 
-  throw new Error('Customer not registered in block');
+  return models.BlockCustomer.findOneAndUpdate(
+    { subdomain, entityId },
+    {
+      $set: {
+        subdomain,
+        entityId,
+        customerId: entityId,
+        firstName: customer.firstName,
+        lastName: customer.lastName,
+        email: customer.primaryEmail,
+        phone: customer.primaryPhone,
+      },
+    },
+    { upsert: true, new: true },
+  ).lean();
 };

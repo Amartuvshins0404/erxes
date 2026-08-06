@@ -14,7 +14,6 @@ export const CREATE_CONTRACT = gql`
 
       customerId
       paymentPlan {
-        type
         downPaymentPercentage
         downPaymentAmount
         barterPercentage
@@ -66,7 +65,6 @@ export const UPDATE_CONTRACT = gql`
 
       customerId
       paymentPlan {
-        type
         downPaymentPercentage
         downPaymentAmount
         barterPercentage

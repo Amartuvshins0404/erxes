@@ -7,12 +7,29 @@ function stripNulls<T extends Record<string, any>>(obj: T): Partial<T> {
   ) as Partial<T>;
 }
 
+// block-admin only knows the semantic status type (draft/signed/...), not
+// this org's own custom ContractStatus _id, so the mirrored payload must
+// carry the resolved type instead of the raw reference.
+const resolveStatusTypeForMirror = async (
+  models: IContext['models'],
+  input: IContract,
+) => {
+  if (!input.status) {
+    return;
+  }
+
+  const status = await models.ContractStatus.findOne({ _id: input.status });
+
+  input.status = status?.type as IContract['status'];
+};
+
 export const contractMutations = {
   blockCreateContract: async (
     _parent: undefined,
     { input }: { input: IContract },
     { models }: IContext,
   ) => {
+    console.log(input);
     if (input.unit) {
       const unit = await models.Unit.findOne({ _id: input.unit });
       if (unit?.locked) {
@@ -25,7 +42,11 @@ export const contractMutations = {
       ) as typeof input.paymentPlan;
     }
 
-    return models.Contract.createContract(input);
+    const created = await models.Contract.createContract(input);
+
+    await resolveStatusTypeForMirror(models, input);
+
+    return created;
   },
 
   blockUpdateContract: async (
@@ -38,7 +59,12 @@ export const contractMutations = {
         input.paymentPlan,
       ) as typeof input.paymentPlan;
     }
-    return models.Contract.updateContract(_id, input);
+
+    const updated = await models.Contract.updateContract(_id, input);
+
+    await resolveStatusTypeForMirror(models, input);
+
+    return updated;
   },
 
   blockUpdateContractStatus: async (

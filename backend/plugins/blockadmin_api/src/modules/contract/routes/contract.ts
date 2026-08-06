@@ -19,7 +19,11 @@ router.post(
 
       const unit = await models.Unit.getUnit(subdomain, input.unit);
 
-      models.Contract.createContract({
+      if (!unit) {
+        throw new Error(`Unit "${input.unit}" not found in subdomain "${subdomain}"`);
+      }
+
+      await models.Contract.createContract({
         ...input,
         subdomain,
         entityId,
@@ -51,7 +55,11 @@ router.post(
 
       const unit = await models.Unit.getUnit(subdomain, input.unit);
 
-      models.Contract.updateContract(subdomain, entityId, {
+      if (!unit) {
+        throw new Error(`Unit "${input.unit}" not found in subdomain "${subdomain}"`);
+      }
+
+      await models.Contract.updateContract(subdomain, entityId, {
         ...input,
         unit: unit._id,
       });
@@ -69,10 +77,7 @@ router.post(
 
 router.post(
   '/contractSigned',
-  async (
-    req: IRequest<{}, { customerId?: string }>,
-    res: IResponse,
-  ) => {
+  async (req: IRequest<{}, { customerId?: string }>, res: IResponse) => {
     const { models } = res.locals as IContext;
 
     try {

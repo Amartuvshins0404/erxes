@@ -36,7 +36,7 @@ export const ContractAddForm = ({ onClose }: { onClose: () => void }) => {
   const { createContract, loading } = useCreateContract();
 
   const handleSubmit = (data: ContractFormData) => {
-    const paymentPlan = data.paymentPlan?.type ? data.paymentPlan : undefined;
+    const paymentPlan = data.paymentPlan?.frequency ? data.paymentPlan : undefined;
     const amount =
       typeof data.amount === 'number' && !isNaN(data.amount)
         ? data.amount

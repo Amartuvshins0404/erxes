@@ -50,11 +50,6 @@ export const types = `
     user: String
   }
 
-  enum BlockAdminOfferStatus {
-    draft
-    sent
-  }
-
   input BlockAdminOfferInvoicesInput {
     _id: String
     amount: Float

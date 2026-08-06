@@ -53,7 +53,7 @@ export const contractSchema = new Schema(
     },
     customerId: { type: String, required: true },
     description: { type: String },
-    paymentPlan: { type: contractPaymentPlanSchema, required: true },
+    paymentPlan: { type: contractPaymentPlanSchema },
     user: { type: String },
     blockAdminId: { type: String },
   },

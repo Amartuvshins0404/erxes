@@ -557,6 +557,9 @@ async function runNotificationJob(
         message,
         authCtx: prepared.authCtx,
         memory: prepared.memoryBinding,
+        activeTools: prepared.activeTools,
+        turnInstructions: prepared.turnInstructions,
+        intentOperationTools: prepared.intentOperationTools,
       });
       const finalReply =
         text(reply, MAX_NOTE_TEXT_LENGTH).trim() || EMPTY_AGENT_REPLY;

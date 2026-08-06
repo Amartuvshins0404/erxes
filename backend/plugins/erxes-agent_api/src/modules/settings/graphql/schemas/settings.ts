@@ -26,8 +26,6 @@ export const types = `
     evaluationEnabled: Boolean
     evaluationDsnConfigured: Boolean
     backgroundRemovalEnabled: Boolean
-    summarizerProvider: String
-    summarizerModel: String
     openSandboxApiUrl: String
     hasOpenSandboxApiKey: Boolean!
     openSandboxApiKeyHint: String
@@ -49,8 +47,6 @@ export const types = `
     evaluationEnabled: Boolean
     evaluationDsn: String
     backgroundRemovalEnabled: Boolean
-    summarizerProvider: String
-    summarizerModel: String
     openSandboxApiUrl: String
     # Write-only. Blank preserves the currently stored key.
     openSandboxApiKey: String

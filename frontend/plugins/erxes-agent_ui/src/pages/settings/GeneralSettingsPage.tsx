@@ -8,13 +8,11 @@ import {
   IconKey,
   IconPaperclip,
   IconPhoto,
-  IconSparkles,
   IconTerminal2,
 } from '@tabler/icons-react';
 import { Badge, Button, Card, Form, Input, Switch, toast } from 'erxes-ui';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { SelectModel, SelectProvider } from '~/components/SelectProviderModel';
 import { useGeneralSettings } from './hooks/useGeneralSettings';
 import {
   GENERAL_SETTINGS_DEFAULTS,
@@ -100,7 +98,6 @@ export const GeneralSettingsPage = () => {
 
   const [saved, setSaved] = useState(false);
   const learningEnabled = form.watch('learningEnabled');
-  const summarizerProvider = form.watch('summarizerProvider');
   const clearEvaluationDsn = form.watch('clearEvaluationDsn');
 
   useEffect(() => {
@@ -125,10 +122,7 @@ export const GeneralSettingsPage = () => {
       evaluationEnabled: settings.evaluationEnabled === true,
       evaluationDsn: '',
       clearEvaluationDsn: false,
-      backgroundRemovalEnabled:
-        settings.backgroundRemovalEnabled !== false,
-      summarizerProvider: settings.summarizerProvider || '',
-      summarizerModel: settings.summarizerModel || '',
+      backgroundRemovalEnabled: settings.backgroundRemovalEnabled !== false,
       openSandboxApiUrl: settings.openSandboxApiUrl || '',
       openSandboxApiKey: '',
     });
@@ -158,8 +152,8 @@ export const GeneralSettingsPage = () => {
             ...(clearEvaluationDsn
               ? { evaluationDsn: '' }
               : replacementDsn
-                ? { evaluationDsn: replacementDsn }
-                : {}),
+              ? { evaluationDsn: replacementDsn }
+              : {}),
           },
         },
       });
@@ -184,10 +178,7 @@ export const GeneralSettingsPage = () => {
         </div>
 
         <Form {...form}>
-          <form
-            className="space-y-4"
-            onSubmit={form.handleSubmit(onSubmit)}
-          >
+          <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
             <Card className="border shadow-none">
               <Card.Content className="space-y-5 p-4 sm:p-5">
                 <div>
@@ -598,9 +589,7 @@ export const GeneralSettingsPage = () => {
                               ? t(
                                   'general-settings-evaluation-dsn-replace-placeholder',
                                 )
-                              : t(
-                                  'general-settings-evaluation-dsn-placeholder',
-                                )
+                              : t('general-settings-evaluation-dsn-placeholder')
                           }
                         />
                       </Form.Control>
@@ -643,67 +632,6 @@ export const GeneralSettingsPage = () => {
                     )}
                   />
                 )}
-
-                <div className="border-t pt-5">
-                  <div className="mb-4 flex items-start gap-3">
-                    <IconSparkles
-                      aria-hidden
-                      className="mt-0.5 size-4 shrink-0 text-muted-foreground"
-                    />
-                    <div>
-                      <h3 className="font-semibold">
-                        {t('general-settings-summarizer-label')}
-                      </h3>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        {t('general-settings-summarizer-description')}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <Form.Field
-                      control={form.control}
-                      name="summarizerProvider"
-                      render={({ field }) => (
-                        <Form.Item>
-                          <Form.Label>
-                            {t('general-settings-summarizer-provider-label')}
-                          </Form.Label>
-                          <Form.Control>
-                            <SelectProvider
-                              value={field.value}
-                              onValueChange={(provider) => {
-                                field.onChange(provider);
-                                form.setValue('summarizerModel', '');
-                              }}
-                            />
-                          </Form.Control>
-                          <Form.Message />
-                        </Form.Item>
-                      )}
-                    />
-
-                    <Form.Field
-                      control={form.control}
-                      name="summarizerModel"
-                      render={({ field }) => (
-                        <Form.Item>
-                          <Form.Label>
-                            {t('general-settings-summarizer-model-label')}
-                          </Form.Label>
-                          <Form.Control>
-                            <SelectModel
-                              provider={summarizerProvider}
-                              value={field.value}
-                              onValueChange={field.onChange}
-                            />
-                          </Form.Control>
-                          <Form.Message />
-                        </Form.Item>
-                      )}
-                    />
-                  </div>
-                </div>
               </Card.Content>
             </Card>
 

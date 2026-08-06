@@ -11,6 +11,12 @@ const PROVIDER_CONTROL_TOKEN = /<\|(?:close|sep)\|>/gi;
 export const INCOMPLETE_PROVIDER_REPLY =
   "I couldn't complete the requested work in this run. Please retry the turn.";
 
+// One corrective attempt is enough. The custom Kimi gateways this guard targets
+// have been observed ignoring repeated `toolChoice: required` requests; allowing
+// eight retries amplified one user turn into nine provider calls and exhausted
+// the provider quota without producing an answer.
+export const PROVIDER_COMPLETION_MAX_RETRIES = 1;
+
 export interface GuardedReplyInput {
   latestText: string;
   allText: string;
@@ -99,6 +105,7 @@ export class ProviderCompletionGuard
     text,
     toolCalls,
     finishReason,
+    retryCount,
     abort,
     messages,
   }: ProcessOutputStepArgs<IncompleteTurnMetadata>): ProcessOutputStepArgs<IncompleteTurnMetadata>['messages'] {
@@ -109,6 +116,13 @@ export class ProviderCompletionGuard
         finishReason,
       })
     ) {
+      return messages;
+    }
+
+    // The retry already had a forced tool choice. Accept the provider output so
+    // resolveGuardedReply can turn it into the stable user-facing fallback
+    // instead of throwing the whole turn away or retrying indefinitely.
+    if (retryCount >= PROVIDER_COMPLETION_MAX_RETRIES) {
       return messages;
     }
 

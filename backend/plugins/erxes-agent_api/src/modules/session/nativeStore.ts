@@ -143,8 +143,8 @@ export async function patchNativeMessages(
  * every caller has to re-supply the current title and spread the existing
  * metadata before layering its patch. This centralises that dance: pass the
  * thread you read and the metadata keys to set; the title and untouched
- * metadata carry through. (native generateTitle / a manual rename own the
- * title; an empty fallback keeps generateTitle eligible.)
+ * metadata carry through. Deterministic titles and manual renames therefore
+ * remain unchanged while metadata is reconciled.
  */
 async function preserveTitleUpdate(
   memory: NativeMemoryFacade,
@@ -362,18 +362,22 @@ export async function ensureThreadRegistered(
   threadId: string,
   resourceId: string,
   agentId: string,
+  initialTitle?: string | null,
 ): Promise<void> {
   const memory = await getNativeMemory(subdomain);
   const existing = await memory.getThreadById({ threadId, resourceId });
+  const title = initialTitle?.trim() ?? '';
 
   if (!existing) {
-    // Empty title keeps native generateTitle eligible (it only fills a blank
-    // title, once, at turn-end). The UI renders a blank title as "New chat".
     await memory.createThread({
       threadId,
       resourceId,
-      title: '',
-      metadata: { agentId, subdomain },
+      title,
+      metadata: {
+        agentId,
+        subdomain,
+        ...(title ? { titleSource: 'derived' } : {}),
+      },
     });
     return;
   }
@@ -381,9 +385,23 @@ export async function ensureThreadRegistered(
   const meta = (existing.metadata ?? {}) as {
     agentId?: string;
     subdomain?: string;
+    titleSource?: string;
   };
-  if (meta.agentId === agentId && meta.subdomain === subdomain) return;
-  await preserveTitleUpdate(memory, existing, threadId, { agentId, subdomain });
+  const needsBinding = meta.agentId !== agentId || meta.subdomain !== subdomain;
+  const needsTitle =
+    !existing.title && Boolean(title) && meta.titleSource !== 'manual';
+  if (!needsBinding && !needsTitle) return;
+
+  await memory.updateThread({
+    id: threadId,
+    title: needsTitle ? title : existing.title ?? '',
+    metadata: {
+      ...meta,
+      agentId,
+      subdomain,
+      ...(needsTitle ? { titleSource: 'derived' } : {}),
+    },
+  });
 }
 
 /**
@@ -492,8 +510,8 @@ export async function getThreadMessagesByResource(
   return (res?.messages ?? []).map(toErxesMessage);
 }
 
-/** Rename a thread the caller owns. Records titleSource='manual' so native
- *  generateTitle (which only fires while the title is empty) never overrides it. */
+/** Rename a thread the caller owns. Records titleSource='manual' so later
+ * deterministic registration never overwrites the user's title. */
 export async function renameOwnedThread(
   subdomain: string,
   userId: string,

@@ -50,8 +50,6 @@ const createSettingsModelMocks = (
         learningArchiveBelowConfidence: 0.2,
         evaluationEnabled: false,
         backgroundRemovalEnabled: true,
-        summarizerProvider: '',
-        summarizerModel: '',
         ...settings,
       },
       'created-settings',
@@ -110,8 +108,6 @@ describe('MastraSettings model', () => {
     expect(defaults.learningEnabled).toBe(false);
     expect(defaults.evaluationEnabled).toBe(false);
     expect(defaults.backgroundRemovalEnabled).toBe(true);
-    expect(defaults.summarizerProvider).toBe('');
-    expect(defaults.summarizerModel).toBe('');
     expect(mocks.create).toHaveBeenCalledWith({});
     expect(settings).toMatchObject({
       erxesApiUrl: 'http://localhost:4000',

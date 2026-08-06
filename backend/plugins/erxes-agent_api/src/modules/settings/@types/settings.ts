@@ -9,8 +9,7 @@ export interface IMastraSettings {
   // effective when that storage is actually configured.
   attachmentsEnabled?: boolean;
   // Runtime feature controls. Defaults mirror the previous environment-backed
-  // behavior: learning/evaluation off, background removal on, summarizer falls
-  // back to each agent's own model.
+  // behavior: learning/evaluation off and background removal on.
   learningEnabled?: boolean;
   learningAutoPromoteMinSources?: number;
   learningAutoPromoteMinConfidence?: number;
@@ -23,8 +22,6 @@ export interface IMastraSettings {
   evaluationEnabled?: boolean;
   evaluationDsn?: string;
   backgroundRemovalEnabled?: boolean;
-  summarizerProvider?: string;
-  summarizerModel?: string;
   // OpenSandbox connection used by the optional per-agent terminal tool.
   // The API key is write-only at the GraphQL boundary.
   openSandboxApiUrl?: string;

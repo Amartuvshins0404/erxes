@@ -46,8 +46,6 @@ export const generalSettingsSchema = z.object({
   evaluationDsn: z.string(),
   clearEvaluationDsn: z.boolean(),
   backgroundRemovalEnabled: z.boolean(),
-  summarizerProvider: z.string(),
-  summarizerModel: z.string(),
   openSandboxApiUrl: z
     .string()
     .max(2048)
@@ -77,8 +75,6 @@ export const GENERAL_SETTINGS_DEFAULTS: GeneralSettingsValues = {
   evaluationDsn: '',
   clearEvaluationDsn: false,
   backgroundRemovalEnabled: true,
-  summarizerProvider: '',
-  summarizerModel: '',
   openSandboxApiUrl: '',
   openSandboxApiKey: '',
 };

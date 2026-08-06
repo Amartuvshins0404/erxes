@@ -76,8 +76,6 @@ export interface IMastraSettings {
   evaluationEnabled?: boolean | null;
   evaluationDsnConfigured?: boolean | null;
   backgroundRemovalEnabled?: boolean | null;
-  summarizerProvider?: string | null;
-  summarizerModel?: string | null;
   openSandboxApiUrl?: string | null;
   hasOpenSandboxApiKey?: boolean | null;
   openSandboxApiKeyHint?: string | null;

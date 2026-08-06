@@ -22,10 +22,19 @@ export const config: ModuleFederationConfig = {
     './automationsWidget':
       './src/widgets/automations/components/AutomationRemoteEntry.tsx',
   },
-  // Nx only calls `shared` for dependencies discovered in its project graph.
-  // Force both router packages into the share scope so this remote's descendant
-  // Routes consume the host Router context instead of bundling a private copy.
-  additionalShared: ['react-router', 'react-router-dom'],
+  // Keep both router packages in the host's singleton context. Use explicit
+  // configs because this pnpm graph stores version-qualified external-node
+  // names, which makes Nx's string-form additionalShared lookup fail.
+  additionalShared: [
+    [
+      'react-router',
+      { singleton: true, strictVersion: false, requiredVersion: false },
+    ],
+    [
+      'react-router-dom',
+      { singleton: true, strictVersion: false, requiredVersion: false },
+    ],
+  ],
   shared: (libraryName, defaultConfig) => {
     if (coreLibraries.has(libraryName)) {
       return defaultConfig;

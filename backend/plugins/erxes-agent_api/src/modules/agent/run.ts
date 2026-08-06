@@ -1,3 +1,4 @@
+import type { ToolsInput } from '@mastra/core/agent';
 import { runWithAuth } from '~/mastra/requestContext';
 import {
   MemoryBinding,
@@ -24,9 +25,19 @@ export async function runAgentTurn(params: {
   message: string;
   authCtx: TurnAuthCtx;
   memory?: MemoryBinding;
+  activeTools: string[];
+  turnInstructions: string;
+  intentOperationTools: ToolsInput;
 }): Promise<string | null> {
-  const { agent, convo, message, authCtx, memory } = params;
-  const genOpts = memory ? { memory } : undefined;
+  const { agent, convo, message, authCtx, memory, activeTools } = params;
+  const genOpts = {
+    activeTools,
+    instructions: params.turnInstructions,
+    ...(Object.keys(params.intentOperationTools).length
+      ? { toolsets: { intent: params.intentOperationTools } }
+      : {}),
+    ...(memory ? { memory } : {}),
+  };
   // With a memory binding, hand generate() the new user message as a STRING —
   // Mastra Memory only persists (and recalls against) string input; passing the
   // convo array silently skips the save. (Recent history + recall come from
@@ -181,7 +192,12 @@ export async function synthesizeFromToolResults(params: {
 
   try {
     const synthesis = await runWithAuth(authCtx, () =>
-      agent.generate(synthesisMessages, { maxSteps: 1 }),
+      agent.generate(synthesisMessages, {
+        maxSteps: 1,
+        activeTools: [],
+        instructions:
+          'Summarize supplied tool results accurately in one or two sentences. Never call tools.',
+      }),
     );
     return synthesis.text || fallback || 'Done.';
   } catch {

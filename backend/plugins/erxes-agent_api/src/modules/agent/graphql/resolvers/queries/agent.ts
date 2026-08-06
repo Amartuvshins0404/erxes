@@ -203,6 +203,9 @@ export const agentQueries = {
       message,
       authCtx,
       memory: memoryBinding,
+      activeTools: prepared.activeTools,
+      turnInstructions: prepared.turnInstructions,
+      intentOperationTools: prepared.intentOperationTools,
     });
 
     await persistTurn({

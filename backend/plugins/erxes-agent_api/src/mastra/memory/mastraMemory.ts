@@ -17,7 +17,6 @@
 // ---------------------------------------------------------------------------
 import { Memory } from '@mastra/memory';
 import { MongoDBStore } from '@mastra/mongodb';
-import { TITLER_INSTRUCTIONS } from '~/mastra/titler';
 
 // Memory storage shares the app's Mongo connection (MONGO_URL). Mastra's
 // MongoDBStore provisions its collections in a dedicated database on that same
@@ -41,7 +40,8 @@ let _building: Promise<Memory> | null = null;
  * symmetry but does not select the instance — isolation is by resourceId
  * (see scopedResource), so a single instance serves every tenant.
  */
-export async function getMastraMemory(_subdomain?: string): Promise<Memory> {
+export function getMastraMemory(subdomain?: string): Promise<Memory>;
+export async function getMastraMemory(): Promise<Memory> {
   if (_shared) return _shared;
   if (_building) return _building;
 
@@ -66,14 +66,6 @@ export async function getMastraMemory(_subdomain?: string): Promise<Memory> {
         // (updateResource) — one row per user, NOT a collection per user — so it
         // adds no collections and is safe on the shared DB.
         workingMemory: { enabled: true, scope: 'resource' },
-        // Native thread titling. Mastra fills thread.title ONCE (only while it
-        // is empty; it never refreshes) using the agent's OWN model and erxes's
-        // multilingual TITLER instructions. `model` is intentionally omitted:
-        // the runtime's title path (genTitle → getLLM) falls back to the calling
-        // agent's model when none is given, so there is no per-tenant model to
-        // resolve on the shared instance. (The published type marks `model`
-        // required; the surrounding `as never` cast covers the omission.)
-        generateTitle: { instructions: TITLER_INSTRUCTIONS },
       },
     } as never);
 
@@ -94,7 +86,9 @@ export async function getMastraMemory(_subdomain?: string): Promise<Memory> {
  * storage-domain methods Memory doesn't surface (e.g. listMessagesById for
  * message-id feedback lookup). Ensures the Memory is built first.
  */
-export async function getMastraStore(subdomain?: string): Promise<MongoDBStore> {
+export async function getMastraStore(
+  subdomain?: string,
+): Promise<MongoDBStore> {
   await getMastraMemory(subdomain);
   if (!_store) throw new Error('Mastra memory store not initialized');
   return _store;

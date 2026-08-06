@@ -94,8 +94,6 @@ export const MASTRA_SETTINGS_SAVE = gql`
       evaluationEnabled
       evaluationDsnConfigured
       backgroundRemovalEnabled
-      summarizerProvider
-      summarizerModel
       openSandboxApiUrl
       hasOpenSandboxApiKey
       openSandboxApiKeyHint

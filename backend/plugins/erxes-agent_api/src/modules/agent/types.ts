@@ -103,6 +103,12 @@ export interface PreparedTurn {
   providers: IMastraProviderDocument[];
   agent: TurnAgent;
   tools: ToolsInput;
+  /** Per-turn tool allowlist sent to the provider after intent scoping. */
+  activeTools: string[];
+  /** System prompt reduced to the capabilities selected for this turn. */
+  turnInstructions: string;
+  /** Exact erxes operations lexically preloaded into the first model step. */
+  intentOperationTools: ToolsInput;
   sessionId: string;
   convo: TurnMessage[];
   authCtx: TurnAuthCtx;

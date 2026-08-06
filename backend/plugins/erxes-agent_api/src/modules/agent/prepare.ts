@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { IUserDocument } from 'erxes-api-shared/core-types';
 import { ExpectedError } from 'erxes-api-shared/utils';
 import { IModels } from '~/connectionResolvers';
-import { getOrCreateAgent } from '~/mastra/agentRuntime';
+import { buildTurnSystemPrompt, getOrCreateAgent } from '~/mastra/agentRuntime';
 import { isWorkspaceMemoryEnabled } from '~/mastra/memory/config';
 import { scopedResource } from '~/mastra/memory/mastraMemory';
 import { deriveResourceId, augmentConvo, MemoryContext } from '~/mastra/memory';
@@ -16,6 +16,9 @@ import { IMastraAgentDocument } from '@/agent/@types/agent';
 import { IMastraProviderDocument } from '@/provider/@types/provider';
 import { IMastraSettingsDocument } from '@/settings/@types/settings';
 import { resolveAgentPrincipal } from '~/mastra/auth/backgroundPrincipal';
+import { deriveThreadTitle } from '~/mastra/titler';
+import { selectTurnActiveTools } from '~/mastra/turnToolScope';
+import { selectIntentOperationTools } from '~/mastra/operationPreload';
 import {
   MemoryBinding,
   PreparedTurn,
@@ -183,7 +186,7 @@ async function buildAgentAndGateMemory(args: {
       typeof threadId === 'string' &&
       threadId,
   );
-  const [{ agent, tools }, priorThread] = await Promise.all([
+  const [{ agent, tools, promptContext }, priorThread] = await Promise.all([
     getOrCreateAgent(agentConfig, models, subdomain, {
       settings,
       providers,
@@ -205,7 +208,7 @@ async function buildAgentAndGateMemory(args: {
     throw new ExpectedError('Thread not found');
   }
 
-  return { agent, tools };
+  return { agent, tools, promptContext };
 }
 
 // Register before execution so a refresh can restore an in-flight session.
@@ -216,14 +219,17 @@ async function preRegisterThread(args: {
   subdomain: string;
   sessionId: string;
   agentId: string;
+  message: string;
 }): Promise<void> {
-  const { identity, memoryBinding, subdomain, sessionId, agentId } = args;
+  const { identity, memoryBinding, subdomain, sessionId, agentId, message } =
+    args;
   if (identity.kind === 'user' && memoryBinding) {
     await ensureThreadRegistered(
       subdomain,
       sessionId,
       memoryBinding.resource,
       agentId,
+      deriveThreadTitle(message),
     ).catch((e) =>
       console.warn(
         `[native-chat-store] thread pre-register skipped: ${
@@ -361,17 +367,79 @@ export async function prepareTurn(
     throw new ExpectedError(principal.error);
   }
 
-  const { agent, tools } = await buildAgentAndGateMemory({
-    agentConfig,
-    models,
-    subdomain,
-    settings,
-    providers,
-    identity,
-    threadId,
-    sessionId,
-    memoryBinding,
+  // Only an in-app user can own or explicitly activate personal skills.
+  const initiatorUserId =
+    identity.kind === 'user' ? identity.user?._id : undefined;
+
+  // Once the acting principal is authorized, the remaining independent reads
+  // overlap: agent/tool construction, learned context/attachments, and any
+  // explicitly activated skill. This removes three stacked setup round trips
+  // from the model's time-to-first-token without weakening the ownership gate.
+  const [{ agent, tools, promptContext }, { convo, learningIds }, activated] =
+    await Promise.all([
+      buildAgentAndGateMemory({
+        agentConfig,
+        models,
+        subdomain,
+        settings,
+        providers,
+        identity,
+        threadId,
+        sessionId,
+        memoryBinding,
+      }),
+      buildTurnConvo({
+        models,
+        agentId,
+        message,
+        weaveDigest,
+        attachments,
+        settings,
+      }),
+      activateTurnSkills({
+        userId: initiatorUserId,
+        activeSkillNames,
+        subdomain,
+        agentConfig,
+      }),
+    ]);
+
+  const availableOperationTools = Object.fromEntries(
+    promptContext.operationToolNames
+      .filter((name) => tools[name])
+      .map((name) => [name, tools[name]]),
+  );
+  const intentOperationTools = selectIntentOperationTools(
+    message,
+    availableOperationTools,
+  );
+  const activeTools = selectTurnActiveTools({
+    message,
+    attachmentCount: attachments?.length ?? 0,
+    availableToolNames: Object.keys(tools),
+    hasErxesOperations: promptContext.operationToolNames.length > 0,
+    hasIntentOperation: Object.keys(intentOperationTools).length > 0,
+    skillsEnabled: Boolean(agentConfig.skills?.length),
   });
+  const operationToolNames = new Set(promptContext.operationToolNames);
+  const alwaysOnToolNames = new Set([
+    'request_approval',
+    'search_tools',
+    'updateWorkingMemory',
+    'skill',
+    'skill_search',
+    'skill_read',
+  ]);
+  const hasTurnSpecificStandaloneTool = activeTools.some(
+    (name) => !operationToolNames.has(name) && !alwaysOnToolNames.has(name),
+  );
+  const toolAnswerLimit =
+    identity.kind === 'user' &&
+    Object.keys(intentOperationTools).length > 0 &&
+    !hasTurnSpecificStandaloneTool
+      ? 2
+      : undefined;
+  const turnInstructions = buildTurnSystemPrompt(promptContext, activeTools);
 
   await preRegisterThread({
     identity,
@@ -379,26 +447,7 @@ export async function prepareTurn(
     subdomain,
     sessionId,
     agentId,
-  });
-
-  const { convo, learningIds } = await buildTurnConvo({
-    models,
-    agentId,
     message,
-    weaveDigest,
-    attachments,
-    settings,
-  });
-
-  // Only an in-app user can own or explicitly activate personal skills.
-  const initiatorUserId =
-    identity.kind === 'user' ? identity.user?._id : undefined;
-
-  const activated = await activateTurnSkills({
-    userId: initiatorUserId,
-    activeSkillNames,
-    subdomain,
-    agentConfig,
   });
 
   const authCtx = {
@@ -412,6 +461,7 @@ export async function prepareTurn(
     backgroundRemovalEnabled: settings.backgroundRemovalEnabled !== false,
     resourceId,
     approvedOps: approvedOperations,
+    toolAnswerLimit,
   };
 
   return {
@@ -424,6 +474,8 @@ export async function prepareTurn(
     agent: agent as unknown as TurnAgent,
     tools,
     sessionId,
+    activeTools,
+    turnInstructions,
     convo,
     authCtx,
     advanced,
@@ -432,6 +484,7 @@ export async function prepareTurn(
     memCtx,
     attachments,
     learningIds,
+    intentOperationTools,
     activeSkillInstructions: activated?.instructions,
     appliedSkillNames: activated?.names ?? [],
   };

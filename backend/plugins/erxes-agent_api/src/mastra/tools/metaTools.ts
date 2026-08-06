@@ -17,7 +17,11 @@ import {
   securityBlockedResult,
 } from './securityGuard';
 import { redactSecrets } from './secretRedaction';
-import { getCurrentAuth } from '../requestContext';
+import {
+  getCurrentAuth,
+  runMutationSerially,
+  runToolOnce,
+} from '../requestContext';
 import { makeAgentProcessId, type AgentActionInput } from '../auditLog';
 
 /** Model-readable metadata used by the static operation-hint census. */
@@ -131,12 +135,18 @@ export async function executePolicyScopedOperation({
   }
 
   const processId = isMutation ? makeAgentProcessId() : undefined;
-  const result = await executeErxesOperation(
-    operation,
-    callArgs,
-    registry,
-    processId,
-    responseFields?.length ? responseFields : undefined,
+  const execute = () =>
+    executeErxesOperation(
+      operation,
+      callArgs,
+      registry,
+      processId,
+      responseFields?.length ? responseFields : undefined,
+    );
+  const result = await runToolOnce(
+    operationName,
+    { args: callArgs, responseFields },
+    () => (isMutation ? runMutationSerially(execute) : execute()),
   );
 
   if (isMutation) {

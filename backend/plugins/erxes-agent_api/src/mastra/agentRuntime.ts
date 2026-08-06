@@ -1,6 +1,7 @@
 import { Agent } from '@mastra/core/agent';
 import { ToolSearchProcessor } from '@mastra/core/processors';
 import type { ToolsInput } from '@mastra/core/agent';
+import { stepCountIs } from 'ai';
 import { ExpectedError } from 'erxes-api-shared/utils';
 import type { IModels } from '~/connectionResolvers';
 import type { IMastraAgentDocument } from '@/agent/@types/agent';
@@ -27,8 +28,11 @@ import type { DestructiveOpsPolicy } from './tools/destructiveGuard';
 import { writeAgentAction, AgentActionInput } from './auditLog';
 import { isWorkspaceMemoryEnabled } from './memory/config';
 import { getMastraMemory } from './memory/mastraMemory';
+import { withToolExecutionControl } from './requestContext';
 import { ToolCallSignalFilter } from './memory/toolCallSignalFilter';
+import { RepeatedToolCallFilter } from './repeatedToolCallFilter';
 import {
+  PROVIDER_COMPLETION_MAX_RETRIES,
   ProviderCompletionGuard,
   shouldGuardProviderOutput,
 } from './providerOutputGuard';
@@ -61,6 +65,19 @@ const agentCache = new Map<string, Agent>();
 // Also cache the raw tools map so the resolver can execute them directly
 // when a model outputs function calls as plain text instead of tool_calls.
 const toolsCache = new Map<string, ToolsInput>();
+const promptContextCache = new Map<string, AgentPromptContext>();
+
+const SIDE_EFFECTING_STANDALONE_TOOLS: Record<string, true> = {
+  make_skill: true,
+  publishWebsite: true,
+  removeImageBackground: true,
+  terminal: true,
+  updateWorkingMemory: true,
+  workflowRunNow: true,
+  workflowSave: true,
+  workflowUpdate: true,
+  workspaceWrite: true,
+};
 
 const PERMISSION_SCOPE_RANK = { own: 0, group: 1, all: 2 } as const;
 
@@ -125,11 +142,36 @@ const enforceDelegatedPermissionCeiling = async ({
 };
 
 // Increment this whenever routing.ts, the meta-tools, or provider logic changes.
-const ROUTING_VERSION = 36;
+const ROUTING_VERSION = 37;
+
+export interface AgentPromptContext {
+  agentInstructions: string;
+  hasErxesTools: boolean;
+  scopeLine: string;
+  inventoryLines: string[];
+  builtins: ToolInfo[];
+  operationToolNames: string[];
+}
 
 export interface AgentWithTools {
   agent: Agent;
   tools: ToolsInput;
+  promptContext: AgentPromptContext;
+}
+
+export function buildTurnSystemPrompt(
+  context: AgentPromptContext,
+  activeTools: string[],
+): string {
+  const active = new Set(activeTools);
+  return buildSystemPrompt(context.agentInstructions, {
+    hasErxesTools: context.hasErxesTools,
+    scopeLine: context.scopeLine,
+    inventoryLines: context.inventoryLines,
+    builtins: context.builtins.filter(
+      (tool) => active.has(tool.id) || active.has(tool.name),
+    ),
+  });
 }
 
 export interface GetOrCreateAgentOptions {
@@ -449,10 +491,12 @@ export async function getOrCreateAgent(
   });
 
   const cached = agentCache.get(cacheKey);
-  if (cached) {
+  const cachedPromptContext = promptContextCache.get(cacheKey);
+  if (cached && cachedPromptContext) {
     return {
       agent: cached,
       tools: toolsCache.get(cacheKey) ?? {},
+      promptContext: cachedPromptContext,
     };
   }
 
@@ -461,6 +505,7 @@ export async function getOrCreateAgent(
     if (key.startsWith(`${agentConfig._id}:`)) {
       agentCache.delete(key);
       toolsCache.delete(key);
+      promptContextCache.delete(key);
     }
   }
 
@@ -477,18 +522,34 @@ export async function getOrCreateAgent(
     destructiveOps,
     hasErxes,
   });
+  const controlledTools = Object.fromEntries(
+    Object.entries(tools).map(([name, tool]) => [
+      name,
+      // fileReader and exact erxes operations already use runToolOnce at their
+      // execution boundary; wrapping them twice would recursively share the
+      // same in-flight promise. Standalone writes share the mutation queue so
+      // four-way read concurrency cannot race workspace or workflow state.
+      name === 'fileReader'
+        ? tool
+        : withToolExecutionControl(name, tool, {
+            serial: Boolean(SIDE_EFFECTING_STANDALONE_TOOLS[name]),
+          }),
+    ]),
+  ) as ToolsInput;
 
   // Conversation persistence + recent-history replay + recall are owned by the
   // attached Mastra Memory (the chat store IS the native memory store; see
   // memory below + session/nativeStore.ts). No custom message store.
-  const toolNames = Object.keys(tools);
-  const systemPrompt = buildSystemPrompt(agentConfig.instructions || '', {
+  const toolNames = Object.keys(controlledTools);
+  const promptContext: AgentPromptContext = {
+    agentInstructions: agentConfig.instructions || '',
     hasErxesTools: hasErxes,
     scopeLine: scopeSummary(policy),
     inventoryLines: inventory.lines,
     builtins: builtinInfos,
-  });
-
+    operationToolNames: Object.keys(operationTools),
+  };
+  const systemPrompt = buildTurnSystemPrompt(promptContext, toolNames);
 
   // Configured sampling temperature. Unset → provider/SDK default (the legacy
   // loop hardcodes 0, which models like Kimi thinking — "only 1 is allowed" —
@@ -515,9 +576,9 @@ export async function getOrCreateAgent(
   const skillsWorkspace = agentConfig.skills?.length
     ? getSkillsWorkspace(subdomain || 'os', agentConfig.skills)
     : undefined;
-
+  const hasExecutableTools = hasErxes || toolNames.length > 0;
   const completionGuard =
-    toolNames.length > 0 && shouldGuardProviderOutput(agentConfig.model)
+    hasExecutableTools && shouldGuardProviderOutput(agentConfig.model)
       ? new ProviderCompletionGuard()
       : null;
 
@@ -533,6 +594,7 @@ export async function getOrCreateAgent(
       : []),
     ...(memory ? [new ToolCallSignalFilter()] : []),
     ...(completionGuard ? [completionGuard] : []),
+    ...(hasExecutableTools ? [new RepeatedToolCallFilter()] : []),
   ];
   const outputProcessors = completionGuard ? [completionGuard] : [];
 
@@ -541,11 +603,14 @@ export async function getOrCreateAgent(
     name: agentAccountName(account),
     instructions: systemPrompt,
     model,
-    tools: toolNames.length ? tools : undefined,
     ...(memory ? { memory } : {}),
+    tools: toolNames.length ? controlledTools : undefined,
     ...(inputProcessors.length ? { inputProcessors } : {}),
     ...(outputProcessors.length
-      ? { outputProcessors, maxProcessorRetries: 8 }
+      ? {
+          outputProcessors,
+          maxProcessorRetries: PROVIDER_COMPLETION_MAX_RETRIES,
+        }
       : {}),
     ...(scorers ? { scorers } : {}),
     ...(skillsWorkspace ? { workspace: skillsWorkspace } : {}),
@@ -553,10 +618,12 @@ export async function getOrCreateAgent(
     // agent configures it — otherwise the provider default applies (sending an
     // explicit 0 is what reasoning models like Kimi reject).
     defaultOptions: {
-      // Continue tool loops until the model returns a final answer. An empty
-      // stop-condition list removes AI SDK's default one-step cutoff.
-      stopWhen: [],
-      toolCallConcurrency: 1,
+      // Eight model steps cover multi-part work while preventing a malformed
+      // provider response from running an unbounded tool loop.
+      stopWhen: [stepCountIs(8)],
+      // Independent reads may execute together. Exact GraphQL mutations and
+      // state-changing standalone tools share the per-turn serial queue.
+      toolCallConcurrency: 4,
       ...(hasTemperature ? { modelSettings: { temperature } } : {}),
     },
   } as never);
@@ -565,10 +632,11 @@ export async function getOrCreateAgent(
     await wireAgentObservability({ agent, subdomain, scorers, settings });
   }
 
-  const executableTools = { ...tools, ...operationTools };
+  const executableTools = { ...controlledTools, ...operationTools };
   agentCache.set(cacheKey, agent);
+  promptContextCache.set(cacheKey, promptContext);
   toolsCache.set(cacheKey, executableTools);
-  return { agent, tools: executableTools };
+  return { agent, tools: executableTools, promptContext };
 }
 
 /** Drop every cached agent built from the given stored config id. */
@@ -577,6 +645,7 @@ export function invalidateAgentCache(agentId: string) {
     if (key.startsWith(`${agentId}:`)) {
       agentCache.delete(key);
       toolsCache.delete(key);
+      promptContextCache.delete(key);
     }
   }
 }

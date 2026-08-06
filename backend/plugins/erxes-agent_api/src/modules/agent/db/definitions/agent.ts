@@ -53,7 +53,7 @@ export const agentSchema = new Schema(
     memoryEnabled: { type: Boolean, default: true },
     // Debug view: when on, the chat shows this agent's full tool-call trace
     // (web searches, fetches, operations, raw I/O). Off (default) → the chat
-    // shows only a one-line turn summary that expands to the short thoughts.
+    // keeps the trace collapsed behind deterministic activity labels.
     debug: { type: Boolean, default: false },
     // Sampling temperature sent to the model. Unset → the provider/SDK default
     // (the legacy OpenAI-compatible loop defaults to 0). Some models pin it:

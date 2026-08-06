@@ -60,8 +60,6 @@ export const settingsSchema = new Schema({
   // Write-only through GraphQL; runtime reads explicitly opt this field in.
   evaluationDsn: { type: String, trim: true, maxlength: 2000, select: false },
   backgroundRemovalEnabled: { type: Boolean, default: true },
-  summarizerProvider: { type: String, trim: true, maxlength: 100, default: '' },
-  summarizerModel: { type: String, trim: true, maxlength: 200, default: '' },
   openSandboxApiUrl: { type: String, maxlength: 2048 },
   openSandboxApiKey: { type: String, maxlength: 512 },
 });

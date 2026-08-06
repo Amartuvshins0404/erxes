@@ -1,6 +1,7 @@
 import {
   INCOMPLETE_PROVIDER_REPLY,
   ProviderCompletionGuard,
+  PROVIDER_COMPLETION_MAX_RETRIES,
   resolveGuardedReply,
   sanitizePersistedProviderOutput,
   sanitizeProviderText,
@@ -9,6 +10,10 @@ import {
 } from '../providerOutputGuard';
 
 describe('providerOutputGuard', () => {
+  it('allows one corrective provider retry', () => {
+    expect(PROVIDER_COMPLETION_MAX_RETRIES).toBe(1);
+  });
+
   it('buffers Kimi K3 models served through custom provider ids', () => {
     expect(shouldGuardProviderOutput('moonshotai/Kimi-K3')).toBe(true);
     expect(shouldGuardProviderOutput('kimi-k3')).toBe(true);
@@ -96,7 +101,7 @@ describe('providerOutputGuard', () => {
     ).toBe(false);
   });
 
-  it('forces a real tool call when Mastra retries stalled narration', () => {
+  it('forces a tool call on the single corrective retry', () => {
     const guard = new ProviderCompletionGuard();
     const messages: unknown[] = [];
     const args = (retryCount: number) =>

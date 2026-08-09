@@ -151,14 +151,11 @@ export const backfillPosCatalog = async (
 
     if (!products?.length) return;
 
-    const allowedCategoryIds = await getPosCategoryIds(subdomain, posToken);
-    const allowed = new Set(allowedCategoryIds);
-
     const categoryIds = Array.from(
       new Set(
         products
           .map((p) => p.categoryId)
-          .filter((id): id is string => !!id && allowed.has(id)),
+          .filter((id): id is string => !!id),
       ),
     );
 
@@ -197,11 +194,7 @@ export const backfillPosCatalog = async (
         }),
     );
 
-    const syncableProducts = products.filter(
-      (p) => p.categoryId && allowed.has(p.categoryId),
-    );
-
-    await processInChunks(syncableProducts, BACKFILL_CHUNK_SIZE, (product) =>
+    await processInChunks(products, BACKFILL_CHUNK_SIZE, (product) =>
       sendMessage({
         subdomain,
         path: 'syncProduct',

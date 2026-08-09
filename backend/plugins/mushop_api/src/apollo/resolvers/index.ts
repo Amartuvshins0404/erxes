@@ -1,5 +1,6 @@
 import { apolloCustomScalars } from 'erxes-api-shared/utils';
 import { MushopSupplier } from '@/supplier/graphql/resolvers/customResolvers/supplier';
+import { MushopOrder } from '@/supplier/graphql/resolvers/customResolvers/order';
 import { MushopProduct } from '@/product/graphql/resolvers/customResolvers/mushopProduct';
 import {
   MushopCollective,
@@ -19,6 +20,7 @@ const resolvers: any = {
     ...queries,
   },
   MushopSupplier,
+  MushopOrder,
   MushopProduct,
   MushopCollective,
   MushopCollectiveSyncResult,

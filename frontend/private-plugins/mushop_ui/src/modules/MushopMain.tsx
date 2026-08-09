@@ -13,6 +13,12 @@ const ProductsPage = lazy(() =>
   })),
 );
 
+const OrdersPage = lazy(() =>
+  import('@/order/pages/OrdersPage').then((module) => ({
+    default: module.OrdersPage,
+  })),
+);
+
 const MembersPage = lazy(() =>
   import('@/member/pages/MembersPage').then((module) => ({
     default: module.MembersPage,
@@ -32,6 +38,7 @@ const MushopMain = () => {
         <Route path="/" element={<Navigate to="suppliers" replace />} />
         <Route path="suppliers" element={<SuppliersPage />} />
         <Route path="products" element={<ProductsPage />} />
+        <Route path="orders" element={<OrdersPage />} />
         <Route path="members" element={<MembersPage />} />
         <Route path="collectives" element={<CollectivesPage />} />
       </Routes>

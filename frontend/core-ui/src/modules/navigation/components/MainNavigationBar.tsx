@@ -25,15 +25,25 @@ export const MainNavigationBar = () => {
   const isInboxActive =
     pathname === `/${AppPath.MyInbox}` ||
     pathname.startsWith(`/${AppPath.MyInbox}/`);
+
+  console.log("activities", activities)
+
   const routeActivity = findNavigationActivityByPath(activities, pathname);
   const activeActivity =
     routeActivity ||
     activities.find((activity) => activity.id === activeActivityId) ||
     activities[0];
+
+  console.log("routeActivity", routeActivity)
+  console.log("navigationGroups", navigationGroups)
+
   const activeNavigationGroup =
     routeActivity?.kind === 'plugin'
       ? navigationGroups[routeActivity.id]
       : undefined;
+
+  console.log("activeNavigationGroup", activeNavigationGroup)
+
   const hasNavigationPanel = Boolean(
     isSettings ||
     activeNavigationGroup?.contents.length ||
@@ -90,6 +100,9 @@ export const MainNavigationBar = () => {
   const handleSelectInbox = () => {
     navigate(`/${AppPath.MyInbox}`);
   };
+
+  console.log("isMobile", isMobile)
+  console.log("hasNavigationPanel", hasNavigationPanel)
 
   return (
     <>

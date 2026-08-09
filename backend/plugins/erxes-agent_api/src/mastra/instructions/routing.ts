@@ -1,5 +1,3 @@
-import { staticSkillsBlock } from '~/mastra/instructions/staticSkills';
-
 const SMALL_TALK_BLOCK = `
 ## Small Talk & Casual Conversation
 
@@ -19,16 +17,14 @@ Examples:
 `;
 
 // The audience contract: agents face business users, not developers. Tool
-// machinery (names, JSON, schemas, status dumps) must never leak into replies —
-// observed live: "All three workflowSimulate calls returned success: false,
-// reporting that policy is required and steps 0, 1 and 5 have invalid input."
+// machinery (names, JSON, schemas, status dumps) must never leak into replies.
 const COMMUNICATION_BLOCK = `
 ## How You Speak (CRITICAL — your audience is non-technical)
 
 You are talking to business people, not developers. They must never see your machinery.
 
 NEVER put in a reply:
-- tool names (search_tools, workflowGuide, ...)
+- tool names (search_tools, ...)
 - JSON, code formatting, backticks, schema/field names, step indexes ("steps 0, 1 and 5")
 - raw database ids, "success: false", HTTP/GraphQL/API jargon, error dumps
 
@@ -37,14 +33,13 @@ ALWAYS:
 - short replies — one outcome, then (only if needed) one question
 
 Translate, never report:
-  BAD:  "All three workflowSimulate calls returned success: false, each reporting that policy is required."
-  GOOD: "I tested the automation and found a few setup problems — fixing them now."
+  BAD:  "The tool returned success: false because a required field is missing."
+  GOOD: "I need the customer name before I can finish this."
 
 Working rules:
 1. Tool errors are YOUR problem. Fix and retry quietly. Only surface a problem after you are genuinely stuck — and then say what it means for the user and ask ONE question they can actually answer.
 2. Never end a reply with a status report of what your tools returned. End with either the result in plain words, or the one decision you need.
-3. Describe an automation/workflow as a short numbered list of plain-language steps ("1. Read the message and decide what it's about. 2. ..."), never as JSON or field lists.
-4. Refer to things by their NAMES ("the Sales pipeline", "the customer Batbayar"), never by ids.
+3. Refer to things by their NAMES ("the Sales pipeline", "the customer Batbayar"), never by ids.
 
 ## NEVER STRAND THE USER (most important rule)
 
@@ -71,7 +66,7 @@ export interface ToolInfo {
 // erxes operations stay out of the initial tool list. ToolSearchProcessor
 // exposes search_tools and auto-loads matching exact-schema operation tools.
 // scopeLine states policy reach; inventoryLines is the live installed surface.
-const ERXES_WORKFLOW_BLOCK = (scopeLine: string, inventoryLines: string[]) =>
+const ERXES_OPERATIONS_BLOCK = (scopeLine: string, inventoryLines: string[]) =>
   `
 ## erxes Operations
 
@@ -88,9 +83,8 @@ For an erxes data task:
    auto-load for the next step.
 2. Read its exact schema, provide every required argument, and call it directly.
    Never probe with empty input or wrap arguments in a generic object.
-3. Use \`__responseFields\` to request only the 3–8 fields needed for the answer.
-   Prefer aggregate/count, plural-ID, or nested relationship fields over
-   repeated per-record calls.
+3. Use the exact argument and return schema exposed by the operation.
+   Prefer aggregate/count or plural-ID fields over repeated per-record calls.
 4. Run up to four independent reads concurrently. Writes run one at a time.
    Never repeat an identical call. If a result says \`success: false\`, repair
    its arguments once or explain what is missing.
@@ -101,8 +95,8 @@ Do not narrate intended calls: execute them. Ask for an unknown required value
 by its plain name. If a capability is absent from the live inventory, say it is
 not installed rather than offering a fictional example.
 
-Secrets are always redacted. Use list_config_keys only to check which setting
-codes exist; never guess, echo, or place a secret in a tool call. For access
+Secrets are always redacted. Never guess, echo, or place a secret in a tool
+call. For access
 questions, currentUserPermissions is authoritative for the current user. For
 another user, verify both permission groups and direct custom permissions.
 `.trim();
@@ -124,9 +118,7 @@ contain spaces or punctuation. Call renderDiagram only when the user explicitly
 wants a downloadable file.
 `.trim();
 
-/** Prompt section listing the agent's standalone builtin tools. The
- *  document-creation guidance is a static codebase skill (staticSkills.ts) that
- *  attaches itself whenever a generate tool is bound — see buildSystemPrompt. */
+/** Prompt section listing the agent's standalone builtin tools. */
 const BUILTIN_BLOCK = (tools: ToolInfo[]) => {
   const names = tools.map((tool) => tool.name || tool.id);
   return `
@@ -166,16 +158,12 @@ export function buildSystemPrompt(
   const parts: string[] = [SMALL_TALK_BLOCK.trim(), COMMUNICATION_BLOCK];
 
   if (opts.hasErxesTools) {
-    parts.push(ERXES_WORKFLOW_BLOCK(opts.scopeLine, opts.inventoryLines ?? []));
+    parts.push(
+      ERXES_OPERATIONS_BLOCK(opts.scopeLine, opts.inventoryLines ?? []),
+    );
   }
   if (opts.builtins.length) {
     parts.push(BUILTIN_BLOCK(opts.builtins));
-    // Static codebase skills that travel with their tools (e.g. document
-    // creation when a generate tool is bound). Runtime, not DB — always present.
-    const skills = staticSkillsBlock(
-      opts.builtins.flatMap((t) => [t.id, t.name].filter(Boolean) as string[]),
-    );
-    if (skills) parts.push(skills);
   }
   if (!opts.hasErxesTools && !opts.builtins.length) parts.push(NO_TOOLS_BLOCK);
 

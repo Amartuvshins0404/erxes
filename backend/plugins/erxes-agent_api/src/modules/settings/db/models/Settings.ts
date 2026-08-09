@@ -62,9 +62,9 @@ export const loadSettingsClass = (_models: IModels) => {
         return cached.doc;
       }
 
-      const persisted = (await _models.MastraSettings.findOne({})
-        .select('+evaluationDsn')
-        .lean()) as PersistedSettings | null;
+      const persisted = (await _models.MastraSettings.findOne(
+        {},
+      ).lean()) as PersistedSettings | null;
       let doc: IMastraSettingsDocument;
       if (!persisted) {
         doc = await _models.MastraSettings.create({});
@@ -114,7 +114,7 @@ export const loadSettingsClass = (_models: IModels) => {
           runValidators: true,
           setDefaultsOnInsert: true,
         },
-      ).select('+evaluationDsn');
+      );
       if (!saved) throw new Error('Mastra settings could not be saved');
       _settingsCacheByTenant.set(key, {
         doc: saved,

@@ -27,7 +27,7 @@ const workspaceContext = (agentId: string) => {
   const requestThreadId = auth.threadId || auth.resourceId || auth.turnId;
   if (!requestThreadId) {
     throw new ExpectedError(
-      'Workspace operations require a chat or workflow context.',
+      'Workspace operations require an agent turn context.',
     );
   }
   return {
@@ -37,13 +37,7 @@ const workspaceContext = (agentId: string) => {
       threadId: stableThreadId(requestThreadId),
       subdomain: auth.subdomain,
     },
-    auditPrincipal: auth.background
-      ? {
-          source: 'workflow' as const,
-          workflowId: auth.resourceId,
-          agentId,
-        }
-      : { source: 'chat' as const, agentId },
+    auditPrincipal: { source: 'chat' as const, agentId },
   };
 };
 

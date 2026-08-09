@@ -18,12 +18,7 @@ import {
   type GqlTypeRef,
   type SchemaMaps,
 } from './schemaIntrospect';
-import {
-  deriveModule,
-  detectPlugin,
-  humanizeOperation,
-  truncateWords,
-} from './humanize';
+import { deriveModule, detectPlugin } from './humanize';
 import {
   INTERNAL_ERROR_RE,
   looksLikeStackFrame,
@@ -31,15 +26,8 @@ import {
 } from './serverErrorClassifier';
 import { redactSecrets, REDACTED } from './secretRedaction';
 import { scrubArgs } from './argScrub';
-import {
-  findEntityKeyInError,
-  lookupCandidates,
-  resolveIdArgs,
-  type EntityResolverDeps,
-} from './entityResolver';
 
-// Re-export the introspection + humanisation surface so existing importers
-// (metaTools, operationRegistry, tests) keep their `from './erxesTools'` paths.
+// Re-export the introspection surface used by the registry and tests.
 export type { GqlArgDef, GqlFieldDef, GqlTypeRef, SchemaMaps };
 export { graphqlTypeToString, sanitizeServerError };
 
@@ -63,19 +51,10 @@ interface IntrospectedNamedType {
   enumValues?: Array<{ name: string }> | null;
 }
 
-// ---------------------------------------------------------------------------
-// Auto-resolution helpers
-//
-// When a GraphQL operation fails with "X not found", the tool should NOT tell
-// the LLM to call other tools (those tools may not be in the agent's toolset).
-// Instead, the tool resolves the dependency chain itself and returns real IDs
-// in the error payload so the LLM can retry immediately with a valid value.
-// ---------------------------------------------------------------------------
-
 /**
  * POST a GraphQL request to `${apiUrl}/graphql` and return the parsed JSON
- * envelope. The single fetch+json site every gateway/subgraph caller routes
- * through; per-site error handling (null / {} / warnings) stays at the callers.
+ * envelope. Discovery calls omit auth; execution calls pass the resolved
+ * principal headers.
  */
 async function gqlFetch<TJson>(
   apiUrl: string,
@@ -88,80 +67,6 @@ async function gqlFetch<TJson>(
     body: JSON.stringify(body),
   });
   return (await res.json()) as TJson;
-}
-
-/** Fire one GraphQL query and return its `data` payload, or null on any failure. */
-async function gqlCall<TData = Record<string, unknown>>(
-  apiUrl: string,
-  authHeaders: Record<string, string>,
-  query: string,
-): Promise<TData | null> {
-  try {
-    const json = await gqlFetch<{ data?: TData | null }>(apiUrl, authHeaders, {
-      query,
-    });
-    return json?.data ?? null;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Route permission-sensitive calls straight to their owning private subgraph.
- * The gateway accepts only signed user tokens and must remain unchanged; direct
- * service calls use erxes' existing trusted `user` header contract.
- */
-function makeServiceExecutionContext(authHeaders: Record<string, string>): {
-  resolveAddress: (serviceName: string) => Promise<string | undefined>;
-  resolverDeps: EntityResolverDeps;
-} {
-  const auth = getCurrentAuth();
-  const addressCache = new Map<string, Promise<string | undefined>>();
-  const resolveAddress = (serviceName: string): Promise<string | undefined> => {
-    let pending = addressCache.get(serviceName);
-    if (!pending) {
-      pending = getPluginAddress(serviceName)
-        .then((address) => address?.trim() || undefined)
-        .catch(() => undefined);
-      addressCache.set(serviceName, pending);
-    }
-    return pending;
-  };
-
-  return {
-    resolveAddress,
-    resolverDeps: {
-      runQuery: async (query, ownerService) => {
-        const address = await resolveAddress(ownerService);
-        return address ? gqlCall(address, authHeaders, query) : null;
-      },
-      scope: `${auth?.subdomain || ''}::${auth?.principalUserId || ''}`,
-    },
-  };
-}
-
-/**
- * Map a server-side "<Entity> not found" error onto a structured failure that
- * carries the real candidates for that entity, so the model can retry with an
- * exact id. Unmapped entities keep the plain sanitized error.
- */
-async function buildNotFoundResult(
-  rawMessage: string,
-  deps: EntityResolverDeps,
-): Promise<Record<string, unknown>> {
-  const entity = findEntityKeyInError(rawMessage);
-  if (entity) {
-    const candidates = await lookupCandidates(entity, deps);
-    if (candidates.length) {
-      return {
-        success: false,
-        ...sanitizeServerError(rawMessage),
-        candidates,
-        instruction: `The ${entity} you specified was not found. Retry this operation with the exact "id" value of the intended ${entity} from the candidates list — never a name.`,
-      };
-    }
-  }
-  return { success: false, ...sanitizeServerError(rawMessage) };
 }
 
 // Shape the executor needs: an operation descriptor as produced by
@@ -250,10 +155,9 @@ function secretRefRefusedResult() {
  * its result (or a structured { success:false, … } payload the model can act on).
  *
  * This is the shared execution core behind every exact operation tool. It owns:
- *   • coercing LLM-supplied args through the operation's Zod schema,
- *   • resolving entity NAMES in *Id/*Ids args → real ids (membership-based),
+ *   • coercing LLM-supplied args through the live operation schema,
  *   • building a valid GraphQL operation + response selection,
- *   • turning "not found"/validation errors into actionable instructions.
+ *   • returning sanitized GraphQL errors without inventing argument values.
  *
  * Auth is read only from the resolved AI team-member request context.
  */
@@ -262,7 +166,6 @@ export async function executeErxesOperation(
   rawArgs: Record<string, unknown>,
   schemaMaps?: Partial<SchemaMaps>,
   processId?: string,
-  requestedFields?: string[],
 ): Promise<unknown> {
   // Any internal failure (a malformed introspection shape, an undefined field
   // access, a network blip) must become a STRUCTURED result the model can act
@@ -298,38 +201,25 @@ export async function executeErxesOperation(
     // ({{secret:CODE}} / {{keep}}) or an echoed REDACTED sentinel. There is NO
     // server-side secret resolver by design; letting either through would
     // silently corrupt a credential field. The guard sits at this shared
-    // chokepoint so both the chat meta-tool and the workflow runtime are covered;
+    // chokepoint so every agent tool path is covered;
     // the chat path audits the refusal via recordAction (the args it logs hold
     // only placeholders, never a real secret).
     if (hasBlockedSecretMaterial(resolvedArgs)) {
       return secretRefRefusedResult();
     }
 
-    // Auth is resolved before entity lookups. Every request stays on the
-    // private service network and runs as the validated AI team member.
+    // Every request stays on the private service network and runs as the
+    // validated AI team member.
     const authHeaders = buildAuthHeaders(processId);
-    const execution = makeServiceExecutionContext(authHeaders);
-    const resolverDeps = execution.resolverDeps;
-    const operationAddress = await execution.resolveAddress(op.plugin);
+    const operationAddress = (await getPluginAddress(op.plugin))?.trim();
     if (!operationAddress) {
       throw new Error(`Erxes service "${op.plugin}" is unavailable`);
     }
-    const idResolution = await resolveIdArgs(
-      resolvedArgs,
-      resolverDeps,
-      op.plugin,
-    );
-    if (!idResolution.ok) return idResolution.failure;
-    resolvedArgs = idResolution.args;
-
-    // Build the GraphQL operation after ids have been resolved. Choose a
-    // VALID response selection derived from the schema (so types without a
-    // `name` field, like User, still produce a runnable query).
+    // GraphQL object results need a valid selection. Use only the live object
+    // schema map; callers pass exact values for every operation argument.
     const finalResponseFields = chooseResponseFields(
-      erxesOperation,
       op.returnType,
       schemaMaps?.objectFieldsMap,
-      requestedFields,
     );
 
     /** Builds and POSTs the GraphQL operation with the given args. */
@@ -369,12 +259,15 @@ export async function executeErxesOperation(
     }
 
     if (data?.errors) {
-      return buildNotFoundResult(joinErrors(data.errors), resolverDeps);
+      return {
+        success: false,
+        ...sanitizeServerError(joinErrors(data.errors)),
+      };
     }
     // Redact secret VALUES (storage/SES/Cloudflare keys, ERP tokens, integration
     // passwords) before the result reaches the model. Reads like `configs`
     // otherwise dump raw credentials into the transcript and on to the LLM
-    // provider; this is the single chokepoint both chat and workflows route
+    // provider; this is the single chokepoint all agent operations route
     // through, so the guard holds for every operation, current and future.
     return redactSecrets(data?.data?.[erxesOperation] ?? null);
   } catch (err) {
@@ -563,7 +456,11 @@ export async function fetchObjectFieldsMap(
 ): Promise<Record<string, GqlFieldDef[]>> {
   const types = await introspectSchemaTypes(
     settings,
-    `fields { name ${TYPE_REF_SELECTION} }`,
+    `fields {
+      name
+      args { name ${TYPE_REF_SELECTION} }
+      ${TYPE_REF_SELECTION}
+    }`,
   );
   return mapNamedTypes(types, (namedType) =>
     namedType.kind === 'OBJECT' && !String(namedType.name).startsWith('__')
@@ -664,9 +561,7 @@ export async function fetchAvailableErxesTools(
         module: deriveModule(field.name),
         operation: field.name,
         operationType: opType,
-        description: field.description?.trim()
-          ? truncateWords(field.description, 15)
-          : humanizeOperation(field.name, opType),
+        description: field.description?.trim() || field.name,
         graphqlArgs: field.args || [],
         returnType: field.type,
       });

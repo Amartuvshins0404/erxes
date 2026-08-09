@@ -55,7 +55,10 @@ function rewriteArg(arg: unknown, resource: string): unknown {
 }
 
 /** Wrap a Memory so all thread/message ops use `resource`. */
-export function pinResource(memory: SharedMemory, resource: string): SharedMemory {
+export function pinResource(
+  memory: SharedMemory,
+  resource: string,
+): SharedMemory {
   return new Proxy(memory as object, {
     get(target, prop, receiver) {
       const orig = Reflect.get(target, prop, receiver);
@@ -78,8 +81,8 @@ export function pinResource(memory: SharedMemory, resource: string): SharedMemor
 /**
  * The erxes dev resource the dashboard writes under: an explicit
  * `ERXES_STUDIO_RESOURCE` override, else the most frequent user-style
- * resourceId in the native store (agent-style resources have no ":"; bot/
- * schedule buckets are excluded). Returns null if none can be determined.
+ * resourceId in the native store (agent-style resources have no ":"; bot
+ * buckets are excluded). Returns null if none can be determined.
  */
 export async function detectDevResource(
   subdomain: string,
@@ -100,7 +103,7 @@ export async function detectDevResource(
       const resId = thread.resourceId;
       if (!resId || !resId.includes(':')) continue; // agent-style resource → skip
       const suffix = resId.slice(resId.indexOf(':') + 1);
-      if (suffix.startsWith('bot:') || suffix.startsWith('schedule:')) continue;
+      if (suffix.startsWith('bot:')) continue;
       counts.set(resId, (counts.get(resId) ?? 0) + 1);
     }
     let best: string | null = null;

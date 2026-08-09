@@ -13,16 +13,6 @@ const STANDALONE_TOOL_NAMES: Record<string, true> = {
   workspaceWrite: true,
   publishWebsite: true,
   fileReader: true,
-  workflowGuide: true,
-  workflowValidate: true,
-  workflowSimulate: true,
-  workflowSave: true,
-  workflowUpdate: true,
-  workflowList: true,
-  workflowRuns: true,
-  workflowRunNow: true,
-  list_config_keys: true,
-  make_skill: true,
 };
 
 const SKILL_TOOLS = ['skill', 'skill_search', 'skill_read'] as const;
@@ -32,20 +22,28 @@ export interface TurnToolScopeInput {
   attachmentCount: number;
   availableToolNames: string[];
   hasErxesOperations?: boolean;
-  hasIntentOperation?: boolean;
   skillsEnabled?: boolean;
 }
 
+export const resolveToolAnswerLimit = (
+  activeToolNames: string[],
+  hasErxesOperations: boolean,
+) =>
+  hasErxesOperations &&
+  !activeToolNames.some((name) => STANDALONE_TOOL_NAMES[name])
+    ? 2
+    : undefined;
+
 /**
- * Keep permission-approved erxes operations available to ToolSearchProcessor,
- * but expose standalone builtins only when this turn's request needs them.
+ * Keep every permission-approved erxes operation name active so
+ * ToolSearchProcessor can activate a searched tool, but expose standalone
+ * builtins only when this turn's request needs them.
  */
 export function selectTurnActiveTools({
   message,
   attachmentCount,
   availableToolNames,
   hasErxesOperations = false,
-  hasIntentOperation = false,
   skillsEnabled = false,
 }: TurnToolScopeInput): string[] {
   const request = message.toLowerCase();
@@ -123,11 +121,6 @@ export function selectTurnActiveTools({
   }
 
   if (
-    /\b(?:config|configuration|setting|secret|api key)\b|тохиргоо/.test(request)
-  ) {
-    activate('list_config_keys');
-  }
-  if (
     /\b(?:website|landing page|web page|static site)\b|вэбсайт|сайт/.test(
       request,
     )
@@ -144,28 +137,6 @@ export function selectTurnActiveTools({
     activate('removeImageBackground');
   }
 
-  if (
-    /\b(?:workflow|automation|automate|scheduled flow)\b|автоматжуул/.test(
-      request,
-    )
-  ) {
-    for (const name of [
-      'workflowGuide',
-      'workflowValidate',
-      'workflowSimulate',
-      'workflowSave',
-      'workflowUpdate',
-      'workflowList',
-      'workflowRuns',
-      'workflowRunNow',
-    ]) {
-      activate(name);
-    }
-  }
-  if (/\b(?:create|make|save|publish) (?:a )?skill\b/.test(request)) {
-    activate('make_skill');
-  }
-
   const hasSelectedStandalone = availableToolNames.some(
     (name) => STANDALONE_TOOL_NAMES[name] && active.has(name),
   );
@@ -173,7 +144,7 @@ export function selectTurnActiveTools({
     /^(?:hi|hello|hey|thanks|thank you|bye|good (?:morning|afternoon|evening)|sain uu|сайн уу)[.!?]*$/i.test(
       request.trim(),
     );
-  if (!hasSelectedStandalone && !hasIntentOperation && !isSmallTalk) {
+  if (!hasSelectedStandalone && !hasErxesOperations && !isSmallTalk) {
     // Keyword scoping is an optimization, never an authority boundary. When
     // intent is ambiguous and no exact erxes operation matched, preserve every
     // permission-approved standalone capability rather than silently hiding a

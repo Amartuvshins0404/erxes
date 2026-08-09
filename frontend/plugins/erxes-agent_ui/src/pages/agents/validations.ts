@@ -19,8 +19,6 @@ export const agentFormSchema = z
     description: z.string(),
     visibility: z.enum(['private', 'shared', 'organization']),
     audienceUserIds: z.array(z.string().max(128)).max(250),
-    audienceTeamIds: z.array(z.string().max(128)).max(250),
-    audienceDepartmentIds: z.array(z.string().max(128)).max(250),
     instructions: z
       .string()
       .min(1, 'System instructions are required')
@@ -29,23 +27,14 @@ export const agentFormSchema = z
     model: z.string().min(1, 'Model is required'),
     permissionGroupIds: z.array(z.string()),
     additionalTools: z.array(z.string()).max(20),
-    destructiveOps: z.enum(['allow', 'ask']),
-    memoryEnabled: z.boolean(),
-    debug: z.boolean(),
-    temperature: z.number().nullable(),
     isActive: z.boolean(),
   })
   .superRefine((value, context) => {
-    if (
-      value.visibility === 'shared' &&
-      !value.audienceUserIds.length &&
-      !value.audienceTeamIds.length &&
-      !value.audienceDepartmentIds.length
-    ) {
+    if (value.visibility === 'shared' && !value.audienceUserIds.length) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['visibility'],
-        message: 'Select at least one person, team, or department',
+        message: 'Select at least one person',
       });
     }
   });
@@ -57,16 +46,10 @@ export const AGENT_FORM_DEFAULTS: AgentFormValues = {
   description: '',
   visibility: 'private',
   audienceUserIds: [],
-  audienceTeamIds: [],
-  audienceDepartmentIds: [],
   instructions: '',
   provider: '',
   model: '',
   additionalTools: [...DEFAULT_ADDITIONAL_TOOLS],
   permissionGroupIds: [],
-  destructiveOps: 'ask',
-  memoryEnabled: true,
-  debug: false,
-  temperature: null,
   isActive: true,
 };

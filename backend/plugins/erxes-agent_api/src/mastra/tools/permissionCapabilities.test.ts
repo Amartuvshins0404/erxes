@@ -15,15 +15,6 @@ jest.mock('./builtins', () => ({
     generatePdf: {},
     webSearch: {},
     fetchUrl: {},
-    workflowGuide: {},
-    workflowValidate: {},
-    workflowSimulate: {},
-    workflowSave: {},
-    workflowUpdate: {},
-    workflowList: {},
-    workflowRuns: {},
-    workflowRunNow: {},
-    make_skill: {},
   },
 }));
 jest.mock('./actionsToAllowedTools', () => ({
@@ -37,7 +28,6 @@ import {
   resolveAgentAllowedTools,
   resolveAgentPermissions,
 } from './permissionCapabilities';
-import { ERXES_AGENT_ACTIONS } from '~/meta/permissionActions';
 
 const registry = { operations: new Map(), list: [] };
 
@@ -50,16 +40,12 @@ beforeEach(() => {
 });
 
 describe('permission-derived agent capabilities', () => {
-  it('maps permission actions to erxes operations and privileged builtins', () => {
+  it('maps permission actions to erxes operations and default builtins', () => {
     const permissions = [
       {
-        plugin: 'erxes-agent',
-        module: 'workflow',
-        actions: [
-          ERXES_AGENT_ACTIONS.workflow.read,
-          ERXES_AGENT_ACTIONS.workflow.createDraft,
-          ERXES_AGENT_ACTIONS.skills.create,
-        ],
+        plugin: 'sales',
+        module: 'deal',
+        actions: ['dealsView'],
       },
     ];
 
@@ -76,18 +62,10 @@ describe('permission-derived agent capabilities', () => {
         'dealsView',
         'builtin:calculator',
         'builtin:generatePdf',
-        'builtin:workflowGuide',
-        'builtin:workflowValidate',
-        'builtin:workflowSimulate',
-        'builtin:workflowList',
-        'builtin:workflowSave',
-        'builtin:make_skill',
       ]),
     );
     expect(result).not.toContain('builtin:webSearch');
     expect(result).not.toContain('builtin:fetchUrl');
-    expect(result).not.toContain('builtin:workflowUpdate');
-    expect(result).not.toContain('builtin:workflowRunNow');
   });
 
   it('adds only the optional tools explicitly selected for an agent', () => {
@@ -106,22 +84,6 @@ describe('permission-derived agent capabilities', () => {
     expect(result).not.toContain('builtin:calculator');
     expect(result).not.toContain('builtin:generatePdf');
     expect(result).not.toContain('builtin:fetchUrl');
-  });
-
-  it('gates workflow run history separately from workflow definitions', () => {
-    const permissions = [
-      {
-        plugin: 'erxes-agent',
-        module: 'workflow',
-        actions: [ERXES_AGENT_ACTIONS.workflow.runsRead],
-      },
-    ];
-
-    const result = deriveAgentAllowedTools(permissions, registry);
-
-    expect(result).toContain('builtin:workflowRuns');
-    expect(result).not.toContain('builtin:workflowList');
-    expect(result).not.toContain('builtin:workflowRunNow');
   });
 
   it('loads every selected custom group in one query and merges actions and scope', async () => {

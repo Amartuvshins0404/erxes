@@ -6,12 +6,11 @@ export const agentActionLogSchema = new Schema(
     _id: mongooseStringRandomId,
     source: {
       type: String,
-      enum: ['chat', 'workflow'],
+      enum: ['chat'],
       index: true,
       label: 'Source',
     },
     agentId: { type: String, index: true, label: 'Agent' },
-    workflowId: { type: String, index: true, label: 'Workflow' },
     operation: { type: String, index: true, label: 'Operation' },
     operationType: { type: String, label: 'Operation type' },
     destructive: { type: Boolean, default: false, label: 'Destructive' },

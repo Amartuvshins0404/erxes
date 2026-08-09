@@ -6,56 +6,41 @@ import { buildTurnSystemPrompt, getOrCreateAgent } from '~/mastra/agentRuntime';
 import { isWorkspaceMemoryEnabled } from '~/mastra/memory/config';
 import { scopedResource } from '~/mastra/memory/mastraMemory';
 import { deriveResourceId, augmentConvo, MemoryContext } from '~/mastra/memory';
-import { readLearnedDigest } from '~/mastra/learning/digest';
 import { ApprovedOp } from '~/mastra/requestContext';
 import { buildChatUserContent } from '~/mastra/files/chatContent';
 import { IMastraChatAttachment } from '@/session/@types/session';
 import { ensureThreadRegistered, getNativeMemory } from '@/session/nativeStore';
-import { buildActivatedSkillsBlock } from '@/skills/service/skillsService';
 import { IMastraAgentDocument } from '@/agent/@types/agent';
 import { IMastraProviderDocument } from '@/provider/@types/provider';
 import { IMastraSettingsDocument } from '@/settings/@types/settings';
-import { resolveAgentPrincipal } from '~/mastra/auth/backgroundPrincipal';
+import { resolveAgentPrincipal } from '~/mastra/auth/agentPrincipal';
 import { deriveThreadTitle } from '~/mastra/titler';
-import { selectTurnActiveTools } from '~/mastra/turnToolScope';
-import { selectIntentOperationTools } from '~/mastra/operationPreload';
+import {
+  resolveToolAnswerLimit,
+  selectTurnActiveTools,
+} from '~/mastra/turnToolScope';
 import {
   MemoryBinding,
   PreparedTurn,
   TurnAgent,
-  TurnIdentity,
   TurnMessage,
 } from '@/agent/types';
 
-// Turn setup: everything a typed chat turn or scheduled run needs before the
-// model runs — agent + tools, thread ownership check, replayed history,
-// advanced-memory blocks, and the auth context tools execute under. `identity`
-// (see TurnIdentity) is the single knob that varies — it decides resource
-// scoping, auth, ownership gating, and the memory toggle.
+// Turn setup: everything a typed chat turn needs before the model runs — agent
+// and tools, thread ownership, replayed history, memory, and tool auth.
 // Throws user-facing errors on bad agent/thread.
 
-// Per-identity resource id and memory toggle. API authorization is resolved
-// separately from the AI team-member principal for every identity.
+// Chat resources belong to the initiating user while erxes operations run as
+// the selected AI team member.
 function resolveIdentity(
-  identity: TurnIdentity,
+  user: IUserDocument,
   agentId: string,
   advanced: boolean,
-): {
-  resourceId: string;
-  useMemory: boolean;
-} {
-  switch (identity.kind) {
-    case 'user':
-      return {
-        resourceId: deriveResourceId({ user: identity.user, agentId }),
-        useMemory: advanced,
-      };
-    case 'schedule':
-      return {
-        resourceId: identity.resourceKey,
-        useMemory: advanced,
-      };
-  }
+) {
+  return {
+    resourceId: deriveResourceId({ user, agentId }),
+    useMemory: advanced,
+  };
 }
 
 // Same NoSQL-injection guard used for sessionId below: agentId arrives from the
@@ -107,27 +92,19 @@ interface TurnMemory {
   memoryBinding?: MemoryBinding;
 }
 
-// Identity + memory-binding resolution: the memory toggle, per-identity resource
-// id/auth, and the per-turn Mastra Memory binding.
+// Resolve the user's resource and per-turn Mastra Memory binding.
 function resolveTurnMemory(args: {
-  identity: TurnIdentity;
-  agentConfig: IMastraAgentDocument;
+  user: IUserDocument;
   settings: IMastraSettingsDocument;
   agentId: string;
   subdomain: string;
   sessionId: string;
 }): TurnMemory {
-  const { identity, agentConfig, settings, agentId, subdomain, sessionId } =
-    args;
+  const { user, settings, agentId, subdomain, sessionId } = args;
 
-  const useHistory = agentConfig.memoryEnabled !== false;
-  const advanced = isWorkspaceMemoryEnabled(settings) && useHistory;
+  const advanced = isWorkspaceMemoryEnabled(settings);
 
-  const { resourceId, useMemory } = resolveIdentity(
-    identity,
-    agentId,
-    advanced,
-  );
+  const { resourceId, useMemory } = resolveIdentity(user, agentId, advanced);
 
   const memCtx: MemoryContext = {
     subdomain,
@@ -163,7 +140,6 @@ async function buildAgentAndGateMemory(args: {
   subdomain: string;
   settings: IMastraSettingsDocument;
   providers: IMastraProviderDocument[];
-  identity: TurnIdentity;
   threadId: string | undefined;
   sessionId: string;
   memoryBinding: MemoryBinding | undefined;
@@ -174,17 +150,13 @@ async function buildAgentAndGateMemory(args: {
     subdomain,
     settings,
     providers,
-    identity,
     threadId,
     sessionId,
     memoryBinding,
   } = args;
 
   const needsThreadRead = Boolean(
-    identity.kind === 'user' &&
-      memoryBinding &&
-      typeof threadId === 'string' &&
-      threadId,
+    memoryBinding && typeof threadId === 'string' && threadId,
   );
   const [{ agent, tools, promptContext }, priorThread] = await Promise.all([
     getOrCreateAgent(agentConfig, models, subdomain, {
@@ -214,16 +186,14 @@ async function buildAgentAndGateMemory(args: {
 // Register before execution so a refresh can restore an in-flight session.
 // Best-effort: persistence failures must not block the turn.
 async function preRegisterThread(args: {
-  identity: TurnIdentity;
   memoryBinding: MemoryBinding | undefined;
   subdomain: string;
   sessionId: string;
   agentId: string;
   message: string;
 }): Promise<void> {
-  const { identity, memoryBinding, subdomain, sessionId, agentId, message } =
-    args;
-  if (identity.kind === 'user' && memoryBinding) {
+  const { memoryBinding, subdomain, sessionId, agentId, message } = args;
+  if (memoryBinding) {
     await ensureThreadRegistered(
       subdomain,
       sessionId,
@@ -240,103 +210,56 @@ async function preRegisterThread(args: {
   }
 }
 
-// The tenant's learned digest (shared "Agent knowledge") woven into the turn,
-// plus attachment content-building. The digest is separate from Mastra Memory;
-// best-effort (null on error) and skipped for scheduled runs (weaveDigest=false),
-// whose prompt is run verbatim.
+// Build the new user turn. Mastra Memory replays recent history and recall, so
+// passing replayed messages here would stop Mastra from persisting the turn.
 async function buildTurnConvo(args: {
-  models: IModels;
-  agentId: string;
   message: string;
-  weaveDigest: boolean;
   attachments: IMastraChatAttachment[] | undefined;
   settings: IMastraSettingsDocument;
-}): Promise<{ convo: TurnMessage[]; learningIds: string[] }> {
-  const { models, agentId, message, weaveDigest, attachments, settings } = args;
-
-  const digest = weaveDigest
-    ? await readLearnedDigest(models, agentId, settings)
-    : null;
-
-  // Mastra Memory replays recent history + recall itself, so generate() gets
-  // ONLY the new user message (+ the learned digest). Passing replayed history
-  // here would stop Mastra from persisting the turn to its store.
+}): Promise<TurnMessage[]> {
+  const { message, attachments, settings } = args;
   const convo: TurnMessage[] = augmentConvo({
     recentHistory: [],
     userMessage: message,
-    workingMemoryBlock: null,
-    learnedDigestBlock: digest?.block,
   });
 
   // Attachments reshape the final user turn: manifest text + inlined image
-  // parts. The persisted message keeps the raw text; only the LLM convo is
-  // augmented. (augmentConvo always places the user message last.)
+  // parts. The persisted message keeps the raw text; only the LLM input changes.
   if (attachments?.length) {
     const content = await buildChatUserContent({
       message,
       attachments,
-      erxesApiUrl: settings?.erxesApiUrl || 'http://localhost:4000',
+      erxesApiUrl: settings.erxesApiUrl || 'http://localhost:4000',
     });
     convo[convo.length - 1] = { role: 'user', content };
   }
 
-  return { convo, learningIds: digest?.ids ?? [] };
+  return convo;
 }
 
-// Explicit slash-activation force-loads the chosen skill's FULL instructions into
-// this turn (vs. the native skill tool, which the model may never call). Resolved
-// through the reachable set so a crafted name can't reach a skill the user can't:
-// the agent's globs still gate which GLOBAL skills are reachable, but a user's OWN
-// published skill is always reachable, so an explicit activation works on any
-// agent — matching what the slash palette offers. No store hit unless something
-// is activated.
-async function activateTurnSkills(args: {
-  userId: string | undefined;
-  activeSkillNames: string[] | undefined;
-  subdomain: string;
-  agentConfig: IMastraAgentDocument;
-}): Promise<{ instructions: string; names: string[] } | undefined> {
-  const { userId, activeSkillNames, subdomain, agentConfig } = args;
-  return userId && activeSkillNames?.length
-    ? buildActivatedSkillsBlock(
-        subdomain,
-        userId,
-        agentConfig.skills ?? [],
-        activeSkillNames,
-      )
-    : undefined;
-}
-
-export interface PrepareTurnParams {
+export interface PrepareChatTurnParams {
   models: IModels;
   subdomain: string;
-  identity: TurnIdentity;
+  user: IUserDocument;
   agentId: string;
   message: string;
   threadId?: string;
   attachments?: IMastraChatAttachment[];
   approvedOperations?: ApprovedOp[];
-  // Weave the tenant's learned digest into typed chat turns (and stamp its ids
-  // onto the turn). Scheduled runs keep their prompt verbatim.
-  weaveDigest?: boolean;
-  // Skill names the user explicitly slash-activated for THIS turn.
-  activeSkillNames?: string[];
 }
 
-export async function prepareTurn(
-  params: PrepareTurnParams,
+export async function prepareChatTurn(
+  params: PrepareChatTurnParams,
 ): Promise<PreparedTurn> {
   const {
     models,
     subdomain,
-    identity,
+    user,
     agentId,
     message,
     threadId,
     attachments,
     approvedOperations,
-    weaveDigest = true,
-    activeSkillNames,
   } = params;
 
   assertAgentId(agentId);
@@ -344,105 +267,56 @@ export async function prepareTurn(
   const { agentConfig, settings, providers } = await readTurnConfig(
     models,
     agentId,
-    identity.kind === 'user' ? identity.user?._id : undefined,
+    user._id,
   );
 
   const sessionId = deriveSessionId(threadId);
 
   const { advanced, resourceId, useMemory, memCtx, memoryBinding } =
     resolveTurnMemory({
-      identity,
-      agentConfig,
+      user,
       settings,
       agentId,
       subdomain,
       sessionId,
     });
-  const principal = await resolveAgentPrincipal({
-    agentConfig,
-    subdomain,
-    background: identity.kind !== 'user',
-  });
+  const principal = await resolveAgentPrincipal({ agentConfig, subdomain });
   if (!principal.ok) {
     throw new ExpectedError(principal.error);
   }
 
-  // Only an in-app user can own or explicitly activate personal skills.
-  const initiatorUserId =
-    identity.kind === 'user' ? identity.user?._id : undefined;
+  const initiatorUserId = user._id;
 
   // Once the acting principal is authorized, the remaining independent reads
-  // overlap: agent/tool construction, learned context/attachments, and any
-  // explicitly activated skill. This removes three stacked setup round trips
-  // from the model's time-to-first-token without weakening the ownership gate.
-  const [{ agent, tools, promptContext }, { convo, learningIds }, activated] =
-    await Promise.all([
-      buildAgentAndGateMemory({
-        agentConfig,
-        models,
-        subdomain,
-        settings,
-        providers,
-        identity,
-        threadId,
-        sessionId,
-        memoryBinding,
-      }),
-      buildTurnConvo({
-        models,
-        agentId,
-        message,
-        weaveDigest,
-        attachments,
-        settings,
-      }),
-      activateTurnSkills({
-        userId: initiatorUserId,
-        activeSkillNames,
-        subdomain,
-        agentConfig,
-      }),
-    ]);
+  // overlap so turn setup does not stack avoidable round trips.
+  const [{ agent, tools, promptContext }, convo] = await Promise.all([
+    buildAgentAndGateMemory({
+      agentConfig,
+      models,
+      subdomain,
+      settings,
+      providers,
+      threadId,
+      sessionId,
+      memoryBinding,
+    }),
+    buildTurnConvo({ message, attachments, settings }),
+  ]);
 
-  const availableOperationTools = Object.fromEntries(
-    promptContext.operationToolNames
-      .filter((name) => tools[name])
-      .map((name) => [name, tools[name]]),
-  );
-  const intentOperationTools = selectIntentOperationTools(
-    message,
-    availableOperationTools,
-  );
   const activeTools = selectTurnActiveTools({
     message,
     attachmentCount: attachments?.length ?? 0,
     availableToolNames: Object.keys(tools),
     hasErxesOperations: promptContext.operationToolNames.length > 0,
-    hasIntentOperation: Object.keys(intentOperationTools).length > 0,
-    skillsEnabled: Boolean(agentConfig.skills?.length),
+    skillsEnabled: promptContext.hasRuntimeSkills,
   });
-  const operationToolNames = new Set(promptContext.operationToolNames);
-  const alwaysOnToolNames = new Set([
-    'request_approval',
-    'search_tools',
-    'updateWorkingMemory',
-    'skill',
-    'skill_search',
-    'skill_read',
-  ]);
-  const hasTurnSpecificStandaloneTool = activeTools.some(
-    (name) => !operationToolNames.has(name) && !alwaysOnToolNames.has(name),
+  const toolAnswerLimit = resolveToolAnswerLimit(
+    activeTools,
+    promptContext.operationToolNames.length > 0,
   );
-  const toolAnswerLimit =
-    identity.kind === 'user' &&
-    Object.keys(intentOperationTools).length > 0 &&
-    !hasTurnSpecificStandaloneTool
-      ? 2
-      : undefined;
   const turnInstructions = buildTurnSystemPrompt(promptContext, activeTools);
 
   await preRegisterThread({
-    identity,
     memoryBinding,
     subdomain,
     sessionId,
@@ -483,27 +357,5 @@ export async function prepareTurn(
     memoryBinding,
     memCtx,
     attachments,
-    learningIds,
-    intentOperationTools,
-    activeSkillInstructions: activated?.instructions,
-    appliedSkillNames: activated?.names ?? [],
   };
-}
-
-// Thin wrapper for the in-app chat path (SSE route + mastraAgentChat resolver),
-// kept so those callers stay stable. Delegates to the generalized prepareTurn.
-export async function prepareChatTurn(params: {
-  models: IModels;
-  subdomain: string;
-  user: IUserDocument;
-  agentId: string;
-  message: string;
-  threadId?: string;
-  attachments?: IMastraChatAttachment[];
-  approvedOperations?: ApprovedOp[];
-  // Skill names the user explicitly slash-activated for THIS turn.
-  activeSkillNames?: string[];
-}): Promise<PreparedTurn> {
-  const { user, ...rest } = params;
-  return prepareTurn({ ...rest, identity: { kind: 'user', user } });
 }

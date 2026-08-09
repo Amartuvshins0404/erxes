@@ -25,8 +25,8 @@ describe('deriveThreadTitle', () => {
 
 describe('sanitizeTitle', () => {
   it('strips wrapping quotes and trailing punctuation', () => {
-    expect(sanitizeTitle('"Lead follow-up workflow."')).toBe(
-      'Lead follow-up workflow',
+    expect(sanitizeTitle('"Lead follow-up process."')).toBe(
+      'Lead follow-up process',
     );
   });
 

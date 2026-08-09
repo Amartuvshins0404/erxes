@@ -6,10 +6,6 @@ import { IMastraAgentDocument } from '@/agent/@types/agent';
 import { IMastraProviderDocument } from '@/provider/@types/provider';
 import { IMastraSettingsDocument } from '@/settings/@types/settings';
 import { IMastraWorkingMemoryDocument } from '@/memory/@types/workingMemory';
-import {
-  IMastraWorkflowDocument,
-  IMastraWorkflowRunDocument,
-} from '@/workflow/@types/workflow';
 import { loadAgentClass, IMastraAgentModel } from '@/agent/db/models/Agent';
 import {
   loadAgentActionLogClass,
@@ -29,26 +25,6 @@ import {
   IMastraWorkingMemoryModel,
 } from '@/memory/db/models/WorkingMemory';
 import {
-  loadWorkflowClass,
-  IMastraWorkflowModel,
-} from '@/workflow/db/models/Workflow';
-import {
-  loadWorkflowRunClass,
-  IMastraWorkflowRunModel,
-} from '@/workflow/db/models/WorkflowRun';
-import {
-  loadLearningClass,
-  IMastraLearningModel,
-} from '@/learning/db/models/Learning';
-import {
-  loadFeedbackClass,
-  IMastraFeedbackModel,
-} from '@/learning/db/models/Feedback';
-import {
-  IMastraLearningDocument,
-  IMastraFeedbackDocument,
-} from '@/learning/@types/learning';
-import {
   loadArtifactClass,
   IMastraArtifactModel,
 } from '@/artifact/db/models/Artifact';
@@ -65,10 +41,6 @@ export interface IModels {
   MastraProvider: IMastraProviderModel;
   MastraSettings: IMastraSettingsModel;
   MastraWorkingMemory: IMastraWorkingMemoryModel;
-  MastraWorkflow: IMastraWorkflowModel;
-  MastraWorkflowRun: IMastraWorkflowRunModel;
-  MastraLearning: IMastraLearningModel;
-  MastraFeedback: IMastraFeedbackModel;
   MastraArtifact: IMastraArtifactModel;
   MastraSandboxSession: IMastraSandboxSessionModel;
 }
@@ -107,26 +79,6 @@ export const loadClasses = (db: mongoose.Connection): IModels => {
     IMastraWorkingMemoryDocument,
     IMastraWorkingMemoryModel
   >('mastra_working_memory', loadWorkingMemoryClass(models));
-
-  models.MastraWorkflow = db.model<
-    IMastraWorkflowDocument,
-    IMastraWorkflowModel
-  >('mastra_workflows', loadWorkflowClass(models));
-
-  models.MastraWorkflowRun = db.model<
-    IMastraWorkflowRunDocument,
-    IMastraWorkflowRunModel
-  >('mastra_workflow_runs', loadWorkflowRunClass(models));
-
-  models.MastraLearning = db.model<
-    IMastraLearningDocument,
-    IMastraLearningModel
-  >('mastra_learnings', loadLearningClass(models));
-
-  models.MastraFeedback = db.model<
-    IMastraFeedbackDocument,
-    IMastraFeedbackModel
-  >('mastra_feedbacks', loadFeedbackClass(models));
 
   models.MastraArtifact = db.model<
     IMastraArtifactDocument,

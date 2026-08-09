@@ -5,18 +5,11 @@ export interface IMastraAgent {
   createdBy?: string | null;
   visibility: 'private' | 'shared' | 'organization';
   audienceUserIds: string[];
-  audienceTeamIds: string[];
-  audienceDepartmentIds: string[];
   permissionGroupIds: string[];
   instructions?: string | null;
   provider?: string | null;
   model?: string | null;
-  skills?: string[] | null;
   additionalTools?: string[] | null;
-  destructiveOps?: 'allow' | 'ask' | null;
-  memoryEnabled?: boolean | null;
-  debug?: boolean | null;
-  temperature?: number | null;
   isActive: boolean;
   createdAt?: string;
   updatedAt?: string;

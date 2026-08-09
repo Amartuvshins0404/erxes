@@ -13,10 +13,8 @@ export interface IMastraAgentRow {
   audienceUserIds: string[];
   provider: string;
   model: string;
-  skills?: string[];
   permissionGroupIds: string[];
   isActive: boolean;
-  workflowsCount?: number;
   createdAt: string;
 }
 

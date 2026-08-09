@@ -1,5 +1,4 @@
 import { getPlugin, getPlugins, sendTRPCMessage } from 'erxes-api-shared/utils';
-import { ERXES_AGENT_ACTIONS } from '~/meta/permissionActions';
 import { normalizeAdditionalToolKeys } from './additionalTools';
 import {
   actionsToAllowedTools,
@@ -20,43 +19,8 @@ interface DefaultPermissionGroup {
   plugin?: string;
 }
 
-
-const additionalBuiltinEntries = (
-  additionalTools?: string[],
-): string[] =>
+const additionalBuiltinEntries = (additionalTools?: string[]): string[] =>
   normalizeAdditionalToolKeys(additionalTools).map((key) => `builtin:${key}`);
-
-const permissionActions = (permissions: GroupPermission[]): Set<string> =>
-  new Set(permissions.flatMap((permission) => permission.actions ?? []));
-
-const permissionBuiltinEntries = (permissions: GroupPermission[]): string[] => {
-  const actions = permissionActions(permissions);
-  const entries: string[] = [];
-  if (actions.has(ERXES_AGENT_ACTIONS.workflow.read)) {
-    entries.push(
-      'builtin:workflowGuide',
-      'builtin:workflowValidate',
-      'builtin:workflowSimulate',
-      'builtin:workflowList',
-    );
-  }
-  if (actions.has(ERXES_AGENT_ACTIONS.workflow.runsRead)) {
-    entries.push('builtin:workflowRuns');
-  }
-  if (actions.has(ERXES_AGENT_ACTIONS.workflow.createDraft)) {
-    entries.push('builtin:workflowSave');
-  }
-  if (actions.has(ERXES_AGENT_ACTIONS.workflow.updateDraft)) {
-    entries.push('builtin:workflowUpdate');
-  }
-  if (actions.has(ERXES_AGENT_ACTIONS.workflow.run)) {
-    entries.push('builtin:workflowRunNow');
-  }
-  if (actions.has(ERXES_AGENT_ACTIONS.skills.create)) {
-    entries.push('builtin:make_skill');
-  }
-  return entries;
-};
 
 const getDefaultPermissionGroups = async (): Promise<
   DefaultPermissionGroup[]
@@ -166,7 +130,6 @@ export function deriveAgentAllowedTools(
     ...new Set([
       ...erxesTools,
       ...additionalBuiltinEntries(additionalTools),
-      ...permissionBuiltinEntries(permissions),
     ]),
   ].sort((a, b) => a.localeCompare(b));
 }

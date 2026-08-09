@@ -34,6 +34,6 @@
     "files": true,
     "require": ["tsconfig-paths/register"]
   },
-  "exclude": ["dist", "frontend/**/*"],
+  "exclude": ["dist", "frontend/**/*", "src/studio/**", "src/mastra/index.ts"],
   "include": ["src/**/*.ts", "src/**/*.tsx"]
 }

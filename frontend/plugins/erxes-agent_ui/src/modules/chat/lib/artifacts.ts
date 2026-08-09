@@ -14,8 +14,8 @@ import type { AgentUIMessage } from '~/modules/chat/types';
 import type { ArtifactGroup } from '~/modules/chat/hooks/useThreadArtifacts';
 import {
   asToolPart,
+  isArtifactTool,
   messageText,
-  toolKind,
   type ToolPartView,
 } from '~/modules/chat/lib/uiParts';
 import {
@@ -79,10 +79,8 @@ const asArtifactParts = (call: ToolPartView): Artifact[] => {
 
 /**
  * One pass over an assistant message's parts → the artifact cards to render
- * plus the artifact-classified tools that finished WITHOUT producing one.
- * Failures matter here because artifact tools are hidden from the run trace
- * (a card is their surface) — an errored render-chart call would otherwise
- * leave the turn looking like nothing happened at all.
+ * plus the artifact tools that finished without producing one. Failures need a
+ * card because an errored render-chart call would otherwise show no result.
  *
  * `settled` = the message is done streaming. A settled message's artifact tool
  * still awaiting its output will never get one (the output chunk was lost —
@@ -102,7 +100,7 @@ export const artifactOutcomes = (
     if (partArtifacts.length) {
       artifacts.push(...partArtifacts);
     } else if (
-      toolKind(tool.toolName) === 'artifact' &&
+      isArtifactTool(tool.toolName) &&
       (tool.state === 'output-available' ||
         tool.state === 'output-error' ||
         (settled && tool.pending))

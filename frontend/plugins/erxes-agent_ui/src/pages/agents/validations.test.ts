@@ -17,46 +17,21 @@ const validForm = (
 });
 
 describe('agentFormSchema', () => {
-  it('allows an empty group selection for users with custom permissions', () => {
+  it('requires at least one person for shared agents', () => {
     const result = agentFormSchema.safeParse(
-      validForm({ permissionGroupIds: [] }),
+      validForm({ visibility: 'shared', audienceUserIds: [] }),
+    );
+
+    expect(result.success).toBe(false);
+  });
+
+  it('accepts a complete shared agent configuration', () => {
+    const result = agentFormSchema.safeParse(
+      validForm({ visibility: 'shared', audienceUserIds: ['user-1'] }),
     );
 
     expect(result.success).toBe(true);
   });
-
-  it('requires at least one target for shared agents', () => {
-    const result = agentFormSchema.safeParse(
-      validForm({
-        visibility: 'shared',
-        audienceUserIds: [],
-        audienceTeamIds: [],
-        audienceDepartmentIds: [],
-      }),
-    );
-
-    expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(result.error.issues).toContainEqual(
-        expect.objectContaining({ path: ['visibility'] }),
-      );
-    }
-  });
-
-  it.each([
-    ['person', { audienceUserIds: ['user-1'] }],
-    ['team', { audienceTeamIds: ['team-1'] }],
-    ['department', { audienceDepartmentIds: ['department-1'] }],
-  ] as const)(
-    'accepts one %s as the complete shared audience',
-    (_name, target) => {
-      const result = agentFormSchema.safeParse(
-        validForm({ visibility: 'shared', ...target }),
-      );
-
-      expect(result.success).toBe(true);
-    },
-  );
 
   it('accepts a complete agent account configuration', () => {
     const result = agentFormSchema.safeParse(validForm());
@@ -67,14 +42,5 @@ describe('agentFormSchema', () => {
       expect(result.data).not.toHaveProperty('toolPolicy');
       expect(result.data).not.toHaveProperty('allowedTools');
     }
-  });
-
-  it('strips the obsolete maxSteps setting from submissions', () => {
-    const result = agentFormSchema.parse({
-      ...validForm(),
-      maxSteps: 10,
-    });
-
-    expect(result).not.toHaveProperty('maxSteps');
   });
 });

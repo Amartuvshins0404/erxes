@@ -83,20 +83,14 @@ export const createTerminalTool = ({
       const requestThreadId = auth.threadId || auth.resourceId || auth.turnId;
       if (!requestThreadId) {
         throw new ExpectedError(
-          'Terminal execution requires a chat or workflow context.',
+          'Terminal execution requires an agent turn context.',
         );
       }
 
       const commandHash = createHash('sha256')
         .update(input.command)
         .digest('hex');
-      const auditPrincipal = auth.background
-        ? {
-            source: 'workflow' as const,
-            workflowId: auth.resourceId,
-            agentId,
-          }
-        : { source: 'chat' as const, agentId };
+      const auditPrincipal = { source: 'chat' as const, agentId };
       try {
         const result = await runSandboxCommand(
           models,

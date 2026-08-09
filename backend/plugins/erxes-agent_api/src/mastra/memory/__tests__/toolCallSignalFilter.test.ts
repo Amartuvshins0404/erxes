@@ -127,7 +127,7 @@ describe('ToolCallSignalFilter', () => {
       {
         role: 'assistant',
         content: [
-          { type: 'reasoning', text: 'I should repeat the old workflow.' },
+          { type: 'reasoning', text: 'I should repeat the old process.' },
           { type: 'text', text: 'The prior website was published.' },
         ],
       },

@@ -38,8 +38,8 @@ const llmRouteLimiter = makeIpRateLimiter();
 //   data-activity      — LLM one-liner of what the agent is doing right now
 //   data-thread-title  — the auto-generated conversation title (after the turn)
 //   data-heartbeat     — keeps the gateway proxy socket warm during long tools
-// and stamp `messageId` / `interrupted` / `langfuseTraceId` onto the assistant
-// message's metadata via the final `finish` chunk.
+// and stamp `messageId` / `interrupted` onto the assistant message's metadata
+// via the final `finish` chunk.
 //
 // Interrupt: the client aborts the fetch; the closed connection aborts the
 // agent run via AbortSignal. Whatever text already streamed is persisted and
@@ -97,21 +97,6 @@ function sanitizeAttachments(raw: unknown): IMastraChatAttachment[] | null {
   });
 }
 
-// Shape-check the slash-activated skill names the composer echoes on send.
-// Returns the sanitized list, or null when malformed. Names are re-resolved
-// against the user's reachable skills server-side (prepareChatTurn), so this is
-// only a payload-shape guard — it never trusts the names as authorization.
-const MAX_ACTIVE_SKILLS = 10;
-const MAX_SKILL_NAME_LEN = 64;
-function sanitizeActiveSkillNames(raw: unknown): string[] | null {
-  return parseBoundedArray(raw, MAX_ACTIVE_SKILLS, (item) => {
-    if (typeof item !== 'string') return null;
-    const name = item.trim();
-    if (!name || name.length > MAX_SKILL_NAME_LEN) return null;
-    return name;
-  });
-}
-
 // Shape-check the per-turn destructive-op approvals the client echoes back when
 // the user clicks Approve. Returns the sanitized list, or null when malformed.
 const MAX_APPROVED_OPS = 20;
@@ -165,11 +150,6 @@ function parseChatStreamBody(raw: unknown): ParseResult {
     return { ok: false, error: 'Invalid approvedOperations payload' };
   }
 
-  const activeSkillNames = sanitizeActiveSkillNames(body.activeSkillNames);
-  if (activeSkillNames === null) {
-    return { ok: false, error: 'Invalid activeSkillNames payload' };
-  }
-
   return {
     ok: true,
     value: {
@@ -179,7 +159,6 @@ function parseChatStreamBody(raw: unknown): ParseResult {
       reasoningEffort,
       attachments,
       approvedOperations,
-      activeSkillNames,
     },
   };
 }
@@ -195,7 +174,7 @@ router.post('/chat/stream', llmRouteLimiter, async (req, res) => {
     return res.status(400).json({ error: parsed.error });
   }
   // The validated turn payload (agentId, message, reasoningEffort, attachments,
-  // approvedOperations, and activeSkillNames) is handed to streamAgentTurn
+  // and approvedOperations) is handed to streamAgentTurn
   // wholesale; only `attachments` is inspected here for the early storage guard.
   const { attachments, threadId } = parsed.value;
 

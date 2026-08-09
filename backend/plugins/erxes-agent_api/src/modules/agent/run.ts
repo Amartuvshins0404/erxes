@@ -1,4 +1,3 @@
-import type { ToolsInput } from '@mastra/core/agent';
 import { runWithAuth } from '~/mastra/requestContext';
 import {
   MemoryBinding,
@@ -27,21 +26,17 @@ export async function runAgentTurn(params: {
   memory?: MemoryBinding;
   activeTools: string[];
   turnInstructions: string;
-  intentOperationTools: ToolsInput;
 }): Promise<string | null> {
   const { agent, convo, message, authCtx, memory, activeTools } = params;
   const genOpts = {
     activeTools,
     instructions: params.turnInstructions,
-    ...(Object.keys(params.intentOperationTools).length
-      ? { toolsets: { intent: params.intentOperationTools } }
-      : {}),
     ...(memory ? { memory } : {}),
   };
   // With a memory binding, hand generate() the new user message as a STRING —
   // Mastra Memory only persists (and recalls against) string input; passing the
-  // convo array silently skips the save. (Recent history + recall come from
-  // Mastra Memory itself; the learned digest is already woven into `message`.)
+  // convo array silently skips the save. Recent history and recall come from
+  // Mastra Memory itself.
   const input = memory ? message : convo;
 
   try {

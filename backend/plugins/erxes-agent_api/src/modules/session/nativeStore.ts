@@ -79,12 +79,9 @@ interface NativeMemoryFacade {
   deleteThread(threadId: string): Promise<unknown>;
 }
 
-// Storage-domain methods Memory itself doesn't surface (e.g. message-id lookup
-// for feedback). Reached via getMastraStore().stores.memory.
+// Storage-domain message updates that Memory itself does not surface. Reached
+// through getMastraStore().stores.memory.
 interface NativeStoreFacade {
-  listMessagesById(args: {
-    messageIds: string[];
-  }): Promise<{ messages: NativeMessage[] }>;
   // Storage-domain message write — patches content as a plain Mongo update.
   // Deliberately NOT Memory.updateMessages so a metadata-only patch touches only
   // the message document. See patchNativeMessages.
@@ -101,7 +98,7 @@ export async function getNativeMemory(
   return (await getMastraMemory(subdomain)) as unknown as NativeMemoryFacade;
 }
 
-/** The native store's message domain, typed to the lookup feedback needs. */
+/** The native store's message write surface. */
 async function getNativeStore(subdomain: string): Promise<NativeStoreFacade> {
   const store = await getMastraStore(subdomain);
   return (store as unknown as { stores: { memory: NativeStoreFacade } }).stores
@@ -109,14 +106,13 @@ async function getNativeStore(subdomain: string): Promise<NativeStoreFacade> {
 }
 
 /**
- * Patch persisted message content (e.g. the erxes turn meta — ordered parts,
- * thinking, tool calls, attachments) via the STORAGE domain, bypassing
+ * Patch persisted message content (for example attachments, interrupted state,
+ * or guarded reply text) via the STORAGE domain, bypassing
  * Memory.updateMessages on purpose.
  *
  * Memory.updateMessages carries extra write semantics that can throw and abandon
- * the turn-end patch — which is exactly what was silently dropping thinking
- * history on reload (and, transitively, nulling the assistant-id the inline
- * artifact cards link to). The store write is a plain Mongo update of the message
+ * the turn-end patch — which can also null the assistant id that inline artifact
+ * cards link to. The store write is a plain Mongo update of the message
  * document. Best-effort — a write failure is logged, never thrown, so it can't
  * abort the rest of the turn-end work.
  */
@@ -180,8 +176,8 @@ export interface ErxesMessage {
   threadId: string | null;
   role: string;
   content: string;
-  // Mastra's native AI SDK v5 turn parts (reasoning / text / tool-invocation, in
-  // order) — the source of truth for replaying thinking and tool calls on reload.
+  // Mastra's native text and tool parts. Tool output drives approvals,
+  // artifacts, and error display after a reload.
   parts: unknown[] | null;
   meta: Record<string, unknown> | null;
   attachments: unknown;
@@ -205,15 +201,18 @@ function toErxesThread(t: NativeThread): ErxesThread {
 }
 
 function toErxesMessage(m: NativeMessage): ErxesMessage {
-  // The erxes turn artifacts (parts/thinking/toolCalls/interrupted/
-  // learningIdsInContext) + attachments were stored verbatim under
-  // content.metadata.erxes by persistTurn's patch; split attachments back out
-  // to its own field for the UI.
+  // Split attachments from plugin metadata and omit old trace-only fields.
   const erxes = {
     ...((m.content?.metadata?.erxes ?? {}) as Record<string, unknown>),
   };
   const attachments = erxes.attachments ?? null;
   delete erxes.attachments;
+  delete erxes.thinking;
+  delete erxes.reasoningSummaries;
+  delete erxes.turnSummary;
+  delete erxes.langfuseTraceId;
+  delete erxes.learningIdsInContext;
+  delete erxes.activeSkills;
   const content =
     typeof m.content?.content === 'string' ? m.content.content : '';
   const parts = Array.isArray(m.content?.parts) ? m.content.parts : [];
@@ -221,60 +220,22 @@ function toErxesMessage(m: NativeMessage): ErxesMessage {
     m.role === 'assistant'
       ? sanitizePersistedProviderOutput(content, parts)
       : { content, parts };
+  const userFacingParts = safe.parts.filter(
+    (part) =>
+      !part ||
+      typeof part !== 'object' ||
+      (part as { type?: unknown }).type !== 'reasoning',
+  );
   return {
     _id: m.id,
     threadId: m.threadId ?? null,
     role: m.role,
     content: safe.content,
-    parts: safe.parts.length ? safe.parts : null,
+    parts: userFacingParts.length ? userFacingParts : null,
     meta: Object.keys(erxes).length ? erxes : null,
     attachments,
     createdAt: m.createdAt ?? null,
   };
-}
-
-/** Message count for a thread without fetching the transcript (recall → total). */
-async function countMessages(
-  memory: NativeMemoryFacade,
-  threadId: string,
-  resourceId: string,
-): Promise<number> {
-  const res = await memory.recall({
-    threadId,
-    resourceId,
-    perPage: 1,
-    page: 0,
-  });
-  return res?.total ?? 0;
-}
-
-// Cap on concurrent per-thread countMessages recalls. The native store exposes
-// no per-thread total in listThreads, so each thread still needs its own recall;
-// bounding the fan-out keeps a large thread list from opening hundreds of
-// simultaneous store reads (the data shape returned is unchanged).
-const COUNT_CONCURRENCY = 8;
-
-/** Map `items` to results with bounded concurrency, preserving order. Each
- *  item's builder gets its thread's message count (recalled lazily). */
-async function withMessageCounts<T, R>(
-  memory: NativeMemoryFacade,
-  items: T[],
-  threadOf: (item: T) => { id: string; resourceId: string },
-  build: (item: T, count: number) => R,
-): Promise<R[]> {
-  const out = new Array<R>(items.length);
-  let cursor = 0;
-  const worker = async () => {
-    while (cursor < items.length) {
-      const i = cursor++;
-      const { id, resourceId } = threadOf(items[i]);
-      out[i] = build(items[i], await countMessages(memory, id, resourceId));
-    }
-  };
-  await Promise.all(
-    Array.from({ length: Math.min(COUNT_CONCURRENCY, items.length) }, worker),
-  );
-  return out;
 }
 
 // Default/max page sizes for the session sidebar. The list is loaded a page at a
@@ -354,7 +315,7 @@ export async function resourceHasThreads(
  *
  * Idempotent: creates the thread when absent, back-fills the binding when an
  * existing thread is missing/stale on it, and no-ops otherwise. The caller gates
- * on a memory binding (advanced memory + known tenant) and treats it as
+ * on a memory binding (workspace memory + known tenant) and treats it as
  * best-effort — a store hiccup here must never block the turn.
  */
 export async function ensureThreadRegistered(
@@ -475,41 +436,6 @@ export async function getOwnedThreadMessages(
   return (res?.messages ?? []).map(toErxesMessage);
 }
 
-/**
- * Read a thread's messages under an EXPLICIT resource — no ownership check.
- *
- * SECURITY: this primitive performs NO ownership/authorization check of its own.
- * Callers MUST authorize (e.g. agent-access) BEFORE calling, and MUST derive
- * threadId/resourceId from trusted SERVER state — never from raw caller input.
- * Wiring caller-influenced ids in here would let any caller read any thread.
- *
- * Unlike getOwnedThreadMessages this does NOT scope the resource to the viewer:
- * the caller passes the exact resourceId the thread lives under and is fully
- * responsible for authorizing the read BEFORE calling. Used by the schedule
- * transcript query, which authorizes by AGENT ACCESS (canUserAccessAgent) and
- * then reads the schedule's dedicated output thread under the schedule's OWN
- * background resource (scopedResource(subdomain, `schedule:<id>`)) — the same
- * resource its runs wrote under — never the viewer's. A missing thread (schedule
- * that has not run yet) reads back as an empty transcript rather than throwing.
- */
-export async function getThreadMessagesByResource(
-  subdomain: string,
-  threadId: string,
-  resourceId: string,
-): Promise<ErxesMessage[]> {
-  const memory = await getNativeMemory(subdomain);
-  const thread = await memory.getThreadById({ threadId, resourceId });
-  if (!thread) return [];
-  const res = await memory.recall({
-    threadId,
-    resourceId,
-    perPage: false,
-    page: 0,
-    orderBy: { field: 'createdAt', direction: 'ASC' },
-  });
-  return (res?.messages ?? []).map(toErxesMessage);
-}
-
 /** Rename a thread the caller owns. Records titleSource='manual' so later
  * deterministic registration never overwrites the user's title. */
 export async function renameOwnedThread(
@@ -588,137 +514,4 @@ export async function getThreadTitle(
   const memory = await getNativeMemory(subdomain);
   const thread = await memory.getThreadById({ threadId, resourceId });
   return thread?.title || null;
-}
-
-// ── Learning sweep (distillation) over native threads ───────────────────────
-
-export interface SweepThread {
-  threadId: string;
-  resourceId: string;
-  agentId: string | null;
-  updatedAt: Date | null;
-  totalCount: number;
-  distilledCount: number;
-}
-
-/**
- * A tenant's threads (oldest activity first) with the counters the learning
- * sweep needs to find idle, undistilled conversations. Filtered by
- * metadata.subdomain (stamped by patchNativeTurn) since resourceId is per-user.
- */
-export async function listTenantThreadsForSweep(
-  subdomain: string,
-  fetchLimit: number,
-): Promise<SweepThread[]> {
-  const memory = await getNativeMemory(subdomain);
-  const res = await memory.listThreads({
-    filter: { metadata: { subdomain } },
-    orderBy: { field: 'updatedAt', direction: 'ASC' },
-    perPage: fetchLimit,
-  });
-  const threads = res?.threads ?? [];
-  return withMessageCounts(
-    memory,
-    threads,
-    (t) => ({ id: t.id, resourceId: t.resourceId }),
-    (t, totalCount) => {
-      const meta = (t.metadata ?? {}) as {
-        agentId?: string;
-        distilledMessageCount?: number;
-      };
-      return {
-        threadId: t.id,
-        resourceId: t.resourceId,
-        agentId: meta.agentId ?? null,
-        updatedAt: t.updatedAt ?? null,
-        totalCount,
-        distilledCount: meta.distilledMessageCount ?? 0,
-      };
-    },
-  );
-}
-
-/** The undistilled tail of a thread as plain {role,content} for distillation. */
-export async function getThreadTail(
-  subdomain: string,
-  threadId: string,
-  resourceId: string,
-  cursor: number,
-): Promise<{ role: string; content: string }[]> {
-  const memory = await getNativeMemory(subdomain);
-  const res = await memory.recall({
-    threadId,
-    resourceId,
-    perPage: false,
-    page: 0,
-    orderBy: { field: 'createdAt', direction: 'ASC' },
-  });
-  const all = (res?.messages ?? []).map((m) => ({
-    role: m.role,
-    content: typeof m.content?.content === 'string' ? m.content.content : '',
-  }));
-  return all.slice(cursor);
-}
-
-/** Advance the distillation cursor (metadata.distilledMessageCount) on a thread. */
-export async function markThreadDistilled(
-  subdomain: string,
-  threadId: string,
-  resourceId: string,
-  count: number,
-): Promise<void> {
-  const memory = await getNativeMemory(subdomain);
-  const thread = await memory.getThreadById({ threadId, resourceId });
-  if (!thread) return;
-  await preserveTitleUpdate(memory, thread, threadId, {
-    distilledMessageCount: count,
-  });
-}
-
-// What a message-id feedback lookup needs back: the owning thread + the
-// learnings that were in that turn's context.
-export interface OwnedAssistantMessage {
-  threadId: string;
-  learningIdsInContext: string[];
-  // Langfuse trace id stamped on this turn (Plan B) — for attaching a human
-  // thumbs score to the right trace. Undefined when evaluation was off.
-  langfuseTraceId?: string;
-}
-
-/**
- * Resolve an assistant message by its native id for the feedback mutation:
- * verifies it is the caller's own assistant message and returns the learnings
- * stamped into that turn's context. Throws "Message not found" otherwise.
- */
-export async function findOwnedAssistantMessage(
-  subdomain: string,
-  userId: string,
-  messageId: string,
-): Promise<OwnedAssistantMessage> {
-  const store = await getNativeStore(subdomain);
-  const { messages } = (await store.listMessagesById({
-    messageIds: [messageId],
-  })) ?? { messages: [] };
-  const msg = messages?.[0];
-  if (!msg || msg.role !== 'assistant' || !msg.threadId) {
-    throw new ExpectedError('Message not found');
-  }
-  // Ownership: the message's thread must belong to this user (resource scope).
-  const memory = await getNativeMemory(subdomain);
-  const resourceId = scopedResource(subdomain, userId);
-  const thread = await memory.getThreadById({
-    threadId: msg.threadId,
-    resourceId,
-  });
-  if (!thread) throw new ExpectedError('Message not found');
-
-  const erxes = (msg.content?.metadata?.erxes ?? {}) as {
-    learningIdsInContext?: string[];
-    langfuseTraceId?: string;
-  };
-  return {
-    threadId: msg.threadId,
-    learningIdsInContext: erxes.learningIdsInContext ?? [],
-    langfuseTraceId: erxes.langfuseTraceId,
-  };
 }

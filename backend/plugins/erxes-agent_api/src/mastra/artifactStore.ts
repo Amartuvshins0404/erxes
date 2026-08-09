@@ -93,7 +93,7 @@ const persistArtifacts = async (
 ): Promise<void> => {
   if (!artifacts.length) return;
   const auth = activeArtifactContext();
-  // Only inside a chat turn (no threadId → e.g. a workflow run) do we record.
+  // Only inside a chat turn do we record.
   if (!auth) {
     if (strict) throw new Error('Website artifact context is unavailable.');
     return;

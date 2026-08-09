@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  IconActivity,
   IconBrain,
   IconCheck,
   IconDatabase,
@@ -20,73 +19,6 @@ import {
   generalSettingsSchema,
 } from './validations';
 
-const LEARNING_TUNING_FIELDS = [
-  {
-    name: 'learningAutoPromoteMinSources',
-    label: 'general-settings-learning-min-sources-label',
-    description: 'general-settings-learning-min-sources-description',
-    min: 1,
-    max: 20,
-    step: 1,
-  },
-  {
-    name: 'learningAutoPromoteMinConfidence',
-    label: 'general-settings-learning-min-confidence-label',
-    description: 'general-settings-learning-min-confidence-description',
-    min: 0,
-    max: 1,
-    step: 0.05,
-  },
-  {
-    name: 'learningIdleMinutes',
-    label: 'general-settings-learning-idle-label',
-    description: 'general-settings-learning-idle-description',
-    min: 1,
-    max: 10080,
-    step: 1,
-  },
-  {
-    name: 'learningDecayDays',
-    label: 'general-settings-learning-decay-days-label',
-    description: 'general-settings-learning-decay-days-description',
-    min: 1,
-    max: 3650,
-    step: 1,
-  },
-  {
-    name: 'learningDecayFactor',
-    label: 'general-settings-learning-decay-factor-label',
-    description: 'general-settings-learning-decay-factor-description',
-    min: 0,
-    max: 1,
-    step: 0.05,
-  },
-  {
-    name: 'learningArchiveBelowConfidence',
-    label: 'general-settings-learning-archive-label',
-    description: 'general-settings-learning-archive-description',
-    min: 0,
-    max: 1,
-    step: 0.05,
-  },
-  {
-    name: 'learningDigestMaxEntries',
-    label: 'general-settings-learning-digest-entries-label',
-    description: 'general-settings-learning-digest-entries-description',
-    min: 1,
-    max: 100,
-    step: 1,
-  },
-  {
-    name: 'learningDigestMaxChars',
-    label: 'general-settings-learning-digest-chars-label',
-    description: 'general-settings-learning-digest-chars-description',
-    min: 500,
-    max: 10000,
-    step: 100,
-  },
-] as const;
-
 export const GeneralSettingsPage = () => {
   const { t } = useTranslation('erxes-agent');
   const { settings, save, saving } = useGeneralSettings();
@@ -97,8 +29,6 @@ export const GeneralSettingsPage = () => {
   });
 
   const [saved, setSaved] = useState(false);
-  const learningEnabled = form.watch('learningEnabled');
-  const clearEvaluationDsn = form.watch('clearEvaluationDsn');
 
   useEffect(() => {
     if (!settings) return;
@@ -107,21 +37,6 @@ export const GeneralSettingsPage = () => {
       erxesApiUrl: settings.erxesApiUrl || 'http://localhost:4000',
       memoryEnabled: settings.memoryEnabled !== false,
       attachmentsEnabled: settings.attachmentsEnabled !== false,
-      learningEnabled: settings.learningEnabled === true,
-      learningAutoPromoteMinSources:
-        settings.learningAutoPromoteMinSources ?? 3,
-      learningAutoPromoteMinConfidence:
-        settings.learningAutoPromoteMinConfidence ?? 0.75,
-      learningDigestMaxChars: settings.learningDigestMaxChars ?? 2400,
-      learningDigestMaxEntries: settings.learningDigestMaxEntries ?? 12,
-      learningIdleMinutes: settings.learningIdleMinutes ?? 30,
-      learningDecayDays: settings.learningDecayDays ?? 30,
-      learningDecayFactor: settings.learningDecayFactor ?? 0.9,
-      learningArchiveBelowConfidence:
-        settings.learningArchiveBelowConfidence ?? 0.2,
-      evaluationEnabled: settings.evaluationEnabled === true,
-      evaluationDsn: '',
-      clearEvaluationDsn: false,
       backgroundRemovalEnabled: settings.backgroundRemovalEnabled !== false,
       openSandboxApiUrl: settings.openSandboxApiUrl || '',
       openSandboxApiKey: '',
@@ -133,32 +48,14 @@ export const GeneralSettingsPage = () => {
   const storageService =
     attachmentStorage?.serviceType ||
     t('general-settings-storage-service-unknown');
-  const evaluationDsnConfigured =
-    settings?.evaluationDsnConfigured === true && !clearEvaluationDsn;
   const sandboxConfigured =
     Boolean(settings?.openSandboxApiUrl) &&
     settings?.hasOpenSandboxApiKey === true;
   const sandboxKeyHint = settings?.openSandboxApiKeyHint || '';
 
   const onSubmit = async (doc: GeneralSettingsValues) => {
-    const { evaluationDsn, clearEvaluationDsn, ...runtimeSettings } = doc;
-    const replacementDsn = evaluationDsn.trim();
-
     try {
-      await save({
-        variables: {
-          doc: {
-            ...runtimeSettings,
-            ...(clearEvaluationDsn
-              ? { evaluationDsn: '' }
-              : replacementDsn
-              ? { evaluationDsn: replacementDsn }
-              : {}),
-          },
-        },
-      });
-      form.setValue('evaluationDsn', '');
-      form.setValue('clearEvaluationDsn', false);
+      await save({ variables: { doc } });
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
       toast({ title: t('general-settings-save-success') });
@@ -450,188 +347,6 @@ export const GeneralSettingsPage = () => {
                     </Form.Item>
                   )}
                 />
-              </Card.Content>
-            </Card>
-
-            <Card className="border shadow-none">
-              <Card.Content className="space-y-5 p-4 sm:p-5">
-                <Form.Field
-                  control={form.control}
-                  name="learningEnabled"
-                  render={({ field }) => (
-                    <Form.Item>
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex min-w-0 flex-1 items-start gap-3">
-                          <IconBrain
-                            aria-hidden
-                            className="mt-0.5 size-4 shrink-0 text-muted-foreground"
-                          />
-                          <div className="min-w-0">
-                            <Form.Label className="text-base font-semibold">
-                              {t('general-settings-learning-label')}
-                            </Form.Label>
-                            <Form.Description className="mt-1">
-                              {t('general-settings-learning-description')}
-                            </Form.Description>
-                          </div>
-                        </div>
-                        <Form.Control>
-                          <Switch
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                            aria-label={t('general-settings-learning-label')}
-                          />
-                        </Form.Control>
-                      </div>
-                      <Form.Message />
-                    </Form.Item>
-                  )}
-                />
-
-                <div className="grid gap-4 border-t pt-5 sm:grid-cols-2">
-                  {LEARNING_TUNING_FIELDS.map((item) => (
-                    <Form.Field
-                      key={item.name}
-                      control={form.control}
-                      name={item.name}
-                      render={({ field }) => (
-                        <Form.Item>
-                          <Form.Label>{t(item.label)}</Form.Label>
-                          <Form.Control>
-                            <Input
-                              {...field}
-                              type="number"
-                              min={item.min}
-                              max={item.max}
-                              step={item.step}
-                              disabled={!learningEnabled}
-                              onChange={(event) =>
-                                field.onChange(
-                                  event.currentTarget.valueAsNumber,
-                                )
-                              }
-                            />
-                          </Form.Control>
-                          <Form.Description>
-                            {t(item.description)}
-                          </Form.Description>
-                          <Form.Message />
-                        </Form.Item>
-                      )}
-                    />
-                  ))}
-                </div>
-              </Card.Content>
-            </Card>
-
-            <Card className="border shadow-none">
-              <Card.Content className="space-y-5 p-4 sm:p-5">
-                <Form.Field
-                  control={form.control}
-                  name="evaluationEnabled"
-                  render={({ field }) => (
-                    <Form.Item>
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex min-w-0 flex-1 items-start gap-3">
-                          <IconActivity
-                            aria-hidden
-                            className="mt-0.5 size-4 shrink-0 text-muted-foreground"
-                          />
-                          <div className="min-w-0">
-                            <Form.Label className="text-base font-semibold">
-                              {t('general-settings-evaluation-label')}
-                            </Form.Label>
-                            <Form.Description className="mt-1">
-                              {t('general-settings-evaluation-description')}
-                            </Form.Description>
-                          </div>
-                        </div>
-                        <Form.Control>
-                          <Switch
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                            aria-label={t('general-settings-evaluation-label')}
-                          />
-                        </Form.Control>
-                      </div>
-                      <Form.Message />
-                    </Form.Item>
-                  )}
-                />
-
-                <Form.Field
-                  control={form.control}
-                  name="evaluationDsn"
-                  render={({ field }) => (
-                    <Form.Item className="border-t pt-5">
-                      <div className="flex items-center justify-between gap-3">
-                        <Form.Label>
-                          {t('general-settings-evaluation-dsn-label')}
-                        </Form.Label>
-                        <Badge
-                          variant={
-                            evaluationDsnConfigured ? 'success' : 'secondary'
-                          }
-                        >
-                          {evaluationDsnConfigured
-                            ? t('general-settings-secret-configured')
-                            : t('general-settings-secret-not-configured')}
-                        </Badge>
-                      </div>
-                      <Form.Control>
-                        <Input
-                          {...field}
-                          type="password"
-                          autoComplete="new-password"
-                          disabled={clearEvaluationDsn}
-                          placeholder={
-                            evaluationDsnConfigured
-                              ? t(
-                                  'general-settings-evaluation-dsn-replace-placeholder',
-                                )
-                              : t('general-settings-evaluation-dsn-placeholder')
-                          }
-                        />
-                      </Form.Control>
-                      <Form.Description>
-                        {t('general-settings-evaluation-dsn-description')}
-                      </Form.Description>
-                      <Form.Message />
-                    </Form.Item>
-                  )}
-                />
-
-                {settings?.evaluationDsnConfigured && (
-                  <Form.Field
-                    control={form.control}
-                    name="clearEvaluationDsn"
-                    render={({ field }) => (
-                      <Form.Item>
-                        <div className="flex items-start justify-between gap-4 rounded-md bg-muted/50 p-3">
-                          <div className="min-w-0">
-                            <Form.Label>
-                              {t('general-settings-evaluation-dsn-clear-label')}
-                            </Form.Label>
-                            <Form.Description>
-                              {t(
-                                'general-settings-evaluation-dsn-clear-description',
-                              )}
-                            </Form.Description>
-                          </div>
-                          <Form.Control>
-                            <Switch
-                              checked={field.value}
-                              onCheckedChange={field.onChange}
-                              aria-label={t(
-                                'general-settings-evaluation-dsn-clear-label',
-                              )}
-                            />
-                          </Form.Control>
-                        </div>
-                      </Form.Item>
-                    )}
-                  />
-                )}
               </Card.Content>
             </Card>
 

@@ -12,22 +12,14 @@ export const types = `
     createdBy: String
     visibility: MastraAgentVisibility!
     audienceUserIds: [String!]!
-    audienceTeamIds: [String!]!
-    audienceDepartmentIds: [String!]!
     instructions: String
     provider: String
     model: String
-    skills: [String]
     additionalTools: [String!]!
-    destructiveOps: String
-    memoryEnabled: Boolean
-    debug: Boolean
-    temperature: Float
     permissionGroupIds: [String!]!
     isActive: Boolean!
     createdAt: Date
     updatedAt: Date
-    workflowsCount: Int
   }
 
   input MastraAgentInput {
@@ -35,17 +27,10 @@ export const types = `
     description: String
     visibility: MastraAgentVisibility
     audienceUserIds: [String!]
-    audienceTeamIds: [String!]
-    audienceDepartmentIds: [String!]
     instructions: String
     provider: String
     model: String
-    skills: [String]
     additionalTools: [String!]
-    destructiveOps: String
-    memoryEnabled: Boolean
-    debug: Boolean
-    temperature: Float
     permissionGroupIds: [String!]
     isActive: Boolean
   }

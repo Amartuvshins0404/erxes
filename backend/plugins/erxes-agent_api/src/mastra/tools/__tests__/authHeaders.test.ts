@@ -68,7 +68,7 @@ describe('AI team-member subgraph authentication', () => {
     );
   });
 
-  it('routes entity lookups and execution to their owning private subgraphs', async () => {
+  it('routes direct operation execution to its owning private subgraph', async () => {
     getPluginAddress.mockImplementation(
       async (service: string) => `http://internal-${service}`,
     );
@@ -82,16 +82,6 @@ describe('AI team-member subgraph authentication', () => {
         expect(headers.hostname).toBe('os');
         expect(headers).not.toHaveProperty('Authorization');
 
-        if (url === 'http://internal-core/graphql') {
-          expect(body.query).toContain('customers');
-          return jsonResponse({
-            data: {
-              customers: {
-                list: [{ _id: 'customer-1', firstName: 'Ada' }],
-              },
-            },
-          });
-        }
         if (url === 'http://internal-sales/graphql') {
           expect(body.query).toContain('dealsAdd');
           return jsonResponse({ data: { dealsAdd: 'created' } });
@@ -118,14 +108,12 @@ describe('AI team-member subgraph authentication', () => {
         principalUserId: 'agent-user-1',
         subdomain: 'os',
       },
-      () => executeErxesOperation(operation, { customerId: 'Ada' }),
+      () => executeErxesOperation(operation, { customerId: 'customer-1' }),
     );
 
     expect(result).toBe('created');
     expect(getPluginAddress).toHaveBeenCalledWith('sales');
-    expect(getPluginAddress).toHaveBeenCalledWith('core');
     expect(fetchSpy.mock.calls.map(([url]) => String(url))).toEqual([
-      'http://internal-core/graphql',
       'http://internal-sales/graphql',
     ]);
   });

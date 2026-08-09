@@ -12,12 +12,6 @@ export async function persistTurn(params: {
   models: IModels;
   prepared: PreparedTurn;
   reply: string | null;
-  // Per-reasoning-step short summaries, index-aligned to the assistant turn's
-  // reasoning parts (holes are null). Stamped onto the assistant message's erxes
-  // meta so the chat re-renders the short thoughts on reload.
-  reasoningSummaries?: (string | null)[];
-  // One-line "what this turn accomplished" headline for the collapsed trace.
-  turnSummary?: string;
   assistantMessageId?: string;
   // Replace native intermediate text blocks with the guarded final reply.
   replaceNativeText?: boolean;
@@ -31,8 +25,6 @@ export async function persistTurn(params: {
     prepared,
     reply,
     assistantMessageId,
-    reasoningSummaries,
-    turnSummary,
     interrupted,
     hasArtifacts,
     replaceNativeText,
@@ -57,8 +49,6 @@ export async function persistTurn(params: {
         agentId: agentConfig._id,
         reply,
         attachments,
-        reasoningSummaries,
-        turnSummary,
         assistantMessageId,
         turnStartedAt: prepared.authCtx?.turnStartedAt,
         interrupted,
@@ -165,31 +155,18 @@ export async function patchNativeTurn(params: {
   agentId: string;
   reply: string | null;
   attachments?: IMastraChatAttachment[];
-  reasoningSummaries?: (string | null)[];
-  turnSummary?: string;
   assistantMessageId?: string;
   turnStartedAt?: Date;
   interrupted?: boolean;
   replaceNativeText?: boolean;
 }): Promise<string | null> {
   const { subdomain, binding, agentId, reply, attachments } = params;
-  const {
-    reasoningSummaries,
-    turnSummary,
-    assistantMessageId,
-    interrupted,
-    replaceNativeText,
-  } = params;
+  const { assistantMessageId, interrupted, replaceNativeText } = params;
   const { turnStartedAt } = params;
 
-  // The erxes-meta fields to stamp onto the assistant message (only the present
-  // ones), so a reload re-renders the short thoughts + turn headline. A stopped
-  // turn also stamps `interrupted` so a reload shows the "stopped" badge instead
-  // of the partial reply as complete.
+  // A stopped turn keeps its state so a reload shows the "stopped" badge
+  // instead of treating the partial reply as complete.
   const assistantMeta: Record<string, unknown> = {};
-  if (reasoningSummaries?.length)
-    assistantMeta.reasoningSummaries = reasoningSummaries;
-  if (turnSummary) assistantMeta.turnSummary = turnSummary;
   if (interrupted) assistantMeta.interrupted = true;
 
   await ensureThreadRegistered(

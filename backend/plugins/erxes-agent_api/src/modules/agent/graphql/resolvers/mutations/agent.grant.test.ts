@@ -46,10 +46,6 @@ const profileInput = (overrides: Partial<IMastraAgentInput> = {}) => ({
   provider: 'provider-1',
   model: 'model-1',
   permissionGroupIds: ['group-1'],
-  skills: [],
-  destructiveOps: 'ask' as const,
-  memoryEnabled: true,
-  debug: false,
   isActive: true,
   ...overrides,
 });
@@ -60,10 +56,6 @@ const profileDocument = (overrides: Partial<IMastraAgent> = {}) => {
     instructions: 'Help the sales team',
     provider: 'provider-1',
     model: 'model-1',
-    skills: [],
-    destructiveOps: 'ask' as const,
-    memoryEnabled: true,
-    debug: false,
     createdAt: new Date('2026-01-01'),
     updatedAt: new Date('2026-01-01'),
     ...overrides,
@@ -168,8 +160,6 @@ describe('AI team member account lifecycle', () => {
         createdBy: 'owner-1',
         visibility: 'private',
         audienceUserIds: [],
-        audienceTeamIds: [],
-        audienceDepartmentIds: [],
         permissionMode: 'managed',
       }),
     );
@@ -187,53 +177,6 @@ describe('AI team member account lifecycle', () => {
         isActive: true,
       }),
     );
-  });
-
-  it('accepts one team as the complete shared audience', async () => {
-    const { ctx, createAgent } = makeCtx();
-
-    await agentMutations.mastraAgentCreate(
-      undefined,
-      {
-        doc: profileInput({
-          visibility: 'shared',
-          audienceTeamIds: [' team-1 ', 'team-1'],
-        }),
-      },
-      ctx,
-    );
-
-    expect(createAgent).toHaveBeenCalledWith(
-      USER_ID,
-      expect.objectContaining({
-        visibility: 'shared',
-        audienceUserIds: [],
-        audienceTeamIds: ['team-1'],
-        audienceDepartmentIds: [],
-      }),
-    );
-  });
-
-  it('rejects oversized audience arrays before creating an account', async () => {
-    const { ctx } = makeCtx();
-
-    await expect(
-      agentMutations.mastraAgentCreate(
-        undefined,
-        {
-          doc: profileInput({
-            visibility: 'shared',
-            audienceTeamIds: Array.from(
-              { length: 251 },
-              (_value, index) => `team-${index}`,
-            ),
-          }),
-        },
-        ctx,
-      ),
-    ).rejects.toThrow('at most 250 targets');
-
-    expect(createAgentAccount).not.toHaveBeenCalled();
   });
 
   it('rejects oversized audience identifiers before creating an account', async () => {
@@ -300,7 +243,7 @@ describe('AI team member account lifecycle', () => {
     });
     expect(updateAgent).toHaveBeenCalledWith(
       USER_ID,
-      expect.objectContaining({ destructiveOps: 'ask' }),
+      expect.objectContaining({ provider: 'provider-1', model: 'model-1' }),
     );
     expect(updateAgent.mock.calls[0][1]).not.toHaveProperty('name');
     expect(updateAgent.mock.calls[0][1]).not.toHaveProperty(
@@ -315,7 +258,7 @@ describe('AI team member account lifecycle', () => {
       _id: 'owner-1',
       permissionGroupIds: ['group-1'],
       customPermissions: [],
-    } as IUserDocument;
+    } as unknown as IUserDocument;
 
     await expect(
       agentMutations.mastraAgentCreate(
@@ -346,7 +289,7 @@ describe('AI team member account lifecycle', () => {
       _id: 'owner-1',
       permissionGroupIds: ['group-1'],
       customPermissions,
-    } as IUserDocument;
+    } as unknown as IUserDocument;
 
     await agentMutations.mastraAgentCreate(
       undefined,

@@ -25,6 +25,7 @@ import {
 } from 'erxes-ui';
 import { useTranslation } from 'react-i18next';
 import { MASTRA_AGENT_REMOVE } from '~/graphql/mutations';
+import { MASTRA_AGENTS } from '~/graphql/queries';
 import { IdentityCell, SortableHead } from '~/components/RecordTableShared';
 import { SortState, SortValue, useTableSort } from '~/components/useTableSort';
 import { PermissionButton } from '~/components/PermissionButton';
@@ -43,13 +44,8 @@ type IAgent = IMastraAgentRow;
 type Visibility = IAgent['visibility'];
 type VisibilityLabels = Record<Visibility, string> & { title: string };
 
-const isConsoleShell = (basePath: string) => !basePath.startsWith('/settings');
 const agentOpenPath = (basePath: string, agent: IAgent, canEdit: boolean) =>
-  !canEdit
-    ? `/erxes-agent/chat/${agent._id}`
-    : isConsoleShell(basePath)
-    ? `${basePath}/${agent._id}`
-    : `${basePath}/edit/${agent._id}`;
+  canEdit ? `${basePath}/${agent._id}` : `/erxes-agent/chat/${agent._id}`;
 
 const agentListCacheUpdate = (cache: ApolloCache<unknown>) => {
   cache.evict({ fieldName: 'mastraAgentsMain' });
@@ -81,6 +77,7 @@ const AgentBulkDeleteCommandBar = () => {
   const { canRemoveAgent } = useAgentAccess();
   const [removeAgent] = useMutation(MASTRA_AGENT_REMOVE, {
     update: agentListCacheUpdate,
+    refetchQueries: [{ query: MASTRA_AGENTS }],
     onError: agentMutationError(),
   });
   const removable = selectedRows.filter((row) => canRemoveAgent(row.original));

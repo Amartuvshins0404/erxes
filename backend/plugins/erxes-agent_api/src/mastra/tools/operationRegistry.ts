@@ -25,7 +25,7 @@ export interface OperationMeta {
 // The full, live picture of what the agent can do, derived from schema
 // introspection. `operations` is a name → meta lookup for O(1) execute resolution;
 // `list` is the same set for searching. The two type maps power argument-schema
-// building (inputTypesMap) and response-field selection (objectFieldsMap).
+// building (inputTypesMap) and the generic valid response selection (objectFieldsMap).
 export interface OperationRegistry extends SchemaMaps {
   operations: Map<string, OperationMeta>;
   list: OperationMeta[];
@@ -55,8 +55,8 @@ function buildRegistry(
 ): OperationRegistry {
   // Strip security-blocked operations (e.g. `configs`, which dumps the whole
   // secret store) before they ever enter the registry, so NO discovery surface
-  // built on it — search, capability inventory, workflow step resolution, the
-  // tool-listing UI — can reveal or resolve them. The execute tool independently
+  // built on it — search, capability inventory, the
+  // tool-listing UI — can reveal or resolve them. The executor independently
   // refuses them by name as a backstop.
   const visible = operations.filter(
     (op) => !isSecurityBlockedOperation(op.operation),

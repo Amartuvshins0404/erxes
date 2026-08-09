@@ -42,7 +42,6 @@ export const sessionMutations = {
     // already-completed deletion into a client-visible failure.
     await Promise.allSettled([
       deleteWebsiteFiles(models, websiteFileKeys),
-      models.MastraFeedback.deleteMany({ threadId }),
       models.MastraArtifact.deleteMany({ threadId }),
     ]);
     return result;
@@ -72,9 +71,6 @@ export const sessionMutations = {
     // Keep the same authoritative-delete behavior for linked auxiliary rows.
     await Promise.allSettled([
       deleteWebsiteFiles(models, websiteFileKeys),
-      models.MastraFeedback.deleteMany({
-        messageId: { $in: result.deletedIds },
-      }),
       models.MastraArtifact.deleteMany({
         messageId: { $in: result.deletedIds },
       }),

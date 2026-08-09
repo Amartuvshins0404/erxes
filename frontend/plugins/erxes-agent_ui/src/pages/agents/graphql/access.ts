@@ -29,15 +29,6 @@ export interface PermissionGroupsVariables {
   includeCustomGroups: boolean;
   includeDefaultGroups: boolean;
 }
-export interface AudienceTeamOption {
-  _id: string;
-  name: string;
-  description?: string;
-}
-
-export interface AudienceTeamsData {
-  getTeams?: AudienceTeamOption[];
-}
 
 export const PERMISSION_GROUPS = gql`
   query MastraPermissionGroups(
@@ -60,16 +51,6 @@ export const PERMISSION_GROUPS = gql`
     }
   }
 `;
-export const AUDIENCE_TEAMS = gql`
-  query MastraAudienceTeams {
-    getTeams {
-      _id
-      name
-      description
-    }
-  }
-`;
-
 type HasActionPermission = (actionName: string, pluginName?: string) => boolean;
 
 export const permissionGroupQueryVariables = (

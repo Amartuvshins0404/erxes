@@ -15,16 +15,13 @@ describe('additional tool selection', () => {
   it('honors an explicit empty or selected allowlist', () => {
     expect(normalizeAdditionalToolKeys([], [])).toEqual([]);
     expect(
-      normalizeAdditionalToolKeys(
-        ['terminal', 'webSearch', 'terminal'],
-        [],
-      ),
+      normalizeAdditionalToolKeys(['terminal', 'webSearch', 'terminal'], []),
     ).toEqual(['webSearch', 'terminal']);
   });
 
   it('rejects unknown tool names instead of granting or silently persisting them', () => {
-    expect(() => normalizeAdditionalToolKeys(['terminal', 'hostShell'], [])).toThrow(
-      'Unknown additional tool: hostShell',
-    );
+    expect(() =>
+      normalizeAdditionalToolKeys(['terminal', 'hostShell'], []),
+    ).toThrow('Unknown additional tool: hostShell');
   });
 });

@@ -2,8 +2,8 @@ import { ExpectedError } from 'erxes-api-shared/utils';
 
 /**
  * User-selectable capabilities that are independent from erxes operation
- * permissions. Workflow builders, skill creation, and file reading are governed
- * elsewhere and deliberately do not appear in this catalog.
+ * permissions. Local skills and file reading are governed elsewhere and do
+ * not appear in this catalog.
  */
 export const ADDITIONAL_TOOL_KEYS = [
   'webSearch',

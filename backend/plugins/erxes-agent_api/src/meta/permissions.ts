@@ -14,7 +14,7 @@ const SCOPES: IPermissionScope[] = [
   { name: 'own', description: 'Records the user owns or created' },
   {
     name: 'group',
-    description: 'Records available through their configured audience',
+    description: 'Records available through their configured access',
   },
   { name: 'all', description: 'All administrable records' },
 ];
@@ -83,7 +83,7 @@ const modules: IPermissionModule[] = [
       action(
         ERXES_AGENT_ACTIONS.agent.share,
         'Share agents',
-        'Change an agent audience to team, department, unit, or organization',
+        'Share an agent with selected people or the whole organization',
       ),
       action(
         ERXES_AGENT_ACTIONS.agent.moderate,
@@ -150,120 +150,6 @@ const modules: IPermissionModule[] = [
     null,
     [],
   ),
-  permissionModule(
-    'workflow',
-    'Workflow drafts, approvals, schedules, execution, and run history',
-    [
-      action(
-        ERXES_AGENT_ACTIONS.workflow.read,
-        'View workflows',
-        'Read workflows belonging to accessible agents',
-      ),
-      action(
-        ERXES_AGENT_ACTIONS.workflow.createDraft,
-        'Create workflow drafts',
-        'Create a disabled draft for an authorized agent',
-      ),
-      action(
-        ERXES_AGENT_ACTIONS.workflow.updateDraft,
-        'Update workflow drafts',
-        'Edit a workflow definition and return it to draft state',
-      ),
-      action(
-        ERXES_AGENT_ACTIONS.workflow.remove,
-        'Remove workflows',
-        'Delete an authorized workflow',
-      ),
-      action(
-        ERXES_AGENT_ACTIONS.workflow.run,
-        'Run workflows',
-        'Manually execute an approved workflow as the requesting user',
-      ),
-      action(
-        ERXES_AGENT_ACTIONS.workflow.approve,
-        'Approve workflows',
-        'Approve a workflow definition for execution',
-      ),
-      action(
-        ERXES_AGENT_ACTIONS.workflow.schedule,
-        'Manage workflow schedules',
-        'Enable or disable approved background workflows',
-      ),
-      action(
-        ERXES_AGENT_ACTIONS.workflow.runsRead,
-        'View workflow runs',
-        'Read authorized workflow run status and redacted output',
-      ),
-    ],
-    'agentId',
-    ['createdByUserId'],
-  ),
-  permissionModule(
-    'learning',
-    'Published agent knowledge and administrative curation',
-    [
-      action(
-        ERXES_AGENT_ACTIONS.learning.read,
-        'View published learnings',
-        'Read approved learnings belonging to accessible agents',
-      ),
-      action(
-        ERXES_AGENT_ACTIONS.learning.curate,
-        'Curate learnings',
-        'Create, edit, review, re-status, or pin learning statements',
-      ),
-      action(
-        ERXES_AGENT_ACTIONS.learning.remove,
-        'Remove learnings',
-        'Delete learning statements',
-      ),
-    ],
-    'agentId',
-    ['createdBy'],
-  ),
-  permissionModule(
-    'skills',
-    'Private and published reusable agent skills',
-    [
-      action(
-        ERXES_AGENT_ACTIONS.skills.read,
-        'View skills',
-        'Read owned skills and published global skills',
-      ),
-      action(
-        ERXES_AGENT_ACTIONS.skills.create,
-        'Create skills',
-        'Create a private skill',
-      ),
-      action(
-        ERXES_AGENT_ACTIONS.skills.update,
-        'Update skills',
-        'Edit an owned skill',
-      ),
-      action(
-        ERXES_AGENT_ACTIONS.skills.publish,
-        'Publish skills',
-        'Publish or restore a version of an owned private skill',
-      ),
-      action(
-        ERXES_AGENT_ACTIONS.skills.remove,
-        'Remove skills',
-        'Delete an owned private skill',
-      ),
-      action(
-        ERXES_AGENT_ACTIONS.skills.promote,
-        'Promote skills',
-        'Promote an owned published skill to global visibility',
-      ),
-      action(
-        ERXES_AGENT_ACTIONS.skills.moderate,
-        'Moderate global skills',
-        'Demote or remove global skills',
-      ),
-    ],
-    null,
-    ['authorId'],
-  ),
 ];
 
 const grant = (
@@ -303,8 +189,7 @@ export const permissions: IPermissionConfig = {
     {
       id: `${PLUGIN}:user`,
       name: 'Agent User',
-      description:
-        'Chat with shared agents and manage owned private agents, workflow drafts, and skills',
+      description: 'Chat with shared agents and manage owned private agents',
       principalType: 'human',
       permissions: [
         grant(
@@ -337,44 +222,18 @@ export const permissions: IPermissionConfig = {
           'own',
         ),
         grant('settings', [ERXES_AGENT_ACTIONS.settings.statusRead], 'group'),
-        grant(
-          'workflow',
-          [
-            ERXES_AGENT_ACTIONS.workflow.read,
-            ERXES_AGENT_ACTIONS.workflow.createDraft,
-            ERXES_AGENT_ACTIONS.workflow.updateDraft,
-            ERXES_AGENT_ACTIONS.workflow.remove,
-            ERXES_AGENT_ACTIONS.workflow.run,
-            ERXES_AGENT_ACTIONS.workflow.runsRead,
-          ],
-          'own',
-        ),
-        grant('skills', [ERXES_AGENT_ACTIONS.skills.read], 'group'),
-        grant(
-          'skills',
-          [
-            ERXES_AGENT_ACTIONS.skills.create,
-            ERXES_AGENT_ACTIONS.skills.update,
-            ERXES_AGENT_ACTIONS.skills.publish,
-            ERXES_AGENT_ACTIONS.skills.remove,
-          ],
-          'own',
-        ),
       ],
     },
     {
       id: `${PLUGIN}:admin`,
       name: 'Agent Admin',
       description:
-        'Manage all agents, providers, settings, workflows, learnings, skills, and agent grant profiles',
+        'Manage all agents, providers, settings, and agent grant profiles',
       principalType: 'human',
       permissions: [
         grant('agent', ADMIN_AGENT_ACTIONS, 'all'),
         grant('provider', allActions('provider'), 'all'),
         grant('settings', allActions('settings'), 'all'),
-        grant('workflow', allActions('workflow'), 'all'),
-        grant('learning', allActions('learning'), 'all'),
-        grant('skills', allActions('skills'), 'all'),
         {
           plugin: 'core',
           module: 'permissions',

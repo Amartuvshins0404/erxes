@@ -2,9 +2,9 @@
 
 Status: **DONE — native-only, no flag.** The custom `mastra_threads`/
 `mastra_messages` mongoose store is deleted; the chat store IS Mastra's native
-memory store (`erxes_mastra_memory`). Reads, writes, titling, feedback, the
-learning sweep, schedules, and notification-triggered turns all run against
-native. The `ERXES_AGENT_NATIVE_CHAT_STORE` flag is removed (native is
+memory store (`erxes_mastra_memory`). Chat reads, writes, and titling all run
+against native. The
+`ERXES_AGENT_NATIVE_CHAT_STORE` flag is removed (native is
 unconditional). **Consequence:** chat persistence follows the tenant's
 `memoryEnabled` value from General Settings (enabled by default); the native
 store is the only chat store, with no custom fallback. Legacy custom-store
@@ -28,20 +28,19 @@ bridge, for the same irreducible custom core.)
 
 ## 1. Mastra built-in vs custom (the capability map)
 
-| Concern                                                                                                   | Mastra built-in?                                                                                                                                 | Decision                                                                            |
-| --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------- |
-| Thread/message storage                                                                                    | ✅ native memory store (`mastra_threads`/`messages`/`resources` in `erxes_mastra_memory`)                                                        | **use native** — drop custom mongoose store                                         |
-| Persist a turn                                                                                            | ✅ auto-persists on `agent.generate(msg, { memory })`                                                                                            | **use native** — drop `persistTurn`'s write                                         |
-| List threads / get messages                                                                               | ✅ `listThreads({ filter:{ resourceId, metadata } })`, `listMessages`, `getThreadById`                                                           | **use native** — drop custom read layer                                             |
-| Thread title generation                                                                                   | Native thread title field; no provider call                                                                                                      | **custom thin derivation** — first meaningful user request, capped at 60 characters |
-| Recent-history replay                                                                                     | ✅ `lastMessages`                                                                                                                                | **use native** — already (#8058)                                                    |
-| Working memory                                                                                            | ✅ native                                                                                                                                        | **use native** — already (#8058)                                                    |
-| Streaming engine                                                                                          | ✅ `agent.stream()`                                                                                                                              | **use native** — erxes shell just relays chunks                                     |
-| Tool-call / reasoning capture                                                                             | ✅ native `content.parts`                                                                                                                        | **use native**, translate to the UI shape                                           |
-| **Auth + tool execution via the erxes gateway**                                                           | ❌ Mastra can't (tools run as the selected agent's linked AI team-member account, forwarding the internal `user` identity and tenant `hostname`) | **custom** (the agent + tools, unchanged)                                           |
-| **Multi-tenant subdomain scoping**                                                                        | ❌ not a Mastra concept                                                                                                                          | **custom** (thin: `scopedResource`)                                                 |
-| **Learning / distillation**                                                                               | ❌ erxes-specific                                                                                                                                | **custom** (re-pointed to read the native store)                                    |
-| **UI GraphQL/SSE contract** + erxes-only fields (`interrupted`, `learningIdsInContext`, attachment shape) | ❌ Mastra's shapes differ                                                                                                                        | **custom** (thin translation + a `content.metadata` patch)                          |
+| Concern                                                                           | Mastra built-in?                                                                                                                                 | Decision                                                                            |
+| --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------- |
+| Thread/message storage                                                            | ✅ native memory store (`mastra_threads`/`messages`/`resources` in `erxes_mastra_memory`)                                                        | **use native** — drop custom mongoose store                                         |
+| Persist a turn                                                                    | ✅ auto-persists on `agent.generate(msg, { memory })`                                                                                            | **use native** — drop `persistTurn`'s write                                         |
+| List threads / get messages                                                       | ✅ `listThreads({ filter:{ resourceId, metadata } })`, `listMessages`, `getThreadById`                                                           | **use native** — drop custom read layer                                             |
+| Thread title generation                                                           | Native thread title field; no provider call                                                                                                      | **custom thin derivation** — first meaningful user request, capped at 60 characters |
+| Recent-history replay                                                             | ✅ `lastMessages`                                                                                                                                | **use native** — already (#8058)                                                    |
+| Working memory                                                                    | ✅ native                                                                                                                                        | **use native** — already (#8058)                                                    |
+| Streaming engine                                                                  | ✅ `agent.stream()`                                                                                                                              | **use native** — erxes shell just relays chunks                                     |
+| Tool-call capture                                                                 | ✅ native `content.parts`                                                                                                                        | **use native**, translate to the UI shape                                           |
+| **Auth + tool execution via the erxes gateway**                                   | ❌ Mastra can't (tools run as the selected agent's linked AI team-member account, forwarding the internal `user` identity and tenant `hostname`) | **custom** (the agent + tools, unchanged)                                           |
+| **Multi-tenant subdomain scoping**                                                | ❌ not a Mastra concept                                                                                                                          | **custom** (thin: `scopedResource`)                                                 |
+| **UI GraphQL/SSE contract** + erxes-only fields (`interrupted`, attachment shape) | ❌ Mastra's shapes differ                                                                                                                        | **custom** (thin translation + a `content.metadata` patch)                          |
 
 Everything in the "custom" rows is a genuine "Mastra cannot do this for erxes"
 case. Everything else becomes Mastra-native.
@@ -75,8 +74,8 @@ UI (unchanged) ◀─ GraphQL/SSE translate native ⇄ MastraThread/MastraMessag
 
 - The transports (SSE + the `mastraAgentChat` blocking fallback) are kept (Level 2) — they delegate to the agent + Mastra memory, and **translate** native
   records into the existing GraphQL/SSE shapes so the frontend is untouched.
-- erxes adds only: auth/tenancy, the tool-exec gateway (the agent's tools), the
-  learning system, and a small `content.metadata` patch for erxes-only fields.
+- erxes adds only auth/tenancy, the tool-exec gateway (the agent's tools), and a
+  small `content.metadata` patch for erxes-only fields.
 
 ---
 
@@ -84,16 +83,15 @@ UI (unchanged) ◀─ GraphQL/SSE translate native ⇄ MastraThread/MastraMessag
 
 ### 4.1 Thread (`MastraThread` ⇄ native `StorageThreadType`)
 
-| UI/erxes field          | Native location                                         |
-| ----------------------- | ------------------------------------------------------- |
-| `threadId`              | `thread.id` (same session id, already 1:1)              |
-| ownership (`userId`)    | `thread.resourceId = scopedResource(subdomain, userId)` |
-| `agentId`               | `thread.metadata.agentId` (list query filters on it)    |
-| `title`                 | `thread.title` (derived before the first model call)    |
-| `titleSource`           | `thread.metadata.titleSource` (`derived` or `manual`)   |
-| `messageCount`          | **derive on read** (count native messages)              |
-| `lastMessageAt`         | `thread.updatedAt`                                      |
-| `distilledMessageCount` | `thread.metadata.distilledMessageCount`                 |
+| UI/erxes field       | Native location                                         |
+| -------------------- | ------------------------------------------------------- |
+| `threadId`           | `thread.id` (same session id, already 1:1)              |
+| ownership (`userId`) | `thread.resourceId = scopedResource(subdomain, userId)` |
+| `agentId`            | `thread.metadata.agentId` (list query filters on it)    |
+| `title`              | `thread.title` (derived before the first model call)    |
+| `titleSource`        | `thread.metadata.titleSource` (`derived` or `manual`)   |
+| `messageCount`       | **derive on read** (count native messages)              |
+| `lastMessageAt`      | `thread.updatedAt`                                      |
 
 Thread list: `listThreads({ filter:{ resourceId: scopedResource(subdomain, userId), metadata:{ agentId } } })` → translate to `[MastraThread]`.
 
@@ -101,11 +99,11 @@ Thread list: `listThreads({ filter:{ resourceId: scopedResource(subdomain, userI
 
 | UI/erxes field                                    | Native location                                                                                                                   |
 | ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `_id` (feedback key)                              | `message.id` (native id — see §10)                                                                                                |
+| `_id`                                             | `message.id` (native id)                                                                                                          |
 | `role` / `createdAt`                              | same                                                                                                                              |
 | `content` (string)                                | `message.content.content`                                                                                                         |
-| `meta.thinking` / `meta.toolCalls` / `meta.parts` | `content.metadata.erxes.*` — erxes ordered shape kept verbatim for faithful replay (native `content.parts` is the lossy fallback) |
-| `meta.interrupted` / `meta.learningIdsInContext`  | `content.metadata.erxes.*` (erxes-only)                                                                                           |
+| `meta.toolCalls` / `meta.parts`                   | `content.metadata.erxes.*` — erxes tool state kept for faithful replay (native `content.parts` is the fallback)                  |
+| `meta.interrupted`                                | `content.metadata.erxes.*` (erxes-only)                                                                                           |
 | `attachments`                                     | `content.metadata.erxes.attachments` (erxes `{url,name,type,size}`)                                                               |
 
 **Namespacing (as built):** erxes-only fields live under a single
@@ -166,25 +164,20 @@ The completed native-only cutover has these properties:
 
 ## 8. Component changes
 
-| Component                               | Change                                                                                                              |
-| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `modules/agent/persist.ts`              | reconciles native ids, attachments, interruption state, artifacts, and guarded replacement text                     |
-| `mastra/streamTurn.ts` SSE              | streams native chunks; persistence and deterministic title reconciliation happen after the visible answer           |
-| `mastraAgentChat` (kept)                | thin `agent.generate` wrapper; shares the same native persist + translate                                           |
-| `session/graphql` reads + rename/remove | read/translate from native store; rename → `updateThread`; remove → native `deleteThread`                           |
-| `mastra/memory/mastraMemory.ts`         | owns 12-message replay and resource-scoped working memory; it performs no model-based titling                       |
-| `mastra/titler.ts`                      | derives an eight-word/60-character title from the first meaningful request without a provider call                  |
-| `learning/worker.ts`                    | idle/undistilled query + cursor against native threads (`metadata.distilledMessageCount`); messages via native list |
-| feedback (`mastraMessageFeedback`)      | keys off the native message id; ownership via `resourceId`                                                          |
-| `session/db/*` custom models            | removed                                                                                                             |
+| Component                               | Change                                                                                                    |
+| --------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `modules/agent/persist.ts`              | reconciles native ids, attachments, interruption state, artifacts, and guarded replacement text           |
+| `mastra/streamTurn.ts` SSE              | streams native chunks; persistence and deterministic title reconciliation happen after the visible answer |
+| `mastraAgentChat` (kept)                | thin `agent.generate` wrapper; shares the same native persist + translate                                 |
+| `session/graphql` reads + rename/remove | read/translate from native store; rename → `updateThread`; remove → native `deleteThread`                 |
+| `mastra/memory/mastraMemory.ts`         | owns 12-message replay and resource-scoped working memory; it performs no model-based titling             |
+| `mastra/titler.ts`                      | derives an eight-word/60-character title from the first meaningful request without a provider call        |
+| `session/db/*` custom models            | removed                                                                                                   |
 
 ---
 
 ## 9. Risks & mitigations
 
-- **Feedback id change** — native id ≠ custom `_id`. Return native ids in
-  `mastraThreadMessages._id` + SSE `done.messageId`; old feedback rows go stale
-  (cutover, acceptable).
 - **Rich-meta fidelity** — store erxes shapes verbatim in `content.metadata`;
   don't rely on lossy native-part inference for the UI.
 - **Ownership / agent filtering** — `thread.metadata.agentId` + `filter`;
@@ -202,16 +195,9 @@ The completed native-only cutover has these properties:
    `modules/agent/persist.ts` reconciles message ids and erxes-owned metadata.
 3. **Read path** — ✅ **done.** `session/nativeStore.ts` translates native
    threads/messages → the `MastraThread`/`MastraMessage` GraphQL shapes;
-   resolvers (list/transcript/rename/remove) + SSE + feedback serve native;
-   ownership is by resourceId scope.
-4. **Repoint** — ✅ **done.** Learning sweep (`worker.ts`), feedback
-   (`learning` mutation + `mastraMessageFeedbacks` query), schedules
-   (`runner.ts`), and notification-triggered turns all run against native.
-   Background workflows and notification turns execute as the owning or
-   recipient agent's active linked AI team-member principal. `turn.ts` stamps
-   `thread.metadata.{agentId,subdomain}` so the sweep can enumerate a tenant's
-   threads (resourceId is per-user).
-5. **Cutover / cleanup** — ✅ **done.** Custom writes dropped from
+   resolvers (list/transcript/rename/remove) + SSE serve native; ownership is
+   by resourceId scope.
+4. **Cutover / cleanup** — ✅ **done.** Custom writes dropped from
    `persistTurn`/`prepareChatTurn` (native ownership replaces the custom gate);
    custom title-model code, chat models, and definitions were removed and
    unregistered from `connectionResolvers`; the transitional cutover flag was

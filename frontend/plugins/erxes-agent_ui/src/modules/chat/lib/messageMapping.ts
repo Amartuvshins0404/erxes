@@ -3,15 +3,11 @@ import {
   DbNativePart,
   DbThreadMessage,
   DbToolCall,
-  DbTurnPart,
 } from '~/modules/chat/types';
 
-// History hydration: rebuild AI SDK UIMessage parts from a persisted assistant
-// message. The source of truth is Mastra's NATIVE `content.parts`
-// (reasoning / text / tool-invocation, in order) — persisted by construction on
-// the correct row. The legacy `meta`-based path remains only as a fallback for
-// rows saved before the resolver surfaced native parts. The reverse direction —
-// UIMessage chunks → persisted meta — lives in the backend turn pipeline.
+// History hydration: rebuild user-facing AI SDK parts from a persisted assistant
+// message. Native text and tool parts are the source of truth. The legacy meta
+// path remains for tool output needed by approvals and artifacts.
 
 type MessagePart = AgentUIMessage['parts'][number];
 
@@ -45,21 +41,14 @@ const toToolPart = (call: DbToolCall, fallbackId: string): MessagePart => {
     };
   }
   if (call.result !== undefined) {
-    return { ...base, state: 'output-available', input: call.args, output: call.result };
+    return {
+      ...base,
+      state: 'output-available',
+      input: call.args,
+      output: call.result,
+    };
   }
   return { ...base, state: 'input-available', input: call.args };
-};
-
-// Reasoning text for a native part: prefer the flat `reasoning`/`text`, else
-// join the `details` text segments (the shape Mastra persists).
-const nativeReasoningText = (part: DbNativePart): string => {
-  const p = part as Extract<DbNativePart, { type: 'reasoning' }>;
-  if (p.reasoning?.trim()) return p.reasoning;
-  const fromDetails = (p.details ?? []).reduce(
-    (acc, d) => (d.type === 'text' ? acc + (d.text ?? '') : acc),
-    '',
-  );
-  return fromDetails || p.text || '';
 };
 
 // A native tool-invocation part → the DbToolCall shape `toToolPart` renders.
@@ -77,16 +66,12 @@ const toolCallFromNative = (part: DbNativePart): DbToolCall | null => {
   };
 };
 
-// Hydrate from Mastra's native `content.parts` (the source of truth): reasoning →
-// reasoning, tool-invocation → dynamic-tool, text → text, in stored order. Other
-// part types (e.g. `step-start`) are dropped.
+// Hydrate native text and tool output. Internal reasoning parts never reach the
+// end-user chat.
 const nativeAssistantParts = (m: DbThreadMessage): MessagePart[] => {
   const parts: MessagePart[] = [];
   (m.parts ?? []).forEach((part, i) => {
-    if (part.type === 'reasoning') {
-      const text = nativeReasoningText(part);
-      if (text) parts.push({ type: 'reasoning', text, state: 'done' });
-    } else if (part.type === 'text') {
+    if (part.type === 'text') {
       const text = (part as Extract<DbNativePart, { type: 'text' }>).text;
       if (text) parts.push({ type: 'text', text, state: 'done' });
     } else if (part.type === 'tool-invocation') {
@@ -97,32 +82,20 @@ const nativeAssistantParts = (m: DbThreadMessage): MessagePart[] => {
   return parts;
 };
 
-// Fallback for rows persisted before native parts were surfaced: rebuild from the
-// legacy `meta` (ordered `parts`, or the flat thinking/toolCalls aggregates).
-const turnParts = (meta: DbThreadMessage['meta']): DbTurnPart[] => {
+// Fallback for rows saved before native parts were exposed. Only legacy tool
+// output still serves the user-facing chat.
+const legacyToolCalls = (meta: DbThreadMessage['meta']): DbToolCall[] => {
   if (!meta) return [];
-  if (Array.isArray(meta.parts) && meta.parts.length) {
-    return meta.parts.map((p) =>
-      p.kind === 'tool'
-        ? { kind: 'tool' as const, call: p.call ?? { toolName: '' } }
-        : { kind: 'thinking' as const, text: p.text ?? '' },
-    );
-  }
-  const parts: DbTurnPart[] = [];
-  if (meta.thinking) parts.push({ kind: 'thinking', text: meta.thinking });
-  for (const call of meta.toolCalls ?? []) parts.push({ kind: 'tool', call });
-  return parts;
+  const ordered = (meta.parts ?? [])
+    .filter((part) => part.kind === 'tool' && part.call)
+    .map((part) => part.call as DbToolCall);
+  return ordered.length ? ordered : meta.toolCalls ?? [];
 };
 
 const metaAssistantParts = (m: DbThreadMessage): MessagePart[] => {
-  const parts: MessagePart[] = [];
-  turnParts(m.meta).forEach((part, i) => {
-    if (part.kind === 'thinking') {
-      parts.push({ type: 'reasoning', text: part.text, state: 'done' });
-    } else {
-      parts.push(toToolPart(part.call, `${m._id}-tool-${i}`));
-    }
-  });
+  const parts = legacyToolCalls(m.meta).map((call, i) =>
+    toToolPart(call, `${m._id}-tool-${i}`),
+  );
   if (m.content) parts.push({ type: 'text', text: m.content, state: 'done' });
   return parts;
 };
@@ -156,8 +129,6 @@ export const metaToUIMessages = (
         messageId: m._id,
         createdAt: m.createdAt,
         interrupted: m.meta?.interrupted || undefined,
-        reasoningSummaries: m.meta?.reasoningSummaries,
-        turnSummary: m.meta?.turnSummary,
       },
     };
   });

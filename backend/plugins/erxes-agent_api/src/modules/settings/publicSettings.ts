@@ -2,8 +2,7 @@ import { IMastraSettings } from '@/settings/@types/settings';
 import { resolveOpenSandboxApiUrl } from '~/mastra/sandbox/config';
 
 export interface IPublicMastraSettings
-  extends Omit<IMastraSettings, 'evaluationDsn' | 'openSandboxApiKey'> {
-  evaluationDsnConfigured: boolean;
+  extends Omit<IMastraSettings, 'openSandboxApiKey'> {
   hasOpenSandboxApiKey: boolean;
   openSandboxApiKeyHint: string | null;
 }
@@ -21,7 +20,7 @@ export const toPublicSettings = (
   },
 ): IPublicMastraSettings => {
   const plain = settings.toObject ? settings.toObject() : settings;
-  const { evaluationDsn, openSandboxApiKey, ...publicSettings } = plain;
+  const { openSandboxApiKey, ...publicSettings } = plain;
   const effectiveApiKey =
     openSandboxApiKey || process.env.OPEN_SANDBOX_API_KEY || '';
   const effectiveApiUrl = resolveOpenSandboxApiUrl(
@@ -30,7 +29,6 @@ export const toPublicSettings = (
 
   return {
     ...publicSettings,
-    evaluationDsnConfigured: Boolean(evaluationDsn?.trim()),
     openSandboxApiUrl: effectiveApiUrl,
     hasOpenSandboxApiKey: Boolean(effectiveApiKey),
     openSandboxApiKeyHint: maskSecret(effectiveApiKey),

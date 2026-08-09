@@ -19,8 +19,6 @@ export const config: ModuleFederationConfig = {
     './erxes_agent': './src/modules/MastraMain.tsx',
     './erxes_agentSettings': './src/modules/MastraSettings.tsx',
     './widgets': './src/widgets/Widgets.tsx',
-    './automationsWidget':
-      './src/widgets/automations/components/AutomationRemoteEntry.tsx',
   },
   // Keep both router packages in the host's singleton context. Use explicit
   // configs because this pnpm graph stores version-qualified external-node

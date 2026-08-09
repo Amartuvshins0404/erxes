@@ -14,17 +14,6 @@ describe('createActivityTracker', () => {
     expect(emit).toHaveBeenCalledWith('Searching customers');
   });
 
-  it('does not process reasoning through an auxiliary summarizer', () => {
-    const emit = jest.fn();
-    const toolSignal = jest.fn(() => null);
-    const tracker = createActivityTracker({ emit, toolSignal });
-
-    tracker.onThinking('I should inspect the customer records first.');
-
-    expect(toolSignal).not.toHaveBeenCalled();
-    expect(emit).not.toHaveBeenCalled();
-  });
-
   it('does not re-emit an unchanged tool status', () => {
     const emit = jest.fn();
     const tracker = createActivityTracker({

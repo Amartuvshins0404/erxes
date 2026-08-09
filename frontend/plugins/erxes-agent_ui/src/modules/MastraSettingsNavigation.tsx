@@ -15,11 +15,6 @@ export const MastraSettingsNavigation = () => {
           />
           <SettingsNavigationMenuLinkItem
             pathPrefix="erxes-agent"
-            path="/skills"
-            name="Skills"
-          />
-          <SettingsNavigationMenuLinkItem
-            pathPrefix="erxes-agent"
             path="/providers"
             name="Providers & Models"
           />

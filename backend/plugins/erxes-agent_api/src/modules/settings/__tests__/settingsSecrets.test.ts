@@ -32,17 +32,13 @@ describe('settings secrets', () => {
 
   it('never exposes raw stored secrets through the public projection', () => {
     const publicSettings = toPublicSettings({
-      evaluationDsn: 'https://public:langfuse-secret@example.com',
       openSandboxApiUrl: 'https://sandbox.example.com',
       openSandboxApiKey: 'sandbox-secret-1234',
     });
 
-    expect(publicSettings).not.toHaveProperty('evaluationDsn');
-    expect(publicSettings.evaluationDsnConfigured).toBe(true);
     expect(publicSettings).not.toHaveProperty('openSandboxApiKey');
     expect(publicSettings.hasOpenSandboxApiKey).toBe(true);
     expect(publicSettings.openSandboxApiKeyHint).toBe('••••1234');
-    expect(JSON.stringify(publicSettings)).not.toContain('langfuse-secret');
     expect(JSON.stringify(publicSettings)).not.toContain('sandbox-secret-1234');
   });
 

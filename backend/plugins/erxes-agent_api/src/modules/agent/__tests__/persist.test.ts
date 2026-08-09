@@ -36,7 +36,7 @@ const runTurn = (over: Record<string, unknown> = {}) =>
     agentId: 'agent-1',
     reply: 'Here is your chart.',
     // Makes wantAssistant true, so the recovery path actually runs.
-    turnSummary: 'Rendered a chart',
+    replaceNativeText: true,
     turnStartedAt: TURN_STARTED_AT,
     ...over,
   });

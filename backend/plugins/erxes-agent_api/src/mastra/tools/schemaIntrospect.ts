@@ -110,7 +110,9 @@ export function graphqlTypeToString(
 // case-insensitive match back to the canonical value — but only after an exact
 // match misses, so enums whose members differ only by case never get remapped.
 function buildEnumZod(values: string[]): z.ZodTypeAny {
-  const canonical = new Map(values.map((value) => [value.toLowerCase(), value]));
+  const canonical = new Map(
+    values.map((value) => [value.toLowerCase(), value]),
+  );
   const normalize = (val: unknown): unknown => {
     if (typeof val !== 'string') return val;
     if (values.includes(val)) return val;
@@ -144,13 +146,12 @@ function graphqlTypeToZod(
     );
   }
   if (kind === 'NON_NULL') {
-    return graphqlTypeToZod(
-      type.ofType,
-      inputTypesMap,
-      enumValuesMap,
-    ).refine((value) => value !== undefined && value !== null, {
-      message: 'Required by the GraphQL schema.',
-    });
+    return graphqlTypeToZod(type.ofType, inputTypesMap, enumValuesMap).refine(
+      (value) => value !== undefined && value !== null,
+      {
+        message: 'Required by the GraphQL schema.',
+      },
+    );
   }
   if (kind === 'ENUM' && enumValuesMap?.[name]?.length) {
     return buildEnumZod(enumValuesMap[name]);
@@ -220,7 +221,10 @@ export function buildZodSchemaFromArgs(
 ): z.ZodObject<Record<string, z.ZodTypeAny>> {
   const shape: Record<string, z.ZodTypeAny> = {};
   for (const arg of args || []) {
-    shape[arg.name] = graphqlTypeToZod(arg.type, inputTypesMap, enumValuesMap);
+    const schema = graphqlTypeToZod(arg.type, inputTypesMap, enumValuesMap);
+    shape[arg.name] = arg.description?.trim()
+      ? schema.describe(arg.description.trim())
+      : schema;
   }
   return z.object(shape);
 }
@@ -298,6 +302,9 @@ export function resolveReturnTypeName(
 
 const LEAF_KINDS = new Set(['SCALAR', 'ENUM']);
 
+const hasRequiredArguments = (field: GqlFieldDef): boolean =>
+  (field.args ?? []).some((arg) => isRequiredType(arg.type));
+
 /** Unwrap NON_NULL / LIST wrappers down to the named type. */
 function namedTypeOf(type: GqlTypeRef | null | undefined): {
   kind: string;
@@ -311,14 +318,18 @@ function namedTypeOf(type: GqlTypeRef | null | undefined): {
 /**
  * Wrapper-aware leaf collection: the safe leaf (scalar/enum) field names of an
  * OBJECT type, with _id floated first when present. Never injects _id on types
- * that lack one. The shared primitive behind every response-field builder.
+ * that lack one. The primitive behind the generic response selection.
  */
 function collectLeaves(
   typeName: string,
   objectFieldsMap: Record<string, GqlFieldDef[]>,
 ): string[] {
   const leaves = (objectFieldsMap[typeName] || [])
-    .filter((field) => LEAF_KINDS.has(namedTypeOf(field.type).kind))
+    .filter(
+      (field) =>
+        !hasRequiredArguments(field) &&
+        LEAF_KINDS.has(namedTypeOf(field.type).kind),
+    )
     .map((field) => field.name);
   return leaves.includes('_id')
     ? ['_id', ...leaves.filter((n) => n !== '_id')]
@@ -326,8 +337,8 @@ function collectLeaves(
 }
 
 /**
- * A selection of safe leaf (scalar/enum) fields for an OBJECT type, always
- * including _id, capped to keep results lean.
+ * A selection of safe leaf (scalar/enum) fields for an OBJECT type, capped to
+ * keep results lean.
  */
 function buildSelectionForType(
   typeName: string,
@@ -335,7 +346,7 @@ function buildSelectionForType(
   maxFields = 12,
 ): string {
   const leaves = collectLeaves(typeName, objectFieldsMap);
-  if (!leaves.length) return '_id';
+  if (!leaves.length) return '__typename';
   return leaves.slice(0, maxFields).join(' ');
 }
 
@@ -352,197 +363,35 @@ function buildIntrospectedSelection(
   const rootFields = rootName ? objectFieldsMap[rootName] : undefined;
   if (!rootFields) return undefined;
 
-  const listField = rootFields.find((field) => field.name === 'list');
+  const listField = rootFields.find(
+    (field) => field.name === 'list' && !hasRequiredArguments(field),
+  );
   if (listField) {
     const itemType = namedTypeOf(listField.type).name;
     const inner = buildSelectionForType(itemType, objectFieldsMap);
-    const hasTotal = rootFields.some((field) => field.name === 'totalCount');
+    const hasTotal = rootFields.some(
+      (field) => field.name === 'totalCount' && !hasRequiredArguments(field),
+    );
     return `list { ${inner} }${hasTotal ? ' totalCount' : ''}`;
   }
   return buildSelectionForType(rootName, objectFieldsMap);
 }
 
 /**
- * Build a VALID selection from agent-requested field paths. Paths are dotted with
- * at most one level of nesting ("amount", "customer.name"). Validation rules:
- *   • unknown fields and paths deeper than one level are dropped;
- *   • a bare object field auto-expands to that type's default leaf fields;
- *   • sibling nested children group under their parent ("customer { name email }");
- *   • _id is always included when the (item) type exposes one.
- * List / Connection wrappers apply the selection to the inner item type and keep
- * `totalCount`. Returns undefined when nothing valid remains, so the caller falls
- * back to the auto selection.
  */
-function buildRequestedSelection(
-  returnType: GqlTypeRef | null | undefined,
-  requestedFields: string[],
-  objectFieldsMap: Record<string, GqlFieldDef[]>,
-): string | undefined {
-  const rootName = resolveReturnTypeName(returnType);
-  const rootFields = rootName ? objectFieldsMap[rootName] : undefined;
-  if (!rootFields) return undefined;
-
-  // For list/connection wrappers the requested fields describe the inner item
-  // type, not the wrapper itself.
-  const listField = rootFields.find((field) => field.name === 'list');
-  const baseTypeName = listField ? namedTypeOf(listField.type).name : rootName;
-  const baseFields = objectFieldsMap[baseTypeName];
-  if (!baseFields || !baseFields.length) return undefined;
-
-  const byName = new Map(baseFields.map((field) => [field.name, field]));
-  const leaves: string[] = [];
-  const nested = new Map<string, Set<string>>();
-
-  const childLeavesOf = (typeName: string): string[] =>
-    (objectFieldsMap[typeName] || [])
-      .filter((field) => LEAF_KINDS.has(namedTypeOf(field.type).kind))
-      .map((field) => field.name);
-
-  for (const raw of requestedFields) {
-    const [head, child] = String(raw || '')
-      .trim()
-      .split('.');
-    if (!head) continue;
-    const field = byName.get(head);
-    if (!field) continue;
-    const named = namedTypeOf(field.type);
-
-    if (!child) {
-      if (LEAF_KINDS.has(named.kind)) {
-        if (!leaves.includes(head)) leaves.push(head);
-      } else if (named.kind === 'OBJECT') {
-        // Bare object field → auto-expand to its default leaves.
-        const set = nested.get(head) ?? new Set<string>();
-        childLeavesOf(named.name)
-          .slice(0, 12)
-          .forEach((leaf) => set.add(leaf));
-        if (set.size) nested.set(head, set);
-      }
-      continue;
-    }
-
-    // Depth-2 path: parent must be an object, child a leaf field on it.
-    if (named.kind !== 'OBJECT') continue;
-    const childField = (objectFieldsMap[named.name] || []).find(
-      (candidate) => candidate.name === child,
-    );
-    if (!childField || !LEAF_KINDS.has(namedTypeOf(childField.type).kind))
-      continue;
-    const set = nested.get(head) ?? new Set<string>();
-    set.add(child);
-    nested.set(head, set);
-  }
-
-  if (!leaves.length && !nested.size) return undefined;
-
-  // Always include _id when the type exposes one — almost every follow-up op
-  // needs it and it costs a single field.
-  if (byName.has('_id') && !leaves.includes('_id')) leaves.unshift('_id');
-
-  const inner = [
-    ...leaves,
-    ...[...nested.entries()].map(
-      ([parent, children]) => `${parent} { ${[...children].join(' ')} }`,
-    ),
-  ].join(' ');
-
-  if (listField) {
-    const hasTotal = rootFields.some((field) => field.name === 'totalCount');
-    return `list { ${inner} }${hasTotal ? ' totalCount' : ''}`;
-  }
-  return inner;
-}
-
-/** Compact menu of the fields an agent may request for an operation. */
-export interface SelectableFields {
-  type: string;
-  isList: boolean;
-  fields: string[];
-  nested: Record<string, string[]>;
-}
-
 /**
- * Describe the fields selectable for an operation's return type, so the agent can
- * choose a response shape in the same round-trip it discovers the op. Leaf
- * scalars/enums are listed directly; object fields expose one level of leaf
- * children (capped). List/connection wrappers describe the inner item type.
- */
-export function describeSelectableFields(
-  returnType: GqlTypeRef | null | undefined,
-  objectFieldsMap?: Record<string, GqlFieldDef[]>,
-): SelectableFields | undefined {
-  if (!objectFieldsMap) return undefined;
-  const rootName = resolveReturnTypeName(returnType);
-  const rootFields = rootName ? objectFieldsMap[rootName] : undefined;
-  if (!rootFields) return undefined;
-
-  const listField = rootFields.find((field) => field.name === 'list');
-  const baseTypeName = listField ? namedTypeOf(listField.type).name : rootName;
-  const baseFields = objectFieldsMap[baseTypeName];
-  if (!baseFields || !baseFields.length) return undefined;
-
-  const MAX_LEAF_FIELDS = 24;
-  const MAX_NESTED_OBJECTS = 8;
-  const MAX_CHILDREN = 6;
-  const fields: string[] = [];
-  const nested: Record<string, string[]> = {};
-  let objectCount = 0;
-
-  for (const field of baseFields) {
-    const named = namedTypeOf(field.type);
-    if (LEAF_KINDS.has(named.kind)) {
-      if (fields.length < MAX_LEAF_FIELDS) fields.push(field.name);
-    } else if (named.kind === 'OBJECT' && objectCount < MAX_NESTED_OBJECTS) {
-      const children = (objectFieldsMap[named.name] || [])
-        .filter((child) => LEAF_KINDS.has(namedTypeOf(child.type).kind))
-        .map((child) => child.name)
-        .slice(0, MAX_CHILDREN);
-      if (children.length) {
-        nested[field.name] = children;
-        objectCount += 1;
-      }
-    }
-  }
-
-  if (!fields.length && !Object.keys(nested).length) return undefined;
-  return { type: baseTypeName, isList: Boolean(listField), fields, nested };
-}
-
-/**
- * The single authority on a response selection. Always returns a concrete
- * selection string: curated override → agent-requested → schema-introspected →
- * the wrapper-aware `_id name` fallback. buildGraphqlOperation just consumes it.
+ * Build the smallest useful valid selection from the live object schema. The
+ * response-field picker is intentionally gone: GraphQL object results still
+ * need a selection set, so this registry keeps only the schema map required to
+ * choose scalar leaves and connection wrappers safely.
  */
 export function chooseResponseFields(
-  erxesOperation: string,
   returnType: GqlTypeRef | null | undefined,
   objectFieldsMap?: Record<string, GqlFieldDef[]>,
-  requestedFields?: string[],
 ): string {
-  if (erxesOperation === 'dealsAdd') return '_id name stageId';
-  // Agent-requested fields win when at least one validates against the schema;
-  // invalid names are dropped inside buildRequestedSelection, and an all-invalid
-  // request falls through to the auto selection below.
-  if (requestedFields?.length && objectFieldsMap) {
-    const requested = buildRequestedSelection(
-      returnType,
-      requestedFields,
-      objectFieldsMap,
-    );
-    if (requested) return requested;
-  }
-  // Schema-introspected selection is authoritative whenever the return type is
-  // resolvable — the stored erxesResponseFields are auto-generated and often
-  // invalid for the type (e.g. `_id` on a *ListResponse`, or `name` on User).
-  const introspected = buildIntrospectedSelection(returnType, objectFieldsMap);
-  if (introspected) return introspected;
-  // Final fallback: ListResponse/Connection wrappers expose items under `list`;
-  // plain object/array types select _id + name so records carry a human label.
-  const rootTypeName = resolveReturnTypeName(returnType);
-  return rootTypeName.endsWith('ListResponse') ||
-    rootTypeName.endsWith('Connection')
-    ? 'list { _id name } totalCount'
-    : '_id name';
+  return (
+    buildIntrospectedSelection(returnType, objectFieldsMap) || '__typename'
+  );
 }
 
 /**

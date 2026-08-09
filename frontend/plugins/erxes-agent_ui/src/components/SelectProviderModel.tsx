@@ -12,7 +12,7 @@ import { ERXES_AGENT_ACTIONS } from '~/permissions';
 //
 // Built on the standard erxes-ui Combobox + Command (searchable popover)
 // pattern used across the app. Any form that needs an AI provider/model pair
-// (agent form, workflow steps, settings…) should use these instead of
+// (agent form, settings…) should use these instead of
 // hand-rolling selects.
 //
 // Model lists are never written in code: SelectModel queries

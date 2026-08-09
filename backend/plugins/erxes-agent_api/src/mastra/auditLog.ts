@@ -11,8 +11,8 @@ export function makeAgentProcessId(): string {
   return `agt_${randomBytes(9).toString('base64url')}`;
 }
 
-// The fields a tool layer produces about one mutation attempt. The source +
-// principal (agentId / workflowId) are added by the caller that owns them.
+// The fields a tool layer produces about one mutation attempt. The source and
+// agent principal are added by the caller that owns them.
 export interface AgentActionInput {
   operation: string;
   operationType: string;
@@ -25,9 +25,8 @@ export interface AgentActionInput {
 }
 
 export interface AgentActionEntry extends AgentActionInput {
-  source: 'chat' | 'workflow';
+  source: 'chat';
   agentId?: string;
-  workflowId?: string;
 }
 
 /**

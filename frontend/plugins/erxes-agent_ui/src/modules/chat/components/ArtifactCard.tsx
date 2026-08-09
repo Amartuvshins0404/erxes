@@ -293,9 +293,9 @@ const ImageCard = ({
 };
 
 // ── Failed artifact tool (visible fallback) ───────────────────────────────────
-// Artifact tools are hidden from the run trace because they normally surface as
-// a card — so when one errors (or its output yields no valid artifact) the turn
-// would show NOTHING. This card makes that failure visible where the chart or
+// Artifact tools normally surface as a card, so when one errors (or its output
+// yields no valid artifact) the turn would show nothing. This card makes that
+// failure visible where the chart or
 // document would have appeared.
 const FAILURE_NOUNS: Record<string, string> = {
   renderchart: 'chart',

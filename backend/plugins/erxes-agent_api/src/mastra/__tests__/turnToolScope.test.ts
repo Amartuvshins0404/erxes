@@ -1,4 +1,7 @@
-import { selectTurnActiveTools } from '../turnToolScope';
+import {
+  resolveToolAnswerLimit,
+  selectTurnActiveTools,
+} from '../turnToolScope';
 
 const available = [
   'deals',
@@ -14,13 +17,34 @@ const available = [
   'workspaceWrite',
   'publishWebsite',
   'fileReader',
-  'workflowGuide',
-  'workflowValidate',
-  'workflowSave',
-  'list_config_keys',
 ];
 
+describe('resolveToolAnswerLimit', () => {
+  it('caps matched reads after two calls', () => {
+    expect(resolveToolAnswerLimit(['deals', 'search_tools'], true)).toBe(2);
+  });
+
+  it('does not cap turns that need a standalone tool', () => {
+    expect(
+      resolveToolAnswerLimit(['deals', 'search_tools', 'generatePptx'], true),
+    ).toBeUndefined();
+  });
+});
+
 describe('selectTurnActiveTools', () => {
+  it('keeps permitted operation names active for dynamic loading', () => {
+    const active = selectTurnActiveTools({
+      message: 'Create a deal',
+      attachmentCount: 0,
+      availableToolNames: ['dealsAdd'],
+      hasErxesOperations: true,
+    });
+
+    expect(active).toEqual(
+      expect.arrayContaining(['dealsAdd', 'search_tools']),
+    );
+  });
+
   it('reduces a PowerPoint turn to the requested generator and dynamic operations', () => {
     const active = selectTurnActiveTools({
       message: 'erxes 3.0 iin taniltsuulgiig power point report deer beldee og',
@@ -38,8 +62,6 @@ describe('selectTurnActiveTools', () => {
       'terminal',
       'publishWebsite',
       'fileReader',
-      'workflowGuide',
-      'list_config_keys',
     ]) {
       expect(active).not.toContain(hidden);
     }
@@ -81,17 +103,6 @@ describe('selectTurnActiveTools', () => {
     expect(active).not.toContain('webSearch');
   });
 
-  it('activates configuration lookup only for a settings request', () => {
-    const active = selectTurnActiveTools({
-      message: 'Which API key settings are configured?',
-      attachmentCount: 0,
-      availableToolNames: available,
-      hasErxesOperations: true,
-    });
-
-    expect(active).toContain('list_config_keys');
-  });
-
   it('recognizes common web, document, and presentation synonyms', () => {
     const cases = [
       ['Look up the current USD exchange rate', 'webSearch'],
@@ -128,7 +139,6 @@ describe('selectTurnActiveTools', () => {
       attachmentCount: 0,
       availableToolNames: available,
       hasErxesOperations: true,
-      hasIntentOperation: true,
     });
     const greeting = selectTurnActiveTools({
       message: 'Hello!',

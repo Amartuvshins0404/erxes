@@ -5,9 +5,8 @@ import { Document } from 'mongoose';
 // (high volume, nothing to audit or revert). This is both an accountability
 // trail and the seed of the future point-in-time revert journal.
 export interface IMastraAgentActionLog {
-  source: 'chat' | 'workflow';
+  source: 'chat';
   agentId?: string;
-  workflowId?: string;
   operation: string;
   operationType: string;
   destructive?: boolean;
@@ -23,7 +22,8 @@ export interface IMastraAgentActionLog {
 }
 
 export interface IMastraAgentActionLogDocument
-  extends IMastraAgentActionLog, Document {
+  extends IMastraAgentActionLog,
+    Document {
   _id: string;
   createdAt: Date;
   updatedAt: Date;

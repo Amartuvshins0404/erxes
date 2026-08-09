@@ -12,11 +12,11 @@ export interface ApprovedOp {
 interface RequestAuth {
   /** Base64-encoded acting user for trusted internal subgraph calls. */
   userHeader?: string;
-  /** Acting principal used by permission-sensitive caches and entity lookup. */
+  /** Acting principal used by permission-sensitive caches and execution. */
   principalUserId?: string;
-  /** Human who initiated an interactive turn; absent for background events. */
+  /** Human who initiated the turn. */
   initiatorUserId?: string;
-  /** Current thread, used for skills and generated artifacts. */
+  /** Current thread, used for generated artifacts. */
   threadId?: string;
   agentId?: string;
   /** Tenant of the request — required by tools that query tenant-partitioned stores. */
@@ -43,10 +43,6 @@ interface RequestAuth {
   /** Destructive ops the user approved for THIS turn — the execute guard runs an
    *  otherwise-gated delete/merge only when it matches one of these. */
   approvedOps?: ApprovedOp[];
-  /** True for unattended workflow execution authenticated as the agent's linked
-   *  core account. Destructive operations then require impossible live approval
-   *  and remain blocked. */
-  background?: boolean;
   /** Workspace runtime gate for the memory-heavy image background tool. */
   backgroundRemovalEnabled?: boolean;
   /** Per-turn exact-call cache. Repeated model calls share the first promise,

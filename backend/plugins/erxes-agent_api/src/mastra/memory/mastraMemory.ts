@@ -82,9 +82,9 @@ export async function getMastraMemory(): Promise<Memory> {
 
 /**
  * The shared Mastra memory STORE (MongoDBStore on erxes_mastra_memory). Built
- * alongside the Memory instance; exposed so the chat read layer can reach
- * storage-domain methods Memory doesn't surface (e.g. listMessagesById for
- * message-id feedback lookup). Ensures the Memory is built first.
+ * alongside the Memory instance; exposed so the chat layer can reach
+ * storage-domain methods Memory does not surface. Ensures the Memory is built
+ * first.
  */
 export async function getMastraStore(
   subdomain?: string,

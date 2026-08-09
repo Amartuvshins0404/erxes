@@ -1,7 +1,5 @@
 import { IContext } from '~/connectionResolvers';
 import { IMastraSettings } from '@/settings/@types/settings';
-import { resetObservabilityHosts } from '~/mastra/scoring/observability';
-import { resetLangfuseClients } from '~/mastra/scoring/langfuseClient';
 import { toPublicSettings } from '@/settings/publicSettings';
 
 /** Mutations for the plugin-wide Mastra settings document. */
@@ -13,8 +11,6 @@ export const settingsMutations = {
   ) => {
     await checkPermission('settingsManage');
     const persisted = await models.MastraSettings.saveSettings(doc);
-    resetObservabilityHosts();
-    resetLangfuseClients();
     return toPublicSettings(persisted);
   },
 };

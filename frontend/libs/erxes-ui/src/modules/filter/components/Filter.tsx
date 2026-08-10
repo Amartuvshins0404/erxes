@@ -1,10 +1,4 @@
 import {
-  IconChevronRight,
-  IconFilter2,
-  IconSearch,
-  IconX,
-} from '@tabler/icons-react';
-import {
   Button,
   Combobox,
   Command,
@@ -14,6 +8,13 @@ import {
   Popover,
   Tooltip,
 } from 'erxes-ui/components';
+import {
+  IconFilter2,
+  IconChevronLeft,
+  IconChevronRight,
+  IconSearch,
+  IconX,
+} from '@tabler/icons-react';
 import { useRemoveQueryStateByKey } from 'erxes-ui/hooks';
 import { cn } from 'erxes-ui/lib';
 import { usePreviousHotkeyScope } from 'erxes-ui/modules/hotkey/hooks/usePreviousHotkeyScope';
@@ -202,6 +203,24 @@ const FilterCommandItem = React.forwardRef<
   );
 });
 
+const FilterBackButton = () => {
+  const { id } = useFilterContext();
+  const setView = useSetAtom(filterPopoverViewState(id));
+
+  return (
+    <button
+      type="button"
+      onClick={() => setView('root')}
+      className="flex h-8 w-full items-center gap-1 border-b px-2 text-sm text-muted-foreground hover:text-foreground"
+    >
+      <IconChevronLeft className="size-4" />
+      Back
+    </button>
+  );
+};
+
+const FilterViewNesting = React.createContext(false);
+
 const FilterView = ({
   children,
   filterKey = 'root',
@@ -214,11 +233,22 @@ const FilterView = ({
   const { id } = useFilterContext();
   const view = useAtomValue(filterPopoverViewState(id));
   const dialogView = useAtomValue(filterDialogViewState(id));
+  const isNested = React.useContext(FilterViewNesting);
 
   if (inDialog ? dialogView !== filterKey : view !== filterKey) {
     return null;
   }
-  return children;
+
+  if (inDialog || filterKey === 'root' || isNested) {
+    return children;
+  }
+
+  return (
+    <FilterViewNesting.Provider value={true}>
+      <FilterBackButton />
+      {children}
+    </FilterViewNesting.Provider>
+  );
 };
 
 const FilterDialog = (props: React.ComponentPropsWithoutRef<typeof Dialog>) => {

@@ -1,19 +1,9 @@
 import { OperationMeta } from './operationRegistry';
 import { ApprovedOp } from '../requestContext';
 
-// Consent for irreversible mutations, stored per-agent (and per-workflow).
-//   'ask' (default) → remove/delete/merge run only after the user approves them
-//                     in chat (the agent never silently destroys data, and never
-//                     hard-refuses — it asks).
-//   'allow'         → destructive operations run without asking.
-// The legacy value 'block' resolves to 'ask' (we no longer hard-refuse).
-export type DestructiveOpsPolicy = 'ask' | 'allow';
-
 // erxes mutation names are suffix-based: customersRemove, dealsRemove,
 // segmentsDelete, customersMerge, companiesMerge. Match those verbs anywhere in
-// the operation name. We gate ONLY mutations, so reads are never affected.
-// 'archive' is deliberately excluded — it is the reversible, soft alternative to
-// a hard delete, so blocking it would push the model toward the worse option.
+// the operation name. We gate only mutations, so reads are never affected.
 const DESTRUCTIVE_NAME = /(remove|delete|merge|destroy)/i;
 
 /** True when `op` is a mutation that irreversibly destroys or merges data. */
@@ -23,41 +13,9 @@ export function isDestructiveOperation(op: OperationMeta): boolean {
 }
 
 /**
- * Resolve the destructive-ops consent from a stored config object (an agent
- * document or a workflow definition). Anything other than an explicit 'allow'
- * — including a missing field on a legacy agent — resolves to 'block', so the
- * safe default holds even before the field is persisted.
- */
-export function resolveDestructiveOpsPolicy(
-  config: unknown,
-): DestructiveOpsPolicy {
-  const value = (config as { destructiveOps?: unknown } | null | undefined)
-    ?.destructiveOps;
-  // Only an explicit 'allow' skips the prompt; everything else (incl. the legacy
-  // 'block' and a missing field) means "ask the user".
-  return value === 'allow' ? 'allow' : 'ask';
-}
-
-/**
- * Whether a destructive mutation may run WITHOUT a per-op approval. True only
- * when the config grants 'allow' AND the run is attended. Unattended workflow
- * and frontline-bot runs can never carry approval, so destructive operations
- * remain gated regardless of configuration.
- */
-export function destructiveOpsPreapproved(
-  policy: DestructiveOpsPolicy,
-  background: boolean,
-): boolean {
-  return !background && policy === 'allow';
-}
-
-/**
  * True when the user approved this operation for the turn. Matched on operation
- * NAME only — the user approves the action ("delete these products"), so the
- * agent may run it even if it adjusts the arguments between turns (e.g. it
- * settles on the right id field). Matching exact args was too brittle: a single
- * arg-shape change by the model re-triggered the prompt in a loop. Args are kept
- * on ApprovedOp for display/audit.
+ * name only — the user approves the action, so argument changes do not trigger
+ * a second prompt.
  */
 export function isApprovedOperation(
   operation: string,
@@ -69,9 +27,7 @@ export function isApprovedOperation(
 
 /**
  * The structured result returned when the model attempts a destructive
- * operation that the user has not yet approved. The agent must NOT retry — it
- * surfaces the intent so the user gets an Approve / Deny prompt; the operation
- * runs only on the follow-up turn carrying the approval.
+ * operation that the user has not yet approved. The agent must not retry.
  */
 export function destructiveApprovalRequiredResult(
   operation: string,

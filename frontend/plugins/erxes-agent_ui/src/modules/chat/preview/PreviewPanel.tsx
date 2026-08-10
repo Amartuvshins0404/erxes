@@ -7,24 +7,31 @@ import {
   IconMinimize,
   IconPresentation,
   IconX,
+  IconWorldWww,
 } from '@tabler/icons-react';
 import { Button, cn, Empty } from 'erxes-ui';
+import { useTranslation } from 'react-i18next';
 import { type EChartHandle } from '~/modules/chat/charts';
 import { ChartArtifactView } from '~/modules/chat/components/ChartArtifactView';
 import {
   artifactIcon,
-  Artifact,
-  DocumentArtifact,
-  ImageArtifact,
+  type Artifact,
+  type DocumentArtifact,
+  type ImageArtifact,
+  type WebsiteArtifact,
   documentUrl,
+  websiteUrl,
 } from '~/modules/chat/lib/artifacts';
-import { MermaidViewer } from '~/modules/chat/preview/MermaidViewer';
 import { formatFileSize } from '~/modules/chat/lib/attachments';
+import { useThreadArtifacts } from '~/modules/chat/hooks/useThreadArtifacts';
 import { previewStore } from '~/modules/chat/preview/previewStore';
-import { DocumentViewer } from '~/modules/chat/preview/DocumentViewer';
+import {
+  DocumentViewer,
+  WebsiteViewer,
+} from '~/modules/chat/preview/DocumentViewer';
+import { MermaidViewer } from '~/modules/chat/preview/MermaidViewer';
 import { ImageViewer } from '~/modules/chat/preview/ImageViewer';
 import { PresentMode } from '~/modules/chat/preview/PresentMode';
-import { useThreadArtifacts } from '~/modules/chat/hooks/useThreadArtifacts';
 
 const canPresent = (a: Artifact): a is DocumentArtifact =>
   a.kind === 'document' && a.format === 'pptx' && !!a.slides?.length;
@@ -34,9 +41,14 @@ const slideLabel = (a: DocumentArtifact): string => {
   return n ? `${n} slide${n === 1 ? '' : 's'}` : '';
 };
 
-const artifactSubtitle = (a: Artifact): string => {
+const artifactSubtitle = (a: Artifact, websiteFilesLabel?: string): string => {
   if (a.kind === 'chart') return 'Interactive chart';
   if (a.kind === 'diagram') return 'Mermaid diagram';
+  if (a.kind === 'website') {
+    return [websiteFilesLabel, formatFileSize(a.size)]
+      .filter(Boolean)
+      .join(' · ');
+  }
   if (a.kind === 'image') {
     return [
       'Transparent PNG',
@@ -101,6 +113,7 @@ const FileRow = ({
   active?: boolean;
   onClick: () => void;
 }) => {
+  const { t } = useTranslation('erxes-agent');
   const Icon = artifactIcon(artifact);
   return (
     <button
@@ -119,7 +132,14 @@ const FileRow = ({
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium">{artifact.title}</p>
         <p className="truncate text-xs text-muted-foreground">
-          {artifactSubtitle(artifact)}
+          {artifactSubtitle(
+            artifact,
+            artifact.kind === 'website'
+              ? t('artifact-website-file-count', {
+                  count: artifact.fileCount,
+                })
+              : undefined,
+          )}
         </p>
       </div>
     </button>
@@ -214,7 +234,12 @@ const FileListView = ({
             <IconMaximize className="size-4" />
           )}
         </Button>
-        <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onClose}
+          aria-label="Close"
+        >
           <IconX className="size-4" />
         </Button>
       </div>
@@ -256,14 +281,17 @@ const ItemView = ({
   const toggleFullscreen = previewStore((s) => s.toggleFullscreen);
   const chartRef = useRef<EChartHandle>(null);
   const [presenting, setPresenting] = useState(false);
+  const { t } = useTranslation('erxes-agent');
   const typeLabel =
     artifact.kind === 'chart'
       ? 'Chart'
       : artifact.kind === 'diagram'
-        ? 'Diagram'
-        : artifact.kind === 'image'
-          ? 'Image'
-          : artifact.format.toUpperCase();
+      ? 'Diagram'
+      : artifact.kind === 'image'
+      ? 'Image'
+      : artifact.kind === 'website'
+      ? t('artifact-website-type')
+      : artifact.format.toUpperCase();
 
   return (
     <>
@@ -313,6 +341,7 @@ const ItemView = ({
         {(artifact.kind === 'document' || artifact.kind === 'image') && (
           <DocumentActions artifact={artifact} />
         )}
+        {artifact.kind === 'website' && <WebsiteActions artifact={artifact} />}
         <Button
           variant="ghost"
           size="icon"
@@ -325,7 +354,12 @@ const ItemView = ({
             <IconMaximize className="size-4" />
           )}
         </Button>
-        <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onClose}
+          aria-label="Close"
+        >
           <IconX className="size-4" />
         </Button>
       </div>
@@ -341,16 +375,15 @@ const ItemView = ({
           <MermaidViewer definition={artifact.definition} />
         ) : artifact.kind === 'image' ? (
           <ImageViewer artifact={artifact} />
+        ) : artifact.kind === 'website' ? (
+          <WebsiteViewer artifact={artifact} />
         ) : (
           <DocumentViewer artifact={artifact} />
         )}
       </div>
 
       {presenting && canPresent(artifact) && (
-        <PresentMode
-          artifact={artifact}
-          onExit={() => setPresenting(false)}
-        />
+        <PresentMode artifact={artifact} onExit={() => setPresenting(false)} />
       )}
     </>
   );
@@ -373,3 +406,16 @@ const DocumentActions = ({
     </a>
   </Button>
 );
+
+const WebsiteActions = ({ artifact }: { artifact: WebsiteArtifact }) => {
+  const { t } = useTranslation('erxes-agent');
+
+  return (
+    <Button asChild variant="secondary" size="sm">
+      <a href={websiteUrl(artifact)} target="_blank" rel="noreferrer">
+        <IconWorldWww className="size-3.5" />
+        {t('artifact-website-open-browser')}
+      </a>
+    </Button>
+  );
+};

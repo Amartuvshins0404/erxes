@@ -1,7 +1,10 @@
+export type MastraProviderScope = 'organization' | 'personal';
+
 export interface IMastraProvider {
   _id: string;
   provider: string;
   label?: string | null;
+  scope: MastraProviderScope;
   // apiKey is write-only: reads expose only these two secret-free fields.
   hasApiKey?: boolean | null;
   apiKeyHint?: string | null;
@@ -14,6 +17,7 @@ export interface IMastraProvider {
   // Header values are write-only; reads expose only the configured header names.
   headerKeys?: string[] | null;
   createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface IMastraProviderPreset {
@@ -51,76 +55,25 @@ export interface IAttachmentStorage {
   enabled?: boolean | null;
 }
 
-export interface IMastraVoiceStatus {
-  enabled?: boolean | null;
-}
-
 export interface IAttachmentStorageStatusResponse {
   mastraAttachmentStorageStatus: IAttachmentStorage | null;
-}
-
-export interface IVoiceStatusResponse {
-  mastraVoiceStatus: IMastraVoiceStatus | null;
 }
 
 export interface IMastraSettings {
   _id?: string;
   erxesApiUrl?: string | null;
-  erxesApiToken?: string | null;
-  defaultAgentId?: string | null;
+  memoryEnabled?: boolean | null;
   attachmentsEnabled?: boolean | null;
-  defaultAgentQuota?: number | null;
-  attachmentStorage?: IAttachmentStorage | null;
-  advancedMemory?: boolean | null;
-}
-
-export interface IMastraVoiceConfigStatus {
-  enabled?: boolean | null;
-  sttEnabled?: boolean | null;
-  ttsEnabled?: boolean | null;
-  sttConfigured?: boolean | null;
-  ttsConfigured?: boolean | null;
-  sttSource?: 'db' | 'env' | 'none' | null;
-  ttsSource?: 'db' | 'env' | 'none' | null;
-  ttsVoice?: string | null;
-  ttsSampleRate?: number | null;
-  isEnabled?: boolean | null;
-}
-
-export interface IMastraVoiceOption {
-  id: string;
-  label: string;
-  gender: 'female' | 'male';
-}
-
-export interface IVoiceConfigResponse {
-  mastraVoiceConfig: IMastraVoiceConfigStatus | null;
-}
-
-export interface IVoiceCatalogResponse {
-  mastraVoiceCatalog: IMastraVoiceOption[];
-}
-
-export interface IMastraUserSettings {
-  userId: string;
-  agentQuota?: number | null;
-}
-
-export interface IUserAgentQuotaResponse {
-  mastraUserAgentQuota: IMastraUserSettings | null;
+  backgroundRemovalEnabled?: boolean | null;
+  openSandboxApiUrl?: string | null;
+  hasOpenSandboxApiKey?: boolean | null;
+  openSandboxApiKeyHint?: string | null;
+  attachmentStorage?: Pick<
+    IAttachmentStorage,
+    'configured' | 'serviceType'
+  > | null;
 }
 
 export interface ISettingsResponse {
   mastraSettings: IMastraSettings | null;
-}
-
-export interface ISettingsAgentOption {
-  _id: string;
-  agentId: string;
-  name: string;
-  isEnabled: boolean;
-}
-
-export interface IAgentsResponse {
-  mastraAgents: ISettingsAgentOption[];
 }

@@ -158,3 +158,23 @@ export function validateSchemaSections(
 
   return null;
 }
+
+export function compareSchemaVersion(a: string, b: string): number {
+  const ax = a.split(/[.-]/).map((p) => parseInt(p, 10) || 0);
+  const bx = b.split(/[.-]/).map((p) => parseInt(p, 10) || 0);
+  const len = Math.max(ax.length, bx.length);
+  for (let i = 0; i < len; i++) {
+    const na = ax[i] ?? 0;
+    const nb = bx[i] ?? 0;
+    if (na !== nb) return na - nb;
+  }
+  if (a !== b) return a.localeCompare(b);
+  return 0;
+}
+
+export function getLatestSchemaVersion(
+  versions: string[],
+): string | null {
+  if (versions.length === 0) return null;
+  return [...versions].sort((a, b) => compareSchemaVersion(b, a))[0];
+}

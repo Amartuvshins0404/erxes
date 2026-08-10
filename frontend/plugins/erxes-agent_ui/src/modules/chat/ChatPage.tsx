@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useApolloClient } from '@apollo/client';
+import { useTranslation } from 'react-i18next';
+import { useToast } from 'erxes-ui';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { IconArrowDown } from '@tabler/icons-react';
 import type {
@@ -11,7 +13,6 @@ import { chatStore } from '~/modules/chat/store/chatStore';
 import {
   useChatAgents,
   useAttachmentsEnabled,
-  useVoiceEnabled,
 } from '~/modules/chat/hooks/useChatAgents';
 import { useAgentChatView } from '~/modules/chat/hooks/useChatView';
 import { useMastraThreads } from '~/modules/chat/hooks/useMastraThreads';
@@ -21,26 +22,17 @@ import { useAttachments } from '~/modules/chat/hooks/useAttachments';
 import { useThreadArtifacts } from '~/modules/chat/hooks/useThreadArtifacts';
 import { useSessionBootstrap } from '~/modules/chat/hooks/useSessionBootstrap';
 import { withThreadParam } from '~/modules/chat/lib/threadParam';
-import {
-  readChatMode,
-  readWorkflowParam,
-  withChatMode,
-  withWorkflowParam,
-  type ChatMode,
-} from '~/modules/chat/lib/chatMode';
-import { useWorkflows } from '~/pages/workflows/hooks/useWorkflows';
 import { useIsNarrow } from '~/modules/chat/hooks/useIsNarrow';
 import { ChatPageHeader } from '~/modules/chat/components/ChatPageHeader';
 import { ChatSidePanel } from '~/modules/chat/components/ChatSidePanel';
 import { DeleteSessionDialog } from '~/modules/chat/components/DeleteSessionDialog';
+import { DeleteMessagePairDialog } from '~/modules/chat/components/DeleteMessagePairDialog';
 import {
   AmbientBackdrop,
   ChatErrorBanner,
   DropOverlay,
   SelectAgentEmpty,
-  SkillDraftBanner,
 } from '~/modules/chat/components/ChatNotices';
-import { WorkflowChatView } from '~/modules/chat/components/WorkflowChatView';
 import { MessageList } from '~/modules/chat/components/MessageList';
 import { Composer } from '~/modules/chat/components/Composer';
 import { ApprovalBar } from '~/modules/chat/components/ApprovalBar';
@@ -48,20 +40,25 @@ import { PreviewResizer } from '~/modules/chat/components/PreviewResizer';
 import { PreviewPanel } from '~/modules/chat/preview/PreviewPanel';
 import { previewStore } from '~/modules/chat/preview/previewStore';
 import { pendingApproval } from '~/modules/chat/lib/uiParts';
+import { MASTRA_MESSAGE_PAIR_REMOVE } from '~/graphql/mutations';
+import { refetchThreadArtifactsIntoCache } from '~/modules/chat/threadsCache';
 import { associateArtifacts } from '~/modules/chat/lib/artifacts';
-import { useSkillSlashPicker } from '~/modules/skills/hooks/useSkillSlashPicker';
-import { useSkillFromThread } from '~/modules/skills/hooks/useSkillFromThread';
-import {
-  showSkillPermissionError,
-  useSkillAccess,
-} from '~/modules/skills/hooks/useSkillAccess';
-import { SkillSlashPicker } from '~/modules/skills/components/SkillSlashPicker';
-import { SkillActivePill } from '~/modules/skills/components/SkillActivePill';
-import { SkillDraftPreviewDialog } from '~/modules/skills/components/SkillDraftPreviewDialog';
-import { findDraftSkillFromMessages } from '~/modules/skills/utils';
-import { VoiceOverlay } from '~/modules/chat/voice/components/VoiceOverlay';
-import { useVoiceConversation } from '~/modules/chat/voice/hooks/useVoiceConversation';
 import '~/modules/chat/chat.css';
+
+interface PendingMessagePairDelete {
+  threadId: string;
+  uiMessageId: string;
+  persistedMessageId: string;
+}
+
+interface MastraMessagePairRemoveResponse {
+  mastraMessagePairRemove?: {
+    deletedIds?: unknown;
+  };
+}
+const isStringArray = (value: unknown): value is string[] =>
+  Array.isArray(value) &&
+  value.every((item: unknown) => typeof item === 'string');
 
 // Distance (px) from the bottom under which we keep following streamed output.
 const SCROLL_PIN_THRESHOLD = 120;
@@ -69,6 +66,8 @@ const SCROLL_PIN_THRESHOLD = 120;
 const SCROLL_BUTTON_THRESHOLD = 280;
 
 export const ChatPage = () => {
+  const { t } = useTranslation('mastra');
+  const { toast } = useToast();
   const { agentId } = useParams<{ agentId: string }>();
   const navigate = useNavigate();
   // The active conversation is addressable via ?thread=<id>. Selecting a session
@@ -81,21 +80,6 @@ export const ChatPage = () => {
       setSearchParams((prev) => withThreadParam(prev, threadId), { replace }),
     [setSearchParams],
   );
-  // Chat | Workflow is deep-linkable alongside the active thread.
-  const chatMode = readChatMode(searchParams);
-  const workflowParam = readWorkflowParam(searchParams);
-  const setChatMode = useCallback(
-    (mode: ChatMode) =>
-      setSearchParams((prev) => withChatMode(prev, mode), { replace: false }),
-    [setSearchParams],
-  );
-  const setWorkflowParam = useCallback(
-    (workflowId: string | undefined, replace = false) =>
-      setSearchParams((prev) => withWorkflowParam(prev, workflowId), {
-        replace,
-      }),
-    [setSearchParams],
-  );
   const [railOpen, setRailOpen] = useState(!agentId);
   // Below `md` the sessions side panel becomes an off-canvas drawer; closed by
   // default so the message column keeps full width. Desktop ignores this.
@@ -104,48 +88,30 @@ export const ChatPage = () => {
   // Thread id awaiting delete confirmation — drives the styled AlertDialog that
   // replaced the native window.confirm().
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
+  const [pendingMessageDelete, setPendingMessageDelete] =
+    useState<PendingMessagePairDelete | null>(null);
+  const [messageDeleteLoading, setMessageDeleteLoading] = useState(false);
   const apolloClient = useApolloClient();
 
   const { agents, loading: agentsLoading } = useChatAgents();
   const attachmentsEnabled = useAttachmentsEnabled();
-  const voiceEnabled = useVoiceEnabled();
 
-  // The route accepts either the agent record id or business agentId.
   const selectedAgent = useMemo(
-    () =>
-      agentId
-        ? agents.find((a) => a._id === agentId || a.agentId === agentId) ?? null
-        : null,
+    () => agents.find((agent) => agent._id === agentId) ?? null,
     [agents, agentId],
   );
+  const view = useAgentChatView(selectedAgent?._id);
 
-  const canReadWorkflows =
-    selectedAgent?.capabilities?.canReadWorkflows === true;
-  const activeChatMode: ChatMode =
-    chatMode === 'workflow' && canReadWorkflows ? 'workflow' : 'chat';
-
-  const view = useAgentChatView(agentId);
   const {
     activeThreadId,
     isDraft,
     reasoningEffort,
-    voiceMode,
     messages,
     loading: chatLoading,
     messagesLoading,
     error: chatError,
     retry,
   } = view;
-
-  // Hands-free voice loop (mic → STT → existing send flow → spoken reply).
-  // Active only when this agent's voice mode is on AND the backend has voice
-  // configured; otherwise the hook is fully inert (no mic, no listeners).
-  const voiceActive = !!voiceMode && voiceEnabled && !!selectedAgent;
-  const voice = useVoiceConversation(
-    agentId,
-    selectedAgent?.agentId,
-    voiceActive,
-  );
 
   // The persisted session list lives in the Apollo cache, not the chat store.
   // Paginated: older sessions load on demand as the sidebar scrolls.
@@ -157,54 +123,15 @@ export const ChatPage = () => {
     hasMore: hasMoreSessions,
     loadingMore: loadingMoreSessions,
     loadMore: loadMoreSessions,
-  } = useMastraThreads(selectedAgent?.agentId);
+  } = useMastraThreads(selectedAgent?._id);
   const sessionsLoaded = !!selectedAgent && !threadsLoading;
   const retrySessions = useCallback(() => {
     void refetchThreads().catch(() => undefined);
   }, [refetchThreads]);
   const { renameThread } = useRenameMastraThread();
-  const { removeThread } = useRemoveMastraThread(selectedAgent?.agentId);
-
-  // Workflow mode lists only definitions owned by the selected agent.
-  const {
-    workflows,
-    loading: workflowsLoading,
-    error: workflowsError,
-    refetch: refetchWorkflows,
-  } = useWorkflows(
-    selectedAgent?.agentId,
-    activeChatMode !== 'workflow' || !canReadWorkflows,
+  const { removeThread, loading: sessionDeleteLoading } = useRemoveMastraThread(
+    selectedAgent?._id,
   );
-  const retryWorkflows = useCallback(() => {
-    void refetchWorkflows().catch(() => undefined);
-  }, [refetchWorkflows]);
-  const selectedWorkflow = useMemo(
-    () => workflows.find(({ _id }) => _id === workflowParam) ?? null,
-    [workflows, workflowParam],
-  );
-  const handleSelectWorkflow = useCallback(
-    (workflowId: string) => {
-      setSidebarOpen(false);
-      setWorkflowParam(workflowId);
-    },
-    [setWorkflowParam],
-  );
-  useEffect(() => {
-    if (activeChatMode !== 'workflow' || workflowsLoading || selectedWorkflow)
-      return;
-    if (workflows.length === 0) {
-      if (workflowParam) setWorkflowParam(undefined, true);
-      return;
-    }
-    setWorkflowParam(workflows[0]._id, true);
-  }, [
-    activeChatMode,
-    workflowsLoading,
-    selectedWorkflow,
-    workflows,
-    workflowParam,
-    setWorkflowParam,
-  ]);
 
   const [input, setInput] = useState('');
   const [showScrollDown, setShowScrollDown] = useState(false);
@@ -221,53 +148,6 @@ export const ChatPage = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const attachments = useAttachments(attachmentsEnabled);
-
-  // ── Skills: composer /slash picker + make_skill draft preview ──
-  const { canCreate: canCreateSkill } = useSkillAccess();
-  const slash = useSkillSlashPicker({
-    agentId: selectedAgent?.agentId,
-    input,
-    setInput,
-  });
-
-  const [draftSkillId, setDraftSkillId] = useState<string | null>(null);
-  const [draftOpen, setDraftOpen] = useState(false);
-  const [draftDismissed, setDraftDismissed] = useState(false);
-
-  const openDraft = useCallback((skillId: string) => {
-    setDraftSkillId(skillId);
-    setDraftOpen(true);
-    setDraftDismissed(false);
-  }, []);
-
-  const { makeSkill, making } = useSkillFromThread((skill) =>
-    openDraft(skill._id),
-  );
-
-  // A draft the makeSkill tool produced mid-conversation — surface a banner so
-  // the user can review/publish it. Dismissable until a new one appears. Memoized
-  // so the reverse scan doesn't re-walk messages on every streamed-token render.
-  const detectedDraft = useMemo(
-    () => findDraftSkillFromMessages(messages),
-    [messages],
-  );
-
-  const handleMakeSkill = () => {
-    if (!selectedAgent || !activeThreadId) return;
-    if (!canCreateSkill) return showSkillPermissionError('create');
-    makeSkill({ agentId: selectedAgent.agentId, threadId: activeThreadId });
-  };
-
-  // Activation is per-turn: drop the /slash pill and any dismissed-draft banner
-  // when the thread changes. A render-time reset (store the last thread, adjust
-  // when it differs) rather than an effect, so it lands in the same render.
-  const { clearActiveSkill } = slash;
-  const [resetThread, setResetThread] = useState(activeThreadId);
-  if (resetThread !== activeThreadId) {
-    setResetThread(activeThreadId);
-    clearActiveSkill();
-    setDraftDismissed(false);
-  }
 
   // Session state-machine (slug→id redirect, ?thread= deep-link, current-agent
   // tracking, bootstrap/re-home) lives in the hook so the view keeps only its
@@ -338,7 +218,7 @@ export const ChatPage = () => {
   // SessionList / AgentRail skip re-rendering while a reply streams.
   const handleNewThread = useCallback(() => {
     if (!agentId || !selectedAgent) return;
-    chatStore.newDraft(apolloClient, agentId, selectedAgent.agentId);
+    chatStore.newDraft(apolloClient, agentId, selectedAgent._id);
     // A draft isn't persisted yet, so it has nothing to address — drop ?thread=
     // and let reload/back fall back to the agent's default (most-recent/draft).
     setThreadParam(undefined);
@@ -352,7 +232,7 @@ export const ChatPage = () => {
       chatStore.selectSession(
         apolloClient,
         agentId,
-        selectedAgent.agentId,
+        selectedAgent._id,
         threadId,
       );
       // Make the conversation addressable: push ?thread= so reload restores it
@@ -373,18 +253,83 @@ export const ChatPage = () => {
     [agentId, selectedAgent],
   );
 
-  const confirmDelete = useCallback(() => {
+  const confirmDelete = useCallback(async () => {
     if (!agentId || !pendingDelete) return;
+    const result = await removeThread(pendingDelete).catch(() => null);
+    if (!result?.data?.mastraThreadRemove) return;
+
     // The cached list filter (hook) + local state teardown (store); the
     // bootstrap effect re-selects the next session if this one was active.
     const wasActive = pendingDelete === activeThreadId;
-    removeThread(pendingDelete);
     chatStore.discardThread(agentId, pendingDelete);
     setPendingDelete(null);
     // Drop the deleted thread from the URL so it doesn't point at a dead session
     // and the bootstrap effect is free to re-home to the next one.
     if (wasActive) setThreadParam(undefined, true);
   }, [agentId, pendingDelete, activeThreadId, removeThread, setThreadParam]);
+
+  const handleDeleteMessage = useCallback(
+    (uiMessageId: string, persistedMessageId: string) => {
+      if (!activeThreadId || chatLoading) return;
+      setPendingMessageDelete({
+        threadId: activeThreadId,
+        uiMessageId,
+        persistedMessageId,
+      });
+    },
+    [activeThreadId, chatLoading],
+  );
+
+  const confirmDeleteMessage = useCallback(() => {
+    if (!agentId || !pendingMessageDelete || messageDeleteLoading) return;
+    setMessageDeleteLoading(true);
+    void apolloClient
+      .mutate<MastraMessagePairRemoveResponse>({
+        mutation: MASTRA_MESSAGE_PAIR_REMOVE,
+        variables: {
+          threadId: pendingMessageDelete.threadId,
+          messageId: pendingMessageDelete.persistedMessageId,
+        },
+      })
+      .then(({ data }) => {
+        const deletedIds = data?.mastraMessagePairRemove?.deletedIds;
+        if (!isStringArray(deletedIds)) {
+          throw new Error(t('delete-failed-description'));
+        }
+        chatStore.discardMessagePair(
+          agentId,
+          pendingMessageDelete.threadId,
+          pendingMessageDelete.uiMessageId,
+          deletedIds,
+        );
+        void refetchThreads().catch(() => undefined);
+        void refetchThreadArtifactsIntoCache(
+          apolloClient,
+          pendingMessageDelete.threadId,
+        );
+        setPendingMessageDelete(null);
+        toast({ title: t('prompt-reply-deleted') });
+      })
+      .catch((error: unknown) => {
+        toast({
+          title: t('delete-failed'),
+          description:
+            error instanceof Error
+              ? error.message
+              : t('delete-failed-description'),
+          variant: 'destructive',
+        });
+      })
+      .finally(() => setMessageDeleteLoading(false));
+  }, [
+    agentId,
+    apolloClient,
+    messageDeleteLoading,
+    pendingMessageDelete,
+    refetchThreads,
+    t,
+    toast,
+  ]);
 
   const handleRenameSession = useCallback(
     (id: string, threadId: string, title: string) => {
@@ -416,7 +361,6 @@ export const ChatPage = () => {
       atts: ChatAttachment[],
       approvedOperations?: ApprovedOp[],
       hidden?: boolean,
-      activeSkillNames?: string[],
     ) => {
       if (!selectedAgent || !agentId) return;
       // Sending re-pins to the bottom so the user follows their own message.
@@ -426,12 +370,11 @@ export const ChatPage = () => {
       chatStore.sendMessage(
         apolloClient,
         agentId,
-        selectedAgent.agentId,
+        selectedAgent._id,
         message,
         atts,
         approvedOperations,
         hidden,
-        activeSkillNames,
       );
     },
     [apolloClient, agentId, selectedAgent],
@@ -467,11 +410,6 @@ export const ChatPage = () => {
     )
       return;
     const message = input.trim();
-    // Carry the /slash-activated skill into this turn's request (names only —
-    // the server force-loads their instructions). Consumed on send.
-    const activeSkillNames = slash.activeSkill
-      ? [slash.activeSkill]
-      : undefined;
     // Files are staged, not uploaded, until now — upload them as part of sending.
     // If any upload fails, abort: keep the composer's text + chips so the user
     // can retry (send again) or remove the offending file. Nothing is sent.
@@ -479,9 +417,7 @@ export const ChatPage = () => {
     if (!ok) return;
     attachments.clear();
     setInput('');
-    sendMessage(message, atts, undefined, undefined, activeSkillNames);
-    // The activated skill applied to this turn; drop the reminder pill.
-    slash.clearActiveSkill();
+    sendMessage(message, atts);
   };
 
   // Re-ask the question that produced the last reply (with its attachments).
@@ -490,17 +426,8 @@ export const ChatPage = () => {
   // rows depend on it not changing every chunk.
   const handleRegenerate = useCallback(() => {
     if (!agentId || !selectedAgent || chatLoading) return;
-    chatStore.regenerate(apolloClient, agentId, selectedAgent.agentId);
+    chatStore.regenerate(apolloClient, agentId, selectedAgent._id);
   }, [apolloClient, agentId, selectedAgent, chatLoading]);
-
-  // Stable rating handler so the memoized message rows don't re-render per token.
-  const handleRate = useCallback(
-    (messageId: string, rating: 1 | -1) => {
-      if (!agentId) return;
-      chatStore.rateMessage(apolloClient, agentId, messageId, rating);
-    },
-    [apolloClient, agentId],
-  );
 
   // Load a past user message back into the composer to tweak before sending.
   const handleEditMessage = useCallback((value: string) => {
@@ -530,24 +457,13 @@ export const ChatPage = () => {
   // Composer callback props, stabilized so the memoized Composer /
   // ReasoningEffortControl don't re-render on every streamed token.
   const handleReasoningEffortChange = useCallback(
-    (effort?: ReasoningEffort) =>
-      chatStore.setReasoningEffort(agentId!, effort),
+    (effort?: ReasoningEffort) => {
+      if (agentId) chatStore.setReasoningEffort(agentId, effort);
+    },
     [agentId],
   );
 
-  const handleVoiceModeToggle = useCallback(
-    () => chatStore.setVoiceMode(agentId!, !voiceMode),
-    [agentId, voiceMode],
-  );
-
-  const handleVoiceSetup = useCallback(
-    () => navigate('/settings/erxes-agent/voice'),
-    [navigate],
-  );
-
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    // The /slash skill picker claims arrow/Enter/Tab/Esc while it's open.
-    if (slash.handleKeyDown(e)) return;
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
@@ -589,61 +505,41 @@ export const ChatPage = () => {
 
   return (
     <div className="flex flex-col h-full">
-      {!voiceActive && (
-        <ChatPageHeader
-          hasAgent={!!selectedAgent}
-          agentName={selectedAgent?.name}
-          agentId={selectedAgent?._id}
-          asDrawer={asDrawer}
-          onToggleSidebar={() => setSidebarOpen((v) => !v)}
-          chatMode={activeChatMode}
-          activeThreadId={activeThreadId}
-          isDraft={isDraft}
-          onMakeSkill={handleMakeSkill}
-          making={making}
-          chatLoading={chatLoading}
-          onNewThread={handleNewThread}
-        />
-      )}
+      <ChatPageHeader
+        hasAgent={!!selectedAgent}
+        agentName={selectedAgent?.accountName}
+        agentId={selectedAgent?._id}
+        asDrawer={asDrawer}
+        onToggleSidebar={() => setSidebarOpen((v) => !v)}
+        onNewThread={handleNewThread}
+      />
 
       <div ref={splitRef} className="flex flex-1 overflow-hidden relative">
-        {/* ── Side panel: AgentRail ↔ SessionList slide (hidden in voice mode) ── */}
-        {!voiceActive && (
-          <ChatSidePanel
-            asDrawer={asDrawer}
-            sidebarOpen={sidebarOpen}
-            onCloseSidebar={() => setSidebarOpen(false)}
-            showAgentRail={showAgentRail}
-            agents={agents}
-            agentsLoading={agentsLoading}
-            agentId={agentId}
-            onAgentSelect={handleAgentSelect}
-            hasAgent={!!selectedAgent}
-            chatMode={activeChatMode}
-            canReadWorkflows={canReadWorkflows}
-            onChatModeChange={setChatMode}
-            threads={threads}
-            sessionsLoaded={sessionsLoaded}
-            isDraft={isDraft}
-            activeThreadId={activeThreadId}
-            hasMoreSessions={hasMoreSessions}
-            loadingMoreSessions={loadingMoreSessions}
-            onLoadMore={loadMoreSessions}
-            onSelectSession={handleSelectSession}
-            onNewThread={handleNewThread}
-            onDeleteSession={handleDeleteSession}
-            onRenameSession={handleRenameSession}
-            onRailOpen={handleRailOpen}
-            sessionsError={!!threadsError}
-            onRetrySessions={retrySessions}
-            workflows={workflows}
-            workflowsLoading={workflowsLoading}
-            workflowsError={!!workflowsError}
-            onRetryWorkflows={retryWorkflows}
-            workflowParam={workflowParam}
-            onSelectWorkflow={handleSelectWorkflow}
-          />
-        )}
+        <ChatSidePanel
+          asDrawer={asDrawer}
+          sidebarOpen={sidebarOpen}
+          onCloseSidebar={() => setSidebarOpen(false)}
+          showAgentRail={showAgentRail}
+          agents={agents}
+          agentsLoading={agentsLoading}
+          agentId={agentId}
+          onAgentSelect={handleAgentSelect}
+          hasAgent={!!selectedAgent}
+          threads={threads}
+          sessionsLoaded={sessionsLoaded}
+          isDraft={isDraft}
+          activeThreadId={activeThreadId}
+          hasMoreSessions={hasMoreSessions}
+          loadingMoreSessions={loadingMoreSessions}
+          onLoadMore={loadMoreSessions}
+          onSelectSession={handleSelectSession}
+          onNewThread={handleNewThread}
+          onDeleteSession={handleDeleteSession}
+          onRenameSession={handleRenameSession}
+          onRailOpen={handleRailOpen}
+          sessionsError={!!threadsError}
+          onRetrySessions={retrySessions}
+        />
 
         {/* ── Chat area ── */}
         <div
@@ -659,11 +555,6 @@ export const ChatPage = () => {
 
           {!selectedAgent ? (
             <SelectAgentEmpty />
-          ) : activeChatMode === 'workflow' ? (
-            <WorkflowChatView
-              workflow={selectedWorkflow}
-              onWorkflowChanged={retryWorkflows}
-            />
           ) : (
             <>
               <MessageList
@@ -672,7 +563,6 @@ export const ChatPage = () => {
                 messagesLoading={messagesLoading}
                 chatLoading={chatLoading}
                 attachmentsEnabled={attachmentsEnabled}
-                ratingEnabled={!!agentId && !!activeThreadId}
                 boxRef={messagesBoxRef}
                 endRef={messagesEndRef}
                 onScroll={handleMessagesScroll}
@@ -681,11 +571,10 @@ export const ChatPage = () => {
                   textareaRef.current?.focus();
                 }}
                 onRegenerate={handleRegenerate}
-                onRate={handleRate}
                 onEditMessage={handleEditMessage}
                 onResendMessage={handleResendMessage}
+                onDeleteMessage={handleDeleteMessage}
                 storeArtifactsByMessage={storeArtifactsByMessage}
-                debug={selectedAgent.debug}
               />
 
               {showScrollDown && (
@@ -715,31 +604,6 @@ export const ChatPage = () => {
                 />
               )}
 
-              {detectedDraft && !draftOpen && !draftDismissed && (
-                <SkillDraftBanner
-                  name={detectedDraft.name}
-                  onReview={() => openDraft(detectedDraft._id)}
-                  onDismiss={() => setDraftDismissed(true)}
-                />
-              )}
-
-              {slash.open && (
-                <SkillSlashPicker
-                  items={slash.items}
-                  activeIndex={slash.activeIndex}
-                  loading={slash.loading}
-                  onSelect={slash.onSelect}
-                  onHover={slash.setActiveIndex}
-                />
-              )}
-
-              {slash.activeSkill && (
-                <SkillActivePill
-                  name={slash.activeSkill}
-                  onClear={slash.clearActiveSkill}
-                />
-              )}
-
               <Composer
                 input={input}
                 onInputChange={setInput}
@@ -749,55 +613,41 @@ export const ChatPage = () => {
                 chatLoading={chatLoading}
                 attachmentsEnabled={attachmentsEnabled}
                 attachments={attachments}
-                agentName={selectedAgent.name}
+                agentName={selectedAgent.accountName}
                 reasoningEffort={reasoningEffort}
                 onReasoningEffortChange={handleReasoningEffortChange}
-                voiceEnabled={voiceEnabled}
-                voiceMode={!!voiceMode}
-                onVoiceModeToggle={handleVoiceModeToggle}
-                onVoiceSetup={handleVoiceSetup}
                 textareaRef={textareaRef}
                 fileInputRef={fileInputRef}
               />
-
-              {voiceActive && (
-                <VoiceOverlay
-                  agentName={selectedAgent.name}
-                  voice={voice}
-                  onExit={() => chatStore.setVoiceMode(agentId!, false)}
-                />
-              )}
             </>
           )}
         </div>
 
         {/* ── Artifact Preview panel (charts / generated documents) ── */}
-        {previewOpen &&
-          selectedAgent &&
-          activeChatMode === 'chat' &&
-          !previewFullscreen && (
-            <PreviewResizer
-              splitRef={splitRef}
-              sideCollapsed={sideCollapsed}
-              onSideCollapsedChange={setSideCollapsed}
-            />
-          )}
-        {previewOpen && selectedAgent && activeChatMode === 'chat' && (
+        {previewOpen && selectedAgent && !previewFullscreen && (
+          <PreviewResizer
+            splitRef={splitRef}
+            sideCollapsed={sideCollapsed}
+            onSideCollapsedChange={setSideCollapsed}
+          />
+        )}
+        {previewOpen && selectedAgent && (
           <PreviewPanel threadId={activeThreadId} />
         )}
       </div>
 
-      <SkillDraftPreviewDialog
-        skillId={draftSkillId}
-        open={draftOpen}
-        onOpenChange={setDraftOpen}
-        onDone={() => setDraftDismissed(true)}
-      />
-
       <DeleteSessionDialog
+        loading={sessionDeleteLoading}
         open={!!pendingDelete}
         onOpenChange={(open) => !open && setPendingDelete(null)}
         onConfirm={confirmDelete}
+      />
+
+      <DeleteMessagePairDialog
+        open={!!pendingMessageDelete}
+        loading={messageDeleteLoading}
+        onOpenChange={(open) => !open && setPendingMessageDelete(null)}
+        onConfirm={confirmDeleteMessage}
       />
     </div>
   );

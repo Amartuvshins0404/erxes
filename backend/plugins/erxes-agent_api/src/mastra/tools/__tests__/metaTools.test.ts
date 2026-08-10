@@ -1,6 +1,11 @@
-jest.mock('@mastra/core/tools', () => ({ createTool: (config: unknown) => config }));
+jest.mock('@mastra/core/tools', () => ({
+  createTool: (config: unknown) => config,
+}));
 
-const mockExecute = jest.fn(() => Promise.resolve({ ok: true }));
+const mockExecute = jest.fn((...args: unknown[]) => {
+  void args;
+  return Promise.resolve({ ok: true });
+});
 
 jest.mock('../erxesTools', () => ({
   executeErxesOperation: (...args: unknown[]) => mockExecute(...args),
@@ -11,7 +16,9 @@ import { runWithAuth } from '../../requestContext';
 import type { OperationRegistry, OperationMeta } from '../operationRegistry';
 import type { AgentActionInput } from '../../auditLog';
 
-const makeRegistry = (ops: Array<Partial<OperationMeta>>): OperationRegistry => {
+const makeRegistry = (
+  ops: Array<Partial<OperationMeta>>,
+): OperationRegistry => {
   const list = ops.map(
     (operation) =>
       ({
@@ -22,10 +29,12 @@ const makeRegistry = (ops: Array<Partial<OperationMeta>>): OperationRegistry => 
         description: '',
         graphqlArgs: [],
         returnType: null,
-      }) as OperationMeta,
+      } as OperationMeta),
   );
   return {
-    operations: new Map(list.map((operation) => [operation.operation, operation])),
+    operations: new Map(
+      list.map((operation) => [operation.operation, operation]),
+    ),
     list,
     inputTypesMap: {},
     objectFieldsMap: {},
@@ -43,15 +52,12 @@ interface ToolLike {
 
 const build = (
   operation: Partial<OperationMeta>,
-  destructiveOps: 'allow' | 'ask',
   calls: AgentActionInput[],
 ): ToolLike => {
   const registry = makeRegistry([operation]);
   const tools = buildErxesOperationTools({
     registry,
-    settings: {},
     policy: { mode: 'all', allowed: [] },
-    destructiveOps,
     recordAction: (entry) => calls.push(entry),
   });
   return tools[registry.list[0].operation] as unknown as ToolLike;
@@ -60,11 +66,10 @@ const build = (
 beforeEach(() => mockExecute.mockClear());
 
 describe('typed operation guard and audit', () => {
-  it('asks for approval on a destructive op, records it, and never executes it', async () => {
+  it('asks for approval on a destructive operation and never executes it', async () => {
     const calls: AgentActionInput[] = [];
     const tool = build(
       { operation: 'customersRemove', operationType: 'mutation' },
-      'ask',
       calls,
     );
 
@@ -72,84 +77,47 @@ describe('typed operation guard and audit', () => {
 
     expect(result.requiresApproval).toBe(true);
     expect(mockExecute).not.toHaveBeenCalled();
-    expect(calls).toHaveLength(1);
     expect(calls[0]).toMatchObject({
       operation: 'customersRemove',
       destructive: true,
       status: 'blocked',
     });
-    expect(calls[0].processId).toBeUndefined();
   });
 
-  it('executes a destructive op approved for this turn', async () => {
+  it('executes a destructive operation approved for this turn', async () => {
     const calls: AgentActionInput[] = [];
     const tool = build(
       { operation: 'customersRemove', operationType: 'mutation' },
-      'ask',
       calls,
     );
 
     const result = await runWithAuth(
-      { approvedOps: [{ operation: 'customersRemove', args: { _ids: ['c1'] } }] },
+      { approvedOps: [{ operation: 'customersRemove', args: {} }] },
       () => tool.execute({ _ids: ['c1'] }),
     );
 
     expect(result.requiresApproval).toBeUndefined();
     expect(mockExecute).toHaveBeenCalledTimes(1);
-    expect(calls[0]).toMatchObject({
-      operation: 'customersRemove',
-      destructive: true,
-      status: 'success',
-    });
+    expect(calls[0]).toMatchObject({ status: 'success' });
   });
 
-  it('records a successful mutation and correlation id when destructive operations are allowed', async () => {
-    const calls: AgentActionInput[] = [];
-    const tool = build(
-      { operation: 'customersRemove', operationType: 'mutation' },
-      'allow',
-      calls,
-    );
-
-    await tool.execute({});
-
-    expect(mockExecute).toHaveBeenCalledTimes(1);
-    const sentProcessId = mockExecute.mock.calls[0][4] as string;
-    expect(sentProcessId).toMatch(/^agt_/);
-    expect(calls[0]).toMatchObject({
-      operation: 'customersRemove',
-      destructive: true,
-      status: 'success',
-      processId: sentProcessId,
-    });
-  });
-
-  it('records a failed mutation', async () => {
-    mockExecute.mockResolvedValueOnce({ success: false, error: 'boom' } as never);
-    const calls: AgentActionInput[] = [];
-    const tool = build(
+  it('records failed mutations and leaves reads untracked', async () => {
+    mockExecute.mockResolvedValueOnce({
+      success: false,
+      error: 'boom',
+    } as never);
+    const failedCalls: AgentActionInput[] = [];
+    await build(
       { operation: 'dealsEdit', operationType: 'mutation' },
-      'ask',
-      calls,
-    );
+      failedCalls,
+    ).execute({});
+    expect(failedCalls[0]).toMatchObject({ status: 'failed', error: 'boom' });
 
-    await tool.execute({});
-
-    expect(calls[0]).toMatchObject({ status: 'failed', error: 'boom' });
-  });
-
-  it('does not record reads or assign them correlation ids', async () => {
-    const calls: AgentActionInput[] = [];
-    const tool = build(
+    const readCalls: AgentActionInput[] = [];
+    await build(
       { operation: 'customers', operationType: 'query' },
-      'ask',
-      calls,
-    );
-
-    await tool.execute({});
-
-    expect(mockExecute).toHaveBeenCalledTimes(1);
-    expect(mockExecute.mock.calls[0][4]).toBeUndefined();
-    expect(calls).toHaveLength(0);
+      readCalls,
+    ).execute({});
+    expect(readCalls).toHaveLength(0);
   });
 });

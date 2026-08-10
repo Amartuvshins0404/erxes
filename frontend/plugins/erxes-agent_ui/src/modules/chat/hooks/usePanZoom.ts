@@ -68,6 +68,62 @@ function findNodeEl(target: EventTarget | null, root: Element): Element | null {
   return null;
 }
 
+const FOREIGN_OBJECT_MARKER = 'data-panzoom-foreign-object';
+
+/**
+ * Sanitizes SVG and XHTML labels independently. DOMPurify intentionally drops
+ * every child of SVG foreignObject elements as a namespace-confusion defense;
+ * Mermaid uses those children for labels. Sanitizing the detached HTML labels
+ * first, then importing only those clean nodes into the sanitized SVG preserves
+ * labels without putting the original mixed-namespace markup into the DOM.
+ */
+export const sanitizeSvg = (svgHtml: string) => {
+  const parser = new DOMParser();
+  const serializer = new XMLSerializer();
+  const source = parser.parseFromString(svgHtml, 'image/svg+xml');
+  const foreignObjects = Array.from(
+    source.querySelectorAll('foreignObject'),
+  );
+  const labels = foreignObjects.map((foreignObject, index) => {
+    const rawLabel = Array.from(foreignObject.childNodes)
+      .map((node) => serializer.serializeToString(node))
+      .join('');
+    const cleanLabel = DOMPurify.sanitize(rawLabel, {
+      USE_PROFILES: { html: true },
+    });
+    foreignObject.replaceChildren();
+    foreignObject.setAttribute(FOREIGN_OBJECT_MARKER, String(index));
+    return cleanLabel;
+  });
+  const svgOnly = foreignObjects.length
+    ? serializer.serializeToString(source.documentElement)
+    : svgHtml;
+  const cleanSvg = DOMPurify.sanitize(svgOnly, {
+    USE_PROFILES: { svg: true, svgFilters: true },
+    ADD_TAGS: ['foreignObject'],
+    ADD_ATTR: [FOREIGN_OBJECT_MARKER],
+  });
+
+  if (!labels.length) return cleanSvg;
+
+  const sanitized = parser.parseFromString(cleanSvg, 'image/svg+xml');
+  for (const foreignObject of Array.from(
+    sanitized.querySelectorAll(`[${FOREIGN_OBJECT_MARKER}]`),
+  )) {
+    const index = Number(foreignObject.getAttribute(FOREIGN_OBJECT_MARKER));
+    const label = labels[index];
+    if (label !== undefined) {
+      const html = parser.parseFromString(label, 'text/html');
+      for (const child of Array.from(html.body.childNodes)) {
+        foreignObject.appendChild(sanitized.importNode(child, true));
+      }
+    }
+    foreignObject.removeAttribute(FOREIGN_OBJECT_MARKER);
+  }
+
+  return serializer.serializeToString(sanitized.documentElement);
+};
+
 /**
  * Owns all pan/zoom state and interaction wiring for a raw SVG string:
  *  - Scroll wheel       → zoom toward cursor
@@ -101,9 +157,7 @@ export const usePanZoom = (svgHtml: string) => {
   // filters, viewBox and foreignObject labels.
   const processedSvg = useMemo(() => {
     if (!svgHtml) return '';
-    const clean = DOMPurify.sanitize(svgHtml, {
-      USE_PROFILES: { svg: true, svgFilters: true, html: true },
-    });
+    const clean = sanitizeSvg(svgHtml);
     return clean.includes('id="panzoom-hover"')
       ? clean
       : clean.replace('</svg>', `${NODE_HOVER_CSS}</svg>`);

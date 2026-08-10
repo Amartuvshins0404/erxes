@@ -1,5 +1,4 @@
 import type { ToolsInput } from '@mastra/core/agent';
-import { IUserDocument } from 'erxes-api-shared/core-types';
 import { IMastraAgentDocument } from '@/agent/@types/agent';
 import { IMastraProviderDocument } from '@/provider/@types/provider';
 import { IMastraSettingsDocument } from '@/settings/@types/settings';
@@ -25,20 +24,25 @@ export interface ToolResultLike {
   result?: unknown;
 }
 
-// The auth context a turn propagates to tools and follow-up LLM calls.
+// The auth context propagated to every tool call.
 export interface TurnAuthCtx {
+  /** Base64-encoded acting user for trusted internal subgraph calls. */
   userHeader?: string;
+  /** Optional caller token for auxiliary flows; erxes operations ignore it. */
   token?: string;
+  principalUserId?: string;
+  /** Human who initiated the turn. */
+  initiatorUserId?: string;
   subdomain?: string;
   threadId?: string;
   turnId?: string;
   turnStartedAt?: Date;
   turnPrompt?: string;
+  /** Successfully persisted artifacts produced during this turn. */
+  artifactCount?: number;
+  /** Persisted website artifacts produced during this turn. */
+  websiteArtifactCount?: number;
   resourceId?: string;
-  // True for unattended frontline-bot execution. Workflow execution carries
-  // the same flag through BackgroundAuthCtx so destructive operations remain
-  // gated without live approval.
-  background?: boolean;
 }
 
 // One message of the assembled LLM conversation. `content` widens beyond a
@@ -73,37 +77,16 @@ export interface MemoryBinding {
   resource: string;
 }
 
-// Who/what is driving a turn — the one knob that varies across the four
-// callers (in-app chat, the GraphQL resolver, the frontline bot webhook, and
-// scheduled runs). It decides resource scoping, the auth context, ownership
-// gating, and whether memory rides on the agent's history toggle or on the
-// message being non-empty. The rest of prepareTurn is shared.
-export type TurnIdentity =
-  | {
-      // In-app user — the SSE route and the mastraAgentChat resolver. Threads
-      // are owned/listed by the user's resource; ownership is enforced.
-      kind: 'user';
-      user: IUserDocument;
-    }
-  | {
-      // The frontline bot webhook — a synthetic resource kept out of users'
-      // chat lists. No ownership gate; memory rides on a non-empty message.
-      kind: 'bot';
-      resourceKey: string;
-    }
-  | {
-      // A scheduled run — a schedule-scoped resource. No ownership gate; the
-      // convo is the schedule's prompt (no learned digest woven in).
-      kind: 'schedule';
-      resourceKey: string;
-    };
-
 export interface PreparedTurn {
   agentConfig: IMastraAgentDocument;
   settings: IMastraSettingsDocument | null;
   providers: IMastraProviderDocument[];
   agent: TurnAgent;
   tools: ToolsInput;
+  /** Per-turn tool allowlist sent to the provider after intent scoping. */
+  activeTools: string[];
+  /** System prompt reduced to the capabilities selected for this turn. */
+  turnInstructions: string;
   sessionId: string;
   convo: TurnMessage[];
   authCtx: TurnAuthCtx;
@@ -114,16 +97,4 @@ export interface PreparedTurn {
   memoryBinding?: MemoryBinding;
   memCtx: MemoryContext;
   attachments?: IMastraChatAttachment[];
-  // Learnings injected into this turn's context — stamped onto the assistant
-  // message meta so feedback can be attributed back to them.
-  learningIds: string[];
-  // Full instructions of the skill(s) the user EXPLICITLY slash-activated for
-  // this turn, force-loaded as the agent.stream `system` message. Undefined when
-  // no skill was activated (the model still uses the native skill tool for the
-  // rest). See buildActivatedSkillsBlock.
-  activeSkillInstructions?: string;
-  // Names of the skill(s) actually resolved + injected this turn (the reachable
-  // subset of the requested activeSkillNames). Stamped onto the assistant
-  // message metadata so the UI can show which skills shaped the answer.
-  appliedSkillNames?: string[];
 }

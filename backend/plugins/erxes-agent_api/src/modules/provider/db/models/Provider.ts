@@ -5,14 +5,43 @@ import { providerSchema } from '@/provider/db/definitions/provider';
 import {
   IMastraProvider,
   IMastraProviderDocument,
+  MastraProviderScope,
 } from '@/provider/@types/provider';
+
+export interface ProviderOwner {
+  scope: MastraProviderScope;
+  ownerId: string | null;
+}
 
 export interface IMastraProviderModel extends Model<IMastraProviderDocument> {
   getProvider(_id: string): Promise<IMastraProviderDocument>;
-  getProviders(): Promise<IMastraProviderDocument[]>;
-  saveProvider(doc: IMastraProvider): Promise<IMastraProviderDocument>;
-  removeProvider(_id: string): Promise<{ ok: number }>;
+  getProviders(owner: ProviderOwner): Promise<IMastraProviderDocument[]>;
+  getRuntimeProviders(ownerId?: string): Promise<IMastraProviderDocument[]>;
+  saveProvider(
+    doc: IMastraProvider,
+    owner: ProviderOwner,
+  ): Promise<IMastraProviderDocument>;
+  removeProvider(_id: string): Promise<{ deletedCount?: number }>;
 }
+
+const providerIndexSyncs = new WeakMap<IMastraProviderModel, Promise<void>>();
+
+export const ensureProviderIndexes = (
+  model: IMastraProviderModel,
+): Promise<void> => {
+  const existing = providerIndexSyncs.get(model);
+  if (existing) return existing;
+
+  const synchronization = model
+    .syncIndexes()
+    .then(() => undefined)
+    .catch((error: unknown) => {
+      providerIndexSyncs.delete(model);
+      throw error;
+    });
+  providerIndexSyncs.set(model, synchronization);
+  return synchronization;
+};
 
 // Build the persisted update from an incoming save doc. Both `apiKey` and the
 // custom `headers` (whose values can carry auth secrets) are WRITE-ONLY: a
@@ -31,6 +60,13 @@ export const buildProviderUpdate = (doc: IMastraProvider): IMastraProvider => {
   return update;
 };
 
+const organizationOwnerFilter = {
+  $or: [{ ownerId: null }, { ownerId: { $exists: false } }],
+};
+
+const ownerFilter = ({ ownerId }: ProviderOwner) =>
+  ownerId ? { ownerId } : organizationOwnerFilter;
+
 export const loadProviderClass = (_models: IModels) => {
   class MastraProvider {
     public static async getProvider(_id: string) {
@@ -39,29 +75,62 @@ export const loadProviderClass = (_models: IModels) => {
       return p;
     }
 
-    public static async getProviders() {
-      return _models.MastraProvider.find().sort({ provider: 1 });
+    public static async getProviders(owner: ProviderOwner) {
+      return _models.MastraProvider.find(ownerFilter(owner)).sort({
+        provider: 1,
+      });
     }
 
-    public static async saveProvider(doc: IMastraProvider) {
-      // If setting as default, clear other defaults first
+    public static async getRuntimeProviders(ownerId?: string) {
+      const providers = await _models.MastraProvider.find({
+        isEnabled: true,
+        ...(ownerId
+          ? {
+              $or: [
+                { ownerId },
+                { ownerId: null },
+                { ownerId: { $exists: false } },
+              ],
+            }
+          : organizationOwnerFilter),
+      }).sort({ ownerId: 1, provider: 1 });
+
+      const effective = new Map<string, IMastraProviderDocument>();
+      for (const provider of providers) {
+        effective.set(provider.provider, provider);
+      }
+      return [...effective.values()];
+    }
+
+    public static async saveProvider(
+      doc: IMastraProvider,
+      owner: ProviderOwner,
+    ) {
+      await ensureProviderIndexes(_models.MastraProvider);
+
+      const selector = {
+        provider: doc.provider,
+        ...ownerFilter(owner),
+      };
       if (doc.isDefault) {
-        await _models.MastraProvider.updateMany(
-          {},
-          { $set: { isDefault: false } },
-        );
+        await _models.MastraProvider.updateMany(ownerFilter(owner), {
+          $set: { isDefault: false },
+        });
       }
 
-      const update = buildProviderUpdate(doc);
-
-      const existing = await _models.MastraProvider.findOne({
-        provider: doc.provider,
+      const update = buildProviderUpdate({
+        ...doc,
+        scope: owner.scope,
+        ownerId: owner.ownerId,
+        ...(owner.scope === 'personal' ? { envKey: undefined } : {}),
       });
+
+      const existing = await _models.MastraProvider.findOne(selector);
       if (existing) {
         return _models.MastraProvider.findOneAndUpdate(
-          { provider: doc.provider },
+          { _id: existing._id },
           { $set: update },
-          { new: true },
+          { new: true, runValidators: true },
         );
       }
       return _models.MastraProvider.create(update);

@@ -36,21 +36,21 @@ export const useOffersFilterVariables = (variables?: {
   }>();
   const projectId = projectIdParam || id || '';
 
-  const { searchValue, status, partyType, currency, user } =
+  const { searchValue, status, customerId, currency, user } =
     useNonNullMultiQueryState<{
       searchValue: string;
       status: string;
-      partyType: string;
+      customerId: string;
       currency: string;
       user: string;
-    }>(['searchValue', 'status', 'partyType', 'currency', 'user']);
+    }>(['searchValue', 'status', 'customerId', 'currency', 'user']);
 
   return {
     filter: {
       projectId: projectId || undefined,
       search: searchValue || undefined,
       status: status || undefined,
-      partyType: partyType || undefined,
+      customerId: customerId || undefined,
       currency: currency || undefined,
       user: user || undefined,
       ...variables,

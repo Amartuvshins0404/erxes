@@ -40,6 +40,7 @@ export const supplierSchema = schemaWrapper(
       urls: { type: [String], default: [] },
 
       registrationNumber: { type: String, label: 'Registration number' },
+      industry: { type: String, label: 'Industry' },
 
       address: { type: Object },
 

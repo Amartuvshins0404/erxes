@@ -1,6 +1,7 @@
 // The provider-document fields this module reads — satisfied by Mongoose
 // MastraProvider docs and by plain objects in tests.
 export interface ProviderDocLike {
+  _id?: string;
   provider?: string;
   isEnabled?: boolean;
   isOpenAICompatible?: boolean;
@@ -8,7 +9,26 @@ export interface ProviderDocLike {
   apiKey?: string;
   baseUrl?: string;
   headers?: Record<string, string>;
+  ownerId?: string | null;
+  updatedAt?: Date | string;
 }
+
+/** Credential identity for cache partitioning without exposing key material. */
+export const providerRuntimeFingerprint = (
+  providers: ProviderDocLike[],
+): string =>
+  providers
+    .map((provider) => {
+      const updatedAt =
+        provider.updatedAt instanceof Date
+          ? provider.updatedAt.getTime()
+          : provider.updatedAt ?? '';
+      return `${provider.provider ?? ''}:${
+        provider.ownerId ?? 'organization'
+      }:${provider._id ?? ''}:${updatedAt}`;
+    })
+    .sort()
+    .join('|');
 
 // NOTE: the old Kimi "reasoning_content" fetch shim was removed here. It existed
 // because OpenAI-compatible models were built as AI-SDK-v1 objects (via
@@ -247,8 +267,7 @@ export function buildModel(
   );
   const preset = PROVIDER_PRESETS.find((p) => p.provider === providerName);
 
-  // Kimi For Coding is BYOK-only: scheduled runs reuse the user-supplied key
-  // persisted in provider settings and must never fall back to a server env key.
+  // Kimi For Coding is BYOK-only and must never fall back to a server env key.
   const envKey = stored?.envKey || preset?.envKey;
   const apiKey =
     providerName === 'kimi-for-coding'

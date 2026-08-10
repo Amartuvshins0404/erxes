@@ -1,111 +1,165 @@
 import { ExpectedError } from 'erxes-api-shared/utils';
-import { canGroup, getGroupActionScope } from 'erxes-api-shared/core-modules';
 import { IContext } from '~/connectionResolvers';
 import { prepareChatTurn, persistTurn, runAgentTurn } from '@/agent/turn';
-import {
-  canUserAccessAgent,
-  getAgentQuotaStatus,
-  getUserUnitIds,
-} from '@/agent/utils';
 import { IMastraAgentDocument } from '@/agent/@types/agent';
+import { agentAccessFilter, requireScopedAgent } from '@/agent/authorization';
 import { requireActionScope } from '@/_shared/authorization';
+import { requireUserId } from '@/_shared/auth';
 import { ERXES_AGENT_ACTIONS } from '~/meta/permissionActions';
+import { shouldGuardProviderCompletion } from '~/mastra/providerOutputGuard';
+import {
+  agentAccountAppId,
+  agentAccountName,
+  agentIdForAccount,
+  findCoreUsers,
+  isAgentAccount,
+} from '~/mastra/auth/servicePrincipal';
+import {
+  ADDITIONAL_TOOL_KEYS,
+  normalizeAdditionalToolKeys,
+} from '~/mastra/tools/additionalTools';
+
+const hydrateProfiles = async (
+  profiles: IMastraAgentDocument[],
+  subdomain: string,
+) => {
+  if (!profiles.length) return [];
+  const accounts = await findCoreUsers(subdomain, {
+    appId: {
+      $in: profiles.map((profile) => agentAccountAppId(profile._id)),
+    },
+  });
+  const accountsById = new Map(
+    accounts
+      .filter(isAgentAccount)
+      .map((account) => [agentIdForAccount(account), account]),
+  );
+
+  return profiles.flatMap((profile) => {
+    const account = accountsById.get(profile._id);
+    if (!account) return [];
+    return [
+      {
+        ...profile.toObject(),
+        _id: profile._id,
+        visibility: profile.visibility ?? 'organization',
+        audienceUserIds: profile.audienceUserIds ?? [],
+        additionalTools: normalizeAdditionalToolKeys(profile.additionalTools),
+        accountName: agentAccountName(account),
+        accountDescription: account.details?.description || '',
+        permissionGroupIds: account.permissionGroupIds || [],
+        isActive: account.isActive !== false,
+      },
+    ];
+  });
+};
+
+const findMatchingAccountIds = async (
+  profiles: IMastraAgentDocument[],
+  subdomain: string,
+  searchValue?: string,
+): Promise<string[]> => {
+  if (!searchValue?.trim() || !profiles.length) return [];
+  const accounts = await findCoreUsers(subdomain, {
+    appId: {
+      $in: profiles.map((profile) => agentAccountAppId(profile._id)),
+    },
+  });
+  const needle = searchValue.trim().toLocaleLowerCase();
+  return accounts
+    .filter(isAgentAccount)
+    .filter((account) =>
+      [
+        agentAccountName(account),
+        account.details?.description,
+        account.username,
+        account.email,
+      ].some((value) => value?.toLocaleLowerCase().includes(needle)),
+    )
+    .flatMap((account) => agentIdForAccount(account) ?? []);
+};
+
+const hydrateProfile = async (
+  profile: IMastraAgentDocument,
+  subdomain: string,
+) => {
+  const [hydrated] = await hydrateProfiles([profile], subdomain);
+  if (!hydrated) throw new ExpectedError('AI team member account not found');
+  return hydrated;
+};
 
 export const agentQueries = {
+  mastraAgentAdditionalTools: async (
+    _parent: undefined,
+    _args: undefined,
+    { checkPermission }: IContext,
+  ) => {
+    await checkPermission(ERXES_AGENT_ACTIONS.agent.readSummary);
+    return ADDITIONAL_TOOL_KEYS;
+  },
   mastraAgents: async (
     _parent: undefined,
     _args: undefined,
-    { models, user, subdomain, checkPermission }: IContext,
+    { models, subdomain, user, checkPermission }: IContext,
   ) => {
-    const [scope, unitIds] = await Promise.all([
-      checkPermission(ERXES_AGENT_ACTIONS.agent.readSummary).then(() =>
-        requireActionScope({
-          subdomain,
-          user,
-          action: ERXES_AGENT_ACTIONS.agent.readSummary,
-        }),
-      ),
-      user?._id
-        ? getUserUnitIds(models, user._id)
-        : Promise.resolve<string[]>([]),
-    ]);
-    return models.MastraAgent.getAgents(
-      user?._id,
-      scope,
-      user?.branchIds ?? [],
-      user?.departmentIds ?? [],
-      unitIds,
+    await checkPermission(ERXES_AGENT_ACTIONS.agent.readSummary);
+    requireUserId(user);
+    const scope = await requireActionScope({
+      subdomain,
+      user,
+      action: ERXES_AGENT_ACTIONS.agent.readSummary,
+    });
+    const profiles = await models.MastraAgent.getAgents(
+      agentAccessFilter(user, scope),
     );
+    return hydrateProfiles(profiles, subdomain);
   },
 
   mastraAgent: async (
     _parent: undefined,
     { _id }: { _id: string },
-    { models, user, subdomain, checkPermission }: IContext,
+    { models, subdomain, user, checkPermission }: IContext,
   ) => {
-    const [scope, unitIds] = await Promise.all([
-      checkPermission(ERXES_AGENT_ACTIONS.agent.readConfig).then(() =>
-        requireActionScope({
-          subdomain,
-          user,
-          action: ERXES_AGENT_ACTIONS.agent.readConfig,
-        }),
-      ),
-      user?._id
-        ? getUserUnitIds(models, user._id)
-        : Promise.resolve<string[]>([]),
-    ]);
-    return models.MastraAgent.getAgent(
-      _id,
-      user?._id,
-      scope,
-      user?.branchIds ?? [],
-      user?.departmentIds ?? [],
-      unitIds,
-    );
+    await checkPermission(ERXES_AGENT_ACTIONS.agent.readConfig);
+    requireUserId(user);
+    const { agent } = await requireScopedAgent({
+      models,
+      subdomain,
+      user,
+      action: ERXES_AGENT_ACTIONS.agent.readConfig,
+      agentId: _id,
+    });
+    return hydrateProfile(agent, subdomain);
   },
 
   mastraAgentsMain: async (
     _parent: undefined,
     params: { page?: number; perPage?: number; searchValue?: string },
-    { models, user, subdomain, checkPermission }: IContext,
+    { models, subdomain, user, checkPermission }: IContext,
   ) => {
-    const [scope, unitIds] = await Promise.all([
-      checkPermission(ERXES_AGENT_ACTIONS.agent.readSummary).then(() =>
-        requireActionScope({
-          subdomain,
-          user,
-          action: ERXES_AGENT_ACTIONS.agent.readSummary,
-        }),
-      ),
-      user?._id
-        ? getUserUnitIds(models, user._id)
-        : Promise.resolve<string[]>([]),
-    ]);
-    return models.MastraAgent.getAgentsList({
-      ...params,
-      userId: user?._id,
-      scope,
-      teamIds: user?.branchIds ?? [],
-      deptIds: user?.departmentIds ?? [],
-      unitIds,
-    });
-  },
-
-  mastraMyAgentQuotaStatus: async (
-    _parent: undefined,
-    _args: undefined,
-    { models, user, subdomain, checkPermission }: IContext,
-  ) => {
-    await checkPermission(ERXES_AGENT_ACTIONS.agent.create);
-    if (!user?._id) throw new ExpectedError('Login required');
+    await checkPermission(ERXES_AGENT_ACTIONS.agent.readSummary);
+    requireUserId(user);
     const scope = await requireActionScope({
       subdomain,
       user,
-      action: ERXES_AGENT_ACTIONS.agent.create,
+      action: ERXES_AGENT_ACTIONS.agent.readSummary,
     });
-    if (scope === 'all') return { count: 0, quota: 0, atQuota: false };
-    return getAgentQuotaStatus(models, user._id);
+    const filter = agentAccessFilter(user, scope);
+    const allProfiles = params.searchValue
+      ? await models.MastraAgent.getAgents(filter)
+      : [];
+    const matchingAccountIds = await findMatchingAccountIds(
+      allProfiles,
+      subdomain,
+      params.searchValue,
+    );
+    const result = await models.MastraAgent.getAgentsList({
+      ...params,
+      matchingAccountIds,
+      filter,
+    });
+    const list = await hydrateProfiles(result.list, subdomain);
+    return { ...result, list };
   },
 
   mastraAgentChat: async (
@@ -118,8 +172,14 @@ export const agentQueries = {
     { models, user, subdomain, checkPermission }: IContext,
   ) => {
     await checkPermission(ERXES_AGENT_ACTIONS.agent.chat);
-    if (!user?._id) throw new ExpectedError('Login required');
-
+    requireUserId(user);
+    await requireScopedAgent({
+      models,
+      subdomain,
+      user,
+      action: ERXES_AGENT_ACTIONS.agent.chat,
+      agentId,
+    });
     const prepared = await prepareChatTurn({
       models,
       subdomain,
@@ -136,102 +196,19 @@ export const agentQueries = {
       message,
       authCtx,
       memory: memoryBinding,
+      activeTools: prepared.activeTools,
+      turnInstructions: prepared.turnInstructions,
+      guardProviderCompletion:
+        prepared.activeTools.length > 0 &&
+        shouldGuardProviderCompletion(prepared.agentConfig.model),
     });
 
-    await persistTurn({ models, prepared, reply });
-
+    await persistTurn({
+      models,
+      prepared,
+      reply,
+      hasArtifacts: (prepared.authCtx.artifactCount ?? 0) > 0,
+    });
     return reply;
-  },
-};
-
-const capabilityActions = [
-  ERXES_AGENT_ACTIONS.agent.readConfig,
-  ERXES_AGENT_ACTIONS.agent.chat,
-  ERXES_AGENT_ACTIONS.agent.update,
-  ERXES_AGENT_ACTIONS.agent.remove,
-  ERXES_AGENT_ACTIONS.agent.share,
-  ERXES_AGENT_ACTIONS.agent.transferOwnership,
-  ERXES_AGENT_ACTIONS.workflow.read,
-  ERXES_AGENT_ACTIONS.skills.read,
-  ERXES_AGENT_ACTIONS.learning.read,
-] as const;
-
-const emptyCapabilities = {
-  canReadConfig: false,
-  canChat: false,
-  canEdit: false,
-  canRemove: false,
-  canShare: false,
-  canTransferOwnership: false,
-  canManageGrant: false,
-  canReadWorkflows: false,
-  canReadSkills: false,
-  canReadLearnings: false,
-};
-
-export const agentCustomResolvers = {
-  MastraAgent: {
-    isOwnAgent: (
-      agent: IMastraAgentDocument,
-      _args: unknown,
-      { user }: IContext,
-    ) => Boolean(user?._id && agent.createdBy === user._id),
-
-    capabilities: async (
-      agent: IMastraAgentDocument,
-      _args: unknown,
-      { models, subdomain, user }: IContext,
-    ) => {
-      if (!user?._id) return emptyCapabilities;
-
-      const [unitIds, actionScopes, canManagePermissions] = await Promise.all([
-        getUserUnitIds(models, user._id),
-        Promise.all(
-          capabilityActions.map((action) =>
-            getGroupActionScope(subdomain, action, user),
-          ),
-        ),
-        Promise.all([
-          canGroup(subdomain, 'permissionsManage', user),
-          canGroup(subdomain, 'permissionsAgentProfilesManage', user),
-        ]).then((permissions) => permissions.some(Boolean)),
-      ]);
-      const allowed = actionScopes.map((scope) =>
-        scope
-          ? canUserAccessAgent(
-              agent,
-              user._id,
-              scope,
-              user.branchIds ?? [],
-              user.departmentIds ?? [],
-              unitIds,
-            )
-          : false,
-      );
-
-      return {
-        canReadConfig: allowed[0],
-        canChat: allowed[1],
-        canEdit: allowed[2],
-        canRemove: allowed[3],
-        canShare: allowed[4],
-        canTransferOwnership: actionScopes[5] === 'all' && Boolean(allowed[5]),
-        canManageGrant: canManagePermissions && Boolean(allowed[2]),
-        canReadWorkflows: allowed[6],
-        canReadSkills: allowed[7],
-        canReadLearnings: allowed[8],
-      };
-    },
-
-    workflowsCount: async (
-      agent: IMastraAgentDocument,
-      _args: unknown,
-      { models }: IContext,
-    ) =>
-      agent.agentId
-        ? await models.MastraWorkflow.countDocuments({
-            agentId: agent.agentId,
-          })
-        : 0,
   },
 };

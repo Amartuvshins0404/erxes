@@ -21,10 +21,7 @@ export const GET_OFFERS_LIST = gql`
         date
         endDate
         number
-        party {
-          id
-          type
-        }
+        customerId
         status
         unit
         user
@@ -50,10 +47,7 @@ export const GET_OFFERS = gql`
       date
       endDate
       number
-      party {
-        id
-        type
-      }
+      customerId
       paymentPlan {
         downPaymentPercentage
         downPaymentAmount
@@ -93,10 +87,7 @@ export const GET_OFFER = gql`
       date
       endDate
       number
-      party {
-        id
-        type
-      }
+      customerId
       paymentPlan {
         downPaymentPercentage
         downPaymentAmount

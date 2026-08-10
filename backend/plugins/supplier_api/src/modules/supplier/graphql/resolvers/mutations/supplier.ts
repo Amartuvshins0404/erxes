@@ -13,12 +13,9 @@ export const supplierMutations = {
     { input }: { input: ISupplier },
     { models, user, subdomain }: IContext,
   ) => {
-    const before = await models.Supplier.findOne().lean();
-    const previousPosToken = before?.posToken;
-
     const supplier = await models.Supplier.updateSupplier(user._id, input);
 
-    if (supplier?.posToken && supplier.posToken !== previousPosToken) {
+    if (supplier?.posToken) {
       enqueuePosBackfill(subdomain, supplier.posToken).catch((e) =>
         console.error('Failed to enqueue POS backfill:', e),
       );

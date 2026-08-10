@@ -23,6 +23,7 @@ export const types = `
     invoiceId: String
     paymentStatus: String
     membershipFeeAmount: Float
+    archivedAt: Date
     invoice: JSON
   }
 
@@ -49,6 +50,13 @@ const registrationListParams = `
   membershipTypeId: String,
   status: String,
   cpUserId: String,
+  name: String,
+  registrationNumber: String,
+  email: String,
+  createdAtFrom: Date,
+  createdAtTo: Date,
+  activityCategory: String,
+  archived: Boolean,
 `;
 
 export const queries = `
@@ -60,6 +68,7 @@ export const queries = `
   cpMtoRegistrationApplications(membershipTypeId: String, status: String, ${GQL_CURSOR_PARAM_DEFS}): MtoRegistrationApplicationListResponse
   mtoRegistrationApplicationsCount(${registrationListParams}): Int
   cpMtoRegistrationApplicationsCount(membershipTypeId: String, status: String): Int
+  mtoRegistrationApplicationsExport(${registrationListParams}): String
   mtoRegistrationApplication(_id: String!): MtoRegistrationApplication
   cpMtoRegistrationApplication(_id: String!): MtoRegistrationApplication
   mtoRegistrationFormSchemas(membershipTypeId: String): [MtoRegistrationFormSchema!]!
@@ -109,4 +118,7 @@ export const mutations = `
   mtoRegistrationApplicationPaymentUrl(
     _id: String!
   ): String
+  mtoRegistrationApplicationRemove(
+    _id: String!
+  ): JSON
 `;

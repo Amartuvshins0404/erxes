@@ -5,6 +5,7 @@ import {
   IconBuildingStore,
   IconCreditCard,
   IconPackage,
+  IconTruckDelivery,
   IconUsers,
 } from '@tabler/icons-react';
 
@@ -29,14 +30,20 @@ export const MushopNavigation = () => {
           pathPrefix="mushop"
         />
       </Can>
-      <Can module="membership">
+      <Can module="order">
         <NavigationMenuLinkItem
-          name={t('Members')}
-          icon={IconCreditCard}
-          path="members"
+          name={t('Orders')}
+          icon={IconTruckDelivery}
+          path="orders"
           pathPrefix="mushop"
         />
       </Can>
+      <NavigationMenuLinkItem
+        name={t('Members')}
+        icon={IconCreditCard}
+        path="members"
+        pathPrefix="mushop"
+      />
       <Can module="collective">
         <NavigationMenuLinkItem
           name={t('Collectives')}

@@ -1,8 +1,3 @@
-// Step 21 — agent service-user lifecycle. ensureServiceUser provisions /
-// reconciles a passwordless role:'system' core user per agent via the core
-// `users.*` trpc router; syncServiceUserGroup assigns a permission group and
-// invalidates the user's action cache; deactivateServiceUser flips isActive
-// off on agent delete. sendTRPCMessage is mocked — no live DB / network.
 const sendTRPCMessage = jest.fn();
 const clearGroupActionsCache = jest.fn();
 
@@ -14,14 +9,15 @@ jest.mock('erxes-api-shared/core-modules', () => ({
     clearGroupActionsCache(...args),
 }));
 
-import type { IModels } from '~/connectionResolvers';
 import {
-  ensureServiceUser,
-  syncServiceUserGroup,
-  deactivateServiceUser,
+  adoptLegacyAgentAccount,
+  createAgentAccount,
+  deactivateAgentAccount,
+  getAgentAccount,
+  updateAgentAccount,
 } from '../servicePrincipal';
 
-type TrpcCall = {
+interface TrpcCall {
   action: string;
   method: string;
   input: {
@@ -30,261 +26,302 @@ type TrpcCall = {
     selector?: Record<string, unknown>;
     modifier?: Record<string, unknown>;
   };
-};
+}
 
-/** Capture every trpc call so assertions can inspect action + input. */
 const calls = (): TrpcCall[] =>
-  sendTRPCMessage.mock.calls.map(([arg]) => arg as TrpcCall);
+  sendTRPCMessage.mock.calls.map(([call]) => call as TrpcCall);
 
 const callsFor = (action: string): TrpcCall[] =>
-  calls().filter((c) => c.action === action);
+  calls().filter((call) => call.action === action);
 
-const makeModels = () =>
-  ({
-    MastraAgent: {
-      updateOne: jest.fn().mockResolvedValue({ acknowledged: true }),
-    },
-  } as unknown as IModels);
+const pendingUser = {
+  _id: 'agent-user-1',
+  role: 'user',
+  isActive: true,
+  email: 'agent-sales-agent-123456789abc@agents.local',
+  username: 'agent-sales-agent-123456789abc',
+  details: { fullName: 'Sales Agent', description: 'Handles sales' },
+};
 
-const agentConfig = (overrides: Record<string, unknown> = {}) => ({
-  _id: 'agent-doc-1',
-  agentId: 'Sales_Bot',
-  name: 'Sales Bot',
-  ...overrides,
-});
+const readyUser = {
+  ...pendingUser,
+  isOwner: false,
+  appId: 'erxes-agent:agent-user-1',
+  permissionGroupIds: ['group-1', 'group-2'],
+};
 
 beforeEach(() => {
   sendTRPCMessage.mockReset();
-  clearGroupActionsCache.mockReset();
+  clearGroupActionsCache.mockReset().mockResolvedValue(undefined);
 });
 
-describe('ensureServiceUser', () => {
-  it('returns the stored user + its current groups when intact (idempotent, no create)', async () => {
-    sendTRPCMessage.mockImplementation(async ({ action }: TrpcCall) => {
-      if (action === 'findOne') {
-        // The mint path (step 22) reads permissionGroupIds off the reconciled
-        // user to decide whether a group sync is needed.
-        return {
-          _id: 'svc-1',
-          role: 'system',
+describe('createAgentAccount', () => {
+  it('creates a passwordless core team member, marks it as AI-owned, and assigns every selected group', async () => {
+    let marked = false;
+    sendTRPCMessage.mockImplementation(async (call: TrpcCall) => {
+      if (call.action === 'create') return pendingUser;
+      if (call.action === 'updateOne') {
+        marked = true;
+        return { acknowledged: true };
+      }
+      if (call.action === 'findOne') return marked ? readyUser : pendingUser;
+      return null;
+    });
+
+    const result = await createAgentAccount({
+      subdomain: 'os',
+      input: {
+        name: ' Sales Agent ',
+        description: ' Handles sales ',
+        permissionGroupIds: [' group-1 ', 'group-2', 'group-1'],
+        isActive: true,
+      },
+    });
+
+    const createData = callsFor('create')[0].input.data;
+    expect(createData).toEqual(
+      expect.objectContaining({
+        notUsePassword: true,
+        isActive: true,
+        isOwner: false,
+        details: {
+          fullName: 'Sales Agent',
+          description: 'Handles sales',
+        },
+      }),
+    );
+    expect(createData?.username).toMatch(/^agent-sales-agent-[a-f0-9]{12}$/);
+    expect(createData?.email).toBe(`${createData?.username}@agents.local`);
+    expect(callsFor('updateOne')[0].input).toEqual({
+      selector: { _id: 'agent-user-1' },
+      modifier: {
+        $set: {
+          role: 'user',
+          isOwner: false,
           isActive: true,
-          permissionGroupIds: ['grp-9'],
-        };
-      }
-      return null;
+          appId: 'erxes-agent:agent-user-1',
+          permissionGroupIds: ['group-1', 'group-2'],
+          customPermissions: [],
+          'details.fullName': 'Sales Agent',
+          'details.description': 'Handles sales',
+        },
+      },
     });
-    const models = makeModels();
-
-    const res = await ensureServiceUser({
-      agentConfig: agentConfig({ serviceUserId: 'svc-1' }),
+    expect(clearGroupActionsCache).toHaveBeenCalledWith({
       subdomain: 'os',
-      models,
+      userId: 'agent-user-1',
     });
-
-    expect(res).toEqual({
-      serviceUserId: 'svc-1',
-      permissionGroupIds: ['grp-9'],
-    });
-    expect(callsFor('create')).toHaveLength(0);
-    expect(callsFor('updateOne')).toHaveLength(0); // already active + system
-    expect(models.MastraAgent.updateOne).not.toHaveBeenCalled();
+    expect(result).toEqual(readyUser);
   });
 
-  it('re-creates when the stored user was deleted out-of-band', async () => {
-    sendTRPCMessage.mockImplementation(async ({ action }: TrpcCall) => {
-      if (action === 'findOne') return null; // deleted
-      if (action === 'create')
-        return { _id: 'svc-new', role: 'user', isActive: true };
-      if (action === 'updateOne') return { acknowledged: true };
-      return null;
-    });
-    const models = makeModels();
-    const cfg = agentConfig({ serviceUserId: 'svc-gone' });
-
-    const res = await ensureServiceUser({
-      agentConfig: cfg,
-      subdomain: 'os',
-      models,
-    });
-
-    // A freshly created user has no groups yet.
-    expect(res).toEqual({ serviceUserId: 'svc-new', permissionGroupIds: [] });
-    const create = callsFor('create')[0];
-    expect(create.input.data).toMatchObject({
-      notUsePassword: true,
-      isActive: true,
-      isOwner: false,
-      email: 'agent-sales_bot@agents.local',
-      username: 'agent-sales_bot',
-      details: { fullName: 'Sales Bot (agent)' },
-    });
-    // role:'system' set via follow-up updateOne (createUser ignores role)
-    expect(callsFor('updateOne')).toEqual([
-      expect.objectContaining({
-        input: {
-          selector: { _id: 'svc-new' },
-          modifier: { $set: { role: 'system' } },
-        },
-      }),
-    ]);
-    // new id persisted onto the agent config
-    expect(models.MastraAgent.updateOne).toHaveBeenCalledWith(
-      { _id: 'agent-doc-1' },
-      { $set: { serviceUserId: 'svc-new' } },
-    );
-    expect(cfg.serviceUserId).toBe('svc-new');
-  });
-
-  it('reactivates a stored user that had been deactivated', async () => {
-    sendTRPCMessage.mockImplementation(async ({ action }: TrpcCall) => {
-      if (action === 'findOne') {
-        return { _id: 'svc-1', role: 'system', isActive: false };
+  it('links a core-generated account ID to a requested legacy profile ID', async () => {
+    const linkedUser = {
+      ...readyUser,
+      appId: 'erxes-agent:legacy-profile-1',
+    };
+    let marked = false;
+    sendTRPCMessage.mockImplementation(async (call: TrpcCall) => {
+      if (call.action === 'create') return pendingUser;
+      if (call.action === 'updateOne') {
+        marked = true;
+        return { acknowledged: true };
       }
-      if (action === 'updateOne') return { acknowledged: true };
+      if (call.action === 'findOne') return marked ? linkedUser : null;
       return null;
     });
-    const models = makeModels();
 
-    const res = await ensureServiceUser({
-      agentConfig: agentConfig({ serviceUserId: 'svc-1' }),
+    const result = await createAgentAccount({
+      userId: 'legacy-profile-1',
       subdomain: 'os',
-      models,
+      input: {
+        name: 'Sales Agent',
+        permissionGroupIds: ['group-1', 'group-2'],
+      },
     });
 
-    expect(res).toEqual({ serviceUserId: 'svc-1', permissionGroupIds: [] });
-    expect(callsFor('create')).toHaveLength(0);
-    expect(callsFor('updateOne')).toEqual([
+    expect(callsFor('create')[0].input.data?._id).toBeUndefined();
+    expect(callsFor('updateOne')[0].input.modifier).toEqual(
       expect.objectContaining({
-        input: {
-          selector: { _id: 'svc-1' },
-          modifier: { $set: { isActive: true } },
-        },
-      }),
-    ]);
-    // id unchanged → not re-persisted
-    expect(models.MastraAgent.updateOne).not.toHaveBeenCalled();
-  });
-
-  it('adopts the existing user on a duplicate-email race', async () => {
-    sendTRPCMessage.mockImplementation(async ({ action, input }: TrpcCall) => {
-      if (action === 'create') return null; // duplicate → swallowed as null
-      if (action === 'findOne' && input.query?.email) {
-        return { _id: 'svc-raced', role: 'user', isActive: true };
-      }
-      if (action === 'updateOne') return { acknowledged: true };
-      return null;
-    });
-    const models = makeModels();
-    const cfg = agentConfig(); // no serviceUserId
-
-    const res = await ensureServiceUser({
-      agentConfig: cfg,
-      subdomain: 'os',
-      models,
-    });
-
-    expect(res).toEqual({ serviceUserId: 'svc-raced', permissionGroupIds: [] });
-    // adopted by email lookup
-    expect(callsFor('findOne')[0].input).toEqual({
-      query: { email: 'agent-sales_bot@agents.local' },
-    });
-    // role repaired to system on the adopted user
-    expect(callsFor('updateOne')).toContainEqual(
-      expect.objectContaining({
-        input: {
-          selector: { _id: 'svc-raced' },
-          modifier: { $set: { role: 'system' } },
-        },
+        $set: expect.objectContaining({
+          appId: 'erxes-agent:legacy-profile-1',
+        }),
       }),
     );
-    expect(cfg.serviceUserId).toBe('svc-raced');
+    expect(result).toEqual(linkedUser);
   });
 
-  it('throws (fail-closed) when create fails and no user can be adopted', async () => {
-    sendTRPCMessage.mockResolvedValue(null); // create null + no user by email
-    const models = makeModels();
+  it('deactivates a partially created account when finalization fails', async () => {
+    let updateCount = 0;
+    sendTRPCMessage.mockImplementation(async (call: TrpcCall) => {
+      if (call.action === 'create') return pendingUser;
+      if (call.action === 'updateOne') {
+        updateCount += 1;
+        if (updateCount === 1) throw new Error('core update failed');
+        return { acknowledged: true };
+      }
+      return null;
+    });
 
     await expect(
-      ensureServiceUser({
-        agentConfig: agentConfig(),
+      createAgentAccount({
         subdomain: 'os',
-        models,
+        input: {
+          name: 'Sales Agent',
+          permissionGroupIds: ['group-1'],
+        },
       }),
-    ).rejects.toThrow(/Failed to ensure service user/);
-    expect(models.MastraAgent.updateOne).not.toHaveBeenCalled();
+    ).rejects.toThrow('core update failed');
+
+    expect(callsFor('updateOne')[1].input).toEqual({
+      selector: { _id: 'agent-user-1' },
+      modifier: { $set: { isActive: false } },
+    });
   });
 });
 
-describe('syncServiceUserGroup', () => {
-  it('assigns the group and invalidates the action cache', async () => {
-    sendTRPCMessage.mockResolvedValue({ acknowledged: true });
-    const models = makeModels();
-    const cfg = agentConfig({ serviceUserId: 'svc-1' });
+describe('account validation and updates', () => {
+  it('rejects ordinary human users as AI execution principals', async () => {
+    sendTRPCMessage.mockResolvedValue({
+      _id: 'human-user-1',
+      role: 'user',
+      isActive: true,
+      email: 'person@example.com',
+    });
 
-    await syncServiceUserGroup({
-      serviceUserId: 'svc-1',
-      groupId: 'grp-9',
+    await expect(
+      getAgentAccount({ userId: 'human-user-1', subdomain: 'os' }),
+    ).rejects.toThrow(/not found/i);
+  });
+
+  it('updates profile fields, activity, and combined permission groups on core', async () => {
+    const changed = {
+      ...readyUser,
+      details: { fullName: 'Revenue Agent', description: 'Handles revenue' },
+      permissionGroupIds: ['group-2', 'group-3'],
+      isActive: false,
+    };
+    let updated = false;
+    sendTRPCMessage.mockImplementation(async (call: TrpcCall) => {
+      if (call.action === 'findOne') return updated ? changed : readyUser;
+      if (call.action === 'updateOne') {
+        updated = true;
+        return { acknowledged: true };
+      }
+      return null;
+    });
+
+    const result = await updateAgentAccount({
+      userId: 'agent-user-1',
       subdomain: 'os',
-      models,
-      agentConfig: cfg,
+      input: {
+        name: ' Revenue Agent ',
+        description: ' Handles revenue ',
+        permissionGroupIds: ['group-2', ' group-3 ', 'group-2'],
+        isActive: false,
+      },
     });
 
     expect(callsFor('updateOne')[0].input).toEqual({
-      selector: { _id: 'svc-1' },
-      modifier: { $set: { permissionGroupIds: ['grp-9'] } },
+      selector: { _id: 'agent-user-1' },
+      modifier: {
+        $set: {
+          'details.fullName': 'Revenue Agent',
+          'details.description': 'Handles revenue',
+          permissionGroupIds: ['group-2', 'group-3'],
+          isActive: false,
+        },
+      },
     });
-    expect(clearGroupActionsCache).toHaveBeenCalledWith({ userId: 'svc-1' });
-    expect(models.MastraAgent.updateOne).toHaveBeenCalledWith(
-      { _id: 'agent-doc-1' },
-      { $set: { grantGroupId: 'grp-9' } },
-    );
-    expect(cfg.grantGroupId).toBe('grp-9');
-  });
-  it('fails before cache invalidation when core rejects the group update', async () => {
-    sendTRPCMessage.mockResolvedValue(null);
-
-    await expect(
-      syncServiceUserGroup({
-        serviceUserId: 'svc-1',
-        groupId: 'grp-9',
-        subdomain: 'os',
-      }),
-    ).rejects.toThrow('Core user update failed');
-
-    expect(clearGroupActionsCache).not.toHaveBeenCalled();
-  });
-
-  it('clears the group (empty array) when groupId is null', async () => {
-    sendTRPCMessage.mockResolvedValue({ acknowledged: true });
-
-    await syncServiceUserGroup({
-      serviceUserId: 'svc-1',
-      groupId: null,
+    expect(clearGroupActionsCache).toHaveBeenCalledWith({
       subdomain: 'os',
+      userId: 'agent-user-1',
+    });
+    expect(result).toEqual(changed);
+  });
+
+  it('deactivates the canonical team member and clears permission cache', async () => {
+    sendTRPCMessage.mockImplementation(async (call: TrpcCall) => {
+      if (call.action === 'findOne') return readyUser;
+      return { acknowledged: true };
     });
 
-    expect(callsFor('updateOne')[0].input.modifier).toEqual({
-      $set: { permissionGroupIds: [] },
+    await deactivateAgentAccount({ userId: 'agent-user-1', subdomain: 'os' });
+
+    expect(callsFor('updateOne')[0].input).toEqual({
+      selector: { _id: 'agent-user-1' },
+      modifier: { $set: { isActive: false } },
     });
-    expect(clearGroupActionsCache).toHaveBeenCalledWith({ userId: 'svc-1' });
+    expect(clearGroupActionsCache).toHaveBeenCalledWith({
+      subdomain: 'os',
+      userId: 'agent-user-1',
+    });
   });
 });
 
-describe('deactivateServiceUser', () => {
-  it('sets isActive:false via updateOne (not the toggling setActiveStatus)', async () => {
-    sendTRPCMessage.mockResolvedValue({ acknowledged: true });
+describe('adoptLegacyAgentAccount', () => {
+  it('links a marked legacy account to its existing plugin profile', async () => {
+    const legacy = {
+      _id: 'legacy-user-1',
+      role: 'system',
+      isActive: true,
+      email: 'sales-agent@agents.local',
+    };
+    const adopted = {
+      ...readyUser,
+      _id: 'legacy-user-1',
+      appId: 'erxes-agent:legacy-profile-1',
+    };
+    let updated = false;
+    sendTRPCMessage.mockImplementation(async (call: TrpcCall) => {
+      if (call.action === 'findOne') return updated ? adopted : legacy;
+      if (call.action === 'updateOne') {
+        updated = true;
+        return { acknowledged: true };
+      }
+      return null;
+    });
 
-    await deactivateServiceUser({ serviceUserId: 'svc-1', subdomain: 'os' });
+    const result = await adoptLegacyAgentAccount({
+      agentId: 'legacy-profile-1',
+      accountId: 'legacy-user-1',
+      subdomain: 'os',
+      name: 'Sales Agent',
+      description: 'Handles sales',
+      permissionGroupIds: ['group-1'],
+      isActive: true,
+    });
 
-    expect(callsFor('setActiveStatus')).toHaveLength(0);
-    expect(callsFor('updateOne')).toEqual([
-      expect.objectContaining({
-        action: 'updateOne',
-        input: {
-          selector: { _id: 'svc-1' },
-          modifier: { $set: { isActive: false } },
-        },
+    expect(callsFor('updateOne')[0].input).toEqual({
+      selector: { _id: 'legacy-user-1' },
+      modifier: {
+        $set: expect.objectContaining({
+          role: 'user',
+          isOwner: false,
+          appId: 'erxes-agent:legacy-profile-1',
+          permissionGroupIds: ['group-1'],
+        }),
+      },
+    });
+    expect(result).toEqual(adopted);
+  });
+
+  it('never claims an ordinary human account during migration', async () => {
+    sendTRPCMessage.mockResolvedValue({
+      _id: 'human-user-1',
+      role: 'user',
+      email: 'person@example.com',
+    });
+
+    await expect(
+      adoptLegacyAgentAccount({
+        agentId: 'human-profile-1',
+        accountId: 'human-user-1',
+        subdomain: 'os',
+        name: 'Sales Agent',
+        permissionGroupIds: ['group-1'],
+        isActive: true,
       }),
-    ]);
+    ).rejects.toThrow(/Refusing to claim/);
+    expect(callsFor('updateOne')).toHaveLength(0);
   });
 });

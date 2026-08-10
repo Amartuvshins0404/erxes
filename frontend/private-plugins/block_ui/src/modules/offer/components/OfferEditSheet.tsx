@@ -95,8 +95,7 @@ const OfferEditBody = ({
       : undefined,
     endDate:
       parseDateLike(offer.endDate) ?? addDays(new Date(), 7),
-    partyType: (offer.party?.type as 'customer' | 'company') ?? 'customer',
-    partyId: offer.party?.id ?? '',
+    customerId: offer.customerId ?? '',
     user: offer.user ?? '',
   };
 
@@ -108,7 +107,7 @@ const OfferEditBody = ({
         currency: data.price?.currency as CurrencyCode,
         date: data.date || new Date().toISOString(),
         endDate: data.endDate?.toISOString(),
-        party: data.partyType ? { type: data.partyType, id: data.partyId } : undefined,
+        customerId: data.customerId || undefined,
         paymentPlan: data.paymentPlan,
         user: data.user,
       });

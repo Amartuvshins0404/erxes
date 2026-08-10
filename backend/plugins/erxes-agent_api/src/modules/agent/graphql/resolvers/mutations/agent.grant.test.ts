@@ -1,14 +1,10 @@
-const sendTRPCMessage = jest.fn();
 class ExpectedError extends Error {}
 
-jest.mock('erxes-api-shared/utils', () => ({
-  ExpectedError,
-  sendTRPCMessage: (...args: unknown[]) => sendTRPCMessage(...args),
-}));
+jest.mock('erxes-api-shared/utils', () => ({ ExpectedError }));
 
-const canGroup = jest.fn();
-jest.mock('erxes-api-shared/core-modules', () => ({
-  canGroup: (...args: unknown[]) => canGroup(...args),
+const requireActionScope = jest.fn();
+jest.mock('@/_shared/authorization', () => ({
+  requireActionScope: (...args: unknown[]) => requireActionScope(...args),
 }));
 
 const requireScopedAgent = jest.fn();
@@ -16,20 +12,20 @@ jest.mock('@/agent/authorization', () => ({
   requireScopedAgent: (...args: unknown[]) => requireScopedAgent(...args),
 }));
 
-const requireActionScope = jest.fn();
-jest.mock('@/_shared/authorization', () => ({
-  requireActionScope: (...args: unknown[]) => requireActionScope(...args),
-}));
-
-const syncServiceUserGroup = jest.fn();
-const deactivateServiceUser = jest.fn();
+const createAgentAccount = jest.fn();
+const updateAgentAccount = jest.fn();
+const deactivateAgentAccount = jest.fn();
 jest.mock('~/mastra/auth/servicePrincipal', () => ({
-  syncServiceUserGroup: (...args: unknown[]) => syncServiceUserGroup(...args),
-  deactivateServiceUser: (...args: unknown[]) => deactivateServiceUser(...args),
+  createAgentAccount: (...args: unknown[]) => createAgentAccount(...args),
+  updateAgentAccount: (...args: unknown[]) => updateAgentAccount(...args),
+  deactivateAgentAccount: (...args: unknown[]) =>
+    deactivateAgentAccount(...args),
 }));
 
-jest.mock('@/agent/utils', () => ({
-  getAgentQuotaStatus: jest.fn(),
+const resolveAgentPermissions = jest.fn();
+jest.mock('~/mastra/tools/permissionCapabilities', () => ({
+  resolveAgentPermissions: (...args: unknown[]) =>
+    resolveAgentPermissions(...args),
 }));
 
 jest.mock('./agentErrors', () => ({
@@ -37,172 +33,325 @@ jest.mock('./agentErrors', () => ({
 }));
 
 import type { IContext } from '~/connectionResolvers';
+import type { IUserDocument } from 'erxes-api-shared/core-types';
+import type { IMastraAgent, IMastraAgentInput } from '@/agent/@types/agent';
 import { agentMutations } from './agent';
 
-const makeContext = () => {
-  const updateAgent = jest.fn().mockResolvedValue({
-    _id: 'agent-document-id',
-    agentId: 'support-agent',
-    createdBy: 'creator-1',
-    serviceUserId: 'service-user-1',
-  });
-  const checkPermission = jest.fn().mockResolvedValue(undefined);
-  const context = {
-    models: { MastraAgent: { updateAgent } },
-    subdomain: 'tenant',
-    user: { _id: 'admin-1' },
-    checkPermission,
-  } as unknown as IContext;
+const USER_ID = 'agent-user-1';
 
-  return { checkPermission, context, updateAgent };
+const profileInput = (overrides: Partial<IMastraAgentInput> = {}) => ({
+  name: 'Sales Agent',
+  description: 'Helps the sales team',
+  instructions: 'Help the sales team',
+  provider: 'provider-1',
+  model: 'model-1',
+  permissionGroupIds: ['group-1'],
+  isActive: true,
+  ...overrides,
+});
+
+const profileDocument = (overrides: Partial<IMastraAgent> = {}) => {
+  const profile = {
+    _id: USER_ID,
+    instructions: 'Help the sales team',
+    provider: 'provider-1',
+    model: 'model-1',
+    createdAt: new Date('2026-01-01'),
+    updatedAt: new Date('2026-01-01'),
+    ...overrides,
+  };
+  return {
+    ...profile,
+    toObject: jest.fn(() => profile),
+  };
+};
+
+const account = (overrides: Record<string, unknown> = {}) => ({
+  _id: USER_ID,
+  role: 'user',
+  isOwner: false,
+  isActive: true,
+  appId: `erxes-agent:${USER_ID}`,
+  permissionGroupIds: ['group-1'],
+  details: {
+    fullName: 'Sales Agent',
+    description: 'Helps the sales team',
+  },
+  ...overrides,
+});
+
+const makeCtx = () => {
+  const createAgent = jest.fn().mockResolvedValue(profileDocument());
+  const updateAgent = jest.fn().mockResolvedValue(profileDocument());
+  const getAgent = jest.fn().mockResolvedValue(profileDocument());
+  const removeAgent = jest.fn().mockResolvedValue({ acknowledged: true });
+  requireScopedAgent.mockResolvedValue({ agent: getAgent(), scope: 'all' });
+  const deleteOne = jest.fn().mockResolvedValue({ acknowledged: true });
+  const ctx = {
+    models: {
+      MastraAgent: {
+        createAgent,
+        updateAgent,
+        getAgent,
+        removeAgent,
+        deleteOne,
+      },
+    },
+    user: { _id: 'owner-1', isOwner: true },
+    subdomain: 'os',
+    checkPermission: jest.fn().mockResolvedValue(undefined),
+  } as unknown as IContext;
+  return {
+    ctx,
+    createAgent,
+    updateAgent,
+    getAgent,
+    removeAgent,
+    deleteOne,
+  };
 };
 
 beforeEach(() => {
-  sendTRPCMessage.mockReset();
-  canGroup.mockReset();
-  requireScopedAgent.mockReset();
-  requireActionScope.mockReset();
-  syncServiceUserGroup.mockReset();
-  deactivateServiceUser.mockReset();
-
-  canGroup.mockImplementation((_subdomain: string, action: string) =>
-    Promise.resolve(action === 'permissionsAgentProfilesManage'),
-  );
-  requireScopedAgent.mockResolvedValue({
-    agent: {
-      createdBy: 'creator-1',
-      serviceUserId: 'service-user-1',
-    },
-    scope: 'all',
-  });
+  requireActionScope.mockReset().mockResolvedValue('all');
+  createAgentAccount.mockReset().mockResolvedValue(account());
+  updateAgentAccount.mockReset().mockResolvedValue(account());
+  deactivateAgentAccount.mockReset().mockResolvedValue(undefined);
+  resolveAgentPermissions
+    .mockReset()
+    .mockImplementation(
+      ({ permissionGroupIds }: { permissionGroupIds: string[] }) =>
+        Promise.resolve({
+          permissions: [],
+          foundGroupIds: permissionGroupIds,
+        }),
+    );
 });
 
-describe('mastraAgentSetGrant', () => {
-  it('validates an agent profile, persists it, and syncs the service user', async () => {
-    sendTRPCMessage.mockResolvedValue([
-      { _id: 'profile-1', principalType: 'agent' },
-    ]);
-    const { checkPermission, context, updateAgent } = makeContext();
+describe('AI team member account lifecycle', () => {
+  it('creates one core account and stores only the AI profile under its id', async () => {
+    const { ctx, createAgent } = makeCtx();
 
-    await agentMutations.mastraAgentSetGrant(
+    const result = await agentMutations.mastraAgentCreate(
       undefined,
-      { _id: 'agent-document-id', grantGroupId: ' profile-1 ' },
-      context,
+      {
+        doc: profileInput({
+          permissionGroupIds: [' group-1 ', 'group-2', 'group-1'],
+        }),
+      },
+      ctx,
     );
 
-    expect(canGroup).toHaveBeenCalledWith(
-      'tenant',
-      'permissionsAgentProfilesManage',
-      context.user,
-    );
-    expect(checkPermission).toHaveBeenCalledWith('erxesAgentAgentsUpdate');
-    expect(sendTRPCMessage).toHaveBeenCalledWith(
+    expect(createAgentAccount).toHaveBeenCalledWith({
+      subdomain: 'os',
+      input: {
+        name: 'Sales Agent',
+        description: 'Helps the sales team',
+        permissionGroupIds: ['group-1', 'group-2'],
+        isActive: true,
+        customPermissions: [],
+      },
+    });
+    expect(createAgent).toHaveBeenCalledWith(
+      USER_ID,
       expect.objectContaining({
-        pluginName: 'core',
-        module: 'permissionGroups',
-        action: 'find',
-        input: { query: { _id: 'profile-1' } },
+        instructions: 'Help the sales team',
+        provider: 'provider-1',
+        model: 'model-1',
+        createdBy: 'owner-1',
+        visibility: 'private',
+        audienceUserIds: [],
+        permissionMode: 'managed',
       }),
     );
-    expect(updateAgent).toHaveBeenCalledWith(
-      'agent-document-id',
-      { grantGroupId: 'profile-1' },
-      'creator-1',
+    expect(createAgent.mock.calls[0][1]).not.toHaveProperty('name');
+    expect(createAgent.mock.calls[0][1]).not.toHaveProperty('description');
+    expect(createAgent.mock.calls[0][1]).not.toHaveProperty(
+      'permissionGroupIds',
     );
-    expect(syncServiceUserGroup).toHaveBeenCalledWith({
-      serviceUserId: 'service-user-1',
-      groupId: 'profile-1',
-      subdomain: 'tenant',
+    expect(result).toEqual(
+      expect.objectContaining({
+        _id: USER_ID,
+        accountName: 'Sales Agent',
+        accountDescription: 'Helps the sales team',
+        permissionGroupIds: ['group-1'],
+        isActive: true,
+      }),
+    );
+  });
+
+  it('rejects oversized audience identifiers before creating an account', async () => {
+    const { ctx } = makeCtx();
+
+    await expect(
+      agentMutations.mastraAgentCreate(
+        undefined,
+        {
+          doc: profileInput({
+            visibility: 'shared',
+            audienceUserIds: ['x'.repeat(129)],
+          }),
+        },
+        ctx,
+      ),
+    ).rejects.toThrow('Audience identifiers are invalid');
+
+    expect(createAgentAccount).not.toHaveBeenCalled();
+  });
+
+  it('deactivates the new account and deletes a partial profile when profile creation fails', async () => {
+    const { ctx, createAgent, deleteOne } = makeCtx();
+    createAgent.mockRejectedValue(new Error('profile unavailable'));
+
+    await expect(
+      agentMutations.mastraAgentCreate(undefined, { doc: profileInput() }, ctx),
+    ).rejects.toThrow('profile unavailable');
+
+    expect(deactivateAgentAccount).toHaveBeenCalledWith({
+      userId: USER_ID,
+      subdomain: 'os',
     });
+    expect(deleteOne).toHaveBeenCalledWith({ _id: USER_ID });
   });
 
-  it('rejects a human permission group', async () => {
-    sendTRPCMessage.mockResolvedValue([
-      { _id: 'human-group', principalType: 'human' },
-    ]);
-    const { context, updateAgent } = makeContext();
+  it('updates account permissions and profile behavior through their owning stores', async () => {
+    const { ctx, updateAgent } = makeCtx();
+    updateAgentAccount
+      .mockResolvedValueOnce(account())
+      .mockResolvedValueOnce(
+        account({ permissionGroupIds: ['group-1', 'group-2'] }),
+      );
 
-    await expect(
-      agentMutations.mastraAgentSetGrant(
-        undefined,
-        { _id: 'agent-document-id', grantGroupId: 'human-group' },
-        context,
-      ),
-    ).rejects.toThrow('Agents may only use agent grant profiles');
-
-    expect(updateAgent).not.toHaveBeenCalled();
-    expect(syncServiceUserGroup).not.toHaveBeenCalled();
-  });
-
-  it('does not persist the profile when service-user synchronization fails', async () => {
-    sendTRPCMessage.mockResolvedValue([
-      { _id: 'profile-1', principalType: 'agent' },
-    ]);
-    syncServiceUserGroup.mockRejectedValue(new Error('core unavailable'));
-    const { context, updateAgent } = makeContext();
-
-    await expect(
-      agentMutations.mastraAgentSetGrant(
-        undefined,
-        { _id: 'agent-document-id', grantGroupId: 'profile-1' },
-        context,
-      ),
-    ).rejects.toThrow('core unavailable');
-
-    expect(updateAgent).not.toHaveBeenCalled();
-  });
-
-  it('rejects callers without agent-profile or global permission management', async () => {
-    canGroup.mockResolvedValue(false);
-    const { context, updateAgent } = makeContext();
-
-    await expect(
-      agentMutations.mastraAgentSetGrant(
-        undefined,
-        { _id: 'agent-document-id', grantGroupId: null },
-        context,
-      ),
-    ).rejects.toThrow('Permission required');
-
-    expect(requireScopedAgent).not.toHaveBeenCalled();
-    expect(updateAgent).not.toHaveBeenCalled();
-  });
-
-  it('clears the profile without looking it up', async () => {
-    const { context, updateAgent } = makeContext();
-
-    await agentMutations.mastraAgentSetGrant(
+    await agentMutations.mastraAgentUpdate(
       undefined,
-      { _id: 'agent-document-id', grantGroupId: null },
-      context,
+      {
+        _id: USER_ID,
+        doc: profileInput({
+          name: 'Revenue Agent',
+          permissionGroupIds: ['group-1', 'group-2'],
+        }),
+      },
+      ctx,
     );
 
-    expect(sendTRPCMessage).not.toHaveBeenCalled();
-    expect(updateAgent).toHaveBeenCalledWith(
-      'agent-document-id',
-      { grantGroupId: null },
-      'creator-1',
-    );
-    expect(syncServiceUserGroup).toHaveBeenCalledWith({
-      serviceUserId: 'service-user-1',
-      groupId: null,
-      subdomain: 'tenant',
+    expect(updateAgentAccount).toHaveBeenNthCalledWith(2, {
+      userId: USER_ID,
+      subdomain: 'os',
+      input: expect.objectContaining({
+        name: 'Revenue Agent',
+        permissionGroupIds: ['group-1', 'group-2'],
+      }),
     });
+    expect(updateAgent).toHaveBeenCalledWith(
+      USER_ID,
+      expect.objectContaining({ provider: 'provider-1', model: 'model-1' }),
+    );
+    expect(updateAgent.mock.calls[0][1]).not.toHaveProperty('name');
+    expect(updateAgent.mock.calls[0][1]).not.toHaveProperty(
+      'permissionGroupIds',
+    );
   });
-});
 
-describe('mastraAgentUpdate protected fields', () => {
-  it('rejects direct grant changes', async () => {
-    const { context, updateAgent } = makeContext();
+  it('prevents a user from delegating permission groups they do not hold', async () => {
+    requireActionScope.mockResolvedValue('own');
+    const { ctx, createAgent } = makeCtx();
+    ctx.user = {
+      _id: 'owner-1',
+      permissionGroupIds: ['group-1'],
+      customPermissions: [],
+    } as unknown as IUserDocument;
 
     await expect(
-      agentMutations.mastraAgentUpdate(
+      agentMutations.mastraAgentCreate(
         undefined,
-        { _id: 'agent-document-id', doc: { grantGroupId: 'profile-1' } },
-        context,
+        {
+          doc: profileInput({ permissionGroupIds: ['group-2'] }),
+        },
+        ctx,
       ),
-    ).rejects.toThrow(/dedicated security actions/i);
+    ).rejects.toThrow(/only permission groups assigned to its creator/i);
 
-    expect(updateAgent).not.toHaveBeenCalled();
+    expect(createAgentAccount).not.toHaveBeenCalled();
+    expect(createAgent).not.toHaveBeenCalled();
+  });
+
+  it('copies only the creator grant into a delegated agent account', async () => {
+    requireActionScope.mockResolvedValue('own');
+    const { ctx, createAgent } = makeCtx();
+    const customPermissions = [
+      {
+        plugin: 'sales',
+        module: 'deal',
+        actions: ['dealsRead'],
+        scope: 'own' as const,
+      },
+    ];
+    ctx.user = {
+      _id: 'owner-1',
+      permissionGroupIds: ['group-1'],
+      customPermissions,
+    } as unknown as IUserDocument;
+
+    await agentMutations.mastraAgentCreate(
+      undefined,
+      { doc: profileInput({ visibility: 'organization' }) },
+      ctx,
+    );
+
+    expect(createAgentAccount).toHaveBeenCalledWith({
+      subdomain: 'os',
+      input: expect.objectContaining({
+        permissionGroupIds: ['group-1'],
+        customPermissions,
+      }),
+    });
+    expect(createAgent).toHaveBeenCalledWith(
+      USER_ID,
+      expect.objectContaining({
+        createdBy: 'owner-1',
+        visibility: 'organization',
+        permissionMode: 'delegated',
+      }),
+    );
+  });
+
+  it('rejects missing permission groups before creating either record', async () => {
+    resolveAgentPermissions.mockResolvedValue({
+      permissions: [],
+      foundGroupIds: ['group-1'],
+    });
+    const { ctx, createAgent } = makeCtx();
+
+    await expect(
+      agentMutations.mastraAgentCreate(
+        undefined,
+        {
+          doc: profileInput({
+            permissionGroupIds: ['group-1', 'missing-group'],
+          }),
+        },
+        ctx,
+      ),
+    ).rejects.toThrow(/missing-group/);
+
+    expect(createAgentAccount).not.toHaveBeenCalled();
+    expect(createAgent).not.toHaveBeenCalled();
+  });
+
+  it('deactivates the canonical account before deleting its AI profile', async () => {
+    const { ctx, removeAgent } = makeCtx();
+
+    await agentMutations.mastraAgentRemove(undefined, { _id: USER_ID }, ctx);
+
+    expect(requireScopedAgent).toHaveBeenCalledWith(
+      expect.objectContaining({ agentId: USER_ID }),
+    );
+    expect(deactivateAgentAccount).toHaveBeenCalledWith({
+      userId: USER_ID,
+      subdomain: 'os',
+    });
+    expect(removeAgent).toHaveBeenCalledWith(USER_ID);
+    expect(deactivateAgentAccount.mock.invocationCallOrder[0]).toBeLessThan(
+      removeAgent.mock.invocationCallOrder[0],
+    );
   });
 });

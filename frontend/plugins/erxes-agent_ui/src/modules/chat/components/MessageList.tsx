@@ -12,37 +12,32 @@ export const MessageList = ({
   messagesLoading,
   chatLoading,
   attachmentsEnabled,
-  ratingEnabled,
   boxRef,
   endRef,
   onScroll,
   onSuggestion,
   onRegenerate,
-  onRate,
   onEditMessage,
   onResendMessage,
+  onDeleteMessage,
   storeArtifactsByMessage,
-  debug,
 }: {
   agent: IChatAgent;
   messages: AgentUIMessage[];
   messagesLoading: boolean;
   chatLoading: boolean;
   attachmentsEnabled: boolean;
-  ratingEnabled: boolean;
   boxRef: RefObject<HTMLDivElement>;
   endRef: RefObject<HTMLDivElement>;
   onScroll: () => void;
   onSuggestion: (text: string) => void;
   onRegenerate: () => void;
-  onRate: (messageId: string, rating: 1 | -1) => void;
   onEditMessage: (text: string) => void;
   onResendMessage: (text: string, attachments: ChatAttachment[]) => void;
+  onDeleteMessage: (uiMessageId: string, persistedMessageId: string) => void;
   // Persisted artifacts per assistant message id — re-renders inline cards on
   // reload (the live message's own tool parts take priority while streaming).
   storeArtifactsByMessage?: Map<string, Artifact[]>;
-  // The agent's debug setting — controls how much of the trace each turn shows.
-  debug?: boolean;
 }) => {
   // Approve/deny replies are sent hidden — they continue a gated turn without a
   // visible user bubble.
@@ -69,11 +64,11 @@ export const MessageList = ({
             <AgentMark size="lg" />
             <div className="space-y-1">
               <p className="text-xl font-semibold tracking-tight">
-                {agent.name}
+                {agent.accountName}
               </p>
-              {agent.description && (
+              {agent.accountDescription && (
                 <p className="mx-auto max-w-sm text-sm text-muted-foreground">
-                  {agent.description}
+                  {agent.accountDescription}
                 </p>
               )}
             </div>
@@ -109,20 +104,26 @@ export const MessageList = ({
                 msg={msg}
                 isLast={i === visible.length - 1}
                 chatLoading={chatLoading}
-                ratingEnabled={ratingEnabled}
                 onRegenerate={onRegenerate}
-                onRate={onRate}
                 onEditMessage={onEditMessage}
                 onResendMessage={onResendMessage}
+                persistedMessageId={
+                  msg.metadata?.messageId ??
+                  (visible[i + 1]?.role === 'assistant'
+                    ? visible[i + 1].metadata?.messageId
+                    : undefined)
+                }
+                onDeleteMessage={onDeleteMessage}
                 storeArtifacts={
                   msg.metadata?.messageId
                     ? storeArtifactsByMessage?.get(msg.metadata.messageId)
                     : undefined
                 }
-                debug={debug}
               />
             ))}
-            {chatLoading && lastMsg?.role !== 'assistant' && <WaitingIndicator />}
+            {chatLoading && lastMsg?.role !== 'assistant' && (
+              <WaitingIndicator />
+            )}
           </>
         )}
         <div ref={endRef} />

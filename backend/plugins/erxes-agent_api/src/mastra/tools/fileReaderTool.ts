@@ -1,6 +1,6 @@
 import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
-import { getCurrentAuth } from '~/mastra/requestContext';
+import { getCurrentAuth, runToolOnce } from '~/mastra/requestContext';
 import {
   nameFromUrl,
   resolveArtifactFile,
@@ -242,20 +242,23 @@ export const fileReaderTool = createTool({
     artifactId: z
       .string()
       .optional()
-      .describe('Id of a file you generated earlier this run (from a generate tool result).'),
+      .describe(
+        'Id of a file you generated earlier this run (from a generate tool result).',
+      ),
     name: z.string().optional().describe('File name, for friendlier errors.'),
   }),
   outputSchema: readerOutput,
-  execute: async ({ url, key, artifactId, name }) => {
-    const auth = getCurrentAuth();
-    const subdomain = auth?.subdomain || 'localhost';
-    if (url) return readByUrl(url, name);
-    if (artifactId) return readByArtifactId(subdomain, artifactId);
-    if (key) return readByKey(subdomain, key, name);
-    throw new ExpectedError(
-      'Provide a url (public link), an artifactId (a file you generated), or a key (a user attachment).',
-    );
-  },
+  execute: async ({ url, key, artifactId, name }) =>
+    runToolOnce('fileReader', { url, key, artifactId, name }, async () => {
+      const auth = getCurrentAuth();
+      const subdomain = auth?.subdomain || 'localhost';
+      if (url) return readByUrl(url, name);
+      if (artifactId) return readByArtifactId(subdomain, artifactId);
+      if (key) return readByKey(subdomain, key, name);
+      throw new ExpectedError(
+        'Provide a url (public link), an artifactId (a file you generated), or a key (a user attachment).',
+      );
+    }),
   // Make a viewable image actually visible to the model: hand it back as a
   // multimodal tool result. Non-image reads return their text fields as-is.
   toModelOutput: (out) => {

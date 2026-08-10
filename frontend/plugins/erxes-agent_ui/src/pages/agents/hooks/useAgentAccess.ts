@@ -1,6 +1,7 @@
 import { ApolloError } from '@apollo/client';
+import { useAtomValue } from 'jotai';
 import { toast } from 'erxes-ui';
-import { usePermissionCheck } from 'ui-modules';
+import { currentUserState, usePermissionCheck } from 'ui-modules';
 import { ERXES_AGENT_ACTIONS } from '~/permissions';
 import { resolveAgentActionScope } from './agentActionScope';
 
@@ -9,111 +10,61 @@ const PERMISSION_DENIED = {
   description: 'You do not have permission to perform this action.',
 } as const;
 
-const QUOTA_REACHED = {
-  title: 'Agent limit reached',
-  description: 'You have reached your agent creation limit.',
-} as const;
-
 export const showAgentPermissionError = () =>
   toast({ ...PERMISSION_DENIED, variant: 'destructive' });
-
-export const showAgentQuotaError = () =>
-  toast({ ...QUOTA_REACHED, variant: 'destructive' });
 
 const isPermissionError = (e: ApolloError) =>
   e.graphQLErrors?.some((g) => g.extensions?.code === 'FORBIDDEN') ||
   /permission|access denied/i.test(e.message);
 
-const isQuotaError = (e: ApolloError) => /quota/i.test(e.message);
-
-/** Apollo `onError` handler — maps all backend access/quota errors to the same
- *  friendly toasts so every user account sees identical messages. */
-export const agentMutationError = () => (e: ApolloError) => {
-  if (isPermissionError(e)) return showAgentPermissionError();
-  if (isQuotaError(e)) return showAgentQuotaError();
-  toast({ title: 'Error', description: e.message, variant: 'destructive' });
+/** Apollo error handler shared by every agent mutation. */
+export const agentMutationError = () => (error: ApolloError) => {
+  if (isPermissionError(error)) return showAgentPermissionError();
+  toast({ title: 'Error', description: error.message, variant: 'destructive' });
 };
 
-type AgentCapability = 'canReadConfig' | 'canEdit' | 'canRemove' | 'canShare';
-
-type AgentAccessTarget = {
-  isOwnAgent?: boolean | null;
-  capabilities?: Partial<Record<AgentCapability, boolean>> | null;
-};
-
-
-/** Permission checks for agent CRUD. Action scope controls whether a visible
- * agent may be changed or only the caller's own agent may be changed. */
+/** CRUD permissions mirror the core permission actions enforced by GraphQL. */
 export const useAgentAccess = () => {
   const permissionCheck = usePermissionCheck();
   const { hasActionPermission, isLoaded } = permissionCheck;
+  const currentUserId = useAtomValue(currentUserState)?._id;
 
-  const canShare =
-    resolveAgentActionScope(
-      permissionCheck,
-      ERXES_AGENT_ACTIONS.agent.share,
-    ) === 'all';
-  const canReadConfig = hasActionPermission(
-    ERXES_AGENT_ACTIONS.agent.readConfig,
+  const isAdmin = hasActionPermission(ERXES_AGENT_ACTIONS.settings.manage);
+  const createScope = resolveAgentActionScope(
+    permissionCheck,
+    ERXES_AGENT_ACTIONS.agent.create,
   );
-  const canCreate = hasActionPermission(ERXES_AGENT_ACTIONS.agent.create);
-  const canEdit = hasActionPermission(ERXES_AGENT_ACTIONS.agent.update);
-  const canRemove = hasActionPermission(ERXES_AGENT_ACTIONS.agent.remove);
+  const updateScope = resolveAgentActionScope(
+    permissionCheck,
+    ERXES_AGENT_ACTIONS.agent.update,
+  );
+  const removeScope = resolveAgentActionScope(
+    permissionCheck,
+    ERXES_AGENT_ACTIONS.agent.remove,
+  );
+  const canCreate = createScope !== null;
+  const canEdit = updateScope !== null;
+  const canRemove = removeScope !== null;
 
-  const canUseScopedAction = (action: string, agent: AgentAccessTarget) => {
-    const scope = resolveAgentActionScope(permissionCheck, action);
-    return scope === 'all' || scope === 'group' || !!agent.isOwnAgent;
-  };
-
-  const canUseCapability = (
-    agent: AgentAccessTarget,
-    capability: AgentCapability,
-    action: string,
-    hasPermission: boolean,
+  const isInScope = (
+    scope: 'own' | 'group' | 'all' | null,
+    agent?: { createdBy?: string | null },
   ) =>
-    agent.capabilities
-      ? agent.capabilities[capability] === true
-      : hasPermission && canUseScopedAction(action, agent);
-
-  const canReadConfigAgent = (agent: AgentAccessTarget) =>
-    canUseCapability(
-      agent,
-      'canReadConfig',
-      ERXES_AGENT_ACTIONS.agent.readConfig,
-      canReadConfig,
-    );
-  const canEditAgent = (agent: AgentAccessTarget) =>
-    canUseCapability(
-      agent,
-      'canEdit',
-      ERXES_AGENT_ACTIONS.agent.update,
-      canEdit,
-    );
-  const canRemoveAgent = (agent: AgentAccessTarget) =>
-    canUseCapability(
-      agent,
-      'canRemove',
-      ERXES_AGENT_ACTIONS.agent.remove,
-      canRemove,
-    );
-  const canShareAgent = (agent: AgentAccessTarget) =>
-    canUseCapability(
-      agent,
-      'canShare',
-      ERXES_AGENT_ACTIONS.agent.share,
-      canShare,
-    );
+    scope === 'all' ||
+    scope === 'group' ||
+    (scope === 'own' && agent?.createdBy === currentUserId);
+  const canEditAgent = (agent?: { createdBy?: string | null }) =>
+    canEdit && isInScope(updateScope, agent);
+  const canRemoveAgent = (agent?: { createdBy?: string | null }) =>
+    canRemove && isInScope(removeScope, agent);
 
   return {
     isLoaded,
-    canReadConfig,
     canCreate,
     canEdit,
     canRemove,
-    canShare,
+    isAdmin,
     canEditAgent,
-    canReadConfigAgent,
     canRemoveAgent,
-    canShareAgent,
   };
 };

@@ -1,15 +1,11 @@
-// turn.ts statically imports agentRuntime, which pulls ESM-only p-map via
-// @mastra/core/agent and fails to parse under the nx jest preset. Stub it so the
-// pure helper under test loads.
-jest.mock('~/mastra/agentRuntime', () => ({ getOrCreateAgent: jest.fn() }));
-
-import { toUserFacingError } from '@/agent/turn';
+import { toUserFacingError } from '@/agent/run';
 
 describe('toUserFacingError', () => {
   const cases: [string, RegExp][] = [
     ['Error: 429 too many requests', /rate-limited/],
     ['rate limit exceeded', /rate-limited/],
     ['401 Unauthorized', /permission or credential/],
+    ['Invalid Authentication', /permission or credential/],
     ['Forbidden: access denied', /permission or credential/],
     ['invalid api key provided', /permission or credential/],
     ['request timed out', /took too long|unreachable/],
@@ -31,11 +27,9 @@ describe('toUserFacingError', () => {
   });
 
   it('redacts long tokens from the server log on unmatched errors', () => {
-    const spy = jest
-      .spyOn(console, 'error')
-      .mockImplementation(() => {
-        /* swallow expected error log */
-      });
+    const spy = jest.spyOn(console, 'error').mockImplementation(() => {
+      /* swallow expected error log */
+    });
     try {
       toUserFacingError(
         new Error('boom key=sk-abcdefABCDEF0123456789zzzzzzzzzzzz happened'),

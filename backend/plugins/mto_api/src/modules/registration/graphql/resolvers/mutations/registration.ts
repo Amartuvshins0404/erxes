@@ -387,6 +387,36 @@ export const registrationMutations: Record<string, Resolver> = {
 
     return getRegistrationPaymentUrl(existing.invoiceId, subdomain);
   },
+
+  async mtoRegistrationApplicationRemove(
+    _root: undefined,
+    { _id }: ApplicationIdArgs,
+    context: IContext,
+  ) {
+    if (context.cpUser) {
+      throw new Error('Forbidden');
+    }
+
+    const { models, subdomain, instanceId } = context;
+
+    const existing = await models.RegistrationApplication.findOne({
+      _id,
+      subdomain,
+    }).lean();
+
+    if (!existing) {
+      throw new Error('Application not found');
+    }
+
+    assertApplicationInstanceMatches(existing, instanceId);
+
+    if (existing.archivedAt) {
+      throw new Error('Application is already archived');
+    }
+
+    await models.RegistrationApplication.removeApplicationById(_id, subdomain);
+    return { success: true };
+  },
 };
 
 markResolvers(registrationMutations, {

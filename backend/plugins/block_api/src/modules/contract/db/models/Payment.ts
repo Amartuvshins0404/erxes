@@ -6,6 +6,7 @@ import {
 import { IContractPaymentTransactionDocument } from '@/contract/@types/transaction';
 import { IModels } from '~/connectionResolvers';
 import { contractPaymentSchema } from '@/contract/db/definitions/payment';
+import { syncContractPayments } from '@/contract/utils/paymentsSync';
 
 export interface IContractPaymentModel extends Model<IContractPaymentDocument> {
   regenerateForContract(
@@ -32,6 +33,7 @@ export interface IContractPaymentModel extends Model<IContractPaymentDocument> {
   removeTransaction(
     _id: string,
   ): Promise<IContractPaymentTransactionDocument>;
+  syncAllForContract(contractId: string): Promise<void>;
 }
 
 const addMonths = (base: Date, months: number) => {
@@ -118,7 +120,7 @@ function generateInstallmentDates(
   return dates;
 }
 
-export const loadContractPaymentClass = (models: IModels) => {
+export const loadContractPaymentClass = (models: IModels, subdomain: string) => {
   class ContractPayment {
     public static async regenerateForContract(contractId: string, force = false) {
       const contract = await models.Contract.findOne({ _id: contractId });
@@ -131,8 +133,7 @@ export const loadContractPaymentClass = (models: IModels) => {
       if (!force && stage?.type !== 'signed') return [];
 
       const contractNumber = contract.number;
-      const partyId = contract.party?.id;
-      const partyType = contract.party?.type;
+      const customerId = contract.customerId;
 
       const projectId = await (async () => {
         if (!contract.unit) return undefined;
@@ -231,8 +232,7 @@ export const loadContractPaymentClass = (models: IModels) => {
       const commonFields = {
         contractId,
         contractNumber,
-        partyId,
-        partyType,
+        customerId,
         projectId: projectId?.toString(),
         unit: contract.unit,
         currency,
@@ -413,7 +413,12 @@ export const loadContractPaymentClass = (models: IModels) => {
         paymentMethod: input.paymentMethod,
       });
 
-      await ContractPayment.recomputeStatus(paymentId);
+      const recomputed = await ContractPayment.recomputeStatus(paymentId);
+      if (recomputed) {
+        await ContractPayment.syncAllForContract(
+          recomputed.contractId.toString(),
+        );
+      }
       return tx;
     }
 
@@ -430,7 +435,14 @@ export const loadContractPaymentClass = (models: IModels) => {
         { new: true },
       );
 
-      await ContractPayment.recomputeStatus(tx.paymentId.toString());
+      const recomputed = await ContractPayment.recomputeStatus(
+        tx.paymentId.toString(),
+      );
+      if (recomputed) {
+        await ContractPayment.syncAllForContract(
+          recomputed.contractId.toString(),
+        );
+      }
       return updated;
     }
 
@@ -440,8 +452,18 @@ export const loadContractPaymentClass = (models: IModels) => {
 
       const paymentId = tx.paymentId.toString();
       await models.ContractPaymentTransaction.deleteOne({ _id });
-      await ContractPayment.recomputeStatus(paymentId);
+      const recomputed = await ContractPayment.recomputeStatus(paymentId);
+      if (recomputed) {
+        await ContractPayment.syncAllForContract(
+          recomputed.contractId.toString(),
+        );
+      }
       return tx;
+    }
+
+    public static async syncAllForContract(contractId: string) {
+      const payments = await models.ContractPayment.find({ contractId });
+      syncContractPayments(contractId, payments, subdomain);
     }
   }
 

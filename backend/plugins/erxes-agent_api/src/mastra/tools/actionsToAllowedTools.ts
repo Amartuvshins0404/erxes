@@ -4,11 +4,10 @@ import type { OperationMeta } from './operationRegistry';
 // actionsToAllowedTools — DERIVE the agent's tool-registry filter
 // (`allowedTools`) from the permission ACTIONS its grant group carries.
 //
-// Selection model A (step 23): the grant group is AUTHORITATIVE and
-// server-enforced (a background run mints a service-user token whose actions
-// ARE the group's, checked by `canGroup`/`checkPermission` — keyed on the bare
-// ACTION NAME, not plugin/module). This tool filter is a DERIVED, best-effort
-// mirror so the agent's model doesn't even see tools it isn't permitted to run.
+// The permission group is authoritative and server-enforced through the AI
+// team member's linked account.
+// This tool filter is a DERIVED, best-effort mirror, so the agent's model
+// doesn't even see tools it isn't permitted to run.
 //
 // Safety contract (fail-closed on the tool side):
 //   - We only ever emit a bare "<operationName>" when a granted action clearly

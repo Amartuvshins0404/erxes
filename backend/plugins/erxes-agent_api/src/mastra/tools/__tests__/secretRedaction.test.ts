@@ -56,7 +56,6 @@ describe('isSecretName', () => {
       'AZURE_STORAGE_CONNECTION_STRING',
       'dbConnectionString',
       'SENTRY_DSN',
-      'ERXES_AGENT_EVALUATION_DSN',
     ]) {
       expect(isSecretName(code)).toBe(true);
     }

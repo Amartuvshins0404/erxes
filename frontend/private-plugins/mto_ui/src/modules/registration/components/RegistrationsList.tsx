@@ -1,4 +1,4 @@
-import { IconCircleFilled, IconMailOpened, IconSelector, IconUsers } from '@tabler/icons-react';
+import { IconCircleFilled, IconMailOpened, IconSelector, IconTrash, IconUsers } from '@tabler/icons-react';
 import { ColumnDef } from '@tanstack/table-core';
 import {
   Badge,
@@ -8,6 +8,7 @@ import {
   RecordTable,
   RecordTableInlineCell,
   RelativeDateDisplay,
+  useConfirm,
 } from 'erxes-ui';
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery } from '@apollo/client';
@@ -17,7 +18,11 @@ import { RegistrationFilters as RegistrationFiltersType } from '@/registration/t
 import { RegistrationDetailSheet } from '@/registration/components/RegistrationDetailSheet';
 import { GET_CLIENT_PORTAL_USER_FOR_SELECT } from '@/registration/graphql/clientPortalUsersQueries';
 import { IClientPortalUserRow } from '@/registration/components/ClientPortalUserSelect';
-import { MTO_REGISTRATION_APPLICATION_UPDATE, MTO_REGISTRATION_APPLICATION_MARK_READ } from '@/registration/graphql/registrationMutations';
+import {
+  MTO_REGISTRATION_APPLICATION_MARK_READ,
+  MTO_REGISTRATION_APPLICATION_REMOVE,
+  MTO_REGISTRATION_APPLICATION_UPDATE,
+} from '@/registration/graphql/registrationMutations';
 
 function formatCpUserLabel(u: IClientPortalUserRow): string {
   const name = [u.firstName, u.lastName].filter(Boolean).join(' ').trim();
@@ -155,16 +160,55 @@ function MarkReadCell({
   );
 }
 
+function RemoveApplicationButton({
+  id,
+  onRemoved,
+  disabled,
+}: {
+  id: string;
+  onRemoved: () => void;
+  disabled?: boolean;
+}) {
+  const { confirm } = useConfirm();
+  const [removeApplication, { loading }] = useMutation(
+    MTO_REGISTRATION_APPLICATION_REMOVE,
+  );
+
+  const handleRemove = () => {
+    void confirm({
+      message: 'Та энэ бүртгэлийг архивлахдаа итгэлтэй байна уу?',
+      options: { confirmationValue: 'archive' },
+    }).then(() => {
+      void removeApplication({ variables: { _id: id } }).then(onRemoved);
+    });
+  };
+
+  return (
+    <Button
+      type="button"
+      variant="destructive"
+      size="icon"
+      disabled={loading || disabled}
+      onClick={handleRemove}
+      title="Архивлах"
+    >
+      <IconTrash size={16} />
+    </Button>
+  );
+}
+
 function GroupSection({
   cpUserId,
   registrations,
   refetch,
   onOpenDetail,
+  hideArchive,
 }: {
   cpUserId: string | null;
   registrations: Record<string, unknown>[];
   refetch: () => void;
   onOpenDetail: (id: string) => void;
+  hideArchive?: boolean;
 }) {
   const { user } = useCpUser(cpUserId);
 
@@ -233,6 +277,9 @@ function GroupSection({
             >
               Дэлгэрэнгүй
             </Button>
+            {!hideArchive && (
+              <RemoveApplicationButton id={id} onRemoved={refetch} />
+            )}
           </RecordTableInlineCell>
         );
       },
@@ -276,10 +323,12 @@ function GroupedRegistrationsView({
   groups,
   refetch,
   onOpenDetail,
+  hideArchive,
 }: {
   groups: [string | null, Record<string, unknown>[]][];
   refetch: () => void;
   onOpenDetail: (id: string) => void;
+  hideArchive?: boolean;
 }) {
   return (
     <div className="m-3 space-y-2">
@@ -290,6 +339,7 @@ function GroupedRegistrationsView({
           registrations={regs}
           refetch={refetch}
           onOpenDetail={onOpenDetail}
+          hideArchive={hideArchive}
         />
       ))}
     </div>
@@ -318,12 +368,19 @@ function statusBadgeVariant(status: string) {
 }
 
 export function RegistrationsList({ filters }: RegistrationsListProps) {
-  const { registrations, handleFetchMore, loading, pageInfo, refetch } =
-    useRegistrations(filters);
+  const {
+    registrations,
+    handleFetchMore,
+    loading,
+    pageInfo,
+    totalCount,
+    refetch,
+  } = useRegistrations(filters);
 
   const [detailId, setDetailId] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [groupByUser, setGroupByUser] = useState(false);
+  const hideArchive = Boolean(filters?.archived);
 
   const grouped = useMemo(() => {
     if (!groupByUser || !registrations) return [];
@@ -414,6 +471,12 @@ export function RegistrationsList({ filters }: RegistrationsListProps) {
             >
               Дэлгэрэнгүй
             </Button>
+            {!hideArchive && (
+              <RemoveApplicationButton
+                id={id}
+                onRemoved={() => void refetch()}
+              />
+            )}
           </RecordTableInlineCell>
         );
       },
@@ -442,6 +505,7 @@ export function RegistrationsList({ filters }: RegistrationsListProps) {
             setDetailId(id);
             setDetailOpen(true);
           }}
+          hideArchive={hideArchive}
         />
       ) : (
         <RecordTable.Provider
@@ -472,6 +536,10 @@ export function RegistrationsList({ filters }: RegistrationsListProps) {
         </RecordTable.Provider>
       )}
 
+      <div className="px-3 pb-3 text-sm text-muted-foreground">
+        Нийт: {totalCount ?? 0}
+      </div>
+
       <RegistrationDetailSheet
         applicationId={detailId}
         open={detailOpen}
@@ -482,6 +550,7 @@ export function RegistrationsList({ filters }: RegistrationsListProps) {
         onSaved={() => {
           void refetch();
         }}
+        hideArchive={hideArchive}
       />
     </>
   );

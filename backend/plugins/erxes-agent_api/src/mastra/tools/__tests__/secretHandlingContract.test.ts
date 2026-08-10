@@ -10,32 +10,25 @@
  * GraphQL results, and must never be able to write secret placeholders back.
  */
 
-// --- Harness mocks (plumbing only; do not encode any expected behavior) --------
+// --- Harness mocks (plumbing only; do not encode expected behavior) -----------
 // createTool is identity so a built tool === the config object (has .execute).
-jest.mock('@mastra/core/tools', () => ({ createTool: (c: any) => c }));
-
-// erxes-api-shared is mocked so nothing hits a live core. sendTRPCMessage is a
-// jest.fn() created INSIDE the factory (avoids TDZ/hoist issues); we grab the
-// mocked reference via the import below and drive it per-test.
-jest.mock('erxes-api-shared/utils', () => ({
-  sendTRPCMessage: jest.fn(),
-  getPlugins: jest.fn(async () => []),
-  getPluginAddress: jest.fn(async () => ''),
+jest.mock('@mastra/core/tools', () => ({
+  createTool: (config: unknown) => config,
 }));
 
+// erxes-api-shared is mocked so nothing hits a live core.
+jest.mock('erxes-api-shared/utils', () => ({
+  getPlugins: jest.fn(async () => []),
+  getPluginAddress: jest.fn(async () => 'http://127.0.0.1:59999'),
+}));
+
+import { isSecretName, redactSecrets, REDACTED } from '../secretRedaction';
 import {
-  isSecretName,
-  redactSecrets,
-  REDACTED,
-} from '../secretRedaction';
-import { executeErxesOperation } from '../erxesTools';
-import { buildErxesSupportTools } from '../metaTools';
-import { sendTRPCMessage } from 'erxes-api-shared/utils';
-
-const mockSend = sendTRPCMessage as unknown as jest.Mock;
-
-// Unreachable gateway: any real network attempt fails fast AFTER the code runs.
-const SETTINGS = { erxesApiUrl: 'http://127.0.0.1:59999', erxesApiToken: '' };
+  executeErxesOperation,
+  type ErxesOperationRef,
+  type GqlArgDef,
+} from '../erxesTools';
+import { runWithAuth } from '../../requestContext';
 
 // -----------------------------------------------------------------------------
 // SECTION 3 (foundational): isSecretName — the name-level predicate.
@@ -98,8 +91,17 @@ describe('isSecretName — name-level predicate', () => {
 // -----------------------------------------------------------------------------
 describe('redactSecrets — hides secret values', () => {
   // (b) code/value & key/value rows whose code/key names a credential.
-  const secretRows = [
-    { code: 'AWS_SECRET_ACCESS_KEY', value: 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY' },
+  interface SecretRow {
+    code?: string;
+    key?: string;
+    value: string;
+  }
+
+  const secretRows: SecretRow[] = [
+    {
+      code: 'AWS_SECRET_ACCESS_KEY',
+      value: 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY',
+    },
     { code: 'CLOUDFLARE_API_TOKEN', value: 'cf-token-abc123' },
     { key: 'apiKey', value: 'sk_test_deadbeef' },
     { key: 'apiToken', value: 'tok-123' },
@@ -108,13 +110,17 @@ describe('redactSecrets — hides secret values', () => {
     { code: 'SMTP_PASS', value: 'p@ssw0rd' },
     { code: 'SENTRY_DSN', value: 'https://pub:secret@o1.ingest.sentry.io/1' },
     { code: 'MONGO_URL', value: 'mongodb://u:p@host/db' },
-    { code: 'AZURE_STORAGE_CONNECTION_STRING', value: 'DefaultEndpointsProtocol=https;AccountName=x;AccountKey=abc123==;EndpointSuffix=core.windows.net' },
+    {
+      code: 'AZURE_STORAGE_CONNECTION_STRING',
+      value:
+        'DefaultEndpointsProtocol=https;AccountName=x;AccountKey=abc123==;EndpointSuffix=core.windows.net',
+    },
     { code: 'BLOCKADMIN_PUBLIC_API_KEY', value: 'zzz-secret' },
     { code: 'MUSHOP_PUBLIC_API_KEY', value: 'yyy-secret' },
   ];
 
-  it.each(secretRows)('redacts row value for %o', (row: any) => {
-    const out: any = redactSecrets(row);
+  it.each(secretRows)('redacts row value for %o', (row) => {
+    const out = redactSecrets(row);
     expect(out.value).toBe(REDACTED);
     // code/key label stays visible (truthful about WHICH key is set):
     if (row.code !== undefined) expect(out.code).toBe(row.code);
@@ -126,66 +132,75 @@ describe('redactSecrets — hides secret values', () => {
   // when under a non-secret key elsewhere), so ONLY the name-level predicate can
   // hide it. Per contract, MONGO_URL names a credential -> value hidden.
   it('redacts a MONGO_URL row even when the value has no inline password (name-level protection)', () => {
-    const out: any = redactSecrets({ code: 'MONGO_URL', value: 'mongodb://plainhost:27017/appdb' });
+    const out = redactSecrets({
+      code: 'MONGO_URL',
+      value: 'mongodb://plainhost:27017/appdb',
+    });
     expect(out.value).toBe(REDACTED);
   });
 
   // (a) property whose NAME denotes a secret → value redacted.
-  const secretProps: Array<[string, any]> = [
+  const secretProps: Array<[string, unknown]> = [
     ['password', 'hunter2'],
     ['clientSecret', 'cs-abc'],
-    ['privateKey', '-----BEGIN PRIVATE KEY-----\nabc\n-----END PRIVATE KEY-----'],
+    [
+      'privateKey',
+      '-----BEGIN PRIVATE KEY-----\nabc\n-----END PRIVATE KEY-----',
+    ],
     ['accessToken', 'ya29.a0AfB_xyz'],
     ['serviceAccountKey', '{"type":"service_account","private_key":"x"}'],
     ['secretKey', 'sk-1234'],
   ];
 
   it.each(secretProps)('redacts property named %s', (name, val) => {
-    const input: any = { [name]: val, bucket: 'keep-me' };
-    const out: any = redactSecrets(input);
+    const input: Record<string, unknown> = { [name]: val, bucket: 'keep-me' };
+    const out = redactSecrets(input);
     expect(out[name]).toBe(REDACTED);
     expect(out.bucket).toBe('keep-me'); // sibling non-secret untouched
   });
 
   // (c) string VALUE embeds a credential regardless of (benign) field name.
   it('redacts a mongodb URI with embedded credentials under a benign key', () => {
-    const out: any = redactSecrets({ note: 'mongodb://user:pass@host/db' });
+    const out = redactSecrets({ note: 'mongodb://user:pass@host/db' });
     expect(JSON.stringify(out)).not.toContain('user:pass@host');
     expect(out.note).toBe(REDACTED);
   });
 
   it('redacts a postgres URI with embedded credentials under a benign key', () => {
-    const out: any = redactSecrets({ conn: 'postgres://u:p@h:5432/db' });
+    const out = redactSecrets({ conn: 'postgres://u:p@h:5432/db' });
     expect(JSON.stringify(out)).not.toContain('u:p@h');
     expect(out.conn).toBe(REDACTED);
   });
 
   it('redacts a Sentry DSN under a benign key', () => {
-    const out: any = redactSecrets({ description: 'https://abc123:def456@o1.ingest.sentry.io/1' });
+    const out = redactSecrets({
+      description: 'https://abc123:def456@o1.ingest.sentry.io/1',
+    });
     expect(JSON.stringify(out)).not.toContain('abc123:def456');
   });
 
   it('redacts an Azure AccountKey blob under a benign key', () => {
-    const out: any = redactSecrets({ blob: 'Endpoint=sb://x;SharedAccessKeyName=y;AccountKey=SUPERSECRETKEY==;EntityPath=z' });
+    const out = redactSecrets({
+      blob: 'Endpoint=sb://x;SharedAccessKeyName=y;AccountKey=SUPERSECRETKEY==;EntityPath=z',
+    });
     expect(JSON.stringify(out)).not.toContain('SUPERSECRETKEY');
   });
 
   it('redacts a credential embedded inside a JSON-string blob', () => {
-    const out: any = redactSecrets({ data: '{"MONGO_URL":"mongodb://user:pass@host/db","ok":1}' });
+    const out = redactSecrets({
+      data: '{"MONGO_URL":"mongodb://user:pass@host/db","ok":1}',
+    });
     expect(JSON.stringify(out)).not.toContain('user:pass@host');
   });
 
   it('redacts secrets nested in objects and arrays (deep traversal)', () => {
     const input = {
       level1: {
-        list: [
-          { code: 'MAIL_PASS', value: 'topsecret' },
-          { bucket: 'safe' },
-        ],
+        list: [{ code: 'MAIL_PASS', value: 'topsecret' }, { bucket: 'safe' }],
         deep: { password: 'nested-pw' },
       },
     };
-    const out: any = redactSecrets(input);
+    const out = redactSecrets(input);
     expect(out.level1.list[0].value).toBe(REDACTED);
     expect(out.level1.list[0].code).toBe('MAIL_PASS');
     expect(out.level1.list[1].bucket).toBe('safe');
@@ -195,7 +210,11 @@ describe('redactSecrets — hides secret values', () => {
   });
 
   it('does NOT mutate the input object', () => {
-    const input = { code: 'MAIL_PASS', value: 'hunter2', nested: { password: 'x' } };
+    const input = {
+      code: 'MAIL_PASS',
+      value: 'hunter2',
+      nested: { password: 'x' },
+    };
     const snapshot = JSON.parse(JSON.stringify(input));
     redactSecrets(input);
     expect(input).toEqual(snapshot); // original untouched -> returns NEW structure
@@ -216,16 +235,19 @@ describe('redactSecrets — keeps benign data visible', () => {
       username: 'admin',
       hostname: 'db.example.com',
     };
-    const out: any = redactSecrets(input);
+    const out = redactSecrets(input);
     expect(out).toEqual(input);
   });
 
   it('keeps empty/unset secret values truthful (NOT redacted)', () => {
-    const emptyRow: any = redactSecrets({ code: 'MAIL_PASS', value: '' });
+    const emptyRow = redactSecrets({ code: 'MAIL_PASS', value: '' });
     expect(emptyRow.value).toBe(''); // "not configured" must stay truthful
-    const nullRow: any = redactSecrets({ code: 'AWS_SECRET_ACCESS_KEY', value: null });
+    const nullRow = redactSecrets({
+      code: 'AWS_SECRET_ACCESS_KEY',
+      value: null,
+    });
     expect(nullRow.value).toBeNull();
-    const nullProp: any = redactSecrets({ password: null, apiKey: '' });
+    const nullProp = redactSecrets({ password: null, apiKey: '' });
     expect(nullProp.password).toBeNull();
     expect(nullProp.apiKey).toBe('');
   });
@@ -236,17 +258,17 @@ describe('redactSecrets — keeps benign data visible', () => {
       b: 'mongodb://host:27017/db', // no user:pass@
       c: 'https://user@host/x', // username only, no password
     };
-    const out: any = redactSecrets(input);
+    const out = redactSecrets(input);
     expect(out).toEqual(input);
   });
 
   it('keeps PUBLIC keys visible by design', () => {
     const input = {
       publishableKey: 'pk_live_ABC123',
-      publicKey: 'pk-lf-123', // Langfuse public key
+      publicKey: 'public-key-123',
       siteKey: 'recaptcha-site-key',
     };
-    const out: any = redactSecrets(input);
+    const out = redactSecrets(input);
     expect(out).toEqual(input);
   });
 
@@ -259,7 +281,7 @@ describe('redactSecrets — keeps benign data visible', () => {
       passCount: 5,
       CustomFieldsNavigation: 'v4',
     };
-    const out: any = redactSecrets(input);
+    const out = redactSecrets(input);
     expect(out).toEqual(input);
   });
 });
@@ -271,47 +293,77 @@ describe('redactSecrets — keeps benign data visible', () => {
 //   Must NOT refuse benign Handlebars (those pass the guard and fail at network).
 // -----------------------------------------------------------------------------
 describe('executeErxesOperation — secret-reference reject-guard', () => {
-  const STRING_ARG = [{ name: 'value', type: { kind: 'SCALAR', name: 'String' } }];
-  const JSON_ARG = [{ name: 'configsMap', type: { kind: 'SCALAR', name: 'JSON' } }];
+  const STRING_ARG: GqlArgDef[] = [
+    { name: 'value', type: { kind: 'SCALAR', name: 'String' } },
+  ];
+  const JSON_ARG: GqlArgDef[] = [
+    { name: 'configsMap', type: { kind: 'SCALAR', name: 'JSON' } },
+  ];
 
-  const opString = {
+  const opString: ErxesOperationRef = {
     operation: 'configsUpdate',
-    operationType: 'mutation' as const,
+    operationType: 'mutation',
+    plugin: 'core',
     graphqlArgs: STRING_ARG,
     returnType: { kind: 'SCALAR', name: 'String' },
   };
-  const opJson = {
+  const opJson: ErxesOperationRef = {
     operation: 'configsUpdate',
-    operationType: 'mutation' as const,
+    operationType: 'mutation',
+    plugin: 'core',
     graphqlArgs: JSON_ARG,
     returnType: { kind: 'SCALAR', name: 'String' },
   };
+  const mockFetch = jest.fn<
+    Promise<Response>,
+    [input: string | URL | Request, init?: RequestInit]
+  >();
 
   beforeEach(() => {
     // Track "did we reach the gateway?" via global fetch. The impl uses global
     // fetch (Node 22, no fetch-lib dep). Rejecting keeps tests fast.
-    (global as any).fetch = jest
-      .fn()
-      .mockRejectedValue(new Error('ECONNREFUSED connect 127.0.0.1:59999 fetch failed'));
+    mockFetch
+      .mockReset()
+      .mockRejectedValue(
+        new Error('ECONNREFUSED connect 127.0.0.1:59999 fetch failed'),
+      );
+    global.fetch = mockFetch as unknown as typeof fetch;
   });
 
-  const looksNetworky = (r: any) =>
+  const looksNetworky = (result: unknown) =>
     /econnrefused|fetch failed|econn|network|connect|59999|socket|und_err|failed to fetch|request to/i.test(
-      JSON.stringify(r || {}),
+      JSON.stringify(result ?? {}),
     );
 
   // Run a single op and capture whether THAT call touched the gateway (per-call
   // fetch delta; global fetch call-count is otherwise cumulative across a test).
-  const runOp = async (op: any, args: any) => {
-    (global as any).fetch.mockClear();
-    const result: any = await executeErxesOperation(op, args, SETTINGS);
-    const fetched = (global as any).fetch.mock.calls.length > 0;
-    return { result, fetched };
+  const runOp = async (
+    op: ErxesOperationRef,
+    args: Record<string, unknown>,
+  ) => {
+    mockFetch.mockClear();
+    const result = await runWithAuth(
+      {
+        userHeader: Buffer.from('{"_id":"u1"}').toString('base64'),
+        principalUserId: 'u1',
+        subdomain: 'os',
+      },
+      () => executeErxesOperation(op, args),
+    );
+    return { result, fetched: mockFetch.mock.calls.length > 0 };
   };
-  const reachedGateway = (r: { result: any; fetched: boolean }) =>
-    r.fetched || looksNetworky(r.result);
-  const isGuardRefusal = (r: { result: any; fetched: boolean }) =>
-    r.result && typeof r.result === 'object' && r.result.success === false && !reachedGateway(r);
+  interface OperationRun {
+    result: unknown;
+    fetched: boolean;
+  }
+  const reachedGateway = (run: OperationRun) =>
+    run.fetched || looksNetworky(run.result);
+  const isGuardRefusal = (run: OperationRun) =>
+    typeof run.result === 'object' &&
+    run.result !== null &&
+    'success' in run.result &&
+    run.result.success === false &&
+    !reachedGateway(run);
 
   // --- Self-validating controls: confirm the classifier discriminates. --------
   it('classifier controls: guard-refusal vs network-failure are distinguishable', async () => {
@@ -321,7 +373,7 @@ describe('executeErxesOperation — secret-reference reject-guard', () => {
     expect(isGuardRefusal(netCtl)).toBe(false); // plain value -> reaches gateway, fails there
   });
 
-  const secretTopLevel: Array<[string, any]> = [
+  const secretTopLevel: Array<[string, Record<string, unknown>]> = [
     ['{{secret:CODE}} reference', { value: '{{secret:MAIL_PASS}}' }],
     ['{{keep}} sentinel', { value: '{{keep}}' }],
     ['equals REDACTED marker', { value: REDACTED }],
@@ -337,11 +389,20 @@ describe('executeErxesOperation — secret-reference reject-guard', () => {
     },
   );
 
-  const secretNested: Array<[string, any]> = [
-    ['secret ref nested in JSON object', { configsMap: { MAIL_PASS: '{{secret:MAIL_PASS}}' } }],
-    ['secret ref nested in array', { configsMap: { list: ['ok', '{{secret:AWS_SECRET_ACCESS_KEY}}'] } }],
+  const secretNested: Array<[string, Record<string, unknown>]> = [
+    [
+      'secret ref nested in JSON object',
+      { configsMap: { MAIL_PASS: '{{secret:MAIL_PASS}}' } },
+    ],
+    [
+      'secret ref nested in array',
+      { configsMap: { list: ['ok', '{{secret:AWS_SECRET_ACCESS_KEY}}'] } },
+    ],
     ['{{keep}} nested deep', { configsMap: { a: { b: { c: '{{keep}}' } } } }],
-    ['REDACTED marker nested in array', { configsMap: { arr: ['fine', REDACTED] } }],
+    [
+      'REDACTED marker nested in array',
+      { configsMap: { arr: ['fine', REDACTED] } },
+    ],
     ['REDACTED marker nested deep', { configsMap: { a: { b: REDACTED } } }],
   ];
 
@@ -354,7 +415,7 @@ describe('executeErxesOperation — secret-reference reject-guard', () => {
     },
   );
 
-  const benignHandlebars: Array<[string, any]> = [
+  const benignHandlebars: Array<[string, Record<string, unknown>]> = [
     ['{{customer.name}}', { value: '{{customer.name}}' }],
     ['{{ user_name }} with spaces', { value: '{{ user_name }}' }],
   ];
@@ -369,61 +430,4 @@ describe('executeErxesOperation — secret-reference reject-guard', () => {
       expect(reachedGateway(r)).toBe(true);
     },
   );
-});
-
-// -----------------------------------------------------------------------------
-// SECTION 5: names-only configuration support tool.
-//   - list_config_keys returns NAMES only; PRESENT for mode 'all', ABSENT for 'custom'.
-//   - support failure is explicit, never misreported as an empty config set.
-// -----------------------------------------------------------------------------
-describe('buildErxesSupportTools / list_config_keys', () => {
-  const build = (mode: 'all' | 'custom') =>
-    buildErxesSupportTools({
-      policy: { mode, allowed: [] },
-      destructiveOps: 'ask',
-    });
-  beforeEach(() => {
-    mockSend.mockReset();
-  });
-
-  it('keeps approval support in both policy modes', () => {
-    expect(build('all').request_approval).toBeTruthy();
-    expect(build('custom').request_approval).toBeTruthy();
-  });
-
-  it('list_config_keys PRESENT for mode "all", ABSENT for mode "custom"', () => {
-    const all: any = build('all');
-    const custom: any = build('custom');
-    expect(all.list_config_keys).toBeTruthy();
-    expect(custom.list_config_keys).toBeUndefined();
-  });
-
-  it('list_config_keys returns ONLY config code NAMES (no secret values)', async () => {
-    mockSend.mockResolvedValue(['CLOUDFLARE_API_TOKEN', 'MAIL_HOST']);
-    const tools: any = build('all');
-    const r: any = await tools.list_config_keys.execute({});
-    const s = JSON.stringify(r);
-    expect(s).toContain('CLOUDFLARE_API_TOKEN');
-    expect(s).toContain('MAIL_HOST');
-    // No value / redaction marker should ever be present in a names-only listing:
-    expect(s).not.toContain(REDACTED);
-    // Not a failure result on the happy path:
-    if (r && typeof r === 'object' && 'success' in r) {
-      expect(r.success).not.toBe(false);
-    }
-  });
-
-  it('list_config_keys reports FAILURE (not "nothing configured") when core returns null', async () => {
-    mockSend.mockResolvedValue(null); // configured default -> core unreachable/empty
-    const tools: any = build('all');
-    const r: any = await tools.list_config_keys.execute({});
-    expect(r).toMatchObject({ success: false });
-  });
-
-  it('list_config_keys reports FAILURE when core rejects', async () => {
-    mockSend.mockRejectedValue(new Error('core down'));
-    const tools: any = build('all');
-    const r: any = await tools.list_config_keys.execute({});
-    expect(r).toMatchObject({ success: false });
-  });
 });

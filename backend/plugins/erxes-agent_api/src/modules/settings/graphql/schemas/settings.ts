@@ -8,49 +8,34 @@ export const types = `
     enabled: Boolean
   }
 
-  # Whether voice mode (Chimege Mongolian STT + TTS) is usable: a CHIMEGE_TOKEN
-  # resolves AND the feature is not disabled. When false the chat UI hides
-  # the voice mode entry point.
-  type MastraVoiceStatus {
-    enabled: Boolean
-  }
-
   type MastraSettings {
     _id: String
     erxesApiUrl: String
-    hasErxesApiToken: Boolean
-    defaultAgentId: String
+    memoryEnabled: Boolean
     attachmentsEnabled: Boolean
     attachmentStorage: MastraAttachmentStorageStatus
-    defaultAgentQuota: Int
-
-    # Read-only: the "Advanced memory feature" is controlled by the
-    # ERXES_AGENT_MEMORY env var, not by app data. Surfaced for display only.
-    advancedMemory: Boolean
+    backgroundRemovalEnabled: Boolean
+    openSandboxApiUrl: String
+    hasOpenSandboxApiKey: Boolean!
+    openSandboxApiKeyHint: String
   }
 
   input MastraSettingsInput {
     erxesApiUrl: String
-    erxesApiToken: String
-    defaultAgentId: String
+    memoryEnabled: Boolean
     attachmentsEnabled: Boolean
-    defaultAgentQuota: Int
-  }
-
-  type MastraUserSettings {
-    userId: String!
-    agentQuota: Int
+    backgroundRemovalEnabled: Boolean
+    openSandboxApiUrl: String
+    # Write-only. Blank preserves the currently stored key.
+    openSandboxApiKey: String
   }
 `;
 
 export const queries = `
   mastraSettings: MastraSettings
   mastraAttachmentStorageStatus: MastraAttachmentStorageStatus
-  mastraVoiceStatus: MastraVoiceStatus
-  mastraUserAgentQuota(userId: String!): MastraUserSettings
 `;
 
 export const mutations = `
   mastraSettingsSave(doc: MastraSettingsInput!): MastraSettings
-  mastraUserAgentQuotaSet(userId: String!, quota: Int): MastraUserSettings
 `;

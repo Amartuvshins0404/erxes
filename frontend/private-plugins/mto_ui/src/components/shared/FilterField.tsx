@@ -4,11 +4,17 @@ interface FilterFieldProps {
   label: string;
   children: ReactNode;
   optional?: boolean;
+  className?: string;
 }
 
-export function FilterField({ label, children, optional }: FilterFieldProps) {
+export function FilterField({
+  label,
+  children,
+  optional,
+  className,
+}: FilterFieldProps) {
   return (
-    <div>
+    <div className={className}>
       <label className="mb-2 block text-sm font-medium">
         {label}
         {optional && (

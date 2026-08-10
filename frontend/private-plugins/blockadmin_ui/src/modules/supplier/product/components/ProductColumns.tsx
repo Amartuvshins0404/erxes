@@ -21,6 +21,7 @@ import {
 } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import { IBaProduct } from '../types';
+import { ProductCategoryAssign } from './ProductCategoryAssign';
 import { ProductStatusAction } from './ProductStatusAction';
 
 const statusVariant = (status?: string) => {
@@ -85,9 +86,7 @@ export const productColumns: ColumnDef<IBaProduct>[] = [
     accessorKey: 'unitPrice',
     header: () => {
       const { t } = useTranslation('blockadmin');
-      return (
-        <RecordTable.InlineHead label={t('Unit Price')} icon={IconCoin} />
-      );
+      return <RecordTable.InlineHead label={t('Unit Price')} icon={IconCoin} />;
     },
     cell: ({ cell }) => (
       <RecordTableInlineCell>
@@ -121,15 +120,14 @@ export const productColumns: ColumnDef<IBaProduct>[] = [
       );
     },
     cell: ({ row }) => (
-      <RecordTableInlineCell>
-        <TextOverflowTooltip
-          value={
-            row.original.category?.name ||
-            row.original.initialCategory?.name ||
-            '-'
-          }
-        />
-      </RecordTableInlineCell>
+      <ProductCategoryAssign.Provider
+        productId={row.original._id}
+        categoryId={row.original.categoryId}
+        category={row.original.category}
+        initialCategory={row.original.initialCategory}
+      >
+        <ProductCategoryAssign.InlineCell />
+      </ProductCategoryAssign.Provider>
     ),
     size: 200,
   },

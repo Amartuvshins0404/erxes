@@ -1,4 +1,4 @@
-import { GQL_CURSOR_PARAM_DEFS } from 'erxes-api-shared/utils';
+import { GQL_CURSOR_PARAM_DEFS, GQL_OFFSET_PARAM_DEFS } from 'erxes-api-shared/utils';
 
 export const types = `
   type BaSupplierSocialLink {
@@ -21,6 +21,8 @@ export const types = `
     attachments: [String]
     urls: [String]
     registrationNumber: String
+    industry: String
+    productsCount: Int
     address: JSON
     primaryEmail: String
     primaryPhone: String
@@ -57,6 +59,9 @@ const supplierQueryParams = `
 export const queries = `
   baSupplierDetail(_id: String!): BaSupplier
   baSuppliers(${supplierQueryParams}${GQL_CURSOR_PARAM_DEFS}): BaSupplierListResponse
+
+  cpBaSupplierDetail(_id: String!): BaSupplier
+  cpBaSuppliers(${supplierQueryParams}${GQL_OFFSET_PARAM_DEFS}): [BaSupplier]
 `;
 
 export const mutations = `

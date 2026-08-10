@@ -43,16 +43,15 @@ export const useAgentChatView = (agentId?: string): AgentChatView => {
   // Retry a turn that errored mid-stream. `regenerate` drops the failed
   // assistant message (or re-requests from the last user message when the
   // error hit before one existed) and clears the error state itself. Carry the
-  // persistent turn params so the retry matches the original request.
-  const { reasoningEffort, voiceMode } = shell;
+  // persistent reasoning parameter so the retry matches the original request.
+  const { reasoningEffort } = shell;
   const retry = useCallback(() => {
     void regenerate({
       body: {
         ...(reasoningEffort ? { reasoningEffort } : {}),
-        ...(voiceMode ? { voiceMode: true } : {}),
       },
     });
-  }, [regenerate, reasoningEffort, voiceMode]);
+  }, [regenerate, reasoningEffort]);
   return {
     ...shell,
     messages,

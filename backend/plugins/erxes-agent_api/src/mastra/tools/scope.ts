@@ -12,6 +12,7 @@ export interface ToolPolicy {
   allowed: string[];
 }
 
+
 // True when `op` is within the policy. This is the programmatic boundary the
 // search and execute meta-tools enforce: a restricted agent literally cannot run
 // anything outside its allowlist, even if the model invents an operation name.
@@ -126,9 +127,11 @@ export function capabilityInventory(
 
   // Stable identity of the installed/allowed surface — used to bust the agent
   // cache when plugins are enabled/disabled, so the prompt never goes stale.
+  const policyFingerprint =
+    policy.mode === 'custom' ? [...policy.allowed].sort().join(',') : 'all';
   const fingerprint = `${[...plugins.keys()]
     .sort((a, b) => a.localeCompare(b))
-    .join(',')}#${allowed.length}`;
+    .join(',')}#${allowed.length}#${policyFingerprint}`;
 
   return { lines, fingerprint };
 }

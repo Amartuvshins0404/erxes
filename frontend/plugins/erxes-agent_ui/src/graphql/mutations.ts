@@ -1,5 +1,5 @@
 import { gql } from '@apollo/client';
-import { AGENT_FIELDS, WORKFLOW_FIELDS } from './queries';
+import { AGENT_FIELDS } from './queries';
 
 export const MASTRA_THREAD_RENAME = gql`
   mutation MastraThreadRename($threadId: String!, $title: String!) {
@@ -17,6 +17,12 @@ export const MASTRA_THREAD_REMOVE = gql`
   }
 `;
 
+export const MASTRA_MESSAGE_PAIR_REMOVE = gql`
+  mutation MastraMessagePairRemove($threadId: String!, $messageId: String!) {
+    mastraMessagePairRemove(threadId: $threadId, messageId: $messageId)
+  }
+`;
+
 export const MASTRA_CHAT_CANCEL = gql`
   mutation MastraChatCancel($threadId: String!) {
     mastraChatCancel(threadId: $threadId)
@@ -24,7 +30,7 @@ export const MASTRA_CHAT_CANCEL = gql`
 `;
 
 export const MASTRA_AGENT_CREATE = gql`
-  mutation MastraAgentCreate($doc: MastraAgentCreateInput!) {
+  mutation MastraAgentCreate($doc: MastraAgentInput!) {
     mastraAgentCreate(doc: $doc) {
       ...AgentFields
     }
@@ -33,38 +39,8 @@ export const MASTRA_AGENT_CREATE = gql`
 `;
 
 export const MASTRA_AGENT_UPDATE = gql`
-  mutation MastraAgentUpdate($_id: String!, $doc: MastraAgentConfigInput!) {
+  mutation MastraAgentUpdate($_id: String!, $doc: MastraAgentInput!) {
     mastraAgentUpdate(_id: $_id, doc: $doc) {
-      ...AgentFields
-    }
-  }
-  ${AGENT_FIELDS}
-`;
-
-export const MASTRA_AGENT_SET_AUDIENCE = gql`
-  mutation MastraAgentSetAudience(
-    $_id: String!
-    $visibility: String!
-    $teamId: String
-    $departmentId: String
-    $unitId: String
-  ) {
-    mastraAgentSetAudience(
-      _id: $_id
-      visibility: $visibility
-      teamId: $teamId
-      departmentId: $departmentId
-      unitId: $unitId
-    ) {
-      ...AgentFields
-    }
-  }
-  ${AGENT_FIELDS}
-`;
-
-export const MASTRA_AGENT_SET_GRANT = gql`
-  mutation MastraAgentSetGrant($_id: String!, $grantGroupId: String) {
-    mastraAgentSetGrant(_id: $_id, grantGroupId: $grantGroupId) {
       ...AgentFields
     }
   }
@@ -83,6 +59,7 @@ export const MASTRA_PROVIDER_SAVE = gql`
       _id
       provider
       label
+      scope
       isDefault
       isEnabled
       isOpenAICompatible
@@ -103,158 +80,12 @@ export const MASTRA_SETTINGS_SAVE = gql`
     mastraSettingsSave(doc: $doc) {
       _id
       erxesApiUrl
-      erxesApiToken
-      defaultAgentId
+      memoryEnabled
       attachmentsEnabled
-      defaultAgentQuota
-    }
-  }
-`;
-
-export const MASTRA_USER_AGENT_QUOTA_SET = gql`
-  mutation MastraUserAgentQuotaSet($userId: String!, $quota: Int) {
-    mastraUserAgentQuotaSet(userId: $userId, quota: $quota) {
-      userId
-      agentQuota
-    }
-  }
-`;
-
-export const MASTRA_VOICE_CONFIG_SAVE = gql`
-  mutation MastraVoiceConfigSave($doc: MastraVoiceConfigInput!) {
-    mastraVoiceConfigSave(doc: $doc) {
-      enabled
-      sttEnabled
-      ttsEnabled
-      sttConfigured
-      ttsConfigured
-      sttSource
-      ttsSource
-      ttsVoice
-      ttsSampleRate
-      isEnabled
-    }
-  }
-`;
-
-export const MASTRA_MESSAGE_FEEDBACK = gql`
-  mutation MastraMessageFeedback(
-    $messageId: String!
-    $rating: Int!
-    $comment: String
-  ) {
-    mastraMessageFeedback(
-      messageId: $messageId
-      rating: $rating
-      comment: $comment
-    )
-  }
-`;
-
-export const MASTRA_LEARNING_ADD = gql`
-  mutation MastraLearningAdd($doc: MastraLearningInput!) {
-    mastraLearningAdd(doc: $doc) {
-      _id
-      statement
-      type
-      status
-    }
-  }
-`;
-
-export const MASTRA_LEARNING_EDIT = gql`
-  mutation MastraLearningEdit($_id: String!, $doc: MastraLearningInput!) {
-    mastraLearningEdit(_id: $_id, doc: $doc) {
-      _id
-      statement
-      type
-      contextTags
-      status
-    }
-  }
-`;
-
-export const MASTRA_LEARNING_SET_STATUS = gql`
-  mutation MastraLearningSetStatus($_id: String!, $status: String!) {
-    mastraLearningSetStatus(_id: $_id, status: $status) {
-      _id
-      status
-    }
-  }
-`;
-
-export const MASTRA_LEARNING_PIN = gql`
-  mutation MastraLearningPin($_id: String!, $pinned: Boolean!) {
-    mastraLearningPin(_id: $_id, pinned: $pinned) {
-      _id
-      pinned
-    }
-  }
-`;
-
-export const MASTRA_LEARNING_REMOVE = gql`
-  mutation MastraLearningRemove($_id: String!) {
-    mastraLearningRemove(_id: $_id)
-  }
-`;
-
-export const MASTRA_WORKFLOW_CREATE = gql`
-  mutation MastraWorkflowCreate($doc: MastraWorkflowInput!) {
-    mastraWorkflowCreate(doc: $doc) {
-      ...WorkflowFields
-    }
-  }
-  ${WORKFLOW_FIELDS}
-`;
-
-export const MASTRA_WORKFLOW_UPDATE = gql`
-  mutation MastraWorkflowUpdate($_id: String!, $doc: MastraWorkflowInput!) {
-    mastraWorkflowUpdate(_id: $_id, doc: $doc) {
-      ...WorkflowFields
-    }
-  }
-  ${WORKFLOW_FIELDS}
-`;
-
-export const MASTRA_WORKFLOW_REMOVE = gql`
-  mutation MastraWorkflowRemove($_id: String!) {
-    mastraWorkflowRemove(_id: $_id)
-  }
-`;
-
-export const MASTRA_WORKFLOW_APPROVE = gql`
-  mutation MastraWorkflowApprove($_id: String!) {
-    mastraWorkflowApprove(_id: $_id) {
-      ...WorkflowFields
-    }
-  }
-  ${WORKFLOW_FIELDS}
-`;
-
-export const MASTRA_WORKFLOW_SET_ENABLED = gql`
-  mutation MastraWorkflowSetEnabled($_id: String!, $isEnabled: Boolean!) {
-    mastraWorkflowSetEnabled(_id: $_id, isEnabled: $isEnabled) {
-      _id
-      isEnabled
-    }
-  }
-`;
-
-export const MASTRA_WORKFLOW_VALIDATE = gql`
-  mutation MastraWorkflowValidate($definition: JSON!) {
-    mastraWorkflowValidate(definition: $definition)
-  }
-`;
-
-export const MASTRA_WORKFLOW_RUN_START = gql`
-  mutation MastraWorkflowRunStart($_id: String!, $input: JSON) {
-    mastraWorkflowRunStart(_id: $_id, input: $input) {
-      _id
-      workflowId
-      version
-      runId
-      status
-      startedAt
+      backgroundRemovalEnabled
+      openSandboxApiUrl
+      hasOpenSandboxApiKey
+      openSandboxApiKeyHint
     }
   }
 `;

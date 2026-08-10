@@ -1,50 +1,38 @@
-// ---------------------------------------------------------------------------
-// Conversation auto-titler — instructions + pure helpers.
-//
-// Thread titling itself is owned by Mastra's native generateTitle, configured
-// on the shared Memory (see mastraMemory.ts) with the instructions below — so
-// there is no custom titler agent / LLM call here any more. The pure helpers
-// remain for reuse and unit tests.
-// ---------------------------------------------------------------------------
+// Fast, deterministic conversation titles. Titling must never consume another
+// provider request: the first meaningful user message is available before the
+// agent runs and already contains the best topic signal.
 
 import { trimEdgeChars } from '~/mastra/text';
 
-export const TITLER_INSTRUCTIONS = `You name chat conversations.
-Given the conversation, output a short title (3-6 words) that captures what it is about.
-Rules:
-- Write the title in the same language the user writes in.
-- Describe the topic or task, not the greeting (never "Hello" or "Greeting").
-- No quotes, no trailing punctuation, no emoji, no markdown.
-- Output ONLY the title text, nothing else.`;
-
 const TITLE_MAX_CHARS = 60;
-// Regenerate after this many new messages so the title tracks the topic.
-const REFRESH_EVERY = 6;
+const TITLE_MAX_WORDS = 8;
+const ATTACHMENT_MANIFEST = '--- Attached files ---';
+const GREETING_ONLY =
+  /^(?:hi|hello|hey|good (?:morning|afternoon|evening)|sain uu|сайн уу)[.!?]*$/i;
 
-// ── Pure helpers (unit-testable) ─────────────────────────────────────────────
-
-/** Whether the thread is due for (re)generation. Manual titles are final. */
-export function shouldGenerateTitle(thread: {
-  titleSource?: string;
-  titleMessageCount?: number;
-  messageCount?: number;
-}): boolean {
-  if (!thread) return false;
-  if (thread.titleSource === 'manual') return false;
-  if (thread.titleSource !== 'generated') return true; // derived/missing → first pass
-  const at = thread.titleMessageCount ?? 0;
-  return (thread.messageCount ?? 0) >= at + REFRESH_EVERY;
-}
-
-/** Normalize raw model output into a usable title, or null when unusable. */
+/** Normalize a title candidate into one compact sidebar label. */
 export function sanitizeTitle(raw: string | null | undefined): string | null {
   let title = (raw || '').split('\n')[0].replace(/\s+/g, ' ').trim();
-  // Strip wrapping quotes/backticks and a "Title:" prefix some models add.
   title = title.replace(/^title\s*:\s*/i, '');
-  title = trimEdgeChars(title, '"\'`“”‘’', '"\'`“”‘’.').trim();
+  title = trimEdgeChars(title, '"\'`“”‘’', '"\'`“”‘’.!?;,').trim();
   if (!title) return null;
   if (title.length > TITLE_MAX_CHARS) {
-    title = `${title.slice(0, TITLE_MAX_CHARS).trimEnd()}…`;
+    title = `${title.slice(0, TITLE_MAX_CHARS - 1).trimEnd()}…`;
   }
   return title;
+}
+
+/**
+ * Derive a stable title from the first meaningful user request without an LLM.
+ * Attachment manifests and Markdown decoration are excluded from the label.
+ */
+export function deriveThreadTitle(message: string): string | null {
+  const request = (message || '')
+    .split(ATTACHMENT_MANIFEST)[0]
+    .replace(/https?:\/\/\S+/gi, ' ')
+    .replace(/[`*_#>[\\\]]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!request || GREETING_ONLY.test(request)) return null;
+  return sanitizeTitle(request.split(' ').slice(0, TITLE_MAX_WORDS).join(' '));
 }

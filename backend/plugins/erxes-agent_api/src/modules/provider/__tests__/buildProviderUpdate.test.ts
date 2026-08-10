@@ -2,7 +2,41 @@
 // dropped from the update so the stored secret is preserved (the masked UI
 // submits an empty key when the admin doesn't re-type it), while a real key
 // replaces it.
-import { buildProviderUpdate } from '@/provider/db/models/Provider';
+import {
+  buildProviderUpdate,
+  ensureProviderIndexes,
+  type IMastraProviderModel,
+} from '@/provider/db/models/Provider';
+
+describe('ensureProviderIndexes', () => {
+  it('reconciles current schema indexes once per tenant model', async () => {
+    const syncIndexes = jest.fn().mockResolvedValue(['provider_1']);
+    const model = { syncIndexes } as unknown as IMastraProviderModel;
+
+    await Promise.all([
+      ensureProviderIndexes(model),
+      ensureProviderIndexes(model),
+    ]);
+    await ensureProviderIndexes(model);
+
+    expect(syncIndexes).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries after an index synchronization failure', async () => {
+    const syncIndexes = jest
+      .fn()
+      .mockRejectedValueOnce(new Error('index unavailable'))
+      .mockResolvedValue([]);
+    const model = { syncIndexes } as unknown as IMastraProviderModel;
+
+    await expect(ensureProviderIndexes(model)).rejects.toThrow(
+      'index unavailable',
+    );
+    await expect(ensureProviderIndexes(model)).resolves.toBeUndefined();
+
+    expect(syncIndexes).toHaveBeenCalledTimes(2);
+  });
+});
 
 describe('buildProviderUpdate (write-only apiKey)', () => {
   it('drops a blank apiKey so the existing stored secret is kept', () => {
@@ -32,7 +66,10 @@ describe('buildProviderUpdate (write-only apiKey)', () => {
   });
 
   it('drops apiKey entirely when omitted (undefined)', () => {
-    const update = buildProviderUpdate({ provider: 'openai', isEnabled: false });
+    const update = buildProviderUpdate({
+      provider: 'openai',
+      isEnabled: false,
+    });
     expect(update).not.toHaveProperty('apiKey');
     expect(update.isEnabled).toBe(false);
   });

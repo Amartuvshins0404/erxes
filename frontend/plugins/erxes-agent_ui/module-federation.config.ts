@@ -19,9 +19,20 @@ export const config: ModuleFederationConfig = {
     './erxes_agent': './src/modules/MastraMain.tsx',
     './erxes_agentSettings': './src/modules/MastraSettings.tsx',
     './widgets': './src/widgets/Widgets.tsx',
-    './automationsWidget':
-      './src/widgets/automations/components/AutomationRemoteEntry.tsx',
   },
+  // Keep both router packages in the host's singleton context. Use explicit
+  // configs because this pnpm graph stores version-qualified external-node
+  // names, which makes Nx's string-form additionalShared lookup fail.
+  additionalShared: [
+    [
+      'react-router',
+      { singleton: true, strictVersion: false, requiredVersion: false },
+    ],
+    [
+      'react-router-dom',
+      { singleton: true, strictVersion: false, requiredVersion: false },
+    ],
+  ],
   shared: (libraryName, defaultConfig) => {
     if (coreLibraries.has(libraryName)) {
       return defaultConfig;

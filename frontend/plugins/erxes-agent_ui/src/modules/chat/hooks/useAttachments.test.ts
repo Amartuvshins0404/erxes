@@ -1,5 +1,11 @@
+/** @jest-environment jsdom */
+
 import { act, renderHook } from '@testing-library/react';
 import { useAttachments } from './useAttachments';
+
+jest.mock('erxes-ui', () => ({
+  useToast: () => ({ toast: jest.fn() }),
+}));
 
 // Staging is pure client state — no upload happens until send — so addFiles can
 // be exercised directly. Empty (0-byte) and oversize files must be rejected up

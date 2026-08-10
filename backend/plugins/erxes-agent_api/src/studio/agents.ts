@@ -4,10 +4,11 @@
  * Reuses the production builder `getOrCreateAgent(cfg, models, subdomain)`.
  * Passing the subdomain makes the builder attach the NATIVE Mastra Memory
  * (recent-history replay + working memory on Mongo `erxes_mastra_memory`, via
- * getMastraMemory) whenever ERXES_AGENT_MEMORY=enable and the agent's
- * memoryEnabled !== false — so Studio lists each real agent AND its per-agent
- * history tab lights up, with zero schema translation. Resilient per-agent: a
- * build failure (gateway down, missing provider key) is logged and skipped.
+ * getMastraMemory) whenever the tenant's General Settings memory switch is on
+ * — so Studio lists each real agent and its history tab, with zero schema
+ * translation.
+ * Resilient per-agent: build failures (gateway down or missing provider key)
+ * are logged and skipped.
  *
  * NOTE: chatting in Studio invokes the agent directly (not erxes's prepareChatTurn
  * wrapper) — the agent is real + tool-bound, and memory persistence goes through
@@ -32,7 +33,7 @@ export async function buildStudioAgents(): Promise<Record<string, Agent>> {
   let configs: IMastraAgentDocument[];
   try {
     models = await studioModels();
-    configs = await models.MastraAgent.getAgentsInternal();
+    configs = await models.MastraAgent.getAgents();
   } catch (err) {
     console.error(
       '[erxes-studio] could not load agents from Mongo:',
@@ -86,12 +87,10 @@ export async function buildStudioAgents(): Promise<Record<string, Agent>> {
         );
       }
       agents[keyOf(cfg)] = agent;
-      console.log(`[erxes-studio] registered: ${cfg.name} (${keyOf(cfg)})`);
+      console.log(`[erxes-studio] registered: ${cfg._id} (${keyOf(cfg)})`);
     } catch (err) {
       console.error(
-        `[erxes-studio] skipped ${cfg?.name ?? cfg?._id}: ${
-          (err as Error).message
-        }`,
+        `[erxes-studio] skipped ${cfg._id}: ${(err as Error).message}`,
       );
     }
   }

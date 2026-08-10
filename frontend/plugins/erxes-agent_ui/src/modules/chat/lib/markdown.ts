@@ -31,13 +31,3 @@ export const splitStreamingMarkdown = (
 
   return { blocks, tail: current.join('\n') };
 };
-
-export const formatJson = (value: unknown): string => {
-  if (value === undefined) return '';
-  if (typeof value === 'string') return value;
-  try {
-    return JSON.stringify(value, null, 2);
-  } catch {
-    return String(value);
-  }
-};

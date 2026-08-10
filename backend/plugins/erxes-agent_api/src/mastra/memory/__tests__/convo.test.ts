@@ -1,4 +1,4 @@
-import { augmentConvo, deriveResourceId, deriveBotResourceId } from '../convo';
+import { augmentConvo, deriveResourceId } from '../convo';
 
 describe('convo assembly', () => {
   const history = [
@@ -6,34 +6,23 @@ describe('convo assembly', () => {
     { role: 'assistant', content: 'hello' },
   ];
 
-  it('AM-CONV-1: order is [wm?, digest?, ...history, user] with user last', () => {
+  it('AM-CONV-1: order is [wm?, ...history, user] with user last', () => {
     const convo = augmentConvo({
       recentHistory: history,
       userMessage: 'now',
-      learnedDigestBlock: 'DIGEST',
       workingMemoryBlock: 'WM',
     });
-    expect(convo.map((m) => m.content)).toEqual([
-      'WM',
-      'DIGEST',
-      'hi',
-      'hello',
-      'now',
-    ]);
+    expect(convo.map((m) => m.content)).toEqual(['WM', 'hi', 'hello', 'now']);
     expect(convo[convo.length - 1]).toEqual({ role: 'user', content: 'now' });
   });
 
-  it('AM-CONV-2: injected blocks are system role, never tool frames', () => {
+  it('AM-CONV-2: working memory is a system message, never a tool frame', () => {
     const convo = augmentConvo({
       recentHistory: [],
       userMessage: 'x',
-      learnedDigestBlock: 'DIGEST',
       workingMemoryBlock: 'WM',
     });
-    const injected = convo.filter(
-      (m) => m.content === 'WM' || m.content === 'DIGEST',
-    );
-    expect(injected.every((m) => m.role === 'system')).toBe(true);
+    expect(convo[0]).toEqual({ role: 'system', content: 'WM' });
     // no tool-call frames anywhere
     expect(
       convo.some(
@@ -52,15 +41,5 @@ describe('convo assembly', () => {
     expect(deriveResourceId({ user: { _id: 'u1' }, agentId: 'a' })).toBe('u1');
     expect(deriveResourceId({ user: null, agentId: 'a' })).toBe('agent:a');
     expect(deriveResourceId({ agentId: 'a' })).toBe('agent:a');
-  });
-
-  it('AM-CONV-6: deriveBotResourceId prefers customer id, else per-conversation', () => {
-    expect(
-      deriveBotResourceId({ customerId: 'c1', conversationId: 'cv' }),
-    ).toBe('c1');
-    expect(deriveBotResourceId({ conversationId: 'cv' })).toBe('bot:cv');
-    expect(
-      deriveBotResourceId({ customerId: null, conversationId: 'cv' }),
-    ).toBe('bot:cv');
   });
 });

@@ -1,74 +1,87 @@
+import { randomUUID } from 'node:crypto';
 import { sendTRPCMessage } from 'erxes-api-shared/utils';
 import { clearGroupActionsCache } from 'erxes-api-shared/core-modules';
-import type { IModels } from '~/connectionResolvers';
-import type { IMastraAgentDocument } from '@/agent/@types/agent';
+import type { GroupPermission } from '~/mastra/tools/actionsToAllowedTools';
 
-// ---------------------------------------------------------------------------
-// Agent service-user lifecycle (step 21 — "agent as principal").
-//
-// Each AI agent gets a dedicated core "service user": a passwordless,
-// non-owner, `role:'system'` user that can NEVER log in interactively
-// (login paths require a non-empty password) but CAN receive short-lived run
-// tokens for background runs (wired in step 22). `role:'system'` hides the
-// user from team-member lists / seat counts.
-//
-// This module is the LIFECYCLE ONLY — create / reconcile / assign group /
-// deactivate. It does not change how any run mints tokens and it builds no
-// grant-selection UI. It is dormant until callers arrive (step 22+); the only
-// live wiring today is best-effort deactivation on agent delete.
-//
-// All core mutations go through the unauthenticated inter-service trpc router
-// `core/users/*`. NOTE: `sendTRPCMessage` SWALLOWS errors and returns
-// `defaultValue` (it never throws) — so a create that hits the duplicate-email
-// guard and a create that fails because core is unreachable are BOTH observed
-// here as a null result. We disambiguate by re-reading the user by email.
-// ---------------------------------------------------------------------------
+// Core owns the AI team member's identity, status, and permissions. The plugin
+// keeps only runtime configuration and links it to the account through the
+// account's deterministic appId marker; no core schema or API change is needed.
 
-/** Minimal shape of an agent config this module reads / persists onto. */
-export type ServiceUserAgentConfig = Pick<
-  IMastraAgentDocument,
-  '_id' | 'agentId' | 'name' | 'serviceUserId' | 'grantGroupId'
->;
-
-/** Subset of a core user document this module inspects. */
-interface CoreUser {
+export interface AgentAccount {
   _id: string;
   role?: string;
+  isOwner?: boolean;
   isActive?: boolean;
   email?: string;
-  /** The user's current permission groups — read so the mint path (step 22)
-   *  can skip a redundant group sync + cache bust when already in lock-step. */
+  username?: string;
+  code?: string;
+  groupIds?: string[];
+  brandIds?: string[];
+  branchIds?: string[];
+  departmentIds?: string[];
+  appId?: string;
+  details?: { fullName?: string; description?: string; avatar?: string };
   permissionGroupIds?: string[];
+  customPermissions?: GroupPermission[];
+  createdAt?: Date | string;
+}
+
+export interface AgentAccountInput {
+  name: string;
+  description?: string;
+  permissionGroupIds: string[];
+  customPermissions?: GroupPermission[];
+  isActive?: boolean;
 }
 
 const CORE_USERS = { pluginName: 'core', module: 'users' } as const;
+const AGENT_APP_PREFIX = 'erxes-agent:';
 
-/**
- * Deterministic, email-valid local part / username for an agent. Core's user
- * schema enforces an RFC-5322 regex on `email`, so we down-map any character
- * that is not safe in a local part to `-`. `agentId` is unique, so the result
- * is stable and (barring a pathological collision on stripped punctuation)
- * unique per agent. `.local` is accepted by core's domain regex.
- */
-const sanitizeToken = (agentId: string): string =>
-  agentId
-    .toLowerCase()
-    .replace(/[^a-z0-9._-]+/g, '-')
-    .replace(/^-+|-+$/g, '') || 'agent';
+export const agentAccountAppId = (userId: string): string =>
+  `${AGENT_APP_PREFIX}${userId}`;
 
-const syntheticEmail = (agentId: string): string =>
-  `agent-${sanitizeToken(agentId)}@agents.local`;
+export const isAgentAccount = (user: AgentAccount): boolean =>
+  user.role === 'user' &&
+  user.isOwner !== true &&
+  Boolean(user.appId?.startsWith(AGENT_APP_PREFIX));
 
-const syntheticUsername = (agentId: string): string =>
-  `agent-${sanitizeToken(agentId)}`;
+export const agentIdForAccount = (user: AgentAccount): string | null => {
+  if (!isAgentAccount(user)) return null;
+  const agentId = user.appId?.slice(AGENT_APP_PREFIX.length).trim();
+  return agentId || null;
+};
 
-// --- thin trpc wrappers (same call shape as runToken.ts / storage.ts) --------
+export const isAdoptableAgentAccount = (
+  user: AgentAccount | null | undefined,
+): user is AgentAccount =>
+  Boolean(
+    user?._id &&
+      (user.appId?.startsWith(AGENT_APP_PREFIX) ||
+        (user.role === 'system' && user.email?.endsWith('@agents.local'))),
+  );
 
-/** `users.findOne` — returns the matching core user, or null. */
+export const agentAccountName = (user: AgentAccount): string =>
+  user.details?.fullName || user.username || user.email || 'AI team member';
+
+const normalizePermissionGroupIds = (ids: string[]): string[] => [
+  ...new Set(ids.map((id) => id.trim()).filter(Boolean)),
+];
+
+const accountHandle = (name: string): string => {
+  const stem =
+    name
+      .toLowerCase()
+      .replace(/[^a-z0-9._-]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 32) || 'agent';
+  const suffix = randomUUID().replaceAll('-', '').slice(0, 12);
+  return `agent-${stem}-${suffix}`;
+};
+
 const findCoreUser = (
   subdomain: string,
   query: Record<string, unknown>,
-): Promise<CoreUser | null> =>
+): Promise<AgentAccount | null> =>
   sendTRPCMessage({
     subdomain,
     ...CORE_USERS,
@@ -78,16 +91,24 @@ const findCoreUser = (
     defaultValue: null,
   });
 
-/**
- * `users.create` — returns the created user, or null when the call errored
- * (duplicate email/username OR core unreachable — indistinguishable here).
- * `createUser` IGNORES `role`/`permissionGroupIds`, so `role:'system'` is set
- * by a follow-up `users.updateOne`.
- */
+export const findCoreUsers = (
+  subdomain: string,
+  query: Record<string, unknown>,
+  fields?: Record<string, number>,
+): Promise<AgentAccount[]> =>
+  sendTRPCMessage({
+    subdomain,
+    ...CORE_USERS,
+    action: 'find',
+    method: 'query',
+    input: { query, ...(fields ? { fields } : {}) },
+    defaultValue: [],
+  });
+
 const createCoreUser = (
   subdomain: string,
   data: Record<string, unknown>,
-): Promise<CoreUser | null> =>
+): Promise<AgentAccount | null> =>
   sendTRPCMessage({
     subdomain,
     ...CORE_USERS,
@@ -97,13 +118,12 @@ const createCoreUser = (
     defaultValue: null,
   });
 
-/** `users.updateOne` — `{selector, modifier}` passthrough. */
-const updateCoreUser = async (
+const updateCoreUser = (
   subdomain: string,
   selector: Record<string, unknown>,
   modifier: Record<string, unknown>,
-): Promise<void> => {
-  const result = await sendTRPCMessage({
+): Promise<unknown> =>
+  sendTRPCMessage({
     subdomain,
     ...CORE_USERS,
     action: 'updateOne',
@@ -111,179 +131,206 @@ const updateCoreUser = async (
     input: { selector, modifier },
     defaultValue: null,
   });
-  if (!result) {
-    throw new Error('Core user update failed');
-  }
-};
 
-/** Force `role:'system'` when it has drifted (create ignores role). */
-const ensureSystemRole = async (
+export const getCoreUserById = (
   subdomain: string,
-  user: CoreUser,
-): Promise<void> => {
-  if (user.role !== 'system') {
-    await updateCoreUser(
-      subdomain,
-      { _id: user._id },
-      { $set: { role: 'system' } },
-    );
-  }
-};
+  userId: string,
+): Promise<AgentAccount | null> => findCoreUser(subdomain, { _id: userId });
 
-/** Reactivate a user that was previously deactivated (it was ours). */
-const ensureActive = async (
-  subdomain: string,
-  user: CoreUser,
-): Promise<void> => {
-  if (user.isActive === false) {
-    await updateCoreUser(
-      subdomain,
-      { _id: user._id },
-      { $set: { isActive: true } },
-    );
-  }
-};
-
-/** Persist the resolved serviceUserId onto the agent config document. */
-const persistServiceUserId = async (
-  models: IModels,
-  agentConfig: ServiceUserAgentConfig,
-  serviceUserId: string,
-): Promise<void> => {
-  if (agentConfig.serviceUserId === serviceUserId) return;
-  await models.MastraAgent.updateOne(
-    { _id: agentConfig._id },
-    { $set: { serviceUserId } },
-  );
-  // Reflect the new id on the in-memory config so the caller sees it.
-  agentConfig.serviceUserId = serviceUserId;
-};
-
-/**
- * Idempotently ensure the agent has a dedicated core service user, returning
- * its id AND its current permission groups (so the mint path can skip a
- * redundant group sync). Safe to call repeatedly and concurrently across
- * replicas.
- *
- *  a. If a serviceUserId is already stored, verify the user still exists; if
- *     so, reactivate it (if it had been deactivated) / repair its role and
- *     return it. If it was deleted out-of-band, fall through and re-create.
- *  b. Otherwise create a passwordless, non-owner, active user with a synthetic
- *     unique email, then set `role:'system'`.
- *  c. Duplicate-email race (two replicas ensure at once): the create returns
- *     null, so re-read the user by email and adopt it.
- *  d. Persist the resolved id on the agent config document.
- */
-export async function ensureServiceUser(opts: {
-  agentConfig: ServiceUserAgentConfig;
+export async function getAgentAccount(opts: {
+  userId: string;
   subdomain: string;
-  models: IModels;
-}): Promise<{ serviceUserId: string; permissionGroupIds: string[] }> {
-  const { agentConfig, subdomain, models } = opts;
-
-  // (a) Reconcile an already-provisioned user.
-  if (agentConfig.serviceUserId) {
-    const existing = await findCoreUser(subdomain, {
-      _id: agentConfig.serviceUserId,
-    });
-    if (existing?._id) {
-      await ensureActive(subdomain, existing);
-      await ensureSystemRole(subdomain, existing);
-      return {
-        serviceUserId: existing._id,
-        permissionGroupIds: existing.permissionGroupIds ?? [],
-      };
-    }
-    // Deleted out-of-band → fall through to re-create and re-point the config.
+  requireActive?: boolean;
+}): Promise<AgentAccount> {
+  const { userId, subdomain, requireActive = true } = opts;
+  const agentId = userId.trim();
+  const user = agentId
+    ? await findCoreUser(subdomain, { appId: agentAccountAppId(agentId) })
+    : null;
+  if (!user?._id || !isAgentAccount(user)) {
+    throw new Error(`AI team-member account for agent ${userId} was not found`);
   }
+  if (requireActive && user.isActive === false) {
+    throw new Error(`AI team-member account for agent ${userId} is inactive`);
+  }
+  return user;
+}
 
-  const email = syntheticEmail(agentConfig.agentId);
-  const username = syntheticUsername(agentConfig.agentId);
-  const fullName = `${agentConfig.name} (agent)`;
+export async function getAgentAccountByUserId(opts: {
+  userId: string;
+  subdomain: string;
+  requireActive?: boolean;
+}): Promise<AgentAccount> {
+  const { userId, subdomain, requireActive = true } = opts;
+  const user = await findCoreUser(subdomain, { _id: userId });
+  if (!user?._id || !isAgentAccount(user)) {
+    throw new Error(`AI team-member account ${userId} was not found`);
+  }
+  if (requireActive && user.isActive === false) {
+    throw new Error(`AI team-member account ${userId} is inactive`);
+  }
+  return user;
+}
 
-  // (b) Create.
-  let user = await createCoreUser(subdomain, {
+export async function createAgentAccount(opts: {
+  subdomain: string;
+  input: AgentAccountInput;
+  userId?: string;
+}): Promise<AgentAccount> {
+  const { subdomain, input } = opts;
+  const requestedAgentId = opts.userId?.trim();
+  const handle = accountHandle(input.name);
+  const permissionGroupIds = normalizePermissionGroupIds(
+    input.permissionGroupIds,
+  );
+  const created = await createCoreUser(subdomain, {
     notUsePassword: true,
-    isActive: true,
+    isActive: input.isActive !== false,
     isOwner: false,
-    email,
-    username,
-    details: { fullName },
+    email: `${handle}@agents.local`,
+    username: handle,
+    details: {
+      fullName: input.name.trim(),
+      description: input.description?.trim() || '',
+    },
   });
 
-  // (c) Create failed → either a duplicate-email race (adopt the existing
-  // user) or core is unreachable (nothing to adopt → fail closed).
-  if (!user?._id) {
-    const adopted = await findCoreUser(subdomain, { email });
-    if (!adopted?._id) {
-      throw new Error(
-        `Failed to ensure service user for agent ${agentConfig.agentId}`,
-      );
-    }
-    user = adopted;
+  if (!created?._id) {
+    throw new Error('Failed to create AI team-member account');
   }
 
-  await ensureSystemRole(subdomain, user);
-  await ensureActive(subdomain, user);
-
-  // (d) Persist.
-  await persistServiceUserId(models, agentConfig, user._id);
-  return {
-    serviceUserId: user._id,
-    permissionGroupIds: user.permissionGroupIds ?? [],
-  };
-}
-
-/**
- * Assign (or clear) the agent's permission group on its service user, then
- * invalidate the user's cached action map so the change takes effect on the
- * next gateway call. Permission-group ASSIGNMENT is plugin-only; group
- * CREATION is out of scope. Optionally persists `grantGroupId` on the agent
- * config (pass `models` + `agentConfig`).
- */
-export async function syncServiceUserGroup(opts: {
-  serviceUserId: string;
-  groupId: string | null;
-  subdomain: string;
-  models?: IModels;
-  agentConfig?: ServiceUserAgentConfig;
-}): Promise<void> {
-  const { serviceUserId, groupId, subdomain, models, agentConfig } = opts;
-
-  await updateCoreUser(
-    subdomain,
-    { _id: serviceUserId },
-    { $set: { permissionGroupIds: groupId ? [groupId] : [] } },
-  );
-
-  // Invalidate `user_actions_<serviceUserId>` so the new grant is picked up.
-  await clearGroupActionsCache({ userId: serviceUserId });
-
-  if (models && agentConfig) {
-    await models.MastraAgent.updateOne(
-      { _id: agentConfig._id },
-      { $set: { grantGroupId: groupId || undefined } },
+  const agentId = requestedAgentId || created._id;
+  try {
+    await updateCoreUser(
+      subdomain,
+      { _id: created._id },
+      {
+        $set: {
+          role: 'user',
+          isOwner: false,
+          isActive: input.isActive !== false,
+          appId: agentAccountAppId(agentId),
+          permissionGroupIds,
+          customPermissions: input.customPermissions ?? [],
+          'details.fullName': input.name.trim(),
+          'details.description': input.description?.trim() || '',
+        },
+      },
     );
-    agentConfig.grantGroupId = groupId || undefined;
+    await clearGroupActionsCache({ subdomain, userId: created._id });
+    return getAgentAccount({
+      userId: agentId,
+      subdomain,
+      requireActive: false,
+    });
+  } catch (error) {
+    await updateCoreUser(
+      subdomain,
+      { _id: created._id },
+      { $set: { isActive: false } },
+    ).catch(() => undefined);
+    throw error;
   }
 }
 
-/**
- * Deactivate the agent's service user (on agent delete). This stops new
- * run-token mints; any already-issued token expires within its ≤1h TTL.
- *
- * We use `users.updateOne` with an explicit `$set:{isActive:false}` — NOT
- * `users.setActiveStatus`, which TOGGLES the flag and would silently
- * re-activate an already-inactive user.
- */
-export async function deactivateServiceUser(opts: {
-  serviceUserId: string;
+export async function updateAgentAccount(opts: {
+  userId: string;
+  subdomain: string;
+  input: Partial<AgentAccountInput>;
+}): Promise<AgentAccount> {
+  const { userId, subdomain, input } = opts;
+  const account = await getAgentAccount({
+    userId,
+    subdomain,
+    requireActive: false,
+  });
+
+  const set: Record<string, unknown> = {};
+  if (input.name !== undefined) set['details.fullName'] = input.name.trim();
+  if (input.description !== undefined) {
+    set['details.description'] = input.description.trim();
+  }
+  if (input.permissionGroupIds !== undefined) {
+    set.permissionGroupIds = normalizePermissionGroupIds(
+      input.permissionGroupIds,
+    );
+  }
+  if (input.customPermissions !== undefined) {
+    set.customPermissions = input.customPermissions;
+  }
+  if (input.isActive !== undefined) set.isActive = input.isActive;
+
+  if (Object.keys(set).length) {
+    await updateCoreUser(subdomain, { _id: account._id }, { $set: set });
+    if (
+      input.permissionGroupIds !== undefined ||
+      input.customPermissions !== undefined
+    ) {
+      await clearGroupActionsCache({ subdomain, userId: account._id });
+    }
+  }
+
+  return getAgentAccount({ userId, subdomain, requireActive: false });
+}
+
+export async function deactivateAgentAccount(opts: {
+  userId: string;
   subdomain: string;
 }): Promise<void> {
-  const { serviceUserId, subdomain } = opts;
+  const { userId, subdomain } = opts;
+  const account = await getAgentAccount({
+    userId,
+    subdomain,
+    requireActive: false,
+  });
   await updateCoreUser(
     subdomain,
-    { _id: serviceUserId },
+    { _id: account._id },
     { $set: { isActive: false } },
   );
+  await clearGroupActionsCache({ subdomain, userId: account._id });
+}
+
+// Migration-only reconciliation for accounts created by the former linked-user
+// model. It never claims an ordinary human account.
+export async function adoptLegacyAgentAccount(opts: {
+  agentId: string;
+  accountId: string;
+  subdomain: string;
+  name: string;
+  description?: string;
+  permissionGroupIds: string[];
+  isActive: boolean;
+}): Promise<AgentAccount> {
+  const {
+    agentId,
+    accountId,
+    subdomain,
+    name,
+    description,
+    permissionGroupIds,
+    isActive,
+  } = opts;
+  const existing = await findCoreUser(subdomain, { _id: accountId });
+  if (!isAdoptableAgentAccount(existing)) {
+    throw new Error(`Refusing to claim non-agent account ${accountId}`);
+  }
+
+  await updateCoreUser(
+    subdomain,
+    { _id: accountId },
+    {
+      $set: {
+        role: 'user',
+        isOwner: false,
+        isActive,
+        appId: agentAccountAppId(agentId),
+        permissionGroupIds: normalizePermissionGroupIds(permissionGroupIds),
+        'details.fullName': name.trim(),
+        'details.description': description?.trim() || '',
+      },
+    },
+  );
+  await clearGroupActionsCache({ subdomain, userId: accountId });
+  return getAgentAccount({ userId: agentId, subdomain, requireActive: false });
 }

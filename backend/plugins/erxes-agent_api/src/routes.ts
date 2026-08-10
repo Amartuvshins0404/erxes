@@ -3,39 +3,26 @@ import { createUIMessageStream, pipeUIMessageStreamToResponse } from 'ai';
 import { extractUserFromHeader, getSubdomain } from 'erxes-api-shared/utils';
 import { checkPermissionGroup } from 'erxes-api-shared/core-modules';
 import { generateModels } from './connectionResolvers';
-import { getOrCreateAgent } from './mastra/agentRuntime';
-import { isReasoningEffort } from './mastra/providers';
-import { runWithAuth, ApprovedOp } from './mastra/requestContext';
-import { resolveBackgroundPrincipal } from './mastra/auth/backgroundPrincipal';
-import { isAdvancedMemoryEnabled } from './mastra/memory/config';
-import { scopedResource } from './mastra/memory/mastraMemory';
-import { augmentConvo } from './mastra/memory';
-import { readLearnedDigest } from './mastra/learning/digest';
-import {
-  toUserFacingError,
-  runAgentTurn,
-  patchNativeTurn,
-  TurnAgent,
-} from '@/agent/turn';
+import { toUserFacingError } from '@/agent/turn';
+import { requireScopedAgent } from '@/agent/authorization';
 import { IMastraChatAttachment } from '@/session/@types/session';
 import { attachmentStorageStatus } from '@/settings/graphql/resolvers/queries/settings';
-import { registerVoiceRoutes } from './mastra/voice/routes';
 import { streamAgentTurn, type ChatStreamRequest } from './mastra/streamTurn';
+import { isReasoningEffort } from './mastra/providers';
+import type { ApprovedOp } from './mastra/requestContext';
 import { makeIpRateLimiter } from './utils/rateLimit';
 import { registerActiveRun } from './mastra/runRegistry';
 import { ERXES_AGENT_ACTIONS } from './meta/permissionActions';
+import { registerAgentLocaleRoutes } from './locales';
+import { registerWebsitePreviewRoutes } from './mastra/websitePreview';
 
 export const router: Router = Router();
-
-// Voice mode (speech-to-text + text-to-speech). Discrete pipeline that reuses
-// the existing chat path: STT only produces transcript text the client feeds
-// into POST /chat/stream, and TTS only voices text the client streamed back.
-registerVoiceRoutes(router);
+registerAgentLocaleRoutes(router);
+registerWebsitePreviewRoutes(router);
 
 // Generous per-IP throttle on the LLM-backed endpoints — normal chat traffic
-// stays well under it; it only blunts abnormal high-frequency bursts (and the
-// LLM/API cost they would incur). Single canonical definition shared with the
-// voice routes via makeIpRateLimiter so the limits never drift apart.
+// stays well under it; it only blunts abnormal high-frequency bursts and their
+// associated LLM/API cost.
 const llmRouteLimiter = makeIpRateLimiter();
 
 // ─── Streaming chat (AI SDK UIMessage stream) ────────────────────────────────
@@ -51,8 +38,8 @@ const llmRouteLimiter = makeIpRateLimiter();
 //   data-activity      — LLM one-liner of what the agent is doing right now
 //   data-thread-title  — the auto-generated conversation title (after the turn)
 //   data-heartbeat     — keeps the gateway proxy socket warm during long tools
-// and stamp `messageId` / `interrupted` / `langfuseTraceId` onto the assistant
-// message's metadata via the final `finish` chunk.
+// and stamp `messageId` / `interrupted` onto the assistant message's metadata
+// via the final `finish` chunk.
 //
 // Interrupt: the client aborts the fetch; the closed connection aborts the
 // agent run via AbortSignal. Whatever text already streamed is persisted and
@@ -110,21 +97,6 @@ function sanitizeAttachments(raw: unknown): IMastraChatAttachment[] | null {
   });
 }
 
-// Shape-check the slash-activated skill names the composer echoes on send.
-// Returns the sanitized list, or null when malformed. Names are re-resolved
-// against the user's reachable skills server-side (prepareChatTurn), so this is
-// only a payload-shape guard — it never trusts the names as authorization.
-const MAX_ACTIVE_SKILLS = 10;
-const MAX_SKILL_NAME_LEN = 64;
-function sanitizeActiveSkillNames(raw: unknown): string[] | null {
-  return parseBoundedArray(raw, MAX_ACTIVE_SKILLS, (item) => {
-    if (typeof item !== 'string') return null;
-    const name = item.trim();
-    if (!name || name.length > MAX_SKILL_NAME_LEN) return null;
-    return name;
-  });
-}
-
 // Shape-check the per-turn destructive-op approvals the client echoes back when
 // the user clicks Approve. Returns the sanitized list, or null when malformed.
 const MAX_APPROVED_OPS = 20;
@@ -178,11 +150,6 @@ function parseChatStreamBody(raw: unknown): ParseResult {
     return { ok: false, error: 'Invalid approvedOperations payload' };
   }
 
-  const activeSkillNames = sanitizeActiveSkillNames(body.activeSkillNames);
-  if (activeSkillNames === null) {
-    return { ok: false, error: 'Invalid activeSkillNames payload' };
-  }
-
   return {
     ok: true,
     value: {
@@ -192,8 +159,6 @@ function parseChatStreamBody(raw: unknown): ParseResult {
       reasoningEffort,
       attachments,
       approvedOperations,
-      activeSkillNames,
-      voiceMode: body.voiceMode === true,
     },
   };
 }
@@ -209,9 +174,8 @@ router.post('/chat/stream', llmRouteLimiter, async (req, res) => {
     return res.status(400).json({ error: parsed.error });
   }
   // The validated turn payload (agentId, message, reasoningEffort, attachments,
-  // approvedOperations, activeSkillNames, voiceMode …) is handed to
-  // streamAgentTurn wholesale; only `attachments` is inspected here for the
-  // early storage guard below.
+  // and approvedOperations) is handed to streamAgentTurn
+  // wholesale; only `attachments` is inspected here for the early storage guard.
   const { attachments, threadId } = parsed.value;
 
   const subdomain = getSubdomain(req);
@@ -226,6 +190,17 @@ router.post('/chat/stream', llmRouteLimiter, async (req, res) => {
   }
 
   const models = await generateModels(subdomain);
+  try {
+    await requireScopedAgent({
+      models,
+      subdomain,
+      user,
+      action: ERXES_AGENT_ACTIONS.agent.chat,
+      agentId: parsed.value.agentId,
+    });
+  } catch {
+    return res.status(404).json({ error: 'AI team member not found' });
+  }
 
   // Attachments require the instance's upload storage — reject early (the UI
   // hides the attach button in this state, so this is defense in depth).
@@ -304,128 +279,4 @@ router.post('/chat/stream', llmRouteLimiter, async (req, res) => {
     // Keep the gateway proxy from buffering the streamed SSE body.
     headers: { 'X-Accel-Buffering': 'no' },
   });
-});
-
-// erxes frontline bot webhook — called by frontline_api when botEndpointUrl is set
-router.post('/bot/:conversationId', llmRouteLimiter, async (req, res) => {
-  const { conversationId } = req.params;
-  const { text, subdomain = 'localhost', customerId } = req.body;
-
-  try {
-    const models = await generateModels(subdomain);
-    const settings = await models.MastraSettings.getSettings();
-
-    if (!settings?.defaultAgentId) {
-      return res.json({
-        responses: [
-          {
-            type: 'text',
-            text: 'No default agent configured. Please set one in Mastra Settings.',
-          },
-        ],
-      });
-    }
-
-    const agentConfig = await models.MastraAgent.findOne({
-      agentId: settings.defaultAgentId,
-      isEnabled: true,
-    });
-
-    if (!agentConfig) {
-      return res.json({
-        responses: [
-          { type: 'text', text: 'Configured agent not found or disabled.' },
-        ],
-      });
-    }
-
-    const { agent } = await getOrCreateAgent(agentConfig, models, subdomain);
-
-    // The frontline conversation is a Mastra-native thread owned by a synthetic
-    // "bot:*" resource (kept out of in-app users' chat lists). Memory replays
-    // history + runs recall/working-memory and persists this turn itself.
-    const userText = text || '';
-    const useMemory =
-      isAdvancedMemoryEnabled() &&
-      agentConfig.memoryEnabled !== false &&
-      Boolean(userText.trim());
-    const memoryBinding = useMemory
-      ? {
-          thread: conversationId,
-          resource: scopedResource(
-            subdomain,
-            `bot:${customerId || conversationId}`,
-          ),
-        }
-      : undefined;
-
-    // Shared learned digest (PII-free agent knowledge), separate from memory.
-    const digest = await readLearnedDigest(models, agentConfig.agentId);
-    const convo = augmentConvo({
-      recentHistory: [],
-      userMessage: userText,
-      workingMemoryBlock: null,
-      learnedDigestBlock: digest?.block,
-    });
-
-    // Bot requests have no user session — run as the agent's bound owner and
-    // fail closed when that principal can't be minted. NEVER falls back to the
-    // app token: doing so would silently escalate the bot to admin instead of
-    // stopping it. The app token (settings.erxesApiToken) is passed only as the
-    // CLIENT CREDENTIAL that authenticates to core's mint endpoint — the minted
-    // owner token, not the app token, is the acting principal for the run.
-    const principal = await resolveBackgroundPrincipal({
-      agentConfig,
-      subdomain,
-      appToken: settings?.erxesApiToken,
-      models,
-    });
-    if (!principal.ok) {
-      console.error(`[agent] bot run refused — ${principal.error}`);
-      return res.json({
-        responses: [
-          {
-            type: 'text',
-            text: 'This bot is temporarily unavailable. Please try again later.',
-          },
-        ],
-      });
-    }
-    const authCtx = principal.authCtx;
-    const reply =
-      (await runWithAuth(authCtx, () =>
-        runAgentTurn({
-          // Structural cast (same idiom as prepareChatTurn): the published
-          // Agent generics are wider than the slice runAgentTurn consumes.
-          agent: agent as unknown as TurnAgent,
-          convo,
-          message: userText,
-          authCtx,
-          memory: memoryBinding,
-        }),
-      )) ?? '';
-
-    // Native persistence happened in runAgentTurn; stamp agentId + tenant so the
-    // bot thread is attributable + sweepable by the learning pass.
-    if (memoryBinding) {
-      await patchNativeTurn({
-        subdomain,
-        binding: memoryBinding,
-        agentId: agentConfig.agentId,
-        reply,
-      }).catch(() => null);
-    }
-
-    return res.json({ responses: [{ type: 'text', text: reply }] });
-  } catch (err) {
-    console.error('[mastra bot endpoint error]', err);
-    return res.json({
-      responses: [
-        {
-          type: 'text',
-          text: `Error: ${(err as { message?: string }).message}`,
-        },
-      ],
-    });
-  }
 });

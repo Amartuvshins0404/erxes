@@ -50,12 +50,26 @@ export const MTO_REGISTRATION_APPLICATIONS = gql`
     $membershipTypeId: String
     $status: String
     $cpUserId: String
+    $name: String
+    $registrationNumber: String
+    $email: String
+    $createdAtFrom: Date
+    $createdAtTo: Date
+    $activityCategory: String
+    $archived: Boolean
     ${GQL_CURSOR_PARAM_DEFS}
   ) {
     mtoRegistrationApplications(
       membershipTypeId: $membershipTypeId
       status: $status
       cpUserId: $cpUserId
+      name: $name
+      registrationNumber: $registrationNumber
+      email: $email
+      createdAtFrom: $createdAtFrom
+      createdAtTo: $createdAtTo
+      activityCategory: $activityCategory
+      archived: $archived
       ${GQL_CURSOR_PARAMS}
     ) {
       list {
@@ -73,6 +87,7 @@ export const MTO_REGISTRATION_APPLICATIONS = gql`
         paymentStatus
         invoiceId
         membershipFeeAmount
+        archivedAt
       }
       totalCount
       pageInfo {
@@ -123,11 +138,53 @@ export const MTO_REGISTRATION_APPLICATIONS_COUNT = gql`
     $membershipTypeId: String
     $status: String
     $cpUserId: String
+    $name: String
+    $registrationNumber: String
+    $email: String
+    $createdAtFrom: Date
+    $createdAtTo: Date
+    $activityCategory: String
+    $archived: Boolean
   ) {
     mtoRegistrationApplicationsCount(
       membershipTypeId: $membershipTypeId
       status: $status
       cpUserId: $cpUserId
+      name: $name
+      registrationNumber: $registrationNumber
+      email: $email
+      createdAtFrom: $createdAtFrom
+      createdAtTo: $createdAtTo
+      activityCategory: $activityCategory
+      archived: $archived
+    )
+  }
+`;
+
+export const MTO_REGISTRATION_APPLICATIONS_EXPORT = gql`
+  query MtoRegistrationApplicationsExport(
+    $membershipTypeId: String
+    $status: String
+    $cpUserId: String
+    $name: String
+    $registrationNumber: String
+    $email: String
+    $createdAtFrom: Date
+    $createdAtTo: Date
+    $activityCategory: String
+    $archived: Boolean
+  ) {
+    mtoRegistrationApplicationsExport(
+      membershipTypeId: $membershipTypeId
+      status: $status
+      cpUserId: $cpUserId
+      name: $name
+      registrationNumber: $registrationNumber
+      email: $email
+      createdAtFrom: $createdAtFrom
+      createdAtTo: $createdAtTo
+      activityCategory: $activityCategory
+      archived: $archived
     )
   }
 `;
@@ -162,6 +219,7 @@ export const MTO_REGISTRATION_APPLICATION = gql`
       paymentStatus
       membershipFeeAmount
       invoice
+      archivedAt
     }
   }
 `;

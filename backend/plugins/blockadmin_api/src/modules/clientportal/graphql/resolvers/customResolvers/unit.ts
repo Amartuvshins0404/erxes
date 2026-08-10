@@ -36,11 +36,7 @@ export default {
 
     return building;
   },
-  type: async (
-    { type }: IUnitDocument,
-    _args: any,
-    { models }: IContext,
-  ) => {
+  type: async ({ type }: IUnitDocument, _args: any, { models }: IContext) => {
     const unitType = await models.UnitType.findOne({ _id: type });
 
     if (!unitType) {
@@ -48,5 +44,26 @@ export default {
     }
 
     return unitType;
+  },
+  project: async (
+    { zoning }: IUnitDocument,
+    _args: any,
+    { models }: IContext,
+  ) => {
+    const unitZoning = await models.Zoning.findOne({ _id: zoning });
+
+    if (!unitZoning) {
+      return null;
+    }
+
+    const building = await models.Building.findOne({
+      _id: unitZoning.building,
+    });
+
+    if (!building) {
+      return null;
+    }
+
+    return models.Project.findOne({ _id: building.project }).lean();
   },
 };

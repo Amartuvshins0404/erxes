@@ -41,6 +41,17 @@ const BA_PRODUCT_FRAGMENT = gql`
   }
 `;
 
+export const BA_PRODUCT_CATEGORIES = gql`
+  query BaProductCategories($searchValue: String) {
+    productCategories(searchValue: $searchValue) {
+      _id
+      name
+      code
+      order
+    }
+  }
+`;
+
 export const BA_PRODUCTS = gql`
   query BaProducts(
     $supplierId: String

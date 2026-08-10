@@ -52,8 +52,14 @@ import { useOpencodeTransfer } from '~/modules/opencode/deploy/hooks/useOpencode
 import { useOpencode } from '~/modules/opencode/main/hooks/useOpencode';
 import {
   ASSISTANT_PROVIDER_OPTIONS,
+  ASSISTANT_SUBSCRIPTION_PROVIDER_OPTIONS,
   getManagedAssistantModel,
+  getSubscriptionAssistantModel,
+  getSubscriptionProviderOption,
+  subscriptionProviderNeedsCredential,
+  subscriptionProviderUsesDeviceCode,
 } from '~/modules/company-brain/llmProviders';
+import { SubscriptionProviderGuide } from './SubscriptionProviderGuide';
 import { useManagedDiscordSetup } from '../hooks/useManagedDiscordSetup';
 
 const MANUAL_REFRESH_THROTTLE_MS = 1_500;
@@ -62,9 +68,11 @@ const workspaceFormSchema = z.object({
   setupMode: z.enum(['new', 'transfer']),
   discordConnectionMode: z.enum(['managed', 'byob']),
   serverName: z.string().min(1, 'Identifier name is required'),
+  credentialMode: z.enum(['api_key', 'subscription']),
   provider: z.string().optional(),
   model: z.string().optional(),
   apiToken: z.string().optional(),
+  subscriptionToken: z.string().optional(),
   discordBotToken: z.string().optional(),
   transferServerName: z.string().optional(),
   transferGatewayToken: z.string().optional(),
@@ -987,12 +995,14 @@ export const CompanyBrainWorkspacePage = ({
       setupMode: 'new',
       discordConnectionMode: DEFAULT_DISCORD_CONNECTION_MODE,
       serverName: '',
+      credentialMode: 'api_key',
       provider: config.providerOptions[0]?.value || '',
       model:
         mode === 'assistant'
           ? ASSISTANT_PROVIDER_OPTIONS[0].defaultModel
           : undefined,
       apiToken: '',
+      subscriptionToken: '',
       discordBotToken: '',
       transferServerName: '',
       transferGatewayToken: '',
@@ -1005,6 +1015,7 @@ export const CompanyBrainWorkspacePage = ({
   });
 
   const setupMode = form.watch('setupMode');
+  const credentialMode = form.watch('credentialMode');
   const isTransfer = setupMode === 'transfer';
   const showAssistantProviderStep =
     mode === 'assistant' &&
@@ -1016,6 +1027,9 @@ export const CompanyBrainWorkspacePage = ({
     managedAgent?.status === SERVER_STATUSES.APPROVED && !!managedAgent?.url;
   const isManagedRuntimeFailed =
     managedAgent?.status === SERVER_STATUSES.FAILED;
+  const managedRetryNeedsToken =
+    managedAgent?.credentialMode !== 'subscription' ||
+    subscriptionProviderNeedsCredential(managedAgent?.provider);
 
   const isSubmitting =
     creatingIdentifier ||
@@ -1070,12 +1084,14 @@ export const CompanyBrainWorkspacePage = ({
       setupMode: 'new',
       discordConnectionMode: DEFAULT_DISCORD_CONNECTION_MODE,
       serverName: '',
+      credentialMode: 'api_key',
       provider: config.providerOptions[0]?.value || '',
       model:
         mode === 'assistant'
           ? ASSISTANT_PROVIDER_OPTIONS[0].defaultModel
           : undefined,
       apiToken: '',
+      subscriptionToken: '',
       discordBotToken: '',
       transferServerName: '',
       transferGatewayToken: '',
@@ -1242,12 +1258,25 @@ export const CompanyBrainWorkspacePage = ({
       return;
     }
 
-    if (!managedRetryApiToken.trim()) {
-      const message = 'An API key is required to retry provisioning.';
+    const retryUsesSubscription =
+      managedAgent?.credentialMode === 'subscription';
+    const retryNeedsToken =
+      !retryUsesSubscription ||
+      subscriptionProviderNeedsCredential(managedAgent?.provider);
+    const retrySubscriptionOption = getSubscriptionProviderOption(
+      managedAgent?.provider,
+    );
+
+    if (retryNeedsToken && !managedRetryApiToken.trim()) {
+      const message = retryUsesSubscription
+        ? `${retrySubscriptionOption.credentialLabel} is required to retry provisioning.`
+        : 'An API key is required to retry provisioning.';
       setManagedError(message);
       toast({
         variant: 'destructive',
-        title: 'API key required',
+        title: retryUsesSubscription
+          ? `${retrySubscriptionOption.credentialLabel} required`
+          : 'API key required',
         description: message,
       });
       return;
@@ -1260,8 +1289,16 @@ export const CompanyBrainWorkspacePage = ({
         provider: managedAgent?.provider || 'kimi',
         model:
           managedAgent?.model ||
-          getManagedAssistantModel(managedAgent?.provider),
-        apiToken: managedRetryApiToken,
+          (retryUsesSubscription
+            ? getSubscriptionAssistantModel(managedAgent?.provider)
+            : getManagedAssistantModel(managedAgent?.provider)),
+        credentialMode: retryUsesSubscription ? 'subscription' : 'api_key',
+        apiToken: retryUsesSubscription ? undefined : managedRetryApiToken,
+        subscriptionToken:
+          retryUsesSubscription &&
+          subscriptionProviderNeedsCredential(managedAgent?.provider)
+            ? managedRetryApiToken
+            : undefined,
       });
       setManagedRetryApiToken('');
       await refetchManagedAgent();
@@ -1472,7 +1509,12 @@ export const CompanyBrainWorkspacePage = ({
                 onChange={(event) =>
                   setManagedRetryApiToken(event.target.value)
                 }
-                placeholder="Paste the provider API key"
+                  placeholder={
+                    managedAgent?.credentialMode === 'subscription'
+                      ? getSubscriptionProviderOption(managedAgent?.provider)
+                          .credentialPlaceholder
+                      : 'Paste the provider API key'
+                  }
                 type="password"
                 autoComplete="off"
                 disabled={deployingManagedAssistant}
@@ -1564,7 +1606,13 @@ export const CompanyBrainWorkspacePage = ({
                     onChange={(event) =>
                       setManagedRetryApiToken(event.target.value)
                     }
-                    placeholder="Paste the provider API key"
+                      placeholder={
+                        managedAgent?.credentialMode === 'subscription'
+                          ? getSubscriptionProviderOption(
+                              managedAgent?.provider,
+                            ).credentialPlaceholder
+                          : 'Paste the provider API key'
+                      }
                     type="password"
                     autoComplete="off"
                     disabled={deployingManagedAssistant}
@@ -1666,10 +1714,28 @@ export const CompanyBrainWorkspacePage = ({
     let createdIdentifier: Identifier | null = null;
 
     try {
-      if (!isTransfer && !values.apiToken?.trim()) {
+      const usesManagedSubscription =
+        mode === 'assistant' &&
+        values.discordConnectionMode === 'managed' &&
+        values.credentialMode === 'subscription';
+
+      if (!isTransfer && !usesManagedSubscription && !values.apiToken?.trim()) {
         form.setError('apiToken', {
           type: 'required',
           message: 'API token is required',
+        });
+        return;
+      }
+
+      if (
+        !isTransfer &&
+        usesManagedSubscription &&
+        subscriptionProviderNeedsCredential(values.provider) &&
+        !values.subscriptionToken?.trim()
+      ) {
+        form.setError('subscriptionToken', {
+          type: 'required',
+          message: `${getSubscriptionProviderOption(values.provider).credentialLabel} is required`,
         });
         return;
       }
@@ -1767,8 +1833,14 @@ export const CompanyBrainWorkspacePage = ({
             const deployedAgent = await deployManagedAgent({
               identifierId: createdIdentifier._id,
               provider: values.provider || config.providerOptions[0]?.value,
-              model: values.model || getManagedAssistantModel(values.provider),
+              model:
+                values.model ||
+                (values.credentialMode === 'subscription'
+                  ? getSubscriptionAssistantModel(values.provider)
+                  : getManagedAssistantModel(values.provider)),
+              credentialMode: values.credentialMode,
               apiToken,
+              subscriptionToken: values.subscriptionToken,
               description: values.description?.trim() || undefined,
               systemPrompt: values.description?.trim() || undefined,
             });
@@ -1777,6 +1849,14 @@ export const CompanyBrainWorkspacePage = ({
               deployedAgent?.status === SERVER_STATUSES.APPROVED &&
               deployedAgent.url?.trim()
             ) {
+              if (
+                values.credentialMode === 'subscription' &&
+                subscriptionProviderUsesDeviceCode(values.provider)
+              ) {
+                finishManagedCreation(createdIdentifier._id);
+                return;
+              }
+
               // Runtime is ready immediately — hand off to the shared Discord
               // manage sheet for the connect/channel/manage experience.
               openManagedDiscordManageSheet(createdIdentifier._id);
@@ -2076,24 +2156,161 @@ export const CompanyBrainWorkspacePage = ({
                       </div>
                     </div>
 
-                    <LlmProviderApiKeyFields
-                      control={form.control}
-                      providerName="provider"
-                      apiKeyName="apiToken"
-                      modelName="model"
-                      providerOptions={ASSISTANT_PROVIDER_OPTIONS}
-                      apiKeyPlaceholder="Paste your provider API key"
-                      onProviderChange={(provider) => {
-                        form.setValue('apiToken', '', {
-                          shouldDirty: true,
-                        });
-                        form.setValue(
-                          'model',
-                          getManagedAssistantModel(provider),
-                          { shouldDirty: true },
-                        );
-                      }}
-                    />
+                    <div className="grid grid-cols-2 gap-2 rounded-lg bg-muted p-1">
+                      <Button
+                        type="button"
+                        variant={
+                          credentialMode === 'api_key' ? 'secondary' : 'ghost'
+                        }
+                        onClick={() => {
+                          form.setValue('credentialMode', 'api_key', {
+                            shouldDirty: true,
+                          });
+                          form.setValue(
+                            'provider',
+                            ASSISTANT_PROVIDER_OPTIONS[0].value,
+                            { shouldDirty: true },
+                          );
+                          form.setValue(
+                            'model',
+                            ASSISTANT_PROVIDER_OPTIONS[0].defaultModel,
+                            { shouldDirty: true },
+                          );
+                          form.setValue('subscriptionToken', '');
+                        }}
+                      >
+                        API key
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={
+                          credentialMode === 'subscription'
+                            ? 'secondary'
+                            : 'ghost'
+                        }
+                        onClick={() => {
+                          form.setValue('credentialMode', 'subscription', {
+                            shouldDirty: true,
+                          });
+                          form.setValue('provider', 'openai', {
+                            shouldDirty: true,
+                          });
+                          form.setValue(
+                            'model',
+                            getSubscriptionAssistantModel('openai'),
+                            { shouldDirty: true },
+                          );
+                          form.setValue('apiToken', '');
+                        }}
+                      >
+                        Provider subscription
+                      </Button>
+                    </div>
+
+                    {credentialMode === 'api_key' ? (
+                      <LlmProviderApiKeyFields
+                        control={form.control}
+                        providerName="provider"
+                        apiKeyName="apiToken"
+                        modelName="model"
+                        providerOptions={ASSISTANT_PROVIDER_OPTIONS}
+                        apiKeyPlaceholder="Paste your provider API key"
+                        onProviderChange={(provider) => {
+                          form.setValue('apiToken', '', {
+                            shouldDirty: true,
+                          });
+                          form.setValue(
+                            'model',
+                            getManagedAssistantModel(provider),
+                            { shouldDirty: true },
+                          );
+                        }}
+                      />
+                    ) : (
+                      <div className="space-y-4">
+                        <Form.Field
+                          name="provider"
+                          render={({ field }) => (
+                            <Form.Item>
+                              <Form.Label>Subscription provider</Form.Label>
+                              <Select
+                                value={field.value}
+                                onValueChange={(provider) => {
+                                  field.onChange(provider);
+                                  form.setValue(
+                                    'model',
+                                    getSubscriptionAssistantModel(provider),
+                                    { shouldDirty: true },
+                                  );
+                                  form.setValue('subscriptionToken', '');
+                                }}
+                              >
+                                <Form.Control>
+                                  <Select.Trigger>
+                                    <Select.Value />
+                                  </Select.Trigger>
+                                </Form.Control>
+                                <Select.Content>
+                                  {ASSISTANT_SUBSCRIPTION_PROVIDER_OPTIONS.map(
+                                    (option) => (
+                                      <Select.Item
+                                        key={option.value}
+                                        value={option.value}
+                                      >
+                                        {option.label}
+                                      </Select.Item>
+                                    ),
+                                  )}
+                                </Select.Content>
+                              </Select>
+                              <Form.Message />
+                            </Form.Item>
+                          )}
+                        />
+
+                        <SubscriptionProviderGuide
+                          provider={form.watch('provider')}
+                        />
+
+                        {subscriptionProviderNeedsCredential(
+                          form.watch('provider'),
+                        ) && (
+                          <Form.Field
+                            name="subscriptionToken"
+                            render={({ field }) => {
+                              const subscriptionOption =
+                                getSubscriptionProviderOption(
+                                  form.getValues('provider'),
+                                );
+
+                              return (
+                                <Form.Item>
+                                  <Form.Label>
+                                    {subscriptionOption.credentialLabel}
+                                  </Form.Label>
+                                  <Form.Control>
+                                    <Input
+                                      {...field}
+                                      type="password"
+                                      autoComplete="off"
+                                      placeholder={
+                                        subscriptionOption.credentialPlaceholder
+                                      }
+                                    />
+                                  </Form.Control>
+                                  <Form.Message />
+                                </Form.Item>
+                              );
+                            }}
+                          />
+                        )}
+
+                        <p className="text-xs text-muted-foreground">
+                          Gemini remains API-key-only because Google does not
+                          allow Gemini CLI OAuth through third-party tools.
+                        </p>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <>
@@ -2379,7 +2596,9 @@ export const CompanyBrainWorkspacePage = ({
                               type="button"
                               variant="outline"
                               disabled={
-                                isSubmitting || !managedRetryApiToken.trim()
+                                isSubmitting ||
+                                (managedRetryNeedsToken &&
+                                  !managedRetryApiToken.trim())
                               }
                               onClick={handleRetryManagedProvisioning}
                             >
@@ -2425,7 +2644,9 @@ export const CompanyBrainWorkspacePage = ({
                               type="button"
                               variant="outline"
                               disabled={
-                                isSubmitting || !managedRetryApiToken.trim()
+                                isSubmitting ||
+                                (managedRetryNeedsToken &&
+                                  !managedRetryApiToken.trim())
                               }
                               onClick={handleRetryManagedProvisioning}
                             >

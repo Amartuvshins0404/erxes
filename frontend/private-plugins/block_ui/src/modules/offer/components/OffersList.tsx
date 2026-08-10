@@ -14,7 +14,7 @@ import {
   Spinner,
   useQueryState,
 } from 'erxes-ui';
-import { CustomersInline, CompaniesInline, MembersInline } from 'ui-modules';
+import { CustomersInline, MembersInline } from 'ui-modules';
 import { useSetAtom } from 'jotai';
 
 const parseDate = (val: string | number | undefined) => {
@@ -31,17 +31,9 @@ const StatusBadge = ({ status }: { status: IOffer['status'] }) => {
   return <Badge variant="secondary">Draft</Badge>;
 };
 
-const DisplayParty = ({ party }: { party: IOffer['party'] }) => {
-  if (!party?.id) return <span className="text-muted-foreground">—</span>;
-  const PartyInline =
-    party.type === 'customer' ? CustomersInline : CompaniesInline;
-  return (
-    <PartyInline
-      {...(party.type === 'customer'
-        ? { customerIds: [party.id] }
-        : { companyIds: [party.id] })}
-    />
-  );
+const DisplayCustomer = ({ customerId }: { customerId?: IOffer['customerId'] }) => {
+  if (!customerId) return <span className="text-muted-foreground">—</span>;
+  return <CustomersInline customerIds={[customerId]} />;
 };
 
 const COLS = 'grid-cols-[1fr_2fr_1.5fr_1fr_1fr_1fr_1fr_40px]';
@@ -61,7 +53,7 @@ const OfferRow = ({ offer }: { offer: IOffer }) => {
         #{offer.number || offer._id?.slice(-6)}
       </button>
       <div className="truncate text-sm">
-        <DisplayParty party={offer.party} />
+        <DisplayCustomer customerId={offer.customerId} />
       </div>
       <div className="flex items-center gap-1 text-sm">
         <CurrencyDisplay variant="icon" code={offer.currency} />

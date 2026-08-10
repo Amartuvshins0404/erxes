@@ -31,6 +31,8 @@ export const DEPLOY_MANAGED_AGENT = gql`
       serverId
       provider
       model
+      credentialMode
+      credentialStatus
       status
       provisioning {
         stage

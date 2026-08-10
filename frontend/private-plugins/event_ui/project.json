@@ -1,0 +1,73 @@
+{
+  "name": "event_ui",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "frontend/private-plugins/event_ui/src",
+  "projectType": "application",
+  "tags": [],
+  "targets": {
+    "build": {
+      "executor": "@nx/rspack:rspack",
+      "outputs": ["{options.outputPath}"],
+      "defaultConfiguration": "production",
+      "options": {
+        "target": "web",
+        "outputPath": "dist/frontend/private-plugins/event_ui",
+        "main": "frontend/private-plugins/event_ui/src/main.ts",
+        "tsConfig": "frontend/private-plugins/event_ui/tsconfig.app.json",
+        "rspackConfig": "frontend/private-plugins/event_ui/rspack.config.ts",
+        "assets": ["frontend/private-plugins/event_ui/src/assets"]
+      },
+      "configurations": {
+        "development": {
+          "mode": "development"
+        },
+        "production": {
+          "mode": "production",
+          "optimization": true,
+          "sourceMap": false,
+          "rspackConfig": "frontend/private-plugins/event_ui/rspack.config.prod.ts"
+        }
+      }
+    },
+    "serve": {
+      "executor": "@nx/rspack:module-federation-dev-server",
+      "options": {
+        "buildTarget": "event_ui:build:development",
+        "port": 3015
+      },
+      "configurations": {
+        "development": {},
+        "production": {
+          "buildTarget": "event_ui:build:production"
+        }
+      }
+    },
+    "serve-static": {
+      "executor": "@nx/rspack:module-federation-static-server",
+      "defaultConfiguration": "production",
+      "options": {
+        "serveTarget": "event_ui:serve"
+      },
+      "configurations": {
+        "development": {
+          "serveTarget": "event_ui:serve:development"
+        },
+        "production": {
+          "serveTarget": "event_ui:serve:production"
+        }
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "pnpm exec jest --config frontend/private-plugins/event_ui/jest.config.ts --runInBand"
+      }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "pnpm exec eslint frontend/private-plugins/event_ui"
+      }
+    }
+  }
+}

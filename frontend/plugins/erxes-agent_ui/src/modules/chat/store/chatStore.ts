@@ -2,14 +2,8 @@ import { ApolloClient } from '@apollo/client';
 import { Chat } from '@ai-sdk/react';
 import type { ChatStatus } from 'ai';
 import { create } from 'zustand';
-import {
-  MASTRA_MESSAGE_FEEDBACKS,
-  MASTRA_THREAD_MESSAGES,
-} from '~/graphql/queries';
-import {
-  MASTRA_MESSAGE_FEEDBACK,
-  MASTRA_CHAT_CANCEL,
-} from '~/graphql/mutations';
+import { MASTRA_THREAD_MESSAGES } from '~/graphql/queries';
+import { MASTRA_CHAT_CANCEL } from '~/graphql/mutations';
 import {
   AgentChatState,
   AgentUIMessage,
@@ -37,12 +31,6 @@ interface MastraThreadMessagesResponse {
   mastraThreadMessages?: DbThreadMessage[];
 }
 
-interface MastraMessageFeedbacksResponse {
-  // Entries are optional and may arrive partial from older/empty rows — read
-  // `rating` through optional chaining so a missing entry never throws.
-  mastraMessageFeedbacks?: Record<string, { rating?: number } | undefined>;
-}
-
 const threadKey = (agentKey: string, threadId: string) =>
   `${agentKey}:${threadId}`;
 
@@ -68,20 +56,6 @@ const loadReasoningEffort = (agentKey: string): ReasoningEffort | undefined => {
     return isReasoningEffort(raw) ? raw : undefined;
   } catch {
     return undefined;
-  }
-};
-
-/** localStorage key holding whether voice mode is on for one agent's chat. */
-const voiceModeStorageKey = (agentKey: string) =>
-  `erxes-agent:voiceMode:${agentKey}`;
-
-// Best-effort read of the persisted voice-mode flag — same contract as
-// loadReasoningEffort (read once at agent-slice creation, never in a selector).
-const loadVoiceMode = (agentKey: string): boolean => {
-  try {
-    return localStorage.getItem(voiceModeStorageKey(agentKey)) === 'on';
-  } catch {
-    return false;
   }
 };
 
@@ -119,7 +93,6 @@ interface ChatStoreState {
     agentKey: string,
     effort: ReasoningEffort | undefined,
   ) => void;
-  setVoiceMode: (agentKey: string, on: boolean) => void;
   newDraft: (client: Client, agentKey: string, mastraAgentId: string) => void;
   selectSession: (
     client: Client,
@@ -127,14 +100,14 @@ interface ChatStoreState {
     mastraAgentId: string,
     threadId: string,
   ) => Promise<void>;
-  rateMessage: (
-    client: Client,
-    agentKey: string,
-    messageId: string,
-    rating: 1 | -1,
-  ) => Promise<void>;
   // Drop a removed thread's Chat + signals. The cached session list is filtered
   // by useRemoveMastraThread; this only clears store-side state.
+  discardMessagePair: (
+    agentKey: string,
+    threadId: string,
+    uiMessageId: string,
+    deletedIds: string[],
+  ) => void;
   discardThread: (agentKey: string, threadId: string) => void;
   stop: (client: Client, agentKey: string) => void;
   sendMessage: (
@@ -147,15 +120,9 @@ interface ChatStoreState {
     // Don't render a user bubble for this send (approve/deny — the turn
     // continues without a visible "Approved" message).
     hidden?: boolean,
-    // Names of /slash-activated skills to force-load for this turn (names only).
-    activeSkillNames?: string[],
   ) => void;
   // Re-ask the question that produced the last reply (with its attachments).
-  regenerate: (
-    client: Client,
-    agentKey: string,
-    mastraAgentId: string,
-  ) => void;
+  regenerate: (client: Client, agentKey: string, mastraAgentId: string) => void;
 }
 
 export const useChatStore = create<ChatStoreState>((set, get) => {
@@ -187,8 +154,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => {
     });
 
   // Patch the metadata of a thread's most recent assistant message. Reassigning
-  // chat.messages re-renders that bubble (the hydrateFeedbacks pattern), so a
-  // post-`finish` reconcile lands without a reload.
+  // chat.messages makes a post-`finish` reconcile render without a reload.
   const patchLastAssistantMeta = (
     key: string,
     metaPatch: Partial<NonNullable<AgentUIMessage['metadata']>>,
@@ -207,8 +173,8 @@ export const useChatStore = create<ChatStoreState>((set, get) => {
   };
 
   // Stamp the reconciled native id (sent via a transient `data-message-id` part
-  // after `finish`, since persistence now runs off the critical path) onto the
-  // latest assistant message so its thumbs feedback becomes ratable live.
+  // after `finish`) onto the latest assistant message for artifact links and
+  // persisted message-pair deletion.
   const reconcileAssistantMessageId = (key: string, messageId: string) => {
     if (!messageId) return;
     patchLastAssistantMeta(key, { messageId });
@@ -288,16 +254,6 @@ export const useChatStore = create<ChatStoreState>((set, get) => {
       onData: (part) => {
         if (part.type === 'data-activity') {
           setThreadActivity(key, part.data.text);
-        } else if (part.type === 'data-reasoning-summaries') {
-          // Arrives once, just after `finish` — stamp the per-step gists onto the
-          // settled assistant message (post-finish, so no streaming clobber).
-          patchLastAssistantMeta(key, {
-            reasoningSummaries: part.data.summaries,
-          });
-        } else if (part.type === 'data-turn-summary') {
-          // Arrives once, just after `finish` — stamp it onto the settled
-          // assistant message (post-finish, so no streaming clobber).
-          patchLastAssistantMeta(key, { turnSummary: part.data.text });
         } else if (part.type === 'data-thread-title') {
           setThreadTitleInCache(
             client,
@@ -306,10 +262,8 @@ export const useChatStore = create<ChatStoreState>((set, get) => {
             part.data.title,
           );
         } else if (part.type === 'data-message-id') {
-          // Reconcile the native id onto the latest assistant message — the
-          // `finish` chunk now ships before the (off-critical-path) persist, so
-          // the id the thumbs feedback rates lands here a moment later. Without
-          // it the message still self-heals its id on the next reload.
+          // Reconcile the native id onto the latest assistant message after the
+          // off-critical-path persistence finishes. A reload also restores it.
           reconcileAssistantMessageId(key, part.data.messageId);
         }
         // data-heartbeat is dropped — it only keeps the proxy socket warm.
@@ -332,30 +286,6 @@ export const useChatStore = create<ChatStoreState>((set, get) => {
     return chat;
   };
 
-  const hydrateFeedbacks = async (
-    client: Client,
-    chat: Chat<AgentUIMessage>,
-    threadId: string,
-  ) => {
-    try {
-      const { data } = await client.query<MastraMessageFeedbacksResponse>({
-        query: MASTRA_MESSAGE_FEEDBACKS,
-        variables: { threadId },
-        fetchPolicy: 'network-only',
-      });
-      const byMessage = data?.mastraMessageFeedbacks ?? {};
-      if (!Object.keys(byMessage).length) return;
-      chat.messages = chat.messages.map((m) => {
-        const id = m.metadata?.messageId;
-        return id && byMessage[id]
-          ? { ...m, metadata: { ...m.metadata, rating: byMessage[id]?.rating } }
-          : m;
-      });
-    } catch {
-      // ignore — thumbs just render unselected
-    }
-  };
-
   // Shared send path used by sendMessage + regenerate.
   const doSend = async (
     client: Client,
@@ -365,7 +295,6 @@ export const useChatStore = create<ChatStoreState>((set, get) => {
     attachments?: ChatAttachment[],
     approvedOperations?: ApprovedOp[],
     hidden?: boolean,
-    activeSkillNames?: string[],
   ) => {
     let agent = get().agents[agentKey] ?? EMPTY_AGENT;
     if (!agent.activeThreadId) {
@@ -396,14 +325,6 @@ export const useChatStore = create<ChatStoreState>((set, get) => {
     prependThreadToCache(client, mastraAgentId, threadId);
     if (agent.isDraft) patchAgent(agentKey, { isDraft: false });
 
-    // Slash-activated skill names for this turn. The server re-resolves them
-    // against the user's reachable skills and force-loads their full
-    // instructions — so we send NAMES only (never ids or instructions), capped
-    // to the contract's 10 names / 64 chars each.
-    const skillNames = activeSkillNames?.length
-      ? activeSkillNames.slice(0, 10).map((n) => n.slice(0, 64))
-      : undefined;
-
     // Attachments ride in the message metadata too (not only the request
     // body): the user bubble renders sent images from metadata immediately,
     // exactly as messageMapping restores them on reload.
@@ -420,11 +341,6 @@ export const useChatStore = create<ChatStoreState>((set, get) => {
             : {}),
           ...(attachments?.length ? { attachments } : {}),
           ...(approvedOperations?.length ? { approvedOperations } : {}),
-          ...(skillNames ? { activeSkillNames: skillNames } : {}),
-          // Voice mode replaces the composer, so any turn sent while it is on
-          // originates from speech. Flag it so the agent answers short and
-          // conversational (spoken style); typed chat is unaffected.
-          ...(agent.voiceMode ? { voiceMode: true } : {}),
         },
       },
     );
@@ -449,7 +365,6 @@ export const useChatStore = create<ChatStoreState>((set, get) => {
         if (!get().agents[agentId]) {
           patchAgent(agentId, {
             reasoningEffort: loadReasoningEffort(agentId),
-            voiceMode: loadVoiceMode(agentId),
           });
         }
       }
@@ -471,18 +386,6 @@ export const useChatStore = create<ChatStoreState>((set, get) => {
         // localStorage unavailable — the in-memory patch below still applies.
       }
       patchAgent(agentKey, { reasoningEffort: effort });
-    },
-
-    // Persist the hands-free voice-mode choice for this agent's chat view.
-    setVoiceMode: (agentKey, on) => {
-      try {
-        const key = voiceModeStorageKey(agentKey);
-        if (on) localStorage.setItem(key, 'on');
-        else localStorage.removeItem(key);
-      } catch {
-        // localStorage unavailable — the in-memory patch below still applies.
-      }
-      patchAgent(agentKey, { voiceMode: on });
     },
 
     newDraft: (client, agentKey, mastraAgentId) => {
@@ -516,7 +419,6 @@ export const useChatStore = create<ChatStoreState>((set, get) => {
           fetchPolicy: 'network-only',
         });
         chat.messages = metaToUIMessages(data?.mastraThreadMessages ?? []);
-        await hydrateFeedbacks(client, chat, threadId);
       } catch {
         // leave the chat empty — the composer still works
       } finally {
@@ -526,28 +428,16 @@ export const useChatStore = create<ChatStoreState>((set, get) => {
       }
     },
 
-    rateMessage: async (client, agentKey, messageId, rating) => {
-      const agent = get().agents[agentKey];
-      const chat = agent?.activeThreadId
-        ? get().chats[threadKey(agentKey, agent.activeThreadId)]
-        : undefined;
+    discardMessagePair: (agentKey, threadId, uiMessageId, deletedIds) => {
+      const chat = get().chats[threadKey(agentKey, threadId)];
       if (!chat) return;
-      const apply = (value: number | undefined) => {
-        chat.messages = chat.messages.map((m) =>
-          m.metadata?.messageId === messageId
-            ? { ...m, metadata: { ...m.metadata, rating: value } }
-            : m,
-        );
-      };
-      apply(rating);
-      try {
-        await client.mutate({
-          mutation: MASTRA_MESSAGE_FEEDBACK,
-          variables: { messageId, rating },
-        });
-      } catch {
-        apply(undefined);
-      }
+      const removed = new Set(deletedIds);
+      chat.messages = chat.messages.filter(
+        (message) =>
+          message.id !== uiMessageId &&
+          !removed.has(message.id) &&
+          !removed.has(message.metadata?.messageId ?? ''),
+      );
     },
 
     discardThread: (agentKey, threadId) => {
@@ -608,7 +498,6 @@ export const useChatStore = create<ChatStoreState>((set, get) => {
       attachments,
       approvedOperations,
       hidden,
-      activeSkillNames,
     ) =>
       doSend(
         client,
@@ -618,7 +507,6 @@ export const useChatStore = create<ChatStoreState>((set, get) => {
         attachments,
         approvedOperations,
         hidden,
-        activeSkillNames,
       ),
 
     regenerate: (client, agentKey, mastraAgentId) => {
@@ -724,10 +612,9 @@ type StoreActionKey =
   | 'setCurrentAgent'
   | 'markRead'
   | 'setReasoningEffort'
-  | 'setVoiceMode'
   | 'newDraft'
   | 'selectSession'
-  | 'rateMessage'
+  | 'discardMessagePair'
   | 'discardThread'
   | 'stop'
   | 'sendMessage'
@@ -739,10 +626,9 @@ const ACTION_KEYS: StoreActionKey[] = [
   'setCurrentAgent',
   'markRead',
   'setReasoningEffort',
-  'setVoiceMode',
   'newDraft',
   'selectSession',
-  'rateMessage',
+  'discardMessagePair',
   'discardThread',
   'stop',
   'sendMessage',

@@ -37,10 +37,10 @@ export const enqueuePosBackfill = async (
     JOB_NAME,
     { subdomain, data: { posToken } },
     {
-      jobId: `${subdomain}:${posToken}`,
+      jobId: `${subdomain}:${posToken}:${Date.now()}`,
       attempts: 5,
       backoff: { type: 'exponential', delay: 5000 },
-      removeOnComplete: 100,
+      removeOnComplete: true,
       removeOnFail: 500,
     },
   );

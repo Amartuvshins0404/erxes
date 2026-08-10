@@ -1,3 +1,14 @@
+import type { AgentUIMessage } from '~/modules/chat/types';
+import type { ArtifactGroup } from '~/modules/chat/hooks/useThreadArtifacts';
+import {
+  artifactOutcomes,
+  associateArtifacts,
+  mergeArtifacts,
+  websiteBaseUrl,
+  websiteNavigationUrl,
+  websiteUrl,
+  type Artifact,
+} from '~/modules/chat/lib/artifacts';
 // artifacts.ts pulls REACT_APP_API_URL and card icons for the non-logic
 // helpers; stub both so the pure readers under test load under node.
 jest.mock('erxes-ui', () => ({ REACT_APP_API_URL: 'http://localhost:4000' }));
@@ -6,15 +17,6 @@ jest.mock(
   () => new Proxy({}, { get: () => () => null }),
 );
 
-import type { AgentUIMessage } from '~/modules/chat/types';
-import type { ArtifactGroup } from '~/modules/chat/hooks/useThreadArtifacts';
-import {
-  artifactOutcomes,
-  associateArtifacts,
-  mergeArtifacts,
-  type Artifact,
-} from '~/modules/chat/lib/artifacts';
-
 type MessagePart = AgentUIMessage['parts'][number];
 
 const chart = (id: string): Artifact => ({
@@ -22,6 +24,16 @@ const chart = (id: string): Artifact => ({
   kind: 'chart',
   title: id,
   spec: { title: id, series: [], data: [] } as never,
+});
+
+const document = (id: string, fileName: string): Artifact => ({
+  id,
+  kind: 'document',
+  title: fileName,
+  format: fileName.split('.').pop() || 'application/octet-stream',
+  fileName,
+  mimeType: 'application/octet-stream',
+  fileKey: `files/${fileName}`,
 });
 
 const renderChartPart = (
@@ -35,7 +47,7 @@ const renderChartPart = (
     state,
     input: { title: 'Sales' },
     ...extra,
-  }) as unknown as MessagePart;
+  } as unknown as MessagePart);
 
 describe('artifactOutcomes', () => {
   it('reports a settled artifact from a finished tool part', () => {
@@ -63,14 +75,32 @@ describe('artifactOutcomes', () => {
     expect(artifactOutcomes(parts, false).failures).toHaveLength(0);
     expect(artifactOutcomes(parts).failures).toHaveLength(0);
   });
+
+  it('collects every file artifact published by a terminal result', () => {
+    const part = {
+      type: 'dynamic-tool',
+      toolName: 'terminal',
+      toolCallId: 'call-terminal',
+      state: 'output-available',
+      input: { command: 'build' },
+      output: {
+        artifacts: [
+          document('doc_1', 'report.pdf'),
+          document('doc_2', 'data.csv'),
+        ],
+      },
+    } as unknown as MessagePart;
+
+    expect(artifactOutcomes([part]).artifacts.map((a) => a.id)).toEqual([
+      'doc_1',
+      'doc_2',
+    ]);
+  });
 });
 
 describe('mergeArtifacts', () => {
   it('unions live and store, deduped by id, live first', () => {
-    const merged = mergeArtifacts(
-      [chart('a')],
-      [chart('a'), chart('b')],
-    );
+    const merged = mergeArtifacts([chart('a')], [chart('a'), chart('b')]);
     expect(merged.map((m) => m.id)).toEqual(['a', 'b']);
   });
 
@@ -145,5 +175,59 @@ describe('associateArtifacts', () => {
     ]);
     // Present exactly once — the prompt matcher must not double-attach it.
     expect(result.get('m2')?.map((a) => a.id)).toEqual(['chart_2']);
+  });
+});
+
+describe('websiteUrl', () => {
+  it('encodes the capability token and each entry path segment', () => {
+    const artifact: Extract<Artifact, { kind: 'website' }> = {
+      id: 'site_1',
+      kind: 'website',
+      title: 'Site',
+      entryPath: 'pages/About us?#.html',
+      fileCount: 2,
+      contentHash: 'a'.repeat(64),
+      previewToken: 'token/with ?#',
+      fileName: 'About us?#.html',
+      mimeType: 'text/html',
+      fileKey: 'websites/site_1/pages/About us?#.html',
+    };
+
+    expect(websiteUrl(artifact)).toBe(
+      'http://localhost:4000/pl:erxes-agent/websites/site_1/token%2Fwith%20%3F%23/pages/About%20us%3F%23.html',
+    );
+  });
+});
+
+describe('websiteNavigationUrl', () => {
+  const artifact: Extract<Artifact, { kind: 'website' }> = {
+    id: 'site_1',
+    kind: 'website',
+    title: 'Site',
+    entryPath: 'index.html',
+    fileCount: 2,
+    contentHash: 'a'.repeat(64),
+    previewToken: 'token-1',
+    fileName: 'index.html',
+    mimeType: 'text/html',
+    fileKey: 'websites/site_1/index.html',
+  };
+
+  it('accepts pages and fragments within the website capability', () => {
+    expect(websiteBaseUrl(artifact)).toBe(
+      'http://localhost:4000/pl:erxes-agent/websites/site_1/token-1/',
+    );
+    expect(websiteNavigationUrl(artifact, 'about.html#team')).toBe(
+      'http://localhost:4000/pl:erxes-agent/websites/site_1/token-1/about.html#team',
+    );
+  });
+
+  it.each([
+    'https://example.com/about.html',
+    'http://localhost:4000/pl:erxes-agent/websites/site_1/other-token/about.html',
+    'http://localhost:4000/gateway/graphql',
+    'http://[',
+  ])('rejects a target outside the website capability: %s', (href) => {
+    expect(websiteNavigationUrl(artifact, href)).toBeNull();
   });
 });

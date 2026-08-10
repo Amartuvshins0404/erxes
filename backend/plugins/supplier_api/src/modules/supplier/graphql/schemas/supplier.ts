@@ -42,6 +42,7 @@ export const types = `
     attachments: [String]
     urls: [String]
     registrationNumber: String
+    industry: String
     address: JSON
     primaryEmail: String
     primaryPhone: String
@@ -75,6 +76,7 @@ export const types = `
     attachments: [String]
     urls: [String]
     registrationNumber: String
+    industry: String
     address: JSON
     primaryEmail: String
     primaryPhone: String

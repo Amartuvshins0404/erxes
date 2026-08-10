@@ -51,7 +51,13 @@ describe('normalizeArtifact', () => {
       format: 'pptx',
       fileName: 'deck.pptx',
       fileKey: 'key/deck.pptx',
-      slides: ['key/s1.png', 'data:image/png;base64,AAA', 7, null, 'http://x/s3.png'],
+      slides: [
+        'key/s1.png',
+        'data:image/png;base64,AAA',
+        7,
+        null,
+        'http://x/s3.png',
+      ],
       slideCount: 3,
     });
     expect(a?.kind).toBe('document');
@@ -147,6 +153,49 @@ describe('normalizeArtifact', () => {
     expect(a && a.kind === 'image' && a.width).toBeUndefined();
   });
 
+  it('normalizes a website and preserves its metadata', () => {
+    const a = normalizeArtifact({
+      id: 'site_1',
+      kind: 'website',
+      title: 'Product launch',
+      entryPath: 'pages/home.html',
+      fileCount: 4,
+      contentHash: 'a'.repeat(64),
+      previewToken: 'preview-secret',
+      fileName: 'home.html',
+      mimeType: 'text/html',
+      fileKey: 'websites/site_1/pages/home.html',
+      inline: true,
+      size: 8192,
+    });
+
+    expect(a).toEqual({
+      id: 'site_1',
+      kind: 'website',
+      title: 'Product launch',
+      entryPath: 'pages/home.html',
+      fileCount: 4,
+      contentHash: 'a'.repeat(64),
+      previewToken: 'preview-secret',
+      fileName: 'home.html',
+      mimeType: 'text/html',
+      fileKey: 'websites/site_1/pages/home.html',
+      inline: true,
+      size: 8192,
+    });
+  });
+
+  it('rejects a website without a preview capability token', () => {
+    expect(
+      normalizeArtifact({
+        id: 'site_2',
+        kind: 'website',
+        entryPath: 'index.html',
+        fileKey: 'websites/site_2/index.html',
+      }),
+    ).toBeNull();
+  });
+
   it('rejects non-objects, missing ids, and unknown kinds', () => {
     expect(normalizeArtifact(null)).toBeNull();
     expect(normalizeArtifact('nope')).toBeNull();
@@ -166,7 +215,9 @@ describe('resolveStorageRef', () => {
     expect(resolveStorageRef('data:image/png;base64,AAA', API)).toBe(
       'data:image/png;base64,AAA',
     );
-    expect(resolveStorageRef('https://cdn/x.png', API)).toBe('https://cdn/x.png');
+    expect(resolveStorageRef('https://cdn/x.png', API)).toBe(
+      'https://cdn/x.png',
+    );
   });
 
   it('routes a storage key through /read-file (inline)', () => {
@@ -176,6 +227,8 @@ describe('resolveStorageRef', () => {
   });
 
   it('appends an optional file name', () => {
-    expect(resolveStorageRef('k', API, 'deck.pptx')).toContain('&name=deck.pptx');
+    expect(resolveStorageRef('k', API, 'deck.pptx')).toContain(
+      '&name=deck.pptx',
+    );
   });
 });

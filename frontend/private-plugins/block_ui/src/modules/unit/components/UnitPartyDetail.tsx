@@ -2,20 +2,16 @@ import { useCustomerDetail } from 'ui-modules';
 import { InfoCard, Label, Skeleton } from 'erxes-ui';
 
 export const UnitPartyDetail = ({
-  partyId,
-  partyType,
+  customerId,
 }: {
-  partyId?: string | null;
-  partyType?: string | null;
+  customerId?: string | null;
 }) => {
-  const isCustomer = partyType === 'customer';
-
   const { customerDetail, loading } = useCustomerDetail(
-    { variables: { _id: partyId }, skip: !partyId || !isCustomer },
+    { variables: { _id: customerId }, skip: !customerId },
     true,
   );
 
-  if (!partyId || !partyType) return null;
+  if (!customerId) return null;
 
   const field = (label: string, value?: string | null) => (
     <div className="space-y-2">
@@ -27,7 +23,7 @@ export const UnitPartyDetail = ({
   );
 
   return (
-    <InfoCard title="Party">
+    <InfoCard title="Customer">
       <InfoCard.Content>
         <div className="gap-4 grid grid-cols-3">
           {field('First Name', customerDetail?.firstName)}

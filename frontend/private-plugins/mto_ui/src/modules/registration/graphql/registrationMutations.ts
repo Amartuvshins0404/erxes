@@ -155,3 +155,9 @@ export const MTO_REGISTRATION_APPLICATION_PAYMENT_URL = gql`
     mtoRegistrationApplicationPaymentUrl(_id: $_id)
   }
 `;
+
+export const MTO_REGISTRATION_APPLICATION_REMOVE = gql`
+  mutation MtoRegistrationApplicationRemove($_id: String!) {
+    mtoRegistrationApplicationRemove(_id: $_id)
+  }
+`;

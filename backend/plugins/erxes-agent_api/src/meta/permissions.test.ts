@@ -38,9 +38,6 @@ describe('erxes-agent human permission roles', () => {
     expect(
       actionScope('erxes-agent:viewer', ERXES_AGENT_ACTIONS.agent.readConfig),
     ).toBeUndefined();
-    expect(
-      actionScope('erxes-agent:viewer', ERXES_AGENT_ACTIONS.workflow.read),
-    ).toBeUndefined();
   });
 
   it('limits user writes to owned resources and withholds privileged actions', () => {
@@ -48,20 +45,8 @@ describe('erxes-agent human permission roles', () => {
       actionScope('erxes-agent:user', ERXES_AGENT_ACTIONS.agent.create),
     ).toBe('own');
     expect(
-      actionScope('erxes-agent:user', ERXES_AGENT_ACTIONS.workflow.run),
-    ).toBe('own');
-    expect(
-      actionScope('erxes-agent:user', ERXES_AGENT_ACTIONS.skills.update),
-    ).toBe('own');
-    expect(
-      actionScope('erxes-agent:user', ERXES_AGENT_ACTIONS.workflow.approve),
-    ).toBeUndefined();
-    expect(
-      actionScope('erxes-agent:user', ERXES_AGENT_ACTIONS.workflow.schedule),
-    ).toBeUndefined();
-    expect(
       actionScope('erxes-agent:user', ERXES_AGENT_ACTIONS.agent.share),
-    ).toBeUndefined();
+    ).toBe('own');
     expect(
       actionScope('erxes-agent:user', ERXES_AGENT_ACTIONS.settings.manage),
     ).toBeUndefined();
@@ -70,9 +55,6 @@ describe('erxes-agent human permission roles', () => {
   it('gives admins full plugin scope but reserves organization ownership transfer', () => {
     expect(
       actionScope('erxes-agent:admin', ERXES_AGENT_ACTIONS.agent.moderate),
-    ).toBe('all');
-    expect(
-      actionScope('erxes-agent:admin', ERXES_AGENT_ACTIONS.workflow.approve),
     ).toBe('all');
     expect(
       actionScope('erxes-agent:admin', ERXES_AGENT_ACTIONS.settings.manage),

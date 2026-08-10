@@ -8,6 +8,8 @@ interface MtoFilterBaseProps<TFilters> {
   children: ReactNode;
   excludeKeysFromCount?: (keyof TFilters)[];
   onClear?: () => void;
+  contentClassName?: string;
+  bodyClassName?: string;
 }
 
 export function MtoFilterBase<TFilters extends Record<string, any>>({
@@ -16,6 +18,8 @@ export function MtoFilterBase<TFilters extends Record<string, any>>({
   children,
   excludeKeysFromCount = [],
   onClear,
+  contentClassName = 'w-80',
+  bodyClassName = 'flex flex-col gap-4',
 }: MtoFilterBaseProps<TFilters>) {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -47,14 +51,14 @@ export function MtoFilterBase<TFilters extends Record<string, any>>({
             )}
           </Button>
         </Popover.Trigger>
-        <Popover.Content className="w-80" align="start">
-          <div className="flex flex-col gap-4">
+        <Popover.Content className={contentClassName} align="start">
+          <div className={bodyClassName}>
             {children}
             {hasActiveFilters && (
               <Button
                 variant="outline"
                 onClick={clearFilters}
-                className="w-full"
+                className="w-full col-span-full"
               >
                 <IconX />
                 Clear Filters

@@ -11,6 +11,8 @@ import {
   isRealToolData,
   isSearchResult,
 } from '@/agent/fallback';
+import { ensureWebsiteDeliveryReply } from '@/agent/websiteDelivery';
+import { looksLikeIncompleteProgress } from '~/mastra/providerOutputGuard';
 
 // Turn execution (blocking). Runs a single agent turn over the full
 // conversation array and returns the reply text (or null). With native
@@ -23,13 +25,28 @@ export async function runAgentTurn(params: {
   message: string;
   authCtx: TurnAuthCtx;
   memory?: MemoryBinding;
+  activeTools: string[];
+  turnInstructions: string;
+  guardProviderCompletion: boolean;
 }): Promise<string | null> {
-  const { agent, convo, message, authCtx, memory } = params;
-  const genOpts = memory ? { memory } : undefined;
+  const {
+    agent,
+    convo,
+    message,
+    authCtx,
+    memory,
+    activeTools,
+    guardProviderCompletion,
+  } = params;
+  const genOpts = {
+    activeTools,
+    instructions: params.turnInstructions,
+    ...(memory ? { memory } : {}),
+  };
   // With a memory binding, hand generate() the new user message as a STRING —
   // Mastra Memory only persists (and recalls against) string input; passing the
-  // convo array silently skips the save. (Recent history + recall come from
-  // Mastra Memory itself; the learned digest is already woven into `message`.)
+  // convo array silently skips the save. Recent history and recall come from
+  // Mastra Memory itself.
   const input = memory ? message : convo;
 
   try {
@@ -37,24 +54,41 @@ export async function runAgentTurn(params: {
       agent.generate(input, genOpts),
     );
 
-    if (result.text) return result.text;
-
-    // Collect tool results from all steps, deduplicated.
     const uniqueResults = dedupeToolResults([
       ...(result.toolResults || []),
       ...(result.steps || []).flatMap((step) => step.toolResults || []),
     ]);
+    const publishAttempted = uniqueResults.some(
+      (toolResult) =>
+        (toolResult.toolName || toolResult.name) === 'publishWebsite',
+    );
 
-    if (!uniqueResults.length) return null;
+    const incompleteText =
+      guardProviderCompletion &&
+      !!result.text &&
+      uniqueResults.length > 0 &&
+      looksLikeIncompleteProgress(result.text);
 
-    // Diagnostic: what did the agent actually call, and what came back?
-    logToolResults(uniqueResults);
+    if (result.text && !incompleteText) {
+      return ensureWebsiteDeliveryReply({
+        reply: result.text,
+        publishAttempted,
+        websiteArtifactCount: authCtx.websiteArtifactCount,
+      });
+    }
 
-    return await synthesizeFromToolResults({
+    if (!uniqueResults.length) return result.text || null;
+
+    const reply = await synthesizeFromToolResults({
       agent,
       message,
       authCtx,
       toolResults: uniqueResults,
+    });
+    return ensureWebsiteDeliveryReply({
+      reply,
+      publishAttempted,
+      websiteArtifactCount: authCtx.websiteArtifactCount,
     });
   } catch (err) {
     throw toUserFacingError(err);
@@ -72,7 +106,7 @@ const ERROR_RULES: { test: RegExp; message: string }[] = [
       'The AI provider is temporarily rate-limited. Please wait a moment and try again.',
   },
   {
-    test: /unauthorized|forbidden|permission|access denied|invalid api key|\b401\b|\b403\b/i,
+    test: /unauthorized|forbidden|permission|access denied|invalid (?:api key|authentication)|\b401\b|\b403\b/i,
     message:
       "I couldn't complete that — it needs a permission or credential that isn't available. Please check with an admin.",
   },
@@ -127,35 +161,6 @@ export function dedupeToolResults(
   });
 }
 
-/** Diagnostic log of which tools ran and the shape of what each returned. */
-export function logToolResults(uniqueResults: ToolResultLike[]) {
-  console.log(
-    '[mastraAgentChat] tool results:',
-    JSON.stringify(
-      uniqueResults.map((tr) => {
-        const data = tr.result ?? tr;
-        const record =
-          data && typeof data === 'object'
-            ? (data as Record<string, unknown>)
-            : null;
-        return {
-          tool: tr.toolName || tr.name,
-          shape:
-            data == null
-              ? 'null'
-              : Array.isArray(data)
-                ? `array(${data.length})`
-                : typeof data === 'object'
-                  ? Object.keys(data).slice(0, 6)
-                  : typeof data,
-          success: record ? record.success : undefined,
-          error: record ? record.error || record.message : undefined,
-        };
-      }),
-    ),
-  );
-}
-
 // Turn a set of tool results into a one-or-two sentence human answer. Skips
 // synthesis when nothing real came back (synthesis would fabricate success).
 export async function synthesizeFromToolResults(params: {
@@ -168,7 +173,16 @@ export async function synthesizeFromToolResults(params: {
 
   // Catalog navigation is not an action result; only direct operation/builtin
   // results decide whether the turn produced something real to report.
-  const actionResults = toolResults.filter((tr) => !isSearchResult(tr));
+  const seenResults = new Set<string>();
+  const actionResults = toolResults.filter((tr) => {
+    if (isSearchResult(tr)) return false;
+    const name = tr.toolName || tr.name || 'tool';
+    const data = tr.result ?? tr;
+    const key = `${name}\u0000${JSON.stringify(data)}`;
+    if (seenResults.has(key)) return false;
+    seenResults.add(key);
+    return true;
+  });
   const hasRealResult = actionResults.some((tr) =>
     isRealToolData(tr.result ?? tr),
   );
@@ -198,7 +212,13 @@ export async function synthesizeFromToolResults(params: {
 
   try {
     const synthesis = await runWithAuth(authCtx, () =>
-      agent.generate(synthesisMessages, { maxSteps: 1 }),
+      agent.generate(synthesisMessages, {
+        maxSteps: 1,
+        activeTools: [],
+        toolChoice: 'none',
+        instructions:
+          'Summarize supplied tool results accurately in one or two sentences. Never call tools.',
+      }),
     );
     return synthesis.text || fallback || 'Done.';
   } catch {

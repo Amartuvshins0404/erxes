@@ -12,10 +12,7 @@ export const GET_CONTRACTS = gql`
       status
 
 
-      party {
-        type
-        id
-      }
+      customerId
       paymentPlan {
         downPaymentPercentage
         downPaymentAmount
@@ -68,10 +65,7 @@ export const GET_CONTRACTS_LIST = gql`
           status
   
 
-        party {
-          type
-          id
-        }
+        customerId
         user
       }
       totalCount
@@ -97,10 +91,7 @@ export const GET_CONTRACT = gql`
       status
 
 
-      party {
-        type
-        id
-      }
+      customerId
       paymentPlan {
         downPaymentPercentage
         downPaymentAmount

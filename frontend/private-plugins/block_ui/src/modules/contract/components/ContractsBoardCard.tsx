@@ -12,7 +12,6 @@ import {
 import { contractDetailSheetState } from '../states/contractDetailSheetState';
 import { MembersInline, useCustomerDetail } from 'ui-modules';
 import { useUnit } from '@/unit/hooks/useUnit';
-import { ContractPartyType } from '../types/contractTypes';
 
 export const contractBoardItemAtom = atom(
   (get) => (id: string) => get(allContractsMapState)[id],
@@ -37,17 +36,15 @@ export const ContractsBoardCard = ({ id }: BoardCardProps) => {
     amount,
     currency,
     unit,
-    party,
+    customerId,
     paymentPlan,
     user,
   } = contract || ({} as IContractWithDescription);
 
   const { unit: unitDoc } = useUnit(unit);
 
-  const partyId = party?.id;
-  const isCustomer = party?.type === ContractPartyType.CUSTOMER;
   const { customerDetail, loading: customerLoading } = useCustomerDetail(
-    { variables: { _id: partyId }, skip: !partyId || !isCustomer },
+    { variables: { _id: customerId }, skip: !customerId },
     true,
   );
 
@@ -58,9 +55,7 @@ export const ContractsBoardCard = ({ id }: BoardCardProps) => {
       customerDetail.primaryPhone ||
       customerDetail.primaryEmail ||
       'Unnamed'
-    : isCustomer
-    ? ''
-    : party?.id || '';
+    : '';
 
   const formatAmount = (val?: number) => {
     if (!val) return null;

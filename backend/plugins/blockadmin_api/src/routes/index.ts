@@ -1,6 +1,8 @@
 import { router as agencyRoutes } from '@/agency/routes';
 import { router as attachmentRoutes } from '@/attachment/routes';
 import { router as buildingRoutes } from '@/building/routes';
+import { router as contractRoutes } from '@/contract/routes';
+import { router as customerRoutes } from '@/blockCustomer/routes';
 import { router as developerRoutes } from '@/developer/routes';
 import { router as documentRoutes } from '@/document/routes';
 import { router as invoiceRoutes } from '@/invoice/routes';
@@ -23,6 +25,8 @@ router.use(
     agencyRoutes,
     attachmentRoutes,
     buildingRoutes,
+    contractRoutes,
+    customerRoutes,
     developerRoutes,
     documentRoutes,
     invoiceRoutes,

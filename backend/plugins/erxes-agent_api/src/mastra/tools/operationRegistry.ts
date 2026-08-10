@@ -25,16 +25,16 @@ export interface OperationMeta {
 // The full, live picture of what the agent can do, derived from schema
 // introspection. `operations` is a name → meta lookup for O(1) execute resolution;
 // `list` is the same set for searching. The two type maps power argument-schema
-// building (inputTypesMap) and response-field selection (objectFieldsMap).
+// building (inputTypesMap) and the generic valid response selection (objectFieldsMap).
 export interface OperationRegistry extends SchemaMaps {
   operations: Map<string, OperationMeta>;
   list: OperationMeta[];
 }
 
 // Schema introspection is identical for every user (it's the gateway's shape,
-// not tenant data), so the registry is cached per API URL + app token with a
-// short TTL. Tool factories derive a fresh, policy-scoped searchable surface
-// from this registry whenever an agent is built; no manual sync step exists.
+// not tenant data), so the registry is cached per API URL with a short TTL.
+// Tool factories derive a fresh, policy-scoped searchable surface from this
+// registry whenever an agent is built; no manual sync step exists.
 const TTL_MS = 15 * 60 * 1000;
 const cache = createTTLCache<OperationRegistry>(TTL_MS);
 
@@ -43,11 +43,9 @@ const cache = createTTLCache<OperationRegistry>(TTL_MS);
 // serve this rather than wiping an agent's capabilities mid-conversation.
 const lastGood = new Map<string, OperationRegistry>();
 
-/** Cache key for a registry: one entry per API URL + app token pair. */
+/** Cache key for a registry: one entry per API URL. */
 function cacheKey(settings: ErxesToolSettings | null | undefined): string {
-  const apiUrl = settings?.erxesApiUrl || 'http://localhost:4000';
-  const token = settings?.erxesApiToken || '';
-  return `${apiUrl}::${token}`;
+  return settings?.erxesApiUrl || 'http://localhost:4000';
 }
 
 /** Assemble the registry struct (name → meta map + search list + type maps). */
@@ -57,8 +55,8 @@ function buildRegistry(
 ): OperationRegistry {
   // Strip security-blocked operations (e.g. `configs`, which dumps the whole
   // secret store) before they ever enter the registry, so NO discovery surface
-  // built on it — search, capability inventory, workflow step resolution, the
-  // tool-listing UI — can reveal or resolve them. The execute tool independently
+  // built on it — search, capability inventory, the
+  // tool-listing UI — can reveal or resolve them. The executor independently
   // refuses them by name as a backstop.
   const visible = operations.filter(
     (op) => !isSecurityBlockedOperation(op.operation),
@@ -89,7 +87,9 @@ const preserveSubgraphAttribution = (
   return {
     ...refreshed,
     list,
-    operations: new Map(list.map((operation) => [operation.operation, operation])),
+    operations: new Map(
+      list.map((operation) => [operation.operation, operation]),
+    ),
   };
 };
 

@@ -3,7 +3,11 @@ import {
   IAfterProcessRule,
   sendTRPCMessage,
 } from 'erxes-api-shared/utils';
-import { sendMessage } from '~/modules/platform/shared';
+import {
+  ConsumerPlatform,
+  getTargetPlatforms,
+  sendMessage,
+} from '~/modules/platform/shared';
 import {
   buildCategorySnapshot,
   buildProductSyncPayload,
@@ -44,6 +48,24 @@ const isInSelectedPos = async (
   return categoryIds.includes(categoryId);
 };
 
+const sendProductMessage = async (
+  subdomain: string,
+  targets: ConsumerPlatform[],
+  path: string,
+  payload: Parameters<typeof sendMessage>[0]['payload'],
+): Promise<void> => {
+  await Promise.all(
+    targets.map((platform) =>
+      sendMessage({
+        subdomain,
+        path,
+        payload,
+        platform,
+      }),
+    ),
+  );
+};
+
 export const afterProcess: AfterProcessConfigs = {
   rules: allRules,
   afterMutation: async (ctx, input) => {
@@ -53,16 +75,15 @@ export const afterProcess: AfterProcessConfigs = {
       return;
     }
 
+    const targets = await getTargetPlatforms(ctx.subdomain);
+    if (!targets.length) return;
+
     if (mutationName === 'productsRemove') {
       const productIds: string[] = args?.productIds || [];
 
-      sendMessage({
-        subdomain: ctx.subdomain,
-        path: 'syncProduct',
-        payload: {
-          entityIds: productIds,
-          data: { action: 'delete' },
-        },
+      await sendProductMessage(ctx.subdomain, targets, 'syncProduct', {
+        entityIds: productIds,
+        data: { action: 'delete' },
       });
 
       return;
@@ -73,13 +94,9 @@ export const afterProcess: AfterProcessConfigs = {
 
       if (!categoryId) return;
 
-      sendMessage({
-        subdomain: ctx.subdomain,
-        path: 'syncProductCategory',
-        payload: {
-          entityId: categoryId,
-          data: { action: 'delete' },
-        },
+      await sendProductMessage(ctx.subdomain, targets, 'syncProductCategory', {
+        entityId: categoryId,
+        data: { action: 'delete' },
       });
 
       return;
@@ -92,17 +109,19 @@ export const afterProcess: AfterProcessConfigs = {
 
       if (!(await isInSelectedPos(ctx.subdomain, category._id))) return;
 
-      sendMessage({
-        subdomain: ctx.subdomain,
-        path: 'syncProductCategory',
-        payload: {
+      await sendProductMessage(
+        ctx.subdomain,
+        targets,
+        'syncProductCategory',
+        {
           entityId: category._id,
           data: {
             category: buildCategorySnapshot(category),
-            action: mutationName === 'productCategoriesAdd' ? 'create' : 'update',
+            action:
+              mutationName === 'productCategoriesAdd' ? 'create' : 'update',
           },
         },
-      });
+      );
 
       return;
     }
@@ -130,15 +149,16 @@ export const afterProcess: AfterProcessConfigs = {
       }
     }
 
-    sendMessage({
-      subdomain: ctx.subdomain,
-      path: 'syncProduct',
-      payload: buildProductSyncPayload(
+    await sendProductMessage(
+      ctx.subdomain,
+      targets,
+      'syncProduct',
+      buildProductSyncPayload(
         product,
         category,
         mutationName === 'productsAdd' ? 'create' : 'update',
         ctx.subdomain,
       ),
-    });
+    );
   },
 };

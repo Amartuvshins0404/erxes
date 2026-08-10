@@ -13,6 +13,16 @@ export interface IContractModel extends Model<IContractDocument> {
     entityId: string,
     input: IContract,
   ): Promise<IContractDocument>;
+  upsertSignedContract(
+    subdomain: string,
+    entityId: string,
+    input: IContract,
+  ): Promise<IContractDocument>;
+  markContractSigned(
+    subdomain: string,
+    entityId: string,
+    data: { customerId?: string; signedAt: Date },
+  ): Promise<IContractDocument>;
   deleteContract(
     subdomain: string,
     entityId: string,
@@ -48,6 +58,54 @@ export const loadContractClass = (models: IModels) => {
       return models.Contract.findOneAndUpdate({ _id }, input, {
         new: true,
       });
+    }
+
+    // Only signed contracts get mirrored into block-admin, and a contract
+    // may become signed via create, edit, or a board status-drag — any of
+    // which can be the first time block-admin ever hears about it — so this
+    // upserts rather than requiring a prior create.
+    public static async upsertSignedContract(
+      subdomain: string,
+      entityId: string,
+      input: IContract,
+    ) {
+      // input._id is block_api's org-side contract id, not this document's
+      // own _id — spreading it into $set would try to overwrite the
+      // immutable _id field on every re-sync of an already-mirrored contract.
+      const fields: Partial<IContract> = { ...input };
+      delete fields._id;
+
+      const existing = await models.Contract.findOne({
+        subdomain,
+        entityId,
+      });
+
+      return models.Contract.findOneAndUpdate(
+        { subdomain, entityId },
+        {
+          $set: {
+            ...fields,
+            subdomain,
+            entityId,
+            signedAt: existing?.signedAt || new Date(),
+          },
+        },
+        { upsert: true, new: true },
+      );
+    }
+
+    public static async markContractSigned(
+      subdomain: string,
+      entityId: string,
+      data: { customerId?: string; signedAt: Date },
+    ) {
+      const { _id } = await models.Contract.getContract(subdomain, entityId);
+
+      return models.Contract.findOneAndUpdate(
+        { _id },
+        { $set: data },
+        { new: true },
+      );
     }
 
     public static async deleteContract(subdomain: string, entityId: string) {

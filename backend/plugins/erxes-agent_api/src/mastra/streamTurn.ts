@@ -3,12 +3,7 @@ import { toAISdkStream } from '@mastra/ai-sdk';
 import type { MastraModelOutput } from '@mastra/core/stream';
 import { IUserDocument } from 'erxes-api-shared/core-types';
 import type { IModels } from '../connectionResolvers';
-import {
-  ActivityTracker,
-  createActivityTracker,
-  summarizeActivity,
-  summarizeTurnAndSteps,
-} from './activity';
+import { type ActivityTracker, createActivityTracker } from './activity';
 import { toolStatusLine } from './activity-signals';
 import {
   buildReasoningProviderOptions,
@@ -24,22 +19,12 @@ import {
 } from '@/agent/turn';
 import { IMastraChatAttachment } from '@/session/@types/session';
 import { UITurnAccumulator } from '@/agent/uiTurn';
-import { buildTurnSystem } from './voice/voicePrompt';
-import { ReasoningBurstCollector } from './reasoningBursts';
-
-// A Mastra stream may expose `traceId` as a value or a promise — sniff and
-// resolve it, accepting only a string (a non-string truthy value would slip past
-// the falsy guard in pushUserScore and ship bad data to Langfuse).
-async function resolveTraceId(
-  stream: { traceId?: unknown },
-): Promise<string | undefined> {
-  const tid = stream.traceId;
-  const resolved =
-    tid && typeof (tid as PromiseLike<unknown>).then === 'function'
-      ? await (tid as Promise<unknown>).catch(() => undefined)
-      : tid;
-  return typeof resolved === 'string' ? resolved : undefined;
-}
+import {
+  INCOMPLETE_PROVIDER_REPLY,
+  resolveGuardedReply,
+  shouldGuardProviderCompletion,
+} from './providerOutputGuard';
+import { ensureWebsiteDeliveryReply } from '@/agent/websiteDelivery';
 
 // Validated POST /chat/stream payload. All shape-checking for the untrusted
 // request body lives in routes.ts (parseChatStreamBody); this is the contract it
@@ -51,11 +36,6 @@ export interface ChatStreamRequest {
   reasoningEffort?: ReasoningEffort;
   attachments: IMastraChatAttachment[];
   approvedOperations: ApprovedOp[];
-  // Skill names the user slash-activated in the composer for THIS message.
-  activeSkillNames: string[];
-  // True when this turn originated from hands-free voice mode: the reply is
-  // read aloud by TTS, so the agent should answer short and conversational.
-  voiceMode: boolean;
 }
 
 // Everything streamAgentTurn needs from the route handler. Dependencies are
@@ -73,48 +53,38 @@ export interface StreamAgentTurnDeps {
 }
 
 // Run the model stream and fold its UIMessage chunks: write each chunk to the
-// client, assemble the persisted turn artifacts (acc), buffer reasoning bursts,
-// and drive the live ActivityTracker. Returns the resolved Langfuse trace id.
-// An abort lands in the catch as an interrupt (not an error) on most providers.
+// client, assemble the persisted turn artifacts (acc), and drive deterministic
+// tool activity labels. An abort lands in the catch as an interrupt (not an
+// error) on most providers.
 async function foldModelStream(params: {
   writer: UIMessageStreamWriter;
   controller: AbortController;
   prepared: PreparedTurn;
   reasoningOptions: ReasoningProviderOptions | undefined;
-  turnSystem: string | undefined;
   acc: UITurnAccumulator;
-  bursts: ReasoningBurstCollector;
   activity: ActivityTracker | null;
-}): Promise<{ langfuseTraceId: string | undefined }> {
+  bufferProviderText: boolean;
+}): Promise<void> {
   const {
     writer,
     controller,
     prepared,
     reasoningOptions,
-    turnSystem,
     acc,
-    bursts,
     activity,
+    bufferProviderText,
   } = params;
   const { agent, convo, authCtx, memoryBinding } = prepared;
 
-  let langfuseTraceId: string | undefined;
   try {
     await runWithAuth(authCtx, async () => {
       const modelStream = await agent.stream(convo, {
         abortSignal: controller.signal,
+        activeTools: prepared.activeTools,
+        instructions: prepared.turnInstructions,
         ...(memoryBinding ? { memory: memoryBinding } : {}),
         ...(reasoningOptions ? { providerOptions: reasoningOptions } : {}),
-        // Per-turn system additions (additive to the agent's base instructions +
-        // the native SkillsProcessor metadata): a voice-mode brevity directive
-        // when the turn came from speech, plus an explicitly slash-activated
-        // skill's full instructions.
-        ...(turnSystem ? { system: turnSystem } : {}),
       });
-      langfuseTraceId = await resolveTraceId(
-        modelStream as { traceId?: unknown },
-      );
-
       // Convert Mastra's native stream to the AI SDK v5 UIMessage chunk stream.
       // sendFinish:false — we emit the final `finish` ourselves after persisting,
       // so it carries the native messageId the client rates. Chunks are
@@ -123,7 +93,7 @@ async function foldModelStream(params: {
         modelStream as unknown as MastraModelOutput,
         {
           from: 'agent',
-          sendReasoning: true,
+          sendReasoning: false,
           sendSources: false,
           sendFinish: false,
         },
@@ -133,29 +103,16 @@ async function foldModelStream(params: {
 
       for await (const chunk of uiStream) {
         acc.fold(chunk);
-        switch (chunk.type) {
-          case 'reasoning-delta':
-            bursts.append(chunk.delta ?? '');
-            activity?.onThinking(chunk.delta ?? '');
-            break;
-          // The same chunk types that close a reasoning burst in the accumulator
-          // (a non-reasoning chunk ends the current burst).
-          case 'reasoning-end':
-          case 'text-start':
-          case 'text-delta':
-          case 'tool-input-available':
-          case 'tool-input-error':
-            bursts.close();
-            if (chunk.type === 'tool-input-available')
-              activity?.onToolCall(chunk.toolName, chunk.input);
-            break;
-          default:
-            break;
+        if (chunk.type === 'tool-input-available') {
+          activity?.onToolCall(chunk.toolName, chunk.input);
         }
-        writer.write(chunk);
+        if (
+          !bufferProviderText ||
+          !['text-start', 'text-delta', 'text-end'].includes(chunk.type)
+        ) {
+          writer.write(chunk);
+        }
       }
-      // Flush a burst still open when the model ended on reasoning.
-      bursts.close();
       // No flush barrier or post-write needed: Mastra persists the turn's parts
       // natively as it saves the row. persistTurn below only reconciles the
       // thread binding, attachments, title, and the native message id.
@@ -164,13 +121,10 @@ async function foldModelStream(params: {
     // An abort lands here on most providers — an interrupt, not an error.
     if (!controller.signal.aborted) throw err;
   }
-  return { langfuseTraceId };
 }
 
-// Finalize the turn once the model stream is done: synthesize a reply from tool
-// results when the model produced no prose, emit the manual `finish`, produce
-// the run-timeline summaries off the felt path, then persist and reconcile the
-// native message id + thread title over the still-open stream.
+// Finalize the turn once the model stream is done: synthesize a reply when the
+// model produced no prose, emit `finish`, then reconcile persistence off-path.
 async function finalizeTurn(params: {
   writer: UIMessageStreamWriter;
   models: IModels;
@@ -178,9 +132,9 @@ async function finalizeTurn(params: {
   clientGone: () => boolean;
   prepared: PreparedTurn;
   acc: UITurnAccumulator;
-  bursts: ReasoningBurstCollector;
   message: string;
-  langfuseTraceId: string | undefined;
+  bufferProviderText: boolean;
+  guardProviderText: boolean;
 }): Promise<void> {
   const {
     writer,
@@ -189,16 +143,23 @@ async function finalizeTurn(params: {
     clientGone,
     prepared,
     acc,
-    bursts,
     message,
-    langfuseTraceId,
+    bufferProviderText,
+    guardProviderText,
   } = params;
   const { agent, authCtx } = prepared;
 
   const interrupted = controller.signal.aborted;
-  let reply: string | null = acc.text || null;
+  const guarded = guardProviderText
+    ? resolveGuardedReply({
+        latestText: acc.latestText,
+        allText: acc.text,
+      })
+    : undefined;
+  let reply: string | null = guarded ? guarded.text : acc.text || null;
+  let emitReply = bufferProviderText;
 
-  if (!acc.text) {
+  if (!reply) {
     // No answer text streamed. When the turn ran to completion the model ended
     // on tool calls without prose — synthesize a summary from the tool results
     // (synthesizeFromToolResults skips synthesis when nothing real came back, so
@@ -224,8 +185,28 @@ async function finalizeTurn(params: {
     if (!reply) {
       reply = interrupted
         ? 'This response was interrupted before it finished. Please tap retry to continue.'
+        : guarded?.incomplete
+        ? INCOMPLETE_PROVIDER_REPLY
         : "I couldn't produce a response for that. Please try again.";
     }
+    emitReply = true;
+  }
+
+  let deliveryCorrected = false;
+  if (!interrupted) {
+    const corrected = ensureWebsiteDeliveryReply({
+      reply,
+      publishAttempted: acc.toolCalls.some(
+        (toolCall) => toolCall.toolName === 'publishWebsite',
+      ),
+      websiteArtifactCount: authCtx.websiteArtifactCount,
+    });
+    deliveryCorrected = corrected !== reply;
+    reply = corrected;
+    emitReply ||= deliveryCorrected;
+  }
+
+  if (emitReply) {
     const id = interrupted ? `interrupt-${Date.now()}` : `synth-${Date.now()}`;
     writer.write({ type: 'text-start', id });
     writer.write({ type: 'text-delta', id, delta: reply });
@@ -242,71 +223,20 @@ async function finalizeTurn(params: {
     messageMetadata: {
       messageId: null,
       interrupted,
-      langfuseTraceId,
-      ...(prepared.appliedSkillNames?.length
-        ? { activeSkills: prepared.appliedSkillNames }
-        : {}),
     },
   });
 
-  // Run-timeline summaries — the turn headline + each step's gist — are produced
-  // together in ONE model call, OFF the felt path (the reply has already
-  // streamed, so this never slows the response). Only for turns that did real
-  // work (tools or reasoning); a plain answer needs none. Streamed to the live
-  // client + persisted; on failure each item degrades to the raw-reasoning lead /
-  // no header.
-  let turnSummary: string | null = null;
-  let reasoningSummaryList: (string | null)[] | undefined;
-  const wantSummaries =
-    !interrupted &&
-    !!reply &&
-    (acc.toolCalls.length > 0 || bursts.bursts.length > 0);
-  if (wantSummaries) {
-    const { turn, steps } = await summarizeTurnAndSteps({
-      provider: prepared.agentConfig.provider,
-      model: prepared.agentConfig.model,
-      providers: prepared.providers,
-      authCtx,
-      userMessage: message,
-      reply,
-      steps: bursts.bursts,
-    });
-    turnSummary = turn;
-    if (steps.length) {
-      const byIndex: (string | null)[] = [];
-      for (const s of steps) byIndex[s.index] = s.summary;
-      reasoningSummaryList = Array.from(byIndex, (s) => s ?? null);
-    }
-    if (!clientGone()) {
-      if (turnSummary)
-        writer.write({
-          type: 'data-turn-summary',
-          data: { text: turnSummary },
-          transient: true,
-        });
-      if (reasoningSummaryList)
-        writer.write({
-          type: 'data-reasoning-summaries',
-          data: { summaries: reasoningSummaryList },
-          transient: true,
-        });
-    }
-  }
-
-  // Persistence OFF the critical path. Mastra persists the turn's parts natively
-  // as it saves the row; persistTurn now only reconciles the thread binding, any
-  // user-message attachments, the per-step summaries, the title, and the native
-  // message id. We never block `finish` on it, but we never drop it (errors are
-  // logged, not swallowed).
+  // Persistence is off the critical path. The user-visible reply is already
+  // complete; this reconciles the native id, attachments, and title.
   const persistPromise = persistTurn({
     models,
     prepared,
     reply,
-    reasoningSummaries: reasoningSummaryList,
-    turnSummary: turnSummary ?? undefined,
     // Mastra's assigned id for this turn's assistant row, captured off the
     // stream's `start` chunk — the id the client rates without a reload.
     assistantMessageId: acc.messageId,
+    replaceNativeText: bufferProviderText || deliveryCorrected,
+    hasArtifacts: (prepared.authCtx.artifactCount ?? 0) > 0,
   });
 
   if (clientGone()) {
@@ -355,12 +285,14 @@ async function finalizeTurn(params: {
   }
 }
 
-// The full assistant turn for POST /chat/stream: prepare → set up activity
-// narration → run + fold the model stream → finalize (synthesize, finish,
-// summarize, persist/reconcile). Writes to `writer` and persists; observable
-// behavior (chunk order, finish metadata, persistence, client-gone handling,
+// The full assistant turn for POST /chat/stream: prepare → set up deterministic
+// activity labels → run + fold the model stream → finalize and
+// persist/reconcile.
+// Observable behavior (chunk order, finish metadata, persistence,
 // abort semantics) matches the former inline route closure exactly.
-export async function streamAgentTurn(deps: StreamAgentTurnDeps): Promise<void> {
+export async function streamAgentTurn(
+  deps: StreamAgentTurnDeps,
+): Promise<void> {
   const { writer, models, subdomain, user, controller, clientGone, request } =
     deps;
   const {
@@ -370,15 +302,11 @@ export async function streamAgentTurn(deps: StreamAgentTurnDeps): Promise<void> 
     reasoningEffort,
     attachments,
     approvedOperations,
-    activeSkillNames,
-    voiceMode,
   } = request;
 
-  // Folds the model's UIMessage chunks into the erxes-only turn artifacts we
-  // persist (ordered parts, thinking, tool calls). The live render is driven by
-  // the chunks themselves — this only assembles what gets written to Mongo.
+  // Fold reply text and tool results needed to finish the turn. Native memory
+  // persists the user-facing message and tool parts.
   const acc = new UITurnAccumulator();
-  const bursts = new ReasoningBurstCollector();
   let activity: ActivityTracker | null = null;
 
   try {
@@ -391,15 +319,6 @@ export async function streamAgentTurn(deps: StreamAgentTurnDeps): Promise<void> 
       threadId,
       attachments,
       approvedOperations,
-      activeSkillNames,
-    });
-
-    // Per-turn system message: voice brevity directive (voice turns only) + any
-    // slash-activated skill instructions. Undefined leaves the agent's base
-    // instructions untouched (the typed-chat path).
-    const turnSystem = buildTurnSystem({
-      voiceMode,
-      activeSkillInstructions: prepared.activeSkillInstructions,
     });
 
     // Per-conversation reasoning override → provider-specific options, resolved
@@ -409,12 +328,17 @@ export async function streamAgentTurn(deps: StreamAgentTurnDeps): Promise<void> 
       prepared.agentConfig.provider,
       reasoningEffort,
     );
+    const guardProviderText =
+      prepared.activeTools.length > 0 &&
+      shouldGuardProviderCompletion(prepared.agentConfig.model);
+    const bufferProviderText =
+      guardProviderText ||
+      Object.prototype.hasOwnProperty.call(prepared.tools, 'publishWebsite');
 
-    // Narrates "what is the agent doing" while the turn runs — throttled
-    // summaries of the live reasoning/tool signals, pushed as transient
-    // `data-activity` parts.
+    // Tool calls receive an instant deterministic status line. Reasoning uses
+    // the UI's built-in waiting state rather than spending extra model calls on
+    // cosmetic narration.
     activity = createActivityTracker({
-      userMessage: message,
       emit: (text) => {
         if (!clientGone())
           writer.write({
@@ -423,27 +347,17 @@ export async function streamAgentTurn(deps: StreamAgentTurnDeps): Promise<void> 
             transient: true,
           });
       },
-      // Tool steps narrate instantly (no LLM); reasoning bursts use the model.
       toolSignal: toolStatusLine,
-      summarize: (snapshot) =>
-        summarizeActivity({
-          provider: prepared.agentConfig.provider,
-          model: prepared.agentConfig.model,
-          providers: prepared.providers,
-          authCtx: prepared.authCtx,
-          snapshot,
-        }),
     });
 
-    const { langfuseTraceId } = await foldModelStream({
+    await foldModelStream({
       writer,
       controller,
       prepared,
       reasoningOptions,
-      turnSystem,
       acc,
-      bursts,
       activity,
+      bufferProviderText,
     });
 
     activity.stop();
@@ -455,9 +369,9 @@ export async function streamAgentTurn(deps: StreamAgentTurnDeps): Promise<void> 
       clientGone,
       prepared,
       acc,
-      bursts,
       message,
-      langfuseTraceId,
+      bufferProviderText,
+      guardProviderText,
     });
   } finally {
     activity?.stop();

@@ -8,6 +8,28 @@ import type { ChartSpec } from './types';
 // (echartsOption.ts) in theme handling, gradients, and animations — do not
 // assert structural equality between them. See README-WHY-LOCAL.md.
 
+interface ChartTestSeries {
+  id?: string;
+  name?: string;
+  type?: string;
+  smooth?: boolean;
+  areaStyle?: unknown;
+  stack?: string;
+  data: Array<Record<string, unknown>>;
+  itemStyle: { color?: string };
+  radius?: unknown;
+}
+
+interface ChartTestOption {
+  xAxis: { type?: string; data?: string[] };
+  yAxis: { type?: string };
+  series: ChartTestSeries[];
+  radar?: { indicator?: unknown[] };
+}
+
+const optionFor = (spec: ChartSpec): ChartTestOption =>
+  chartSpecToEChartsOption(spec) as unknown as ChartTestOption;
+
 const twoSeriesSpec: ChartSpec = {
   chartType: 'area',
   title: 'Bull Case',
@@ -23,7 +45,7 @@ const twoSeriesSpec: ChartSpec = {
 
 describe('chartSpecToEChartsOption', () => {
   it('renders an area spec as line+areaStyle series with correct axes', () => {
-    const opt = chartSpecToEChartsOption(twoSeriesSpec) as any;
+    const opt = optionFor(twoSeriesSpec);
 
     expect(opt.xAxis.type).toBe('category');
     expect(opt.xAxis.data).toEqual(['2026.07', '2026.08']);
@@ -41,18 +63,22 @@ describe('chartSpecToEChartsOption', () => {
     }
 
     // Data items are name+value objects in the browser mapper.
-    expect(opt.series[0].data[0]).toEqual(expect.objectContaining({ name: '2026.07', value: 12 }));
-    expect(opt.series[0].data[1]).toEqual(expect.objectContaining({ name: '2026.08', value: 13 }));
+    expect(opt.series[0].data[0]).toEqual(
+      expect.objectContaining({ name: '2026.07', value: 12 }),
+    );
+    expect(opt.series[0].data[1]).toEqual(
+      expect.objectContaining({ name: '2026.08', value: 13 }),
+    );
 
     // Explicit series color is passed through.
     expect(opt.series[0].itemStyle.color).toBe('#2ecc71');
   });
 
   it('stacks bar series with stackedBar chartType', () => {
-    const opt = chartSpecToEChartsOption({
+    const opt = optionFor({
       ...twoSeriesSpec,
       chartType: 'stackedBar',
-    }) as any;
+    });
     for (const s of opt.series) {
       expect(s.type).toBe('bar');
       expect(s.stack).toBe('total');
@@ -61,44 +87,49 @@ describe('chartSpecToEChartsOption', () => {
 
   it('coerces non-finite series values to 0', () => {
     // Use two series to avoid the single-bar-per-label path.
-    const opt = chartSpecToEChartsOption({
+    const opt = optionFor({
       chartType: 'bar',
       title: 't',
       series: [
         { key: 'v', label: 'V' },
         { key: 'w', label: 'W' },
       ],
-      data: [{ label: 'a', v: 5, w: 1 }, { label: 'b', w: 2 } as any],
-    }) as any;
-    const vSeries = opt.series.find((s: any) => s.name === 'V' || s.id === 'v');
-    expect(vSeries.data[0]).toEqual(expect.objectContaining({ value: 5 }));
-    expect(vSeries.data[1]).toEqual(expect.objectContaining({ value: 0 }));
+      data: [
+        { label: 'a', v: 5, w: 1 },
+        { label: 'b', w: 2 },
+      ],
+    });
+    const vSeries = opt.series.find(
+      (series) => series.name === 'V' || series.id === 'v',
+    );
+    expect(vSeries?.data[0]).toEqual(expect.objectContaining({ value: 5 }));
+    expect(vSeries?.data[1]).toEqual(expect.objectContaining({ value: 0 }));
   });
 
   it('maps pie chartType to a single pie series', () => {
-    const opt = chartSpecToEChartsOption({
+    const opt = optionFor({
       ...twoSeriesSpec,
       chartType: 'pie',
-    }) as any;
+    });
     expect(opt.series).toHaveLength(1);
     expect(opt.series[0].type).toBe('pie');
   });
 
   it('maps donut chartType to a pie series with inner radius', () => {
-    const opt = chartSpecToEChartsOption({
+    const opt = optionFor({
       ...twoSeriesSpec,
       chartType: 'donut',
-    }) as any;
+    });
     expect(opt.series[0].type).toBe('pie');
     expect(Array.isArray(opt.series[0].radius)).toBe(true);
   });
 
   it('maps radar chartType to a radar series', () => {
-    const opt = chartSpecToEChartsOption({
+    const opt = optionFor({
       ...twoSeriesSpec,
       chartType: 'radar',
-    }) as any;
+    });
     expect(opt.series[0].type).toBe('radar');
-    expect(Array.isArray(opt.radar.indicator)).toBe(true);
+    expect(Array.isArray(opt.radar?.indicator)).toBe(true);
   });
 });

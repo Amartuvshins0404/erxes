@@ -115,10 +115,9 @@ export async function refreshWorkingMemory(params: {
   provider: string;
   model: string;
   providers: ProviderDocLike[];
-  authCtx: { userHeader?: string; token?: string; subdomain?: string };
+  authCtx: { userHeader?: string; subdomain?: string };
 }): Promise<void> {
-  const { models, ctx, exchange, provider, model, providers, authCtx } =
-    params;
+  const { models, ctx, exchange, provider, model, providers, authCtx } = params;
   try {
     const existing = await models.MastraWorkingMemory.getContent(
       ctx.resourceId,

@@ -1,4 +1,4 @@
-import { IconBook2, IconRobot, IconSitemap } from '@tabler/icons-react';
+import { IconRobot } from '@tabler/icons-react';
 import { lazy, Suspense } from 'react';
 import type { IUIConfig } from 'erxes-ui';
 
@@ -42,21 +42,6 @@ export const CONFIG: IUIConfig = {
       name: 'agents',
       icon: IconRobot,
       path: 'erxes-agent/agents',
-    },
-    {
-      name: 'skills',
-      icon: IconBook2,
-      path: 'erxes-agent/skills',
-    },
-    {
-      name: 'workflows',
-      icon: IconSitemap,
-      path: 'erxes-agent/workflows',
-      // Advertises that this plugin contributes to the automations builder, so
-      // core's RenderPluginsComponentWrapper loads our `automationsWidget`
-      // (the "Run agent workflow" action config UI) instead of showing the
-      // "Plugin disabled" fallback.
-      hasAutomation: true,
     },
   ],
 };

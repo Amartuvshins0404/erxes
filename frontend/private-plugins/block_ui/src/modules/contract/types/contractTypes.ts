@@ -1,19 +1,9 @@
 import { CurrencyCode } from 'erxes-ui';
 
-export enum ContractPartyType {
-  CUSTOMER = 'customer',
-  COMPANY = 'company',
-}
-
 export enum ContractInterestType {
   SIMPLE = 'SIMPLE',
   FLAT = 'FLAT',
   REDUCING = 'REDUCING',
-}
-
-export interface IContractParty {
-  type: ContractPartyType;
-  id: string;
 }
 
 export interface IContractPaymentPlan {
@@ -48,13 +38,13 @@ export interface IContractInput {
   date?: string;
   amount?: number;
   status?: string;
-  party?: IContractParty;
+  customerId?: string;
   paymentPlan?: IContractPaymentPlan;
   user?: string;
 }
 
 export interface IContract extends IContractInput {
   _id: string;
-  party: IContractParty;
+  customerId: string;
   paymentPlan?: IContractPaymentPlan;
 }

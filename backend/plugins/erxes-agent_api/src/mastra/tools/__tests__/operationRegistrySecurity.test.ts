@@ -1,6 +1,6 @@
 /**
  * The operation registry is the single source every discovery surface (search,
- * capability inventory, workflow step resolution, the tool-listing UI) reads
+ * capability inventory and the tool-listing UI) reads
  * from. Security-blocked operations must be stripped here so none of those
  * surfaces can reveal or resolve them. Network introspection is mocked.
  */
@@ -32,7 +32,7 @@ const meta = (
     description: '',
     graphqlArgs: [],
     pluginAttribution,
-  }) as OperationMeta;
+  } as OperationMeta);
 
 describe('getOperationRegistry — security strip', () => {
   beforeEach(() => {
@@ -47,12 +47,9 @@ describe('getOperationRegistry — security strip', () => {
   it('preserves a better-attributed registry after a partial forced refresh', async () => {
     const settings = {
       erxesApiUrl: 'http://test',
-      erxesApiToken: 'attribution-fallback',
     };
     asMock(erxesTools.fetchAvailableErxesTools)
-      .mockResolvedValueOnce([
-        meta('conversations', 'subgraph', 'frontline'),
-      ])
+      .mockResolvedValueOnce([meta('conversations', 'subgraph', 'frontline')])
       .mockResolvedValueOnce([
         meta('conversations', 'fallback', 'conversations'),
         meta('automations', 'subgraph', 'core'),
@@ -89,7 +86,6 @@ describe('getOperationRegistry — security strip', () => {
 
     const reg = await getOperationRegistry({
       erxesApiUrl: 'http://test',
-      erxesApiToken: 'security-strip',
     });
 
     // Only the legitimate op survives — the config-store reads are gone, so

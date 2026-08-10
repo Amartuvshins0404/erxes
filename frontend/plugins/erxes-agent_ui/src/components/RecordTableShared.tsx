@@ -1,12 +1,8 @@
-import { ColumnDef } from '@tanstack/react-table';
 import {
   Icon,
   IconChevronDown,
   IconChevronUp,
   IconSelector,
-  IconToggleLeft,
-  IconToggleRight,
-  IconTrash,
 } from '@tabler/icons-react';
 import {
   Badge,
@@ -17,7 +13,6 @@ import {
   RecordTable,
   RecordTableInlineCell,
 } from 'erxes-ui';
-import { PermissionButton } from './PermissionButton';
 import { SortState } from './useTableSort';
 
 // Shared record-table cells and columns for plugin resources.
@@ -120,7 +115,11 @@ export const SortableHead = ({
   onSort: (id: string) => void;
 }) => {
   const active = sort?.id === columnId;
-  const Caret = !active ? IconSelector : sort?.desc ? IconChevronDown : IconChevronUp;
+  const Caret = !active
+    ? IconSelector
+    : sort?.desc
+    ? IconChevronDown
+    : IconChevronUp;
   return (
     <button
       type="button"
@@ -160,97 +159,3 @@ export const RowActionsMenu = ({ children }: { children: React.ReactNode }) => (
     </Combobox.Content>
   </Popover>
 );
-
-/** Enable/disable + delete tail of a row actions menu. */
-export const ToggleDeleteMenuItems = ({
-  isEnabled,
-  onToggle,
-  onDelete,
-  toggleDisabled = false,
-  deleteDisabled = false,
-  onToggleDenied,
-  onDeleteDenied,
-}: {
-  isEnabled: boolean;
-  onToggle: () => void;
-  onDelete: () => void;
-  toggleDisabled?: boolean;
-  deleteDisabled?: boolean;
-  onToggleDenied?: () => void;
-  onDeleteDenied?: () => void;
-}) => (
-  <>
-    <Command.Item asChild>
-      <PermissionButton
-        variant="ghost"
-        size="sm"
-        className="justify-start w-full h-8"
-        allowed={!toggleDisabled}
-        onDenied={onToggleDenied ?? (() => {})}
-        onClick={onToggle}
-      >
-        {isEnabled ? (
-          <>
-            <IconToggleLeft className="size-4" /> Disable
-          </>
-        ) : (
-          <>
-            <IconToggleRight className="size-4" /> Enable
-          </>
-        )}
-      </PermissionButton>
-    </Command.Item>
-    <Command.Item asChild>
-      <PermissionButton
-        variant="ghost"
-        size="sm"
-        className="justify-start w-full h-8 text-destructive"
-        allowed={!deleteDisabled}
-        onDenied={onDeleteDenied ?? (() => {})}
-        onClick={onDelete}
-      >
-        <IconTrash className="size-4" /> Delete
-      </PermissionButton>
-    </Command.Item>
-  </>
-);
-
-/** The Active/Disabled status column over a row's isEnabled flag. Pass `sort`
- *  props to make the header click-to-sort. */
-export const enabledStatusColumn = <T extends { isEnabled: boolean }>(sortProps?: {
-  sort: SortState;
-  onSort: (id: string) => void;
-}): ColumnDef<T> => ({
-  id: 'status',
-  accessorKey: 'isEnabled',
-  header: () =>
-    sortProps ? (
-      <SortableHead
-        icon={IconToggleRight}
-        label="Status"
-        columnId="status"
-        {...sortProps}
-      />
-    ) : (
-      <RecordTable.InlineHead icon={IconToggleRight} label="Status" />
-    ),
-  cell: ({ cell }) => {
-    const isEnabled = cell.getValue() as boolean;
-    return (
-      <RecordTableInlineCell>
-        <span className="flex items-center gap-1.5">
-          <span
-            className={cn(
-              'size-1.5 rounded-full',
-              isEnabled ? 'bg-success' : 'bg-muted-foreground',
-            )}
-          />
-          <span className={cn('text-sm', !isEnabled && 'text-muted-foreground')}>
-            {isEnabled ? 'Active' : 'Disabled'}
-          </span>
-        </span>
-      </RecordTableInlineCell>
-    );
-  },
-  size: 100,
-});

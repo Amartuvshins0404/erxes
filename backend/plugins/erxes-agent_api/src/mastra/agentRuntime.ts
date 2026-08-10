@@ -1,10 +1,12 @@
 import { Agent } from '@mastra/core/agent';
 import { ToolSearchProcessor } from '@mastra/core/processors';
 import type { ToolsInput } from '@mastra/core/agent';
+import { stepCountIs } from 'ai';
+import { ExpectedError } from 'erxes-api-shared/utils';
 import type { IModels } from '~/connectionResolvers';
 import type { IMastraAgentDocument } from '@/agent/@types/agent';
 import { BUILTIN_TOOLS } from './tools/builtins';
-import { buildModel } from './providers';
+import { buildModel, providerRuntimeFingerprint } from './providers';
 import { buildSystemPrompt, ToolInfo } from './instructions/routing';
 import { getOperationRegistry } from './tools/operationRegistry';
 import { buildErxesSupportTools } from './tools/metaTools';
@@ -19,21 +21,35 @@ import {
   capabilityInventory,
 } from './tools/scope';
 import type { ToolPolicy } from './tools/scope';
-import { resolveDestructiveOpsPolicy } from './tools/destructiveGuard';
-import type { DestructiveOpsPolicy } from './tools/destructiveGuard';
+import { resolveAgentAllowedTools } from './tools/permissionCapabilities';
+import type { GroupPermission } from './tools/actionsToAllowedTools';
 import { writeAgentAction, AgentActionInput } from './auditLog';
-import { isAdvancedMemoryEnabled } from './memory/config';
+import { isWorkspaceMemoryEnabled } from './memory/config';
 import { getMastraMemory } from './memory/mastraMemory';
+import { withToolExecutionControl } from './requestContext';
 import { ToolCallSignalFilter } from './memory/toolCallSignalFilter';
-import { isEvaluationEnabled } from './scoring/config';
-import { buildAgentScorers } from './scoring/scorers';
-import { getObservabilityHost } from './scoring/observability';
-import { getSkillsWorkspace } from '@/skills/store/skillsWorkspace';
-import { createMakeSkillTool } from '@/skills/tools/makeSkill';
+import { RepeatedToolCallFilter } from './repeatedToolCallFilter';
+import {
+  PROVIDER_COMPLETION_MAX_RETRIES,
+  ProviderCompletionGuard,
+  shouldGuardProviderCompletion,
+  shouldGuardProviderOutput,
+} from './providerOutputGuard';
+import { getRuntimeSkillsWorkspace } from './runtimeSkills';
+import { createTerminalTool } from './tools/terminalTool';
+import {
+  createPublishWebsiteTool,
+  createWorkspaceWriteTool,
+} from './tools/workspaceTools';
 import type { OperationRegistry } from './tools/operationRegistry';
 import type { IMastraProviderDocument } from '@/provider/@types/provider';
 import type { IMastraSettingsDocument } from '@/settings/@types/settings';
-import { resolveAgentGrantPolicy } from './tools/agentGrantPolicy';
+import {
+  agentAccountName,
+  getAgentAccount,
+  getCoreUserById,
+  type AgentAccount,
+} from './auth/servicePrincipal';
 
 // Cache agents by config ID + updatedAt + routing version.
 const agentCache = new Map<string, Agent>();
@@ -41,13 +57,110 @@ const agentCache = new Map<string, Agent>();
 // Also cache the raw tools map so the resolver can execute them directly
 // when a model outputs function calls as plain text instead of tool_calls.
 const toolsCache = new Map<string, ToolsInput>();
+const promptContextCache = new Map<string, AgentPromptContext>();
 
-// Increment this whenever routing, operation discovery, or provider logic changes.
-const ROUTING_VERSION = 32;
+const SIDE_EFFECTING_STANDALONE_TOOLS: Record<string, true> = {
+  publishWebsite: true,
+  removeImageBackground: true,
+  terminal: true,
+  updateWorkingMemory: true,
+  workspaceWrite: true,
+};
+
+const PERMISSION_SCOPE_RANK = { own: 0, group: 1, all: 2 } as const;
+
+const safePermissionScope = (
+  scope: string | undefined,
+): keyof typeof PERMISSION_SCOPE_RANK =>
+  scope === 'all' || scope === 'group' ? scope : 'own';
+
+const intersectCustomPermissions = (
+  delegated: GroupPermission[],
+  current: GroupPermission[],
+): GroupPermission[] =>
+  delegated.flatMap((permission) => {
+    const live = current.find(
+      (candidate) =>
+        candidate.plugin === permission.plugin &&
+        candidate.module === permission.module,
+    );
+    const actions = (permission.actions ?? []).filter((action) =>
+      live?.actions?.includes(action),
+    );
+    if (!actions.length) return [];
+    const delegatedScope = safePermissionScope(permission.scope);
+    const liveScope = safePermissionScope(live?.scope);
+    const scope =
+      PERMISSION_SCOPE_RANK[delegatedScope] <= PERMISSION_SCOPE_RANK[liveScope]
+        ? delegatedScope
+        : liveScope;
+    return [{ ...permission, actions, scope }];
+  });
+
+const enforceDelegatedPermissionCeiling = async ({
+  account,
+  agentConfig,
+  subdomain,
+}: {
+  account: AgentAccount;
+  agentConfig: IMastraAgentDocument;
+  subdomain: string;
+}): Promise<AgentAccount> => {
+  if (agentConfig.permissionMode !== 'delegated') return account;
+  if (!agentConfig.createdBy) {
+    throw new ExpectedError('AI team member permission owner not found');
+  }
+  const creator = await getCoreUserById(subdomain, agentConfig.createdBy);
+  if (!creator || creator.isActive === false) {
+    throw new ExpectedError('AI team member permission owner is inactive');
+  }
+  if (creator.isOwner || creator.role === 'admin') return account;
+
+  const creatorGroupIds = new Set(creator.permissionGroupIds ?? []);
+  return {
+    ...account,
+    permissionGroupIds: (account.permissionGroupIds ?? []).filter((groupId) =>
+      creatorGroupIds.has(groupId),
+    ),
+    customPermissions: intersectCustomPermissions(
+      account.customPermissions ?? [],
+      creator.customPermissions ?? [],
+    ),
+  };
+};
+
+// Increment this whenever routing.ts, the meta-tools, or provider logic changes.
+const ROUTING_VERSION = 40;
+
+export interface AgentPromptContext {
+  agentInstructions: string;
+  hasErxesTools: boolean;
+  scopeLine: string;
+  inventoryLines: string[];
+  builtins: ToolInfo[];
+  operationToolNames: string[];
+  hasRuntimeSkills: boolean;
+}
 
 export interface AgentWithTools {
   agent: Agent;
   tools: ToolsInput;
+  promptContext: AgentPromptContext;
+}
+
+export function buildTurnSystemPrompt(
+  context: AgentPromptContext,
+  activeTools: string[],
+): string {
+  const active = new Set(activeTools);
+  return buildSystemPrompt(context.agentInstructions, {
+    hasErxesTools: context.hasErxesTools,
+    scopeLine: context.scopeLine,
+    inventoryLines: context.inventoryLines,
+    builtins: context.builtins.filter(
+      (tool) => active.has(tool.id) || active.has(tool.name),
+    ),
+  });
 }
 
 export interface GetOrCreateAgentOptions {
@@ -57,6 +170,7 @@ export interface GetOrCreateAgentOptions {
   // and the values are fetched here — getSettings() is process-cached anyway.
   providers?: IMastraProviderDocument[];
   settings?: IMastraSettingsDocument;
+  account?: AgentAccount;
 }
 
 /**
@@ -66,84 +180,52 @@ export interface GetOrCreateAgentOptions {
  * mirrors the original key exactly:
  *   • updatedAt + ROUTING_VERSION + inventory fingerprint rebuild on config /
  *     routing / installed-plugin changes.
- *   • resolved tool-policy mode + exact allowed identities ensure an agent
- *     cannot reuse stale grants whose inventories have the same count.
- *   • memory joins the subdomain only when advanced memory is on.
- *   • evaluation binds each tenant to its own Langfuse project (per-subdomain
- *     observability host) when on.
- *   • skills key the subdomain + allowlist so a cached agent can't be reused
- *     for another tenant with the wrong skills source.
+ *   • memory joins the subdomain only when workspace memory is on.
  */
-/**
- * Unambiguous, allocation-light identity for the resolved server-side grant.
- * The resolver produces a stable allowlist order, so preserve it rather than
- * sorting and allocating a second array on every runtime lookup.
- */
-function policyCacheTag(policy: ToolPolicy): string {
-  let tag = `${policy.mode.length}:${policy.mode}`;
-  for (const identity of policy.allowed) {
-    tag += `:${identity.length}:${identity}`;
-  }
-  return tag;
-}
-
 function buildAgentCacheKey(params: {
   agentConfig: IMastraAgentDocument;
+  backgroundRemovalEnabled: boolean;
   subdomain?: string;
   useMemory: boolean;
-  evaluationEnabled: boolean;
   inventoryFingerprint: string;
-  policy: ToolPolicy;
+  permissionFingerprint: string;
+  providerFingerprint: string;
 }): string {
   const {
     agentConfig,
     subdomain,
+    backgroundRemovalEnabled,
     useMemory,
-    evaluationEnabled,
     inventoryFingerprint,
-    policy,
+    permissionFingerprint,
+    providerFingerprint,
   } = params;
-  const evalTag = evaluationEnabled ? subdomain || 'os' : 'off';
-  const skillsTag = agentConfig.skills?.length
-    ? `${subdomain || 'os'}:${agentConfig.skills.join('|')}`
-    : 'off';
 
   return `${agentConfig._id}:${
     agentConfig.updatedAt?.getTime?.() ?? 0
-  }:v${ROUTING_VERSION}:${inventoryFingerprint}:policy${policyCacheTag(
-    policy,
-  )}:mem${useMemory ? subdomain : 'off'}:eval${evalTag}:skills${skillsTag}`;
+  }:v${ROUTING_VERSION}:${inventoryFingerprint}:permissions${permissionFingerprint}:provider${providerFingerprint}:mem${
+    useMemory ? subdomain : 'off'
+  }:bg${backgroundRemovalEnabled ? 'on' : 'off'}`;
 }
 
 /**
- * Assemble directly-bound support/builtin tools plus the policy-filtered erxes
- * operation catalog searched by ToolSearchProcessor. Also returns the ToolInfo
- * list that grounds the system prompt.
+ * Assemble the agent's tool map: erxes meta-tools (only when the policy grants
+ * an operation), policy-filtered builtins, and the always-on fileReader. Also
+ * returns the ToolInfo list that grounds the system prompt.
  */
 function assembleAgentTools(params: {
   agentConfig: IMastraAgentDocument;
   models: IModels;
-  providers: IMastraProviderDocument[];
   registry: OperationRegistry;
-  settings: IMastraSettingsDocument;
   policy: ToolPolicy;
-  destructiveOps: DestructiveOpsPolicy;
   hasErxes: boolean;
+  settings: IMastraSettingsDocument;
 }): {
   tools: ToolsInput;
   operationTools: ErxesOperationTools;
   builtinInfos: ToolInfo[];
 } {
-  const {
-    agentConfig,
-    models,
-    providers,
-    registry,
-    settings,
-    policy,
-    destructiveOps,
-    hasErxes,
-  } = params;
+  const { agentConfig, models, registry, policy, hasErxes, settings } = params;
 
   const tools: ToolsInput = {};
   const builtinInfos: ToolInfo[] = [];
@@ -154,38 +236,73 @@ function assembleAgentTools(params: {
     writeAgentAction(models, {
       ...entry,
       source: 'chat',
-      agentId: agentConfig.agentId,
+      agentId: agentConfig._id,
     });
 
   const operationTools = hasErxes
     ? buildErxesOperationTools({
         registry,
-        settings,
         policy,
-        destructiveOps,
         recordAction,
       })
     : {};
 
   if (hasErxes) {
-    Object.assign(
-      tools,
-      buildErxesSupportTools({
-        policy,
-        destructiveOps,
-      }),
-    );
+    Object.assign(tools, buildErxesSupportTools());
   }
 
   // Standalone builtin tools, filtered by policy.
   for (const [key, tool] of Object.entries(BUILTIN_TOOLS)) {
     if (!isBuiltinAllowed(key, policy)) continue;
+    if (
+      key === 'removeImageBackground' &&
+      settings.backgroundRemovalEnabled === false
+    ) {
+      continue;
+    }
     tools[key] = tool;
     builtinInfos.push({
       id: key,
       name: key,
       description: tool.description,
     });
+  }
+
+  if (isBuiltinAllowed('terminal', policy)) {
+    const terminalTool = createTerminalTool({
+      models,
+      agentId: agentConfig._id,
+    });
+    const workspaceWriteTool = createWorkspaceWriteTool({
+      models,
+      agentId: agentConfig._id,
+    });
+    const publishWebsiteTool = createPublishWebsiteTool({
+      models,
+      agentId: agentConfig._id,
+    });
+    Object.assign(tools, {
+      terminal: terminalTool,
+      workspaceWrite: workspaceWriteTool,
+      publishWebsite: publishWebsiteTool,
+    });
+    builtinInfos.push(
+      {
+        id: 'terminal',
+        name: 'terminal',
+        description: terminalTool.description,
+      },
+      {
+        id: 'workspaceWrite',
+        name: 'workspaceWrite',
+        description: workspaceWriteTool.description,
+      },
+      {
+        id: 'publishWebsite',
+        name: 'publishWebsite',
+        description: publishWebsiteTool.description,
+      },
+    );
   }
 
   // file_reader is bound regardless of policy: the agent must always be able to
@@ -201,81 +318,7 @@ function assembleAgentTools(params: {
     });
   }
 
-  // Skills-enabled agents can distill the current conversation into a SKILL.md
-  // draft via the makeSkill tool (the only creation path). Bound with the
-  // agent's own provider/model; the thread/user come from the request context.
-  if (agentConfig.skills?.length) {
-    const makeSkillTool = createMakeSkillTool({
-      provider: agentConfig.provider,
-      model: agentConfig.model,
-      providers,
-    });
-    tools.make_skill = makeSkillTool;
-    builtinInfos.push({
-      id: 'make_skill',
-      name: 'make_skill',
-      description: makeSkillTool.description,
-    });
-  }
-
   return { tools, operationTools, builtinInfos };
-}
-
-/**
- * Step budget for a turn. Workflow builds are 20+ steps (guide → searches →
- * validate → simulate → save → run), so workflow-capable agents floor at 32.
- * Pure chat/search/chart agents only ever need ~5 steps — use the configured
- * value with a floor of 8 so they don't waste LLM round-trips. Tool-less agents
- * take the configured value verbatim.
- */
-function resolveMaxSteps(
-  agentConfig: IMastraAgentDocument,
-  toolNames: string[],
-  hasErxes: boolean,
-): number {
-  const configuredSteps = agentConfig.maxSteps || 8;
-  const hasWorkflowTools = toolNames.some((k) => k.startsWith('workflow'));
-  const stepFloor = hasWorkflowTools ? 32 : 8;
-  return toolNames.length || hasErxes
-    ? Math.max(configuredSteps, stepFloor)
-    : configuredSteps;
-}
-
-/**
- * Wire the agent to the per-tenant observability host so traces + scores reach
- * the central Langfuse. Two distinct hooks, both guarded (internal Mastra APIs):
- *   • __registerMastra(host)  → the agent emits TRACES to host.observability.
- *   • host.addScorer(scorer)  → registers each scorer so Mastra's onScorerRun
- *     hook can resolve it (findScorer → getScorerById) AND sets scorer.#mastra
- *     = host, so the scorer's run() emits its SCORE to Langfuse. (The host's
- *     storage, set above, is what stops the hook from bailing.)
- * Null host = evaluation off or Langfuse unconfigured → no-op.
- */
-async function wireAgentObservability(params: {
-  agent: Agent;
-  subdomain?: string;
-  scorers?: ReturnType<typeof buildAgentScorers>;
-}): Promise<void> {
-  const { agent, subdomain, scorers } = params;
-
-  const host = await getObservabilityHost(subdomain);
-  if (!host) return;
-
-  const register = (
-    agent as unknown as { __registerMastra?: (m: unknown) => void }
-  ).__registerMastra;
-  if (typeof register === 'function') register.call(agent, host);
-
-  const addScorer = (
-    host as unknown as {
-      addScorer?: (s: unknown, key?: string, o?: { source: string }) => void;
-    }
-  ).addScorer;
-  if (scorers && typeof addScorer === 'function') {
-    for (const [id, entry] of Object.entries(scorers)) {
-      addScorer.call(host, entry.scorer, id, { source: 'code' });
-    }
-  }
 }
 
 /** Build (or return the cached) Mastra agent for a stored agent config. */
@@ -285,60 +328,69 @@ export async function getOrCreateAgent(
   subdomain?: string,
   options: GetOrCreateAgentOptions = {},
 ): Promise<AgentWithTools> {
-  // Mastra Memory (persistence + semantic recall + working memory) is attached
-  // whenever advanced memory is on and the agent hasn't opted out. An unknown
-  // tenant must NOT detach memory — that would stop the turn from being
-  // persisted (and lose the session); scopedResource defaults an empty subdomain
-  // to the "os" scope.
-  const useMemory =
-    isAdvancedMemoryEnabled() && agentConfig.memoryEnabled !== false;
   // Reuse the caller's already-fetched config when present; otherwise load it.
   const [providers, settings] =
     options.providers && options.settings
       ? [options.providers, options.settings]
       : await Promise.all([
-          models.MastraProvider.find({ isEnabled: true }),
+          models.MastraProvider.getRuntimeProviders(),
           models.MastraSettings.getSettings(),
         ]);
+  // Mastra Memory is controlled by the workspace setting for every agent.
+  // Missing workspace settings default to enabled for existing tenants.
+  const useMemory = isWorkspaceMemoryEnabled(settings);
 
-  // Resolve the live server-side grant on every cache build. Missing groups,
-  // missing tenant context, and core lookup failures all produce zero tools.
+  // Core is authoritative for both identity and permissions. Reading the
+  // account here also makes permission changes invalidate the runtime cache
+  // even when they were made from the standard Team Members UI.
+  const storedAccount =
+    options.account ??
+    (await getAgentAccount({
+      userId: agentConfig._id,
+      subdomain: subdomain || 'os',
+    }));
+  const account = await enforceDelegatedPermissionCeiling({
+    account: storedAccount,
+    agentConfig,
+    subdomain: subdomain || 'os',
+  });
   const registry = await getOperationRegistry(settings);
-  const policy = await resolveAgentGrantPolicy({
-    subdomain,
-    grantGroupId: agentConfig.grantGroupId,
+  const allowedTools = await resolveAgentAllowedTools({
+    subdomain: subdomain || 'os',
+    permissionGroupIds: account.permissionGroupIds ?? [],
+    customPermissions: account.customPermissions ?? [],
+    additionalTools: agentConfig.additionalTools,
     registry,
   });
-
-  // Consent for irreversible deletes/merges. Defaults to 'block' (including
-  // legacy agents with no persisted field); direct operation tools enforce it.
-  const destructiveOps = resolveDestructiveOpsPolicy(agentConfig);
-
-
+  const permissionFingerprint = JSON.stringify([
+    account.permissionGroupIds ?? [],
+    account.customPermissions ?? [],
+    agentConfig.additionalTools ?? [],
+  ]);
+  const providerFingerprint = providerRuntimeFingerprint(providers);
+  const policy: ToolPolicy = { mode: 'custom', allowed: allowedTools };
   // The installed-services inventory both grounds the system prompt AND keys
   // the cache: enabling/disabling a plugin changes the fingerprint, so the
   // agent (and its prompt) is rebuilt as soon as the registry refreshes.
   const inventory = capabilityInventory(registry.list, policy);
 
-  // Evaluation is process-wide (env), but the observability host is per-tenant
-  // — so when it's on, the subdomain joins the cache key to keep each tenant's
-  // agent bound to its own Langfuse project (serviceName).
-  const evaluationEnabled = isEvaluationEnabled();
-
   const cacheKey = buildAgentCacheKey({
     agentConfig,
     subdomain,
     useMemory,
-    evaluationEnabled,
+    backgroundRemovalEnabled: settings.backgroundRemovalEnabled !== false,
     inventoryFingerprint: inventory.fingerprint,
-    policy,
+    permissionFingerprint,
+    providerFingerprint,
   });
 
   const cached = agentCache.get(cacheKey);
-  if (cached) {
+  const cachedPromptContext = promptContextCache.get(cacheKey);
+  if (cached && cachedPromptContext) {
     return {
       agent: cached,
       tools: toolsCache.get(cacheKey) ?? {},
+      promptContext: cachedPromptContext,
     };
   }
 
@@ -347,6 +399,7 @@ export async function getOrCreateAgent(
     if (key.startsWith(`${agentConfig._id}:`)) {
       agentCache.delete(key);
       toolsCache.delete(key);
+      promptContextCache.delete(key);
     }
   }
 
@@ -356,53 +409,58 @@ export async function getOrCreateAgent(
   const { tools, operationTools, builtinInfos } = assembleAgentTools({
     agentConfig,
     models,
-    providers,
     registry,
     settings,
     policy,
-    destructiveOps,
     hasErxes,
   });
+  const controlledTools = Object.fromEntries(
+    Object.entries(tools).map(([name, tool]) => [
+      name,
+      // fileReader and exact erxes operations already use runToolOnce at their
+      // execution boundary; wrapping them twice would recursively share the
+      // same in-flight promise. Standalone writes share the mutation queue so
+      // four-way read concurrency cannot race workspace state.
+      name === 'fileReader'
+        ? tool
+        : withToolExecutionControl(name, tool, {
+            serial: Boolean(SIDE_EFFECTING_STANDALONE_TOOLS[name]),
+          }),
+    ]),
+  ) as ToolsInput;
 
   // Conversation persistence + recent-history replay + recall are owned by the
   // attached Mastra Memory (the chat store IS the native memory store; see
   // memory below + session/nativeStore.ts). No custom message store.
-  const toolNames = Object.keys(tools);
-  const systemPrompt = buildSystemPrompt(agentConfig.instructions || '', {
+  const toolNames = Object.keys(controlledTools);
+  const runtimeSkillsWorkspace = getRuntimeSkillsWorkspace(toolNames);
+  const promptContext: AgentPromptContext = {
+    agentInstructions: agentConfig.instructions || '',
     hasErxesTools: hasErxes,
     scopeLine: scopeSummary(policy),
     inventoryLines: inventory.lines,
     builtins: builtinInfos,
-  });
-
-  const maxSteps = resolveMaxSteps(agentConfig, toolNames, hasErxes);
-
-  // Configured sampling temperature. Unset → provider/SDK default (the legacy
-  // loop hardcodes 0, which models like Kimi thinking — "only 1 is allowed" —
-  // reject; setting it here lets the dashboard fix that per agent).
-  const temperature = agentConfig.temperature;
-  const hasTemperature = typeof temperature === 'number';
+    operationToolNames: Object.keys(operationTools),
+    hasRuntimeSkills: Boolean(runtimeSkillsWorkspace),
+  };
+  const systemPrompt = buildTurnSystemPrompt(promptContext, toolNames);
 
   // Per-tenant Mastra Memory (recall + working memory). ToolCallSignalFilter
   // strips raw tool-call frames from any replayed/recalled history so reasoning
   // models (Kimi) don't reject the request, but leaves a text breadcrumb so the
-  // model keeps calling render tools on later turns. Both are opt-in via
-  // advanced memory.
+  // model keeps calling render tools on later turns. Both are active when
+  // workspace memory is enabled.
   const memory = useMemory ? await getMastraMemory(subdomain) : undefined;
 
-  // Quality scorers (heuristic + LLM-judge using this agent's own model) — only
-  // when ERXES_AGENT_EVALUATION=enable. Results export to Langfuse via the host
-  // registered below.
-  const scorers = evaluationEnabled ? buildAgentScorers(model) : undefined;
-
-  // Native Mastra skills: a per-subdomain Workspace (Mongo-backed SkillSource +
-  // dynamic per-user resolver). Passing `workspace` makes the Agent auto-wire the
-  // SkillsProcessor (name+description into the prompt) and the skill /
-  // skill_search / skill_read tools (progressive disclosure). Additive: only
-  // attached when the agent declares a skills allowlist.
-  const skillsWorkspace = agentConfig.skills?.length
-    ? getSkillsWorkspace(subdomain || 'os', agentConfig.skills)
-    : undefined;
+  // Native Mastra skills load from plugin-owned SKILL.md files. Passing this
+  // workspace makes Mastra add its skill discovery processor and skill tools.
+  const hasExecutableTools = hasErxes || toolNames.length > 0;
+  const completionGuard =
+    hasExecutableTools && shouldGuardProviderCompletion(agentConfig.model)
+      ? new ProviderCompletionGuard(
+          shouldGuardProviderOutput(agentConfig.model),
+        )
+      : null;
 
   const inputProcessors = [
     ...(hasErxes
@@ -415,35 +473,41 @@ export async function getOrCreateAgent(
         ]
       : []),
     ...(memory ? [new ToolCallSignalFilter()] : []),
+    ...(completionGuard ? [completionGuard] : []),
+    ...(hasExecutableTools ? [new RepeatedToolCallFilter()] : []),
   ];
+  const outputProcessors = completionGuard ? [completionGuard] : [];
 
   const agent = new Agent({
-    id: agentConfig.agentId,
-    name: agentConfig.name,
+    id: agentConfig._id,
+    name: agentAccountName(account),
     instructions: systemPrompt,
     model,
-    tools: toolNames.length ? tools : undefined,
     ...(memory ? { memory } : {}),
+    tools: toolNames.length ? controlledTools : undefined,
     ...(inputProcessors.length ? { inputProcessors } : {}),
-    ...(scorers ? { scorers } : {}),
-    ...(skillsWorkspace ? { workspace: skillsWorkspace } : {}),
-    // generate()/stream() read defaultOptions. Temperature is only set when the
-    // agent configures it — otherwise the provider default applies (sending an
-    // explicit 0 is what reasoning models like Kimi reject).
+    ...(outputProcessors.length
+      ? {
+          outputProcessors,
+          maxProcessorRetries: PROVIDER_COMPLETION_MAX_RETRIES,
+        }
+      : {}),
+    ...(runtimeSkillsWorkspace ? { workspace: runtimeSkillsWorkspace } : {}),
     defaultOptions: {
-      maxSteps,
-      ...(hasTemperature ? { modelSettings: { temperature } } : {}),
+      // Eight model steps cover multi-part work while preventing a malformed
+      // provider response from running an unbounded tool loop.
+      stopWhen: [stepCountIs(8)],
+      // Independent reads may execute together. Exact GraphQL mutations and
+      // state-changing standalone tools share the per-turn serial queue.
+      toolCallConcurrency: 4,
     },
   } as never);
 
-  if (evaluationEnabled) {
-    await wireAgentObservability({ agent, subdomain, scorers });
-  }
-
-  const executableTools = { ...tools, ...operationTools };
+  const executableTools = { ...controlledTools, ...operationTools };
   agentCache.set(cacheKey, agent);
+  promptContextCache.set(cacheKey, promptContext);
   toolsCache.set(cacheKey, executableTools);
-  return { agent, tools: executableTools };
+  return { agent, tools: executableTools, promptContext };
 }
 
 /** Drop every cached agent built from the given stored config id. */
@@ -452,6 +516,7 @@ export function invalidateAgentCache(agentId: string) {
     if (key.startsWith(`${agentId}:`)) {
       agentCache.delete(key);
       toolsCache.delete(key);
+      promptContextCache.delete(key);
     }
   }
 }

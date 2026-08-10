@@ -1,43 +1,16 @@
-import { ICursorPaginateParams, Resolver } from 'erxes-api-shared/core-types';
+import { Resolver } from 'erxes-api-shared/core-types';
 import { cursorPaginate, markResolvers } from 'erxes-api-shared/utils';
 import { IContext } from '~/connectionResolvers';
 import { mapRegistrationApplicationGql } from '@/registration/utils/mapRegistrationApplicationGql';
 import { assertClientPortalUser } from '@/registration/graphql/utils/registrationAuth';
+import {
+  buildRegistrationApplicationsFilter,
+  IRegistrationApplicationsFilterParams,
+} from '@/registration/utils/buildRegistrationApplicationsFilter';
+import { exportRegistrationApplicationsCsv } from '@/registration/utils/exportRegistrationApplicationsCsv';
 
-export interface IRegistrationApplicationsQueryParams extends ICursorPaginateParams {
-  membershipTypeId?: string;
-  status?: string;
-  cpUserId?: string;
-}
-
-function buildRegistrationApplicationsFilter(
-  params: IRegistrationApplicationsQueryParams,
-  subdomain: string,
-  instanceId?: string,
-  cpUser?: { _id: string },
-) {
-  const filter: Record<string, unknown> = { subdomain };
-
-  if (instanceId) {
-    filter.instanceId = instanceId;
-  }
-
-  if (cpUser?._id) {
-    filter.cpUserId = String(cpUser._id);
-  } else if (params.cpUserId) {
-    filter.cpUserId = String(params.cpUserId);
-  }
-
-  if (params.membershipTypeId) {
-    filter.membershipTypeId = params.membershipTypeId;
-  }
-
-  if (params.status) {
-    filter.status = params.status;
-  }
-
-  return filter;
-}
+export type IRegistrationApplicationsQueryParams =
+  IRegistrationApplicationsFilterParams;
 
 export const registrationApplicationsQueries: Record<string, Resolver> = {
   async mtoRegistrationApplications(
@@ -121,10 +94,7 @@ export const registrationApplicationsQueries: Record<string, Resolver> = {
 
   async mtoRegistrationApplicationsCount(
     _root: undefined,
-    params: Pick<
-      IRegistrationApplicationsQueryParams,
-      'membershipTypeId' | 'status' | 'cpUserId'
-    >,
+    params: IRegistrationApplicationsFilterParams,
     context: IContext,
   ) {
     const { models, subdomain, instanceId, cpUser } = context;
@@ -142,7 +112,7 @@ export const registrationApplicationsQueries: Record<string, Resolver> = {
   async cpMtoRegistrationApplicationsCount(
     _root: undefined,
     params: Pick<
-      IRegistrationApplicationsQueryParams,
+      IRegistrationApplicationsFilterParams,
       'membershipTypeId' | 'status'
     >,
     context: IContext,
@@ -159,6 +129,26 @@ export const registrationApplicationsQueries: Record<string, Resolver> = {
     );
 
     return models.RegistrationApplication.countDocuments(filter);
+  },
+
+  async mtoRegistrationApplicationsExport(
+    _root: undefined,
+    params: IRegistrationApplicationsFilterParams,
+    context: IContext,
+  ) {
+    if (context.cpUser) {
+      throw new Error('Forbidden');
+    }
+
+    const { models, subdomain, instanceId } = context;
+
+    const filter = buildRegistrationApplicationsFilter(
+      params,
+      subdomain,
+      instanceId,
+    );
+
+    return exportRegistrationApplicationsCsv(models, filter);
   },
 
   async mtoRegistrationApplication(

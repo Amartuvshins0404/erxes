@@ -99,16 +99,43 @@ const getBundleTargets = async (
     | undefined;
 
   const bundleType = organization?.bundle?.type;
-  if (!bundleType) return [];
+  if (!bundleType) {
+    if (
+      getEnv({ name: 'NODE_ENV', defaultValue: 'development' }) ===
+      'development'
+    ) {
+      return consumers;
+    }
 
-  return consumers.filter((c) => getEnv({ name: c.bundleEnv }) === bundleType);
+    return [];
+  }
+
+  const targets = consumers.filter(
+    (c) => getEnv({ name: c.bundleEnv }) === bundleType,
+  );
+
+  if (
+    targets.length ||
+    getEnv({ name: 'NODE_ENV', defaultValue: 'development' }) !== 'development'
+  ) {
+    return targets;
+  }
+
+  return consumers.filter((c) => !getEnv({ name: c.bundleEnv }));
+};
+
+export const getTargetPlatforms = async (
+  subdomain: string,
+): Promise<ConsumerPlatform[]> => {
+  const targets = await getBundleTargets(subdomain, getConsumers());
+  return targets.map((target) => target.name);
 };
 
 export const getTargetPlatform = async (
   subdomain: string,
 ): Promise<ConsumerPlatform | null> => {
-  const targets = await getBundleTargets(subdomain, getConsumers());
-  return targets[0]?.name ?? null;
+  const targets = await getTargetPlatforms(subdomain);
+  return targets[0] ?? null;
 };
 
 export const sendMessage = async ({
@@ -129,6 +156,11 @@ export const sendMessage = async ({
   const targets = platform
     ? consumers.filter((c) => c.name === platform)
     : await getBundleTargets(subdomain, consumers);
+
+  if (!targets.length) {
+    console.error(`No webhook consumers matched for supplier ${subdomain}`);
+    return;
+  }
 
   await Promise.all(
     targets.map((consumer) =>

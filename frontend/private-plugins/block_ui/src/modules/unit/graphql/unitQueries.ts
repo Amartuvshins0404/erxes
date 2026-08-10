@@ -74,8 +74,7 @@ export const BLOCK_GET_UNIT = gql`
         statusType
         statusLabel
         statusColor
-        partyId
-        partyType
+        customerId
       }
       locked
     }

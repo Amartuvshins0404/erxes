@@ -1,47 +1,32 @@
-import { shouldGenerateTitle, sanitizeTitle } from '../titler';
+import { deriveThreadTitle, sanitizeTitle } from '../titler';
 
-describe('shouldGenerateTitle', () => {
-  it('generates on the first completed exchange (derived title)', () => {
+describe('deriveThreadTitle', () => {
+  it('uses the first eight words without a provider request', () => {
     expect(
-      shouldGenerateTitle({ titleSource: 'derived', messageCount: 2 }),
-    ).toBe(true);
+      deriveThreadTitle(
+        'Prepare a twelve month sales forecast for erxes Mongolia pipeline',
+      ),
+    ).toBe('Prepare a twelve month sales forecast for erxes');
   });
 
-  it('generates for legacy threads with no titleSource', () => {
-    expect(shouldGenerateTitle({ messageCount: 2 })).toBe(true);
+  it('skips greetings so the next meaningful message can title the thread', () => {
+    expect(deriveThreadTitle('Hello!')).toBeNull();
+    expect(deriveThreadTitle('Сайн уу')).toBeNull();
   });
 
-  it('never overwrites a manual rename', () => {
+  it('excludes attachment manifests and markdown decoration', () => {
     expect(
-      shouldGenerateTitle({ titleSource: 'manual', messageCount: 100 }),
-    ).toBe(false);
-  });
-
-  it('does not regenerate right after generating', () => {
-    expect(
-      shouldGenerateTitle({
-        titleSource: 'generated',
-        titleMessageCount: 2,
-        messageCount: 4,
-      }),
-    ).toBe(false);
-  });
-
-  it('refreshes once the conversation has grown enough', () => {
-    expect(
-      shouldGenerateTitle({
-        titleSource: 'generated',
-        titleMessageCount: 2,
-        messageCount: 8,
-      }),
-    ).toBe(true);
+      deriveThreadTitle(
+        '**Import these contacts**\n\n--- Attached files ---\n1. contacts.xlsx',
+      ),
+    ).toBe('Import these contacts');
   });
 });
 
 describe('sanitizeTitle', () => {
   it('strips wrapping quotes and trailing punctuation', () => {
-    expect(sanitizeTitle('"Lead follow-up workflow."')).toBe(
-      'Lead follow-up workflow',
+    expect(sanitizeTitle('"Lead follow-up process."')).toBe(
+      'Lead follow-up process',
     );
   });
 
@@ -58,7 +43,7 @@ describe('sanitizeTitle', () => {
 
   it('caps overly long titles', () => {
     const title = sanitizeTitle('word '.repeat(30)) ?? '';
-    expect(title.length).toBeLessThanOrEqual(61);
+    expect(title.length).toBeLessThanOrEqual(60);
     expect(title.endsWith('…')).toBe(true);
   });
 });

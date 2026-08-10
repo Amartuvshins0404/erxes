@@ -1,24 +1,21 @@
 import { useCallback, useMemo } from 'react';
 import { MASTRA_AGENTS_MAIN } from '~/graphql/queries';
 import { useAuthedListQuery } from '~/hooks/useAuthedListQuery';
-import type { IMastraAgentCapabilities } from './types';
 
 export const AGENTS_PER_PAGE = 30;
 
 export interface IMastraAgentRow {
   _id: string;
-  name: string;
-  agentId: string;
-  description?: string;
-  isEnabled: boolean;
-  visibility?: 'private' | 'team' | 'department' | 'unit' | 'org';
-  teamId?: string;
-  departmentId?: string;
-  unitId?: string;
-  isOwnAgent?: boolean;
-  capabilities?: IMastraAgentCapabilities | null;
+  accountName: string;
+  accountDescription?: string;
+  createdBy?: string;
+  visibility: 'private' | 'shared' | 'organization';
+  audienceUserIds: string[];
+  provider: string;
+  model: string;
+  permissionGroupIds: string[];
+  isActive: boolean;
   createdAt: string;
-  workflowsCount?: number;
 }
 
 interface IMastraAgentsMainResponse {

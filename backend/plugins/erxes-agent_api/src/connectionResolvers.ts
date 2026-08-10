@@ -5,12 +5,7 @@ import mongoose from 'mongoose';
 import { IMastraAgentDocument } from '@/agent/@types/agent';
 import { IMastraProviderDocument } from '@/provider/@types/provider';
 import { IMastraSettingsDocument } from '@/settings/@types/settings';
-import { IMastraUserSettingsDocument } from '@/settings/@types/userSettings';
 import { IMastraWorkingMemoryDocument } from '@/memory/@types/workingMemory';
-import {
-  IMastraWorkflowDocument,
-  IMastraWorkflowRunDocument,
-} from '@/workflow/@types/workflow';
 import { loadAgentClass, IMastraAgentModel } from '@/agent/db/models/Agent';
 import {
   loadAgentActionLogClass,
@@ -26,57 +21,28 @@ import {
   IMastraSettingsModel,
 } from '@/settings/db/models/Settings';
 import {
-  loadUserSettingsClass,
-  IMastraUserSettingsModel,
-} from '@/settings/db/models/UserSettings';
-import {
   loadWorkingMemoryClass,
   IMastraWorkingMemoryModel,
 } from '@/memory/db/models/WorkingMemory';
-import {
-  loadWorkflowClass,
-  IMastraWorkflowModel,
-} from '@/workflow/db/models/Workflow';
-import {
-  loadWorkflowRunClass,
-  IMastraWorkflowRunModel,
-} from '@/workflow/db/models/WorkflowRun';
-import {
-  loadLearningClass,
-  IMastraLearningModel,
-} from '@/learning/db/models/Learning';
-import {
-  loadFeedbackClass,
-  IMastraFeedbackModel,
-} from '@/learning/db/models/Feedback';
-import {
-  IMastraLearningDocument,
-  IMastraFeedbackDocument,
-} from '@/learning/@types/learning';
 import {
   loadArtifactClass,
   IMastraArtifactModel,
 } from '@/artifact/db/models/Artifact';
 import { IMastraArtifactDocument } from '@/artifact/@types/artifact';
 import {
-  loadVoiceConfigClass,
-  IMastraVoiceConfigModel,
-} from '@/voice/db/models/VoiceConfig';
-import { IMastraVoiceConfigDocument } from '@/voice/@types/voice';
+  IMastraSandboxSessionDocument,
+  IMastraSandboxSessionModel,
+} from '@/sandbox/@types/session';
+import { sandboxSessionSchema } from '@/sandbox/db/definitions/session';
 
 export interface IModels {
   MastraAgent: IMastraAgentModel;
   MastraAgentActionLog: IMastraAgentActionLogModel;
   MastraProvider: IMastraProviderModel;
   MastraSettings: IMastraSettingsModel;
-  MastraUserSettings: IMastraUserSettingsModel;
   MastraWorkingMemory: IMastraWorkingMemoryModel;
-  MastraWorkflow: IMastraWorkflowModel;
-  MastraWorkflowRun: IMastraWorkflowRunModel;
-  MastraLearning: IMastraLearningModel;
-  MastraFeedback: IMastraFeedbackModel;
   MastraArtifact: IMastraArtifactModel;
-  MastraVoiceConfig: IMastraVoiceConfigModel;
+  MastraSandboxSession: IMastraSandboxSessionModel;
 }
 
 export interface IContext extends IMainContext {
@@ -109,45 +75,20 @@ export const loadClasses = (db: mongoose.Connection): IModels => {
     IMastraSettingsModel
   >('mastra_settings', loadSettingsClass(models));
 
-  models.MastraUserSettings = db.model<
-    IMastraUserSettingsDocument,
-    IMastraUserSettingsModel
-  >('mastra_user_settings', loadUserSettingsClass(models));
-
   models.MastraWorkingMemory = db.model<
     IMastraWorkingMemoryDocument,
     IMastraWorkingMemoryModel
   >('mastra_working_memory', loadWorkingMemoryClass(models));
 
-  models.MastraWorkflow = db.model<
-    IMastraWorkflowDocument,
-    IMastraWorkflowModel
-  >('mastra_workflows', loadWorkflowClass(models));
-
-  models.MastraWorkflowRun = db.model<
-    IMastraWorkflowRunDocument,
-    IMastraWorkflowRunModel
-  >('mastra_workflow_runs', loadWorkflowRunClass(models));
-
-  models.MastraLearning = db.model<
-    IMastraLearningDocument,
-    IMastraLearningModel
-  >('mastra_learnings', loadLearningClass(models));
-
-  models.MastraFeedback = db.model<
-    IMastraFeedbackDocument,
-    IMastraFeedbackModel
-  >('mastra_feedbacks', loadFeedbackClass(models));
-
-
   models.MastraArtifact = db.model<
     IMastraArtifactDocument,
     IMastraArtifactModel
   >('mastra_artifacts', loadArtifactClass(models));
-  models.MastraVoiceConfig = db.model<
-    IMastraVoiceConfigDocument,
-    IMastraVoiceConfigModel
-  >('mastra_voice_config', loadVoiceConfigClass(models));
+
+  models.MastraSandboxSession = db.model<
+    IMastraSandboxSessionDocument,
+    IMastraSandboxSessionModel
+  >('mastra_sandbox_sessions', sandboxSessionSchema);
 
   return models;
 };

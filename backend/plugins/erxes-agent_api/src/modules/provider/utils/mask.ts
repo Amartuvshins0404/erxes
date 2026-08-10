@@ -1,4 +1,7 @@
-import { IMastraProviderDocument } from '@/provider/@types/provider';
+import {
+  IMastraProviderDocument,
+  MastraProviderScope,
+} from '@/provider/@types/provider';
 
 // Secret-free GraphQL view of a stored provider. Mirrors the voice BYOK module:
 // the raw `apiKey` AND custom header VALUES NEVER cross the GraphQL boundary.
@@ -10,6 +13,7 @@ export interface IPublicMastraProvider {
   _id: string;
   provider: string;
   label?: string;
+  scope: MastraProviderScope;
   baseUrl?: string;
   isDefault?: boolean;
   isEnabled?: boolean;
@@ -17,6 +21,7 @@ export interface IPublicMastraProvider {
   modelsEndpoint?: string;
   envKey?: string;
   createdAt?: Date;
+  updatedAt?: Date;
   hasApiKey: boolean;
   apiKeyHint: string | null;
   // Names only of the configured custom headers — values are withheld.
@@ -47,14 +52,20 @@ export const toPublicProvider = (
   ) as Record<string, unknown> & {
     apiKey?: string;
     headers?: Record<string, string> | null;
+    ownerId?: string | null;
+    scope?: MastraProviderScope;
   };
-  // Drop both secrets: apiKey and the header VALUES never leave the server.
+  // Drop secrets and internal ownership: personal rows are always returned only
+  // to their owner, so the public contract needs the scope but not the owner id.
   const { apiKey, headers, ...rest } = plain;
+  const ownerId = rest.ownerId;
+  delete rest.ownerId;
   return {
     ...(rest as Omit<
       IPublicMastraProvider,
       'hasApiKey' | 'apiKeyHint' | 'headerKeys'
     >),
+    scope: plain.scope ?? (ownerId ? 'personal' : 'organization'),
     hasApiKey: Boolean(apiKey),
     apiKeyHint: maskApiKey(apiKey),
     headerKeys:

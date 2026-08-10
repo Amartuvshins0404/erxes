@@ -3,6 +3,8 @@
   "compilerOptions": {
     "outDir": "../../../dist/out-tsc",
     "module": "commonjs",
+    "esModuleInterop": true,
+    "isolatedModules": true,
     "moduleResolution": "node10",
     "jsx": "react-jsx",
     "types": ["jest", "node", "@nx/react/typings/cssmodule.d.ts", "@nx/react/typings/image.d.ts"]

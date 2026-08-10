@@ -4,6 +4,11 @@ import {
   types as SupplierTypes,
 } from '@/supplier/graphql/schemas/supplier';
 import {
+  mutations as OrderMutations,
+  queries as OrderQueries,
+  types as OrderTypes,
+} from '@/supplier/graphql/schemas/order';
+import {
   mutations as ProductMutations,
   queries as ProductQueries,
   types as ProductTypes,
@@ -48,6 +53,7 @@ export const types = `
   ${TypeExtensions}
 
   ${SupplierTypes}
+  ${OrderTypes}
   ${ProductTypes}
   ${ProductSpecificationTypes}
   ${ConfigTypes}
@@ -60,6 +66,7 @@ export const types = `
 
 export const queries = `
   ${SupplierQueries}
+  ${OrderQueries}
   ${ProductQueries}
   ${ProductSpecificationQueries}
   ${ConfigQueries}
@@ -72,6 +79,7 @@ export const queries = `
 
 export const mutations = `
   ${SupplierMutations}
+  ${OrderMutations}
   ${ProductMutations}
   ${ProductSpecificationMutations}
   ${ConfigMutations}

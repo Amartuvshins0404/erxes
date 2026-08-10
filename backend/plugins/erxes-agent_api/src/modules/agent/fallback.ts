@@ -35,7 +35,6 @@ interface FallbackPayload {
   _id?: unknown;
   name?: unknown;
   list?: unknown;
-  candidates?: Array<{ id: string; name: string }>;
   instruction?: string;
   message?: string;
   error?: string;
@@ -46,15 +45,8 @@ function formatFoundCount(count: number): string {
   return `Found ${count} result${count !== 1 ? 's' : ''}.`;
 }
 
-/** Surface a failed payload's own guidance (candidates, instruction, message). */
+/** Surface a failed payload's own guidance (instruction or message). */
 function describeFailedResult(payload: FallbackPayload): string | null {
-  if (payload.candidates?.length) {
-    const names = payload.candidates
-      .map((candidate) => candidate.name)
-      .filter(Boolean)
-      .join(', ');
-    if (names) return `Which one? Available: ${names}.`;
-  }
   if (payload.instruction) return payload.instruction;
   const msg = payload.message || payload.error;
   if (msg) return `Failed: ${msg}`;

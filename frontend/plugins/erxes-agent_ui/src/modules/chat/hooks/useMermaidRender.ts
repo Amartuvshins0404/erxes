@@ -10,7 +10,7 @@ export function sanitizeMermaid(raw: string): string {
   return raw
     .replace(/\r\n/g, '\n')
     .replace(/\r/g, '\n')
-    .replace(/^﻿/, '')
+    .replace(/^\uFEFF/, '')
     .trim()
     .replace(/\[([^\]"[]*[@:/][^\]"[]*)\]/g, '["$1"]');
 }
@@ -128,9 +128,7 @@ export function useMermaidRender(
 
   useEffect(() => {
     let cancelled = false;
-    let timer: ReturnType<typeof setTimeout>;
-
-    timer = setTimeout(async () => {
+    const timer = setTimeout(async () => {
       if (cancelled) return;
       const renderId = `mer-${Math.random().toString(36).slice(2)}`;
       try {

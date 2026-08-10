@@ -7,6 +7,7 @@ import unitCustomResolvers from '@/unit/graphql/resolvers/customResolvers';
 import { BaSupplier } from '@/supplier/profile/graphql/resolvers/customResolvers/supplier';
 import { BaProduct } from '@/supplier/product/graphql/resolvers/customResolvers/product';
 import { membershipTypeResolvers } from '@/membership/graphql/resolvers/queries/membership';
+import CPUser from '@/membership/graphql/resolvers/customResolvers/cpUser';
 
 export const customResolvers = {
   ...unitCustomResolvers,
@@ -18,6 +19,7 @@ export const customResolvers = {
   BaSupplier,
   BaProduct,
   ...membershipTypeResolvers,
+  CPUser,
 
   ...cpCustomResolvers,
 };

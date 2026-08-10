@@ -11,8 +11,8 @@
 //
 // This module redacts secret-bearing values from EVERY operation result before
 // it reaches the model. It is applied at the single execution chokepoint
-// (executeErxesOperation), so both the chat meta-tool and the workflow runtime
-// are covered, and it is value/field-shaped rather than operation-name-based —
+// (executeErxesOperation), so every agent tool path is covered, and it is
+// value/field-shaped rather than operation-name-based —
 // a config query added by any future plugin is redacted automatically, with no
 // allowlist to maintain. It mirrors the provider module's stance (utils/mask.ts:
 // the real apiKey never crosses the GraphQL boundary), extended to arbitrary
@@ -38,7 +38,7 @@ const SECRET_NAME_RE =
   /(password|passwd|passphrase|pwd|secret|token|apikey|accesskey|privatekey|secretkey|signingkey|encryptionkey|clientsecret|credential|connectionstring)/;
 
 // Names that END WITH "key" but are PUBLIC by design (Stripe publishableKey,
-// Langfuse / client-portal / socialpay publicKey, reCAPTCHA siteKey, web-push
+// client-portal / socialpay publicKey, reCAPTCHA siteKey, web-push
 // applicationServerKey). Exempted from the endsWith("key") rule — but ONLY after
 // SECRET_NAME_RE has had first refusal, so PUBLIC_API_KEY-style names (which
 // carry "apikey") still redact.
@@ -67,7 +67,7 @@ const tokenize = (name: string): string[] =>
 //     passwords, while a LEADING "pass" is pass/fail semantics (passRate,
 //     passCount) and stays visible; compass/passenger/bypass never tokenize to a
 //     bare "pass" at all.
-//   • "dsn" in any position → SENTRY_DSN / ERXES_AGENT_EVALUATION_DSN, without
+//   • "dsn" in any position → SENTRY_DSN, without
 //     the substring collisions a normalized match would cause
 //     (CustomFieldsNavigation → "…fieldsnavigation" contains "dsn").
 // Their VALUES are additionally caught by the value-shape pass below.
@@ -119,7 +119,7 @@ export function isSecretName(name: string): boolean {
   if (isDbConnectionName(name)) return true;
   // (3) A name ending in "key" is secret (config.key/golomt, inStoreSPKey/
   // socialpay, serviceAccountKey/firebase) EXCEPT the public-by-design
-  // allowlist. Safe: anything here that ALSO carried a secret fragment already
+  // allowlist. Safe: a name here that ALSO carried a secret fragment already
   // returned at (1). Over-redacting a non-listed field ending in "key" is
   // accepted (security > minor utility).
   if (normalized.endsWith('key')) {

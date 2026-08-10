@@ -1,44 +1,28 @@
 import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
-import { sendTRPCMessage } from 'erxes-api-shared/utils';
 import { executeErxesOperation } from './erxesTools';
-import { parseJsonPreprocess } from './schemaIntrospect';
 import type { OperationMeta, OperationRegistry } from './operationRegistry';
 import { isOperationAllowed, type ToolPolicy } from './scope';
 import {
   destructiveApprovalRequiredResult,
-  destructiveOpsPreapproved,
   isApprovedOperation,
   isDestructiveOperation,
-  type DestructiveOpsPolicy,
 } from './destructiveGuard';
 import {
   isSecurityBlockedOperation,
   securityBlockedResult,
 } from './securityGuard';
 import { redactSecrets } from './secretRedaction';
-import { getCurrentAuth } from '../requestContext';
+import {
+  getCurrentAuth,
+  runMutationSerially,
+  runToolOnce,
+} from '../requestContext';
 import { makeAgentProcessId, type AgentActionInput } from '../auditLog';
 
-/** Model-readable metadata used by the static operation-hint census. */
-export interface ArgFieldSpec {
-  name: string;
-  type: string;
-  required: boolean;
-  enumValues?: string[];
-  requiredNote?: string;
-}
-
-/** One operation argument plus its optional nested input-object shape. */
-export interface ArgSpec extends ArgFieldSpec {
-  description?: string;
-  fields?: Array<ArgFieldSpec | string>;
-}
-
 function coerceArgs(value: unknown): Record<string, unknown> {
-  const parsed = typeof value === 'string' ? parseJsonPreprocess(value) : value;
-  return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-    ? (parsed as Record<string, unknown>)
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
     : {};
 }
 
@@ -63,10 +47,8 @@ export function auditErrorMessage(result: unknown): string {
 export interface ExecutePolicyScopedOperationParams {
   operation: OperationMeta;
   args: Record<string, unknown>;
-  responseFields?: string[];
   registry: OperationRegistry;
   policy: ToolPolicy;
-  destructiveOps: DestructiveOpsPolicy;
   recordAction?: (entry: AgentActionInput) => void;
 }
 
@@ -78,10 +60,8 @@ export interface ExecutePolicyScopedOperationParams {
 export async function executePolicyScopedOperation({
   operation,
   args,
-  responseFields,
   registry,
   policy,
-  destructiveOps,
   recordAction,
 }: ExecutePolicyScopedOperationParams): Promise<unknown> {
   const operationName = operation.operation;
@@ -109,13 +89,8 @@ export async function executePolicyScopedOperation({
   }
 
   const isMutation = operation.operationType === 'mutation';
-  const background = getCurrentAuth()?.background === true;
-  const destructiveAllowed = destructiveOpsPreapproved(
-    destructiveOps,
-    background,
-  );
 
-  if (!destructiveAllowed && isDestructiveOperation(operation)) {
+  if (isDestructiveOperation(operation)) {
     const approvedOps = getCurrentAuth()?.approvedOps;
     if (!isApprovedOperation(operationName, approvedOps)) {
       recordAction?.({
@@ -131,12 +106,10 @@ export async function executePolicyScopedOperation({
   }
 
   const processId = isMutation ? makeAgentProcessId() : undefined;
-  const result = await executeErxesOperation(
-    operation,
-    callArgs,
-    registry,
-    processId,
-    responseFields?.length ? responseFields : undefined,
+  const execute = () =>
+    executeErxesOperation(operation, callArgs, registry, processId);
+  const result = await runToolOnce(operationName, { args: callArgs }, () =>
+    isMutation ? runMutationSerially(execute) : execute(),
   );
 
   if (isMutation) {
@@ -160,12 +133,7 @@ export async function executePolicyScopedOperation({
 }
 
 /** Standalone erxes helpers that remain directly bound beside tool discovery. */
-export function buildErxesSupportTools(params: {
-  policy: ToolPolicy;
-  destructiveOps: DestructiveOpsPolicy;
-}) {
-  const { policy, destructiveOps } = params;
-
+export function buildErxesSupportTools() {
   const requestApproval = createTool({
     id: 'request_approval',
     description:
@@ -192,55 +160,6 @@ export function buildErxesSupportTools(params: {
     }),
   });
 
-  const listConfigKeys = createTool({
-    id: 'list_config_keys',
-    description:
-      'List which erxes configuration codes are currently SET (names only; values are never returned).',
-    inputSchema: z.object({}),
-    outputSchema: z.unknown(),
-    execute: async () => {
-      const subdomain = getCurrentAuth()?.subdomain || '';
-      try {
-        const codes = await sendTRPCMessage({
-          subdomain,
-          pluginName: 'core',
-          module: 'configs',
-          action: 'getCodes',
-          method: 'query',
-          input: {},
-          defaultValue: null,
-        });
-        if (codes == null) {
-          return {
-            success: false,
-            error: 'Could not reach the configuration service.',
-            instruction:
-              'Tell the user the configuration list is temporarily unavailable; do not guess what is configured.',
-          };
-        }
-        const list = Array.isArray(codes) ? codes.map(String) : [];
-        return {
-          total: list.length,
-          codes: list,
-          note: list.length
-            ? 'These configuration codes are set. Values are hidden and cannot be read. To change a config that holds a secret, send only the fields being changed.'
-            : 'No configuration codes are set on this instance.',
-        };
-      } catch {
-        return {
-          success: false,
-          error: 'Could not reach the configuration service.',
-          instruction:
-            'Tell the user the configuration list is temporarily unavailable; do not guess what is configured.',
-        };
-      }
-    },
-  });
-
-  return {
-    ...(policy.mode === 'all' ? { list_config_keys: listConfigKeys } : {}),
-    ...(destructiveOps !== 'allow'
-      ? { request_approval: requestApproval }
-      : {}),
-  };
+  // Every destructive mutation asks for approval; the agent config cannot bypass this.
+  return { request_approval: requestApproval };
 }

@@ -117,6 +117,12 @@ import {
   types as ContractPaymentTypes,
 } from '@/contract/graphql/schemas/payment';
 
+import {
+  mutations as CustomerSyncMutations,
+  queries as CustomerSyncQueries,
+  types as CustomerSyncTypes,
+} from '@/admin/graphql/schemas/customerSync';
+
 export const types = `
   type DeveloperAddress {
     countryCode: String
@@ -192,6 +198,7 @@ export const types = `
   ${StatusTypes}
   ${ContractStatusTypes}
   ${ContractPaymentTypes}
+  ${CustomerSyncTypes}
   `;
 
 export const queries = `
@@ -214,6 +221,7 @@ export const queries = `
   ${StatusQueries}
   ${ContractStatusQueries}
   ${ContractPaymentQueries}
+  ${CustomerSyncQueries}
   `;
 
 export const mutations = `
@@ -236,6 +244,7 @@ export const mutations = `
   ${StatusMutations}
   ${ContractStatusMutations}
   ${ContractPaymentMutations}
+  ${CustomerSyncMutations}
   `;
 
 export default { types, queries, mutations };

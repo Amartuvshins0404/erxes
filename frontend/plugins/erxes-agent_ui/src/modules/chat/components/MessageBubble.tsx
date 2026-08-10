@@ -1,7 +1,6 @@
 import { memo, type ReactNode } from 'react';
 import {
   IconAlertTriangle,
-  IconBolt,
   IconPencil,
   IconRefresh,
   IconRepeat,
@@ -10,14 +9,13 @@ import {
 import { useTranslation } from 'react-i18next';
 import { Tooltip } from 'erxes-ui';
 import { AgentUIMessage, ChatAttachment } from '~/modules/chat/types';
-import { asToolPart, messageText } from '~/modules/chat/lib/uiParts';
+import { messageText } from '~/modules/chat/lib/uiParts';
 import {
   artifactOutcomes,
   mergeArtifacts,
   type Artifact,
 } from '~/modules/chat/lib/artifacts';
 import { AgentAvatar } from '~/modules/chat/components/Avatars';
-import { AgentTrace } from '~/modules/chat/components/AgentTrace';
 import {
   ArtifactCard,
   ArtifactFailureCard,
@@ -27,7 +25,6 @@ import {
   StreamingMarkdown,
 } from '~/modules/chat/components/ChatMarkdown';
 import { CopyButton } from '~/modules/chat/components/CopyButton';
-import { FeedbackButtons } from '~/modules/chat/components/FeedbackButtons';
 import { MessageAttachments } from '~/modules/chat/components/MessageAttachments';
 
 const formatTime = (iso?: string): string =>
@@ -76,22 +73,17 @@ export const MessageBubble = memo(function MessageBubble({
   msg,
   isLast,
   chatLoading,
-  ratingEnabled,
   onRegenerate,
-  onRate,
   onEditMessage,
   onResendMessage,
   persistedMessageId,
   onDeleteMessage,
   storeArtifacts,
-  debug,
 }: {
   msg: AgentUIMessage;
   isLast: boolean;
   chatLoading: boolean;
-  ratingEnabled: boolean;
   onRegenerate: () => void;
-  onRate: (messageId: string, rating: 1 | -1) => void;
   // Load a past user message back into the composer to tweak and send again.
   onEditMessage: (text: string) => void;
   // Send a past user message again as a new turn (text + its attachments).
@@ -101,9 +93,6 @@ export const MessageBubble = memo(function MessageBubble({
   // Persisted artifacts for this message — used when the live tool parts are
   // gone (after a reload), so the inline cards reappear.
   storeArtifacts?: Artifact[];
-  // The agent's debug setting — when on, the trace shows the full tool-call
-  // timeline; off shows only the turn summary + short thoughts.
-  debug?: boolean;
 }) {
   const { t } = useTranslation('mastra');
   const text = messageText(msg);
@@ -166,9 +155,6 @@ export const MessageBubble = memo(function MessageBubble({
   // assistant — a borderless, full-width reading column (no bubble), so long
   // answers read like a document and the width stays put while a reply streams.
   const streaming = isLast && chatLoading;
-  const turnParts = msg.parts.filter(
-    (p) => p.type === 'reasoning' || !!asToolPart(p),
-  );
   // Charts and generated documents surface as prominent ArtifactCards (with a
   // Preview-panel opener), not buried in the collapsed thinking section. Live
   // turns read them off the tool parts, merged with the persisted store rows
@@ -195,12 +181,6 @@ export const MessageBubble = memo(function MessageBubble({
     !text &&
     artifacts.length === 0 &&
     failedArtifactTools.length === 0;
-  const activeSkills = msg.metadata?.activeSkills;
-  const messageId = msg.metadata?.messageId;
-  const handleRate =
-    ratingEnabled && messageId
-      ? (rating: 1 | -1) => onRate(messageId, rating)
-      : undefined;
 
   return (
     <div className="flex justify-start items-start gap-3 group ea-msg-in">
@@ -213,36 +193,13 @@ export const MessageBubble = memo(function MessageBubble({
           streaming || artifacts.length > 0 ? 'w-full' : 'w-auto max-w-full'
         }`}
       >
-        {activeSkills && activeSkills.length > 0 && (
-          <div className="flex flex-wrap items-center gap-1 mb-1.5">
-            {activeSkills.map((name) => (
-              <span
-                key={name}
-                className="inline-flex items-center gap-1 rounded-full bg-primary/10 text-primary px-2 py-0.5 text-[10px] font-medium"
-                title={`Skill "${name}" was applied to this reply`}
-              >
-                <IconBolt className="size-3" />
-                {name}
-              </span>
-            ))}
-          </div>
-        )}
-        {(turnParts.length > 0 || msg.metadata?.turnSummary) && (
-          <AgentTrace
-            parts={turnParts}
-            streaming={streaming}
-            summaries={msg.metadata?.reasoningSummaries}
-            turnSummary={msg.metadata?.turnSummary}
-            debug={debug}
-          />
-        )}
         {text ? (
           streaming ? (
             <StreamingMarkdown content={text} />
           ) : (
             <ChatMarkdown content={text} />
           )
-        ) : streaming && !turnParts.length ? (
+        ) : streaming && artifacts.length === 0 ? (
           <div className="flex items-center gap-1.5 py-1">
             <span className="ea-typing-dot" />
             <span className="ea-typing-dot" />
@@ -315,12 +272,6 @@ export const MessageBubble = memo(function MessageBubble({
                   icon={<IconRefresh className="size-3.5" />}
                   label="Regenerate"
                   onClick={onRegenerate}
-                />
-              )}
-              {handleRate && (
-                <FeedbackButtons
-                  rating={msg.metadata?.rating}
-                  onRate={handleRate}
                 />
               )}
               <CopyButton text={text} />

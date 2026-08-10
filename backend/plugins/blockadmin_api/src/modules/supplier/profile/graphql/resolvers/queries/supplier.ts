@@ -1,6 +1,7 @@
 import { IContext } from '~/connectionResolvers';
 import { SupplierQueryParams } from '@/supplier/profile/@types/supplier';
 import { ICursorPaginateParams } from 'erxes-api-shared/core-types';
+import { markResolvers } from 'erxes-api-shared/utils';
 
 export const supplierQueries = {
   baSupplierDetail: async (
@@ -19,3 +20,9 @@ export const supplierQueries = {
     return models.Supplier.listSuppliers(params);
   },
 };
+
+markResolvers(supplierQueries, {
+  wrapperConfig: {
+    forClientPortal: true,
+  },
+})

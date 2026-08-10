@@ -21,6 +21,8 @@ export const types = `
     attachments: [String]
     urls: [String]
     registrationNumber: String
+    industry: String
+    productsCount: Int
     address: JSON
     primaryEmail: String
     primaryPhone: String

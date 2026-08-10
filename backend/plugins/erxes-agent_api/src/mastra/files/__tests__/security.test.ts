@@ -28,12 +28,15 @@ describe('fetchAttachmentBuffer — key is a storage key, never a URL (finding A
   });
 
   it("reads a real storage key through core's internal /read-file endpoint", async () => {
-    const spy = jest.fn(async () => ({
-      ok: true,
-      status: 200,
-      headers: new Headers({ 'content-type': 'text/plain' }),
-      arrayBuffer: async () => new TextEncoder().encode('data').buffer,
-    }));
+    const spy = jest.fn<ReturnType<typeof fetch>, Parameters<typeof fetch>>(
+      async () =>
+        ({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'text/plain' }),
+          arrayBuffer: async () => new TextEncoder().encode('data').buffer,
+        } as Response),
+    );
     global.fetch = spy as unknown as typeof fetch;
 
     const { buffer } = await fetchAttachmentBuffer({

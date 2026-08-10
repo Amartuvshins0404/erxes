@@ -1,13 +1,9 @@
 export const types = `
-  enum BlockAdminContractPartyType {
-    customer
-    company
-  }
-
   enum BlockAdminContractStatus {
+    reserved
     draft
     signed
-    completed
+    lost
     cancelled
   }
 
@@ -18,18 +14,28 @@ export const types = `
   }
 
   type BlockAdminContractPaymentPlan {
-    type: BlockAdminProjectPaymentPlanType!
     downPaymentPercentage: Float
+    downPaymentAmount: Float
+    barterPercentage: Float
+    barterAmount: Float
     interestPercentage: Float
     interestType: BlockAdminContractInterestType
     completionPaymentPercentage: Float
+    completionPaymentAmount: Float
     discountPercentage: Float
     description: String
     installment: Int
     frequency: BlockAdminProjectPaymentPlanFrequency
     penaltyPercentage: Float
     vatIncluded: Boolean
+    roundedInstallmentAmount: Float
+    installmentAmounts: [Float]
     paymentDates: [Int]
+    paymentDueDates: [Date]
+    firstPaymentDate: Date
+    downPaymentDate: Date
+    completionPaymentDate: Date
+    completionPaymentDateLabel: String
   }
 
   enum BlockAdminContractAmountType {
@@ -47,14 +53,9 @@ export const types = `
     amountType: BlockAdminContractAmountType
     status: BlockAdminContractStatus
     isLifeTime: Boolean
-    party: BlockAdminContractParty
+    customerId: String
     paymentPlan: BlockAdminContractPaymentPlan
     user: String
-  }
-
-  type BlockAdminContractParty {
-    type: BlockAdminContractPartyType
-    id: String
   }
 `;
 

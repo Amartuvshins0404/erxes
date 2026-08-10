@@ -16,11 +16,8 @@ jest.mock('@mastra/core/tools', () => ({
   createTool: (config: unknown) => config,
 }));
 
-// erxes-api-shared is mocked so nothing hits a live core. sendTRPCMessage is a
-// jest.fn() created INSIDE the factory (avoids TDZ/hoist issues); we grab the
-// mocked reference via the import below and drive it per-test.
+// erxes-api-shared is mocked so nothing hits a live core.
 jest.mock('erxes-api-shared/utils', () => ({
-  sendTRPCMessage: jest.fn(),
   getPlugins: jest.fn(async () => []),
   getPluginAddress: jest.fn(async () => 'http://127.0.0.1:59999'),
 }));
@@ -31,11 +28,7 @@ import {
   type ErxesOperationRef,
   type GqlArgDef,
 } from '../erxesTools';
-import { buildErxesSupportTools } from '../metaTools';
-import { sendTRPCMessage } from 'erxes-api-shared/utils';
 import { runWithAuth } from '../../requestContext';
-
-const mockSend = sendTRPCMessage as unknown as jest.Mock;
 
 // -----------------------------------------------------------------------------
 // SECTION 3 (foundational): isSecretName — the name-level predicate.
@@ -272,7 +265,7 @@ describe('redactSecrets — keeps benign data visible', () => {
   it('keeps PUBLIC keys visible by design', () => {
     const input = {
       publishableKey: 'pk_live_ABC123',
-      publicKey: 'pk-lf-123', // Langfuse public key
+      publicKey: 'public-key-123',
       siteKey: 'recaptcha-site-key',
     };
     const out = redactSecrets(input);
@@ -437,77 +430,4 @@ describe('executeErxesOperation — secret-reference reject-guard', () => {
       expect(reachedGateway(r)).toBe(true);
     },
   );
-});
-
-// -----------------------------------------------------------------------------
-// SECTION 5: names-only configuration support tool.
-//   - list_config_keys returns NAMES only; PRESENT for mode 'all', ABSENT for 'custom'.
-//   - support failure is explicit, never misreported as an empty config set.
-// -----------------------------------------------------------------------------
-describe('buildErxesSupportTools / list_config_keys', () => {
-  interface ExecutableTool {
-    execute(input: Record<string, never>): Promise<unknown>;
-  }
-
-  const build = (mode: 'all' | 'custom') =>
-    buildErxesSupportTools({
-      policy: { mode, allowed: [] },
-      destructiveOps: 'ask',
-    });
-  beforeEach(() => {
-    mockSend.mockReset();
-  });
-
-  it('keeps approval support in both policy modes', () => {
-    expect(build('all').request_approval).toBeTruthy();
-    expect(build('custom').request_approval).toBeTruthy();
-  });
-
-  it('list_config_keys PRESENT for mode "all", ABSENT for mode "custom"', () => {
-    const all = build('all');
-    const custom = build('custom');
-    expect(all.list_config_keys).toBeTruthy();
-    expect(custom.list_config_keys).toBeUndefined();
-  });
-
-  it('list_config_keys returns ONLY config code NAMES (no secret values)', async () => {
-    mockSend.mockResolvedValue(['CLOUDFLARE_API_TOKEN', 'MAIL_HOST']);
-    const tool = build('all').list_config_keys as unknown as
-      | ExecutableTool
-      | undefined;
-    expect(tool).toBeDefined();
-    if (!tool) throw new Error('list_config_keys tool missing');
-    const r = await tool.execute({});
-    const s = JSON.stringify(r);
-    expect(s).toContain('CLOUDFLARE_API_TOKEN');
-    expect(s).toContain('MAIL_HOST');
-    // No value / redaction marker should ever be present in a names-only listing:
-    expect(s).not.toContain(REDACTED);
-    // Not a failure result on the happy path:
-    if (r && typeof r === 'object' && 'success' in r) {
-      expect(r.success).not.toBe(false);
-    }
-  });
-
-  it('list_config_keys reports FAILURE (not "nothing configured") when core returns null', async () => {
-    mockSend.mockResolvedValue(null); // configured default -> core unreachable/empty
-    const tool = build('all').list_config_keys as unknown as
-      | ExecutableTool
-      | undefined;
-    expect(tool).toBeDefined();
-    if (!tool) throw new Error('list_config_keys tool missing');
-    const r = await tool.execute({});
-    expect(r).toMatchObject({ success: false });
-  });
-
-  it('list_config_keys reports FAILURE when core rejects', async () => {
-    mockSend.mockRejectedValue(new Error('core down'));
-    const tool = build('all').list_config_keys as unknown as
-      | ExecutableTool
-      | undefined;
-    expect(tool).toBeDefined();
-    if (!tool) throw new Error('list_config_keys tool missing');
-    const r = await tool.execute({});
-    expect(r).toMatchObject({ success: false });
-  });
 });

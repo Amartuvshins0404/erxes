@@ -1,6 +1,6 @@
 /**
  * The operation registry is the single source every discovery surface (search,
- * capability inventory, workflow step resolution, the tool-listing UI) reads
+ * capability inventory and the tool-listing UI) reads
  * from. Security-blocked operations must be stripped here so none of those
  * surfaces can reveal or resolve them. Network introspection is mocked.
  */

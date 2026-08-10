@@ -1,8 +1,8 @@
 // ---------------------------------------------------------------------------
 // Lazy, tool-less one-shot ("stateless") Mastra agents.
 //
-// Several extraction paths (working-memory refresh, learning distillation) need
-// a small agent that can never emit a tool call and runs a single generate per
+// Working-memory refresh needs a small agent that can never emit a tool call
+// and runs a single generate per
 // invocation. They all build the same thing: a tool-less Agent, cached per
 // id+provider+model (+ processor pipeline), built lazily so @mastra/core and the
 // provider/model builder load only when an extraction actually runs.

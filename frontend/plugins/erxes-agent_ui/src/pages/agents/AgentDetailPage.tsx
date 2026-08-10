@@ -8,39 +8,18 @@ import {
   useNavigate,
   useParams,
 } from 'react-router-dom';
-import {
-  IconBook2,
-  IconBulb,
-  IconRobot,
-  IconSettings,
-  IconSitemap,
-} from '@tabler/icons-react';
-import { Breadcrumb, Button, Separator, Spinner, Tabs } from 'erxes-ui';
+import { IconRobot, IconSettings } from '@tabler/icons-react';
+import { Breadcrumb, Button, Spinner, Tabs } from 'erxes-ui';
 import { PageHeader } from 'ui-modules';
 import { useAgent } from './hooks/useAgent';
 import { useAgentsBasePath } from './hooks/useAgentsBasePath';
-import { AgentSkillsTab } from './components/AgentSkillsTab';
 
-// Existing resource pages are embedded and scoped to the canonical team-member
-// id, alongside skills, learnings, and settings.
-const WorkflowsIndexPage = lazy(() =>
-  import('~/pages/workflows/WorkflowsIndexPage').then((m) => ({
-    default: m.WorkflowsIndexPage,
-  })),
-);
-const LearningsIndexPage = lazy(() =>
-  import('~/pages/learnings/LearningsIndexPage').then((m) => ({
-    default: m.LearningsIndexPage,
-  })),
-);
+// The full editor is scoped to the canonical team-member id.
 const AgentFormPage = lazy(() =>
   import('./AgentFormPage').then((m) => ({ default: m.AgentFormPage })),
 );
 
 const TABS = [
-  { value: 'workflows', label: 'Workflows', icon: IconSitemap },
-  { value: 'skills', label: 'Skills', icon: IconBook2 },
-  { value: 'learnings', label: 'Learnings', icon: IconBulb },
   { value: 'config', label: 'Settings', icon: IconSettings },
 ] as const;
 
@@ -60,7 +39,7 @@ export const AgentDetailPage = () => {
   // Active tab = the trailing path segment; anything else falls back so the
   // Settings redirect below (index route) can normalize it.
   const lastSegment = pathname.split('/').filter(Boolean).pop() ?? '';
-  const activeTab: TabValue = isTab(lastSegment) ? lastSegment : 'workflows';
+  const activeTab: TabValue = isTab(lastSegment) ? lastSegment : 'config';
 
   const detailBase = `${basePath}/${id}`;
 
@@ -96,8 +75,6 @@ export const AgentDetailPage = () => {
               </Breadcrumb.Item>
             </Breadcrumb.List>
           </Breadcrumb>
-          <Separator.Inline />
-          <PageHeader.FavoriteToggleButton />
         </PageHeader.Start>
       </PageHeader>
 
@@ -126,26 +103,9 @@ export const AgentDetailPage = () => {
           }
         >
           <Routes>
-            <Route index element={<Navigate to="workflows" replace />} />
-            <Route
-              path="workflows"
-              element={<WorkflowsIndexPage agentId={agent._id} embedded />}
-            />
-            <Route
-              path="skills"
-              element={
-                <AgentSkillsTab
-                  agentId={agent._id}
-                  skills={agent.skills ?? []}
-                />
-              }
-            />
-            <Route
-              path="learnings"
-              element={<LearningsIndexPage agentId={agent._id} embedded />}
-            />
+            <Route index element={<Navigate to="config" replace />} />
             <Route path="config" element={<AgentFormPage embedded />} />
-            <Route path="*" element={<Navigate to="workflows" replace />} />
+            <Route path="*" element={<Navigate to="config" replace />} />
           </Routes>
         </Suspense>
       </div>

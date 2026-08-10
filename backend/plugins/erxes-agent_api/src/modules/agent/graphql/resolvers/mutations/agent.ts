@@ -22,6 +22,7 @@ import {
 import { resolveAgentPermissions } from '~/mastra/tools/permissionCapabilities';
 import { ERXES_AGENT_ACTIONS } from '~/meta/permissionActions';
 import { toUserFacingAgentError } from './agentErrors';
+import { normalizeAdditionalToolKeys } from '~/mastra/tools/additionalTools';
 
 const assertPermissionGroupsExist = async (
   subdomain: string,
@@ -98,7 +99,7 @@ const resolveAgentGrant = async (
   };
 };
 
-const MAX_AUDIENCE_IDS_PER_TYPE = 250;
+const MAX_AUDIENCE_IDS = 250;
 const MAX_AUDIENCE_ID_LENGTH = 128;
 
 const normalizeAudienceIds = (
@@ -106,15 +107,13 @@ const normalizeAudienceIds = (
   existing: string[] | undefined,
 ): string[] => {
   const ids = requested ?? existing ?? [];
-  if (ids.length > MAX_AUDIENCE_IDS_PER_TYPE) {
+  if (ids.length > MAX_AUDIENCE_IDS) {
     throw new ExpectedError(
-      `An audience may include at most ${MAX_AUDIENCE_IDS_PER_TYPE} targets of each type.`,
+      `A shared agent may include at most ${MAX_AUDIENCE_IDS} people.`,
     );
   }
 
-  const normalized = [
-    ...new Set(ids.map((id) => id.trim()).filter(Boolean)),
-  ];
+  const normalized = [...new Set(ids.map((id) => id.trim()).filter(Boolean))];
   if (normalized.some((id) => id.length > MAX_AUDIENCE_ID_LENGTH)) {
     throw new ExpectedError('Audience identifiers are invalid.');
   }
@@ -131,29 +130,14 @@ const normalizeAgentAudience = (
     profile.audienceUserIds,
     existing?.audienceUserIds,
   );
-  const audienceTeamIds = normalizeAudienceIds(
-    profile.audienceTeamIds,
-    existing?.audienceTeamIds,
-  );
-  const audienceDepartmentIds = normalizeAudienceIds(
-    profile.audienceDepartmentIds,
-    existing?.audienceDepartmentIds,
-  );
-  const hasAudience =
-    audienceUserIds.length > 0 ||
-    audienceTeamIds.length > 0 ||
-    audienceDepartmentIds.length > 0;
-  if (visibility === 'shared' && !hasAudience) {
+  if (visibility === 'shared' && !audienceUserIds.length) {
     throw new ExpectedError(
-      'Select at least one person, team, or department for a shared AI team member.',
+      'Select at least one person for a shared AI team member.',
     );
   }
-  const isShared = visibility === 'shared';
   return {
     visibility,
-    audienceUserIds: isShared ? audienceUserIds : [],
-    audienceTeamIds: isShared ? audienceTeamIds : [],
-    audienceDepartmentIds: isShared ? audienceDepartmentIds : [],
+    audienceUserIds: visibility === 'shared' ? audienceUserIds : [],
   };
 };
 
@@ -162,8 +146,6 @@ const toAgentView = (profile: IMastraAgentDocument, account: AgentAccount) => ({
   _id: profile._id,
   visibility: profile.visibility ?? 'organization',
   audienceUserIds: profile.audienceUserIds ?? [],
-  audienceTeamIds: profile.audienceTeamIds ?? [],
-  audienceDepartmentIds: profile.audienceDepartmentIds ?? [],
   accountName:
     account.details?.fullName ||
     account.username ||
@@ -172,6 +154,7 @@ const toAgentView = (profile: IMastraAgentDocument, account: AgentAccount) => ({
   accountDescription: account.details?.description || '',
   permissionGroupIds: account.permissionGroupIds || [],
   isActive: account.isActive !== false,
+  additionalTools: normalizeAdditionalToolKeys(profile.additionalTools),
 });
 
 const splitInput = (doc: IMastraAgentInput) => {
@@ -240,8 +223,7 @@ export const agentMutations = {
           createdBy: user._id,
           visibility: audience.visibility,
           audienceUserIds: audience.audienceUserIds,
-          audienceTeamIds: audience.audienceTeamIds,
-          audienceDepartmentIds: audience.audienceDepartmentIds,
+          additionalTools: normalizeAdditionalToolKeys(profile.additionalTools),
           permissionMode: grant.mode,
         },
       );
@@ -296,11 +278,14 @@ export const agentMutations = {
     }
 
     const nextProfile: Partial<IMastraAgent> = { ...profile };
+    if (profile.additionalTools !== undefined) {
+      nextProfile.additionalTools = normalizeAdditionalToolKeys(
+        profile.additionalTools,
+        [],
+      );
+    }
     const sharingChanged =
-      profile.visibility !== undefined ||
-      profile.audienceUserIds !== undefined ||
-      profile.audienceTeamIds !== undefined ||
-      profile.audienceDepartmentIds !== undefined;
+      profile.visibility !== undefined || profile.audienceUserIds !== undefined;
     if (sharingChanged) {
       await checkPermission(ERXES_AGENT_ACTIONS.agent.share);
       await requireScopedAgent({

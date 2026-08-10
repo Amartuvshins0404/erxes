@@ -2,11 +2,7 @@ import { ExpectedError } from 'erxes-api-shared/utils';
 import { IContext } from '~/connectionResolvers';
 import { prepareChatTurn, persistTurn, runAgentTurn } from '@/agent/turn';
 import { IMastraAgentDocument } from '@/agent/@types/agent';
-import {
-  agentAccessFilter,
-  requireScopedAgent,
-  resolveAgentAudienceTeamIds,
-} from '@/agent/authorization';
+import { agentAccessFilter, requireScopedAgent } from '@/agent/authorization';
 import { requireActionScope } from '@/_shared/authorization';
 import { requireUserId } from '@/_shared/auth';
 import { ERXES_AGENT_ACTIONS } from '~/meta/permissionActions';
@@ -17,6 +13,10 @@ import {
   findCoreUsers,
   isAgentAccount,
 } from '~/mastra/auth/servicePrincipal';
+import {
+  ADDITIONAL_TOOL_KEYS,
+  normalizeAdditionalToolKeys,
+} from '~/mastra/tools/additionalTools';
 
 const hydrateProfiles = async (
   profiles: IMastraAgentDocument[],
@@ -43,8 +43,7 @@ const hydrateProfiles = async (
         _id: profile._id,
         visibility: profile.visibility ?? 'organization',
         audienceUserIds: profile.audienceUserIds ?? [],
-        audienceTeamIds: profile.audienceTeamIds ?? [],
-        audienceDepartmentIds: profile.audienceDepartmentIds ?? [],
+        additionalTools: normalizeAdditionalToolKeys(profile.additionalTools),
         accountName: agentAccountName(account),
         accountDescription: account.details?.description || '',
         permissionGroupIds: account.permissionGroupIds || [],
@@ -89,6 +88,14 @@ const hydrateProfile = async (
 };
 
 export const agentQueries = {
+  mastraAgentAdditionalTools: async (
+    _parent: undefined,
+    _args: undefined,
+    { checkPermission }: IContext,
+  ) => {
+    await checkPermission(ERXES_AGENT_ACTIONS.agent.readSummary);
+    return ADDITIONAL_TOOL_KEYS;
+  },
   mastraAgents: async (
     _parent: undefined,
     _args: undefined,
@@ -101,9 +108,8 @@ export const agentQueries = {
       user,
       action: ERXES_AGENT_ACTIONS.agent.readSummary,
     });
-    const teamIds = await resolveAgentAudienceTeamIds(subdomain, user, scope);
     const profiles = await models.MastraAgent.getAgents(
-      agentAccessFilter(user, scope, teamIds),
+      agentAccessFilter(user, scope),
     );
     return hydrateProfiles(profiles, subdomain);
   },
@@ -137,8 +143,7 @@ export const agentQueries = {
       user,
       action: ERXES_AGENT_ACTIONS.agent.readSummary,
     });
-    const teamIds = await resolveAgentAudienceTeamIds(subdomain, user, scope);
-    const filter = agentAccessFilter(user, scope, teamIds);
+    const filter = agentAccessFilter(user, scope);
     const allProfiles = params.searchValue
       ? await models.MastraAgent.getAgents(filter)
       : [];
@@ -190,19 +195,16 @@ export const agentQueries = {
       message,
       authCtx,
       memory: memoryBinding,
+      activeTools: prepared.activeTools,
+      turnInstructions: prepared.turnInstructions,
     });
 
-    await persistTurn({ models, prepared, reply });
+    await persistTurn({
+      models,
+      prepared,
+      reply,
+      hasArtifacts: (prepared.authCtx.artifactCount ?? 0) > 0,
+    });
     return reply;
-  },
-};
-
-export const agentCustomResolvers = {
-  MastraAgent: {
-    workflowsCount: async (
-      agent: IMastraAgentDocument,
-      _args: unknown,
-      { models }: IContext,
-    ) => await models.MastraWorkflow.countDocuments({ agentId: agent._id }),
   },
 };

@@ -17,6 +17,7 @@ import { blockNoteQueries } from '@/note/graphql/resolvers/queries/note';
 import { statusQueries } from '@/oppty/graphql/queries/status';
 import { contractStatusQueries } from '@/contract/graphql/resolvers/queries/status';
 import { contractPaymentQueries } from '@/contract/graphql/resolvers/queries/payment';
+import { customerSyncQueries } from '@/admin/graphql/resolvers/queries/customerSync';
 
 export const queries = {
   ...blockNoteQueries,
@@ -38,4 +39,5 @@ export const queries = {
   ...statusQueries,
   ...contractStatusQueries,
   ...contractPaymentQueries,
+  ...customerSyncQueries,
 };

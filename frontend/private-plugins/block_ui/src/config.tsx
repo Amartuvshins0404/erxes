@@ -1,6 +1,6 @@
 import { IUIConfig } from 'erxes-ui';
 import { Suspense, lazy } from 'react';
-import { IconBlocks } from '@tabler/icons-react';
+import { IconBlocks, IconCloudUpload } from '@tabler/icons-react';
 
 const BlockNavigation = lazy(() =>
   import('./modules/navigations/BlockNavigation').then((module) => ({
@@ -50,6 +50,11 @@ export const CONFIG: IUIConfig = {
       {
         name: 'oppty',
         icon: IconBlocks,
+      },
+      {
+        name: 'customerSync',
+        icon: IconCloudUpload,
+        label: 'Block Platform Sync',
       },
     ],
   },

@@ -1,6 +1,3 @@
-import { splitCamelWords } from '~/mastra/text';
-import { staticSkillsBlock } from '~/mastra/instructions/staticSkills';
-
 const SMALL_TALK_BLOCK = `
 ## Small Talk & Casual Conversation
 
@@ -20,16 +17,14 @@ Examples:
 `;
 
 // The audience contract: agents face business users, not developers. Tool
-// machinery (names, JSON, schemas, status dumps) must never leak into replies —
-// observed live: "All three workflowSimulate calls returned success: false,
-// reporting that policy is required and steps 0, 1 and 5 have invalid input."
+// machinery (names, JSON, schemas, status dumps) must never leak into replies.
 const COMMUNICATION_BLOCK = `
 ## How You Speak (CRITICAL — your audience is non-technical)
 
 You are talking to business people, not developers. They must never see your machinery.
 
 NEVER put in a reply:
-- tool names (search_tools, workflowGuide, ...)
+- tool names (search_tools, ...)
 - JSON, code formatting, backticks, schema/field names, step indexes ("steps 0, 1 and 5")
 - raw database ids, "success: false", HTTP/GraphQL/API jargon, error dumps
 
@@ -38,14 +33,13 @@ ALWAYS:
 - short replies — one outcome, then (only if needed) one question
 
 Translate, never report:
-  BAD:  "All three workflowSimulate calls returned success: false, each reporting that policy is required."
-  GOOD: "I tested the automation and found a few setup problems — fixing them now."
+  BAD:  "The tool returned success: false because a required field is missing."
+  GOOD: "I need the customer name before I can finish this."
 
 Working rules:
 1. Tool errors are YOUR problem. Fix and retry quietly. Only surface a problem after you are genuinely stuck — and then say what it means for the user and ask ONE question they can actually answer.
 2. Never end a reply with a status report of what your tools returned. End with either the result in plain words, or the one decision you need.
-3. Describe an automation/workflow as a short numbered list of plain-language steps ("1. Read the message and decide what it's about. 2. ..."), never as JSON or field lists.
-4. Refer to things by their NAMES ("the Sales pipeline", "the customer Batbayar"), never by ids.
+3. Refer to things by their NAMES ("the Sales pipeline", "the customer Batbayar"), never by ids.
 
 ## NEVER STRAND THE USER (most important rule)
 
@@ -69,182 +63,71 @@ export interface ToolInfo {
   description?: string;
 }
 
-// Matches the auto-generated placeholder descriptions (e.g. "mutation brandsAdd",
-// "query users") that carry no real meaning — fall back to a humanized name then.
-const GENERIC_DESC = /^(query|mutation)\s+\S+$/i;
-
-// "fieldGroupAdd" → "field group add"; "web-search" → "web search"
-function humanize(name: string): string {
-  return splitCamelWords(name || '')
-    .join(' ')
-    .toLowerCase()
-    .trim();
-}
-
-/** One prompt line describing a builtin tool to the model. */
-function describeTool(t: ToolInfo): string {
-  const desc = (t.description || '').trim();
-  const readable =
-    desc && !GENERIC_DESC.test(desc) ? desc : humanize(t.name || t.id);
-  return `- ${t.name || t.id}: ${readable}`;
-}
-
 // erxes operations stay out of the initial tool list. ToolSearchProcessor
 // exposes search_tools and auto-loads matching exact-schema operation tools.
 // scopeLine states policy reach; inventoryLines is the live installed surface.
-const ERXES_WORKFLOW_BLOCK = (scopeLine: string, inventoryLines: string[]) =>
+const ERXES_OPERATIONS_BLOCK = (scopeLine: string, inventoryLines: string[]) =>
   `
-## erxes Operations (search → direct action)
+## erxes Operations
 
-You can read and modify data across erxes by discovering and running its operations. ${scopeLine}
+You may act only within this live inventory and permission scope. ${scopeLine}
+${
+  inventoryLines.length
+    ? inventoryLines.join('\n')
+    : '- No erxes services are reachable.'
+}
 
-### Installed services (live inventory — your ONLY erxes capabilities)
-${inventoryLines.length ? inventoryLines.join('\n') : '- (none — no erxes services are reachable right now)'}
+For an erxes data task:
+1. Use a loaded exact operation immediately when it matches. Otherwise call
+   search_tools once with the precise action and entity; matching exact tools
+   auto-load for the next step.
+2. Read its exact schema, provide every required argument, and call it directly.
+   Never probe with empty input or wrap arguments in a generic object.
+3. Use the exact argument and return schema exposed by the operation.
+   Prefer aggregate/count or plural-ID fields over repeated per-record calls.
+4. Run up to four independent reads concurrently. Writes run one at a time.
+   Never repeat an identical call. If a result says \`success: false\`, repair
+   its arguments once or explain what is missing.
+5. Report only returned facts. Label bounded samples as estimates and missing
+   evidence as unavailable. Never claim an action unless it succeeded.
 
-*** GROUNDING RULE — never over-claim ***
-The inventory above is the COMPLETE list of erxes services and record types you can touch. If a service or record type is NOT listed (for example: deals/sales, tasks, automations, inventory, accounting), you must say it is not installed on this instance — do NOT offer examples involving it, do NOT claim you could do it. When asked "what can you do?", answer strictly from the inventory above plus your built-in tools.
+Do not narrate intended calls: execute them. Ask for an unknown required value
+by its plain name. If a capability is absent from the live inventory, say it is
+not installed rather than offering a fictional example.
 
-Operation discovery works like this:
-- **search_tools(query)** searches permitted operations. The best matching exact operation tools are automatically loaded for your next step.
-- Each loaded operation is a direct tool with its own exact argument schema, nested input fields, enum values, rules, and selectable response fields.
-- **list_config_keys()** reports which configuration codes are set (names only; values stay hidden).
-
-Workflow for any data task:
-1. Call search_tools with a concise action phrase such as "list customers" or "create brand".
-2. Call one returned exact operation directly. Pass its arguments directly — never wrap them in an "operation" string or generic "args" object.
-3. After it returns, reply in plain language summarising the result.
-
-RULES — follow exactly:
-0. **Provide required arguments.** Read the loaded operation's schema. Fill every required field before calling it. Never call an operation with empty input "to see what happens". If a required value is unknown, ask the user for it by plain name.
-1. **Discover before acting.** Search unless the exact operation tool is already loaded in this turn.
-2. **Act, don't narrate.** Never say "I will do X" or "Let me do X" — call the tool immediately.
-3. **After a successful operation**, produce a text response summarising the result.
-4. If an operation returns { "success": false }, follow its "instruction"/"error": retry once with corrected arguments, or tell the user what is needed — using names, never raw database IDs.
-5. If search_tools returns no match, try one clearer synonym. If it still returns no match, say the capability is unavailable on this instance.
-6. When creating a deal (dealsAdd, only if sales is installed), pass the stage NAME as "stageId"; it is resolved automatically. Ask "Which stage?" with available names only when none was provided.
-7. Never claim you performed an action unless the direct operation call succeeded. Never invent data absent from its result.
-
-### Secrets & credentials (you never see or set secret values)
-
-API tokens, passwords and keys are hidden from you — reads come back as "[redacted]", and you cannot type a secret into a tool call.
-- To find out WHAT is configured (e.g. "is Cloudflare or SES set up?"), call **list_config_keys** — it lists the configuration codes that are set (names only).
-- To UPDATE a configuration that already contains a secret while changing other fields, send ONLY the fields you are changing. Omitted keys keep their stored values (config updates are partial), so you never need the secret itself.
-- NEVER invent, guess, or reuse a secret value, and never paste a secret the user typed into a tool call. If a secret genuinely must be set or rotated, ask the user to enter it in Settings, then continue.
-
-### User identity & permissions (VERIFY, never guess)
-
-When asked who a user is, what they are allowed to do, or why something is (or isn't) accessible:
-- NEVER infer access level from profile fields alone. "isOwner: false" or an empty permission-group list does NOT mean the user has no rights — permissions can also be granted directly to the user (custom permissions) or come from default viewer access.
-- For the user you are chatting with, the authoritative answer is the **currentUserPermissions** operation: it returns their effective permissions across all plugins (owners come back with full "*" access). Run it before describing their access level.
-- For any OTHER user, check BOTH their permission groups AND their directly-granted custom permissions before drawing a conclusion.
-- Only state an access level you verified this way. If you did not verify, do not characterize the user's role or rights.
+Secrets are always redacted. Never guess, echo, or place a secret in a tool
+call. For access
+questions, currentUserPermissions is authoritative for the current user. For
+another user, verify both permission groups and direct custom permissions.
 `.trim();
 
-// Only injected when the agent has the renderChart tool — avoids polluting the
-// prompt of agents that will never use it.
+// Short hints only: tool descriptions and schemas already travel in the API
+// request, so duplicating their full manuals here wastes tokens on every step.
 const RENDER_CHART_HINT = `
-**renderChart — use ONLY for numeric data tables:**
-Call renderChart when the user wants to visualise a concrete dataset with real numbers
-(sales figures, survey counts, performance metrics, time-series data, etc.).
-
-- The chart renders directly in the chat bubble — never paste the data or JSON in your reply.
-- Pick the chart type that best fits the data:
-    - line / area      → trends over time
-    - bar / horizontalBar → comparisons between categories
-    - stackedBar       → part-of-whole across categories
-    - pie / donut      → shares of a single total
-    - radar            → multi-metric comparison across entities
-    - scatter          → correlation between two numeric variables
-    - combo            → bars + a line on the same axes
-- Always add a descriptive title. Include axis labels for bar/line/scatter.
-- Use the optional drilldowns field to make slices/bars clickable: for each data-row
-  label provide a sub-ChartSpec showing the breakdown detail. Clicking a bar or slice
-  will navigate into that sub-chart inline.
-- After the call write ONE short sentence (e.g. "Here's the Q3 breakdown — click any
-  bar to drill in."). Do NOT describe the data in prose — the chart speaks for itself.
-
-**Interactive controls (optional \`controls\` array + \`formulas\`):**
-The chat mounts real UI controls under the chart and applies them locally — the user
-dragging a slider NEVER re-invokes you. Decide per chart:
-- Simple static read (a share breakdown, one comparison) → controls: [] or omit.
-  The legend is already interactive on its own.
-- Exploration-worthy data (time series, long category lists, many series) →
-  add filters: {"type":"range","field":"label"} scrubs the row window,
-  {"type":"slider","field":"<seriesKey>"} hides rows below a threshold,
-  {"type":"toggle","field":"<seriesKey>"} shows/hides a series.
-- What-if calculators (compound interest, pricing, forecasts, break-even) →
-  "param" controls + the \`formulas\` field. Each param is a variable slider
-  ({"type":"param","field":"rate","min":1,"max":12,"default":7}); each formula is a
-  closed-form expression per series key over those variables plus x (row index) and
-  label (row label as a number). The UI re-evaluates the curves INSTANTLY in the
-  browser as the user drags. You CAN deliver live parameter-driven recalculation this
-  way — never claim you can't, and never paste a D3/HTML/JS snippet as a substitute.
-  Still fill \`data\` with the values computed at the param defaults.
-  Worked example (params principal, monthly, rate): formulas =
-  {"contributions": "principal + monthly*12*x",
-   "interest": "principal*(1+rate/100)^x + monthly*12*((((1+rate/100)^x)-1)/(rate/100)) - principal - monthly*12*x"}.
-  For a duration/years param: provide rows up to the slider's MAX and gate every
-  formula with if(label > years, 0/0, <expr>) — rows where every formula returns
-  NaN are removed, so the x-axis genuinely grows/shrinks with the slider instead
-  of drawing a flat tail past the chosen duration.
-
-If the request is about STRUCTURE, LOGIC, FLOW, or RELATIONSHIPS — not a numeric
-dataset — skip renderChart entirely and use a Mermaid block instead (see below).
+**Charts:** use renderChart only for concrete numeric data. Pick line/area for
+time trends, bar for comparisons, pie/donut for shares, and scatter for
+correlation. Add a title and axis labels. Use controls/formulas only when the
+user requested interactive filtering or what-if inputs. Structural flows belong
+in a Mermaid block, not a numeric chart.
 `.trim();
 
-// Injected when the agent has the renderDiagram tool.
 const RENDER_DIAGRAM_HINT = `
-**Mermaid diagrams — write inline code blocks for EVERYTHING structural:**
-
-Use a fenced \`\`\`mermaid block for ANY visualisation that is NOT a numeric data chart:
-process flows, decision trees, architectures, sequences, state machines, timelines,
-entity models, class hierarchies, git graphs, mind maps, market positioning — all Mermaid.
-
-The block renders immediately in the chat. Never call renderDiagram for inline diagrams.
-
-Choose the right diagram type:
-  flowchart TD / LR   → process flows, decision trees, pipelines, logic diagrams
-  sequenceDiagram     → API/service call sequences, user ↔ system handoffs
-  erDiagram           → database schemas, entity relationships, data models
-  stateDiagram-v2     → state machines, order/ticket/lifecycle flows
-  classDiagram        → OOP models, class hierarchies, interface maps
-  gantt               → project plans, timelines, sprint schedules
-  quadrantChart       → 2×2 positioning (effort vs impact, risk vs reward)
-  gitGraph            → branching strategies, release flows
-  mindmap             → brainstorming hierarchies, concept maps
-  timeline            → historical sequences, roadmaps
-  xychart-beta        → simple trend/bar when full ECharts is overkill
-  pie                 → quick share breakdown without drill-down
-
-Rules:
-- Write valid Mermaid syntax.
-- ALWAYS wrap node label text in double quotes when it contains special characters
-  (spaces, @, ., :, /, -, parentheses, commas). Examples:
-    GOOD: P1["tester1@gmail.com"]   A["Sales Dept."]   B["Step (1/3)"]
-    BAD:  P1[tester1@gmail.com]     A[Sales Dept.]
-  Plain single-word labels without special chars don't need quotes: A[Start] is fine.
-- One diagram per reply unless the user explicitly asks for several.
-- To update a diagram: rewrite the SAME block with the change applied — never add a
-  second separate block below.
-- Call renderDiagram (the tool) ONLY when the user explicitly asks to save the diagram
-  to the Files panel for download or sharing.
+**Diagrams:** write one valid fenced Mermaid block for flows, architecture,
+sequences, states, entities, timelines, or relationships. Quote labels that
+contain spaces or punctuation. Call renderDiagram only when the user explicitly
+wants a downloadable file.
 `.trim();
 
-/** Prompt section listing the agent's standalone builtin tools. The
- *  document-creation guidance is a static codebase skill (staticSkills.ts) that
- *  attaches itself whenever a generate tool is bound — see buildSystemPrompt. */
+/** Prompt section listing the agent's standalone builtin tools. */
 const BUILTIN_BLOCK = (tools: ToolInfo[]) => {
-  const has = (key: string) =>
-    tools.some((t) => t.id === key || t.name === key);
-  const hasRenderChart = has('renderChart');
-  const hasRenderDiagram = has('renderDiagram');
+  const names = tools.map((tool) => tool.name || tool.id);
   return `
 ## Built-in Tools
 
-You also have these standalone tools — call them directly (no search needed):
-${tools.map(describeTool).join('\n')}
-${hasRenderChart ? `\n${RENDER_CHART_HINT}` : ''}
-${hasRenderDiagram ? `\n${RENDER_DIAGRAM_HINT}` : ''}
+Use only the tools active for this turn; their input schemas are authoritative.
+Configured capabilities: ${names.join(', ')}.
+${names.includes('renderChart') ? `\n${RENDER_CHART_HINT}` : ''}
+${names.includes('renderDiagram') ? `\n${RENDER_DIAGRAM_HINT}` : ''}
 `.trim();
 };
 
@@ -275,16 +158,12 @@ export function buildSystemPrompt(
   const parts: string[] = [SMALL_TALK_BLOCK.trim(), COMMUNICATION_BLOCK];
 
   if (opts.hasErxesTools) {
-    parts.push(ERXES_WORKFLOW_BLOCK(opts.scopeLine, opts.inventoryLines ?? []));
+    parts.push(
+      ERXES_OPERATIONS_BLOCK(opts.scopeLine, opts.inventoryLines ?? []),
+    );
   }
   if (opts.builtins.length) {
     parts.push(BUILTIN_BLOCK(opts.builtins));
-    // Static codebase skills that travel with their tools (e.g. document
-    // creation when a generate tool is bound). Runtime, not DB — always present.
-    const skills = staticSkillsBlock(
-      opts.builtins.flatMap((t) => [t.id, t.name].filter(Boolean) as string[]),
-    );
-    if (skills) parts.push(skills);
   }
   if (!opts.hasErxesTools && !opts.builtins.length) parts.push(NO_TOOLS_BLOCK);
 

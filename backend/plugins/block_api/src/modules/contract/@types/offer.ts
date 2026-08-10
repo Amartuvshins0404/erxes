@@ -2,16 +2,6 @@ import {
   BlockProjectPaymentPlanInterestType,
 } from '@/project/@types/payment';
 
-export enum OfferPartyType {
-  CUSTOMER = 'customer',
-  COMPANY = 'company',
-}
-
-export interface IOfferParty {
-  type: OfferPartyType;
-  id: string;
-}
-
 export interface IOfferPaymentPlan {
   downPaymentPercentage: number;
   downPaymentAmount?: number;
@@ -51,7 +41,7 @@ export interface IOffer {
   currency: string;
   status: OfferStatus;
   endDate: Date;
-  party: IOfferParty;
+  customerId: string;
   paymentPlan: IOfferPaymentPlan;
   user: string;
   description: string;

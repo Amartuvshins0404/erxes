@@ -7,7 +7,6 @@ import {
   Button,
   Empty,
   RecordTable,
-  Separator,
 } from 'erxes-ui';
 import { PageHeader } from 'ui-modules';
 import { GroupByConfig, GroupedRowList } from './GroupedRowList';
@@ -133,8 +132,6 @@ export const ResourceIndexLayout = <T,>({
                 </Breadcrumb.Item>
               </Breadcrumb.List>
             </Breadcrumb>
-            <Separator.Inline />
-            <PageHeader.FavoriteToggleButton />
           </PageHeader.Start>
           <PageHeader.End>{actions}</PageHeader.End>
         </PageHeader>

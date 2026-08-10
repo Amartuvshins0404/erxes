@@ -12,6 +12,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { useBaProductDetail } from '../hooks/useBaProductDetail';
 import { IBaProduct } from '../types';
+import { ProductCategoryAssign } from './ProductCategoryAssign';
 import { ProductStatusAction } from './ProductStatusAction';
 
 const statusVariant = (status?: string) => {
@@ -50,6 +51,7 @@ const ProductInfo = ({ product }: { product: IBaProduct }) => {
     description,
     status,
     supplier,
+    categoryId,
     category,
     initialCategory,
     createdAt,
@@ -76,7 +78,16 @@ const ProductInfo = ({ product }: { product: IBaProduct }) => {
               <Row label={t('UOM')} value={uom} />
               <Row
                 label={t('Category')}
-                value={category?.name || initialCategory?.name}
+                value={
+                  <ProductCategoryAssign.Provider
+                    productId={_id}
+                    categoryId={categoryId}
+                    category={category}
+                    initialCategory={initialCategory}
+                  >
+                    <ProductCategoryAssign.DetailTrigger />
+                  </ProductCategoryAssign.Provider>
+                }
               />
               <Row label={t('Supplier')} value={supplier?.name} />
               <Table.Row>

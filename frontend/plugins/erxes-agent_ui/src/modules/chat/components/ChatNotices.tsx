@@ -3,7 +3,6 @@ import {
   IconFileUpload,
   IconMessageCircle,
   IconReload,
-  IconSparkles,
 } from '@tabler/icons-react';
 import { Button, Empty } from 'erxes-ui';
 
@@ -71,34 +70,6 @@ export const ChatErrorBanner = ({
       >
         <IconReload className="size-3.5" />
         Retry
-      </Button>
-    </div>
-  </div>
-);
-
-// Banner surfacing a draft skill the make_skill tool produced mid-conversation.
-export const SkillDraftBanner = ({
-  name,
-  onReview,
-  onDismiss,
-}: {
-  name?: string;
-  onReview: () => void;
-  onDismiss: () => void;
-}) => (
-  <div className="max-w-3xl mx-auto w-full px-3 pb-1.5">
-    <div className="flex items-center gap-2 rounded-lg border border-primary/40 bg-primary/8 px-3 py-1.5 text-xs">
-      <IconSparkles className="size-4 text-primary" />
-      <span className="flex-1 text-primary">
-        A draft skill
-        {name ? <span className="font-mono"> /{name}</span> : null}{' '}
-        was created from this conversation.
-      </span>
-      <Button size="sm" variant="secondary" className="h-6" onClick={onReview}>
-        Review
-      </Button>
-      <Button size="sm" variant="ghost" className="h-6" onClick={onDismiss}>
-        Dismiss
       </Button>
     </div>
   </div>

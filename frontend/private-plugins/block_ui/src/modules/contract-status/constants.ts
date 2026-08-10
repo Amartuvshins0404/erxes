@@ -15,6 +15,7 @@ export const BlockContractStatusIcons: Record<string, any> = {
 };
 
 export const TERMINAL_CONTRACT_STATUS_TYPES = [
+  'signed',
   'lost',
   'cancelled',
 ];

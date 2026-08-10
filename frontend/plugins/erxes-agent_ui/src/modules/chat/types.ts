@@ -8,35 +8,16 @@ import type { UIMessage } from 'ai';
 // Live turn state is owned by the AI SDK `Chat`/`useChat`; messages are standard
 // `UIMessage`s whose parts the components render directly. erxes-only fields ride
 // on the message metadata (set live by the backend `finish` chunk, or rebuilt on
-// hydration) and on two transient data parts the backend streams alongside the
-// model output.
+// hydration) and on transient data parts streamed next to the model output.
 
 // erxes-only fields stamped onto an assistant (or user) message.
 export interface AgentMessageMetadata {
-  // Native message id the thumbs feedback resolves — set live by the stream's
-  // final `finish` chunk, or to the Mongo `_id` on hydration.
+  // Native message id used to link artifacts and delete persisted message pairs.
   messageId?: string;
   interrupted?: boolean;
-  // Langfuse trace id for this turn (Plan B) — lets a thumbs rating attach a
-  // human score to the right trace.
-  langfuseTraceId?: string;
   // ISO timestamp for the message time label (hydrated messages only; live
   // messages fall back to "now").
   createdAt?: string;
-  // The caller's own thumbs vote (1 / -1), when one exists.
-  rating?: number;
-  // Names of the skill(s) the user slash-activated that actually shaped this
-  // turn — set by the stream's final `finish` chunk. Drives the "Skills applied"
-  // badge on the assistant message.
-  activeSkills?: string[];
-  // Per-reasoning-step short summaries ("short thoughts"), index-aligned to the
-  // turn's reasoning parts (holes may be null). Stamped from the live stream on
-  // finish; hydrated from persisted meta on reload. Drives the gist shown on each
-  // reasoning step in the run timeline.
-  reasoningSummaries?: (string | null)[];
-  // One-line "what this turn accomplished" headline, shown as the collapsed
-  // run-timeline header. Stamped post-finish from the stream / hydrated on reload.
-  turnSummary?: string;
   // Files attached to a user message.
   attachments?: ChatAttachment[];
   // Approve/deny replies are sent to continue a gated turn without showing a
@@ -53,18 +34,9 @@ export type AgentDataParts = {
   activity: { text: string };
   'thread-title': { threadId: string; title: string };
   heartbeat: Record<string, never>;
-  // All per-step "short thoughts" for the turn, index-aligned to its reasoning
-  // parts (holes null), streamed once after `finish` (the backend summarizes them
-  // in a single batched call). Stamped onto the last assistant message's metadata
-  // (transient — never added to the message).
-  'reasoning-summaries': { summaries: (string | null)[] };
-  // The whole-turn headline, streamed once after `finish`. Stamped onto the
-  // last assistant message's metadata (transient — never added to the message).
-  'turn-summary': { text: string };
-  // The native assistant-message id, reconciled AFTER the `finish` chunk: the
-  // backend now closes the message immediately and persists off the critical
-  // path, so the id the thumbs feedback rates arrives here once the background
-  // write resolves. Patched onto the latest assistant message's metadata.
+  // The native assistant-message id, reconciled after the `finish` chunk when
+  // the background persistence write resolves. Patched onto the latest
+  // assistant message's metadata for artifact links and message-pair deletion.
   'message-id': { messageId: string };
 };
 
@@ -163,37 +135,18 @@ export interface DbToolCall {
   isError?: boolean;
 }
 
-// One chronological segment of a persisted assistant turn.
-export type DbTurnPart =
-  | { kind: 'thinking'; text: string }
-  | { kind: 'tool'; call: DbToolCall };
-
-// Erxes-only persisted metadata — the fields NOT in Mastra's native turn parts.
-// (Reasoning / tool / text now hydrate from `parts`; the legacy thinking/
-// toolCalls aggregates remain as a fallback for rows saved before that move.)
+// Erxes-only persisted metadata. Legacy tool calls remain as a fallback for
+// rows saved before Mastra exposed native parts.
 export interface DbMessageMeta {
-  parts?: Array<{ kind?: string; text?: string; call?: DbToolCall }>;
-  thinking?: string;
+  parts?: Array<{ kind?: string; call?: DbToolCall }>;
   toolCalls?: DbToolCall[];
   interrupted?: boolean;
-  // Per-reasoning-step summaries, index-aligned to the turn's reasoning parts
-  // (holes are null) — re-renders the "short thoughts" on reload.
-  reasoningSummaries?: (string | null)[];
-  // Whole-turn headline — the collapsed run-timeline header on reload.
-  turnSummary?: string;
 }
 
-// Mastra's native AI SDK v5 turn parts, as stored on `content.parts` and surfaced
-// by the resolver. Reasoning text lives on `reasoning` or `details[].text`; tool
-// calls on `toolInvocation`. Only the variants we render are typed; the rest
-// (e.g. `step-start`) are ignored.
+// Mastra's native AI SDK v5 user-facing parts, as stored on `content.parts` and
+// surfaced by the resolver. Tool calls stay available for approvals, artifacts,
+// and errors. Other part types are ignored.
 export type DbNativePart =
-  | {
-      type: 'reasoning';
-      reasoning?: string;
-      text?: string;
-      details?: Array<{ type?: string; text?: string }>;
-    }
   | { type: 'text'; text?: string }
   | {
       type: 'tool-invocation';
@@ -214,8 +167,7 @@ export interface DbThreadMessage {
   role: 'user' | 'assistant';
   content: string;
   createdAt?: string;
-  // Mastra's native turn parts — the source of truth for reasoning/tool/text on
-  // reload. Absent only on rows persisted before the resolver exposed it.
+  // Mastra's native text and tool parts. Absent only on old rows.
   parts?: DbNativePart[];
   meta?: DbMessageMeta;
   attachments?: ChatAttachment[];

@@ -23,9 +23,9 @@ export const providerRuntimeFingerprint = (
         provider.updatedAt instanceof Date
           ? provider.updatedAt.getTime()
           : provider.updatedAt ?? '';
-      return `${provider.provider ?? ''}:${provider.ownerId ?? 'organization'}:${
-        provider._id ?? ''
-      }:${updatedAt}`;
+      return `${provider.provider ?? ''}:${
+        provider.ownerId ?? 'organization'
+      }:${provider._id ?? ''}:${updatedAt}`;
     })
     .sort()
     .join('|');
@@ -267,8 +267,7 @@ export function buildModel(
   );
   const preset = PROVIDER_PRESETS.find((p) => p.provider === providerName);
 
-  // Kimi For Coding is BYOK-only: scheduled runs reuse the user-supplied key
-  // persisted in provider settings and must never fall back to a server env key.
+  // Kimi For Coding is BYOK-only and must never fall back to a server env key.
   const envKey = stored?.envKey || preset?.envKey;
   const apiKey =
     providerName === 'kimi-for-coding'

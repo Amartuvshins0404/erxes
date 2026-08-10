@@ -38,8 +38,7 @@ export const offerSchema = z.object({
   unit: z.string().nullish(),
   date: z.string().nullish(),
   endDate: z.date().nullish(),
-  partyType: z.enum(['customer', 'company']).nullish(),
-  partyId: z.string().nullish(),
+  customerId: z.string().nullish(),
   user: z.string().nullish(),
 });
 

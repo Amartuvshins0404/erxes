@@ -87,8 +87,7 @@ export const contractPaymentQueries = {
       match.contractNumber = { $regex: contractNumber, $options: 'i' };
     }
     if (customerId) {
-      match.partyId = customerId;
-      match.partyType = 'customer';
+      match.customerId = customerId;
     }
     if (unitNumber) {
       const matchedUnits = await models.Unit.find(

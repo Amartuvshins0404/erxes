@@ -23,6 +23,10 @@ interface ArtifactRow {
   fileKey?: string;
   inline?: boolean;
   size?: number;
+  entryPath?: string;
+  fileCount?: number;
+  contentHash?: string;
+  previewToken?: string;
   spec?: ChartSpec;
   definition?: string;
   messageId?: string;

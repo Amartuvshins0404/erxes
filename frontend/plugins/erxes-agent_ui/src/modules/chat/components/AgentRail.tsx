@@ -1,8 +1,9 @@
-import { memo, useMemo, useState } from 'react';
+import { memo, useMemo } from 'react';
 import { IconSettings } from '@tabler/icons-react';
 import { useAtomValue } from 'jotai';
 import { useTranslation } from 'react-i18next';
 import { Badge, Button, cn, ErxesLogoIcon, Skeleton, Tooltip } from 'erxes-ui';
+import { Link } from 'react-router-dom';
 import { currentUserState } from 'ui-modules';
 import { IChatAgent } from '~/modules/chat/hooks/useChatAgents';
 import {
@@ -10,8 +11,8 @@ import {
   useAgentUnread,
   useAgentWorking,
 } from '~/modules/chat/hooks/useChatView';
-import { EditAgentDialog } from '~/modules/chat/components/EditAgentDialog';
 import { duplicatedAgentNames } from '~/pages/agents/utils';
+import { useAgentAccess } from '~/pages/agents/hooks/useAgentAccess';
 import {
   AgentVisibilityBadge,
   AgentVisibilitySection,
@@ -36,8 +37,6 @@ const VISIBILITY_SECTION_KEYS: Record<AgentVisibilitySection, string> = {
 const VISIBILITY_BADGE_KEYS: Record<AgentVisibilityBadge, string> = {
   'only-me': 'agent-rail-visibility-only-me',
   direct: 'agent-rail-visibility-direct',
-  team: 'agent-rail-visibility-team',
-  department: 'agent-rail-visibility-department',
   everyone: 'agent-rail-visibility-everyone',
   private: 'agent-rail-visibility-private',
   shared: 'agent-rail-visibility-shared',
@@ -51,15 +50,15 @@ const AgentRailItem = memo(
     currentUserId,
     isActive,
     isNameDuplicated,
+    canEditSettings,
     onSelect,
-    onEdit,
   }: {
     agent: IChatAgent;
     currentUserId?: string;
     isActive: boolean;
     isNameDuplicated: boolean;
+    canEditSettings: boolean;
     onSelect: (agentId: string) => void;
-    onEdit: (agent: IChatAgent) => void;
   }) => {
     const isWorking = useAgentWorking(agent._id);
     const hasUnread = useAgentUnread(agent._id) && !isActive;
@@ -121,26 +120,28 @@ const AgentRailItem = memo(
           </div>
         </button>
 
-        {/* Quick-edit affordance — appears on hover/focus, opens the in-chat
-          settings modal without leaving the conversation. */}
-        <Tooltip.Provider>
-          <Tooltip>
-            <Tooltip.Trigger asChild>
-              <Button
-                size="icon"
-                variant="ghost"
-                aria-label={t('agent-rail-edit-settings-aria', {
-                  name: agent.accountName,
-                })}
-                className="absolute right-1 top-1 z-10 size-6 text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100"
-                onClick={() => onEdit(agent)}
-              >
-                <IconSettings className="size-3.5" />
-              </Button>
-            </Tooltip.Trigger>
-            <Tooltip.Content>{t('agent-rail-edit-settings')}</Tooltip.Content>
-          </Tooltip>
-        </Tooltip.Provider>
+        {canEditSettings && (
+          <Tooltip.Provider>
+            <Tooltip>
+              <Tooltip.Trigger asChild>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  asChild
+                  aria-label={t('agent-rail-edit-settings-aria', {
+                    name: agent.accountName,
+                  })}
+                  className="absolute right-1 top-1 z-10 size-6 text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100"
+                >
+                  <Link to={`/erxes-agent/agents/${agent._id}/config`}>
+                    <IconSettings className="size-3.5" />
+                  </Link>
+                </Button>
+              </Tooltip.Trigger>
+              <Tooltip.Content>{t('agent-rail-edit-settings')}</Tooltip.Content>
+            </Tooltip>
+          </Tooltip.Provider>
+        )}
       </div>
     );
   },
@@ -159,11 +160,9 @@ export const AgentRail = memo(
     activeAgentId?: string;
     onSelect: (agentId: string) => void;
   }) => {
-    // A single editor for the whole rail — opened with the row's agent, mounted
-    // only while open so its form/mutation/subscriptions don't exist per row.
-    const [editingAgent, setEditingAgent] = useState<IChatAgent | null>(null);
     const { t } = useTranslation('erxes-agent');
     const currentUserId = useAtomValue(currentUserState)?._id;
+    const { canEditAgent } = useAgentAccess();
 
     // Names are not unique; show an account-id suffix only for collisions.
     const duplicatedNames = useMemo(
@@ -223,8 +222,8 @@ export const AgentRail = memo(
                           isNameDuplicated={duplicatedNames.has(
                             agent.accountName,
                           )}
+                          canEditSettings={canEditAgent(agent)}
                           onSelect={onSelect}
-                          onEdit={setEditingAgent}
                         />
                       ))}
                     </div>
@@ -234,16 +233,6 @@ export const AgentRail = memo(
             </div>
           )}
         </div>
-
-        {editingAgent && (
-          <EditAgentDialog
-            agent={editingAgent}
-            open
-            onOpenChange={(next) => {
-              if (!next) setEditingAgent(null);
-            }}
-          />
-        )}
       </div>
     );
   },

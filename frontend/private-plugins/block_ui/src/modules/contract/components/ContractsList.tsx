@@ -14,7 +14,7 @@ import {
   Spinner,
   useQueryState,
 } from 'erxes-ui';
-import { CustomersInline, CompaniesInline } from 'ui-modules';
+import { CustomersInline } from 'ui-modules';
 import { ContractAddSheet } from './ContractAdd';
 import { ContractPrintPreview } from './ContractPrintPreview';
 import { CONTRACT_STATUS_OPTIONS } from '../constants/contract';
@@ -69,7 +69,7 @@ export function ContractsList({
 export const ContractItem = ({
   _id,
   number,
-  party,
+  customerId,
   amount,
   currency,
   status,
@@ -82,12 +82,12 @@ export const ContractItem = ({
         <Badge
           variant="secondary"
           className="ml-2 cursor-pointer truncate font-medium"
-          onClick={() => onSelect?.({ _id, number, party, amount, currency, status, date } as IContract)}
+          onClick={() => onSelect?.({ _id, number, customerId, amount, currency, status, date } as IContract)}
         >
           #{number || _id}
         </Badge>
         <div className="truncate">
-          <DisplayParty party={party} />
+          <DisplayCustomer customerId={customerId} />
         </div>
         <div className="flex items-center truncate">
           {currency && amount && (
@@ -146,25 +146,19 @@ export const ContractItem = ({
   );
 };
 
-export const DisplayParty = ({ party }: { party: IContract['party'] }) => {
-  if (!party) return null;
-  if (party.type === 'customer') {
-    return (
-      <CustomersInline.Provider customerIds={[party.id]}>
-        <span className="inline-flex items-center gap-2 overflow-hidden">
-          <CustomersInline.Avatar />
-          <CustomersInline.Title />
-        </span>
-      </CustomersInline.Provider>
-    );
-  }
+export const DisplayCustomer = ({
+  customerId,
+}: {
+  customerId?: IContract['customerId'];
+}) => {
+  if (!customerId) return null;
   return (
-    <CompaniesInline.Provider companyIds={[party.id]}>
+    <CustomersInline.Provider customerIds={[customerId]}>
       <span className="inline-flex items-center gap-2 overflow-hidden">
-        <CompaniesInline.Avatar />
-        <CompaniesInline.Title />
+        <CustomersInline.Avatar />
+        <CustomersInline.Title />
       </span>
-    </CompaniesInline.Provider>
+    </CustomersInline.Provider>
   );
 };
 
@@ -179,7 +173,7 @@ export const ContractsListCard = () => {
               <span>Number</span>
             </Label>
             <Label asChild>
-              <span>Party</span>
+              <span>Customer</span>
             </Label>
             <Label asChild>
               <span>Amount</span>

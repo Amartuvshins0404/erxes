@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ApolloCache, useMutation, useQuery } from '@apollo/client';
+import { ApolloCache, useMutation } from '@apollo/client';
 import { ColumnDef, Row } from '@tanstack/react-table';
 import {
   IconAlignLeft,
@@ -25,6 +25,7 @@ import {
 } from 'erxes-ui';
 import { useTranslation } from 'react-i18next';
 import { MASTRA_AGENT_REMOVE } from '~/graphql/mutations';
+import { MASTRA_AGENTS } from '~/graphql/queries';
 import { IdentityCell, SortableHead } from '~/components/RecordTableShared';
 import { SortState, SortValue, useTableSort } from '~/components/useTableSort';
 import { PermissionButton } from '~/components/PermissionButton';
@@ -37,23 +38,14 @@ import {
   useAgentAccess,
 } from './hooks/useAgentAccess';
 import { useAgentsBasePath } from './hooks/useAgentsBasePath';
-import {
-  PERMISSION_GROUPS,
-  permissionGroupOptions,
-  type PermissionGroupsData,
-} from './graphql/access';
+import { useAgentPermissionGroups } from './hooks/useAgentPermissionGroups';
 
 type IAgent = IMastraAgentRow;
 type Visibility = IAgent['visibility'];
 type VisibilityLabels = Record<Visibility, string> & { title: string };
 
-const isConsoleShell = (basePath: string) => !basePath.startsWith('/settings');
 const agentOpenPath = (basePath: string, agent: IAgent, canEdit: boolean) =>
-  !canEdit
-    ? `/erxes-agent/chat/${agent._id}`
-    : isConsoleShell(basePath)
-    ? `${basePath}/${agent._id}`
-    : `${basePath}/edit/${agent._id}`;
+  canEdit ? `${basePath}/${agent._id}` : `/erxes-agent/chat/${agent._id}`;
 
 const agentListCacheUpdate = (cache: ApolloCache<unknown>) => {
   cache.evict({ fieldName: 'mastraAgentsMain' });
@@ -85,6 +77,7 @@ const AgentBulkDeleteCommandBar = () => {
   const { canRemoveAgent } = useAgentAccess();
   const [removeAgent] = useMutation(MASTRA_AGENT_REMOVE, {
     update: agentListCacheUpdate,
+    refetchQueries: [{ query: MASTRA_AGENTS }],
     onError: agentMutationError(),
   });
   const removable = selectedRows.filter((row) => canRemoveAgent(row.original));
@@ -303,17 +296,13 @@ export const AgentsIndexPage = () => {
   const basePath = useAgentsBasePath();
   const { agentsList, loading, error, pageInfo, handleFetchMore, refetch } =
     useMastraAgentList();
-  const { data: permissionData } =
-    useQuery<PermissionGroupsData>(PERMISSION_GROUPS);
+  const { groups: permissionGroups } = useAgentPermissionGroups();
   const permissionGroupNames = useMemo(
     () =>
       Object.fromEntries(
-        permissionGroupOptions(permissionData).map((group) => [
-          group.id,
-          group.name,
-        ]),
+        permissionGroups.map((group) => [group.id, group.name]),
       ),
-    [permissionData],
+    [permissionGroups],
   );
   const visibilityLabels = useMemo<VisibilityLabels>(
     () => ({

@@ -75,20 +75,16 @@ const UnitCell = ({ unitId }: { unitId?: string }) => {
 };
 
 const CustomerCell = ({ payment }: { payment: IContractPayment }) => {
-  const isCustomer = payment.partyType === 'customer';
   const { customerDetail, loading } = useCustomerDetail(
     {
-      variables: { _id: payment.partyId },
-      skip: !payment.partyId || !isCustomer,
+      variables: { _id: payment.customerId },
+      skip: !payment.customerId,
     },
     true,
   );
 
-  if (!payment.partyId) {
+  if (!payment.customerId) {
     return <RecordTableInlineCell>-</RecordTableInlineCell>;
-  }
-  if (!isCustomer) {
-    return <RecordTableInlineCell>{payment.partyId}</RecordTableInlineCell>;
   }
   if (loading) {
     return (

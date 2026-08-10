@@ -1,6 +1,6 @@
 /* eslint-disable react-hooks/rules-of-hooks */
 import { contractDetailSheetState } from '@/contract/states/contractDetailSheetState';
-import { IContract, ContractPartyType } from '@/contract/types/contractTypes';
+import { IContract } from '@/contract/types/contractTypes';
 import { IBlockContractStatus } from '@/contract-status/types';
 import {
   IconHash,
@@ -19,7 +19,7 @@ import {
 } from 'erxes-ui';
 import { useSetAtom } from 'jotai';
 import { format } from 'date-fns';
-import { CustomersInline, CompaniesInline, MembersInline } from 'ui-modules';
+import { CustomersInline, MembersInline } from 'ui-modules';
 
 const parseDate = (value: any) => {
   if (!value) return null;
@@ -86,29 +86,22 @@ export const contractsColumns = (
       size: 170,
     },
     {
-      id: 'party',
-      accessorKey: 'party',
-      header: () => <RecordTable.InlineHead label="Party" icon={IconUser} />,
+      id: 'customerId',
+      accessorKey: 'customerId',
+      header: () => <RecordTable.InlineHead label="Customer" icon={IconUser} />,
       cell: ({ cell }) => {
-        const party = cell.getValue() as IContract['party'];
+        const customerId = cell.getValue() as IContract['customerId'];
         return (
           <RecordTableInlineCell>
-            {!party ? (
+            {!customerId ? (
               <span className="text-muted-foreground">-</span>
-            ) : party.type === ContractPartyType.CUSTOMER ? (
-              <CustomersInline.Provider customerIds={[party.id]}>
+            ) : (
+              <CustomersInline.Provider customerIds={[customerId]}>
                 <span className="inline-flex items-center gap-2 overflow-hidden">
                   <CustomersInline.Avatar />
                   <CustomersInline.Title />
                 </span>
               </CustomersInline.Provider>
-            ) : (
-              <CompaniesInline.Provider companyIds={[party.id]}>
-                <span className="inline-flex items-center gap-2 overflow-hidden">
-                  <CompaniesInline.Avatar />
-                  <CompaniesInline.Title />
-                </span>
-              </CompaniesInline.Provider>
             )}
           </RecordTableInlineCell>
         );

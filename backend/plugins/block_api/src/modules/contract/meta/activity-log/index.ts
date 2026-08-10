@@ -10,7 +10,7 @@ const CONTRACT_ACTIVITY_FIELDS = [
   { field: 'currency', label: 'Currency' },
   { field: 'date', label: 'Contract Date' },
   { field: 'description', label: 'Description' },
-  { field: 'party', label: 'Party' },
+  { field: 'customerId', label: 'Customer' },
   { field: 'unit', label: 'Unit' },
   { field: 'paymentPlan', label: 'Payment Plan' },
   { field: 'user', label: 'Assigned User' },

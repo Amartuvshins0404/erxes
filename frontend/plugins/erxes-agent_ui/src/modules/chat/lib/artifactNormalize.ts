@@ -58,10 +58,28 @@ export interface ImageArtifact {
   height?: number;
 }
 
+export interface WebsiteArtifact {
+  id: string;
+  kind: 'website';
+  title: string;
+  entryPath: string;
+  fileCount: number;
+  contentHash: string;
+  previewToken: string;
+  // Entry HTML source, retained for the Code tab.
+  fileName: string;
+  mimeType: string;
+  fileKey: string;
+  inline?: boolean;
+  // Total bytes across all website files.
+  size?: number;
+}
+
 export type Artifact =
   | ChartArtifact
   | DocumentArtifact
   | DiagramArtifact
+  | WebsiteArtifact
   | ImageArtifact;
 
 /**
@@ -122,6 +140,38 @@ export const normalizeArtifact = (raw: unknown): Artifact | null => {
     };
   }
 
+  if (a.kind === 'website') {
+    const entryPath = String(a.entryPath ?? '');
+    const previewToken = String(a.previewToken ?? '');
+    const contentHash = String(a.contentHash ?? '');
+    const fileKey = String(a.fileKey ?? '');
+    if (
+      !entryPath ||
+      !previewToken ||
+      !fileKey ||
+      !/^[a-f0-9]{64}$/i.test(contentHash)
+    )
+      return null;
+
+    return {
+      id,
+      kind: 'website',
+      title: String(a.title ?? 'Website'),
+      entryPath,
+      fileCount:
+        typeof a.fileCount === 'number' && a.fileCount > 0 ? a.fileCount : 1,
+      previewToken,
+      contentHash,
+      fileName: String(
+        a.fileName ?? entryPath.split('/').pop() ?? 'index.html',
+      ),
+      mimeType: String(a.mimeType ?? 'text/html'),
+      fileKey,
+      inline: Boolean(a.inline),
+      size: typeof a.size === 'number' ? a.size : undefined,
+    };
+  }
+
   if (a.kind === 'document') {
     const slides = Array.isArray(a.slides)
       ? a.slides.filter((s): s is string => typeof s === 'string')
@@ -157,5 +207,7 @@ export const resolveStorageRef = (
 ): string => {
   if (/^(https?:|data:)/i.test(ref)) return ref;
   const name = fileName ? `&name=${encodeURIComponent(fileName)}` : '';
-  return `${apiUrl}/read-file?key=${encodeURIComponent(ref)}&inline=true${name}`;
+  return `${apiUrl}/read-file?key=${encodeURIComponent(
+    ref,
+  )}&inline=true${name}`;
 };

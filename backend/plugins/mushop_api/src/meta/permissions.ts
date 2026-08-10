@@ -102,6 +102,26 @@ export const permissions: IPermissionConfig = {
       ],
     },
     {
+      name: 'order',
+      description: 'Orders forwarded to suppliers',
+      scopeField: null,
+      ownerFields: [],
+      scopes: [{ name: 'all', description: 'All orders' }],
+      actions: [
+        {
+          title: 'View orders',
+          name: 'showMushopOrders',
+          description: 'List and view orders forwarded to suppliers',
+          always: true,
+        },
+        {
+          title: 'Resync order',
+          name: 'mushopResyncOrder',
+          description: 'Resend a pending or failed order to the supplier again',
+        },
+      ],
+    },
+    {
       name: 'product',
       description: 'Mushop products',
       scopeField: null,
@@ -245,6 +265,12 @@ export const permissions: IPermissionConfig = {
         },
         {
           plugin: 'mushop',
+          module: 'order',
+          actions: ['showMushopOrders', 'mushopResyncOrder'],
+          scope: 'all',
+        },
+        {
+          plugin: 'mushop',
           module: 'product',
           actions: [
             'showMushopProducts',
@@ -305,6 +331,12 @@ export const permissions: IPermissionConfig = {
         },
         {
           plugin: 'mushop',
+          module: 'order',
+          actions: ['showMushopOrders'],
+          scope: 'all',
+        },
+        {
+          plugin: 'mushop',
           module: 'product',
           actions: ['showMushopProducts', 'mushopUpdateProductStatus'],
           scope: 'all',
@@ -338,6 +370,12 @@ export const permissions: IPermissionConfig = {
           plugin: 'mushop',
           module: 'supplier',
           actions: ['showMushopSuppliers'],
+          scope: 'all',
+        },
+        {
+          plugin: 'mushop',
+          module: 'order',
+          actions: ['showMushopOrders'],
           scope: 'all',
         },
         {

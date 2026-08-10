@@ -12,6 +12,7 @@ export const SUPPLIER_FRAGMENT = gql`
     attachments
     urls
     registrationNumber
+    industry
     address
     primaryEmail
     primaryPhone

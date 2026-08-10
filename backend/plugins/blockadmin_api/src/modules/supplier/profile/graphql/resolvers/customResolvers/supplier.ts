@@ -1,5 +1,6 @@
 import { IBaSupplierDocument } from '@/supplier/profile/@types/supplier';
 import { toFileUrl } from '@/supplier/utils/fileUrl';
+import { IContext } from '~/connectionResolvers';
 
 export const BaSupplier = {
   address: ({ address }: IBaSupplierDocument) => {
@@ -22,4 +23,13 @@ export const BaSupplier = {
     Array.isArray(attachments)
       ? attachments.map((key) => toFileUrl(key, subdomain))
       : null,
+  productsCount: async (
+    supplier: IBaSupplierDocument,
+    _args: any,
+    { models }: IContext,
+  ) => {
+    return models.SupplierProduct.countDocuments({
+      subdomain: supplier.subdomain,
+    });
+  },
 };

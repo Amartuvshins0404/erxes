@@ -1,45 +1,43 @@
-import {
-  BlockProjectPaymentPlanInterestType,
-  BlockProjectPaymentPlanType,
-} from '@/project/@types/payment';
+import { BlockProjectPaymentPlanInterestType } from '@/project/@types/payment';
 import { Document } from 'mongoose';
 import { IBlock } from '~/types';
-
-export enum ContractPartyType {
-  CUSTOMER = 'customer',
-  COMPANY = 'company',
-}
 
 export enum ContractAmountType {
   PER_SIZE = 'perSize',
   PER_UNIT = 'perUnit',
 }
 
-export interface IContractParty {
-  type: ContractPartyType;
-  id: string;
-}
-
 export enum ContractStatus {
+  RESERVED = 'reserved',
   DRAFT = 'draft',
   SIGNED = 'signed',
+  LOST = 'lost',
   CANCELLED = 'cancelled',
-  EXPIRED = 'expired',
 }
 
 export interface IContractPaymentPlan {
-  type: BlockProjectPaymentPlanType;
-  downPaymentPercentage: number;
-  interestPercentage: number;
-  completionPaymentPercentage: number;
-  discountPercentage: number;
-  description: string;
-  installment: number;
-  frequency: string;
-  penaltyPercentage: number;
-  vatIncluded: boolean;
-  paymentDates: number[];
-  interestType: BlockProjectPaymentPlanInterestType;
+  downPaymentPercentage?: number;
+  downPaymentAmount?: number;
+  barterPercentage?: number;
+  barterAmount?: number;
+  interestPercentage?: number;
+  interestType?: BlockProjectPaymentPlanInterestType;
+  completionPaymentPercentage?: number;
+  completionPaymentAmount?: number;
+  discountPercentage?: number;
+  description?: string;
+  installment?: number;
+  frequency?: string;
+  penaltyPercentage?: number;
+  vatIncluded?: boolean;
+  roundedInstallmentAmount?: number;
+  installmentAmounts?: number[];
+  paymentDates?: number[];
+  paymentDueDates?: Date[];
+  firstPaymentDate?: Date;
+  downPaymentDate?: Date;
+  completionPaymentDate?: Date;
+  completionPaymentDateLabel?: string;
 }
 
 export interface IContract extends IBlock {
@@ -52,10 +50,11 @@ export interface IContract extends IBlock {
   currency: string;
   status: ContractStatus;
   isLifeTime: boolean;
-  party: IContractParty;
   paymentPlan: IContractPaymentPlan;
   user: string;
   description: string;
+  customerId?: string;
+  signedAt?: Date;
 }
 
 export interface IContractDocument extends IContract, Document {

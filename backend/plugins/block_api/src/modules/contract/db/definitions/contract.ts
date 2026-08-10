@@ -1,22 +1,9 @@
 import { Schema } from 'mongoose';
-import { ContractPartyType } from '@/contract/@types/contract';
 
 import {
   BlockProjectPaymentPlanFrequency,
   BlockProjectPaymentPlanInterestType,
 } from '@/project/@types/payment';
-
-const contractPartySchema = new Schema(
-  {
-    type: {
-      type: String,
-      enum: Object.values(ContractPartyType),
-      required: true,
-    },
-    id: { type: String, required: true },
-  },
-  { _id: false },
-);
 
 const contractPaymentPlanSchema = new Schema(
   {
@@ -64,10 +51,11 @@ export const contractSchema = new Schema(
       ref: 'block_contract_statuses',
       index: true,
     },
-    party: { type: contractPartySchema, required: true },
+    customerId: { type: String, required: true },
     description: { type: String },
-    paymentPlan: { type: contractPaymentPlanSchema, required: true },
+    paymentPlan: { type: contractPaymentPlanSchema },
     user: { type: String },
+    blockAdminId: { type: String },
   },
   { timestamps: true },
 );

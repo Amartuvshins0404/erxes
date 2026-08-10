@@ -17,6 +17,7 @@ import { blockNoteMutations } from '@/note/graphql/resolvers/mutations/note';
 import { statusMutations } from '@/oppty/graphql/mutations/status';
 import { contractStatusMutations } from '@/contract/graphql/resolvers/mutations/status';
 import { contractPaymentMutations } from '@/contract/graphql/resolvers/mutations/payment';
+import { customerSyncMutations } from '@/admin/graphql/resolvers/mutations/customerSync';
 
 export const mutations = {
   ...projectMutations,
@@ -38,4 +39,5 @@ export const mutations = {
   ...statusMutations,
   ...contractStatusMutations,
   ...contractPaymentMutations,
+  ...customerSyncMutations,
 };

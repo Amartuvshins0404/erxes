@@ -6,6 +6,8 @@ import { IModels } from '~/connectionResolvers';
 import { contractSchema } from '@/contract/db/definitions/contract';
 import { EventDispatcherReturn } from 'erxes-api-shared/core-modules';
 import { generateContractUpdateActivityLogs } from '../../meta/activity-log';
+import { handleContractSigned } from '@/contract/utils/signedStatus';
+import { syncContractPayments } from '@/contract/utils/paymentsSync';
 
 export interface IContractModel extends Model<IContractDocument> {
   createContract(input: IContract): Promise<IContractDocument>;
@@ -21,6 +23,7 @@ export interface IContractModel extends Model<IContractDocument> {
 
 export const loadContractClass = (
   models: IModels,
+  subdomain: string,
   eventHandlers?: EventDispatcherReturn,
 ) => {
   const createActivityLog = eventHandlers?.createActivityLog;
@@ -28,10 +31,29 @@ export const loadContractClass = (
   class Contract {
     public static async createContract(input: IContract) {
       const created = await models.Contract.create(input);
+
       if (created) {
-        await models.ContractPayment.regenerateForContract(
-          created._id.toString(),
-        );
+        const status = created.status
+          ? await models.ContractStatus.findOne({ _id: created.status })
+          : null;
+
+        if (status?.type === 'signed') {
+          const contractId = created._id.toString();
+          const generated = await models.ContractPayment.regenerateForContract(
+            contractId,
+          );
+
+          if (generated.length) {
+            // regenerateForContract's own return value can go stale if its
+            // transaction-restore step recomputed statuses afterward.
+            const payments = await models.ContractPayment.find({
+              contractId,
+            });
+            syncContractPayments(contractId, payments, subdomain);
+          }
+
+          await handleContractSigned(created, models, subdomain);
+        }
       }
       return created;
     }
@@ -49,10 +71,7 @@ export const loadContractClass = (
       const currentStage = prev.status
         ? await models.ContractStatus.findOne({ _id: prev.status })
         : null;
-      if (
-        currentStage?.type === 'signed' &&
-        !withinRevertWindow
-      ) {
+      if (currentStage?.type === 'signed' && !withinRevertWindow) {
         throw new Error('Signed contracts cannot be edited');
       }
 
@@ -69,7 +88,27 @@ export const loadContractClass = (
       }
 
       if (updated) {
-        await models.ContractPayment.regenerateForContract(_id);
+        const currentStatus = updated.status
+          ? await models.ContractStatus.findOne({ _id: updated.status })
+          : null;
+        const isSigned = currentStatus?.type === 'signed';
+
+        if (isSigned) {
+          const generated = await models.ContractPayment.regenerateForContract(
+            _id,
+          );
+
+          if (generated.length) {
+            const payments = await models.ContractPayment.find({
+              contractId: _id,
+            });
+            syncContractPayments(_id, payments, subdomain);
+          }
+
+          if (String(updated.status) !== String(prev.status)) {
+            await handleContractSigned(updated, models, subdomain);
+          }
+        }
       }
 
       return updated;
@@ -127,13 +166,33 @@ export const loadContractClass = (
           { contractId: _id },
           { $set: { status: 'cancelled' } },
         );
+
+        const cancelledPayments = await models.ContractPayment.find({
+          contractId: _id,
+        });
+
+        syncContractPayments(_id, cancelledPayments, subdomain);
       }
 
       if (updated && newStage.type === 'signed') {
-        await models.ContractPayment.regenerateForContract(_id, true);
+        await handleContractSigned(updated, models, subdomain);
+
+        const generated = await models.ContractPayment.regenerateForContract(
+          _id,
+          true,
+        );
+
+        if (generated.length) {
+          const payments = await models.ContractPayment.find({
+            contractId: _id,
+          });
+          syncContractPayments(_id, payments, subdomain);
+        }
 
         if (updated.unit) {
-          const cancelledStage = await models.ContractStatus.findOne({ type: 'cancelled' });
+          const cancelledStage = await models.ContractStatus.findOne({
+            type: 'cancelled',
+          });
           if (cancelledStage) {
             await models.Contract.updateMany(
               {

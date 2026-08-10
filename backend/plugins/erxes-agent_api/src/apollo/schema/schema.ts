@@ -18,30 +18,11 @@ import {
   queries as sessionQueries,
   mutations as sessionMutations,
 } from '@/session/graphql/schemas/session';
-import {
-  types as workflowTypes,
-  queries as workflowQueries,
-  mutations as workflowMutations,
-} from '@/workflow/graphql/schemas/workflow';
-import {
-  types as learningTypes,
-  queries as learningQueries,
-  mutations as learningMutations,
-} from '@/learning/graphql/schemas/learning';
-import {
-  types as skillTypes,
-  queries as skillQueriesSchema,
-  mutations as skillMutationsSchema,
-} from '@/skills/graphql/schemas/skills';
-
 export const types = `
   ${agentTypes}
   ${providerTypes}
   ${settingsTypes}
   ${sessionTypes}
-  ${workflowTypes}
-  ${learningTypes}
-  ${skillTypes}
 `;
 
 export const queries = `
@@ -49,9 +30,6 @@ export const queries = `
   ${providerQueries}
   ${settingsQueries}
   ${sessionQueries}
-  ${workflowQueries}
-  ${learningQueries}
-  ${skillQueriesSchema}
 `;
 
 export const mutations = `
@@ -59,7 +37,4 @@ export const mutations = `
   ${providerMutations}
   ${settingsMutations}
   ${sessionMutations}
-  ${workflowMutations}
-  ${learningMutations}
-  ${skillMutationsSchema}
 `;

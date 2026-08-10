@@ -7,6 +7,7 @@ import {
 import { cancelActiveRun } from '~/mastra/runRegistry';
 import { requireUserId } from '@/_shared/auth';
 import { ERXES_AGENT_ACTIONS } from '~/meta/permissionActions';
+import { deleteWebsiteFiles } from '~/mastra/files/websiteFileStore';
 
 /** Mutations on a user's own chat threads (rename / delete), Mastra-native. */
 export const sessionMutations = {
@@ -30,10 +31,17 @@ export const sessionMutations = {
       requireUserId(user),
       threadId,
     );
+    const artifacts = await models.MastraArtifact.find({ threadId })
+      .select({ websiteFiles: 1 })
+      .lean()
+      .catch(() => []);
+    const websiteFileKeys = artifacts.flatMap(
+      (artifact) => artifact.websiteFiles?.map((file) => file.fileKey) ?? [],
+    );
     // The native delete is authoritative; auxiliary cleanup must not turn an
     // already-completed deletion into a client-visible failure.
     await Promise.allSettled([
-      models.MastraFeedback.deleteMany({ threadId }),
+      deleteWebsiteFiles(models, websiteFileKeys),
       models.MastraArtifact.deleteMany({ threadId }),
     ]);
     return result;
@@ -51,11 +59,18 @@ export const sessionMutations = {
       threadId,
       messageId,
     );
+    const artifacts = await models.MastraArtifact.find({
+      messageId: { $in: result.deletedIds },
+    })
+      .select({ websiteFiles: 1 })
+      .lean()
+      .catch(() => []);
+    const websiteFileKeys = artifacts.flatMap(
+      (artifact) => artifact.websiteFiles?.map((file) => file.fileKey) ?? [],
+    );
     // Keep the same authoritative-delete behavior for linked auxiliary rows.
     await Promise.allSettled([
-      models.MastraFeedback.deleteMany({
-        messageId: { $in: result.deletedIds },
-      }),
+      deleteWebsiteFiles(models, websiteFileKeys),
       models.MastraArtifact.deleteMany({
         messageId: { $in: result.deletedIds },
       }),

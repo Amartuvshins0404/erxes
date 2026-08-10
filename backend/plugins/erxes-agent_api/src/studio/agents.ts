@@ -4,9 +4,9 @@
  * Reuses the production builder `getOrCreateAgent(cfg, models, subdomain)`.
  * Passing the subdomain makes the builder attach the NATIVE Mastra Memory
  * (recent-history replay + working memory on Mongo `erxes_mastra_memory`, via
- * getMastraMemory) whenever the tenant's General Settings memory switch and
- * the agent's memoryEnabled value are on — so Studio lists each real agent AND
- * its per-agent history tab lights up, with zero schema translation.
+ * getMastraMemory) whenever the tenant's General Settings memory switch is on
+ * — so Studio lists each real agent and its history tab, with zero schema
+ * translation.
  * Resilient per-agent: build failures (gateway down or missing provider key)
  * are logged and skipped.
  *
@@ -33,7 +33,7 @@ export async function buildStudioAgents(): Promise<Record<string, Agent>> {
   let configs: IMastraAgentDocument[];
   try {
     models = await studioModels();
-    configs = await models.MastraAgent.getAgentsInternal();
+    configs = await models.MastraAgent.getAgents();
   } catch (err) {
     console.error(
       '[erxes-studio] could not load agents from Mongo:',
@@ -87,12 +87,10 @@ export async function buildStudioAgents(): Promise<Record<string, Agent>> {
         );
       }
       agents[keyOf(cfg)] = agent;
-      console.log(`[erxes-studio] registered: ${cfg.name} (${keyOf(cfg)})`);
+      console.log(`[erxes-studio] registered: ${cfg._id} (${keyOf(cfg)})`);
     } catch (err) {
       console.error(
-        `[erxes-studio] skipped ${cfg?.name ?? cfg?._id}: ${
-          (err as Error).message
-        }`,
+        `[erxes-studio] skipped ${cfg._id}: ${(err as Error).message}`,
       );
     }
   }

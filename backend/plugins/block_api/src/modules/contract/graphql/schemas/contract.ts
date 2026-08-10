@@ -1,9 +1,4 @@
 export const types = `
-  enum BlockContractPartyType {
-    customer
-    company
-  }
-
   enum BlockContractInterestType {
     SIMPLE
     FLAT
@@ -68,21 +63,10 @@ export const types = `
     date: String
     amount: Float
     status: String
-    party: BlockContractParty
+    customerId: String
     paymentPlan: BlockContractPaymentPlan
     user: String
   }
-
-  type BlockContractParty {
-    type: BlockContractPartyType
-    id: String
-  }
-
-  input BlockContractPartyInput {
-    type: BlockContractPartyType
-    id: String
-  }
-
 
   input BlockContractInput {
     unit: String!
@@ -91,7 +75,7 @@ export const types = `
     date: String
     amount: Float
     status: String
-    party: BlockContractPartyInput
+    customerId: String
     paymentPlan: BlockContractPaymentPlanInput
     user: String
   }
@@ -101,6 +85,7 @@ export const mutations = `
   blockCreateContract(input: BlockContractInput!): BlockContract
   blockUpdateContract(_id: String!, input: BlockContractInput!): BlockContract
   blockUpdateContractStatus(_id: String!, status: String!): BlockContract
+  blockManualSyncContract(contractId: String!): BlockContract
 `;
 
 export const queries = `
@@ -133,7 +118,7 @@ export const filterInputTypes = `
     unit: String
     search: String
     status: String
-    partyType: String
+    customerId: String
     currency: String
     dateFrom: String
     dateTo: String

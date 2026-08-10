@@ -36,22 +36,22 @@ export const useContractsFilterVariables = (variables?: {
   }>();
   const projectId = projectIdParam || id || '';
 
-  const { searchValue, status, partyType, currency, date, user } =
+  const { searchValue, status, customerId, currency, date, user } =
     useNonNullMultiQueryState<{
       searchValue: string;
       status: string;
-      partyType: string;
+      customerId: string;
       currency: string;
       date: string;
       user: string;
-    }>(['searchValue', 'status', 'partyType', 'currency', 'date', 'user']);
+    }>(['searchValue', 'status', 'customerId', 'currency', 'date', 'user']);
 
   return {
     filter: {
       projectId: projectId || undefined,
       search: searchValue || undefined,
       status: status || undefined,
-      partyType: partyType || undefined,
+      customerId: customerId || undefined,
       currency: currency || undefined,
       user: user || undefined,
       ...variables,

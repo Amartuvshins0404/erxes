@@ -1,4 +1,5 @@
 import { supplierMutations } from '@/supplier/graphql/resolvers/mutations/supplier';
+import { orderMutations } from '@/supplier/graphql/resolvers/mutations/order';
 import { productMutations } from '@/product/graphql/resolvers/mutations/product';
 import { productSpecificationMutations } from '@/product-specification/graphql/resolvers/mutations/productSpecification';
 import { configMutations } from '@/config/graphql/resolvers/mutations/config';
@@ -8,6 +9,7 @@ import { collectiveMutations } from '@/collective/graphql/resolvers/mutations/co
 
 export const mutations = {
   ...supplierMutations,
+  ...orderMutations,
   ...productMutations,
   ...productSpecificationMutations,
   ...configMutations,

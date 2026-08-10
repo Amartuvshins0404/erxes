@@ -11,6 +11,7 @@ import {
   isRealToolData,
   isSearchResult,
 } from '@/agent/fallback';
+import { ensureWebsiteDeliveryReply } from '@/agent/websiteDelivery';
 
 // Turn execution (blocking). Runs a single agent turn over the full
 // conversation array and returns the reply text (or null). With native
@@ -23,13 +24,19 @@ export async function runAgentTurn(params: {
   message: string;
   authCtx: TurnAuthCtx;
   memory?: MemoryBinding;
+  activeTools: string[];
+  turnInstructions: string;
 }): Promise<string | null> {
-  const { agent, convo, message, authCtx, memory } = params;
-  const genOpts = memory ? { memory } : undefined;
+  const { agent, convo, message, authCtx, memory, activeTools } = params;
+  const genOpts = {
+    activeTools,
+    instructions: params.turnInstructions,
+    ...(memory ? { memory } : {}),
+  };
   // With a memory binding, hand generate() the new user message as a STRING —
   // Mastra Memory only persists (and recalls against) string input; passing the
-  // convo array silently skips the save. (Recent history + recall come from
-  // Mastra Memory itself; the learned digest is already woven into `message`.)
+  // convo array silently skips the save. Recent history and recall come from
+  // Mastra Memory itself.
   const input = memory ? message : convo;
 
   try {
@@ -37,21 +44,35 @@ export async function runAgentTurn(params: {
       agent.generate(input, genOpts),
     );
 
-    if (result.text) return result.text;
-
-    // Collect tool results from all steps, deduplicated.
     const uniqueResults = dedupeToolResults([
       ...(result.toolResults || []),
       ...(result.steps || []).flatMap((step) => step.toolResults || []),
     ]);
+    const publishAttempted = uniqueResults.some(
+      (toolResult) =>
+        (toolResult.toolName || toolResult.name) === 'publishWebsite',
+    );
+
+    if (result.text) {
+      return ensureWebsiteDeliveryReply({
+        reply: result.text,
+        publishAttempted,
+        websiteArtifactCount: authCtx.websiteArtifactCount,
+      });
+    }
 
     if (!uniqueResults.length) return null;
 
-    return await synthesizeFromToolResults({
+    const reply = await synthesizeFromToolResults({
       agent,
       message,
       authCtx,
       toolResults: uniqueResults,
+    });
+    return ensureWebsiteDeliveryReply({
+      reply,
+      publishAttempted,
+      websiteArtifactCount: authCtx.websiteArtifactCount,
     });
   } catch (err) {
     throw toUserFacingError(err);
@@ -166,7 +187,12 @@ export async function synthesizeFromToolResults(params: {
 
   try {
     const synthesis = await runWithAuth(authCtx, () =>
-      agent.generate(synthesisMessages, { maxSteps: 1 }),
+      agent.generate(synthesisMessages, {
+        maxSteps: 1,
+        activeTools: [],
+        instructions:
+          'Summarize supplied tool results accurately in one or two sentences. Never call tools.',
+      }),
     );
     return synthesis.text || fallback || 'Done.';
   } catch {

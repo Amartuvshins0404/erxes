@@ -1,4 +1,4 @@
-import { IconMessageCircle, IconRobot, IconSitemap } from '@tabler/icons-react';
+import { IconMessageCircle, IconRobot } from '@tabler/icons-react';
 import { NavigationMenuLinkItem } from 'erxes-ui';
 import { usePermissionCheck } from 'ui-modules';
 import { ERXES_AGENT_ACTIONS } from '~/permissions';
@@ -30,9 +30,6 @@ export const MastraNavigation = () => {
   const canReadAgents = hasActionPermission(
     ERXES_AGENT_ACTIONS.agent.readSummary,
   );
-  const canReadWorkflows = hasActionPermission(
-    ERXES_AGENT_ACTIONS.workflow.read,
-  );
 
   return (
     <>
@@ -42,13 +39,6 @@ export const MastraNavigation = () => {
           name="Agents"
           icon={IconRobot}
           path="erxes-agent/agents"
-        />
-      )}
-      {canReadWorkflows && (
-        <NavigationMenuLinkItem
-          name="Workflows"
-          icon={IconSitemap}
-          path="erxes-agent/workflows"
         />
       )}
     </>

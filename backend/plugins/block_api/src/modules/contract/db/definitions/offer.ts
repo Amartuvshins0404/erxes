@@ -3,20 +3,7 @@ import {
   BlockProjectPaymentPlanFrequency,
   BlockProjectPaymentPlanInterestType,
 } from '@/project/@types/payment';
-import { ContractPartyType } from '@/contract/@types/contract';
 import { OfferStatus } from '@/contract/@types/offer';
-
-const offerPartySchema = new Schema(
-  {
-    type: {
-      type: String,
-      enum: Object.values(ContractPartyType),
-      required: true,
-    },
-    id: { type: String, required: true },
-  },
-  { _id: false },
-);
 
 const offerPaymentPlanSchema = new Schema(
   {
@@ -61,7 +48,7 @@ export const offerSchema = new Schema(
     date: { type: Date, required: true },
     amount: { type: Number, required: true },
     endDate: { type: Date },
-    party: { type: offerPartySchema, required: true },
+    customerId: { type: String, required: true },
     description: { type: String },
     paymentPlan: { type: offerPaymentPlanSchema, required: true },
     status: {

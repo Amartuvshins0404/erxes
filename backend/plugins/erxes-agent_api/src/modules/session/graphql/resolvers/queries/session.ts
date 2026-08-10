@@ -5,7 +5,7 @@ import {
   assertThreadOwned,
 } from '@/session/nativeStore';
 import { requireUserId } from '@/_shared/auth';
-import { requireScopedWorkflowAgent } from '@/workflow/authorization';
+import { requireScopedAgent } from '@/agent/authorization';
 import { ERXES_AGENT_ACTIONS } from '~/meta/permissionActions';
 
 // Threads are private: every query requires a logged-in user and is filtered
@@ -25,7 +25,7 @@ export const sessionQueries = {
     { models, user, subdomain, checkPermission }: IContext,
   ) => {
     await checkPermission(ERXES_AGENT_ACTIONS.agent.chat);
-    await requireScopedWorkflowAgent({
+    await requireScopedAgent({
       models,
       subdomain,
       user,

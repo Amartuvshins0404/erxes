@@ -5,8 +5,7 @@ export type ContractPaymentStatus = 'unpaid' | 'partial' | 'paid' | 'cancelled';
 export interface IContractPayment {
   contractId: string;
   contractNumber?: string;
-  partyId?: string;
-  partyType?: string;
+  customerId?: string;
   projectId?: string;
   unit?: string;
   index: number;

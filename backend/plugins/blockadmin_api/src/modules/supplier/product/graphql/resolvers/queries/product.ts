@@ -1,10 +1,17 @@
 import { IContext } from '~/connectionResolvers';
 import { ProductQueryParams } from '@/supplier/product/@types/product';
 import { BA_PRODUCT_STATE } from '@/supplier/product/db/definitions/product';
-import { ICursorPaginateParams } from 'erxes-api-shared/core-types';
-import { cursorPaginateAggregation } from 'erxes-api-shared/utils';
+import {
+  ICursorPaginateParams,
+  IOffsetPaginateParams,
+  Resolver,
+} from 'erxes-api-shared/core-types';
+import {
+  cursorPaginateAggregation,
+  defaultPaginate,
+} from 'erxes-api-shared/utils';
 
-export const productQueries = {
+export const productQueries: Record<string, Resolver> = {
   baProducts: async (
     _root: undefined,
     params: ProductQueryParams & ICursorPaginateParams,
@@ -71,4 +78,49 @@ export const productQueries = {
   ) => {
     return models.SupplierProduct.getProduct(_id);
   },
+
+  cpBaProducts: async (
+    _root: undefined,
+    params: ProductQueryParams & IOffsetPaginateParams,
+    { models }: IContext,
+  ) => {
+    const { supplierId, categoryId, status, searchValue } = params;
+
+    const filter: any = { state: BA_PRODUCT_STATE.ACTIVE };
+
+    if (supplierId) {
+      const supplier = await models.Supplier.getSupplier(supplierId);
+
+      filter.subdomain = supplier.subdomain;
+    }
+
+    if (categoryId) filter.categoryId = categoryId;
+
+    if (status) filter.status = status;
+
+    if (searchValue) {
+      filter.$or = [
+        { name: { $regex: searchValue, $options: 'i' } },
+        { code: { $regex: searchValue, $options: 'i' } },
+      ];
+    }
+
+    return defaultPaginate(models.SupplierProduct.find(filter), params);
+  },
+
+  cpBaProductDetail: async (
+    _root: undefined,
+    { _id }: { _id: string },
+    { models }: IContext,
+  ) => {
+    return models.SupplierProduct.getProduct(_id);
+  },
+};
+
+productQueries.cpBaProducts.wrapperConfig = {
+  forClientPortal: true,
+};
+
+productQueries.cpBaProductDetail.wrapperConfig = {
+  forClientPortal: true,
 };

@@ -1,8 +1,101 @@
 import { Badge, Button, Spinner, toast } from 'erxes-ui';
-import { IconCloudCheck, IconCloudUpload } from '@tabler/icons-react';
+import { IconCloudCheck, IconCloudUpload, IconRefresh } from '@tabler/icons-react';
 import { useCustomerSync, useSyncCustomer } from '@/admin/hooks/useCustomerSync';
+import { useCustomerContracts } from '@/contract/hooks/useCustomerContracts';
+import { useManualSyncContract } from '@/contract/hooks/useManualSyncContract';
+import { IContract } from '@/contract/types/contractTypes';
 
 const ALLOWED_CONTENT_TYPES = ['core:customer', 'block:contract'];
+
+const ContractSyncRow = ({
+  contract,
+  access,
+}: {
+  contract: IContract;
+  access: 'read' | 'write';
+}) => {
+  const { syncContract, loading } = useManualSyncContract();
+
+  const handleSync = () => {
+    syncContract({
+      variables: { contractId: contract._id },
+      onCompleted: () => {
+        toast({
+          title: 'Contract synced to Block Platform',
+          description: 'Contract info, payments and transactions were synced.',
+          variant: 'success',
+        });
+      },
+      onError: (error) => {
+        toast({
+          title: 'Sync failed',
+          description: error.message,
+          variant: 'destructive',
+        });
+      },
+    });
+  };
+
+  return (
+    <div className="flex items-center justify-between gap-2 py-2 border-b last:border-0">
+      <div className="text-sm min-w-0">
+        <div className="font-medium truncate">
+          {contract.number || contract._id}
+        </div>
+        <div className="text-muted-foreground text-xs">
+          {contract.amount ? `${contract.amount} ${contract.currency || ''}` : ''}
+        </div>
+      </div>
+      {access === 'write' && (
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={handleSync}
+          disabled={loading}
+        >
+          {loading ? <Spinner containerClassName="flex-none" /> : <IconRefresh className="size-4" />}
+        </Button>
+      )}
+    </div>
+  );
+};
+
+const ContractSyncList = ({
+  customerId,
+  access,
+}: {
+  customerId: string;
+  access: 'read' | 'write';
+}) => {
+  const { contracts, loading } = useCustomerContracts(customerId);
+
+  return (
+    <div className="flex flex-col gap-2 p-4 border-t">
+      <span className="font-medium text-primary">Contract Sync</span>
+      <span className="text-xs text-muted-foreground">
+        Manually sync a signed contract, its payments and transactions to
+        Block Platform.
+      </span>
+      {loading ? (
+        <Spinner containerClassName="py-6" />
+      ) : contracts.length ? (
+        <div className="flex flex-col">
+          {contracts.map((contract) => (
+            <ContractSyncRow
+              key={contract._id}
+              contract={contract}
+              access={access}
+            />
+          ))}
+        </div>
+      ) : (
+        <span className="text-sm text-muted-foreground py-2">
+          No contracts found for this customer.
+        </span>
+      )}
+    </div>
+  );
+};
 
 export const CustomerSync = ({
   contentId,
@@ -66,44 +159,47 @@ export const CustomerSync = ({
   };
 
   return (
-    <div className="flex flex-col gap-4 p-4">
-      <div className="flex items-center justify-between">
-        <span className="font-medium text-primary">Block Platform Sync</span>
-        {customerSync ? (
-          <Badge variant="secondary" className="gap-1">
-            <IconCloudCheck className="size-3.5" />
-            Synced
-          </Badge>
-        ) : (
-          <Badge variant="secondary">Not synced</Badge>
-        )}
-      </div>
-      {customerSync && (
-        <div className="text-sm text-muted-foreground space-y-1">
-          <div>
-            Block Platform ID:{' '}
-            <span className="font-mono text-foreground">
-              {customerSync.blockAdminId}
-            </span>
-          </div>
-          {customerSync.updatedAt && (
-            <div>
-              Last synced:{' '}
-              {new Date(customerSync.updatedAt).toLocaleString()}
-            </div>
+    <div className="flex flex-col">
+      <div className="flex flex-col gap-4 p-4">
+        <div className="flex items-center justify-between">
+          <span className="font-medium text-primary">Block Platform Sync</span>
+          {customerSync ? (
+            <Badge variant="secondary" className="gap-1">
+              <IconCloudCheck className="size-3.5" />
+              Synced
+            </Badge>
+          ) : (
+            <Badge variant="secondary">Not synced</Badge>
           )}
         </div>
-      )}
-      {access === 'write' && (
-        <Button
-          variant="secondary"
-          onClick={handleSync}
-          disabled={syncing}
-        >
-          {syncing && <Spinner containerClassName="flex-none" />}
-          {customerSync ? 'Re-sync now' : 'Sync now'}
-        </Button>
-      )}
+        {customerSync && (
+          <div className="text-sm text-muted-foreground space-y-1">
+            <div>
+              Block Platform ID:{' '}
+              <span className="font-mono text-foreground">
+                {customerSync.blockAdminId}
+              </span>
+            </div>
+            {customerSync.updatedAt && (
+              <div>
+                Last synced:{' '}
+                {new Date(customerSync.updatedAt).toLocaleString()}
+              </div>
+            )}
+          </div>
+        )}
+        {access === 'write' && (
+          <Button
+            variant="secondary"
+            onClick={handleSync}
+            disabled={syncing}
+          >
+            {syncing && <Spinner containerClassName="flex-none" />}
+            {customerSync ? 'Re-sync now' : 'Sync now'}
+          </Button>
+        )}
+      </div>
+      <ContractSyncList customerId={targetCustomerId} access={access} />
     </div>
   );
 };

@@ -85,6 +85,7 @@ export const mutations = `
   blockCreateContract(input: BlockContractInput!): BlockContract
   blockUpdateContract(_id: String!, input: BlockContractInput!): BlockContract
   blockUpdateContractStatus(_id: String!, status: String!): BlockContract
+  blockManualSyncContract(contractId: String!): BlockContract
 `;
 
 export const queries = `

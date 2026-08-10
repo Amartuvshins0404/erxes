@@ -70,7 +70,7 @@ export const cpContractQueries = {
       return [];
     }
 
-    return models.ContractPayment.find({ contractId })
+    return models.ContractPayment.find({ contractId: contract.entityId })
       .sort({ dueDate: 1 })
       .lean();
   },
@@ -88,7 +88,9 @@ export const cpContractQueries = {
       return null;
     }
 
-    const payments = await models.ContractPayment.find({ contractId })
+    const payments = await models.ContractPayment.find({
+      contractId: contract.entityId,
+    })
       .sort({ dueDate: 1 })
       .lean();
 

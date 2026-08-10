@@ -143,8 +143,8 @@ export const ContractDetailSheet = () => {
             contentType="block:contract"
             customerId={contract?.customerId}
             hookOptions={{
-              hiddenPlugins: ['sales', 'operation', 'block'],
-              hiddenModules: ['contract', 'company', 'ticket'],
+              hiddenPlugins: ['sales', 'operation'],
+              hiddenModules: ['contract', 'company', 'ticket', 'oppty'],
             }}
           />
         </FocusSheet.Content>

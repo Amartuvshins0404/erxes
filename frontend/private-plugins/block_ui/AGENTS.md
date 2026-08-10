@@ -60,6 +60,7 @@
 ## Local Invariants
 
 - The relation-widget `module` prop dispatched by `core-ui` must exactly match a `name` entry in `config.tsx`'s `widgets.relationWidgets` array (`oppty`, `customerSync`); adding a new widget requires registering it there.
+- Each detail-sheet's own `RelationWidgetSideTabs` call (`ContractDetailSheet.tsx`, `UnitDetailSheet.tsx`, `OfferDetailSheet.tsx`, `OpptyDetailSheet.tsx`, `PaymentTransactionsSheet.tsx`) passes `hookOptions.hiddenPlugins`/`hiddenModules` to suppress specific relation widgets on that page — filtering is by plugin name or module name, not per-page-per-widget, so hiding one block-owned widget (e.g. `oppty`, to avoid recursion) requires listing that module name in `hiddenModules` rather than hiding the whole `block` plugin, or every other block-owned widget (e.g. `customerSync`) disappears too.
 - `CustomerSync`/`ContractSync*` components must degrade gracefully (empty state, no throw) when `contentType` is outside `['core:customer', 'block:contract']` or when no customer is linked — the widget host renders this component in multiple unrelated content-type contexts.
 - Contract payment-plan fields must stay in exact parity (TS type, Zod schema, GraphQL query/mutation selection sets) with `block_api`'s Mongoose schema — Mongoose silently drops any field not declared server-side, so a frontend-only field addition here is inert until mirrored server-side too.
 - `ContractAdd.tsx`/`ContractEditSheet.tsx` gate "has a payment plan" on `paymentPlan?.frequency` (not a nonexistent `.type` field) — this was a previously-fixed bug; don't reintroduce the `.type` check.
@@ -74,6 +75,12 @@
 ## Recent Changes
 
 <!-- Newest first. Keep at most 10 entries. -->
+
+### `2026-08-10` — Fixed sync widget hidden on Contract detail page
+
+- **Summary:** `ContractDetailSheet.tsx` hid the entire `block` plugin (`hiddenPlugins: [..., 'block']`) from its own relation-widget side tabs, which also hid the newly-added "Block Platform Sync" / Contract Sync widget. Narrowed the exclusion to just the `oppty` module (via `hiddenModules`) so `customerSync` now shows.
+- **Affected areas:** `src/modules/contract/components/ContractDetailSheet.tsx`.
+- **Contracts changed:** None.
 
 ### `2026-08-10` — Contract sync widget on Contact page
 

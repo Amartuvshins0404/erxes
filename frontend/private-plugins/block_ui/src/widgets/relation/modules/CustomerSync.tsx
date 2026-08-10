@@ -2,6 +2,7 @@ import { Badge, Button, Spinner, toast } from 'erxes-ui';
 import { IconCloudCheck, IconCloudUpload, IconRefresh } from '@tabler/icons-react';
 import { useCustomerSync, useSyncCustomer } from '@/admin/hooks/useCustomerSync';
 import { useCustomerContracts } from '@/contract/hooks/useCustomerContracts';
+import { useContract } from '@/contract/hooks/useContracts';
 import { useManualSyncContract } from '@/contract/hooks/useManualSyncContract';
 import { IContract } from '@/contract/types/contractTypes';
 
@@ -91,6 +92,38 @@ const ContractSyncList = ({
       ) : (
         <span className="text-sm text-muted-foreground py-2">
           No contracts found for this customer.
+        </span>
+      )}
+    </div>
+  );
+};
+
+// Used on the contract's own detail page: only the contract being viewed is
+// relevant here, so this syncs just that one instead of listing every
+// contract for the linked customer.
+const SingleContractSync = ({
+  contractId,
+  access,
+}: {
+  contractId: string;
+  access: 'read' | 'write';
+}) => {
+  const { contract, loading } = useContract(contractId);
+
+  return (
+    <div className="flex flex-col gap-2 p-4 border-t">
+      <span className="font-medium text-primary">Contract Sync</span>
+      <span className="text-xs text-muted-foreground">
+        Manually sync this signed contract, its payments and transactions to
+        Block Platform.
+      </span>
+      {loading ? (
+        <Spinner containerClassName="py-6" />
+      ) : contract ? (
+        <ContractSyncRow contract={contract} access={access} />
+      ) : (
+        <span className="text-sm text-muted-foreground py-2">
+          Contract not found.
         </span>
       )}
     </div>
@@ -199,7 +232,11 @@ export const CustomerSync = ({
           </Button>
         )}
       </div>
-      <ContractSyncList customerId={targetCustomerId} access={access} />
+      {contentType === 'block:contract' ? (
+        <SingleContractSync contractId={contentId} access={access} />
+      ) : (
+        <ContractSyncList customerId={targetCustomerId} access={access} />
+      )}
     </div>
   );
 };

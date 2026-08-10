@@ -58,7 +58,10 @@
 - HTTP `POST /webhook/{customerSync, blockCreateContract, blockUpdateContract, blockUpdateContractStatus, contractSigned, blockSyncContractPayments}` — all signed contract/customer mirror receivers consumed only by `block_api`.
 - GraphQL supplier profile queries/mutations with `ba*` operation names.
 - GraphQL supplier product queries/mutations with `ba*` operation names.
-- GraphQL client-portal queries `cpBlockAdminGetContracts`, `cpBlockAdminGetContractPayments(contractId)`, `cpBlockAdminGetContractSummary(contractId)` — require an authenticated `cpUser` (`erxesCustomerId`); the latter two verify the requested contract belongs to that customer before returning data.
+- GraphQL client-portal queries — all require an authenticated `cpUser` (`erxesCustomerId`):
+  - `cpBlockAdminGetContracts` — every contract this customer holds, across all orgs.
+  - `cpBlockAdminGetContractPayments(contractId)` / `cpBlockAdminGetContractSummary(contractId)` — scoped to one contract; verify the contract belongs to the requesting customer via `getOwnedContract` before returning data.
+  - `cpBlockAdminGetPayments` / `cpBlockAdminGetSummary` — the same payments/summary shape aggregated across *every* contract the customer holds (no `contractId`), by querying `ContractPayment` directly on `customerId` rather than joining through `Contract`.
 
 ### Consumes
 
@@ -79,6 +82,7 @@
 - `block_admin_contract_payments` is wholesale-replaced (`deleteMany` + `insertMany`) on every sync — never patched row by row — keyed by `{subdomain, contractId}`.
 - `block_admin_customers` (`BlockCustomer`) stores `{customerId, subdomain, entityId}` only (no PII); `entityId` uses `String` (core customer ids are `mongooseStringRandomId`-based, not ObjectIds) via `schemaWrapper`'s `entityIdType` override — every other blockadmin schema keeps the default `ObjectId` `entityId`.
 - Client-portal queries intentionally do not filter by `subdomain` — a customer's contracts are looked up purely by `customerId` across all orgs; per-contract queries additionally verify ownership via `BlockCustomer` → `Contract.customerId`.
+- `ContractPayment` rows carry their own `customerId` (mirrored from block_api's payment rows, which inherit it from their parent contract), so user-wide payment/summary queries can query `ContractPayment` directly without joining through `Contract` first.
 
 ## Local Invariants
 
@@ -102,6 +106,18 @@
 ## Recent Changes
 
 <!-- Newest first. Keep at most 10 entries. -->
+
+### `2026-08-10` — User-wide payments/summary client-portal queries
+
+- **Summary:** Added `cpBlockAdminGetPayments`/`cpBlockAdminGetSummary`, aggregating across every contract a customer holds (no `contractId` arg), alongside the existing per-contract `cpBlockAdminGetContractPayments`/`cpBlockAdminGetContractSummary`. Both query `ContractPayment` directly by `customerId` rather than joining through `Contract`. Extracted shared `getBlockCustomer`/`summarizePayments` helpers used by all four query resolvers. Added `contractId`/`contractNumber` to `CpBlockPayment` so multi-contract payment rows are distinguishable.
+- **Affected areas:** `src/modules/clientportal/graphql/resolvers/queries/contract.ts`, `src/modules/clientportal/graphql/schemas/contract.ts`.
+- **Contracts changed:** Added GraphQL queries `cpBlockAdminGetPayments: [CpBlockPayment]` and `cpBlockAdminGetSummary: CpBlockContractSummary`; added fields `CpBlockPayment.contractId`/`contractNumber`.
+
+### `2026-08-10` — Fixed `_id`/`entityId` mismatch breaking client-portal payment/summary lookups
+
+- **Summary:** `cpBlockAdminGetContracts` returned blockAdmin's own internal Mongo `_id` as each contract's `_id`, but `cpBlockAdminGetContractPayments`/`cpBlockAdminGetContractSummary` (and `ContractPayment.contractId`) key off `entityId` (block_api's org-side contract id) — a different value — so a client round-tripping the list's `_id` into either follow-up query always got an empty/null result. `cpBlockAdminGetContracts` now returns `entityId` as `_id`.
+- **Affected areas:** `src/modules/clientportal/graphql/resolvers/queries/contract.ts`.
+- **Contracts changed:** `cpBlockAdminGetContracts[]._id` now returns the org-side contract id (matches `Contract.entityId`) instead of blockAdmin's internal document `_id`.
 
 ### `2026-08-10` — Fixed immutable `_id` error on contract re-sync
 

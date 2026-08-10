@@ -8,6 +8,8 @@ export const types = `
 
   type CpBlockPayment {
     _id: String
+    contractId: String
+    contractNumber: String
     index: Int
     label: String
     dueDate: Date
@@ -44,4 +46,6 @@ export const queries = `
   cpBlockAdminGetContracts: [CpBlockContract]
   cpBlockAdminGetContractPayments(contractId: String!): [CpBlockPayment]
   cpBlockAdminGetContractSummary(contractId: String!): CpBlockContractSummary
+  cpBlockAdminGetPayments: [CpBlockPayment]
+  cpBlockAdminGetSummary: CpBlockContractSummary
 `;

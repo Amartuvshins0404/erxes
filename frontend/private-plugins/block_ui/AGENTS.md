@@ -24,7 +24,7 @@
 
 - Dev port **3007**. Registers with `core-ui` as module `block`, with a navigation group, a floating widget (`hasFloatingWidget: true`), and relation-widget modules `oppty` and `customerSync` (label "Block Platform Sync") shown wherever a content record (contact, company, contract, ...) hosts relation widgets.
 - Full CRUD UI for projects, buildings, units, unit types, opportunities, contracts (with payment-plan builder validated by Zod — `frequency` is required whenever any other payment-plan field is filled), offers, stacking plan, developer info.
-- "Block Platform Sync" relation widget (`src/widgets/relation/modules/CustomerSync.tsx`): shows the linked core customer's block-admin sync status with a manual (re-)sync button, and — since 2026-08-10 — a "Contract Sync" section listing the customer's contracts, each with a manual sync action that calls `blockManualSyncContract`. Renders in `core:customer` context (contentId = customerId) and `block:contract` context (contentId = contract id, customerId passed separately).
+- "Block Platform Sync" relation widget (`src/widgets/relation/modules/CustomerSync.tsx`): shows the linked core customer's block-admin sync status with a manual (re-)sync button, plus a "Contract Sync" section that calls `blockManualSyncContract`. In `core:customer` context (Contact page, contentId = customerId) it lists every contract for that customer; in `block:contract` context (Contract detail page, contentId = contract id, customerId passed separately) it shows a sync action for only that one contract, not the full list.
 
 ## Architecture
 
@@ -75,6 +75,12 @@
 ## Recent Changes
 
 <!-- Newest first. Keep at most 10 entries. -->
+
+### `2026-08-10` — Contract detail page syncs only the viewed contract
+
+- **Summary:** On the Contract detail page's "Block Platform Sync" widget, the "Contract Sync" section previously listed every contract for the linked customer (correct for the Contact page, redundant here). Added `SingleContractSync`, used only in `block:contract` context, which shows a sync action for just the contract being viewed.
+- **Affected areas:** `src/widgets/relation/modules/CustomerSync.tsx`.
+- **Contracts changed:** None.
 
 ### `2026-08-10` — Fixed sync widget hidden on Contract detail page
 

@@ -6,7 +6,7 @@
 - **Project:** `supplier_api`
 - **Layer:** `Backend API`
 - **Path:** `backend/plugins/supplier_api`
-- **Last synchronized:** `2026-08-09`
+- **Last synchronized:** `2026-08-10`
 
 ## Scope
 
@@ -25,7 +25,7 @@
 
 ## Current Capabilities
 
-- Stores and updates the tenant's supplier profile, verification status, tier level, and POS token.
+- Stores and updates the tenant's supplier profile, including industry, verification status, tier level, and POS token.
 - Sends supplier profile updates to configured consumer platforms through signed webhooks.
 - Listens to core product/category create, update, and delete after-mutation events and sends signed `syncProduct` / `syncProductCategory` webhooks to target consumer platforms.
 - Sends product/category create and update sync only for products/categories included in the supplier's selected POS catalog, regardless of target consumer platform.
@@ -64,6 +64,7 @@
 ## Data and State
 
 - Tenant-scoped supplier Mongo models are generated through `generateModels(subdomain)`.
+- Supplier profile data includes nullable `industry`, which is sent to consumer platforms during profile sync.
 - Supplier POS token defines the product/category publish scope for every consumer platform and drives replayable backfill jobs.
 - Consumer platform targets are selected by SaaS bundle type and `MUSHOP_SUPPLIER_BUNDLE_TYPE` / `BLOCK_ADMIN_SUPPLIER_BUNDLE_TYPE`; development falls back to configured consumers when bundle targeting is unavailable.
 - Product/category sync state is not stored here; consumer plugins own synced copies.
@@ -84,6 +85,12 @@
 ## Recent Changes
 
 <!-- Newest first. Keep at most 10 entries. -->
+
+### `2026-08-10` — `Supplier industry profile field`
+
+- **Summary:** Added nullable supplier `industry` to the source supplier profile schema, GraphQL type/input, and profile sync payload.
+- **Affected areas:** `src/modules/supplier/@types/supplier.ts`, `src/modules/supplier/db/definitions/supplier.ts`, `src/modules/supplier/graphql/schemas/supplier.ts`
+- **Contracts changed:** Added nullable `Supplier.industry` and `SupplierInput.industry`.
 
 ### `2026-08-09` — `Selected POS product webhook sync`
 

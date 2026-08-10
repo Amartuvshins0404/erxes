@@ -6,7 +6,7 @@
 - **Project:** `mushop_ui`
 - **Layer:** `Frontend UI`
 - **Path:** `frontend/private-plugins/mushop_ui`
-- **Last synchronized:** `2026-08-08`
+- **Last synchronized:** `2026-08-10`
 
 ## Scope
 
@@ -22,7 +22,7 @@
 
 ## Current Capabilities
 
-- **Suppliers** (`suppliers`): cursor-paginated list, filter (search/verification/created/founded), detail `FocusSheet` (overview + activity log), verification/tier/POS actions.
+- **Suppliers** (`suppliers`): cursor-paginated list, filter (search/verification/created/founded), detail `FocusSheet` (overview + activity log with synced industry), verification/tier/POS actions.
 - **Products** (`products`): cursor-paginated list, filter (search/category/status), detail sheet, status/category actions.
 - **Orders** (`orders`): cursor-paginated list of orders forwarded to suppliers (`mushopOrders`), filterable by order ID, status (`pending`/`forwarded`/`cancelled`/`failed`), supplier, and created date. Detail `FocusSheet` (`mushopOrderDetail`) shows status, forwarding error, resolved supplier, resolved customer, parsed line items (when the payload has `items`), amounts, and the raw JSON payload for diagnosis. The `error` field (table cell and detail row) renders through `humanizeOrderError`/`OrderErrorText`: a friendly reason by default, click to toggle to the raw backend message and back. **Resync**: `OrderResyncButton` (next to the status badge, in both the table and the detail sheet's General card) calls `mushopResyncOrder` to re-send the order to its supplier — only rendered for `pending`/`failed` orders, and only for users with the `mushopResyncOrder` action (admin group only by default).
 - **Members** (`members`): membership list/detail, grant membership flow, cancel/status/end-date actions, payment mirror.
@@ -55,6 +55,7 @@ Each domain module follows the same internal shape: `types.ts`, `constants/curso
 
 - `erxes-ui` (`RecordTable`, `FocusSheet`, `Filter`, `Combobox`, `InfoCard`, `Sheet`, `Table`, cursor-pagination helpers, `useQueryState`/`useMultiQueryState`) and `ui-modules` (`PageHeader`, `Can`, `ActivityLogs`, `usePermissionCheck`).
 - `mushop_api` GraphQL only (queries/mutations prefixed `mushop`/`cp`); never calls another plugin's backend directly.
+- Supplier detail consumes nullable `MushopSupplier.industry`.
 
 ## Data and State
 
@@ -80,6 +81,12 @@ Each domain module follows the same internal shape: `types.ts`, `constants/curso
 ## Recent Changes
 
 <!-- Newest first. Keep at most 10 entries. -->
+
+### `2026-08-10` — `Supplier industry displayed`
+
+- **Summary:** Supplier detail now queries and displays the synced supplier industry field.
+- **Affected areas:** `src/modules/supplier/graphql/supplierDetail.ts`, `src/modules/supplier/types.ts`, `src/modules/supplier/components/SupplierDetailSheet.tsx`
+- **Contracts changed:** Consumes nullable `MushopSupplier.industry`.
 
 ### `2026-08-08` — Order resync action
 

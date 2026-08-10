@@ -13,6 +13,7 @@ export const MUSHOP_SUPPLIER_DETAIL = gql`
       attachments
       urls
       registrationNumber
+      industry
       address
       primaryEmail
       primaryPhone

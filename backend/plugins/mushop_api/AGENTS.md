@@ -6,7 +6,7 @@
 - **Project:** `mushop_api`
 - **Layer:** `Backend API`
 - **Path:** `backend/plugins/mushop_api`
-- **Last synchronized:** `2026-08-08`
+- **Last synchronized:** `2026-08-10`
 
 ## Scope
 
@@ -24,7 +24,7 @@
 
 ## Current Capabilities
 
-- Supplier directory: list/detail/verify/tier/POS-assignment (GraphQL `mushopSuppliers*`).
+- Supplier directory: list/detail/verify/tier/POS-assignment (GraphQL `mushopSuppliers*`), including synced supplier industry.
 - Product catalog moderation: list/detail/approve/reject/category-assign (GraphQL `mushopProducts*`).
 - Membership lifecycle: grant/cancel/status/end-date, membership plans, invoices.
 - Collectives (co-shops): group suppliers, replicate approved products into a target SaaS via tRPC, resync.
@@ -65,7 +65,7 @@
 
 ## Data and State
 
-- `mushop_suppliers` — shared schema with `supplier_api`; scoped by `subdomain` (the local tenant) and carries the supplier's own `subdomain`/`posToken` for forwarding.
+- `mushop_suppliers` — shared schema with `supplier_api`; scoped by `subdomain` (the local tenant), carries synced profile fields such as `industry`, and carries the supplier's own `subdomain`/`posToken` for forwarding.
 - `mushop_orders` (`Order` model) — one row per order/action forwarded to (or synced back from) a supplier: `subdomain` (**the supplier's** subdomain, not the local tenant), `order` (raw payload pre-forward, or the supplier's returned order post-forward), `status` (`pending|forwarded|cancelled|failed`), `entityId` (order id at the supplier), `customerId` (local core customer id), `error`. Written by `Order.logForward`/`markResult`/`syncFromSupplier`; never written by the frontend directly.
 - `mushop_products`, `mushop_product_specifications`, `mushop_memberships`, `mushop_membership_plans`, `mushop_collectives`, `mushop_collective_packages`, `mushop_configs` — each subdomain-scoped per `connectionResolvers.ts`.
 
@@ -86,6 +86,12 @@
 ## Recent Changes
 
 <!-- Newest first. Keep at most 10 entries. -->
+
+### `2026-08-10` — `Synced supplier industry`
+
+- **Summary:** Added nullable `industry` to mushop's synced supplier profile schema and GraphQL type.
+- **Affected areas:** `src/modules/supplier/@types/supplier.ts`, `src/modules/supplier/db/definitions/supplier.ts`, `src/modules/supplier/graphql/schemas/supplier.ts`
+- **Contracts changed:** Added nullable `MushopSupplier.industry`.
 
 ### `2026-08-08` — Order resync mutation
 

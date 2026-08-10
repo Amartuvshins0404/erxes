@@ -7,6 +7,7 @@ import type {
 
 const KIMI_REASONING_SEPARATOR = '<|close|>think<|sep|>';
 const PROVIDER_CONTROL_TOKEN = /<\|(?:close|sep)\|>/gi;
+const KIMI_CODING_MODEL = /(?:^|[/_-])kimi[-_]?for[-_]?coding(?:$|[/_-])/i;
 
 export const INCOMPLETE_PROVIDER_REPLY =
   "I couldn't complete the requested work in this run. Please retry the turn.";
@@ -39,6 +40,14 @@ export function shouldGuardProviderOutput(model: string): boolean {
   return /(?:^|[/_-])kimi[-_]?k3(?:$|[/_-])/i.test(model.trim());
 }
 
+/** Models whose tool turns must not settle on promised future work. */
+export function shouldGuardProviderCompletion(model: string): boolean {
+  const normalized = model.trim();
+  return (
+    shouldGuardProviderOutput(normalized) || KIMI_CODING_MODEL.test(normalized)
+  );
+}
+
 export function sanitizeProviderText(raw: string): {
   text: string;
   leakedReasoning: boolean;
@@ -55,15 +64,25 @@ export function sanitizeProviderText(raw: string): {
   };
 }
 
-/** A reply ending in another promised action is progress, not an answer. */
+const ACTION_VERB =
+  '(?:fetch|pull|research|look up|check|build|create|write|generate|open|run|continue|gather|review|inspect|prepare|update|save|publish|deploy|finish|complete|implement)';
+const ACTION_IN_PROGRESS =
+  /^(?:fetching|building|creating|writing|generating|opening|running|continuing|gathering|reviewing|inspecting|preparing|updating|saving|publishing|deploying|finishing|completing|implementing)\b/i;
+const DIRECT_ACTION = new RegExp(
+  `^(?:(?:let me|i(?: need to| am going to))\\s+${ACTION_VERB}\\b|now,?\\s*i(?:['’]ll| will)\\s+${ACTION_VERB}\\b|i(?:['’]ll| will)\\s+${ACTION_VERB}\\b[^.!?]*\\b(?:now|next|first|then|right away)\\b)`,
+  'i',
+);
+
+/** A reply ending in an immediate promised action is progress, not an answer. */
 export function looksLikeIncompleteProgress(text: string): boolean {
   const normalized = text.replace(/\s+/g, ' ').trim();
   if (!normalized) return true;
 
-  const futureAction =
-    /(?:^|[.!?]\s+)(?:(?:good|great|solid) (?:data|results|stats)(?: so far)?[.!?]\s+)?(?:(?:let me|i(?:'ll| will| need to| am going to)|next,? i(?:'ll| will))\s+(?:fetch|pull|research|look up|check|build|create|write|generate|open|run|continue|gather|review|inspect|prepare|update|save|publish|deploy|finish|complete|implement)|(?:fetching|building|creating|writing|generating|opening|running|continuing|gathering|reviewing|inspecting|preparing|updating|saving|publishing|deploying|finishing|completing|implementing)\s+)/i;
-
-  return futureAction.test(normalized);
+  const sentences = normalized.split(/(?<=[.!?])\s+/);
+  const lastSentence = sentences[sentences.length - 1];
+  return (
+    ACTION_IN_PROGRESS.test(lastSentence) || DIRECT_ACTION.test(lastSentence)
+  );
 }
 
 interface IncompleteTurnMetadata {
@@ -92,13 +111,21 @@ export class ProviderCompletionGuard
 {
   readonly id = 'provider-completion-guard' as const;
   readonly name = 'Provider completion guard';
+
+  constructor(private readonly requireToolOnRetry = true) {}
+
   processInputStep({
     retryCount,
     messages,
+    activeTools,
+    state,
   }: ProcessInputStepArgs<IncompleteTurnMetadata>):
     | ProcessInputStepResult
     | undefined {
-    return retryCount > 0 ? { messages, toolChoice: 'required' } : undefined;
+    state.hasActiveTools = Boolean(activeTools?.length);
+    return this.requireToolOnRetry && state.hasActiveTools && retryCount > 0
+      ? { messages, toolChoice: 'required' }
+      : undefined;
   }
 
   processOutputStep({
@@ -108,8 +135,10 @@ export class ProviderCompletionGuard
     retryCount,
     abort,
     messages,
+    state,
   }: ProcessOutputStepArgs<IncompleteTurnMetadata>): ProcessOutputStepArgs<IncompleteTurnMetadata>['messages'] {
     if (
+      !state.hasActiveTools ||
       !shouldRetryProviderStep({
         text,
         toolCallCount: toolCalls?.length ?? 0,
@@ -145,7 +174,9 @@ export function resolveGuardedReply(input: GuardedReplyInput): GuardedReply {
   const incomplete = !text || looksLikeIncompleteProgress(text);
 
   return {
-    text: incomplete ? INCOMPLETE_PROVIDER_REPLY : text || null,
+    // Keep an incomplete reply empty so the turn finalizer can prefer completed
+    // tool results. Display-only paths apply INCOMPLETE_PROVIDER_REPLY later.
+    text: incomplete ? null : text || null,
     incomplete,
     leakedReasoning,
   };

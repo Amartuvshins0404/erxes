@@ -6,7 +6,7 @@
 - **Project:** `erxes-agent_api`
 - **Layer:** Backend API
 - **Path:** `backend/plugins/erxes-agent_api`
-- **Last synchronized:** `2026-08-07`
+- **Last synchronized:** `2026-08-10`
 
 ## Scope
 
@@ -32,15 +32,15 @@
 
 ## Architecture
 
-| Area             | Path                                                                 | Responsibility                                                                                         |
-| ---------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| Agent runtime    | `backend/plugins/erxes-agent_api/src/mastra/agentRuntime.ts`         | Builds cached Mastra agents, permission-filtered tools, memory, processors, and prompt context.        |
-| Turn preparation | `backend/plugins/erxes-agent_api/src/modules/agent/prepare.ts`       | Resolves identity, ownership, active tools, prompt scope, memory, and attachments.                    |
-| Turn execution   | `backend/plugins/erxes-agent_api/src/mastra/streamTurn.ts`           | Streams model output, tool activity, guarded replies, and persistence reconciliation.                  |
-| Tool execution   | `backend/plugins/erxes-agent_api/src/mastra/tools`                   | Implements operation discovery, erxes calls, files, documents, and workspace tools.                    |
-| Native sessions  | `backend/plugins/erxes-agent_api/src/modules/session/nativeStore.ts` | Translates and owns native thread/message persistence and tenant-scoped session operations.            |
-| Runtime skills   | `backend/plugins/erxes-agent_api/skills`                             | Stores read-only Agent Skills files loaded by the Mastra workspace.                                    |
-| GraphQL API      | `backend/plugins/erxes-agent_api/src/modules/*/graphql`              | Exposes agent, provider, settings, session, and artifact contracts.                                    |
+| Area             | Path                                                                 | Responsibility                                                                                  |
+| ---------------- | -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| Agent runtime    | `backend/plugins/erxes-agent_api/src/mastra/agentRuntime.ts`         | Builds cached Mastra agents, permission-filtered tools, memory, processors, and prompt context. |
+| Turn preparation | `backend/plugins/erxes-agent_api/src/modules/agent/prepare.ts`       | Resolves identity, ownership, active tools, prompt scope, memory, and attachments.              |
+| Turn execution   | `backend/plugins/erxes-agent_api/src/mastra/streamTurn.ts`           | Streams model output, tool activity, guarded replies, and persistence reconciliation.           |
+| Tool execution   | `backend/plugins/erxes-agent_api/src/mastra/tools`                   | Implements operation discovery, erxes calls, files, documents, and workspace tools.             |
+| Native sessions  | `backend/plugins/erxes-agent_api/src/modules/session/nativeStore.ts` | Translates and owns native thread/message persistence and tenant-scoped session operations.     |
+| Runtime skills   | `backend/plugins/erxes-agent_api/skills`                             | Stores read-only Agent Skills files loaded by the Mastra workspace.                             |
+| GraphQL API      | `backend/plugins/erxes-agent_api/src/modules/*/graphql`              | Exposes agent, provider, settings, session, and artifact contracts.                             |
 
 ## Contracts
 
@@ -84,6 +84,12 @@
 ## Recent Changes
 
 <!-- Newest first. Keep at most 10 entries. -->
+
+### `2026-08-10` — Finish Kimi operation turns
+
+- **Summary:** Guards immediate Kimi coding tool-work promises without forcing duplicate tools or changing plain future-tense answers, and makes streamed and blocking chats answer from completed, deduplicated operation results.
+- **Affected areas:** Agent runtime, provider-scoped completion guard, streamed and blocking turn finalization, GraphQL chat, and regression tests.
+- **Contracts changed:** None
 
 ### `2026-08-07` — Fix dynamic operation routing
 
@@ -138,9 +144,3 @@
 - **Summary:** Removed the external analysis client, runtime response checks, metadata, settings, export, dependencies, and deploy files.
 - **Affected areas:** Agent runtime and stream metadata, settings, session types, locales, dependencies, deployment files, and tests.
 - **Contracts changed:** Removed the retired analysis settings fields and chat message metadata field.
-
-### `2026-08-06` — Reduce agent turn latency
-
-- **Summary:** Removed auxiliary title/activity model calls and obsolete summarizer settings, bounded provider retries and tool execution, deduplicated exact calls, serialized state-changing tools, forced result-aware completion after repetitive or overlong matched read flows, excluded mutations from read-only preloads, and made prompt/tool scoping conservative when intent is ambiguous.
-- **Affected areas:** `src/mastra`, agent/session persistence, settings GraphQL/schema, streamed and blocking chat execution.
-- **Contracts changed:** Removed `summarizerProvider` and `summarizerModel` from `MastraSettings`/`MastraSettingsInput`; internal turn execution carries active tool names, turn instructions, and an optional two-call interactive read budget; SSE shapes are unchanged.

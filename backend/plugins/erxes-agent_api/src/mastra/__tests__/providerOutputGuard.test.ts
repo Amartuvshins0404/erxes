@@ -5,6 +5,7 @@ import {
   resolveGuardedReply,
   sanitizePersistedProviderOutput,
   sanitizeProviderText,
+  shouldGuardProviderCompletion,
   shouldGuardProviderOutput,
   shouldRetryProviderStep,
 } from '../providerOutputGuard';
@@ -18,6 +19,13 @@ describe('providerOutputGuard', () => {
     expect(shouldGuardProviderOutput('moonshotai/Kimi-K3')).toBe(true);
     expect(shouldGuardProviderOutput('kimi-k3')).toBe(true);
     expect(shouldGuardProviderOutput('moonshotai/Kimi-K2.5')).toBe(false);
+  });
+
+  it('guards Kimi coding tool turns without buffering their reasoning', () => {
+    expect(shouldGuardProviderCompletion('kimi-for-coding-highspeed')).toBe(
+      true,
+    );
+    expect(shouldGuardProviderCompletion('gpt-4o')).toBe(false);
   });
 
   it('removes a leaked reasoning prefix and control tokens', () => {
@@ -41,25 +49,34 @@ describe('providerOutputGuard', () => {
     });
   });
 
-  it('replaces unfinished narration with an explicit failed-turn result', () => {
+  it('leaves unfinished narration empty so tool results can become the answer', () => {
     expect(
       resolveGuardedReply({
         latestText:
           'Good data. Fetching two detailed sources for the landing page.',
         allText:
           'private chain<|close|>think<|sep|>Good data. Fetching two detailed sources for the landing page.',
-      }).text,
-    ).toBe(INCOMPLETE_PROVIDER_REPLY);
+      }),
+    ).toEqual({
+      text: null,
+      incomplete: true,
+      leakedReasoning: true,
+    });
   });
 
-  it('retries the exact stalled continuation before ending the turn', () => {
-    expect(
-      shouldRetryProviderStep({
-        text: 'Let me update my notes and build the landing page now.',
-        toolCallCount: 0,
-        finishReason: 'stop',
-      }),
-    ).toBe(true);
+  it('retries stalled continuations before ending the turn', () => {
+    for (const text of [
+      'Let me update my notes and build the landing page now.',
+      'I’ll pull up the teams on your system now.',
+    ]) {
+      expect(
+        shouldRetryProviderStep({
+          text,
+          toolCallCount: 0,
+          finishReason: 'stop',
+        }),
+      ).toBe(true);
+    }
   });
 
   it('retries the reported build promise instead of settling it', () => {
@@ -101,13 +118,30 @@ describe('providerOutputGuard', () => {
     ).toBe(false);
   });
 
-  it('forces a tool call on the single corrective retry', () => {
+  it('keeps ordinary future-tense answers', () => {
+    for (const text of [
+      'I’ll build a report if you ask for one.',
+      'I’ll build another report if requested. The current total is 12.',
+    ]) {
+      expect(
+        shouldRetryProviderStep({
+          text,
+          toolCallCount: 0,
+          finishReason: 'stop',
+        }),
+      ).toBe(false);
+    }
+  });
+
+  it('only forces a tool call when the provider requires it', () => {
     const guard = new ProviderCompletionGuard();
     const messages: unknown[] = [];
     const args = (retryCount: number) =>
       ({
         retryCount,
         messages,
+        activeTools: ['search_tools'],
+        state: {},
       } as unknown as Parameters<
         ProviderCompletionGuard['processInputStep']
       >[0]);
@@ -117,6 +151,34 @@ describe('providerOutputGuard', () => {
       messages,
       toolChoice: 'required',
     });
+    expect(
+      new ProviderCompletionGuard(false).processInputStep(args(1)),
+    ).toBeUndefined();
+  });
+
+  it('does not retry when the turn has no active tools', () => {
+    const guard = new ProviderCompletionGuard();
+    const state: Record<string, unknown> = {};
+    const messages: unknown[] = [];
+    guard.processInputStep({
+      retryCount: 0,
+      messages,
+      activeTools: [],
+      state,
+    } as never);
+    const abort = jest.fn();
+
+    const result = guard.processOutputStep({
+      text: 'I’ll pull up the teams on your system now.',
+      toolCalls: [],
+      retryCount: 0,
+      state,
+      messages,
+      abort,
+    } as never);
+
+    expect(result).toBe(messages);
+    expect(abort).not.toHaveBeenCalled();
   });
 
   it('sanitizes a previously persisted leaked turn without raw text parts', () => {

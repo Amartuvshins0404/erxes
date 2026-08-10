@@ -12,6 +12,7 @@ import {
   isSearchResult,
 } from '@/agent/fallback';
 import { ensureWebsiteDeliveryReply } from '@/agent/websiteDelivery';
+import { looksLikeIncompleteProgress } from '~/mastra/providerOutputGuard';
 
 // Turn execution (blocking). Runs a single agent turn over the full
 // conversation array and returns the reply text (or null). With native
@@ -26,8 +27,17 @@ export async function runAgentTurn(params: {
   memory?: MemoryBinding;
   activeTools: string[];
   turnInstructions: string;
+  guardProviderCompletion: boolean;
 }): Promise<string | null> {
-  const { agent, convo, message, authCtx, memory, activeTools } = params;
+  const {
+    agent,
+    convo,
+    message,
+    authCtx,
+    memory,
+    activeTools,
+    guardProviderCompletion,
+  } = params;
   const genOpts = {
     activeTools,
     instructions: params.turnInstructions,
@@ -53,7 +63,13 @@ export async function runAgentTurn(params: {
         (toolResult.toolName || toolResult.name) === 'publishWebsite',
     );
 
-    if (result.text) {
+    const incompleteText =
+      guardProviderCompletion &&
+      !!result.text &&
+      uniqueResults.length > 0 &&
+      looksLikeIncompleteProgress(result.text);
+
+    if (result.text && !incompleteText) {
       return ensureWebsiteDeliveryReply({
         reply: result.text,
         publishAttempted,
@@ -61,7 +77,7 @@ export async function runAgentTurn(params: {
       });
     }
 
-    if (!uniqueResults.length) return null;
+    if (!uniqueResults.length) return result.text || null;
 
     const reply = await synthesizeFromToolResults({
       agent,
@@ -90,7 +106,7 @@ const ERROR_RULES: { test: RegExp; message: string }[] = [
       'The AI provider is temporarily rate-limited. Please wait a moment and try again.',
   },
   {
-    test: /unauthorized|forbidden|permission|access denied|invalid api key|\b401\b|\b403\b/i,
+    test: /unauthorized|forbidden|permission|access denied|invalid (?:api key|authentication)|\b401\b|\b403\b/i,
     message:
       "I couldn't complete that — it needs a permission or credential that isn't available. Please check with an admin.",
   },
@@ -157,7 +173,16 @@ export async function synthesizeFromToolResults(params: {
 
   // Catalog navigation is not an action result; only direct operation/builtin
   // results decide whether the turn produced something real to report.
-  const actionResults = toolResults.filter((tr) => !isSearchResult(tr));
+  const seenResults = new Set<string>();
+  const actionResults = toolResults.filter((tr) => {
+    if (isSearchResult(tr)) return false;
+    const name = tr.toolName || tr.name || 'tool';
+    const data = tr.result ?? tr;
+    const key = `${name}\u0000${JSON.stringify(data)}`;
+    if (seenResults.has(key)) return false;
+    seenResults.add(key);
+    return true;
+  });
   const hasRealResult = actionResults.some((tr) =>
     isRealToolData(tr.result ?? tr),
   );
@@ -190,6 +215,7 @@ export async function synthesizeFromToolResults(params: {
       agent.generate(synthesisMessages, {
         maxSteps: 1,
         activeTools: [],
+        toolChoice: 'none',
         instructions:
           'Summarize supplied tool results accurately in one or two sentences. Never call tools.',
       }),

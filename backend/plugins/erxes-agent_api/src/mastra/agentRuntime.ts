@@ -32,6 +32,7 @@ import { RepeatedToolCallFilter } from './repeatedToolCallFilter';
 import {
   PROVIDER_COMPLETION_MAX_RETRIES,
   ProviderCompletionGuard,
+  shouldGuardProviderCompletion,
   shouldGuardProviderOutput,
 } from './providerOutputGuard';
 import { getRuntimeSkillsWorkspace } from './runtimeSkills';
@@ -129,7 +130,7 @@ const enforceDelegatedPermissionCeiling = async ({
 };
 
 // Increment this whenever routing.ts, the meta-tools, or provider logic changes.
-const ROUTING_VERSION = 39;
+const ROUTING_VERSION = 40;
 
 export interface AgentPromptContext {
   agentInstructions: string;
@@ -455,8 +456,10 @@ export async function getOrCreateAgent(
   // workspace makes Mastra add its skill discovery processor and skill tools.
   const hasExecutableTools = hasErxes || toolNames.length > 0;
   const completionGuard =
-    hasExecutableTools && shouldGuardProviderOutput(agentConfig.model)
-      ? new ProviderCompletionGuard()
+    hasExecutableTools && shouldGuardProviderCompletion(agentConfig.model)
+      ? new ProviderCompletionGuard(
+          shouldGuardProviderOutput(agentConfig.model),
+        )
       : null;
 
   const inputProcessors = [

@@ -20,8 +20,9 @@ import {
 import { IMastraChatAttachment } from '@/session/@types/session';
 import { UITurnAccumulator } from '@/agent/uiTurn';
 import {
+  INCOMPLETE_PROVIDER_REPLY,
   resolveGuardedReply,
-  shouldGuardProviderOutput,
+  shouldGuardProviderCompletion,
 } from './providerOutputGuard';
 import { ensureWebsiteDeliveryReply } from '@/agent/websiteDelivery';
 
@@ -184,6 +185,8 @@ async function finalizeTurn(params: {
     if (!reply) {
       reply = interrupted
         ? 'This response was interrupted before it finished. Please tap retry to continue.'
+        : guarded?.incomplete
+        ? INCOMPLETE_PROVIDER_REPLY
         : "I couldn't produce a response for that. Please try again.";
     }
     emitReply = true;
@@ -325,9 +328,9 @@ export async function streamAgentTurn(
       prepared.agentConfig.provider,
       reasoningEffort,
     );
-    const guardProviderText = shouldGuardProviderOutput(
-      prepared.agentConfig.model,
-    );
+    const guardProviderText =
+      prepared.activeTools.length > 0 &&
+      shouldGuardProviderCompletion(prepared.agentConfig.model);
     const bufferProviderText =
       guardProviderText ||
       Object.prototype.hasOwnProperty.call(prepared.tools, 'publishWebsite');

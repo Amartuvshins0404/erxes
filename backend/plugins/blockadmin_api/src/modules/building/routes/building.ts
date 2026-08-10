@@ -19,7 +19,7 @@ router.post(
 
       const project = await models.Project.getProject(subdomain, input.project);
 
-      models.Building.createBuilding({
+      await models.Building.createBuilding({
         ...input,
         subdomain,
         entityId,
@@ -51,7 +51,7 @@ router.post(
 
       const building = await models.Building.getBuilding(subdomain, entityId);
 
-      models.Building.updateBuilding(subdomain, entityId, {
+      await models.Building.updateBuilding(subdomain, entityId, {
         ...input,
         project: building.project,
       });
@@ -77,7 +77,7 @@ router.post(
 
       const { entityId } = payload || {};
 
-      models.Building.deleteBuilding(subdomain, entityId);
+      await models.Building.deleteBuilding(subdomain, entityId);
 
       return res.status(200).json({
         success: true,
@@ -106,7 +106,7 @@ router.post(
 
       const { _id, ...rest } = building;
 
-      models.Building.createBuilding({
+      await models.Building.createBuilding({
         ...rest,
         name: `${rest.name} duplicated`,
         subdomain,

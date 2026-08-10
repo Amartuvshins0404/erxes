@@ -36,11 +36,7 @@ export default {
 
     return building;
   },
-  type: async (
-    { type }: IUnitDocument,
-    _args: any,
-    { models }: IContext,
-  ) => {
+  type: async ({ type }: IUnitDocument, _args: any, { models }: IContext) => {
     const unitType = await models.UnitType.findOne({ _id: type });
 
     if (!unitType) {
@@ -68,6 +64,6 @@ export default {
       return null;
     }
 
-    return models.Project.findOne({ _id: building.project });
+    return models.Project.findOne({ _id: building.project }).lean();
   },
 };

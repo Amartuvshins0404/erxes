@@ -107,6 +107,18 @@
 
 <!-- Newest first. Keep at most 10 entries. -->
 
+### `2026-08-10` — Added `unitDetail`/`project`/`unitType` to the client-portal Contract custom resolver
+
+- **Summary:** `CpBlockContract` only exposed `unit` as a raw unit-id string; added a `CpBlockContract` custom resolver (previously none existed) with `unitDetail` (full Unit record — named to avoid colliding with the existing `unit` id field), `project`, and `unitType` fields that walk `contract.unit → Unit → (zoning → building → project) / type` to return full unit/project/unit-type detail directly from a contract, mirroring the chain already used by the client-portal Unit resolver.
+- **Affected areas:** `src/modules/clientportal/graphql/resolvers/customResolvers/contract.ts` (new), `src/modules/clientportal/graphql/resolvers/customResolvers/index.ts`, `src/modules/clientportal/graphql/schemas/contract.ts`.
+- **Contracts changed:** Added fields `CpBlockContract.unitDetail: CpBlockAdminUnit`, `CpBlockContract.project: BlockAdminProject`, `CpBlockContract.unitType: CpBlockAdminUnitType`.
+
+### `2026-08-10` — Fixed missing `await` on Project/Building/Zoning webhook writes
+
+- **Summary:** Same bug class fixed earlier in the contract webhook routes: `blockCreateProject`/`blockUpdateProjectGeneralInfo`/`blockPublishProject`/`blockRemoveProject`, `blockCreateBuilding`/`blockUpdateBuilding`/`blockDeleteBuilding`/`blockDupplicateBuilding`, and the equivalent zoning routes called their model writes without `await`. Beyond swallowing thrown errors, this let `blockCreateProject` and the immediately-following `blockUpdateProjectGeneralInfo` race each other — the update's `getProject` lookup could run before the create had actually landed, fall into its own `create` branch, and produce a second, full-data project document with a different `_id` than the stub the update should have completed, while `Building.project`/counts kept pointing at the original stub. This is the likely explanation for a project client-portal resolver returning a correct `_id` (matching real building/unit counts) but null on every descriptive field. `unit/routes/unit.ts` was already correctly awaited and needed no change.
+- **Affected areas:** `src/modules/project/routes/project.ts`, `src/modules/building/routes/building.ts`, `src/modules/building/routes/zoning.ts`.
+- **Contracts changed:** None (webhook payload shapes unchanged; fixes how writes are sequenced).
+
 ### `2026-08-10` — Added `project` to the client-portal Unit custom resolver
 
 - **Summary:** `CpBlockAdminUnit` (client-portal unit type) previously only resolved `building`/`zoning`/`type`; added a `project` field resolver that walks `unit.zoning → zoning.building → building.project` to return the unit's project detail directly, matching the existing (non-batched) resolver style in this file.

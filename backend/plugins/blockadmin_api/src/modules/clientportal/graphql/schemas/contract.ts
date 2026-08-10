@@ -23,6 +23,9 @@ export const types = `
   type CpBlockContract {
     _id: String
     unit: String
+    unitDetail: CpBlockAdminUnit
+    project: BlockAdminProject
+    unitType: CpBlockAdminUnitType
     number: String
     currency: String
     date: Date

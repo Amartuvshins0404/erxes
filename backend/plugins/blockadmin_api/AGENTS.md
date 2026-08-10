@@ -107,6 +107,12 @@
 
 <!-- Newest first. Keep at most 10 entries. -->
 
+### `2026-08-10` — Added `project` to the client-portal Unit custom resolver
+
+- **Summary:** `CpBlockAdminUnit` (client-portal unit type) previously only resolved `building`/`zoning`/`type`; added a `project` field resolver that walks `unit.zoning → zoning.building → building.project` to return the unit's project detail directly, matching the existing (non-batched) resolver style in this file.
+- **Affected areas:** `src/modules/clientportal/graphql/resolvers/customResolvers/unit.ts`, `src/modules/clientportal/graphql/schemas/unit.ts`.
+- **Contracts changed:** Added field `CpBlockAdminUnit.project: BlockAdminProject`.
+
 ### `2026-08-10` — User-wide payments/summary client-portal queries
 
 - **Summary:** Added `cpBlockAdminGetPayments`/`cpBlockAdminGetSummary`, aggregating across every contract a customer holds (no `contractId` arg), alongside the existing per-contract `cpBlockAdminGetContractPayments`/`cpBlockAdminGetContractSummary`. Both query `ContractPayment` directly by `customerId` rather than joining through `Contract`. Extracted shared `getBlockCustomer`/`summarizePayments` helpers used by all four query resolvers. Added `contractId`/`contractNumber` to `CpBlockPayment` so multi-contract payment rows are distinguishable.

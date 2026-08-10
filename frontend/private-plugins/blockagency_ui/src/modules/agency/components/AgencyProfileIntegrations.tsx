@@ -60,11 +60,14 @@ export const AgencyIntegrationsInfo = () => {
 
   const { updateAgency } = useUpdateAgency();
 
-  const { Component: SelectErxesMessenger, loading: remoteLoading } =
-    useRemoteComponent<SelectErxesMessengerProps>(
-      'frontline_ui',
-      'selectErxesMessenger',
-    );
+  const {
+    Component: SelectErxesMessenger,
+    loading: remoteLoading,
+    error,
+  } = useRemoteComponent<SelectErxesMessengerProps>(
+    'frontline_ui',
+    'selectErxesMessenger',
+  );
 
   const handleSave = (patch: Partial<AgencyIntegrationsValues>) => {
     const values = { ...form.getValues(), ...patch };
@@ -94,14 +97,20 @@ export const AgencyIntegrationsInfo = () => {
                     }}
                     placeholder="Select erxes messenger integration"
                   />
+                ) : error ? (
+                  <div className="flex h-9 items-center rounded-md border border-destructive/50 px-3 text-sm text-destructive">
+                    Frontline plugin is unavailable
+                  </div>
                 ) : (
                   <Skeleton className="h-9 w-full" />
                 )}
               </Form.Control>
               <Form.Description>
-                {remoteLoading
-                  ? 'Loading erxes messenger integrations…'
-                  : "The erxes messenger integration connected to this agency's account. Selecting one also sets its widget bundle url."}
+                {error
+                  ? 'Enable and start the frontline plugin to connect an erxes messenger integration.'
+                  : remoteLoading
+                    ? 'Loading erxes messenger integrations…'
+                    : "The erxes messenger integration connected to this agency's account. Selecting one also sets its widget bundle url."}
               </Form.Description>
               <Form.Message />
             </Form.Item>

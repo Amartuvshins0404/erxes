@@ -6,7 +6,7 @@
 - **Project:** `blockadmin_api`
 - **Layer:** `Backend API`
 - **Path:** `backend/plugins/blockadmin_api`
-- **Last synchronized:** `2026-08-10`
+- **Last synchronized:** `2026-08-11`
 
 ## Scope
 
@@ -32,6 +32,7 @@
 - Supports product approval/rejection, category assignment, soft-delete by source entity IDs, and supplier verification/tier updates.
 - Mirrors a `block_api` org's signed contracts (create/update/status-change/manual-resync all funnel through one upsert-by-`{subdomain, entityId}` path), their full payment/transaction schedules (bulk-replaced on every sync), and customer identity links (`BlockCustomer`, verified against erxes core by email/phone before linking, keyed by `customerId` = core's customer id).
 - Client-portal GraphQL surface (`clientportal` module) exposing a customer's contracts, per-contract payment schedule, and a computed summary (totals + next payment) — intentionally NOT subdomain-scoped, since a customer may hold contracts across multiple orgs; ownership is instead verified per-request against the authenticated `cpUser`.
+- Client-portal browse surface for agencies and listings (`cpGetBlockAdmin*`): agency directory/detail, and listing directory/detail/stats scoped to publicly visible (`status: 'active'`) listings, optionally narrowed to one agency. These require only a client-portal app token, not a `cpUser`.
 - Exposes blockadmin GraphQL schema sections through `src/apollo/schema/schema.ts`.
 
 ## Architecture
@@ -62,6 +63,10 @@
   - `cpBlockAdminGetContracts` — every contract this customer holds, across all orgs.
   - `cpBlockAdminGetContractPayments(contractId)` / `cpBlockAdminGetContractSummary(contractId)` — scoped to one contract; verify the contract belongs to the requesting customer via `getOwnedContract` before returning data.
   - `cpBlockAdminGetPayments` / `cpBlockAdminGetSummary` — the same payments/summary shape aggregated across *every* contract the customer holds (no `contractId`), by querying `ContractPayment` directly on `customerId` rather than joining through `Contract`.
+- GraphQL client-portal agency/listing browse queries — marked `forClientPortal: true` only, so they need a client-portal app token but no authenticated `cpUser`:
+  - `cpGetBlockAdminAgencies(verificationStatus, searchValue, city, district, + offset params): [CpBlockAdminAgency]` / `cpGetBlockAdminAgencyInfo(_id!): CpBlockAdminAgency`.
+  - `cpGetBlockAdminListings(agencyId, type, propertyType, searchValue, city, district, + offset params): [CpBlockAdminListing]`, `cpGetBlockAdminListing(_id!): CpBlockAdminListing`, `cpGetBlockAdminListingStats(agencyId): CpBlockAdminListingStats`.
+  - `CpBlockAdminAgency` deliberately omits the admin-only `documents`, `rejectionReasons`, and `rejectionNotes` fields; `CpBlockAdminListing` omits `subdomain`/`entityId` and resolves `agencyId` through a custom resolver instead.
 
 ### Consumes
 
@@ -95,6 +100,9 @@
 - `Contract.status` here is a fixed enum (`reserved|draft|signed|lost|cancelled`) mirroring `block_api`'s per-org `ContractStatus.type`, never a raw per-org `ContractStatus._id` reference.
 - `Contract.upsertSignedContract` is the single upsert path for all three of block_api's mirror entry points (create/update/status-change) plus manual re-sync — any of them may be blockadmin's first encounter with a given contract, so it must always upsert, never assume prior existence.
 - `BlockCustomer.resolveBlockCustomer` always re-verifies identity against erxes core by email/phone before linking/upserting; it never trusts a client-supplied `entityId`-only claim.
+- Client-portal listing queries must force `status: 'active'`; `draft`, `inactive`, and `sold` listings stay admin-side. `cpGetBlockAdminListing` therefore returns "Listing not found" for a non-active `_id` rather than the record.
+- Listings carry no `agencyId` column — they are joined to an agency by `subdomain`. Any client-portal `agencyId` filter must resolve the agency first, and an unknown `agencyId` must yield an empty result, never an unfiltered one.
+- `@/agency/utils#generateFilter` covers only `searchValue`/`city`/`district` and silently ignores `verificationStatus`; the client-portal agency query applies that filter itself. Do not assume the shared filter honors every declared query param.
 
 ## Validation
 
@@ -106,6 +114,12 @@
 ## Recent Changes
 
 <!-- Newest first. Keep at most 10 entries. -->
+
+### `2026-08-11` — Client-portal agency and listing browse queries
+
+- **Summary:** Added `cpGetBlockAdminAgencies`, `cpGetBlockAdminAgencyInfo`, `cpGetBlockAdminListings`, `cpGetBlockAdminListing`, and `cpGetBlockAdminListingStats` to the `clientportal` module, reusing the admin `Agency`/`Listing` models and filter utilities but exposing public-safe `CpBlockAdminAgency`/`CpBlockAdminListing` projections, forcing `status: 'active'` on every listing read, and resolving the `agencyId` filter through the agency's `subdomain`.
+- **Affected areas:** `src/modules/clientportal/graphql/schemas/{agency,listing,index}.ts`, `src/modules/clientportal/graphql/resolvers/queries/{agency,listing,index}.ts`, `src/modules/clientportal/graphql/resolvers/customResolvers/{listing,index}.ts`.
+- **Contracts changed:** Added the five `cpGetBlockAdmin*` queries and the `CpBlockAdminAgency`, `CpBlockAdminListing`, `CpBlockAdminListingStats` types.
 
 ### `2026-08-10` — Added `unitDetail`/`project`/`unitType` to the client-portal Contract custom resolver
 

@@ -12,23 +12,6 @@ const getBlockCustomer = async (
   return models.BlockCustomer.findOne({ customerId }).lean();
 };
 
-const getOwnedContract = async (
-  models: IContext['models'],
-  customerId: string | undefined,
-  contractId: string,
-) => {
-  const blockCustomer = await getBlockCustomer(models, customerId);
-
-  if (!blockCustomer) {
-    return null;
-  }
-
-  return models.Contract.findOne({
-    entityId: contractId,
-    customerId: blockCustomer.entityId,
-  }).lean();
-};
-
 const summarizePayments = (
   payments: { amount?: number; paidAmount?: number; status?: string }[],
 ) => {
@@ -77,13 +60,11 @@ export const cpContractQueries = {
   cpBlockAdminGetContractPayments: async (
     _parent: undefined,
     { contractId }: { contractId: string },
-    { models, cpUser }: IContext,
+    { models }: IContext,
   ) => {
-    const contract = await getOwnedContract(
-      models,
-      cpUser?.erxesCustomerId,
-      contractId,
-    );
+    const contract = await models.Contract.findOne({
+      _id: contractId,
+    }).lean();
 
     if (!contract) {
       return [];
@@ -97,13 +78,11 @@ export const cpContractQueries = {
   cpBlockAdminGetContractSummary: async (
     _parent: undefined,
     { contractId }: { contractId: string },
-    { models, cpUser }: IContext,
+    { models }: IContext,
   ) => {
-    const contract = await getOwnedContract(
-      models,
-      cpUser?.erxesCustomerId,
-      contractId,
-    );
+    const contract = await models.Contract.findOne({
+      _id: contractId,
+    }).lean();
 
     if (!contract) {
       return null;

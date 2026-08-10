@@ -69,6 +69,12 @@ export const loadContractClass = (models: IModels) => {
       entityId: string,
       input: IContract,
     ) {
+      // input._id is block_api's org-side contract id, not this document's
+      // own _id — spreading it into $set would try to overwrite the
+      // immutable _id field on every re-sync of an already-mirrored contract.
+      const fields: Partial<IContract> = { ...input };
+      delete fields._id;
+
       const existing = await models.Contract.findOne({
         subdomain,
         entityId,
@@ -78,7 +84,7 @@ export const loadContractClass = (models: IModels) => {
         { subdomain, entityId },
         {
           $set: {
-            ...input,
+            ...fields,
             subdomain,
             entityId,
             signedAt: existing?.signedAt || new Date(),

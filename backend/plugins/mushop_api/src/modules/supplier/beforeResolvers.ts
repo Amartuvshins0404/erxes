@@ -6,19 +6,14 @@ import {
   sendTRPCMessage,
 } from 'erxes-api-shared/utils';
 import { IModels, generateModels } from '~/connectionResolvers';
+import { ORDER_STATUS } from '@/supplier/@types/order';
 import { getSupplierId } from '~/utils/getSupplierId';
 import { sendSupplierMessage } from '~/utils/sendSupplierMessage';
 
-// The storefront calls mushop's own resolvers (cpOrdersAdd, invoiceCreate,
-// invoicesCheck, cpFullOrders, cpOrdersEdit, ...) against a single endpoint.
-// When a request carries an erxes-supplier-id header it belongs to a supplier
-// SaaS, so mushop proxies the call into that supplier's server and returns the
-// supplier's result verbatim (via the 'resolved' short-circuit) — the storefront
-// never knows it was routed. Requests without a supplier id fall through to
-// mushop's own handling.
 const SUPPLIER_RESOLVERS = [
   'cpOrdersAdd',
   'invoiceCreate',
+  'paymentTransactionsAdd',
   'invoicesCheck',
   'cpOrdersEdit',
   'cpOrdersCancel',
@@ -34,8 +29,6 @@ type ForwardSupplier = {
   paymentId?: string;
 };
 
-// The shopper's contact info forwarded to a supplier tenant so it can create its
-// own customer record (linked back to the global shopper via sourceUserId).
 type CustomerInfo = {
   sourceUserId?: string;
   phone?: string;
@@ -59,9 +52,41 @@ const resolveSupplier = async (
   return supplier;
 };
 
-// cpOrdersAdd → supplier /order. Remaps product ids (mushop → supplier
-// entityId), logs the forward, and returns the supplier's created order so the
-// storefront receives { _id, number } to invoice against.
+const buildCustomerInfo = async (
+  subdomain: string,
+  customerId: string | undefined,
+  cpUser: any,
+): Promise<CustomerInfo | undefined> => {
+  if (!customerId && !cpUser) {
+    return undefined;
+  }
+
+  const coreCustomer = customerId
+    ? ((await sendTRPCMessage({
+        subdomain,
+        pluginName: 'core',
+        method: 'query',
+        module: 'customers',
+        action: 'findOne',
+        input: { query: { _id: customerId } },
+        defaultValue: null,
+      })) as {
+        primaryPhone?: string;
+        primaryEmail?: string;
+        firstName?: string;
+        lastName?: string;
+      } | null)
+    : null;
+
+  return {
+    sourceUserId: customerId,
+    phone: coreCustomer?.primaryPhone || cpUser?.phone,
+    email: coreCustomer?.primaryEmail || cpUser?.email,
+    firstName: coreCustomer?.firstName || cpUser?.firstName,
+    lastName: coreCustomer?.lastName || cpUser?.lastName,
+  };
+};
+
 const proxyOrder = async (
   models: IModels,
   supplier: ForwardSupplier,
@@ -97,11 +122,10 @@ const proxyOrder = async (
     subdomain: supplier.subdomain,
     posToken: supplier.posToken,
     order,
+    customerId: customerInfo?.sourceUserId ?? null,
   });
 
   try {
-    // customerInfo lets the supplier create its own customer; it returns that
-    // local customerId so mushop can index global shopper → tenant customer.
     const res = await sendSupplierMessage<{
       order?: Record<string, any>;
       customerId?: string;
@@ -114,7 +138,7 @@ const proxyOrder = async (
     await models.Order.markResult(log._id, {
       ok: true,
       orderId: res?.order?._id,
-      customerId: res?.customerId,
+      order: res?.order ?? null,
     });
 
     return { status: 'resolved', data: res?.order ?? null };
@@ -129,12 +153,10 @@ const proxyOrder = async (
   }
 };
 
-// invoiceCreate → supplier /invoice. Injects the supplier's posToken/paymentId
-// (never exposed to the storefront) and returns the supplier-tenant invoice +
-// transaction shaped as the storefront's Invoice type.
 const proxyInvoiceCreate = async (
   supplier: ForwardSupplier,
   args: Record<string, any>,
+  customerInfo?: CustomerInfo,
 ): Promise<BeforeResolverResult> => {
   if (!supplier.posToken || !supplier.paymentId) {
     return {
@@ -146,15 +168,7 @@ const proxyInvoiceCreate = async (
 
   const input = (args.input || {}) as Record<string, any>;
 
-  const res = await sendSupplierMessage<{
-    invoice?: {
-      _id?: string;
-      invoiceNumber?: string;
-      amount?: number;
-      createdAt?: string;
-    };
-    transaction?: { _id?: string; status?: string; response?: any } | null;
-  }>({
+  const res = await sendSupplierMessage({
     subdomain: supplier.subdomain,
     action: 'invoice',
     payload: {
@@ -167,9 +181,10 @@ const proxyInvoiceCreate = async (
       customer: {
         id: input.customerId,
         type: input.customerType,
-        phone: input.phone,
-        email: input.email,
+        phone: input.phone || customerInfo?.phone,
+        email: input.email || customerInfo?.email,
       },
+      customerInfo,
     },
   });
 
@@ -181,7 +196,6 @@ const proxyInvoiceCreate = async (
     };
   }
 
-  // Shaped to match the payment plugin's Invoice type the storefront expects.
   return {
     status: 'resolved',
     data: {
@@ -192,27 +206,65 @@ const proxyInvoiceCreate = async (
       phone: input.phone,
       email: input.email,
       description: input.description,
-      status: res.transaction?.status || 'pending',
+      status: res.invoice.status || 'pending',
       customerType: input.customerType,
-      customerId: input.customerId,
-      contentType: 'pos:orders',
+      customerId: res.customerId ?? res.invoice.customerId ?? input.customerId,
+      contentType: res.invoice.contentType ?? 'sales:pos:orders',
       contentTypeId: input.contentTypeId,
       createdAt: res.invoice.createdAt,
       data: input.data ?? null,
-      transactions: res.transaction
-        ? [
-            {
-              _id: res.transaction._id,
-              status: res.transaction.status,
-              response: res.transaction.response,
-            },
-          ]
-        : [],
+      transactions: res.transactions,
     },
   };
 };
 
-// invoicesCheck → supplier /invoice-check. Returns the paid status string.
+const proxyTransactionAdd = async (
+  supplier: ForwardSupplier,
+  args: Record<string, any>,
+): Promise<BeforeResolverResult> => {
+  if (!supplier.paymentId) {
+    return {
+      status: 'blocked',
+      code: 'SUPPLIER_NO_PAYMENT_CONFIG',
+      message: `Supplier ${supplier._id} has no paymentId configured`,
+    };
+  }
+
+  const input = (args.input || {}) as Record<string, any>;
+
+  const res = await sendSupplierMessage<{
+    transaction?: { _id?: string; status?: string; response?: any } | null;
+  }>({
+    subdomain: supplier.subdomain,
+    action: 'transaction',
+    payload: {
+      paymentId: supplier.paymentId,
+      invoiceId: input.invoiceId,
+      amount: input.amount,
+      details: input.details,
+    },
+  });
+
+  if (!res?.transaction?._id) {
+    return {
+      status: 'blocked',
+      code: 'SUPPLIER_TRANSACTION_FAILED',
+      message: `Supplier ${supplier._id} did not create a transaction`,
+    };
+  }
+
+  return {
+    status: 'resolved',
+    data: {
+      _id: res.transaction._id,
+      status: res.transaction.status,
+      response: res.transaction.response,
+      paymentId: supplier.paymentId,
+      amount: input.amount,
+    },
+  };
+};
+
 const proxyInvoiceCheck = async (
   supplier: ForwardSupplier,
   args: Record<string, any>,
@@ -226,9 +278,6 @@ const proxyInvoiceCheck = async (
   return { status: 'resolved', data: res?.status ?? null };
 };
 
-// Runs a posclient order query/mutation in the supplier tenant via the supplier
-// webhook (posToken-scoped, no client-portal token needed) and returns the
-// result via the short-circuit.
 const proxyOrderAction = async (
   supplier: ForwardSupplier,
   action: string,
@@ -254,109 +303,58 @@ const proxyOrderAction = async (
 const proxyCurrentOrder = (
   supplier: ForwardSupplier,
   args: Record<string, any>,
-) => proxyOrderAction(supplier, 'orders-list', { params: args });
+  customerInfo?: CustomerInfo,
+) => proxyOrderAction(supplier, 'orders-list', { params: args, customerInfo });
 
-// Returns the createdAt timestamp of an order for cross-tenant sorting; orders
-// from different posclient tenants only share their stored field shape.
-const orderTime = (order: any): number => {
-  const t = order?.createdAt ?? order?.modifiedAt;
-  const ms = t ? new Date(t).getTime() : 0;
-  return Number.isNaN(ms) ? 0 : ms;
-};
-
-// cpFullOrders aggregates ONE shopper's orders across every supplier tenant AND
-// mushop's own POS into a single list. The shopper's customerId (the client-
-// portal user id stored on each posclient order) is the same across tenants, so
-// it's passed through to every leg unchanged. Each leg is isolated (allSettled)
-// so one slow/broken tenant can't break the whole history.
 const aggregateFullOrders = async (
   subdomain: string,
   models: IModels,
   args: Record<string, any>,
   mushopPosToken?: string,
 ): Promise<BeforeResolverResult> => {
-  const { page, perPage, ...params } = args;
+  const { customerId, ...params } = args;
 
-  const suppliers = await models.Supplier.find({
-    subdomain: { $exists: true, $ne: null },
-    posToken: { $exists: true, $ne: null },
-  }).lean<ForwardSupplier[]>();
+  const supplierOrders = customerId
+    ? (
+        await models.Order.find({
+          customerId,
+          status: { $in: [ORDER_STATUS.FORWARDED, ORDER_STATUS.CANCELLED] },
+          'order.paidDate': null,
+        })
+          .sort({ createdAt: -1 })
+          .lean()
+      ).map((row) => row.order)
+    : [];
 
-  type Leg = () => Promise<any[]>;
-  const legs: Leg[] = [];
+  let ownOrders: any[] = [];
 
-  // mushop's own POS — the storefront passes its token in erxes-pos-token.
   if (mushopPosToken) {
-    legs.push(async () => {
-      const result = await callOwnPosclient(subdomain, mushopPosToken, params);
-      return Array.isArray(result) ? result : [];
+    const result = await sendTRPCMessage({
+      subdomain,
+      pluginName: 'posclient',
+      method: 'query',
+      module: 'posclient',
+      action: 'fullOrders',
+      input: { posToken: mushopPosToken, ...params },
+      defaultValue: [],
     });
-  }
 
-  // Every supplier tenant, via its /orders-list webhook.
-  for (const supplier of suppliers) {
-    if (!supplier.posToken) continue;
-    legs.push(async () => {
-      const res = await sendSupplierMessage<{ result?: unknown }>({
-        subdomain: supplier.subdomain,
-        action: 'orders-list',
-        payload: { posToken: supplier.posToken, params },
-      });
-      return Array.isArray(res?.result) ? (res?.result as any[]) : [];
-    });
+    ownOrders = Array.isArray(result) ? result : [];
   }
 
   console.log(
-    `[cpFullOrders] aggregate: subdomain=${subdomain} mushopPosToken=${
+    `[cpFullOrders] local aggregate: subdomain=${subdomain} mushopPosToken=${
       mushopPosToken ? 'yes' : 'no'
-    } suppliers=${suppliers.length} legs=${legs.length} customerId=${
-      params.customerId
-    }`,
+    } ownOrders=${ownOrders.length} supplierOrders=${
+      supplierOrders.length
+    } customerId=${customerId}`,
   );
 
-  const settled = await Promise.allSettled(legs.map((leg) => leg()));
+  const orders = [...ownOrders, ...supplierOrders].filter(Boolean);
 
-  const merged: any[] = [];
-  settled.forEach((outcome, i) => {
-    if (outcome.status === 'fulfilled') {
-      console.log(`[cpFullOrders] leg ${i}: ${outcome.value.length} orders`);
-      merged.push(...outcome.value);
-    } else {
-      console.error('[cpFullOrders] leg', i, 'failed:', outcome.reason);
-    }
-  });
-
-  console.log(`[cpFullOrders] merged total before paging: ${merged.length}`);
-
-  merged.sort((a, b) => orderTime(b) - orderTime(a));
-
-  // Apply pagination once, after the merge, since each tenant paginated its own.
-  const _perPage = Number(perPage) || 20;
-  const _page = Number(page) || 1;
-  const paged = merged.slice((_page - 1) * _perPage, _page * _perPage);
-
-  return { status: 'resolved', data: paged };
+  return { status: 'resolved', data: orders };
 };
 
-// Calls mushop's OWN posclient fullOrders in-tenant (no webhook) using the
-// marketplace's own POS token.
-const callOwnPosclient = (
-  subdomain: string,
-  posToken: string,
-  params: Record<string, any>,
-) =>
-  sendTRPCMessage({
-    subdomain,
-    pluginName: 'posclient',
-    method: 'query',
-    module: 'posclient',
-    action: 'fullOrders',
-    input: { posToken, ...params },
-    defaultValue: [],
-  });
-
-// mushop's own POS token, sent by the storefront so its own orders join the
-// aggregate. Without it the aggregate covers supplier tenants only.
 const getMushopPosToken = (
   headers?: Record<string, unknown>,
 ): string | undefined => {
@@ -367,15 +365,14 @@ const getMushopPosToken = (
 const proxyOrderDetail = (
   supplier: ForwardSupplier,
   args: Record<string, any>,
+  customerInfo?: CustomerInfo,
 ) =>
   proxyOrderAction(supplier, 'order-detail', {
     _id: args._id,
     customerId: args.customerId,
+    customerInfo,
   });
 
-// cpOrdersEdit remaps each item's productId (mushop → supplier entityId) so the
-// edited order references the supplier's products, then runs the edit in the
-// supplier tenant.
 const proxyOrdersEdit = async (
   models: IModels,
   supplier: ForwardSupplier,
@@ -402,13 +399,40 @@ const proxyOrdersEdit = async (
     doc = { ...args, items: forwardItems };
   }
 
-  return proxyOrderAction(supplier, 'order-edit', { doc });
+  const result = await proxyOrderAction(supplier, 'order-edit', { doc });
+
+  if (result?.status === 'resolved' && args._id) {
+    await models.Order.syncFromSupplier(
+      supplier.subdomain,
+      args._id,
+      result.data ?? doc,
+      ORDER_STATUS.FORWARDED,
+    );
+  }
+
+  return result;
 };
 
-const proxyOrdersCancel = (
+const proxyOrdersCancel = async (
+  models: IModels,
   supplier: ForwardSupplier,
   args: Record<string, any>,
-) => proxyOrderAction(supplier, 'order-cancel', { _id: args._id });
+): Promise<BeforeResolverResult> => {
+  const result = await proxyOrderAction(supplier, 'order-cancel', {
+    _id: args._id,
+  });
+
+  if (result?.status === 'resolved' && args._id) {
+    await models.Order.syncFromSupplier(
+      supplier.subdomain,
+      args._id,
+      result.data,
+      ORDER_STATUS.CANCELLED,
+    );
+  }
+
+  return result;
+};
 
 export const supplierBeforeResolvers: BeforeResolversConfig = {
   resolvers: {
@@ -420,7 +444,7 @@ export const supplierBeforeResolvers: BeforeResolversConfig = {
       'cpCurrentOrder',
       'cpOrderDetail',
     ],
-    payment: ['invoiceCreate', 'invoicesCheck'],
+    payment: ['invoiceCreate', 'paymentTransactionsAdd', 'invoicesCheck'],
   },
   handler: async (
     subdomain: string,
@@ -429,74 +453,86 @@ export const supplierBeforeResolvers: BeforeResolversConfig = {
     const { resolver, args = {}, headers } = params;
 
     if (!SUPPLIER_RESOLVERS.includes(resolver)) {
-      return args;
+      return { status: 'ok', args };
     }
 
-    // The shopper's customerId (the client-portal user id stored on each
-    // posclient order) is the same across every tenant, so it scopes orders in
-    // all of them. Trust the authenticated cpUser, never the client's arg —
-    // otherwise a customer could read/edit another's orders.
     const cpUser = extractCPUserFromHeader((headers || {}) as any);
-    const customerId = cpUser?.erxesCustomerId || cpUser?._id;
-    const scopedArgs =
-      customerId !== undefined ? { ...args, customerId } : args;
-
-    // The shopper's contact info, forwarded so a supplier tenant can create its
-    // OWN customer (keyed by phone/email, linked back via sourceUserId) — the
-    // order still carries the global customerId for cross-tenant aggregation.
-    const customerInfo = cpUser
-      ? {
-          sourceUserId: customerId,
-          phone: cpUser.phone,
-          email: cpUser.email,
-          firstName: cpUser.firstName,
-          lastName: cpUser.lastName,
-        }
-      : undefined;
+    const customerId =
+      args.customerId || cpUser?.erxesCustomerId || cpUser?._id;
 
     const models = await generateModels(subdomain);
 
-    // cpFullOrders is special: it aggregates the shopper's orders across ALL
-    // supplier tenants + mushop's own POS, regardless of which (if any) supplier
-    // the request came in under. So it runs before the single-supplier routing.
     if (resolver === 'cpFullOrders') {
       const mushopPosToken = getMushopPosToken(headers);
+
       return aggregateFullOrders(
         subdomain,
         models,
-        scopedArgs,
+        { ...args, customerId },
         mushopPosToken,
       );
     }
 
     const supplierId = getSupplierId(headers);
 
-    // No supplier context → not a supplier request; mushop handles it itself.
     if (!supplierId) {
-      return args;
+      return { status: 'ok', args };
     }
 
     const supplier = await resolveSupplier(models, supplierId);
 
     if (!supplier) {
-      return args;
+      return { status: 'ok', args };
     }
 
     switch (resolver) {
-      case 'cpOrdersAdd':
-        return proxyOrder(models, supplier, scopedArgs, customerInfo);
-      case 'invoiceCreate':
-        return proxyInvoiceCreate(supplier, args);
+      case 'cpOrdersAdd': {
+        const orderCustomerId = args.customerId || customerId;
+
+        const customerInfo = await buildCustomerInfo(
+          subdomain,
+          orderCustomerId,
+          cpUser,
+        );
+
+        return proxyOrder(models, supplier, args, customerInfo);
+      }
+      case 'invoiceCreate': {
+        const input = (args.input || {}) as Record<string, any>;
+        const customerInfo = await buildCustomerInfo(
+          subdomain,
+          input.customerId || customerId,
+          cpUser,
+        );
+
+        return proxyInvoiceCreate(supplier, args, customerInfo);
+      }
+      case 'paymentTransactionsAdd':
+        return proxyTransactionAdd(supplier, args);
       case 'invoicesCheck':
         return proxyInvoiceCheck(supplier, args);
       case 'cpOrdersEdit':
-        return proxyOrdersEdit(models, supplier, scopedArgs);
+        return proxyOrdersEdit(models, supplier, args);
       case 'cpOrdersCancel':
-        return proxyOrdersCancel(supplier, scopedArgs);
-      case 'cpCurrentOrder':
-        return proxyCurrentOrder(supplier, scopedArgs);
-      case 'cpOrderDetail':
-        return proxyOrderDetail(supplier, scopedArgs);
+        return proxyOrdersCancel(models, supplier, args);
+      case 'cpCurrentOrder': {
+        const customerInfo = await buildCustomerInfo(
+          subdomain,
+          customerId,
+          cpUser,
+        );
+
+        return proxyCurrentOrder(supplier, args, customerInfo);
+      }
+      case 'cpOrderDetail': {
+        const customerInfo = await buildCustomerInfo(
+          subdomain,
+          args.customerId || customerId,
+          cpUser,
+        );
+
+        return proxyOrderDetail(supplier, args, customerInfo);
+      }
       default:
         return args;
     }

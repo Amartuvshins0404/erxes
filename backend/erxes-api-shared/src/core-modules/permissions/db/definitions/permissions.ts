@@ -7,6 +7,12 @@ export const permissionGroupSchema = schemaWrapper(
       _id: mongooseField({ pkey: true }),
       name: mongooseField({ type: String, label: 'Name' }),
       description: mongooseField({ type: String, label: 'Description' }),
+      principalType: mongooseField({
+        type: String,
+        enum: ['human', 'agent'],
+        default: 'human',
+        label: 'Principal type',
+      }),
       permissions: mongooseField({
         type: [
           {

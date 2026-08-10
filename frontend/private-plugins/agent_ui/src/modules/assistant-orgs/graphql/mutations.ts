@@ -54,6 +54,12 @@ export const DELETE_IDENTIFIER = gql`
   }
 `;
 
+export const SET_ASSISTANT_PLAN_SELECTION = gql`
+  mutation SetAssistantPlanSelection($identifierIds: [String!]!) {
+    setAssistantPlanSelection(identifierIds: $identifierIds)
+  }
+`;
+
 export const CREATE_ASSISTANT_ORG = CREATE_IDENTIFIER;
 export const UPDATE_ASSISTANT_ORG = UPDATE_IDENTIFIER;
 export const INVITE_ASSISTANT_ORG_MEMBERS = INVITE_IDENTIFIER_MEMBERS;

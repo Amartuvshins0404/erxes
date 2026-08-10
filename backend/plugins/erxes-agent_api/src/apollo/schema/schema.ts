@@ -4,11 +4,6 @@ import {
   mutations as agentMutations,
 } from '@/agent/graphql/schemas/agent';
 import {
-  types as toolTypes,
-  queries as toolQueries,
-  mutations as toolMutations,
-} from '@/tool/graphql/schemas/tool';
-import {
   types as providerTypes,
   queries as providerQueries,
   mutations as providerMutations,
@@ -34,11 +29,6 @@ import {
   mutations as learningMutations,
 } from '@/learning/graphql/schemas/learning';
 import {
-  types as scheduleTypes,
-  queries as scheduleQueries,
-  mutations as scheduleMutations,
-} from '@/schedule/graphql/schemas/schedule';
-import {
   types as skillTypes,
   queries as skillQueriesSchema,
   mutations as skillMutationsSchema,
@@ -51,39 +41,33 @@ import {
 
 export const types = `
   ${agentTypes}
-  ${toolTypes}
   ${providerTypes}
   ${settingsTypes}
   ${sessionTypes}
   ${workflowTypes}
   ${learningTypes}
-  ${scheduleTypes}
   ${skillTypes}
   ${voiceTypes}
 `;
 
 export const queries = `
   ${agentQueries}
-  ${toolQueries}
   ${providerQueries}
   ${settingsQueries}
   ${sessionQueries}
   ${workflowQueries}
   ${learningQueries}
-  ${scheduleQueries}
   ${skillQueriesSchema}
   ${voiceQueriesSchema}
 `;
 
 export const mutations = `
   ${agentMutations}
-  ${toolMutations}
   ${providerMutations}
   ${settingsMutations}
   ${sessionMutations}
   ${workflowMutations}
   ${learningMutations}
-  ${scheduleMutations}
   ${skillMutationsSchema}
   ${voiceMutationsSchema}
 `;

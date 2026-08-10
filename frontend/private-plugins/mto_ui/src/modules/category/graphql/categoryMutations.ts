@@ -2,12 +2,12 @@ import { gql } from '@apollo/client';
 
 export const MTO_CATEGORY_CREATE = gql`
   mutation MtoCategoryCreate(
-    $name: MtoAssociationNameInput!
+    $name: MtoMultilingualStringInput!
     $logo: String
     $level: String
     $isActive: Boolean
   ) {
-    mtoAssociationCreate(
+    mtoCategoryCreate(
       name: $name
       logo: $logo
       level: $level
@@ -29,12 +29,12 @@ export const MTO_CATEGORY_CREATE = gql`
 export const MTO_CATEGORY_UPDATE = gql`
   mutation MtoCategoryUpdate(
     $_id: String!
-    $name: MtoAssociationNameInput
+    $name: MtoMultilingualStringInput
     $logo: String
     $level: String
     $isActive: Boolean
   ) {
-    mtoAssociationUpdate(
+    mtoCategoryUpdate(
       _id: $_id
       name: $name
       logo: $logo
@@ -56,6 +56,6 @@ export const MTO_CATEGORY_UPDATE = gql`
 
 export const MTO_CATEGORIES_REMOVE = gql`
   mutation MtoCategoriesRemove($ids: [String]!) {
-    mtoAssociationsRemove(ids: $ids)
+    mtoCategoriesRemove(ids: $ids)
   }
 `;

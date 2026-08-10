@@ -1,30 +1,5 @@
-import { getEnv } from 'erxes-api-shared/utils';
 import { IMushopSupplierDocument } from '~/modules/supplier/@types/supplier';
-
-const NODE_ENV = getEnv({ name: 'NODE_ENV', defaultValue: 'development' });
-
-const toFileUrl = (
-  key: string | undefined,
-  subdomain: string,
-): string | null => {
-  if (!key) return null;
-
-  if (NODE_ENV === 'development') return `http://localhost:4000/read-file?key=${key}`;
-
-  if (key.startsWith('http://') || key.startsWith('https://')) return key;
-
-  const SUPPLIER_DOMAIN = getEnv({
-    name: 'SUPPLIER_API_URL',
-    subdomain,
-    defaultValue: 'http://localhost:4000',
-  });
-
-  if (!SUPPLIER_DOMAIN) return null;
-
-  const domain = SUPPLIER_DOMAIN.replace('<subdomain>', subdomain);
-
-  return `${domain}/read-file?key=${key}`;
-};
+import { toFileUrl } from '~/utils/fileUrl';
 
 export const MushopSupplier = {
   address: ({ address }: IMushopSupplierDocument) => {

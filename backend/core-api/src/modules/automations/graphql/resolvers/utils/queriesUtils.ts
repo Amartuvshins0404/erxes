@@ -6,6 +6,8 @@ import {
   TAutomationOutputDefinition,
   TAutomationOutputVariable,
   TAutomationFindObjectTargetDefinition,
+  TAiKnowledgeSourceConfig,
+  TAiToolConfig,
   TAutomationSetPropertyTarget,
   TRecordReferencesConfig,
   normalizeAutomationConstantsForTransport,
@@ -36,6 +38,8 @@ type TAutomationConstantsResponse = {
   actionsConst: TWithPluginName<IAutomationsActionConfig>[];
   findObjectTargetsConst: TAutomationFindObjectTargetDefinition[];
   setPropertyTargetsConst: TWithPluginName<TAutomationSetPropertyTarget>[];
+  aiKnowledgeSourcesConst: TWithPluginName<TAiKnowledgeSourceConfig>[];
+  aiToolsConst: TWithPluginName<TAiToolConfig>[];
 };
 
 type TRecordReferenceType = TRecordReferencesConfig['types'][number];
@@ -158,6 +162,14 @@ export const generateAutomationHistoriesFilter = (params: any) => {
     filter.targetId = { $in: targetIds };
   }
 
+  // Workflow child executions are opened from within their parent execution;
+  // the main history list shows only root executions.
+  if (params.parentExecutionId) {
+    filter.parentExecutionId = params.parentExecutionId;
+  } else {
+    filter.parentExecutionId = { $exists: false };
+  }
+
   return filter;
 };
 
@@ -179,6 +191,16 @@ export const getAutomationConstants =
       setPropertyTargetsConst: [
         ...(normalizedCoreConstants.setPropertyTargets || []),
       ],
+      aiKnowledgeSourcesConst: (
+        normalizedCoreConstants.ai?.knowledgeSources || []
+      ).map((source) => ({
+        ...source,
+        pluginName: 'core',
+      })),
+      aiToolsConst: (normalizedCoreConstants.ai?.tools || []).map((tool) => ({
+        ...tool,
+        pluginName: 'core',
+      })),
     };
 
     for (const pluginName of plugins) {
@@ -202,10 +224,23 @@ export const getAutomationConstants =
         actions = [],
         findObjectTargets = [],
         setPropertyTargets = [],
+        ai,
       } = pluginConstants as AutomationConstants;
       constants.findObjectTargetsConst.push(...findObjectTargets);
       constants.setPropertyTargetsConst.push(
         ...setPropertyTargets.map((target) => ({ ...target, pluginName })),
+      );
+      constants.aiKnowledgeSourcesConst.push(
+        ...(ai?.knowledgeSources || []).map((source) => ({
+          ...source,
+          pluginName,
+        })),
+      );
+      constants.aiToolsConst.push(
+        ...(ai?.tools || []).map((tool) => ({
+          ...tool,
+          pluginName,
+        })),
       );
 
       for (const trigger of triggers) {
@@ -272,6 +307,7 @@ const toSetPropertyTargetOption = (
   sourceType: target.sourceType,
   relation: target.relation,
   resolverKey: target.resolverKey,
+  targetPath: target.targetPath,
   pluginName: target.pluginName,
   value: target.type,
   description: target.label,
@@ -289,6 +325,7 @@ const getSetPropertyTargetOptionKey = (
     target.relation?.contentType || '',
     target.relation?.relatedContentType || '',
     target.resolverKey || '',
+    target.targetPath || '',
   ].join(':');
 
 export const getAutomationSetPropertyTargets = async (sourceType: string) => {

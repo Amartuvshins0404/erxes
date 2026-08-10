@@ -1,9 +1,13 @@
+import { useMemo } from 'react';
 import { useQuery } from '@apollo/client';
 import {
   MASTRA_AGENTS,
   MASTRA_ATTACHMENT_STORAGE_STATUS,
   MASTRA_VOICE_STATUS,
 } from '~/graphql/queries';
+import { usePermissionCheck } from 'ui-modules';
+import { ERXES_AGENT_ACTIONS } from '~/permissions';
+import type { IMastraAgentCapabilities } from '~/pages/agents/types';
 
 export interface IChatAgent {
   _id: string;
@@ -13,19 +17,7 @@ export interface IChatAgent {
   provider?: string;
   description?: string;
   isEnabled?: boolean;
-  // Full settings — present on the MASTRA_AGENTS payload, used by the in-chat
-  // "Edit agent" modal so it can populate without a second fetch.
-  instructions?: string;
-  toolPolicy?: string;
-  allowedTools?: string[];
-  destructiveOps?: 'allow' | 'ask';
-  memoryEnabled?: boolean;
-  maxSteps?: number;
-  temperature?: number | null;
-  visibility?: 'private' | 'team' | 'department' | 'unit' | 'org';
-  teamId?: string | null;
-  departmentId?: string | null;
-  unitId?: string | null;
+  capabilities?: IMastraAgentCapabilities | null;
 }
 
 interface MastraAgentsResponse {
@@ -43,15 +35,24 @@ interface VoiceStatusResponse {
 // Enabled agents for the chat rail.
 export const useChatAgents = () => {
   const { data, loading } = useQuery<MastraAgentsResponse>(MASTRA_AGENTS);
-  const agents = (data?.mastraAgents ?? []).filter((a) => a.isEnabled);
+  // Memoized so the array keeps a stable identity across streamed-token
+  // re-renders — the memoized AgentRail depends on it not changing per chunk.
+  const agents = useMemo(
+    () => (data?.mastraAgents ?? []).filter((a) => a.isEnabled),
+    [data],
+  );
   return { agents, loading };
 };
 
 // Whether file attachments are usable: instance storage configured AND the
 // plugin toggle on. When off, the chat is text-only (no attach button).
 export const useAttachmentsEnabled = (): boolean => {
+  const { hasActionPermission, isLoaded } = usePermissionCheck();
+  const canReadStatus =
+    isLoaded && hasActionPermission(ERXES_AGENT_ACTIONS.settings.statusRead);
   const { data } = useQuery<AttachmentStorageStatusResponse>(
     MASTRA_ATTACHMENT_STORAGE_STATUS,
+    { skip: !canReadStatus },
   );
   return !!data?.mastraAttachmentStorageStatus?.enabled;
 };
@@ -59,6 +60,11 @@ export const useAttachmentsEnabled = (): boolean => {
 // Whether voice mode is usable: the backend resolved an OpenAI key and the
 // feature isn't disabled. When off, the chat hides the voice mode entry point.
 export const useVoiceEnabled = (): boolean => {
-  const { data } = useQuery<VoiceStatusResponse>(MASTRA_VOICE_STATUS);
+  const { hasActionPermission, isLoaded } = usePermissionCheck();
+  const canReadStatus =
+    isLoaded && hasActionPermission(ERXES_AGENT_ACTIONS.settings.statusRead);
+  const { data } = useQuery<VoiceStatusResponse>(MASTRA_VOICE_STATUS, {
+    skip: !canReadStatus,
+  });
   return !!data?.mastraVoiceStatus?.enabled;
 };

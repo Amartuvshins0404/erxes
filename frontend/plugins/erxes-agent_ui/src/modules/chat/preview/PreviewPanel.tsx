@@ -1,41 +1,55 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import {
   IconArrowLeft,
-  IconChartBar,
   IconDownload,
   IconFile,
-  IconFileTypeDocx,
-  IconFileTypePdf,
-  IconFileTypePpt,
-  IconFileTypeXls,
   IconMaximize,
   IconMinimize,
+  IconPresentation,
   IconX,
 } from '@tabler/icons-react';
-import { Button, cn } from 'erxes-ui';
-import { EChart, type EChartHandle } from '~/modules/chat/charts';
+import { Button, cn, Empty } from 'erxes-ui';
+import { type EChartHandle } from '~/modules/chat/charts';
+import { ChartArtifactView } from '~/modules/chat/components/ChartArtifactView';
 import {
+  artifactIcon,
   Artifact,
   DocumentArtifact,
+  ImageArtifact,
   documentUrl,
 } from '~/modules/chat/lib/artifacts';
+import { MermaidViewer } from '~/modules/chat/preview/MermaidViewer';
 import { formatFileSize } from '~/modules/chat/lib/attachments';
 import { previewStore } from '~/modules/chat/preview/previewStore';
 import { DocumentViewer } from '~/modules/chat/preview/DocumentViewer';
+import { ImageViewer } from '~/modules/chat/preview/ImageViewer';
+import { PresentMode } from '~/modules/chat/preview/PresentMode';
 import { useThreadArtifacts } from '~/modules/chat/hooks/useThreadArtifacts';
 
-const artifactIcon = (a: Artifact) => {
-  if (a.kind === 'chart') return IconChartBar;
-  if (a.format === 'pdf') return IconFileTypePdf;
-  if (a.format === 'docx') return IconFileTypeDocx;
-  if (a.format === 'pptx') return IconFileTypePpt;
-  return IconFileTypeXls;
+const canPresent = (a: Artifact): a is DocumentArtifact =>
+  a.kind === 'document' && a.format === 'pptx' && !!a.slides?.length;
+
+const slideLabel = (a: DocumentArtifact): string => {
+  const n = a.slideCount ?? a.slides?.length;
+  return n ? `${n} slide${n === 1 ? '' : 's'}` : '';
 };
 
-const artifactSubtitle = (a: Artifact): string =>
-  a.kind === 'chart'
-    ? 'Interactive chart'
-    : [a.format.toUpperCase(), formatFileSize(a.size)].filter(Boolean).join(' · ');
+const artifactSubtitle = (a: Artifact): string => {
+  if (a.kind === 'chart') return 'Interactive chart';
+  if (a.kind === 'diagram') return 'Mermaid diagram';
+  if (a.kind === 'image') {
+    return [
+      'Transparent PNG',
+      a.width && a.height ? `${a.width}×${a.height}` : '',
+      formatFileSize(a.size),
+    ]
+      .filter(Boolean)
+      .join(' · ');
+  }
+  return [a.format.toUpperCase(), slideLabel(a), formatFileSize(a.size)]
+    .filter(Boolean)
+    .join(' · ');
+};
 
 // The Claude-artifacts-style side panel. Two views — a per-thread file list
 // (persisted, survives reloads) and a single artifact (interactive chart or an
@@ -163,7 +177,7 @@ const SidebarFileList = ({
           Files{artifacts.length ? ` · ${artifacts.length}` : ''}
         </p>
       </div>
-      <div className="min-h-0 flex-1 overflow-auto p-3">
+      <div className="ea-scroll min-h-0 flex-1 overflow-auto p-3">
         <GroupedFiles threadId={threadId} activeId={activeId} />
       </div>
     </>
@@ -204,17 +218,23 @@ const FileListView = ({
           <IconX className="size-4" />
         </Button>
       </div>
-      <div className="min-h-0 flex-1 overflow-auto p-3">
+      <div className="ea-scroll min-h-0 flex-1 overflow-auto p-3">
         {artifacts.length === 0 ? (
-          <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-muted-foreground">
-            <IconFile className="size-8 opacity-40" />
-            <p className="text-sm">
-              {loading ? 'Loading…' : 'No charts or documents yet.'}
-            </p>
-            <p className="text-xs">
-              Ask the agent to chart data or generate a report.
-            </p>
-          </div>
+          <Empty className="h-full">
+            <Empty.Header>
+              <Empty.Media variant="icon">
+                <IconFile />
+              </Empty.Media>
+              <Empty.Title>
+                {loading ? 'Loading files…' : 'No files yet'}
+              </Empty.Title>
+              <Empty.Description>
+                {loading
+                  ? 'Fetching this thread’s charts and documents.'
+                  : 'Ask the agent to chart data or generate a report.'}
+              </Empty.Description>
+            </Empty.Header>
+          </Empty>
         ) : (
           <GroupedFiles threadId={threadId} />
         )}
@@ -235,8 +255,15 @@ const ItemView = ({
   const fullscreen = previewStore((s) => s.fullscreen);
   const toggleFullscreen = previewStore((s) => s.toggleFullscreen);
   const chartRef = useRef<EChartHandle>(null);
+  const [presenting, setPresenting] = useState(false);
   const typeLabel =
-    artifact.kind === 'chart' ? 'Chart' : artifact.format.toUpperCase();
+    artifact.kind === 'chart'
+      ? 'Chart'
+      : artifact.kind === 'diagram'
+        ? 'Diagram'
+        : artifact.kind === 'image'
+          ? 'Image'
+          : artifact.format.toUpperCase();
 
   return (
     <>
@@ -273,7 +300,19 @@ const ItemView = ({
             PNG
           </Button>
         )}
-        {artifact.kind === 'document' && <DocumentActions artifact={artifact} />}
+        {canPresent(artifact) && (
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setPresenting(true)}
+          >
+            <IconPresentation className="size-3.5" />
+            Present
+          </Button>
+        )}
+        {(artifact.kind === 'document' || artifact.kind === 'image') && (
+          <DocumentActions artifact={artifact} />
+        )}
         <Button
           variant="ghost"
           size="icon"
@@ -294,17 +333,34 @@ const ItemView = ({
       <div className="min-h-0 flex-1 overflow-hidden">
         {artifact.kind === 'chart' ? (
           <div className="h-full w-full p-4">
-            <EChart ref={chartRef} spec={artifact.spec} height="100%" />
+            {/* Same unified view (and per-artifact filter state) as the inline
+                chat card and the expand dialog — slider positions carry over. */}
+            <ChartArtifactView ref={chartRef} artifact={artifact} />
           </div>
+        ) : artifact.kind === 'diagram' ? (
+          <MermaidViewer definition={artifact.definition} />
+        ) : artifact.kind === 'image' ? (
+          <ImageViewer artifact={artifact} />
         ) : (
           <DocumentViewer artifact={artifact} />
         )}
       </div>
+
+      {presenting && canPresent(artifact) && (
+        <PresentMode
+          artifact={artifact}
+          onExit={() => setPresenting(false)}
+        />
+      )}
     </>
   );
 };
 
-const DocumentActions = ({ artifact }: { artifact: DocumentArtifact }) => (
+const DocumentActions = ({
+  artifact,
+}: {
+  artifact: DocumentArtifact | ImageArtifact;
+}) => (
   <Button asChild variant="secondary" size="sm">
     <a
       href={documentUrl(artifact)}

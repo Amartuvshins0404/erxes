@@ -53,6 +53,7 @@ export interface ISupplier {
   dateFounded?: string;
   website?: string;
   paymentId?: string;
+  posToken?: string;
   verificationStatus?: string;
   verificationNote?: string;
   tierLevel?: number;

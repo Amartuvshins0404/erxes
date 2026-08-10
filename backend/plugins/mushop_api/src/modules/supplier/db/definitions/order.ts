@@ -14,9 +14,7 @@ export const orderSchema = new Schema<IOrderDocument>(
       default: ORDER_STATUS.PENDING,
       index: true,
     },
-    entityId: { type: String, default: null },
-    // The supplier tenant's OWN customer id for this order (links the global
-    // shopper to that tenant's local customer). Null until the forward succeeds.
+    entityId: { type: String, default: null, index: true },
     customerId: { type: String, default: null, index: true },
     error: { type: String, default: null },
   },

@@ -16,13 +16,10 @@ import {
   IconUsers,
 } from '@tabler/icons-react';
 import {
-  Badge,
   Button,
   Command,
-  RecordTable,
   RecordTableInlineCell,
   RelativeDateDisplay,
-  useConfirm,
 } from 'erxes-ui';
 import {
   MASTRA_LEARNING_PIN,
@@ -30,8 +27,15 @@ import {
   MASTRA_LEARNING_REMOVE,
 } from '~/graphql/mutations';
 import { toastError } from '~/lib/mutationToast';
-import { RowActionsMenu } from '~/components/RecordTableShared';
+import {
+  IconBadge,
+  RowActionsMenu,
+  SortableHead,
+} from '~/components/RecordTableShared';
+import { SortState } from '~/components/useTableSort';
+import { useConfirmedRemove } from '~/components/useConfirmedRemove';
 import { ILearningRow, confidencePct, statusVariant } from '../types';
+import { LearningStatementCell } from './LearningStatementCell';
 
 const LearningMoreCell = ({
   learning,
@@ -40,7 +44,7 @@ const LearningMoreCell = ({
   learning: ILearningRow;
   refetch: () => void;
 }) => {
-  const { confirm } = useConfirm();
+  const { confirmRemove } = useConfirmedRemove();
 
   const [pin] = useMutation(MASTRA_LEARNING_PIN, {
     onCompleted: () => refetch(),
@@ -56,10 +60,10 @@ const LearningMoreCell = ({
   });
 
   const handleDelete = () =>
-    confirm({
-      message: 'Remove this learning permanently? This cannot be undone.',
-      options: { okLabel: 'Delete', cancelLabel: 'Cancel' },
-    }).then(() => remove({ variables: { _id: learning._id } }));
+    confirmRemove(
+      { message: 'Remove this learning permanently? This cannot be undone.' },
+      () => remove({ variables: { _id: learning._id } }),
+    );
 
   const statusItem = (
     next: string,
@@ -125,9 +129,13 @@ const LearningMoreCell = ({
 export const useLearningColumns = ({
   setSelected,
   refetch,
+  sort,
+  onSort,
 }: {
   setSelected: (item: ILearningRow) => void;
   refetch: () => void;
+  sort: SortState;
+  onSort: (id: string) => void;
 }) =>
   useMemo<ColumnDef<ILearningRow>[]>(
     () => [
@@ -142,23 +150,19 @@ export const useLearningColumns = ({
         id: 'statement',
         accessorKey: 'statement',
         header: () => (
-          <RecordTable.InlineHead icon={IconBulb} label="Learning" />
+          <SortableHead
+            icon={IconBulb}
+            label="Learning"
+            columnId="statement"
+            sort={sort}
+            onSort={onSort}
+          />
         ),
         cell: ({ row }) => (
-          <RecordTableInlineCell>
-            <span className="flex items-center gap-1.5 min-w-0">
-              {row.original.pinned ? (
-                <IconPinFilled className="size-3.5 shrink-0 text-primary" />
-              ) : null}
-              <button
-                type="button"
-                onClick={() => setSelected(row.original)}
-                className="text-left font-medium hover:underline line-clamp-1 cursor-pointer"
-              >
-                {row.original.statement || 'Untitled'}
-              </button>
-            </span>
-          </RecordTableInlineCell>
+          <LearningStatementCell
+            learning={row.original}
+            setSelected={setSelected}
+          />
         ),
         size: 420,
       },
@@ -166,11 +170,19 @@ export const useLearningColumns = ({
         id: 'type',
         accessorKey: 'type',
         header: () => (
-          <RecordTable.InlineHead icon={IconCategory} label="Type" />
+          <SortableHead
+            icon={IconCategory}
+            label="Type"
+            columnId="type"
+            sort={sort}
+            onSort={onSort}
+          />
         ),
         cell: ({ row }) => (
           <RecordTableInlineCell>
-            <Badge variant="secondary">{row.original.type}</Badge>
+            <IconBadge icon={IconCategory} variant="secondary">
+              {row.original.type}
+            </IconBadge>
           </RecordTableInlineCell>
         ),
         size: 130,
@@ -179,13 +191,22 @@ export const useLearningColumns = ({
         id: 'status',
         accessorKey: 'status',
         header: () => (
-          <RecordTable.InlineHead icon={IconActivity} label="Status" />
+          <SortableHead
+            icon={IconActivity}
+            label="Status"
+            columnId="status"
+            sort={sort}
+            onSort={onSort}
+          />
         ),
         cell: ({ row }) => (
           <RecordTableInlineCell>
-            <Badge variant={statusVariant(row.original.status)}>
+            <IconBadge
+              icon={IconActivity}
+              variant={statusVariant(row.original.status)}
+            >
               {row.original.status}
-            </Badge>
+            </IconBadge>
           </RecordTableInlineCell>
         ),
         size: 120,
@@ -194,11 +215,18 @@ export const useLearningColumns = ({
         id: 'confidence',
         accessorKey: 'confidence',
         header: () => (
-          <RecordTable.InlineHead icon={IconChartBar} label="Confidence" />
+          <SortableHead
+            icon={IconChartBar}
+            label="Confidence"
+            columnId="confidence"
+            sort={sort}
+            onSort={onSort}
+          />
         ),
         cell: ({ row }) => (
           <RecordTableInlineCell>
-            <span className="font-mono text-xs">
+            <span className="flex items-center gap-1 font-mono text-xs">
+              <IconChartBar className="size-3.5 text-muted-foreground" />
               {confidencePct(row.original.confidence)}
             </span>
           </RecordTableInlineCell>
@@ -209,11 +237,20 @@ export const useLearningColumns = ({
         id: 'sourceCount',
         accessorKey: 'sourceCount',
         header: () => (
-          <RecordTable.InlineHead icon={IconUsers} label="Sources" />
+          <SortableHead
+            icon={IconUsers}
+            label="Sources"
+            columnId="sourceCount"
+            sort={sort}
+            onSort={onSort}
+          />
         ),
         cell: ({ row }) => (
           <RecordTableInlineCell>
-            <span className="text-sm">{row.original.sourceCount ?? 0}</span>
+            <span className="flex items-center gap-1 text-sm tabular-nums">
+              <IconUsers className="size-3.5 text-muted-foreground" />
+              {row.original.sourceCount ?? 0}
+            </span>
           </RecordTableInlineCell>
         ),
         size: 90,
@@ -222,7 +259,13 @@ export const useLearningColumns = ({
         id: 'updatedAt',
         accessorKey: 'updatedAt',
         header: () => (
-          <RecordTable.InlineHead icon={IconCalendar} label="Updated" />
+          <SortableHead
+            icon={IconCalendar}
+            label="Updated"
+            columnId="updatedAt"
+            sort={sort}
+            onSort={onSort}
+          />
         ),
         cell: ({ cell }) => {
           const value = cell.getValue() as string | undefined;
@@ -241,5 +284,5 @@ export const useLearningColumns = ({
         size: 130,
       },
     ],
-    [refetch, setSelected],
+    [refetch, setSelected, sort, onSort],
   );

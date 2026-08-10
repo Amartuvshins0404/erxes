@@ -13,6 +13,7 @@ export const types = `
     description: String!
     always: Boolean
     disabled: Boolean
+    agentCallable: Boolean
   }
 
   type PermissionScopeDescription {
@@ -48,6 +49,7 @@ export const types = `
     name: String!
     description: String
     plugin: String!
+    principalType: String
     permissions: [PermissionGroupPermission]!
     members: [User]
   }
@@ -56,6 +58,7 @@ export const types = `
     _id: String!
     name: String!
     description: String
+    principalType: String
     permissions: [PermissionGroupPermission]!
     members: [User]
     createdAt: Date
@@ -67,6 +70,7 @@ export const types = `
     module: String!
     actions: [String]!
     scope: String!
+    actionScopes: JSON
   }
 
   type CurrentUserPermissionsResult {
@@ -95,6 +99,7 @@ export const mutations = `
   permissionGroupAdd(
     name: String!
     description: String
+    principalType: String
     permissions: [PermissionInput]!
   ): PermissionGroup
 
@@ -102,6 +107,7 @@ export const mutations = `
     _id: String!
     name: String
     description: String
+    principalType: String
     permissions: [PermissionInput]
   ): PermissionGroup
 

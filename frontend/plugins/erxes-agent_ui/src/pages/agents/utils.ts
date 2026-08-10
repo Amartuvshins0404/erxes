@@ -1,4 +1,24 @@
-import { IErxesTool, IToolItem, IToolPluginGroup } from './types';
+// Agent pages render in two shells — the AI-Agents console (`/erxes-agent`) and
+// generic Settings (`/settings/erxes-agent`). Resolve the agents base for the
+// shell of the given pathname so navigation stays inside that shell.
+export const resolveAgentsBasePath = (pathname: string): string =>
+  pathname.startsWith('/settings/erxes-agent')
+    ? '/settings/erxes-agent/agents'
+    : '/erxes-agent/agents';
+
+// Names aren't unique, so same-named agents render as identical picker rows.
+// Return the set of names that appear more than once so those rows can be
+// tagged with their unique agentId.
+export const duplicatedAgentNames = (names: string[]): Set<string> => {
+  const counts = new Map<string, number>();
+  const duplicates = new Set<string>();
+  for (const name of names) {
+    const next = (counts.get(name) ?? 0) + 1;
+    counts.set(name, next);
+    if (next === 2) duplicates.add(name);
+  }
+  return duplicates;
+};
 
 // Slugify a name into an agentId. Names with no ASCII alphanumerics (e.g.
 // "日本語", "!!!") would otherwise slug to an empty string and fail the
@@ -8,112 +28,3 @@ export const toSlug = (name: string, fallback = 'agent'): string =>
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/(^-|-$)/g, '') || fallback;
-
-// Built-in (non-erxes) tools, offered alongside operations in the picker.
-// Keep in sync with backend mastra/tools/builtins.ts (BUILTIN_TOOLS keys).
-export const BUILTIN_TOOLS: { key: string; description: string }[] = [
-  { key: 'webSearch', description: 'Web search (DuckDuckGo)' },
-  { key: 'fetchUrl', description: 'Fetch a web page as readable text' },
-  { key: 'calculator', description: 'Evaluate a math expression' },
-  {
-    key: 'renderChart',
-    description: 'Render an interactive chart in the Preview panel',
-  },
-  {
-    key: 'generatePdf',
-    description: 'Generate a downloadable PDF report (charts embeddable)',
-  },
-  {
-    key: 'generateDocx',
-    description: 'Generate a downloadable Word document (charts embeddable)',
-  },
-  {
-    key: 'generateXlsx',
-    description: 'Generate a downloadable Excel spreadsheet (charts embeddable)',
-  },
-  {
-    key: 'generatePptx',
-    description: 'Generate a downloadable PowerPoint deck (charts embeddable)',
-  },
-  {
-    key: 'fileReader',
-    description: 'Read a file as text (PDF, Word, Excel, PowerPoint, …)',
-  },
-  {
-    key: 'companyKnowledge',
-    description: 'Search indexed company knowledge',
-  },
-];
-
-/**
- * Nested grouping: plugin → module → operations, driven by each op's
- * plugin/module metadata. Builtins live under a synthetic "Built-in" plugin.
- */
-export const buildNestedTools = (
-  operations: IErxesTool[],
-  search: string,
-): IToolPluginGroup[] => {
-  const q = search.trim().toLowerCase();
-
-  const erxes: IToolItem[] = operations.map((o) => ({
-    kind: 'erxes',
-    key: o.operation,
-    operation: o.operation,
-    operationType: o.operationType ?? undefined,
-    plugin: o.plugin || 'other',
-    module: o.module || 'other',
-    description: o.description || o.operation,
-  }));
-  const builtins: IToolItem[] = BUILTIN_TOOLS.map((b) => ({
-    kind: 'builtin',
-    key: `builtin:${b.key}`,
-    operation: b.key,
-    operationType: undefined,
-    plugin: '__builtin__',
-    module: 'tools',
-    description: b.description,
-  }));
-
-  const all = [...builtins, ...erxes];
-  const filtered = q
-    ? all.filter(
-        (t) =>
-          t.operation.toLowerCase().includes(q) ||
-          t.description.toLowerCase().includes(q) ||
-          t.plugin.toLowerCase().includes(q) ||
-          t.module.toLowerCase().includes(q),
-      )
-    : all;
-
-  const plugins = new Map<string, Map<string, IToolItem[]>>();
-  for (const t of filtered) {
-    if (!plugins.has(t.plugin)) plugins.set(t.plugin, new Map());
-    const mods = plugins.get(t.plugin)!;
-    if (!mods.has(t.module)) mods.set(t.module, []);
-    mods.get(t.module)!.push(t);
-  }
-
-  // Built-in first, then plugins alphabetically.
-  const pluginEntries = [...plugins.entries()].sort(([a], [b]) => {
-    if (a === '__builtin__') return -1;
-    if (b === '__builtin__') return 1;
-    return a.localeCompare(b);
-  });
-
-  return pluginEntries.map(([pluginKey, mods]) => {
-    const modules = [...mods.entries()]
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([module, items]) => ({
-        module,
-        items: items.sort((x, y) => x.operation.localeCompare(y.operation)),
-      }));
-    const count = modules.reduce((n, m) => n + m.items.length, 0);
-    return {
-      pluginKey,
-      plugin: pluginKey === '__builtin__' ? 'Built-in' : pluginKey,
-      isBuiltin: pluginKey === '__builtin__',
-      count,
-      modules,
-    };
-  });
-};

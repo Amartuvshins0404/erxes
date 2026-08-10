@@ -1,6 +1,7 @@
 import { IContext } from '~/connectionResolvers';
 import { PROVIDER_PRESETS } from '~/mastra/providers';
 import { toPublicProvider } from '@/provider/utils/mask';
+import { ERXES_AGENT_ACTIONS } from '~/meta/permissionActions';
 
 // One entry of a provider's live model-listing response. Field names cover
 // the OpenAI/Anthropic/Mistral (`id`, `display_name`), Google (`name`,
@@ -20,7 +21,7 @@ export const providerQueries = {
     _args: undefined,
     { models, checkPermission }: IContext,
   ) => {
-    await checkPermission('providersView');
+    await checkPermission(ERXES_AGENT_ACTIONS.provider.configRead);
     // Mask before the secret crosses the GraphQL boundary: callers get
     // hasApiKey + a masked hint, never the raw apiKey.
     const providers = await models.MastraProvider.getProviders();
@@ -32,14 +33,17 @@ export const providerQueries = {
     { _id }: { _id: string },
     { models, checkPermission }: IContext,
   ) => {
-    await checkPermission('providersView');
+    await checkPermission(ERXES_AGENT_ACTIONS.provider.configRead);
     return toPublicProvider(await models.MastraProvider.getProvider(_id));
   },
 
-  // Returns static presets — used only by the "Add Provider" form in the UI
-  // to pre-fill fields when a user picks a known provider. No stored secrets are
-  // involved, so this stays open to any logged-in user.
-  mastraProviderPresets: () => {
+  // Returns static presets for the provider administration form.
+  mastraProviderPresets: async (
+    _parent: undefined,
+    _args: undefined,
+    { checkPermission }: IContext,
+  ) => {
+    await checkPermission(ERXES_AGENT_ACTIONS.provider.configRead);
     return PROVIDER_PRESETS;
   },
 
@@ -49,20 +53,37 @@ export const providerQueries = {
     _args: undefined,
     { models, checkPermission }: IContext,
   ) => {
-    await checkPermission('providersView');
+    await checkPermission(ERXES_AGENT_ACTIONS.provider.catalogRead);
     const storedProviders = await models.MastraProvider.find({
       isEnabled: true,
+    }).select({
+      provider: 1,
+      label: 1,
+      isOpenAICompatible: 1,
     });
     const storedSet = new Set(storedProviders.map((stored) => stored.provider));
+    const presetKeys = new Set(
+      PROVIDER_PRESETS.map((preset) => preset.provider),
+    );
 
-    return PROVIDER_PRESETS.map((preset) => ({
-      provider: preset.provider,
-      label: preset.label,
-      isOpenAICompatible: preset.isOpenAICompatible ?? false,
-      isConfigured:
-        storedSet.has(preset.provider) ||
-        !!(preset.envKey && process.env[preset.envKey]),
-    }));
+    return [
+      ...PROVIDER_PRESETS.map((preset) => ({
+        provider: preset.provider,
+        label: preset.label,
+        isOpenAICompatible: preset.isOpenAICompatible ?? false,
+        isConfigured:
+          storedSet.has(preset.provider) ||
+          !!(preset.envKey && process.env[preset.envKey]),
+      })),
+      ...storedProviders
+        .filter((stored) => !presetKeys.has(stored.provider))
+        .map((stored) => ({
+          provider: stored.provider,
+          label: stored.label || stored.provider,
+          isOpenAICompatible: stored.isOpenAICompatible ?? false,
+          isConfigured: true,
+        })),
+    ];
   },
 
   // Returns the models a provider ACTUALLY serves right now, by querying its
@@ -75,7 +96,7 @@ export const providerQueries = {
     { provider }: { provider: string },
     { models, checkPermission }: IContext,
   ) => {
-    await checkPermission('providersView');
+    await checkPermission(ERXES_AGENT_ACTIONS.provider.catalogRead);
     // Prefer the stored DB doc (supports custom/unknown providers too)
     const stored = await models.MastraProvider.findOne({ provider });
 

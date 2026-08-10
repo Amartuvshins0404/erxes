@@ -50,6 +50,7 @@ const SupplierInfo = ({ supplier }: { supplier: ISupplier }) => {
     posToken,
     mushopPosToken,
     name,
+    code,
     description,
     about,
     logo,
@@ -107,6 +108,7 @@ const SupplierInfo = ({ supplier }: { supplier: ISupplier }) => {
           <Table>
             <Table.Body className="bt:[&_td]:px-2 bt:[&_tr:first-child_td]:border-t bt:[&_td]:h-10">
               <Row label={t('Name')} value={name} />
+              <Row label={t('Code')} value={code} />
               <Row label={t('Registration #')} value={registrationNumber} />
               <Row label={t('Founded')} value={dateFounded} />
               <Row label={t('Website')} value={website} />

@@ -23,14 +23,28 @@ export async function storeArtifact(artifact: Artifact): Promise<void> {
       title: artifact.title,
       ...(artifact.kind === 'chart'
         ? { spec: artifact.spec as unknown as Record<string, unknown> }
-        : {
-            format: artifact.format,
-            fileName: artifact.fileName,
-            mimeType: artifact.mimeType,
-            fileKey: artifact.fileKey,
-            inline: artifact.inline,
-            size: artifact.size,
-          }),
+        : artifact.kind === 'diagram'
+          ? { definition: artifact.definition }
+          : artifact.kind === 'image'
+            ? {
+                fileName: artifact.fileName,
+                mimeType: artifact.mimeType,
+                fileKey: artifact.fileKey,
+                inline: artifact.inline,
+                size: artifact.size,
+                width: artifact.width,
+                height: artifact.height,
+              }
+            : {
+                format: artifact.format,
+                fileName: artifact.fileName,
+                mimeType: artifact.mimeType,
+                fileKey: artifact.fileKey,
+                inline: artifact.inline,
+                size: artifact.size,
+                slides: artifact.slides,
+                slideCount: artifact.slideCount,
+              }),
     });
   } catch (e) {
     // eslint-disable-next-line no-console

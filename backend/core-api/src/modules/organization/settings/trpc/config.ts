@@ -31,6 +31,14 @@ export const configTrpcRouter = t.router({
         const { models } = ctx;
         return await models.Configs.getConfigs(codes);
       }),
+    // Names-only config discovery for the erxes-agent AI plugin: returns the SET
+    // config codes, never their values. `.distinct('code')` reads no value into
+    // memory or across the boundary, so this cannot leak a secret even though the
+    // bulk `configs` read stays blocked at the agent boundary.
+    getCodes: t.procedure.query(async ({ ctx }) => {
+      const { models } = ctx;
+      return (await models.Configs.find().distinct('code')) as string[];
+    }),
     getValues: t.procedure
       .input(z.object({ query: z.any() }))
       .query(async ({ ctx, input }) => {

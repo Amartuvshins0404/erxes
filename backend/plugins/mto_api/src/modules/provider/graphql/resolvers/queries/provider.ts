@@ -9,7 +9,7 @@ import { IContext } from '~/connectionResolvers';
 export interface IProviderQueryParams extends ICursorPaginateParams {
   searchValue?: string;
   status?: string;
-  associationId?: string;
+  categoryId?: string;
   isActive?: boolean;
   hasScheduleFutureOrNow?: boolean;
 }
@@ -59,8 +59,8 @@ const generateFilter = async (
     filter.status = params.status;
   }
 
-  if (params.associationId) {
-    filter.associationIds = params.associationId;
+  if (params.categoryId) {
+    filter.categoryIds = params.categoryId;
   }
 
   if (params.isActive !== undefined) {

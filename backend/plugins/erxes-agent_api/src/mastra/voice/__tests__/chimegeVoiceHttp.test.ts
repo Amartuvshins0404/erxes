@@ -4,6 +4,7 @@
 // and the failure→ExpectedError mapping without touching the network.
 import {
   isLikelyWav,
+  isValidChimegeToken,
   MAX_WAV_BYTES,
   synthesize,
   transcribe,
@@ -51,6 +52,31 @@ describe('isLikelyWav', () => {
   });
 });
 
+describe('isValidChimegeToken', () => {
+  it('accepts a normal opaque hex-ish token', () => {
+    expect(isValidChimegeToken('a1b2c3d4e5f60718293a4b5c6d7e8f90')).toBe(true);
+    expect(isValidChimegeToken('CHIMEGE_live-9f8e7d6c')).toBe(true);
+  });
+
+  it('rejects a Cyrillic sentence (chars > 255 — the ByteString bug)', () => {
+    // The exact class of value from the production incident: Mongolian text
+    // pasted into the token field. charCode 1057 (>255) is what made undici
+    // throw "Cannot convert argument to a ByteString".
+    expect(isValidChimegeToken('Сайн байна уу')).toBe(false);
+    expect(isValidChimegeToken('токен')).toBe(false);
+  });
+
+  it('rejects tokens with whitespace', () => {
+    expect(isValidChimegeToken('abc 123')).toBe(false);
+    expect(isValidChimegeToken('abc\t123')).toBe(false);
+    expect(isValidChimegeToken(' abc123')).toBe(false);
+  });
+
+  it('rejects an empty token', () => {
+    expect(isValidChimegeToken('')).toBe(false);
+  });
+});
+
 describe('transcribe (HTTP)', () => {
   const fetchMock = jest.fn();
   beforeEach(() => {
@@ -63,6 +89,14 @@ describe('transcribe (HTTP)', () => {
     await expect(
       transcribe({ token: 't', audio: tooBig }),
     ).rejects.toThrow(/too long/i);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('throws a friendly ExpectedError for an invalid token without calling fetch', async () => {
+    await expect(
+      transcribe({ token: 'Сайн байна уу', audio: wav() }),
+    ).rejects.toThrow(/Chimege STT token is invalid — re-save it/);
+    // The whole point: we never reach undici's ByteString TypeError.
     expect(fetchMock).not.toHaveBeenCalled();
   });
 

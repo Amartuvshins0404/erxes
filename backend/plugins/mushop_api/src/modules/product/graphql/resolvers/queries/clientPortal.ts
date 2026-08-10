@@ -1,5 +1,6 @@
 import { IContext } from '~/connectionResolvers';
 import { ProductQueryParams } from '@/product/@types/product';
+import { MUSHOP_PRODUCT_STATE } from '@/product/db/definitions/product';
 import { IOffsetPaginateParams } from 'erxes-api-shared/core-types';
 import { markResolvers, paginate } from 'erxes-api-shared/utils';
 import { checkMembership } from '~/utils';
@@ -18,7 +19,7 @@ export const cpProductQueries = {
 
     const { supplierId, categoryId, status, searchValue } = params;
 
-    const filter: any = {};
+    const filter: any = { state: MUSHOP_PRODUCT_STATE.ACTIVE };
 
     if (supplierId) {
       const supplier = await models.Supplier.getSupplier(supplierId);
@@ -59,7 +60,10 @@ export const cpProductQueries = {
     });
 
     if (!isMembership) {
-      return models.Product.findOne({ _id }).select('-unitPrice');
+      return models.Product.findOne({
+        _id,
+        state: MUSHOP_PRODUCT_STATE.ACTIVE,
+      }).select('-unitPrice');
     }
 
     return models.Product.getProduct(_id);

@@ -32,6 +32,7 @@ export const useManagedAgentDeploy = (identifierId?: string) => {
     input: {
       identifierId?: string;
       provider?: string;
+      model?: string;
       apiToken: string;
       description?: string;
       systemPrompt?: string;
@@ -50,7 +51,8 @@ export const useManagedAgentDeploy = (identifierId?: string) => {
         identifierId: nextIdentifierId,
         input: {
           provider: input.provider || 'kimi',
-          kimiApiKey: input.apiToken.trim(),
+          model: input.model,
+          apiKey: input.apiToken.trim(),
           description: input.description?.trim() || undefined,
           systemPrompt: input.systemPrompt?.trim() || undefined,
         },

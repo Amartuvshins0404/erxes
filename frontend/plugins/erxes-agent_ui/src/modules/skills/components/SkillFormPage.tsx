@@ -50,7 +50,8 @@ export const SkillFormPage = () => {
   const [historyOpen, setHistoryOpen] = useState(false);
 
   const { skill, loading } = useSkill(id);
-  const { canCreate, canEdit, canPromote } = useSkillAccess();
+  const { canCreate, canEdit, canPublish, canPromote, canModerate } =
+    useSkillAccess();
 
   const onSaved = (saved: IMastraSkill) => {
     toast({ title: isEdit ? 'Skill saved' : 'Skill created' });
@@ -58,8 +59,12 @@ export const SkillFormPage = () => {
   };
 
   const { createSkillDoc, updateSkillDoc, saving } = useSaveSkill(id, onSaved);
-  const { publish, promote, demote, loading: lifecycleBusy } =
-    useSkillMutations();
+  const {
+    publish,
+    promote,
+    demote,
+    loading: lifecycleBusy,
+  } = useSkillMutations();
 
   const canSave = isEdit ? canEdit : canCreate;
   // isMine is a nullable Boolean; only an explicit `true` is the owner — `null`
@@ -69,9 +74,8 @@ export const SkillFormPage = () => {
   const isPublished = skill?.status === 'published';
   const isPrivate = skill?.visibility === 'private';
   const isPublic = skill?.visibility === 'public';
-  // A promoted (global) skill can be pulled back to private by its author or an
-  // admin — the inverse of Promote, so the one-way trap has an exit.
-  const canDemote = isPublic && (isOwner || canPromote);
+  // Global skills may be demoted by their author or a skill moderator.
+  const canDemote = isPublic && canEdit && (isOwner || canModerate);
 
   // Populate the form once the skill arrives (edit only).
   useEffect(() => {
@@ -108,7 +112,7 @@ export const SkillFormPage = () => {
 
   const handlePublish = () => {
     if (!id) return;
-    if (!canEdit) return showSkillPermissionError('publish');
+    if (!canPublish) return showSkillPermissionError('publish');
     publish(id);
   };
 
@@ -120,7 +124,9 @@ export const SkillFormPage = () => {
 
   const handleDemote = () => {
     if (!id) return;
-    if (!isOwner && !canPromote) return showSkillPermissionError('demote');
+    if (!canEdit || (!isOwner && !canModerate)) {
+      return showSkillPermissionError('demote');
+    }
     demote(id);
   };
 

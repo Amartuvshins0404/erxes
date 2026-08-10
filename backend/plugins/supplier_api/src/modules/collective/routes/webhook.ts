@@ -1,7 +1,14 @@
 import crypto from 'crypto';
 import { Router, Request, Response } from 'express';
-import { isDev, sendTRPCMessage } from 'erxes-api-shared/utils';
-import { isValid } from '@/collective/utils/isCollective';
+import {
+  isDev,
+  sendTRPCMessage,
+  sendWorkerMessage,
+  sendWorkerQueue,
+} from 'erxes-api-shared/utils';
+import { splitType } from 'erxes-api-shared/core-modules';
+import { isValid } from '@/collective/utils/bundleGuard';
+import { sendMessage } from '~/modules/platform/shared';
 import { generateModels } from '~/connectionResolvers';
 
 const COLLECTIVE_BUNDLE_TYPE = 'COLLECTIVE_BUNDLE_TYPE';
@@ -100,8 +107,6 @@ router.post('/collective', async (req: Request, res: Response) => {
     }
 
     const supplierLabel = supplierName || `Supplier ${supplierId}`;
-    // The supplier's unique, human-readable code drives all replicated codes
-    // (company / categories / products). Falls back to the id if absent.
     const supplierKey = supplierCode || supplierId;
 
     const companyId = deterministicObjectId(
@@ -125,21 +130,15 @@ router.post('/collective', async (req: Request, res: Response) => {
       new Set([...(primaryPhone ? [primaryPhone] : []), ...phoneList]),
     );
 
-    await upsertCore(
-      subdomain,
-      'companies',
-      'createCompany',
-      companyId,
-      {
-        primaryName: supplierLabel,
-        names: [supplierLabel],
-        code: supplierKey,
-        ...(primaryEmail ? { primaryEmail } : {}),
-        ...(primaryPhone ? { primaryPhone } : {}),
-        ...(emails.length ? { emails } : {}),
-        ...(phones.length ? { phones } : {}),
-      },
-    );
+    await upsertCore(subdomain, 'companies', 'createCompany', companyId, {
+      primaryName: supplierLabel,
+      names: [supplierLabel],
+      code: supplierKey,
+      ...(primaryEmail ? { primaryEmail } : {}),
+      ...(primaryPhone ? { primaryPhone } : {}),
+      ...(emails.length ? { emails } : {}),
+      ...(phones.length ? { phones } : {}),
+    });
 
     const supplierCategoryId = deterministicObjectId(
       'collective-supplier-cat',
@@ -167,10 +166,13 @@ router.post('/collective', async (req: Request, res: Response) => {
     }
 
     const targetCatId = (sourceId: string) =>
-      deterministicObjectId('collective-cat', collectiveId, supplierId, sourceId);
+      deterministicObjectId(
+        'collective-cat',
+        collectiveId,
+        supplierId,
+        sourceId,
+      );
 
-    // Create a source category and its ancestors first (depth order), so every
-    // node's cloned parent already exists. Returns the cloned category id.
     const targetCategoryBySource = new Map<string, string>();
     const ensureCategory = async (
       sourceId: string,
@@ -180,11 +182,9 @@ router.post('/collective', async (req: Request, res: Response) => {
       if (cached) return cached;
 
       const cat = sourceById.get(sourceId);
-      // Parent not in the payload, or a cycle: hang it off the supplier root.
       if (!cat || seen.has(sourceId)) return supplierCategoryId;
       seen.add(sourceId);
 
-      // Resolve the cloned parent first; top-level → supplier root.
       const parentTargetId =
         cat.parentId && sourceById.has(cat.parentId)
           ? await ensureCategory(cat.parentId, seen)
@@ -198,7 +198,6 @@ router.post('/collective', async (req: Request, res: Response) => {
         cloneId,
         {
           name: cat.name || cat.code || sourceId,
-          // Flat code per category regardless of depth; nesting is in parentId.
           code: `${supplierKey}-${cat.code || sourceId}`,
           parentId: parentTargetId,
         },
@@ -223,17 +222,17 @@ router.post('/collective', async (req: Request, res: Response) => {
     for await (const doc of products) {
       const { _id: sourceProductId, prices, categoryId, ...rest } = doc || {};
 
-      delete (rest as any).__v;
-      delete (rest as any).createdAt;
-      delete (rest as any).updatedAt;
-      delete (rest as any).vendorId;
-      delete (rest as any).tokens;
-      delete (rest as any).isCheckRems;
-      delete (rest as any).taxRules;
-      delete (rest as any).scopeBrandIds;
-      delete (rest as any).mergedIds;
-      delete (rest as any).sameDefault;
-      delete (rest as any).sameMasks;
+      delete rest.__v;
+      delete rest.createdAt;
+      delete rest.updatedAt;
+      delete rest.vendorId;
+      delete rest.tokens;
+      delete rest.isCheckRems;
+      delete rest.taxRules;
+      delete rest.scopeBrandIds;
+      delete rest.mergedIds;
+      delete rest.sameDefault;
+      delete rest.sameMasks;
 
       if (!doc?.code) {
         results.push({
@@ -258,8 +257,6 @@ router.post('/collective', async (req: Request, res: Response) => {
         (categoryId && targetCategoryBySource.get(categoryId)) ||
         supplierCategoryId;
 
-      // Code: <supplierCode>-<srcProductCode>, e.g. UB-BZD-001-PHONEX1. The
-      // category isn't repeated here — it's already linked via categoryId.
       const targetCode = `${supplierKey}-${doc.code}`;
 
       const doc_ = {
@@ -353,13 +350,10 @@ router.post('/collective-push', async (req: Request, res: Response) => {
       });
     }
 
-    // The supplier's authoritative profile lives in this (the supplier's) own
-    // tenant — exactly one per tenant — so we read its contact info here rather
-    // than relying on mushop to pass it down.
     const models = await generateModels(subdomain);
     const supplier = await models.Supplier.findOne({}).lean();
 
-    const products = (await sendTRPCMessage({
+    const products = await sendTRPCMessage({
       subdomain,
       pluginName: 'posclient',
       method: 'query',
@@ -367,7 +361,7 @@ router.post('/collective-push', async (req: Request, res: Response) => {
       action: 'findByToken',
       input: { token: posToken },
       defaultValue: [],
-    })) as Record<string, any>[];
+    });
 
     if (!products.length) {
       return res.status(200).json({
@@ -390,13 +384,11 @@ router.post('/collective-push', async (req: Request, res: Response) => {
       }
     }
 
-    // Resolve the categories the products sit in AND all their ancestors, so
-    // the target can rebuild the full tree. Walk up parentId until no new ids.
     const categoryById = new Map<string, Record<string, any>>();
     let pending = Array.from(leafCategoryIds);
 
     while (pending.length) {
-      const fetched = (await sendTRPCMessage({
+      const fetched = await sendTRPCMessage({
         subdomain,
         pluginName: 'core',
         method: 'query',
@@ -407,7 +399,7 @@ router.post('/collective-push', async (req: Request, res: Response) => {
           fields: { _id: 1, name: 1, code: 1, parentId: 1 },
         },
         defaultValue: [],
-      })) as Record<string, any>[];
+      });
 
       const nextParents: string[] = [];
       for (const cat of fetched) {
@@ -422,19 +414,19 @@ router.post('/collective-push', async (req: Request, res: Response) => {
 
     const categories = Array.from(categoryById.values());
 
-    const { SUPPLIER_API_URL, MUSHOP_SECRET } = process.env;
+    const { DOMAIN, MUSHOP_SECRET } = process.env;
 
-    if (!SUPPLIER_API_URL || !MUSHOP_SECRET) {
+    if (!DOMAIN || !MUSHOP_SECRET) {
       return res
         .status(500)
-        .json({ error: 'SUPPLIER_API_URL or MUSHOP_SECRET is not configured' });
+        .json({ error: 'DOMAIN or MUSHOP_SECRET is not configured' });
     }
 
     const baseUrl = isDev
-      ? SUPPLIER_API_URL
-      : SUPPLIER_API_URL.replace('<subdomain>', targetSubdomain);
+      ? DOMAIN
+      : DOMAIN.replace('<subdomain>', targetSubdomain);
 
-    const endpoint = `${baseUrl}/pl:supplier/webhook/mushop/collective`;
+    const endpoint = `${baseUrl}/gateway/pl:supplier/webhook/mushop/collective`;
 
     const body = JSON.stringify({
       subdomain: targetSubdomain,
@@ -488,12 +480,8 @@ router.post('/collective-push', async (req: Request, res: Response) => {
 router.post('/collective-purge', async (req: Request, res: Response) => {
   try {
     const { subdomain, payload } = req.body || {};
-    const {
-      collectiveId,
-      productIds,
-      supplierId,
-      targetPosToken,
-    } = payload || {};
+    const { collectiveId, productIds, supplierId, targetPosToken } =
+      payload || {};
 
     if (!subdomain) {
       return res.status(400).json({ error: 'subdomain is required' });
@@ -546,7 +534,11 @@ router.post('/collective-purge', async (req: Request, res: Response) => {
         });
         results.push({ _id: productId, ok: true });
       } catch (e: any) {
-        results.push({ _id: productId, ok: false, error: e?.message || String(e) });
+        results.push({
+          _id: productId,
+          ok: false,
+          error: e?.message || String(e),
+        });
       }
     }
 
@@ -634,7 +626,7 @@ router.post('/collective-purge-push', async (req: Request, res: Response) => {
       });
     }
 
-    const products = (await sendTRPCMessage({
+    const products = await sendTRPCMessage({
       subdomain,
       pluginName: 'posclient',
       method: 'query',
@@ -642,25 +634,25 @@ router.post('/collective-purge-push', async (req: Request, res: Response) => {
       action: 'findByToken',
       input: { token: posToken },
       defaultValue: [],
-    })) as Record<string, any>[];
+    });
 
     const productIds = products
       .map((p) => p?._id)
       .filter((id): id is string => !!id);
 
-    const { SUPPLIER_API_URL, MUSHOP_SECRET } = process.env;
+    const { DOMAIN, MUSHOP_SECRET } = process.env;
 
-    if (!SUPPLIER_API_URL || !MUSHOP_SECRET) {
+    if (!DOMAIN || !MUSHOP_SECRET) {
       return res
         .status(500)
-        .json({ error: 'SUPPLIER_API_URL or MUSHOP_SECRET is not configured' });
+        .json({ error: 'DOMAIN or MUSHOP_SECRET is not configured' });
     }
 
     const baseUrl = isDev
-      ? SUPPLIER_API_URL
-      : SUPPLIER_API_URL.replace('<subdomain>', targetSubdomain);
+      ? DOMAIN
+      : DOMAIN.replace('<subdomain>', targetSubdomain);
 
-    const endpoint = `${baseUrl}/pl:supplier/webhook/mushop/collective-purge`;
+    const endpoint = `${baseUrl}/gateway/pl:supplier/webhook/mushop/collective-purge`;
 
     const body = JSON.stringify({
       subdomain: targetSubdomain,
@@ -717,7 +709,7 @@ router.post('/create-pos', async (req: Request, res: Response) => {
       });
     }
 
-    const owner = (await sendTRPCMessage({
+    const owner = await sendTRPCMessage({
       subdomain,
       pluginName: 'core',
       method: 'query',
@@ -725,7 +717,7 @@ router.post('/create-pos', async (req: Request, res: Response) => {
       action: 'findOne',
       input: { query: { isOwner: true } },
       defaultValue: null,
-    })) as { _id: string } | null;
+    });
 
     if (!owner?._id) {
       return res.status(400).json({
@@ -733,7 +725,7 @@ router.post('/create-pos', async (req: Request, res: Response) => {
       });
     }
 
-    const pos = (await sendTRPCMessage({
+    const pos = await sendTRPCMessage({
       subdomain,
       pluginName: 'sales',
       method: 'mutation',
@@ -748,7 +740,7 @@ router.post('/create-pos', async (req: Request, res: Response) => {
           cashierIds: [owner._id],
         },
       },
-    })) as { _id: string; token: string } | null;
+    });
 
     if (!pos?.token) {
       return res
@@ -772,10 +764,31 @@ interface CustomerInfo {
   lastName?: string;
 }
 
-// Creates/finds THIS tenant's own customer for a mushop shopper, matched by the
-// global shopper id (stored in `code`) or phone/email. Returns the tenant-local
-// customer id so mushop can index the global→local mapping. The tenant owns the
-// id — no foreign id is injected; the global id only lives in `code`.
+const findLocalCustomerId = async (
+  subdomain: string,
+  info?: CustomerInfo,
+): Promise<string | undefined> => {
+  if (!info || (!info.sourceUserId && !info.phone && !info.email)) {
+    return undefined;
+  }
+
+  const existing = (await sendTRPCMessage({
+    subdomain,
+    pluginName: 'core',
+    method: 'query',
+    module: 'customers',
+    action: 'getWidgetCustomer',
+    input: {
+      code: info.sourceUserId,
+      email: info.email,
+      phone: info.phone,
+    },
+    defaultValue: null,
+  })) as { _id?: string } | null;
+
+  return existing?._id;
+};
+
 const upsertLocalCustomer = async (
   subdomain: string,
   info?: CustomerInfo,
@@ -784,47 +797,36 @@ const upsertLocalCustomer = async (
     return undefined;
   }
 
-  const findOne = (query: Record<string, any>) =>
-    sendTRPCMessage({
-      subdomain,
-      pluginName: 'core',
-      method: 'query',
-      module: 'customers',
-      action: 'findOne',
-      input: { query },
-      defaultValue: null,
-    }) as Promise<{ _id?: string } | null>;
+  const existingId = await findLocalCustomerId(subdomain, info);
 
-  // Match by the global shopper id first (stable), then phone, then email.
-  let existing: { _id?: string } | null = null;
-  if (info.sourceUserId) existing = await findOne({ code: info.sourceUserId });
-  if (!existing?._id && info.phone)
-    existing = await findOne({ customerPrimaryPhone: info.phone });
-  if (!existing?._id && info.email)
-    existing = await findOne({ customerPrimaryEmail: info.email });
+  const doc: Record<string, any> = { state: 'customer' };
+  if (info.sourceUserId) doc.code = info.sourceUserId;
+  if (info.phone) doc.primaryPhone = info.phone;
+  if (info.email) doc.primaryEmail = info.email;
+  if (info.firstName) doc.firstName = info.firstName;
+  if (info.lastName) doc.lastName = info.lastName;
 
-  if (existing?._id) return existing._id;
+  const saved = existingId
+    ? ((await sendTRPCMessage({
+        subdomain,
+        pluginName: 'core',
+        method: 'mutation',
+        module: 'customers',
+        action: 'updateCustomer',
+        input: { _id: existingId, doc },
+        defaultValue: null,
+      })) as { _id?: string } | null)
+    : ((await sendTRPCMessage({
+        subdomain,
+        pluginName: 'core',
+        method: 'mutation',
+        module: 'customers',
+        action: 'createCustomer',
+        input: { doc },
+        defaultValue: null,
+      })) as { _id?: string } | null);
 
-  const created = (await sendTRPCMessage({
-    subdomain,
-    pluginName: 'core',
-    method: 'mutation',
-    module: 'customers',
-    action: 'createCustomer',
-    input: {
-      doc: {
-        code: info.sourceUserId,
-        primaryPhone: info.phone,
-        primaryEmail: info.email,
-        firstName: info.firstName,
-        lastName: info.lastName,
-        state: 'customer',
-      },
-    },
-    defaultValue: null,
-  })) as { _id?: string } | null;
-
-  return created?._id;
+  return saved?._id ?? existingId;
 };
 
 router.post('/order', async (req: Request, res: Response) => {
@@ -844,8 +846,6 @@ router.post('/order', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'payload.order is required' });
     }
 
-    // Create this tenant's own customer for the shopper (best-effort: a contact
-    // failure must not block the order). The order keeps the global customerId.
     let localCustomerId: string | undefined;
     try {
       localCustomerId = await upsertLocalCustomer(subdomain, customerInfo);
@@ -853,15 +853,24 @@ router.post('/order', async (req: Request, res: Response) => {
       console.error('mushop/order: customer upsert failed:', e.message);
     }
 
-    const created = (await sendTRPCMessage({
+    const orderInput = localCustomerId
+      ? {
+          ...order,
+          posToken,
+          customerId: localCustomerId,
+          customerType: 'customer',
+        }
+      : { ...order, posToken };
+
+    const created = await sendTRPCMessage({
       subdomain,
       pluginName: 'posclient',
       method: 'mutation',
       module: 'posclient',
       action: 'createOrder',
-      input: { order: { ...order, posToken } },
+      input: { order: orderInput },
       defaultValue: null,
-    }))
+    });
 
     if (!created?._id) {
       return res
@@ -869,9 +878,6 @@ router.post('/order', async (req: Request, res: Response) => {
         .json({ error: 'posclient did not create the order' });
     }
 
-    // Return the full created order so the storefront (via mushop's proxy) gets
-    // _id/number/totalAmount/paidAmounts to invoice against, plus the tenant's
-    // own customerId so mushop can index the global→local customer mapping.
     return res
       .status(200)
       .json({ success: true, order: created, customerId: localCustomerId });
@@ -881,10 +887,6 @@ router.post('/order', async (req: Request, res: Response) => {
   }
 });
 
-// Creates a gateway invoice (+ transaction/QR) in the SUPPLIER tenant for a
-// posclient order, using the supplier's own payment method. mushop proxies the
-// storefront's invoiceCreate here so the invoice + money live in the supplier
-// tenant; the returned QR is handed back to the storefront unchanged.
 router.post('/invoice', async (req: Request, res: Response) => {
   try {
     const { subdomain, payload } = req.body || {};
@@ -895,6 +897,7 @@ router.post('/invoice', async (req: Request, res: Response) => {
       amount,
       currency,
       customer,
+      customerInfo,
       description,
     } = payload || {};
 
@@ -916,7 +919,15 @@ router.post('/invoice', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'payload.amount is required' });
     }
 
-    const invoice = (await sendTRPCMessage({
+    let customerId: string | undefined;
+
+    try {
+      customerId = await upsertLocalCustomer(subdomain, customerInfo);
+    } catch (e: any) {
+      console.error('mushop/invoice: customer upsert failed:', e.message);
+    }
+
+    const invoice = await sendTRPCMessage({
       subdomain,
       pluginName: 'payment',
       method: 'mutation',
@@ -928,15 +939,15 @@ router.post('/invoice', async (req: Request, res: Response) => {
         phone: customer?.phone || '',
         email: customer?.email || '',
         description: description || '',
-        customerId: customer?.id,
-        customerType: customer?.type || 'customer',
-        contentType: 'pos:orders',
+        customerId: customerId,
+        customerType: 'customer',
+        contentType: 'sales:pos:orders',
         contentTypeId,
         paymentIds: [paymentId],
         data: { posToken },
       },
       defaultValue: null,
-    })) as { _id?: string; invoiceNumber?: string; createdAt?: string } | null;
+    });
 
     if (!invoice?._id) {
       return res
@@ -944,31 +955,23 @@ router.post('/invoice', async (req: Request, res: Response) => {
         .json({ error: 'payment plugin did not create the invoice' });
     }
 
-    const transaction = (await sendTRPCMessage({
+    const invoiceWithTransactions = await sendTRPCMessage({
       subdomain,
       pluginName: 'payment',
-      method: 'mutation',
+      method: 'query',
       module: 'payment',
-      action: 'addTransaction',
-      input: { invoiceId: invoice._id, paymentId, amount },
+      action: 'getInvoiceWithTransactions',
+      input: { _id: invoice._id },
       defaultValue: null,
-    })) as { _id?: string; status?: string; response?: any } | null;
+    });
+
+    const transactions = invoiceWithTransactions?.transactions || [];
 
     return res.status(200).json({
       success: true,
-      invoice: {
-        _id: invoice._id,
-        invoiceNumber: invoice.invoiceNumber,
-        amount,
-        createdAt: invoice.createdAt,
-      },
-      transaction: transaction
-        ? {
-            _id: transaction._id,
-            status: transaction.status,
-            response: transaction.response,
-          }
-        : null,
+      invoice,
+      transactions,
+      customerId: customerId,
     });
   } catch (e: any) {
     console.error('mushop/invoice webhook failed:', e);
@@ -976,8 +979,50 @@ router.post('/invoice', async (req: Request, res: Response) => {
   }
 });
 
-// Customer order operations proxied from mushop, run in the SUPPLIER tenant
-// against its posclient (posToken-scoped via new posclient tRPC procedures).
+router.post('/transaction', async (req: Request, res: Response) => {
+  try {
+    const { subdomain, payload } = req.body || {};
+    const { paymentId, invoiceId, amount, details } = payload || {};
+
+    if (!subdomain) {
+      return res.status(400).json({ error: 'subdomain is required' });
+    }
+    if (!paymentId) {
+      return res.status(400).json({ error: 'payload.paymentId is required' });
+    }
+    if (!invoiceId) {
+      return res.status(400).json({ error: 'payload.invoiceId is required' });
+    }
+    if (!amount) {
+      return res.status(400).json({ error: 'payload.amount is required' });
+    }
+
+    const transaction = await sendTRPCMessage({
+      subdomain,
+      pluginName: 'payment',
+      method: 'mutation',
+      module: 'payment',
+      action: 'addTransaction',
+      input: { invoiceId, paymentId, amount, details },
+      defaultValue: null,
+    });
+
+    if (!transaction?._id) {
+      return res
+        .status(502)
+        .json({ error: 'payment plugin did not create the transaction' });
+    }
+
+    return res.status(200).json({
+      success: true,
+      transaction,
+    });
+  } catch (e: any) {
+    console.error('mushop/transaction webhook failed:', e);
+    return res.status(400).json({ error: e.message });
+  }
+});
+
 const callPosclientOrder = async (
   subdomain: string,
   action: string,
@@ -1006,9 +1051,6 @@ router.post('/orders-list', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'payload.posToken is required' });
     }
 
-    // params carries the shopper's customerId (the client-portal user id, the
-    // same across tenants); posclient fullOrders filters this tenant's orders by
-    // it.
     const result = await callPosclientOrder(
       subdomain,
       'fullOrders',
@@ -1110,8 +1152,86 @@ router.post('/order-cancel', async (req: Request, res: Response) => {
   }
 });
 
-// Polls the SUPPLIER tenant for an invoice's paid status. On 'paid', the
-// supplier tenant's own payment callback settles the posclient order.
+const syncPaidOrderToMushop = async (subdomain: string, invoiceId: string) => {
+  const invoiceWithTransactions = await sendTRPCMessage({
+    subdomain,
+    pluginName: 'payment',
+    method: 'query',
+    module: 'payment',
+    action: 'getInvoiceWithTransactions',
+    input: { _id: invoiceId },
+    defaultValue: null,
+  });
+
+  if (!invoiceWithTransactions?._id) {
+    return;
+  }
+
+  const { transactions, ...invoice } = invoiceWithTransactions;
+
+  const contentTypeId = invoice.contentTypeId;
+  const posToken = invoice.data?.posToken;
+
+  if (!contentTypeId || !posToken) {
+    return;
+  }
+
+  const fetchOrder = () =>
+    sendTRPCMessage({
+      subdomain,
+      pluginName: 'posclient',
+      method: 'query',
+      module: 'posclient',
+      action: 'orderDetail',
+      input: { posToken, _id: contentTypeId, customerId: invoice.customerId },
+      defaultValue: null,
+    });
+
+  let order = await fetchOrder();
+
+  if (order && !order.paidDate) {
+    const [pluginName, moduleName, collectionType] = splitType(
+      invoice.contentType || 'sales:pos:orders',
+    );
+
+    try {
+      await sendWorkerMessage({
+        subdomain,
+        pluginName: pluginName === 'pos' ? 'sales' : pluginName,
+        queueName: 'payments',
+        jobName: 'callback',
+        data: {
+          ...invoice,
+          status: 'paid',
+          moduleName,
+          collectionType,
+          apiResponse: 'success',
+        },
+        defaultValue: null,
+        timeout: 10000,
+      });
+    } catch (e: any) {
+      console.error(
+        'mushop/invoice-check: payment callback failed:',
+        e.message,
+      );
+    }
+
+    order = await fetchOrder();
+  }
+
+  if (!order) {
+    return;
+  }
+
+  await sendMessage({
+    subdomain,
+    path: 'order-sync',
+    payload: { entityId: contentTypeId, order },
+    platform: 'mushop',
+  });
+};
+
 router.post('/invoice-check', async (req: Request, res: Response) => {
   try {
     const { subdomain, payload } = req.body || {};
@@ -1124,7 +1244,7 @@ router.post('/invoice-check', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'payload.invoiceId is required' });
     }
 
-    const status = (await sendTRPCMessage({
+    const status = await sendTRPCMessage({
       subdomain,
       pluginName: 'payment',
       method: 'mutation',
@@ -1132,7 +1252,15 @@ router.post('/invoice-check', async (req: Request, res: Response) => {
       action: 'checkInvoice',
       input: { _id: invoiceId },
       defaultValue: null,
-    })) as string | null;
+    });
+
+    if (status === 'paid') {
+      try {
+        await syncPaidOrderToMushop(subdomain, invoiceId);
+      } catch (e: any) {
+        console.error('mushop/invoice-check: order sync failed:', e.message);
+      }
+    }
 
     return res.status(200).json({ success: true, status });
   } catch (e: any) {

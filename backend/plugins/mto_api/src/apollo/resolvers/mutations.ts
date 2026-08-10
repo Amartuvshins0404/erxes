@@ -1,5 +1,5 @@
 import { providerMutations } from '@/provider/graphql/resolvers/mutations/provider';
-import { associationMutations } from '@/association/graphql/resolvers/mutations/association';
+import { categoryMutations } from '@/category/graphql/resolvers/mutations/category';
 import { eventMutations } from '@/event/graphql/resolvers/mutations/event';
 
 import { configMutations } from '@/config/graphql/resolvers/mutations/config';
@@ -12,7 +12,7 @@ export const mutations = Object.assign(
   {},
   providerMutations,
   configMutations,
-  associationMutations,
+  categoryMutations,
   eventMutations,
   registrationMutations,
   registrationFormSchemaMutations,

@@ -30,7 +30,13 @@ export const uploadToStorage = async (file: File): Promise<string> => {
   });
   const text = await res.text();
   if (!res.ok) {
-    throw new Error(text || `Upload failed (HTTP ${res.status})`);
+    // A misconfigured/unreachable storage backend surfaces as a 500 with an
+    // EMPTY body (the SDK error had no message) — turn that into guidance
+    // instead of a bare status code.
+    throw new Error(
+      text ||
+        `Upload failed (HTTP ${res.status}). File storage may not be configured on this instance — check System configuration → File upload (S3/MinIO/Cloudflare).`,
+    );
   }
   return text.replace(/^"|"$/g, '');
 };

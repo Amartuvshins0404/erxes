@@ -1,18 +1,18 @@
 import type { ChartSpec, ChartSeries } from './chartSpec';
 
 // ---------------------------------------------------------------------------
-// chartSpecToEChartsOption — the single mapping from our small ChartSpec to a
-// real ECharts `option`. Duplicated verbatim on the frontend
-// (frontend/libs/erxes-ui/src/modules/charts/chartSpecToEChartsOption.ts) so a
-// chart renders identically in the Preview panel and inside generated files.
-// Keep both copies in sync (a shared JSON fixture asserts equality in tests).
+// chartSpecToEChartsOption — server-side (PDF/DOCX/XLSX export) option builder.
+//
+// This is intentionally simpler than the browser version at
+// frontend/libs/erxes-ui/src/modules/charts/chartSpecToEChartsOption.ts.
+// The browser version adds theme-aware colors, gradients, animations,
+// drilldown emphasis, and label rotation that only make sense in a live DOM.
+// This version produces clean, static options suited for canvas/PNG rendering
+// in a Node.js context. Do NOT try to unify them.
 // ---------------------------------------------------------------------------
 
-// ECharts options are deeply dynamic; model the return as a plain JSON object
-// rather than pulling the full echarts type surface into this module.
 export type EChartsOption = Record<string, unknown>;
 
-// Default qualitative palette (used when a series has no explicit color).
 const PALETTE = [
   '#4f46e5',
   '#06b6d4',
@@ -40,42 +40,53 @@ const valuesOf = (spec: ChartSpec, key: string): number[] =>
     return Number.isFinite(value) ? value : 0;
   });
 
-// Title is the chart title only — the (often long) description is shown in the
-// Preview header / surrounding document text, never as a subtitle that collides
-// with the axis name.
 const baseOption = (spec: ChartSpec): EChartsOption => ({
+  animation: false,
   title: {
     text: spec.title,
     left: 'center',
-    top: 6,
-    textStyle: { fontSize: 15, fontWeight: 600 },
+    top: 10,
+    textStyle: { fontSize: 14, fontWeight: 600 },
   },
   tooltip: { trigger: 'item' },
-  legend: { bottom: 0, type: 'scroll' },
-  grid: { left: 8, right: 24, bottom: 48, top: 48, containLabel: true },
+  legend: {
+    bottom: 4,
+    type: 'scroll',
+    icon: 'circle',
+    itemHeight: 8,
+    itemGap: 16,
+    textStyle: { fontSize: 12 },
+  },
+  grid: { left: 8, right: 16, bottom: 52, top: 56, containLabel: true },
 });
+
+const axisLine = { lineStyle: { opacity: 0.25 } };
+const axisTick = { show: false };
+const splitLine = { lineStyle: { type: 'dashed' as const, opacity: 0.35 } };
 
 const categoryAxis = (spec: ChartSpec) => ({
   type: 'category' as const,
   data: labels(spec),
   name: spec.xAxisLabel,
   nameLocation: 'middle' as const,
-  nameGap: 34,
-  axisLabel: { hideOverlap: true },
+  nameGap: 36,
+  axisLine,
+  axisTick,
+  axisLabel: { hideOverlap: true, fontSize: 12 },
 });
 
-// The value-axis name runs along the axis (vertical when on Y) so it never
-// overlaps the title; containLabel keeps it inside the grid.
 const valueAxis = (spec: ChartSpec, horizontal: boolean) => ({
   type: 'value' as const,
   name: spec.yAxisLabel,
   nameLocation: 'middle' as const,
   nameRotate: horizontal ? 0 : 90,
-  nameGap: horizontal ? 28 : 52,
+  nameGap: horizontal ? 32 : 56,
+  axisLine: { show: false },
+  axisTick: { show: false },
+  splitLine,
+  axisLabel: { fontSize: 12 },
 });
 
-// bar / horizontalBar / line / area / stackedBar / combo all share the same
-// cartesian skeleton; the per-series styling is what differs.
 function cartesian(spec: ChartSpec): EChartsOption {
   const horizontal = spec.chartType === 'horizontalBar' || spec.horizontal;
   const stacked = spec.chartType === 'stackedBar' || spec.stacked;
@@ -88,16 +99,40 @@ function cartesian(spec: ChartSpec): EChartsOption {
       spec.chartType === 'area' ||
       (spec.chartType === 'combo' && s.type === 'line');
     const isArea = spec.chartType === 'area';
+    const color = colorAt(s, index);
 
-    return {
+    const base = {
       name: s.label,
       id: s.key,
       type: isLine ? 'line' : 'bar',
       data: valuesOf(spec, s.key),
-      itemStyle: { color: colorAt(s, index) },
-      ...(isArea ? { areaStyle: {} } : {}),
-      ...(isLine ? { smooth: true } : {}),
-      ...(stacked && !isLine ? { stack: 'total' } : {}),
+      itemStyle: {
+        color,
+        borderRadius: isLine
+          ? 0
+          : horizontal
+            ? [0, 6, 6, 0]
+            : [6, 6, 0, 0],
+      },
+    };
+
+    if (isLine) {
+      return {
+        ...base,
+        smooth: true,
+        lineStyle: { width: 2.5, color },
+        symbol: 'circle',
+        symbolSize: 6,
+        ...(isArea
+          ? { areaStyle: { color, opacity: 0.12 } }
+          : {}),
+      };
+    }
+
+    return {
+      ...base,
+      barMaxWidth: 64,
+      ...(stacked ? { stack: 'total' } : {}),
     };
   });
 
@@ -112,7 +147,7 @@ function cartesian(spec: ChartSpec): EChartsOption {
 
 function pie(spec: ChartSpec): EChartsOption {
   const isDonut = spec.chartType === 'donut';
-  // A pie reads the FIRST series across the category labels.
+  // A pie/donut reads only the FIRST series — extra series are ignored.
   const key = spec.series[0]?.key;
   const data = spec.data.map((row, index) => ({
     name: String(row['label'] ?? ''),
@@ -127,10 +162,12 @@ function pie(spec: ChartSpec): EChartsOption {
       {
         type: 'pie',
         name: spec.series[0]?.label ?? spec.title,
-        radius: isDonut ? ['45%', '70%'] : '65%',
+        radius: isDonut ? ['42%', '68%'] : '62%',
         center: ['50%', '52%'],
         data,
-        label: { formatter: '{b}: {d}%' },
+        label: { formatter: '{b}: {d}%', fontSize: 12 },
+        labelLine: { length: 12, length2: 8 },
+        emphasis: { scaleSize: 6 },
       },
     ],
   };
@@ -140,17 +177,25 @@ function radar(spec: ChartSpec): EChartsOption {
   const indicators = spec.data.map((row) => ({
     name: String(row['label'] ?? ''),
   }));
-  const series = spec.series.map((s, index) => ({
-    name: s.label,
-    value: valuesOf(spec, s.key),
-    itemStyle: { color: colorAt(s, index) },
-    areaStyle: { opacity: 0.1 },
-  }));
+  const series = spec.series.map((s, index) => {
+    const color = colorAt(s, index);
+    return {
+      name: s.label,
+      value: valuesOf(spec, s.key),
+      itemStyle: { color },
+      lineStyle: { color, width: 2 },
+      areaStyle: { color, opacity: 0.1 },
+    };
+  });
 
   return {
     ...baseOption(spec),
     tooltip: { trigger: 'item' },
-    radar: { indicator: indicators },
+    radar: {
+      indicator: indicators,
+      splitLine: { lineStyle: { opacity: 0.3 } },
+      axisLine: { lineStyle: { opacity: 0.25 } },
+    },
     series: [{ type: 'radar', data: series }],
   };
 }
@@ -159,8 +204,8 @@ function scatter(spec: ChartSpec): EChartsOption {
   const series = spec.series.map((s, index) => ({
     name: s.label,
     type: 'scatter',
-    itemStyle: { color: colorAt(s, index) },
-    // x = row index (or numeric label), y = the series value.
+    symbolSize: 8,
+    itemStyle: { color: colorAt(s, index), opacity: 0.85 },
     data: spec.data.map((row, rowIndex) => {
       const rawLabel = Number(row['label']);
       const x = Number.isFinite(rawLabel) ? rawLabel : rowIndex;
@@ -176,14 +221,20 @@ function scatter(spec: ChartSpec): EChartsOption {
       type: 'value',
       name: spec.xAxisLabel,
       nameLocation: 'middle',
-      nameGap: 28,
+      nameGap: 32,
+      axisLine,
+      axisTick,
+      splitLine,
     },
     yAxis: {
       type: 'value',
       name: spec.yAxisLabel,
       nameLocation: 'middle',
       nameRotate: 90,
-      nameGap: 52,
+      nameGap: 56,
+      axisLine: { show: false },
+      axisTick: { show: false },
+      splitLine,
     },
     series,
   };

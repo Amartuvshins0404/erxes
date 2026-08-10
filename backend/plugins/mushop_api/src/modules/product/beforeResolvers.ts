@@ -15,13 +15,13 @@ export const productBeforeResolvers: BeforeResolversConfig = {
     const { resolver, args = {}, headers } = params;
 
     if (resolver !== 'cpPoscProducts') {
-      return args;
+      return { status: 'ok', args };
     }
 
     const supplierId = getSupplierId(headers);
 
     if (!supplierId) {
-      return args;
+      return { status: 'ok', args };
     }
 
     const models = await generateModels(subdomain);
@@ -29,7 +29,7 @@ export const productBeforeResolvers: BeforeResolversConfig = {
     const supplier = await models.Supplier.getSupplier(supplierId);
 
     if (!supplier?.subdomain) {
-      return args;
+      return { status: 'ok', args };
     }
 
     const products = await models.Product.find({
@@ -41,9 +41,9 @@ export const productBeforeResolvers: BeforeResolversConfig = {
     const productIds = Array.from(new Set(products.map((p) => p.toString())));
 
     if (!productIds.length) {
-      return { ...args, ids: [''] };
+      return { status: 'ok', args: { ...args, ids: [''] } };
     }
 
-    return { ...args, ids: productIds };
+    return { status: 'ok', args: { ...args, ids: productIds } };
   },
 };

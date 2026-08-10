@@ -1,5 +1,9 @@
 import { IContext } from '~/connectionResolvers';
 import { SERVER_STATUSES } from '~/modules/agent/constants';
+import {
+  MANAGED_LLM_PROVIDERS,
+  resolveManagedLlmConnection,
+} from '~/modules/agent/managedLlmProviders';
 import { assertIdentifierManageAccess } from '~/modules/assistantOrg/permissions';
 import { ensureLegacyIdentifierLinks } from '~/modules/assistantOrg/utils';
 import {
@@ -98,8 +102,9 @@ const runManagedDeployment = async ({
   };
   serverMongoId: string;
   input: {
-    kimiApiKey: string;
-    provider?: string;
+    apiKey: string;
+    provider: string;
+    model: string;
     description?: string;
     systemPrompt?: string;
   };
@@ -118,8 +123,14 @@ const runManagedDeployment = async ({
   // Pre-compute the K8s namespace name so frontend polls during deployment
   // hit the right endpoint. Format mirrors the deployer's sanitizeId logic.
   const sanitizeId = (v: string) =>
-    v.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/^-+|-+$/g, '').slice(0, 20);
-  const expectedServerName = `assistant-${sanitizeId(subdomain)}-${sanitizeId(identifier.slug)}`;
+    v
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 20);
+  const expectedServerName = `assistant-${sanitizeId(subdomain)}-${sanitizeId(
+    identifier.slug,
+  )}`;
 
   try {
     await models.AgentServer.findOneAndUpdate(
@@ -127,6 +138,8 @@ const runManagedDeployment = async ({
       {
         $set: {
           status: SERVER_STATUSES.PENDING,
+          provider: input.provider,
+          providerModel: input.model,
           name: expectedServerName,
           url: `https://${expectedServerName}.assistant.erxes.io`,
           ...provisioningSet('server_lookup'),
@@ -139,8 +152,9 @@ const runManagedDeployment = async ({
       orgId: subdomain,
       assistantId: identifier.slug,
       serverName: expectedServerName,
-      provider: input.provider?.trim() || 'kimi',
-      kimiApiKey: input.kimiApiKey.trim(),
+      provider: input.provider,
+      model: input.model,
+      apiKey: input.apiKey,
       description,
       systemPrompt,
     });
@@ -255,9 +269,10 @@ export const agentMutations = {
         url: server.serverUrl,
         token: server.gatewayToken,
         serverId: server.serverId,
-        status: server.status === 'approved'
-          ? SERVER_STATUSES.APPROVED
-          : SERVER_STATUSES.DEPLOYING,
+        status:
+          server.status === 'approved'
+            ? SERVER_STATUSES.APPROVED
+            : SERVER_STATUSES.DEPLOYING,
       });
     } catch (error) {
       await models.AgentServer.deleteOne({ identifierId });
@@ -275,23 +290,37 @@ export const agentMutations = {
     }: {
       identifierId: string;
       input: {
-        kimiApiKey: string;
+        apiKey?: string;
+        kimiApiKey?: string;
         provider?: string;
+        model?: string;
         description?: string;
         systemPrompt?: string;
       };
     },
     { models, subdomain, user }: IContext,
   ) => {
-    const { kimiApiKey } = input || {};
+    const apiKey = input?.apiKey?.trim() || input?.kimiApiKey?.trim();
 
-    if (!kimiApiKey?.trim()) {
-      throw new Error('kimiApiKey is required');
+    if (!apiKey) {
+      throw new Error('apiKey is required');
     }
 
-    if (input.provider?.trim() && input.provider.trim() !== 'kimi') {
-      throw new Error('Only the Kimi provider is supported for AI Assistants');
+    if (apiKey.length > 4096) {
+      throw new Error('apiKey is too long');
     }
+
+    const connection = resolveManagedLlmConnection(
+      input?.provider,
+      input?.model,
+    );
+    const managedInput = {
+      apiKey,
+      provider: connection.provider,
+      model: connection.model,
+      description: input?.description,
+      systemPrompt: input?.systemPrompt,
+    };
 
     await ensureLegacyIdentifierLinks(models);
     const identifier = await assertIdentifierManageAccess(
@@ -320,6 +349,8 @@ export const agentMutations = {
           {
             $set: {
               agentId: identifier.slug,
+              provider: connection.provider,
+              providerModel: connection.model,
               status: SERVER_STATUSES.PENDING,
               provisioning: {
                 ...provisioningUpdate('preparing'),
@@ -340,7 +371,7 @@ export const agentMutations = {
           subdomain,
           identifier,
           serverMongoId: String(pendingServer._id),
-          input,
+          input: managedInput,
         });
 
         return {
@@ -349,7 +380,10 @@ export const agentMutations = {
         };
       }
 
-      return { ...agentServer.toObject(), identifierId: agentServer.identifierId };
+      return {
+        ...agentServer.toObject(),
+        identifierId: agentServer.identifierId,
+      };
     }
 
     const serverName = identifier.slug;
@@ -361,6 +395,8 @@ export const agentMutations = {
       url: '',
       token: '',
       serverId: '',
+      provider: connection.provider,
+      providerModel: connection.model,
       status: SERVER_STATUSES.PENDING,
       provisioning: {
         ...provisioningUpdate('preparing'),
@@ -373,7 +409,7 @@ export const agentMutations = {
       subdomain,
       identifier,
       serverMongoId: String(createdServer._id),
-      input,
+      input: managedInput,
     });
 
     return {
@@ -853,6 +889,149 @@ export const agentMutations = {
     }
   },
 
+  setAgentLlmConnection: async (
+    _root: undefined,
+    {
+      identifierId,
+      input,
+    }: {
+      identifierId: string;
+      input: { provider: string; model: string; apiKey: string };
+    },
+    { models, subdomain, user }: IContext,
+  ) => {
+    const apiKey = input?.apiKey?.trim();
+
+    if (!apiKey) {
+      throw new Error('apiKey is required');
+    }
+
+    if (apiKey.length > 4096) {
+      throw new Error('apiKey is too long');
+    }
+
+    const connection = resolveManagedLlmConnection(
+      input?.provider,
+      input?.model,
+    );
+
+    await ensureLegacyIdentifierLinks(models);
+    const identifier = await assertIdentifierManageAccess(
+      models,
+      identifierId,
+      user,
+    );
+
+    if (identifier.kind && identifier.kind !== 'assistant') {
+      throw new Error('This identifier is not an AI Assistant');
+    }
+
+    const server = await models.AgentServer.findOne({ identifierId });
+
+    if (!server) {
+      throw new Error('Assistant server not found');
+    }
+
+    const isManagedAssistant = Boolean(
+      server.provider ||
+        server.providerModel ||
+        server.provisioning?.stage ||
+        server.provisioning?.startedAt,
+    );
+
+    if (!isManagedAssistant) {
+      if (
+        connection.provider !== 'kimi' ||
+        connection.model !== MANAGED_LLM_PROVIDERS.kimi.defaultModel
+      ) {
+        throw new Error(
+          'Legacy assistants only support the Kimi For Coding connection',
+        );
+      }
+
+      try {
+        await setKimiApiKey(server.name, apiKey);
+      } catch {
+        throw new Error(
+          'Could not apply the Kimi connection. Verify the API key and try again.',
+        );
+      }
+
+      const updatedLegacyServer = await models.AgentServer.findOneAndUpdate(
+        { _id: server._id },
+        {
+          $set: {
+            updatedAt: new Date(),
+          },
+        },
+        { new: true },
+      );
+
+      if (!updatedLegacyServer) {
+        throw new Error('Assistant server not found');
+      }
+
+      return {
+        ...updatedLegacyServer.toObject(),
+        identifierId: updatedLegacyServer.identifierId,
+      };
+    }
+
+    if (!server.name?.trim()) {
+      throw new Error('Managed assistant server name is not configured');
+    }
+
+    if (managedDeploymentsInProgress.has(identifierId)) {
+      throw new Error('Managed assistant deployment is already running');
+    }
+
+    managedDeploymentsInProgress.add(identifierId);
+
+    try {
+      const deployed = await deployManagedServer({
+        orgId: subdomain,
+        assistantId: identifier.slug,
+        serverName: server.name,
+        provider: connection.provider,
+        model: connection.model,
+        apiKey,
+      });
+
+      const updatedServer = await models.AgentServer.findOneAndUpdate(
+        { _id: server._id },
+        {
+          $set: {
+            name: deployed.serverName,
+            url: deployed.url,
+            token: deployed.gatewayToken,
+            serverId: String(deployed.serverId),
+            provider: connection.provider,
+            providerModel: connection.model,
+            status: SERVER_STATUSES.APPROVED,
+            ...provisioningSet('approved'),
+            updatedAt: new Date(),
+          },
+        },
+        { new: true },
+      );
+
+      if (!updatedServer) {
+        throw new Error('Assistant server record disappeared during update');
+      }
+
+      return {
+        ...updatedServer.toObject(),
+        identifierId: updatedServer.identifierId,
+      };
+    } catch {
+      throw new Error(
+        'Could not apply the AI connection. Verify the API key and selected model, then try again.',
+      );
+    } finally {
+      managedDeploymentsInProgress.delete(identifierId);
+    }
+  },
+
   agentRuntimeInstallSkill: async (
     _root: undefined,
     {
@@ -882,6 +1061,7 @@ export const agentMutations = {
         },
       },
       message: 'Managed runtime skill install completed',
+      setupSync: { action: 'install', type: 'skill' },
       mapResult: (payload) =>
         mapRuntimePayload('Managed runtime skill install completed', payload, {
           diagnostics:
@@ -920,6 +1100,7 @@ export const agentMutations = {
         },
       },
       message: 'Managed runtime plugin install completed',
+      setupSync: { action: 'install', type: 'plugin' },
       mapResult: (payload) =>
         mapRuntimePayload('Managed runtime plugin install completed', payload, {
           diagnostics:
@@ -956,6 +1137,41 @@ export const agentMutations = {
       message: 'Managed runtime plugin enable completed',
       mapResult: (payload) =>
         mapRuntimePayload('Managed runtime plugin enable completed', payload, {
+          diagnostics:
+            payload.verification && typeof payload.verification === 'object'
+              ? (payload.verification as Record<string, unknown>)
+              : payload,
+          records: payload,
+        }),
+    });
+  },
+
+  agentRuntimeDisablePlugin: async (
+    _root: undefined,
+    { agentId, pluginId }: { agentId: string; pluginId: string },
+    { models, subdomain, user }: IContext,
+  ) => {
+    const safePluginId = assertSafeRuntimeIdentifier(pluginId, 'pluginId');
+
+    return callManagedRuntimeOperation({
+      models,
+      user,
+      subdomain,
+      agentId,
+      operation: 'agentRuntimeDisablePlugin',
+      identifier: safePluginId,
+      requireAdmin: true,
+      request: {
+        method: 'POST',
+        path: '/openclaw/plugins/disable',
+        body: {
+          plugin: safePluginId,
+        },
+      },
+      message: 'Managed runtime plugin disable completed',
+      setupSync: { action: 'remove', type: 'plugin' },
+      mapResult: (payload) =>
+        mapRuntimePayload('Managed runtime plugin disable completed', payload, {
           diagnostics:
             payload.verification && typeof payload.verification === 'object'
               ? (payload.verification as Record<string, unknown>)

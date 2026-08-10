@@ -9,6 +9,7 @@
 // ---------------------------------------------------------------------------
 
 import type { ProviderDocLike } from '~/mastra/providers';
+import { createAgentCache } from '~/mastra/cachedAgent';
 
 // The minimal surface these paths need from a Mastra Agent. Keeping it local
 // avoids a static @mastra/core type dependency in a lazily-loaded path.
@@ -16,7 +17,7 @@ export interface StatelessAgent {
   generate(msgs: unknown, opts?: unknown): Promise<{ text?: string }>;
 }
 
-const _agents = new Map<string, StatelessAgent>();
+const agentCache = createAgentCache<StatelessAgent>();
 
 export interface StatelessAgentSpec {
   id: string;
@@ -36,22 +37,15 @@ export async function getStatelessAgent(
   // Include the processor count so an agent built with a different processor
   // pipeline (e.g. with vs. without the PIIDetector) is never reused.
   const key = `${id}:${provider}:${model}:p${spec.outputProcessors?.length ?? 0}`;
-  let cached = _agents.get(key);
-  if (!cached) {
-    const { Agent } = await import('@mastra/core/agent');
-    const { buildModel } = await import('~/mastra/providers');
-    cached = new Agent({
-      id,
-      name,
-      instructions,
-      model: buildModel(provider, model, providers),
-      ...(spec.outputProcessors?.length
-        ? { outputProcessors: spec.outputProcessors }
-        : {}),
-    } as never) as unknown as StatelessAgent;
-    _agents.set(key, cached);
-  }
-  return cached;
+  return agentCache.getOrBuild(key, ({ buildModel }) => ({
+    id,
+    name,
+    instructions,
+    model: buildModel(provider, model, providers),
+    ...(spec.outputProcessors?.length
+      ? { outputProcessors: spec.outputProcessors }
+      : {}),
+  }));
 }
 
 /** One single-turn generate under the given auth context; returns text. */

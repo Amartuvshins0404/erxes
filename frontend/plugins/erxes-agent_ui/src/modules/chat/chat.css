@@ -131,7 +131,7 @@
 .ea-step-rail {
   position: relative;
   flex: none;
-  width: 1.25rem;
+  width: 1.5rem;
   align-self: stretch;
 }
 .ea-step-rail::before {
@@ -156,34 +156,64 @@
 .ea-step:only-child .ea-step-rail::before {
   display: none;
 }
-/* Node — opaque so it masks the thread, giving "beads on a string". */
-.ea-node {
+/* Card/chip steps (search + fetch) are taller than a text line — drop the marker
+   to the card header's centre so the rail bead lines up with the card, and trim
+   the connecting thread to that same centre at the ends. */
+.ea-step.is-card .ea-step-marker {
+  top: 1.375rem;
+}
+.ea-step.is-card:first-child .ea-step-rail::before {
+  top: 1.375rem;
+}
+.ea-step.is-card:last-child .ea-step-rail::before {
+  bottom: auto;
+  height: 1.375rem;
+}
+/* Step marker — a glyph (tool steps) or a quiet hollow dot (reasoning) inside an
+   opaque disc that masks the thread, giving "beads on a string". The icon names
+   the step type at a glance, Claude-style. */
+.ea-step-marker {
   position: absolute;
   left: 50%;
   top: 0.625rem;
-  width: 0.5rem;
-  height: 0.5rem;
+  width: 1.125rem;
+  height: 1.125rem;
   border-radius: 9999px;
   transform: translate(-50%, -50%);
   background: var(--background);
   box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted-foreground);
   z-index: 1;
-  transition: background-color 0.2s ease, box-shadow 0.2s ease;
+  transition: color 0.2s ease;
 }
-/* Reasoning step — hollow ring. */
-.ea-node-reason {
+/* Web steps (search / read) carry the brand tint; errors go destructive. */
+.ea-step-marker.is-search,
+.ea-step-marker.is-read {
+  color: var(--primary);
+}
+.ea-step-marker.is-error {
+  color: var(--destructive);
+}
+/* Reasoning marker — a small hollow ring rather than a glyph, kept calm. */
+.ea-think-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 9999px;
   box-shadow: inset 0 0 0 1.5px
     color-mix(in oklch, var(--muted-foreground) 55%, transparent);
 }
-/* Tool step — solid bead. */
-.ea-node-tool {
-  background: color-mix(in oklch, var(--primary) 55%, transparent);
+/* The short-thought summary line reads as foreground text on hover. */
+.ea-think-summary {
+  color: inherit;
 }
-.ea-node-tool.is-running {
-  background: var(--primary);
+/* Running marker wears the same sweep ring as the agent mark — one motion. */
+.ea-step-marker.is-running {
+  color: var(--primary);
 }
-/* Running node wears the same sweep ring as the agent mark — one motion. */
-.ea-node-tool.is-running::after {
+.ea-step-marker.is-running::after {
   content: '';
   position: absolute;
   inset: -3px;
@@ -206,9 +236,6 @@
   );
   animation: ea-spin 0.9s linear infinite;
 }
-.ea-node-tool.is-error {
-  background: var(--destructive);
-}
 /* Step body sits to the right of the rail; first text line aligns to the node. */
 .ea-step-body {
   flex: 1 1 auto;
@@ -226,6 +253,120 @@
 /* Recessed request/response panes inside an expanded tool step. */
 .ea-trace-pre {
   background: color-mix(in oklch, var(--muted) 65%, transparent);
+}
+
+/* ── Web rows: favicons, search-result card, reading chip ──────────────────
+   Tool-data-driven, Claude-style surfaces for web search + page fetches. All
+   colours come off design tokens so they survive the production CSS purge
+   (same rule as .ea-user-bubble). Favicon URLs are supplied by the tool output
+   (DuckDuckGo's favicon service) — never constructed in the UI. */
+.ea-favicon {
+  border-radius: 4px;
+  object-fit: cover;
+}
+
+/* Web-search result card — header (engine + query + count) over result rows. */
+.ea-websearch {
+  margin-top: 0.25rem;
+  border: 1px solid color-mix(in oklch, var(--border) 85%, transparent);
+  border-radius: var(--radius);
+  background: color-mix(in oklch, var(--muted) 30%, transparent);
+  overflow: hidden;
+}
+.ea-websearch-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.4375rem 0.625rem;
+  font-size: 0.8125rem;
+  text-align: left;
+  transition: background-color 0.12s ease;
+}
+.ea-websearch-head:hover {
+  background: color-mix(in oklch, var(--foreground) 4%, transparent);
+}
+/* Divider only while expanded — a standalone collapsed header reads cleaner. */
+.ea-websearch.is-open .ea-websearch-head {
+  border-bottom: 1px solid color-mix(in oklch, var(--border) 60%, transparent);
+}
+.ea-websearch-query {
+  font-weight: 500;
+  color: var(--foreground);
+}
+.ea-websearch-list {
+  list-style: none;
+  margin: 0;
+  padding: 0.25rem;
+}
+.ea-websearch-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.375rem 0.5rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.8125rem;
+  color: var(--foreground);
+  text-decoration: none;
+  transition: background-color 0.12s ease;
+}
+.ea-websearch-row:hover {
+  background: color-mix(in oklch, var(--foreground) 6%, transparent);
+}
+.ea-websearch-domain {
+  max-width: 11rem;
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+}
+.ea-websearch-more {
+  display: block;
+  width: 100%;
+  padding: 0.375rem 0.625rem;
+  text-align: left;
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+  border-top: 1px solid color-mix(in oklch, var(--border) 60%, transparent);
+  transition: color 0.12s ease;
+}
+.ea-websearch-more:hover {
+  color: var(--foreground);
+}
+
+/* Fetch-url reading chip — "Reading <site>" with the page favicon. */
+.ea-readchip {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+  padding: 0.4375rem 0.5rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.8125rem;
+  color: var(--muted-foreground);
+  text-decoration: none;
+  transition: background-color 0.12s ease;
+}
+a.ea-readchip:hover {
+  background: color-mix(in oklch, var(--foreground) 6%, transparent);
+}
+.ea-readchip-domain {
+  max-width: 10rem;
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+}
+
+/* Nested search cards inside a group: drop the card chrome so each reads as a
+   row, separated by hairlines — the group card supplies the border. */
+.ea-nestlist {
+  padding: 0.125rem 0;
+}
+.ea-websearch.is-nested {
+  margin: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+.ea-websearch.is-nested + .ea-websearch.is-nested {
+  border-top: 1px solid color-mix(in oklch, var(--border) 40%, transparent);
 }
 
 /* Shimmer sweep over "Thinking…" labels while the model reasons. */
@@ -309,6 +450,26 @@
   box-shadow: none !important;
   border: none !important;
   outline: none !important;
+  padding: 0 !important;
+}
+
+/* Empty-state suggestion chips — token-driven so they survive the production
+   purge (the old `hover:bg-primary/4` arbitrary opacity did not). */
+.ea-suggestion {
+  border-radius: 9999px;
+  border: 1px solid var(--border);
+  background: var(--background);
+  padding: 0.375rem 0.875rem;
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+  transition: color 0.15s ease, border-color 0.15s ease,
+    background-color 0.15s ease, transform 0.15s ease;
+}
+.ea-suggestion:hover {
+  color: var(--foreground);
+  border-color: color-mix(in oklch, var(--primary) 40%, transparent);
+  background: color-mix(in oklch, var(--primary) 6%, transparent);
+  transform: translateY(-1px);
 }
 
 /* Ambient glow — two blurred gradient blobs that drift around the chat
@@ -381,7 +542,7 @@
 /* Honor reduced-motion for the thinking sweep — show a static arc, no spin. */
 @media (prefers-reduced-motion: reduce) {
   .ea-spin-ring,
-  .ea-node-tool.is-running::after {
+  .ea-step-marker.is-running::after {
     animation: none;
   }
 }
@@ -415,6 +576,147 @@
 }
 .ea-pptx-deck > *:last-child {
   margin-bottom: 0;
+}
+/* Generated decks arrive as per-slide PNGs — each is a direct child of the deck
+   so it inherits the framed-card chrome above; this only sets the image box. */
+.ea-slide-img {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: #fff;
+}
+
+/* ── PPTX present mode ─────────────────────────────────────────────────────
+   A true full-screen presenter (browser Fullscreen API): one slide image at a
+   time, contain-fit and centred on a black stage, with edge click zones, a
+   slide counter, an exit button, and a thumbnail strip. Controls + cursor
+   auto-hide when idle (.is-idle). Highest z so it covers the docked/fullscreen
+   panel; if the Fullscreen request is refused this fixed layer still presents. */
+.ea-present-root {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: #000;
+  overflow: hidden;
+}
+.ea-present-root.is-idle {
+  cursor: none;
+}
+.ea-present-stage {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2.5rem;
+}
+.ea-present-slide {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  user-select: none;
+}
+
+/* Half-width transparent click zones for prev/next. */
+.ea-present-zone {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 35%;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.ea-present-zone-prev {
+  left: 0;
+}
+.ea-present-zone-next {
+  right: 0;
+}
+
+.ea-present-controls {
+  position: absolute;
+  bottom: 1.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 9999px;
+  background: rgba(20, 20, 22, 0.7);
+  backdrop-filter: blur(8px);
+  color: #fff;
+  transition: opacity 0.25s ease;
+}
+.ea-present-counter {
+  min-width: 4.5rem;
+  text-align: center;
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+}
+.ea-present-exit {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  z-index: 2;
+  color: #fff;
+  background: rgba(20, 20, 22, 0.7);
+  transition: opacity 0.25s ease;
+}
+.ea-present-controls :where(button),
+.ea-present-exit {
+  color: #fff;
+}
+
+.ea-present-thumbs {
+  position: absolute;
+  bottom: 4.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  display: flex;
+  gap: 0.5rem;
+  max-width: 90vw;
+  padding: 0.5rem;
+  overflow-x: auto;
+  transition: opacity 0.25s ease;
+}
+.ea-present-thumb {
+  flex: 0 0 auto;
+  width: 6rem;
+  height: 3.5rem;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 0.375rem;
+  overflow: hidden;
+  background: #111;
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.15s ease, border-color 0.15s ease;
+}
+.ea-present-thumb:hover {
+  opacity: 1;
+}
+.ea-present-thumb.is-active {
+  border-color: #fff;
+  opacity: 1;
+}
+.ea-present-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Idle = hide every overlay (and the cursor, above). */
+.ea-present-root.is-idle .ea-present-controls,
+.ea-present-root.is-idle .ea-present-exit,
+.ea-present-root.is-idle .ea-present-thumbs {
+  opacity: 0;
+  pointer-events: none;
 }
 
 /* ── Voice mode ──────────────────────────────────────────────────────────
@@ -599,10 +901,140 @@
   .ea-preview-dock {
     position: static;
     z-index: auto;
-    width: 42%;
-    min-width: 360px;
-    max-width: 680px;
+    /* Width is user-adjustable via the split handle (PreviewResizer sets the
+       variable on the split container in px); 42% is the untouched default. */
+    width: var(--ea-preview-w, 42%);
+    min-width: 320px;
+    max-width: 75%;
   }
+}
+
+/* ── Chat ↔ Preview split handle ──────────────────────────────────────────
+   The draggable divider between the chat column and the docked Preview panel
+   (PreviewResizer). Invisible at rest — the dock's own 1px border is the only
+   chrome; on hover / drag / keyboard focus a small centred grab pill fades in
+   (the macOS split-view affordance) and the hairline tints to the brand
+   colour. Desktop-docked layout only: below the lg breakpoint the panel is a
+   full-area overlay, so the handle stays display:none. Lives here, not as
+   Tailwind utilities, for the same production-purge reason as .ea-preview-dock. */
+.ea-split-handle {
+  display: none;
+}
+@media (min-width: 1024px) {
+  .ea-split-handle {
+    position: relative;
+    z-index: 40;
+    display: block;
+    flex: none;
+    width: 9px;
+    /* Zero layout width: paints 4px over the chat edge and 5px over the dock
+       edge so the grab area straddles the dock's border-left exactly. */
+    margin-left: -4px;
+    margin-right: -5px;
+    cursor: col-resize;
+    touch-action: none;
+    outline: none;
+  }
+  /* The hairline — sits precisely over the dock's 1px border. */
+  .ea-split-handle::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 4px;
+    width: 1px;
+    background: transparent;
+    transition: background-color 0.15s ease;
+  }
+  /* The grab pill — always visible so the affordance is discoverable.
+     Hovering anywhere along the divider (or focusing it) shifts it to the
+     "ready to move" state: taller and brand-tinted. Dragging goes full
+     primary. */
+  .ea-split-handle::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 4px;
+    height: 36px;
+    border-radius: 9999px;
+    transform: translate(-50%, -50%);
+    background: color-mix(in oklch, var(--foreground) 20%, transparent);
+    transition: height 0.18s ease, background-color 0.18s ease;
+  }
+  .ea-split-handle:hover::after,
+  .ea-split-handle:focus-visible::after {
+    height: 56px;
+    background: color-mix(in oklch, var(--primary) 75%, transparent);
+  }
+  .ea-split-handle:hover::before,
+  .ea-split-handle:focus-visible::before,
+  .ea-split-handle.is-dragging::before {
+    background: color-mix(in oklch, var(--primary) 45%, transparent);
+  }
+  .ea-split-handle.is-dragging::after {
+    height: 56px;
+    background: var(--primary);
+  }
+}
+
+/* ── Collapsible side panel (agents ↔ sessions column) ────────────────────
+   Auto-collapses when the Preview panel is dragged wide enough to squeeze
+   the chat column (PreviewResizer drives .is-collapsed with hysteresis so
+   the boundary can't flap during a drag) and restores when space returns or
+   the preview closes. The inner slide layers keep their natural width so
+   the column clips away cleanly instead of reflowing mid-animation. */
+.ea-side-panel {
+  width: 15rem;
+  transition: width 0.2s ease;
+}
+.ea-side-panel > div {
+  right: auto;
+  width: 15rem;
+}
+.ea-side-panel.is-collapsed {
+  width: 0;
+  border-right-width: 0;
+}
+
+/* ── Ghost scrollbar ──────────────────────────────────────────────────────
+   macOS-style overlay scrollbar for the chat + panel scroll regions: no
+   track, no buttons — just a slim rounded pill that fades in while the
+   pointer is over the region or while it's actively scrolling (the chat's
+   scroll handler toggles `.is-scrolling`), and vanishes at rest. Modern
+   engines take the standard scrollbar-width/color pair; the ::-webkit-*
+   rules cover older Safari. Token-driven so both themes work and the rules
+   survive the production CSS purge (same rule as .ea-user-bubble above). */
+.ea-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+.ea-scroll:hover,
+.ea-scroll.is-scrolling {
+  scrollbar-color: color-mix(in oklch, var(--foreground) 25%, transparent)
+    transparent;
+}
+.ea-scroll::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+  background: transparent;
+}
+.ea-scroll::-webkit-scrollbar-track,
+.ea-scroll::-webkit-scrollbar-corner {
+  background: transparent;
+}
+.ea-scroll::-webkit-scrollbar-thumb {
+  background-color: transparent;
+  background-clip: padding-box;
+  border: 3px solid transparent;
+  border-radius: 9999px;
+}
+.ea-scroll:hover::-webkit-scrollbar-thumb,
+.ea-scroll.is-scrolling::-webkit-scrollbar-thumb {
+  background-color: color-mix(in oklch, var(--foreground) 25%, transparent);
+}
+.ea-scroll::-webkit-scrollbar-thumb:active {
+  background-color: color-mix(in oklch, var(--foreground) 40%, transparent);
 }
 
 /* The fullscreen file-list sidebar — hidden on narrow screens, shown from the

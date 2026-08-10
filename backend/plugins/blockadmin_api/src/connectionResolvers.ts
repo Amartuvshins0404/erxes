@@ -69,8 +69,16 @@ import {
   IUnitTypeModel,
   loadUnitTypeClass,
 } from './modules/unit/db/models/UnitType';
+import {
+  ISupplierModels,
+  loadSupplierModels,
+} from '@/supplier/db/loadModels';
+import {
+  IMembershipModels,
+  loadMembershipModels,
+} from '@/membership/db/loadModels';
 
-export interface IModels {
+export interface IModels extends ISupplierModels, IMembershipModels {
   Agency: IBlockAgencyModel;
   Listing: IBlockAdminListingModel;
   Project: IProjectModel;
@@ -182,6 +190,10 @@ export const loadClasses = (db: mongoose.Connection): IModels => {
     'block_admin_submissions',
     loadSubmissionClass(models),
   );
+
+  loadSupplierModels(models, db);
+
+  loadMembershipModels(models, db);
 
   return models;
 };

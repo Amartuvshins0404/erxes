@@ -4,7 +4,7 @@ import { IMastraAgentDocument } from '@/agent/@types/agent';
 import { IMastraProviderDocument } from '@/provider/@types/provider';
 import { IMastraSettingsDocument } from '@/settings/@types/settings';
 import { IMastraChatAttachment } from '@/session/@types/session';
-import { MemoryContext } from '~/mastra/memory';
+import { MemoryContext } from '~/mastra/memory/types';
 
 // Shared chat-turn types used across the staged turn pipeline (prepare → run →
 // persist) and its fallback synthesis. Co-located so each stage file imports
@@ -32,8 +32,13 @@ export interface TurnAuthCtx {
   subdomain?: string;
   threadId?: string;
   turnId?: string;
+  turnStartedAt?: Date;
   turnPrompt?: string;
   resourceId?: string;
+  // True for unattended frontline-bot execution. Workflow execution carries
+  // the same flag through BackgroundAuthCtx so destructive operations remain
+  // gated without live approval.
+  background?: boolean;
 }
 
 // One message of the assembled LLM conversation. `content` widens beyond a
@@ -62,17 +67,10 @@ export interface TurnAgent {
 }
 
 // Per-turn Mastra Memory binding — which thread + (tenant-scoped) resource this
-// turn reads/writes. Passed to generate()/stream() so Mastra recalls + persists.
+// turn reads/writes. Passed to generate()/stream() so Mastra persists + replays.
 export interface MemoryBinding {
   thread: string;
   resource: string;
-  // Per-turn overrides deep-merged onto the shared Memory config (Mastra's
-  // AgentMemoryOption.options). Used to skip semantic recall on a thread's first
-  // turn — there is nothing to recall yet, so the embed + Qdrant round-trip is
-  // pure latency. Working memory, recent-history replay, and native titling are
-  // left untouched (deepMerge preserves the unset keys). Persist/patch read only
-  // thread/resource, so the extra field is inert for them.
-  options?: { semanticRecall?: boolean };
 }
 
 // Who/what is driving a turn — the one knob that varies across the four

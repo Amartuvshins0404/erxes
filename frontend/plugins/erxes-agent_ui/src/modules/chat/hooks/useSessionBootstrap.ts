@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useApolloClient } from '@apollo/client';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { IMastraThread } from '~/modules/chat/types';
 import { chatStore, useChatStore } from '~/modules/chat/store/chatStore';
 
@@ -13,9 +13,8 @@ export const useSessionBootstrap = (
   selectedAgent: { _id: string; agentId: string } | null,
   threads: IMastraThread[],
   sessionsLoaded: boolean,
-) => {
+): string | null => {
   const { agentId } = useParams<{ agentId: string }>();
-  const navigate = useNavigate();
   const apolloClient = useApolloClient();
   const [searchParams] = useSearchParams();
 
@@ -27,19 +26,19 @@ export const useSessionBootstrap = (
   const selectedId = selectedAgent?._id;
 
   // Slug routes normalize to the _id route so the chat store stays keyed by _id.
-  useEffect(() => {
-    if (selectedId && agentId && selectedId !== agentId) {
-      const search = searchParams.toString();
-      navigate(
-        `/erxes-agent/chat/${selectedId}${search ? `?${search}` : ''}`,
-        { replace: true },
-      );
-    }
-  }, [selectedId, agentId, searchParams, navigate]);
+  // Returned as a redirect target (rendered via <Navigate replace/> by the view)
+  // rather than fired from an effect, so the normalization isn't a faked handler.
+  const search = searchParams.toString();
+  const slugRedirect =
+    selectedId && agentId && selectedId !== agentId
+      ? `/erxes-agent/chat/${selectedId}${search ? `?${search}` : ''}`
+      : null;
 
-  // Deep link: ?thread=<id> opens that session once sessions have loaded. Fires
-  // once per ?thread value — it does not depend on activeThreadId, so switching
-  // sessions afterwards never snaps the user back to the linked thread.
+  // ?thread=<id> is the addressable active conversation: this opens it once
+  // sessions have loaded, and re-fires whenever the value changes — a deep-link,
+  // a reload, a sidebar selection (ChatPage pushes the new id), or browser Back
+  // walking between conversations. selectSession is idempotent for an already-
+  // loaded thread, so re-runs are cheap and never reload over live state.
   useEffect(() => {
     if (!agentId || !mastraAgentId || !threadParam || !sessionsLoaded) return;
     chatStore.selectSession(apolloClient, agentId, mastraAgentId, threadParam);
@@ -53,9 +52,12 @@ export const useSessionBootstrap = (
 
   // Bootstrap / re-home the active session: once the cached list has loaded and
   // nothing is selected (first open of this agent, or after deleting the active
-  // session), open the most recent session or a fresh draft.
+  // session), open the most recent session or a fresh draft. A ?thread= deep-link
+  // owns the initial selection, so skip auto-homing while one is present —
+  // otherwise it would race the deep-link effect and override the linked thread.
   useEffect(() => {
     if (!agentId || !mastraAgentId || !sessionsLoaded || activeThreadId) return;
+    if (threadParam) return;
     if (threads.length > 0) {
       chatStore.selectSession(
         apolloClient,
@@ -71,7 +73,10 @@ export const useSessionBootstrap = (
     mastraAgentId,
     sessionsLoaded,
     activeThreadId,
+    threadParam,
     threads,
     apolloClient,
   ]);
+
+  return slugRedirect;
 };

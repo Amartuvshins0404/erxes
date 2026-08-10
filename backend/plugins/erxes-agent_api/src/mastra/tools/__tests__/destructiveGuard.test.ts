@@ -3,6 +3,7 @@ import {
   resolveDestructiveOpsPolicy,
   isApprovedOperation,
   destructiveApprovalRequiredResult,
+  destructiveOpsPreapproved,
 } from '../destructiveGuard';
 import type { OperationMeta } from '../operationRegistry';
 
@@ -56,6 +57,23 @@ describe('resolveDestructiveOpsPolicy', () => {
     expect(resolveDestructiveOpsPolicy({})).toBe('ask');
     expect(resolveDestructiveOpsPolicy(null)).toBe('ask');
     expect(resolveDestructiveOpsPolicy({ destructiveOps: 'yes' })).toBe('ask');
+  });
+});
+
+describe('destructiveOpsPreapproved (background defense-in-depth)', () => {
+  it("pre-approves a destructive op only for an attended 'allow' run", () => {
+    expect(destructiveOpsPreapproved('allow', false)).toBe(true);
+  });
+
+  it("blocks 'allow' in a background run — unattended deletes are impossible", () => {
+    // The whole point: a scheduled/bot/automation run configured 'allow' still
+    // cannot destroy data, because it can never carry a per-op approval.
+    expect(destructiveOpsPreapproved('allow', true)).toBe(false);
+  });
+
+  it("never pre-approves 'ask', attended or background", () => {
+    expect(destructiveOpsPreapproved('ask', false)).toBe(false);
+    expect(destructiveOpsPreapproved('ask', true)).toBe(false);
   });
 });
 

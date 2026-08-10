@@ -5,6 +5,7 @@ export const MUSHOP_SUPPLIER_DETAIL = gql`
     mushopSupplierDetail(_id: $_id) {
       _id
       name
+      code
       description
       about
       logo

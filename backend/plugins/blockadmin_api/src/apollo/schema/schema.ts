@@ -93,6 +93,30 @@ import {
   types as ClientPortalBlockTypes,
 } from '~/modules/clientportal/graphql/schemas';
 
+import {
+  mutations as SupplierMutations,
+  queries as SupplierQueries,
+  types as SupplierTypes,
+} from '@/supplier/profile/graphql/schemas/supplier';
+
+import {
+  mutations as ProductMutations,
+  queries as ProductQueries,
+  types as ProductTypes,
+} from '@/supplier/product/graphql/schemas/product';
+
+import {
+  mutations as MembershipMutations,
+  queries as MembershipQueries,
+  types as MembershipTypes,
+} from '@/membership/graphql/schemas/membership';
+
+import {
+  mutations as MembershipPlanMutations,
+  queries as MembershipPlanQueries,
+  types as MembershipPlanTypes,
+} from '@/membership/graphql/schemas/membershipPlan';
+
 import { TypeExtensions } from './extensions';
 
 export const types = `
@@ -114,6 +138,11 @@ export const types = `
   ${OfferTypes}
   ${SubmissionTypes}
   ${ListingTypes}
+
+  ${SupplierTypes}
+  ${ProductTypes}
+  ${MembershipTypes}
+  ${MembershipPlanTypes}
 
   ${ClientPortalBlockTypes}
   `;
@@ -137,6 +166,11 @@ export const queries = `
   ${FormQueries}
   ${ListingQueries}
 
+  ${SupplierQueries}
+  ${ProductQueries}
+  ${MembershipQueries}
+  ${MembershipPlanQueries}
+
   ${ClientPortalBlockQueries}
   `;
 
@@ -147,6 +181,11 @@ export const mutations = `
   ${UnitMutations}
   ${ProjectMutations}
   ${ListingMutations}
+
+  ${SupplierMutations}
+  ${ProductMutations}
+  ${MembershipMutations}
+  ${MembershipPlanMutations}
   `;
 
 export default { types, queries, mutations };

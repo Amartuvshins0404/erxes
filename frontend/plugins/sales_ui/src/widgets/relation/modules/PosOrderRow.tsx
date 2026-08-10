@@ -8,6 +8,7 @@ import {
 
 import { INVOICE_DETAIL_BY_CONTENT } from '../graphql/posOrdersByDeal';
 import { useQuery } from '@apollo/client';
+import { useTranslation } from 'react-i18next';
 
 type IPosOrder = {
   _id: string;
@@ -56,10 +57,11 @@ const PaymentIcon = ({ kind }: { kind: PaymentKind }) => {
 };
 
 export const PosOrderRow = ({ order }: { order: IPosOrder }) => {
+  const { t } = useTranslation('sales');
   const hasMobile = !!order.mobileAmount && order.mobileAmount > 0;
 
   const { data: invoiceData } = useQuery(INVOICE_DETAIL_BY_CONTENT, {
-    variables: { contentType: 'pos:orders', contentTypeId: order._id },
+    variables: { contentType: 'sales:pos:order', contentTypeId: order._id },
     skip: !hasMobile,
     fetchPolicy: 'network-only',
   });
@@ -67,7 +69,11 @@ export const PosOrderRow = ({ order }: { order: IPosOrder }) => {
   const entries: PaymentEntry[] = [];
 
   if (order.cashAmount) {
-    entries.push({ label: 'Cash', amount: order.cashAmount, kind: 'cash' });
+    entries.push({
+      label: t('payment-cash', 'Cash'),
+      amount: order.cashAmount,
+      kind: 'cash',
+    });
   }
 
   if (order.paidAmounts?.length) {
@@ -137,7 +143,7 @@ export const PosOrderRow = ({ order }: { order: IPosOrder }) => {
           </ul>
         ) : (
           <span className="text-xs text-muted-foreground">
-            No payment details
+            {t('no-payment-details', 'No payment details')}
           </span>
         )}
       </div>

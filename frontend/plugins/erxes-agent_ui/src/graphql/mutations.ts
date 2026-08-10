@@ -17,8 +17,14 @@ export const MASTRA_THREAD_REMOVE = gql`
   }
 `;
 
+export const MASTRA_CHAT_CANCEL = gql`
+  mutation MastraChatCancel($threadId: String!) {
+    mastraChatCancel(threadId: $threadId)
+  }
+`;
+
 export const MASTRA_AGENT_CREATE = gql`
-  mutation MastraAgentCreate($doc: MastraAgentInput!) {
+  mutation MastraAgentCreate($doc: MastraAgentCreateInput!) {
     mastraAgentCreate(doc: $doc) {
       ...AgentFields
     }
@@ -27,8 +33,38 @@ export const MASTRA_AGENT_CREATE = gql`
 `;
 
 export const MASTRA_AGENT_UPDATE = gql`
-  mutation MastraAgentUpdate($_id: String!, $doc: MastraAgentInput!) {
+  mutation MastraAgentUpdate($_id: String!, $doc: MastraAgentConfigInput!) {
     mastraAgentUpdate(_id: $_id, doc: $doc) {
+      ...AgentFields
+    }
+  }
+  ${AGENT_FIELDS}
+`;
+
+export const MASTRA_AGENT_SET_AUDIENCE = gql`
+  mutation MastraAgentSetAudience(
+    $_id: String!
+    $visibility: String!
+    $teamId: String
+    $departmentId: String
+    $unitId: String
+  ) {
+    mastraAgentSetAudience(
+      _id: $_id
+      visibility: $visibility
+      teamId: $teamId
+      departmentId: $departmentId
+      unitId: $unitId
+    ) {
+      ...AgentFields
+    }
+  }
+  ${AGENT_FIELDS}
+`;
+
+export const MASTRA_AGENT_SET_GRANT = gql`
+  mutation MastraAgentSetGrant($_id: String!, $grantGroupId: String) {
+    mastraAgentSetGrant(_id: $_id, grantGroupId: $grantGroupId) {
       ...AgentFields
     }
   }
@@ -97,15 +133,6 @@ export const MASTRA_VOICE_CONFIG_SAVE = gql`
       ttsVoice
       ttsSampleRate
       isEnabled
-    }
-  }
-`;
-
-export const MASTRA_KNOWLEDGE_SYNC = gql`
-  mutation MastraKnowledgeSync {
-    mastraKnowledgeSync {
-      ok
-      queued
     }
   }
 `;
@@ -195,6 +222,15 @@ export const MASTRA_WORKFLOW_REMOVE = gql`
   }
 `;
 
+export const MASTRA_WORKFLOW_APPROVE = gql`
+  mutation MastraWorkflowApprove($_id: String!) {
+    mastraWorkflowApprove(_id: $_id) {
+      ...WorkflowFields
+    }
+  }
+  ${WORKFLOW_FIELDS}
+`;
+
 export const MASTRA_WORKFLOW_SET_ENABLED = gql`
   mutation MastraWorkflowSetEnabled($_id: String!, $isEnabled: Boolean!) {
     mastraWorkflowSetEnabled(_id: $_id, isEnabled: $isEnabled) {
@@ -207,72 +243,6 @@ export const MASTRA_WORKFLOW_SET_ENABLED = gql`
 export const MASTRA_WORKFLOW_VALIDATE = gql`
   mutation MastraWorkflowValidate($definition: JSON!) {
     mastraWorkflowValidate(definition: $definition)
-  }
-`;
-
-export const MASTRA_SCHEDULE_CREATE = gql`
-  mutation MastraScheduleCreate($doc: MastraScheduleInput!) {
-    mastraScheduleCreate(doc: $doc) {
-      _id
-      name
-      description
-      agentId
-      cron
-      timezone
-      prompt
-      isEnabled
-      createdAt
-      updatedAt
-    }
-  }
-`;
-
-export const MASTRA_SCHEDULE_UPDATE = gql`
-  mutation MastraScheduleUpdate(
-    $_id: String!
-    $doc: MastraScheduleUpdateInput!
-  ) {
-    mastraScheduleUpdate(_id: $_id, doc: $doc) {
-      _id
-      name
-      description
-      agentId
-      cron
-      timezone
-      prompt
-      isEnabled
-      createdAt
-      updatedAt
-    }
-  }
-`;
-
-export const MASTRA_SCHEDULE_REMOVE = gql`
-  mutation MastraScheduleRemove($_id: String!) {
-    mastraScheduleRemove(_id: $_id)
-  }
-`;
-
-export const MASTRA_SCHEDULE_SET_ENABLED = gql`
-  mutation MastraScheduleSetEnabled($_id: String!, $isEnabled: Boolean!) {
-    mastraScheduleSetEnabled(_id: $_id, isEnabled: $isEnabled) {
-      _id
-      isEnabled
-    }
-  }
-`;
-
-export const MASTRA_SCHEDULE_RUN_NOW = gql`
-  mutation MastraScheduleRunNow($_id: String!) {
-    mastraScheduleRunNow(_id: $_id) {
-      _id
-      lastRunAt
-      lastStatus
-      lastError
-      lastReply
-      lastDurationMs
-      runCount
-    }
   }
 `;
 

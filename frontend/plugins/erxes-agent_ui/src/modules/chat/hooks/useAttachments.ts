@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useToast } from 'erxes-ui';
 import { ChatAttachment, PendingAttachment } from '~/modules/chat/types';
 import { randomIdSuffix } from '~/modules/chat/lib/ids';
 import { uploadToStorage } from '~/modules/chat/lib/attachments';
@@ -12,6 +13,7 @@ const MAX_ATTACHMENT_BYTES = MAX_ATTACHMENT_MB * 1024 * 1024;
 // and the chat-area drop overlay.
 export const useAttachments = (enabled: boolean) => {
   const [pendingAtts, setPendingAtts] = useState<PendingAttachment[]>([]);
+  const { toast } = useToast();
 
   // Revoke every outstanding preview object URL when the composer unmounts
   // (navigate away mid-compose) — removeAttachment/clear only cover explicit
@@ -29,10 +31,14 @@ export const useAttachments = (enabled: boolean) => {
     [],
   );
 
+  // Stage selected files in the composer WITHOUT uploading — the upload is
+  // deferred to send (uploadAll). Picking a file (or hitting a transient upload
+  // error) therefore never costs a round-trip until the user commits to sending.
   const addFiles = (files: FileList | File[]) => {
     if (!enabled) return;
     const list = Array.from(files).slice(0, 10 - pendingAtts.length);
 
+    const staged: PendingAttachment[] = [];
     for (let file of list) {
       // Clipboard screenshots all arrive as "image.png" — give each a distinct,
       // readable name before it becomes the stored file name.
@@ -49,57 +55,49 @@ export const useAttachments = (enabled: boolean) => {
 
       const id = `att-${Date.now()}-${randomIdSuffix(6)}`;
 
-      // Reject oversize files up front — mark them errored without uploading
-      // (and without creating a preview URL that would need cleanup).
-      if (file.size > MAX_ATTACHMENT_BYTES) {
-        setPendingAtts((prev) => [
-          ...prev,
-          {
-            id,
-            name: file.name,
-            type: file.type || 'application/octet-stream',
-            size: file.size,
-            status: 'error',
-            error: `File exceeds the ${MAX_ATTACHMENT_MB} MB limit`,
-          },
-        ]);
+      // Reject empty files up front — a 0-byte upload only trips a raw parser
+      // error server-side and would block the whole send. Mirror the oversize
+      // path: mark it errored without staging the file or a preview URL.
+      if (file.size === 0) {
+        staged.push({
+          id,
+          name: file.name,
+          type: file.type || 'application/octet-stream',
+          size: 0,
+          status: 'error',
+          error: 'This file is empty',
+        });
         continue;
       }
 
-      const entry: PendingAttachment = {
+      // Reject oversize files up front — mark them errored without staging the
+      // file (nothing to upload) or a preview URL that would need cleanup.
+      if (file.size > MAX_ATTACHMENT_BYTES) {
+        staged.push({
+          id,
+          name: file.name,
+          type: file.type || 'application/octet-stream',
+          size: file.size,
+          status: 'error',
+          error: `File exceeds the ${MAX_ATTACHMENT_MB} MB limit`,
+        });
+        continue;
+      }
+
+      // Hold the File for the deferred upload; 'ready' = staged, not yet sent.
+      staged.push({
         id,
         name: file.name,
         type: file.type || 'application/octet-stream',
         size: file.size,
+        file,
         previewUrl: file.type.startsWith('image/')
           ? URL.createObjectURL(file)
           : undefined,
-        status: 'uploading',
-      };
-      setPendingAtts((prev) => [...prev, entry]);
-
-      uploadToStorage(file)
-        .then((key) => {
-          setPendingAtts((prev) =>
-            prev.map((a) =>
-              a.id === id ? { ...a, url: key, status: 'done' as const } : a,
-            ),
-          );
-        })
-        .catch((err: unknown) => {
-          setPendingAtts((prev) =>
-            prev.map((a) =>
-              a.id === id
-                ? {
-                    ...a,
-                    status: 'error' as const,
-                    error: (err as Error)?.message || 'Upload failed',
-                  }
-                : a,
-            ),
-          );
-        });
+        status: 'ready',
+      });
     }
+    if (staged.length) setPendingAtts((prev) => [...prev, ...staged]);
   };
 
   const removeAttachment = (id: string) => {
@@ -119,10 +117,77 @@ export const useAttachments = (enabled: boolean) => {
 
   const uploadsInFlight = pendingAtts.some((a) => a.status === 'uploading');
 
-  const collectReady = (): ChatAttachment[] =>
-    pendingAtts
-      .filter((a) => a.status === 'done' && a.url)
-      .map((a) => ({ url: a.url!, name: a.name, type: a.type, size: a.size }));
+  // Upload everything staged, then report whether the batch is safe to send.
+  // Called on send (not on select): every staged file (and any that failed a
+  // prior attempt) is uploaded now. Success marks it done; failure marks it
+  // errored and keeps it in the composer so the user can retry (send again) or
+  // remove it. Returns the uploaded attachments and `ok` — false if any failed,
+  // so the caller can abort the send without dropping the file silently.
+  const uploadAll = async (): Promise<{
+    attachments: ChatAttachment[];
+    ok: boolean;
+  }> => {
+    const current = pendingRef.current;
+    // Entries already uploaded in a prior (partial) send carry straight through.
+    const alreadyDone = current.reduce<ChatAttachment[]>((acc, a) => {
+      if (a.status === 'done' && a.url)
+        acc.push({ url: a.url, name: a.name, type: a.type, size: a.size });
+      return acc;
+    }, []);
+
+    const targets = current.filter((a) => a.file && a.status !== 'done');
+    if (!targets.length) return { attachments: alreadyDone, ok: true };
+
+    // Flip targets to uploading so their chips show the spinner.
+    const ids = new Set(targets.map((t) => t.id));
+    setPendingAtts((prev) =>
+      prev.map((a) =>
+        ids.has(a.id)
+          ? { ...a, status: 'uploading' as const, error: undefined }
+          : a,
+      ),
+    );
+
+    // Build the result from the upload outcomes (the React state set above isn't
+    // readable synchronously here), so the returned list is always accurate.
+    const uploaded: ChatAttachment[] = [];
+    let ok = true;
+    await Promise.all(
+      targets.map(async (t) => {
+        try {
+          const key = await uploadToStorage(t.file!);
+          uploaded.push({ url: key, name: t.name, type: t.type, size: t.size });
+          setPendingAtts((prev) =>
+            prev.map((a) =>
+              a.id === t.id
+                ? { ...a, url: key, file: undefined, status: 'done' as const }
+                : a,
+            ),
+          );
+        } catch (err: unknown) {
+          ok = false;
+          const reason = (err as Error)?.message || 'Upload failed';
+          setPendingAtts((prev) =>
+            prev.map((a) =>
+              a.id === t.id
+                ? { ...a, status: 'error' as const, error: reason }
+                : a,
+            ),
+          );
+          // The chip's error icon alone is easy to miss and the send aborts
+          // silently — tell the user what failed and why (the server's reason,
+          // e.g. storage not configured / file type not allowed).
+          toast({
+            title: `Couldn't upload ${t.name}`,
+            description: reason,
+            variant: 'destructive',
+          });
+        }
+      }),
+    );
+
+    return { attachments: [...alreadyDone, ...uploaded], ok };
+  };
 
   // Whole-chat-area drop target + clipboard ingestion. `dragDepth` guards against
   // the flicker from dragenter/dragleave firing on every child; `isDragging`
@@ -168,7 +233,7 @@ export const useAttachments = (enabled: boolean) => {
     removeAttachment,
     clear,
     uploadsInFlight,
-    collectReady,
+    uploadAll,
     isDragging,
     onPaste,
     onDragEnter,

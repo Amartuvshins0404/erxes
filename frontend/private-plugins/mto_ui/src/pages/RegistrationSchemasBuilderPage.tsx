@@ -4,6 +4,8 @@ import {
   Checkbox,
   Input,
   Label,
+  ScrollArea,
+  Select,
   Sheet,
   Spinner,
   Textarea,
@@ -16,7 +18,10 @@ import {
   MTO_REGISTRATION_FORM_SCHEMA_REMOVE,
   MTO_REGISTRATION_FORM_SCHEMA_UPDATE,
 } from '@/registration/graphql/registrationMutations';
-import { MTO_REGISTRATION_FORM_SCHEMAS } from '@/registration/graphql/registrationQueries';
+import {
+  MTO_REGISTRATION_FORM_SCHEMAS,
+  MTO_REGISTRATION_MEMBERSHIP_SUMMARIES,
+} from '@/registration/graphql/registrationQueries';
 import {
   RegistrationField,
   RegistrationFieldKind,
@@ -59,6 +64,11 @@ interface SchemaRow {
   applicationsCount: number;
 }
 
+interface MembershipTypeOption {
+  membershipTypeId: string;
+  title: string;
+}
+
 function updateSection(
   sections: RegistrationSection[],
   sectionIndex: number,
@@ -96,6 +106,9 @@ export function RegistrationSchemasBuilderPage() {
   const { data, loading, error, refetch } = useQuery(
     MTO_REGISTRATION_FORM_SCHEMAS,
   );
+  const { data: summariesData } = useQuery(
+    MTO_REGISTRATION_MEMBERSHIP_SUMMARIES,
+  );
   const [createMutation, { loading: creating }] = useMutation(
     MTO_REGISTRATION_FORM_SCHEMA_CREATE,
   );
@@ -125,6 +138,32 @@ export function RegistrationSchemasBuilderPage() {
     () => rows.find((row) => row._id === selectedId) ?? null,
     [rows, selectedId],
   );
+
+  const membershipTypeOptions: MembershipTypeOption[] = useMemo(() => {
+    const summaries: MembershipTypeOption[] =
+      summariesData?.mtoRegistrationMembershipSummaries ?? [];
+    const knownIds = new Set(
+      summaries.map((item) => item.membershipTypeId),
+    );
+
+    if (membershipTypeId && !knownIds.has(membershipTypeId)) {
+      return [
+        ...summaries,
+        { membershipTypeId, title: membershipTypeId },
+      ];
+    }
+
+    return summaries;
+  }, [summariesData, membershipTypeId]);
+
+  const membershipTypeTitleById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const item of summariesData?.mtoRegistrationMembershipSummaries ??
+      []) {
+      map.set(item.membershipTypeId, item.title);
+    }
+    return map;
+  }, [summariesData]);
 
   const hasUsedApplications = (selected?.applicationsCount ?? 0) > 0;
   const mutationLoading = creating || updating || removing;
@@ -254,34 +293,40 @@ export function RegistrationSchemasBuilderPage() {
 
   return (
     <MtoPageLayout pageName="Registration Schemas">
-      <div className="p-6">
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="font-semibold">Schemas</h3>
-          <Button type="button" onClick={openCreateSheet}>
-            New schema
-          </Button>
+      <div className="flex flex-auto overflow-hidden flex-col">
+        <div className="shrink-0 p-6 pb-4">
+          <div className="mb-4 flex items-center justify-between">
+            <h3 className="font-semibold">Schemas</h3>
+            <Button type="button" onClick={openCreateSheet}>
+              New schema
+            </Button>
+          </div>
+
+          {loading ? <Spinner /> : null}
+          {error ? (
+            <p className="text-sm text-destructive">{error.message}</p>
+          ) : null}
         </div>
 
-        {loading ? <Spinner /> : null}
-        {error ? (
-          <p className="text-sm text-destructive">{error.message}</p>
-        ) : null}
-
-        <div className="space-y-2">
-          {rows.map((row) => (
-            <button
-              key={row._id}
-              type="button"
-              className="w-full border rounded-md p-3 text-left"
-              onClick={() => openEditSheet(row)}
-            >
-              <p className="font-medium">{row.title}</p>
-              <p className="text-xs text-muted-foreground">
-                {row.membershipTypeId} / {row.schemaVersion}
-              </p>
-            </button>
-          ))}
-        </div>
+        <ScrollArea className="flex-auto">
+          <div className="space-y-2 px-6 pb-6">
+            {rows.map((row) => (
+              <button
+                key={row._id}
+                type="button"
+                className="w-full border rounded-md p-3 text-left"
+                onClick={() => openEditSheet(row)}
+              >
+                <p className="font-medium">{row.title}</p>
+                <p className="text-xs text-muted-foreground">
+                  {membershipTypeTitleById.get(row.membershipTypeId) ??
+                    row.membershipTypeId}{' '}
+                  / {row.schemaVersion}
+                </p>
+              </button>
+            ))}
+          </div>
+        </ScrollArea>
       </div>
 
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
@@ -303,16 +348,36 @@ export function RegistrationSchemasBuilderPage() {
               ) : null}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                <Input
-                  value={membershipTypeId}
-                  onChange={(e) => setMembershipTypeId(e.target.value)}
-                  placeholder="membershipTypeId"
-                />
-                <Input
-                  value={schemaVersion}
-                  onChange={(e) => setSchemaVersion(e.target.value)}
-                  placeholder="schemaVersion"
-                />
+                <div className="space-y-2">
+                  <Label>Membership type</Label>
+                  <Select
+                    value={membershipTypeId || undefined}
+                    onValueChange={setMembershipTypeId}
+                    disabled={Boolean(selectedId)}
+                  >
+                    <Select.Trigger>
+                      <Select.Value placeholder="Select membership type" />
+                    </Select.Trigger>
+                    <Select.Content>
+                      {membershipTypeOptions.map((option) => (
+                        <Select.Item
+                          key={option.membershipTypeId}
+                          value={option.membershipTypeId}
+                        >
+                          {option.title}
+                        </Select.Item>
+                      ))}
+                    </Select.Content>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Schema version</Label>
+                  <Input
+                    value={schemaVersion}
+                    onChange={(e) => setSchemaVersion(e.target.value)}
+                    placeholder="schemaVersion"
+                  />
+                </div>
               </div>
               <Input
                 value={title}

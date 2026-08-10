@@ -7,7 +7,7 @@ import {
 } from 'erxes-api-shared/core-modules';
 import { generateModels, IModels } from '~/connectionResolvers';
 import { buildAutomationEnvelope } from '~/mastra/workflows/envelope';
-import { runWorkflow } from '~/mastra/workflows/runtime';
+import { runBackgroundWorkflow } from '~/mastra/workflows/runtime';
 
 /**
  * The automation:* trigger (docs/WORKFLOW-SPEC.md §6): ONE generic action —
@@ -47,11 +47,11 @@ const workflowAutomationProducers = {
     const workflow = await context.models.MastraWorkflow.getWorkflow(
       workflowId,
     );
-    if (!workflow.isEnabled) {
+    if (!workflow.isEnabled || workflow.approvalStatus !== 'approved') {
       return {
         result: {
           success: false,
-          error: `Workflow "${workflow.name}" is disabled`,
+          error: `Workflow "${workflow.name}" is not approved and enabled`,
         },
       };
     }
@@ -61,7 +61,13 @@ const workflowAutomationProducers = {
       target: (execution.target as Record<string, unknown>) || {},
     });
 
-    const runPromise = runWorkflow({
+    // Background entry point: resolves the workflow owner's bounded principal
+    // (fails closed to a failed run record) and wraps execution in runWithAuth.
+    // runBackgroundWorkflow calls runWithAuth internally, so the auth context is
+    // captured for the WHOLE run — including this detached continuation that
+    // outlives the SYNC_RESULT_BUDGET_MS race below (AsyncLocalStorage flows
+    // through the promise chain from the point .run() was entered).
+    const runPromise = runBackgroundWorkflow({
       models: context.models,
       subdomain: context.subdomain,
       workflow,

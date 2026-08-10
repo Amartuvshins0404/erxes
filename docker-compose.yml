@@ -1,0 +1,84 @@
+# docker-compose.yml — local DEV infrastructure for erxes
+#
+# This file provisions ONLY the backing services the app needs. The Node
+# APIs (gateway, core-api, plugins) and the React UIs are still run on the
+# host with pnpm (`pnpm dev:core-api`, `pnpm dev:apis`, `pnpm dev:uis`).
+#
+# Quick start:
+#   docker compose up -d
+#   cp .env.sample .env   # then point MONGO_URL/REDIS_HOST at these services
+#   pnpm install && pnpm dev:core-api
+#
+# Matching .env values for these services:
+#   MONGO_URL=mongodb://127.0.0.1:27017/erxes?directConnection=true
+#   REDIS_HOST=localhost
+#   REDIS_PORT=6379
+#   ELASTICSEARCH_URL=http://localhost:9200
+#
+# Stop & keep data:   docker compose down
+# Stop & wipe data:   docker compose down -v
+
+services:
+  # MongoDB 7 as a single-node replica set.
+  # The replica set is required because erxes uses MongoDB change streams
+  # (unless DISABLE_CHANGE_STREAM=true is set in .env).
+  mongo:
+    image: mongo:7
+    container_name: erxes-mongo
+    restart: unless-stopped
+    command: ['--replSet', 'rs0', '--bind_ip_all', '--port', '27017']
+    ports:
+      - '27017:27017'
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      # Initialize the single-node replica set on first boot, then report healthy.
+      test: >
+        mongosh --quiet --eval "
+          try { rs.status().ok }
+          catch (e) { rs.initiate({ _id: 'rs0', members: [{ _id: 0, host: 'localhost:27017' }] }).ok }
+        "
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
+
+  redis:
+    image: redis:7-alpine
+    container_name: erxes-redis
+    restart: unless-stopped
+    command: ['redis-server', '--appendonly', 'yes']
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Elasticsearch 7 — optional, used for search. Single-node, security off.
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.17.24
+    container_name: erxes-elasticsearch
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    ports:
+      - '9200:9200'
+    volumes:
+      - es-data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ['CMD-SHELL', "curl -s http://localhost:9200/_cluster/health | grep -q '\"status\"'"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+volumes:
+  mongo-data:
+  redis-data:
+  es-data:

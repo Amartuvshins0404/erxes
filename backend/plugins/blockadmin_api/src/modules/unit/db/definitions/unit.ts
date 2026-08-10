@@ -13,6 +13,7 @@ export const unitSchema = schemaWrapper(
       blockEntityId: { type: Types.ObjectId, index: true },
       agencySubdomain: { type: String, index: true },
       agencyEntityId: { type: Types.ObjectId, index: true },
+      locked: { type: Boolean, default: false },
     },
     {
       timestamps: true,

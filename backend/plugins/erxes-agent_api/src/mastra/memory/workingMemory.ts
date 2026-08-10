@@ -3,7 +3,7 @@
 //
 // A persistent, per-(user, agent) profile stored in MongoDB. Read each turn and
 // injected as a `system` context block; refreshed AFTER the turn by a small,
-// stateless extraction call (markdown replace semantics). No Qdrant involved.
+// stateless extraction call (markdown replace semantics).
 //
 // The refresh uses a dedicated, tool-less extractor agent so it can never emit a
 // tool call — keeping the exchange clean and Kimi-safe.
@@ -16,7 +16,7 @@
 import type { IModels } from '~/connectionResolvers';
 import type { ProviderDocLike } from '~/mastra/providers';
 import { getStatelessAgent, runStateless } from '~/mastra/statelessAgent';
-import type { MemoryContext } from './semanticRecall';
+import type { MemoryContext } from './types';
 import type { ConvoMessage } from './convo';
 
 export const WM_EXTRACTOR_INSTRUCTIONS = `You maintain a concise, durable profile of a single user for an AI assistant.

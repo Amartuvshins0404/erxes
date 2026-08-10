@@ -1,5 +1,5 @@
 import { providerQueries } from '@/provider/graphql/resolvers/queries/provider';
-import { associationQueries } from '@/association/graphql/resolvers/queries/association';
+import { categoryQueries } from '@/category/graphql/resolvers/queries/category';
 import { eventQueries } from '@/event/graphql/resolvers/queries/event';
 
 import { configQueries } from '@/config/graphql/resolvers/queries/config';
@@ -11,7 +11,7 @@ import { registrationFormSchemaQueries } from '@/registration/graphql/resolvers/
 export const queries = {
   ...providerQueries,
   ...configQueries,
-  ...associationQueries,
+  ...categoryQueries,
   ...eventQueries,
   ...registrationQueries,
   ...registrationApplicationsQueries,

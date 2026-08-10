@@ -4,11 +4,11 @@
 // time — so speech starts after the first sentence instead of the full reply.
 
 // Sentence-terminal punctuation.
-const LATIN_TERMINALS = '.!?…';
-const CJK_TERMINALS = '。！？';
-const ALL_TERMINALS = LATIN_TERMINALS + CJK_TERMINALS;
+const LATIN_TERMINALS = new Set('.!?…');
+const CJK_TERMINALS = new Set('。！？');
+const ALL_TERMINALS = new Set([...LATIN_TERMINALS, ...CJK_TERMINALS]);
 // Closing marks that belong to the sentence they trail (quotes / brackets).
-const CLOSERS = '"\'”’)]';
+const CLOSERS = new Set('"\'”’)]');
 
 const isWhitespace = (ch: string) => /\s/.test(ch);
 
@@ -33,14 +33,14 @@ export function splitSentences(buffer: string): SentenceSplit {
 
   while (i < n) {
     const ch = buffer[i];
-    const isCjk = CJK_TERMINALS.includes(ch);
-    const isLatin = LATIN_TERMINALS.includes(ch);
+    const isCjk = CJK_TERMINALS.has(ch);
+    const isLatin = LATIN_TERMINALS.has(ch);
 
     if (isLatin || isCjk) {
       // Absorb a run of terminals then any closing quotes/brackets.
       let j = i + 1;
-      while (j < n && ALL_TERMINALS.includes(buffer[j])) j++;
-      while (j < n && CLOSERS.includes(buffer[j])) j++;
+      while (j < n && ALL_TERMINALS.has(buffer[j])) j++;
+      while (j < n && CLOSERS.has(buffer[j])) j++;
 
       const latinBoundary = isLatin && j < n && isWhitespace(buffer[j]);
       if (isCjk || latinBoundary) {

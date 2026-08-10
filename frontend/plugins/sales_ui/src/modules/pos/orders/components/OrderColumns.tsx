@@ -4,9 +4,10 @@ import {
   IconClock,
   IconUser,
   IconTag,
+  IconFileText,
 } from '@tabler/icons-react';
 import { ColumnDef } from '@tanstack/table-core';
-import { useTranslation } from 'react-i18next';
+import { TFunction } from 'i18next';
 import {
   RecordTable,
   TextOverflowTooltip,
@@ -50,7 +51,10 @@ const getPaidAmountsMap = (
   }, {});
 };
 
-export const generateOtherPaymentColumns = (summary?: PaymentSummary) => {
+export const generateOtherPaymentColumns = (
+  t: TFunction,
+  summary?: PaymentSummary,
+) => {
   const otherPayTitles = (summary ? Object.keys(summary) : [])
     .filter(
       (a) =>
@@ -62,10 +66,12 @@ export const generateOtherPaymentColumns = (summary?: PaymentSummary) => {
 
   return otherPayTitles.map((title: string, index) => ({
     id: `${title}_${index}`,
-    header: () => {
-      const { t } = useTranslation('sales');
-      return <RecordTable.InlineHead icon={IconClock} label={t(title, { defaultValue: title })} />;
-    },
+    header: () => (
+      <RecordTable.InlineHead
+        icon={IconClock}
+        label={t(title, { defaultValue: title })}
+      />
+    ),
     cell: ({ row }: { row: PaymentRow }) => {
       const order = row.original;
       const dynamicAmounts = getPaidAmountsMap(order.paidAmounts);
@@ -80,12 +86,14 @@ export const generateOtherPaymentColumns = (summary?: PaymentSummary) => {
     size: 150,
   }));
 };
-export const firstOrderColumns: ColumnDef<IOrder>[] = [
+export const firstOrderColumns: (t: TFunction) => ColumnDef<IOrder>[] = (t) => [
   ordersMoreColumn,
   {
     id: 'number',
     accessorKey: 'number',
-    header: () => { const { t } = useTranslation('sales'); return <RecordTable.InlineHead icon={IconLabel} label={t('bill-number')} />; },
+    header: () => (
+      <RecordTable.InlineHead icon={IconLabel} label={t('bill-number')} />
+    ),
     cell: ({ cell, row }) => {
       return (
         <ClickableBillNumber value={cell.getValue() as string} row={row} />
@@ -95,7 +103,9 @@ export const firstOrderColumns: ColumnDef<IOrder>[] = [
   {
     id: 'paidDate',
     accessorKey: 'paidDate',
-    header: () => { const { t } = useTranslation('sales'); return <RecordTable.InlineHead icon={IconMobiledata} label={t('date')} />; },
+    header: () => (
+      <RecordTable.InlineHead icon={IconMobiledata} label={t('date')} />
+    ),
     cell: ({ cell }) => {
       return (
         <RelativeDateDisplay value={cell.getValue() as string} asChild>
@@ -118,7 +128,9 @@ export const firstOrderColumns: ColumnDef<IOrder>[] = [
   {
     id: 'cashAmount',
     accessorKey: 'cashAmount',
-    header: () => { const { t } = useTranslation('sales'); return <RecordTable.InlineHead icon={IconLabel} label={t('cash-amount')} />; },
+    header: () => (
+      <RecordTable.InlineHead icon={IconLabel} label={t('cash-amount')} />
+    ),
     cell: ({ cell }) => {
       const value = cell.getValue() as number;
       return (
@@ -132,7 +144,9 @@ export const firstOrderColumns: ColumnDef<IOrder>[] = [
   {
     id: 'mobileAmount',
     accessorKey: 'mobileAmount',
-    header: () => { const { t } = useTranslation('sales'); return <RecordTable.InlineHead icon={IconLabel} label={t('mobile-amount')} />; },
+    header: () => (
+      <RecordTable.InlineHead icon={IconLabel} label={t('mobile-amount')} />
+    ),
     cell: ({ cell }) => {
       const value = cell.getValue() as number;
       return (
@@ -145,11 +159,15 @@ export const firstOrderColumns: ColumnDef<IOrder>[] = [
   },
 ];
 
-export const secondOrderColumns: ColumnDef<IOrder>[] = [
+export const secondOrderColumns: (t: TFunction) => ColumnDef<IOrder>[] = (
+  t,
+) => [
   {
     id: 'totalAmount',
     accessorKey: 'totalAmount',
-    header: () => { const { t } = useTranslation('sales'); return <RecordTable.InlineHead icon={IconLabel} label={t('amount')} />; },
+    header: () => (
+      <RecordTable.InlineHead icon={IconLabel} label={t('amount')} />
+    ),
     cell: ({ cell }) => {
       const value = cell.getValue() as number;
       return (
@@ -163,7 +181,41 @@ export const secondOrderColumns: ColumnDef<IOrder>[] = [
   {
     id: 'customerType',
     accessorKey: 'customerType',
-    header: () => { const { t } = useTranslation('sales'); return <RecordTable.InlineHead icon={IconClock} label={t('customer')} />; },
+    header: () => (
+      <RecordTable.InlineHead icon={IconClock} label={t('customer')} />
+    ),
+    cell: ({ cell }) => {
+      const value = cell.getValue() as string;
+      return (
+        <RecordTableInlineCell>
+          <TextOverflowTooltip value={value} />
+        </RecordTableInlineCell>
+      );
+    },
+    size: 150,
+  },
+  {
+    id: 'brokerType',
+    accessorKey: 'brokerType',
+    header: () => (
+      <RecordTable.InlineHead icon={IconUser} label={t('broker-type')} />
+    ),
+    cell: ({ cell }) => {
+      const value = cell.getValue() as string;
+      return (
+        <RecordTableInlineCell>
+          <TextOverflowTooltip value={value} />
+        </RecordTableInlineCell>
+      );
+    },
+    size: 120,
+  },
+  {
+    id: 'brokerName',
+    accessorKey: 'brokerName',
+    header: () => (
+      <RecordTable.InlineHead icon={IconUser} label={t('broker')} />
+    ),
     cell: ({ cell }) => {
       const value = cell.getValue() as string;
       return (
@@ -177,7 +229,7 @@ export const secondOrderColumns: ColumnDef<IOrder>[] = [
   {
     id: 'posName',
     accessorKey: 'posName',
-    header: () => { const { t } = useTranslation('sales'); return <RecordTable.InlineHead icon={IconUser} label={t('pos')} />; },
+    header: () => <RecordTable.InlineHead icon={IconUser} label={t('pos')} />,
     cell: ({ cell }) => {
       return (
         <RecordTableInlineCell>
@@ -190,7 +242,7 @@ export const secondOrderColumns: ColumnDef<IOrder>[] = [
   {
     id: 'type',
     accessorKey: 'type',
-    header: () => { const { t } = useTranslation('sales'); return <RecordTable.InlineHead icon={IconTag} label={t('type')} />; },
+    header: () => <RecordTable.InlineHead icon={IconTag} label={t('type')} />,
     cell: ({ cell }) => {
       return (
         <RecordTableInlineCell>
@@ -203,7 +255,7 @@ export const secondOrderColumns: ColumnDef<IOrder>[] = [
   {
     id: 'user',
     accessorKey: 'user',
-    header: () => { const { t } = useTranslation('sales'); return <RecordTable.InlineHead icon={IconUser} label={t('user')} />; },
+    header: () => <RecordTable.InlineHead icon={IconUser} label={t('user')} />,
     cell: ({ cell }) => {
       const user = cell.getValue() as IUser;
       return (
@@ -214,9 +266,24 @@ export const secondOrderColumns: ColumnDef<IOrder>[] = [
     },
     size: 150,
   },
+  {
+    id: 'description',
+    accessorKey: 'description',
+    header: () => (
+      <RecordTable.InlineHead icon={IconFileText} label="Description" />
+    ),
+    cell: ({ cell }) => {
+      return (
+        <RecordTableInlineCell>
+          <TextOverflowTooltip value={cell.getValue() as string} />
+        </RecordTableInlineCell>
+      );
+    },
+    size: 200,
+  },
 ];
 
-export const orderColumns: ColumnDef<IOrder>[] = [
-  ...firstOrderColumns,
-  ...secondOrderColumns,
+export const orderColumns: (t: TFunction) => ColumnDef<IOrder>[] = (t) => [
+  ...firstOrderColumns(t),
+  ...secondOrderColumns(t),
 ];

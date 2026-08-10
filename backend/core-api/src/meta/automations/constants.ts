@@ -14,6 +14,7 @@ import {
   TRANSFORM_ACTION_OUTPUT,
 } from './actionOutputs';
 import { CORE_FIND_OBJECT_TARGETS_CONST } from './findObjectTargets';
+import { CORE_PRODUCT_KNOWLEDGE_SOURCE_KEY } from '~/modules/products/meta/automations';
 import {
   COMPANY_TRIGGER_OUTPUT,
   CUSTOMER_TRIGGER_OUTPUT,
@@ -31,7 +32,32 @@ const CORE_ACTION_GROUPS = {
 
 export const CORE_AUTOMATION_CONSTANTS: AutomationConstants = {
   findObjectTargets: CORE_FIND_OBJECT_TARGETS_CONST,
+  ai: {
+    knowledgeSources: [
+      {
+        key: CORE_PRODUCT_KNOWLEDGE_SOURCE_KEY,
+        label: 'Products',
+        moduleName: 'products',
+        sourceSelector: 'local',
+      },
+    ],
+  },
   triggers: [
+    {
+      type: AUTOMATION_CORE_TRIGGER_TYPES.SCHEDULE,
+      moduleName: 'schedules',
+      collectionName: 'recurring',
+      icon: 'IconCalendarClock',
+      label: 'Recurring schedule',
+      description: 'Run an automation on a recurring cron schedule',
+      isCustom: true,
+      output: {
+        variables: [
+          { key: 'scheduledAt', label: 'Scheduled at' },
+          { key: 'timezone', label: 'Timezone' },
+        ],
+      },
+    },
     {
       type: AUTOMATION_CORE_TRIGGER_TYPES.INCOMING_WEBHOOK,
       moduleName: 'webhooks',

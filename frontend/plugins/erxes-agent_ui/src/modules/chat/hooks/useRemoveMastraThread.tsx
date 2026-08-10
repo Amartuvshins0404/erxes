@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import { useMutation } from '@apollo/client';
 import { useToast } from 'erxes-ui';
 import { MASTRA_THREAD_REMOVE } from '~/graphql/mutations';
@@ -15,23 +16,28 @@ export const useRemoveMastraThread = (mastraAgentId?: string) => {
     MASTRA_THREAD_REMOVE,
   );
 
-  const mutate = (threadId: string) =>
-    removeThread({
-      variables: { threadId },
-      optimisticResponse: { mastraThreadRemove: true },
-      update: (cache) => {
-        if (!mastraAgentId) return;
-        updateThreadsCache(cache, mastraAgentId, (list) =>
-          list.filter((t) => t.threadId !== threadId),
-        );
-      },
-      onError: (error) => {
-        toast({
-          title: error?.message || 'Failed to delete session',
-          variant: 'destructive',
-        });
-      },
-    });
+  // Stable identity so callers can pass it into memoized children without
+  // breaking their memo on every parent (streamed-token) re-render.
+  const mutate = useCallback(
+    (threadId: string) =>
+      removeThread({
+        variables: { threadId },
+        optimisticResponse: { mastraThreadRemove: true },
+        update: (cache) => {
+          if (!mastraAgentId) return;
+          updateThreadsCache(cache, mastraAgentId, (list) =>
+            list.filter((t) => t.threadId !== threadId),
+          );
+        },
+        onError: (error) => {
+          toast({
+            title: error?.message || 'Failed to delete session',
+            variant: 'destructive',
+          });
+        },
+      }),
+    [removeThread, mastraAgentId, toast],
+  );
 
   return { removeThread: mutate, loading };
 };

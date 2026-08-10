@@ -1,7 +1,6 @@
 import { NavigationMenuLinkItem } from 'erxes-ui';
 import {
   IconActivity,
-  IconTags,
   IconList,
   IconForms,
   IconCalendarEvent,
@@ -20,14 +19,6 @@ export const MtoNavigation = () => {
         pathPrefix="mto"
         path=""
       />
-      {!isSlaveMode && (
-        <NavigationMenuLinkItem
-          name="Associations"
-          icon={IconTags}
-          pathPrefix="mto"
-          path="associations"
-        />
-      )}
       {!isSlaveMode && (
         <NavigationMenuLinkItem
           name="Categories"

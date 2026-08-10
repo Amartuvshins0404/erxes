@@ -7,7 +7,7 @@
 //
 // Both share the chat path's gateway contract: the gateway authenticates the
 // request and forwards the user as a base64 header, and both are gated by the
-// same `agentsChat` permission as /chat/stream. The discrete STT→chat→TTS
+// same chat permission as /chat/stream. The discrete STT→chat→TTS
 // pipeline keeps the existing Mastra agent + SSE flow untouched: STT only
 // produces text the client feeds into the normal send-message path, and TTS
 // only voices text the client already streamed back.
@@ -26,6 +26,7 @@ import {
   synthesize,
   transcribe,
 } from '~/mastra/voice/chimegeVoice';
+import { ERXES_AGENT_ACTIONS } from '~/meta/permissionActions';
 
 // Outer upload cap (express.raw limit). The body is a browser-encoded WAV; the
 // real bound is Chimege's 3MB cap (MAX_WAV_BYTES), enforced below before we
@@ -64,7 +65,7 @@ async function authorizeVoice(
   }
   const subdomain = getSubdomain(req);
   try {
-    await checkPermissionGroup(subdomain, user)('agentsChat');
+    await checkPermissionGroup(subdomain, user)(ERXES_AGENT_ACTIONS.agent.chat);
   } catch {
     res.status(403).json({ error: 'Permission required' });
     return { ok: false, subdomain: '' };

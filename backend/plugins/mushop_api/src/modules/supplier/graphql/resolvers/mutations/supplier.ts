@@ -1,6 +1,6 @@
 import { IContext } from '~/connectionResolvers';
 import { sendSupplierMessage } from '~/utils/sendSupplierMessage';
-import { fetchSupplierPosProducts } from '~/utils/fetchSupplierPosProducts';
+import { applySupplierRejectionChange } from '~/utils/supplierRejection';
 
 export const supplierMutations = {
   mushopUpdateSupplierVerificationStatus: async (
@@ -30,11 +30,21 @@ export const supplierMutations = {
       throw new Error(`Failed to send supplier status: ${error.message}`);
     }
 
-    return models.Supplier.updateVerificationStatus(
+    const updated = await models.Supplier.updateVerificationStatus(
       _id,
       verificationStatus,
       note,
     );
+
+    await applySupplierRejectionChange({
+      models,
+      subdomain: existing.subdomain,
+      posToken: updated?.mushopPosToken,
+      prevStatus: existing.verificationStatus,
+      nextStatus: verificationStatus,
+    });
+
+    return updated;
   },
 
   mushopUpdateSupplierTier: async (
@@ -46,50 +56,6 @@ export const supplierMutations = {
     return models.Supplier.updateTierLevel(_id, tierLevel);
   },
 
-  mushopUpdateSupplierPos: async (
-    _root: undefined,
-    { _id, posToken }: { _id: string; posToken: string },
-    { models, checkPermission }: IContext,
-  ) => {
-    await checkPermission('mushopUpdateSupplierPos');
-    const supplier = await models.Supplier.getSupplier(_id);
-
-    const updated = await models.Supplier.findOneAndUpdate(
-      { _id },
-      { $set: { posToken } },
-      { new: true },
-    );
-
-    const products = await fetchSupplierPosProducts({
-      subdomain: supplier.subdomain,
-      posToken,
-    });
-
-    await Promise.all(
-      products.map((p) =>
-        models.Product.syncProduct(supplier.subdomain, p._id, {
-          name: p.name,
-          shortName: p.shortName,
-          code: p.code,
-          type: p.type,
-          description: p.description,
-          barcodes: p.barcodes,
-          barcodeDescription: p.barcodeDescription,
-          unitPrice: p.unitPrice,
-          initialCategory: p.category,
-          tagIds: p.tagIds,
-          attachment: p.attachment,
-          attachmentMore: p.attachmentMore,
-          uom: p.uom,
-          subUoms: p.subUoms,
-          currency: p.currency,
-          pdfAttachment: p.pdfAttachment,
-        }),
-      ),
-    );
-
-    return updated;
-  },
 
   mushopUpdateSupplierMushopPos: async (
     _root: undefined,

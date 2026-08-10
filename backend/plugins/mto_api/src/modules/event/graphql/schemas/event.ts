@@ -10,7 +10,7 @@ export const types = `
     endDate: Date
     location: String
     categoryIds: [String]
-    categories: [MtoActivityAssociation]
+    categories: [MtoCategory]
     status: String
     isActive: Boolean
   }

@@ -55,15 +55,11 @@ export const loadInvoiceClass = (models: IModels) => {
           description: invoice.description,
         });
 
-        const api = new ErxesPayment(payment);
+        const api = new ErxesPayment(payment, subdomain);
 
         try {
           const response = await api.createInvoice(transaction.toObject());
           transaction.response = response;
-          transaction.details = {
-            ...transaction.details,
-            tdbOrderId: response.order?.id,
-          };
           await transaction.save();
 
           return invoice;

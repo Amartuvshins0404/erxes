@@ -1,0 +1,111 @@
+import { useState } from 'react';
+import {
+  IconAlertCircle,
+  IconCheck,
+  IconChevronRight,
+} from '@tabler/icons-react';
+import { ToolPartView, normToolName } from '~/modules/chat/lib/uiParts';
+import { formatJson } from '~/modules/chat/lib/markdown';
+
+// First non-empty string among the given keys of an args object.
+const pick = (input: unknown, keys: string[]): string | undefined => {
+  if (!input || typeof input !== 'object') return undefined;
+  const obj = input as Record<string, unknown>;
+  for (const k of keys) {
+    const v = obj[k];
+    if (typeof v === 'string' && v.trim()) return v.trim();
+  }
+  return undefined;
+};
+
+// A human, present-tense label for an erxes/knowledge tool call — "Ran
+// customers.list", "Searched operations for refunds" — instead of the raw tool
+// name. Mirrors the backend's toolStatusLine vocabulary.
+const operationLabel = (toolName: string, input: unknown): string => {
+  switch (normToolName(toolName)) {
+    case 'executeerxesoperation': {
+      const op = pick(input, ['operation', 'operationName']);
+      return op ? `Ran ${op}` : 'Ran an operation';
+    }
+    case 'searcherxesoperations': {
+      const q = pick(input, ['query']);
+      return q ? `Searched operations for ${q}` : 'Searched operations';
+    }
+    case 'companyknowledge': {
+      const q = pick(input, ['query']);
+      return q ? `Searched company data for ${q}` : 'Searched company data';
+    }
+    case 'agentknowledge': {
+      const q = pick(input, ['query']);
+      return q ? `Recalled learnings about ${q}` : 'Recalled learnings';
+    }
+    default:
+      return toolName;
+  }
+};
+
+// An erxes operation / knowledge lookup as a quiet, human one-liner that still
+// expands to the exact request + response for power users.
+export const OperationRow = ({
+  call,
+  streaming,
+}: {
+  call: ToolPartView;
+  streaming?: boolean;
+}) => {
+  const [expanded, setExpanded] = useState(false);
+  const pending = call.pending && streaming;
+  const settled =
+    call.state === 'output-available' || call.state === 'output-error';
+  const result = call.isError ? call.errorText : call.output;
+
+  return (
+    <div className="ea-pop">
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        className="ea-trace-row flex w-full items-center gap-2 px-1.5 py-1 text-left text-xs"
+      >
+        <span className="min-w-0 flex-1 truncate text-foreground">
+          {operationLabel(call.toolName, call.input)}
+        </span>
+        {pending ? (
+          <span className="ea-shimmer-text shrink-0 text-[11px] font-medium">
+            Running…
+          </span>
+        ) : call.isError ? (
+          <IconAlertCircle className="size-3.5 shrink-0 text-destructive" />
+        ) : settled ? (
+          <IconCheck className="size-3.5 shrink-0 text-success" />
+        ) : null}
+        <IconChevronRight
+          className={`size-3 shrink-0 text-muted-foreground opacity-40 transition-transform duration-200 ${
+            expanded ? 'rotate-90' : ''
+          }`}
+        />
+      </button>
+      {expanded && (
+        <div className="ea-expand space-y-2 px-1.5 pb-1.5 pt-1">
+          {call.input !== undefined && (
+            <div>
+              <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Request
+              </p>
+              <pre className="ea-trace-pre max-h-40 overflow-auto whitespace-pre-wrap break-all rounded-md p-2 font-mono text-[11px]">
+                {formatJson(call.input)}
+              </pre>
+            </div>
+          )}
+          <div>
+            <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Response
+            </p>
+            <pre className="ea-trace-pre max-h-60 overflow-auto whitespace-pre-wrap break-all rounded-md p-2 font-mono text-[11px]">
+              {pending ? 'Running…' : formatJson(result) || '—'}
+            </pre>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};

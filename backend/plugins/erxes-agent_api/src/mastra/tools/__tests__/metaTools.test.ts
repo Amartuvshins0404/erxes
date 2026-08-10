@@ -1,82 +1,76 @@
-/**
- * execute_erxes_operation: the destructive-ops guard and the audit-trail
- * recording. Mastra's createTool and the network executor are mocked so the
- * test drives the tool's own logic directly.
- */
-jest.mock('@mastra/core/tools', () => ({ createTool: (cfg: unknown) => cfg }));
+jest.mock('@mastra/core/tools', () => ({ createTool: (config: unknown) => config }));
 
-const mockExecute = jest.fn((..._args: unknown[]) =>
-  Promise.resolve({ ok: true }),
-);
+const mockExecute = jest.fn(() => Promise.resolve({ ok: true }));
+
 jest.mock('../erxesTools', () => ({
   executeErxesOperation: (...args: unknown[]) => mockExecute(...args),
-  graphqlTypeToString: () => 'String',
 }));
 
-import { buildErxesMetaTools } from '../metaTools';
+import { buildErxesOperationTools } from '../operationTools';
 import { runWithAuth } from '../../requestContext';
 import type { OperationRegistry, OperationMeta } from '../operationRegistry';
 import type { AgentActionInput } from '../../auditLog';
 
-const mkRegistry = (ops: Array<Partial<OperationMeta>>): OperationRegistry => {
+const makeRegistry = (ops: Array<Partial<OperationMeta>>): OperationRegistry => {
   const list = ops.map(
-    (o) =>
+    (operation) =>
       ({
-        operation: o.operation || 'x',
-        operationType: o.operationType || 'mutation',
-        plugin: o.plugin || 'core',
-        module: o.module || 'customers',
+        operation: operation.operation || 'x',
+        operationType: operation.operationType || 'mutation',
+        plugin: operation.plugin || 'core',
+        module: operation.module || 'customers',
         description: '',
         graphqlArgs: [],
         returnType: null,
       }) as OperationMeta,
   );
   return {
-    operations: new Map(list.map((o) => [o.operation, o])),
+    operations: new Map(list.map((operation) => [operation.operation, operation])),
     list,
     inputTypesMap: {},
     objectFieldsMap: {},
+    enumValuesMap: {},
   };
 };
 
 interface ToolLike {
   execute: (
-    input: unknown,
+    input: Record<string, unknown>,
   ) => Promise<
     { blocked?: boolean; requiresApproval?: boolean } & Record<string, unknown>
   >;
 }
 
 const build = (
-  ops: Array<Partial<OperationMeta>>,
+  operation: Partial<OperationMeta>,
   destructiveOps: 'allow' | 'ask',
   calls: AgentActionInput[],
-) =>
-  buildErxesMetaTools({
-    registry: mkRegistry(ops),
+): ToolLike => {
+  const registry = makeRegistry([operation]);
+  const tools = buildErxesOperationTools({
+    registry,
     settings: {},
     policy: { mode: 'all', allowed: [] },
     destructiveOps,
     recordAction: (entry) => calls.push(entry),
-  }).execute_erxes_operation as unknown as ToolLike;
+  });
+  return tools[registry.list[0].operation] as unknown as ToolLike;
+};
 
 beforeEach(() => mockExecute.mockClear());
 
-describe('execute_erxes_operation guard + audit', () => {
+describe('typed operation guard and audit', () => {
   it('asks for approval on a destructive op, records it, and never executes it', async () => {
     const calls: AgentActionInput[] = [];
     const tool = build(
-      [{ operation: 'customersRemove', operationType: 'mutation' }],
+      { operation: 'customersRemove', operationType: 'mutation' },
       'ask',
       calls,
     );
 
-    const res = await tool.execute({
-      operation: 'customersRemove',
-      args: { _ids: ['c1'] },
-    });
+    const result = await tool.execute({ _ids: ['c1'] });
 
-    expect(res.requiresApproval).toBe(true);
+    expect(result.requiresApproval).toBe(true);
     expect(mockExecute).not.toHaveBeenCalled();
     expect(calls).toHaveLength(1);
     expect(calls[0]).toMatchObject({
@@ -84,24 +78,23 @@ describe('execute_erxes_operation guard + audit', () => {
       destructive: true,
       status: 'blocked',
     });
-    // Nothing executed → no correlation id.
     expect(calls[0].processId).toBeUndefined();
   });
 
-  it('executes a destructive op the user approved for this turn', async () => {
+  it('executes a destructive op approved for this turn', async () => {
     const calls: AgentActionInput[] = [];
     const tool = build(
-      [{ operation: 'customersRemove', operationType: 'mutation' }],
+      { operation: 'customersRemove', operationType: 'mutation' },
       'ask',
       calls,
     );
 
-    const res = await runWithAuth(
+    const result = await runWithAuth(
       { approvedOps: [{ operation: 'customersRemove', args: { _ids: ['c1'] } }] },
-      () => tool.execute({ operation: 'customersRemove', args: { _ids: ['c1'] } }),
+      () => tool.execute({ _ids: ['c1'] }),
     );
 
-    expect(res.requiresApproval).toBeUndefined();
+    expect(result.requiresApproval).toBeUndefined();
     expect(mockExecute).toHaveBeenCalledTimes(1);
     expect(calls[0]).toMatchObject({
       operation: 'customersRemove',
@@ -110,19 +103,18 @@ describe('execute_erxes_operation guard + audit', () => {
     });
   });
 
-  it("records a successful mutation (with a correlation id) when destructiveOps is 'allow'", async () => {
+  it('records a successful mutation and correlation id when destructive operations are allowed', async () => {
     const calls: AgentActionInput[] = [];
     const tool = build(
-      [{ operation: 'customersRemove', operationType: 'mutation' }],
+      { operation: 'customersRemove', operationType: 'mutation' },
       'allow',
       calls,
     );
 
-    await tool.execute({ operation: 'customersRemove', args: {} });
+    await tool.execute({});
 
     expect(mockExecute).toHaveBeenCalledTimes(1);
-    // The processId is the 6th arg to executeErxesOperation and is recorded.
-    const sentProcessId = mockExecute.mock.calls[0][5] as string;
+    const sentProcessId = mockExecute.mock.calls[0][4] as string;
     expect(sentProcessId).toMatch(/^agt_/);
     expect(calls[0]).toMatchObject({
       operation: 'customersRemove',
@@ -132,36 +124,32 @@ describe('execute_erxes_operation guard + audit', () => {
     });
   });
 
-  it('records a failed mutation when the executor returns success:false', async () => {
-    mockExecute.mockResolvedValueOnce({
-      success: false,
-      error: 'boom',
-    } as never);
+  it('records a failed mutation', async () => {
+    mockExecute.mockResolvedValueOnce({ success: false, error: 'boom' } as never);
     const calls: AgentActionInput[] = [];
     const tool = build(
-      [{ operation: 'dealsEdit', operationType: 'mutation' }],
+      { operation: 'dealsEdit', operationType: 'mutation' },
       'ask',
       calls,
     );
 
-    await tool.execute({ operation: 'dealsEdit', args: {} });
+    await tool.execute({});
 
     expect(calls[0]).toMatchObject({ status: 'failed', error: 'boom' });
   });
 
-  it('does not record reads (queries)', async () => {
+  it('does not record reads or assign them correlation ids', async () => {
     const calls: AgentActionInput[] = [];
     const tool = build(
-      [{ operation: 'customers', operationType: 'query' }],
+      { operation: 'customers', operationType: 'query' },
       'ask',
       calls,
     );
 
-    await tool.execute({ operation: 'customers', args: {} });
+    await tool.execute({});
 
     expect(mockExecute).toHaveBeenCalledTimes(1);
-    // Reads get no correlation id (nothing to revert).
-    expect(mockExecute.mock.calls[0][5]).toBeUndefined();
+    expect(mockExecute.mock.calls[0][4]).toBeUndefined();
     expect(calls).toHaveLength(0);
   });
 });

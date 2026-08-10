@@ -37,14 +37,14 @@ export function CategoriesList({ filters }: CategoriesListProps) {
   const [sheetOpen, setSheetOpen] = useState(false);
 
   const categories = useMemo(() => {
-    const rows = (data?.mtoAssociations ?? []) as MtoCategory[];
+    const rows = (data?.mtoCategories ?? []) as MtoCategory[];
 
     if (filters?.level === 'sub') {
       return rows.filter((category) => !isMainCategory(category));
     }
 
     return rows;
-  }, [data?.mtoAssociations, filters?.level]);
+  }, [data?.mtoCategories, filters?.level]);
 
   const handleRemove = (id: string) => {
     void confirm({
@@ -132,7 +132,7 @@ export function CategoriesList({ filters }: CategoriesListProps) {
         const id = row.original._id as string;
 
         return (
-          <RecordTableInlineCell className="flex gap-2">
+          <RecordTableInlineCell className="flex justify-end items-center gap-2">
             <Button
               type="button"
               variant="outline"

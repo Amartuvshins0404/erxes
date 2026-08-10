@@ -20,6 +20,7 @@ import { useGetSupplier } from '../hooks/useSupplier';
 import { useUpdateSupplier } from '../hooks/useUpdateSupplier';
 import { SupplierEditorField } from './SupplierEditorField';
 import { PaymentMethodField } from './PaymentMethodField';
+import { SyncPosField } from './SyncPosField';
 import { SupplierPhones } from './SupplierPhones';
 import { UploadImage } from './upload';
 import { MultiUploadImage } from './MultiUploadImage';
@@ -66,6 +67,7 @@ export const SupplierProfileForm = () => {
       phones: supplier?.phones || [],
       dateFounded: supplier?.dateFounded || '',
       paymentId: supplier?.paymentId || '',
+      posToken: supplier?.posToken || '',
       address: {
         details: {
           countryCode: addressDetails?.countryCode || undefined,
@@ -438,7 +440,14 @@ export const SupplierProfileForm = () => {
               </InfoCard.Content>
             </InfoCard>
 
-            <PaymentMethodField control={form.control} />
+            <InfoCard title="Integrations">
+              <InfoCard.Content>
+                <div className="gap-4 grid grid-cols-2">
+                  <PaymentMethodField control={form.control} />
+                  <SyncPosField control={form.control} />
+                </div>
+              </InfoCard.Content>
+            </InfoCard>
           </div>
 
           <InfoCard title="Attachments" className="lg:col-span-2">

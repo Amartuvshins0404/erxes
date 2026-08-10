@@ -1,12 +1,12 @@
 import { createTTLCache } from '~/utils/ttlCache';
 import {
   fetchAvailableErxesTools,
-  fetchInputTypesMap,
+  fetchInputSchemaMaps,
   fetchObjectFieldsMap,
   type ErxesToolSettings,
   type GqlArgDef,
-  type GqlFieldDef,
   type GqlTypeRef,
+  type SchemaMaps,
 } from './erxesTools';
 import { isSecurityBlockedOperation } from './securityGuard';
 
@@ -18,6 +18,7 @@ export interface OperationMeta {
   module: string;
   description: string;
   graphqlArgs: GqlArgDef[];
+  pluginAttribution?: 'subgraph' | 'fallback';
   returnType?: GqlTypeRef | null;
 }
 
@@ -25,18 +26,15 @@ export interface OperationMeta {
 // introspection. `operations` is a name → meta lookup for O(1) execute resolution;
 // `list` is the same set for searching. The two type maps power argument-schema
 // building (inputTypesMap) and response-field selection (objectFieldsMap).
-export interface OperationRegistry {
+export interface OperationRegistry extends SchemaMaps {
   operations: Map<string, OperationMeta>;
   list: OperationMeta[];
-  inputTypesMap: Record<string, GqlArgDef[]>;
-  objectFieldsMap: Record<string, GqlFieldDef[]>;
 }
 
 // Schema introspection is identical for every user (it's the gateway's shape,
 // not tenant data), so the registry is cached per API URL + app token with a
-// short TTL. This replaces the old per-operation MastraTool collection: the
-// agent's capabilities are now always derived from the live schema, no manual
-// "sync" step required.
+// short TTL. Tool factories derive a fresh, policy-scoped searchable surface
+// from this registry whenever an agent is built; no manual sync step exists.
 const TTL_MS = 15 * 60 * 1000;
 const cache = createTTLCache<OperationRegistry>(TTL_MS);
 
@@ -55,8 +53,7 @@ function cacheKey(settings: ErxesToolSettings | null | undefined): string {
 /** Assemble the registry struct (name → meta map + search list + type maps). */
 function buildRegistry(
   operations: OperationMeta[],
-  inputTypesMap: Record<string, GqlArgDef[]>,
-  objectFieldsMap: Record<string, GqlFieldDef[]>,
+  schemaMaps: SchemaMaps,
 ): OperationRegistry {
   // Strip security-blocked operations (e.g. `configs`, which dumps the whole
   // secret store) before they ever enter the registry, so NO discovery surface
@@ -68,8 +65,33 @@ function buildRegistry(
   );
   const map = new Map<string, OperationMeta>();
   for (const op of visible) map.set(op.operation, op);
-  return { operations: map, list: visible, inputTypesMap, objectFieldsMap };
+  return { operations: map, list: visible, ...schemaMaps };
 }
+
+const preserveSubgraphAttribution = (
+  previous: OperationRegistry,
+  refreshed: OperationRegistry,
+): OperationRegistry => {
+  const list = refreshed.list.map((operation) => {
+    const previousOperation = previous.operations.get(operation.operation);
+    if (
+      operation.pluginAttribution === 'fallback' &&
+      previousOperation?.pluginAttribution === 'subgraph'
+    ) {
+      return {
+        ...operation,
+        plugin: previousOperation.plugin,
+        pluginAttribution: previousOperation.pluginAttribution,
+      };
+    }
+    return operation;
+  });
+  return {
+    ...refreshed,
+    list,
+    operations: new Map(list.map((operation) => [operation.operation, operation])),
+  };
+};
 
 /**
  * Returns the cached operation registry for these settings, refreshing it from
@@ -90,9 +112,9 @@ export async function getOperationRegistry(
   const previous = lastGood.get(key);
 
   try {
-    const [operations, inputTypesMap, objectFieldsMap] = await Promise.all([
+    const [operations, inputSchemaMaps, objectFieldsMap] = await Promise.all([
       fetchAvailableErxesTools(settings),
-      fetchInputTypesMap(settings),
+      fetchInputSchemaMaps(settings),
       fetchObjectFieldsMap(settings),
     ]);
 
@@ -101,13 +123,27 @@ export async function getOperationRegistry(
       return previous;
     }
 
-    const reg = buildRegistry(operations, inputTypesMap, objectFieldsMap);
+    const builtRegistry = buildRegistry(operations, {
+      ...inputSchemaMaps,
+      objectFieldsMap,
+    });
+    // A forced refresh can encounter a transiently unreachable subgraph while
+    // the gateway schema still returns its operations. Preserve known subgraph
+    // ownership per operation while accepting new operations and fresh schemas.
+    const reg =
+      opts.force && previous
+        ? preserveSubgraphAttribution(previous, builtRegistry)
+        : builtRegistry;
     cache.set(key, reg);
     lastGood.set(key, reg);
     return reg;
   } catch {
     if (previous) return previous;
-    return buildRegistry([], {}, {});
+    return buildRegistry([], {
+      inputTypesMap: {},
+      objectFieldsMap: {},
+      enumValuesMap: {},
+    });
   }
 }
 

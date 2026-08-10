@@ -4,7 +4,7 @@ import {
   IconTicket,
   IconBook,
 } from '@tabler/icons-react';
-import { IUIConfig } from 'erxes-ui';
+import { IUIConfig, TActivityRowProps, TPropertyInputProps } from 'erxes-ui';
 import { lazy, Suspense } from 'react';
 
 const FrontlineNavigation = lazy(() =>
@@ -22,6 +22,20 @@ const FrontlineSubGroups = lazy(() =>
 const FrontlineSettingsNavigation = lazy(() =>
   import('./modules/FrontlineSettingsNavigation').then((module) => ({
     default: module.FrontlineSettingsNavigation,
+  })),
+);
+
+const TicketStatusPropertyInput = lazy(() =>
+  import('./modules/ticket/components/ticket-selects/TicketStatusPropertyInput').then(
+    (module) => ({
+      default: module.TicketStatusPropertyInput,
+    }),
+  ),
+);
+
+const FormSubmissionActivityRow = lazy(() =>
+  import('./widgets/activity/FormSubmissionActivityRow').then((module) => ({
+    default: module.FormSubmissionActivityRow,
   })),
 );
 
@@ -53,12 +67,28 @@ export const CONFIG: IUIConfig = {
       {
         name: 'conversation',
         icon: IconMail,
+        label: 'Conversations',
       },
       {
         name: 'ticket',
         icon: IconTicket,
+        label: 'Tickets',
       },
     ],
+    propertyInputs: {
+      ticketStatus: (props: TPropertyInputProps) => (
+        <Suspense fallback={<div />}>
+          <TicketStatusPropertyInput {...props} />
+        </Suspense>
+      ),
+    },
+    activityRows: {
+      formSubmission: (props: TActivityRowProps) => (
+        <Suspense fallback={<div />}>
+          <FormSubmissionActivityRow {...props} />
+        </Suspense>
+      ),
+    },
   },
   modules: [
     {

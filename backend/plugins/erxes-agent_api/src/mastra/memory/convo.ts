@@ -1,9 +1,10 @@
 // ---------------------------------------------------------------------------
 // Advanced Memory — conversation assembly (pure).
 //
-// Keeps the LLM message array clean and Kimi-safe: recall / working-memory are
-// injected ONLY as `system` context messages, never as tool-call frames. When
-// both blocks are absent the output is byte-identical to the pre-feature shape.
+// Keeps the LLM message array clean and Kimi-safe: working-memory / learned
+// digest are injected ONLY as `system` context messages, never as tool-call
+// frames. When the injected blocks are absent the output is byte-identical to
+// the pre-feature shape.
 // ---------------------------------------------------------------------------
 
 export interface ConvoMessage {
@@ -13,13 +14,12 @@ export interface ConvoMessage {
 
 /**
  * Assemble the turn's message array:
- *   [ workingMemoryBlock?, learnedDigestBlock?, recallBlock?, ...recentHistory, userMessage ]
+ *   [ workingMemoryBlock?, learnedDigestBlock?, ...recentHistory, userMessage ]
  * The user message is always last; injected blocks are `system` role.
  */
 export function augmentConvo(args: {
   recentHistory: ConvoMessage[];
   userMessage: string;
-  recallBlock?: string | null;
   workingMemoryBlock?: string | null;
   // Tenant-shared "Agent knowledge" digest (PII-free by construction — the
   // distiller redacts via a Mastra PIIDetector output processor).
@@ -31,9 +31,6 @@ export function augmentConvo(args: {
   }
   if (args.learnedDigestBlock) {
     convo.push({ role: 'system', content: args.learnedDigestBlock });
-  }
-  if (args.recallBlock) {
-    convo.push({ role: 'system', content: args.recallBlock });
   }
   convo.push(...args.recentHistory);
   convo.push({ role: 'user', content: args.userMessage });

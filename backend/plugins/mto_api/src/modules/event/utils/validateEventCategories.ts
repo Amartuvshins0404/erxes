@@ -1,4 +1,4 @@
-import { CategoryLevel } from '@/association/@types/association';
+import { CategoryLevel } from '@/category/@types/category';
 import { IModels } from '~/connectionResolvers';
 
 export const isSubCategory = (level?: string, parentId?: string | null) =>
@@ -21,7 +21,7 @@ export const validateEventCategories = async (
   }
 
   for (const id of ids) {
-    const category = await models.Association.findOne({ _id: id });
+    const category = await models.Category.findOne({ _id: id });
 
     if (!category) {
       throw new Error('Category not found');

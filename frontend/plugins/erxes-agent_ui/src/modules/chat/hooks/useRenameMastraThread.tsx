@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import { useMutation } from '@apollo/client';
 import { useToast } from 'erxes-ui';
 import { MASTRA_THREAD_RENAME } from '~/graphql/mutations';
@@ -19,38 +20,43 @@ export const useRenameMastraThread = () => {
     MASTRA_THREAD_RENAME,
   );
 
-  const mutate = (id: string, threadId: string, title: string) =>
-    renameThread({
-      variables: { threadId, title },
-      optimisticResponse: {
-        mastraThreadRename: {
-          __typename: 'MastraThread',
-          _id: id,
-          threadId,
-          title,
+  // Stable identity so callers can pass it into memoized children without
+  // breaking their memo on every parent (streamed-token) re-render.
+  const mutate = useCallback(
+    (id: string, threadId: string, title: string) =>
+      renameThread({
+        variables: { threadId, title },
+        optimisticResponse: {
+          mastraThreadRename: {
+            __typename: 'MastraThread',
+            _id: id,
+            threadId,
+            title,
+          },
         },
-      },
-      update: (cache, { data }) => {
-        const thread = data?.mastraThreadRename;
-        if (!thread?._id) return;
-        const cacheId = cache.identify({
-          __typename: 'MastraThread',
-          _id: thread._id,
-        });
-        if (cacheId) {
-          cache.modify({
-            id: cacheId,
-            fields: { title: () => thread.title },
+        update: (cache, { data }) => {
+          const thread = data?.mastraThreadRename;
+          if (!thread?._id) return;
+          const cacheId = cache.identify({
+            __typename: 'MastraThread',
+            _id: thread._id,
           });
-        }
-      },
-      onError: (error) => {
-        toast({
-          title: error?.message || 'Failed to rename session',
-          variant: 'destructive',
-        });
-      },
-    });
+          if (cacheId) {
+            cache.modify({
+              id: cacheId,
+              fields: { title: () => thread.title },
+            });
+          }
+        },
+        onError: (error) => {
+          toast({
+            title: error?.message || 'Failed to rename session',
+            variant: 'destructive',
+          });
+        },
+      }),
+    [renameThread, toast],
+  );
 
   return { renameThread: mutate, loading };
 };

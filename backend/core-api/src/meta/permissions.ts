@@ -552,6 +552,12 @@ export const permissions: IPermissionConfig = {
           description:
             'Create, edit, delete permission groups and assign permissions',
         },
+        {
+          title: 'Manage agent grant profiles',
+          name: 'permissionsAgentProfilesManage',
+          description:
+            'Create and edit service-user permission profiles for AI agents',
+        },
       ],
     },
     {
@@ -595,6 +601,28 @@ export const permissions: IPermissionConfig = {
           title: 'Manage client portal',
           name: 'clientPortalManage',
           description: 'Create, edit, delete client portals',
+        },
+      ],
+    },
+    {
+      name: 'approval',
+      description: 'Approval lock management',
+      scopeField: null,
+      ownerFields: [],
+
+      scopes: [{ name: 'all', description: 'All records' }],
+
+      actions: [
+        {
+          title: 'Manage approval locks',
+          name: 'approvalLocksManage',
+          description: 'Create and release approval locks',
+          always: true,
+        },
+        {
+          title: 'Force release approval locks',
+          name: 'approvalLocksForceRelease',
+          description: 'Force release locked resources with a reason',
         },
       ],
     },
@@ -829,6 +857,12 @@ export const permissions: IPermissionConfig = {
         },
         {
           plugin: 'core',
+          module: 'approval',
+          actions: ['approvalLocksManage', 'approvalLocksForceRelease'],
+          scope: 'all',
+        },
+        {
+          plugin: 'core',
           module: 'automations',
           actions: [
             'automationsCreate',
@@ -1003,6 +1037,12 @@ export const permissions: IPermissionConfig = {
           plugin: 'core',
           module: 'clientPortal',
           actions: ['clientPortalRead'],
+          scope: 'all',
+        },
+        {
+          plugin: 'core',
+          module: 'approval',
+          actions: ['approvalLocksManage'],
           scope: 'all',
         },
         {

@@ -55,8 +55,8 @@ export function CategoryFormSheet({
       return;
     }
 
-    if (editId && editData?.mtoAssociation) {
-      const category = editData.mtoAssociation;
+    if (editId && editData?.mtoCategory) {
+      const category = editData.mtoCategory;
 
       setForm({
         nameEn: category.name?.en ?? '',

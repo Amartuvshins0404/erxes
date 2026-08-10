@@ -6,7 +6,10 @@ import {
   MASTRA_MESSAGE_FEEDBACKS,
   MASTRA_THREAD_MESSAGES,
 } from '~/graphql/queries';
-import { MASTRA_MESSAGE_FEEDBACK } from '~/graphql/mutations';
+import {
+  MASTRA_MESSAGE_FEEDBACK,
+  MASTRA_CHAT_CANCEL,
+} from '~/graphql/mutations';
 import {
   AgentChatState,
   AgentUIMessage,
@@ -23,6 +26,7 @@ import { metaToUIMessages } from '~/modules/chat/lib/messageMapping';
 import { createChatTransport } from '~/modules/chat/lib/chatTransport';
 import {
   prependThreadToCache,
+  refetchThreadArtifactsIntoCache,
   refetchThreadsIntoCache,
   setThreadTitleInCache,
 } from '~/modules/chat/threadsCache';
@@ -101,6 +105,11 @@ interface ChatStoreState {
   threadStatus: Record<string, ChatStatus>;
   threadActivity: Record<string, string | undefined>;
   threadHydrating: Record<string, boolean>;
+  // The turn's `finish` chunk has arrived, but the stream is still open for the
+  // server's reconcile tail (turn summary, message id, title). The reply is done
+  // writing — the UI must leave "working" mode even though status is still
+  // 'streaming' (the AI SDK only flips it back when the stream closes).
+  threadSettled: Record<string, boolean>;
   unreadAgents: string[];
   currentViewedAgentId?: string;
 
@@ -127,7 +136,7 @@ interface ChatStoreState {
   // Drop a removed thread's Chat + signals. The cached session list is filtered
   // by useRemoveMastraThread; this only clears store-side state.
   discardThread: (agentKey: string, threadId: string) => void;
-  stop: (agentKey: string) => void;
+  stop: (client: Client, agentKey: string) => void;
   sendMessage: (
     client: Client,
     agentKey: string,
@@ -161,20 +170,63 @@ export const useChatStore = create<ChatStoreState>((set, get) => {
   const setThreadActivity = (key: string, text: string | undefined) =>
     set((s) => ({ threadActivity: { ...s.threadActivity, [key]: text } }));
 
-  // Stamp the reconciled native id onto the most recent assistant message of a
-  // thread (the backend sends it via a transient `data-message-id` part after
-  // `finish`, since persistence now runs off the critical path). Mirrors the
-  // hydrateFeedbacks pattern: reassigning chat.messages re-renders the bubble so
-  // its thumbs feedback becomes ratable without a reload.
-  const reconcileAssistantMessageId = (key: string, messageId: string) => {
+  const setThreadSettled = (key: string, settled: boolean) =>
+    set((s) => ({ threadSettled: { ...s.threadSettled, [key]: settled } }));
+
+  // Resolves once the chat's request loop is idle (status left submitted /
+  // streaming) — used to hand off cleanly from a cut reconcile tail to the
+  // next turn without racing the SDK's own teardown.
+  const statusIdle = (chat: Chat<AgentUIMessage>): Promise<void> =>
+    new Promise((resolve) => {
+      if (!isWorkingStatus(chat.status)) return resolve();
+      const unsub = chat['~registerStatusCallback'](() => {
+        if (isWorkingStatus(chat.status)) return;
+        unsub();
+        resolve();
+      });
+    });
+
+  // Patch the metadata of a thread's most recent assistant message. Reassigning
+  // chat.messages re-renders that bubble (the hydrateFeedbacks pattern), so a
+  // post-`finish` reconcile lands without a reload.
+  const patchLastAssistantMeta = (
+    key: string,
+    metaPatch: Partial<NonNullable<AgentUIMessage['metadata']>>,
+  ) => {
     const chat = get().chats[key];
-    if (!chat || !messageId) return;
+    if (!chat) return;
+    const msgs = chat.messages;
+    for (let i = msgs.length - 1; i >= 0; i--) {
+      if (msgs[i].role === 'assistant') {
+        chat.messages = msgs.map((m, idx) =>
+          idx === i ? { ...m, metadata: { ...m.metadata, ...metaPatch } } : m,
+        );
+        return;
+      }
+    }
+  };
+
+  // Stamp the reconciled native id (sent via a transient `data-message-id` part
+  // after `finish`, since persistence now runs off the critical path) onto the
+  // latest assistant message so its thumbs feedback becomes ratable live.
+  const reconcileAssistantMessageId = (key: string, messageId: string) => {
+    if (!messageId) return;
+    patchLastAssistantMeta(key, { messageId });
+  };
+
+  // Stamp the latest assistant message of a thread as `interrupted` so the
+  // "stopped" badge shows the instant the user clicks Stop — even mid-Thinking,
+  // before any text streamed and before the aborted stream could send `finish`.
+  // Mirrors reconcileAssistantMessageId: reassigning chat.messages re-renders.
+  const markLastAssistantInterrupted = (key: string) => {
+    const chat = get().chats[key];
+    if (!chat) return;
     const msgs = chat.messages;
     for (let i = msgs.length - 1; i >= 0; i--) {
       if (msgs[i].role === 'assistant') {
         chat.messages = msgs.map((m, idx) =>
           idx === i
-            ? { ...m, metadata: { ...m.metadata, messageId } }
+            ? { ...m, metadata: { ...m.metadata, interrupted: true } }
             : m,
         );
         return;
@@ -205,6 +257,8 @@ export const useChatStore = create<ChatStoreState>((set, get) => {
       patchAgent(agentKey, { isDraft: false });
     }
     void refetchThreadsIntoCache(client, mastraAgentId);
+    // Surface any file the turn produced in the Files panel without a reload.
+    void refetchThreadArtifactsIntoCache(client, threadId);
   };
 
   // Create + register a Chat for one agent+thread, wiring the transport and the
@@ -225,10 +279,25 @@ export const useChatStore = create<ChatStoreState>((set, get) => {
     const chat = new Chat<AgentUIMessage>({
       id: threadId,
       messages: initialMessages,
-      transport: createChatTransport(mastraAgentId, threadId),
+      // The `finish` chunk marks the reply done writing; the stream stays open
+      // for the reconcile tail, so flag the thread settled to end "working"
+      // mode now instead of at stream close (seconds later).
+      transport: createChatTransport(mastraAgentId, threadId, () =>
+        setThreadSettled(key, true),
+      ),
       onData: (part) => {
         if (part.type === 'data-activity') {
           setThreadActivity(key, part.data.text);
+        } else if (part.type === 'data-reasoning-summaries') {
+          // Arrives once, just after `finish` — stamp the per-step gists onto the
+          // settled assistant message (post-finish, so no streaming clobber).
+          patchLastAssistantMeta(key, {
+            reasoningSummaries: part.data.summaries,
+          });
+        } else if (part.type === 'data-turn-summary') {
+          // Arrives once, just after `finish` — stamp it onto the settled
+          // assistant message (post-finish, so no streaming clobber).
+          patchLastAssistantMeta(key, { turnSummary: part.data.text });
         } else if (part.type === 'data-thread-title') {
           setThreadTitleInCache(
             client,
@@ -288,7 +357,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => {
   };
 
   // Shared send path used by sendMessage + regenerate.
-  const doSend = (
+  const doSend = async (
     client: Client,
     agentKey: string,
     mastraAgentId: string,
@@ -307,10 +376,21 @@ export const useChatStore = create<ChatStoreState>((set, get) => {
     if (!threadId) return;
 
     const chat = ensureChat(client, agentKey, mastraAgentId, threadId, []);
-    // Never start a second turn on a thread that's already streaming — a
-    // concurrent send (regenerate, suggestion, double Enter) would interleave
-    // two replies. `status` is the AI SDK's own in-flight guard.
-    if (chat.status !== 'ready') return;
+    const key = threadKey(agentKey, threadId);
+    // Never start a second turn on a thread whose reply is still being written
+    // — a concurrent send (regenerate, suggestion, double Enter) would
+    // interleave two replies. After the `finish` chunk the reply is complete
+    // but the stream stays open for the reconcile tail: a send there is
+    // legitimate, so cut the tail and hand off (the persist already runs
+    // server-side; the title self-heals on the next session-list load).
+    if (isWorkingStatus(chat.status)) {
+      if (!get().threadSettled[key]) return;
+      setThreadSettled(key, false); // claim the send — a second Enter drops above
+      void chat.stop();
+      await statusIdle(chat);
+    } else {
+      setThreadSettled(key, false); // clear the previous turn's stale flag
+    }
 
     // Surface the session in the sidebar the instant the first message is sent.
     prependThreadToCache(client, mastraAgentId, threadId);
@@ -324,8 +404,15 @@ export const useChatStore = create<ChatStoreState>((set, get) => {
       ? activeSkillNames.slice(0, 10).map((n) => n.slice(0, 64))
       : undefined;
 
+    // Attachments ride in the message metadata too (not only the request
+    // body): the user bubble renders sent images from metadata immediately,
+    // exactly as messageMapping restores them on reload.
+    const metadata = {
+      ...(hidden ? { hidden: true } : {}),
+      ...(attachments?.length ? { attachments } : {}),
+    };
     void chat.sendMessage(
-      { text: message, ...(hidden ? { metadata: { hidden: true } } : {}) },
+      { text: message, ...(Object.keys(metadata).length ? { metadata } : {}) },
       {
         body: {
           ...(agent.reasoningEffort
@@ -349,6 +436,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => {
     threadStatus: {},
     threadActivity: {},
     threadHydrating: {},
+    threadSettled: {},
     unreadAgents: [],
     currentViewedAgentId: undefined,
 
@@ -472,11 +560,19 @@ export const useChatStore = create<ChatStoreState>((set, get) => {
         const threadStatus = { ...s.threadStatus };
         const threadActivity = { ...s.threadActivity };
         const threadHydrating = { ...s.threadHydrating };
+        const threadSettled = { ...s.threadSettled };
         delete chats[key];
         delete threadStatus[key];
         delete threadActivity[key];
         delete threadHydrating[key];
-        return { chats, threadStatus, threadActivity, threadHydrating };
+        delete threadSettled[key];
+        return {
+          chats,
+          threadStatus,
+          threadActivity,
+          threadHydrating,
+          threadSettled,
+        };
       });
       // Drop the active selection so the view's bootstrap re-selects the next
       // session (or opens a fresh draft) from the now-filtered cached list.
@@ -485,10 +581,23 @@ export const useChatStore = create<ChatStoreState>((set, get) => {
       }
     },
 
-    stop: (agentKey) => {
+    stop: (client, agentKey) => {
       const agent = get().agents[agentKey];
       if (!agent?.activeThreadId) return;
-      void get().chats[threadKey(agentKey, agent.activeThreadId)]?.stop();
+      const threadId = agent.activeThreadId;
+      const key = threadKey(agentKey, threadId);
+      // Abort the client reader (stops the incoming stream) and stamp the
+      // partial reply as stopped so the badge shows immediately.
+      void get().chats[key]?.stop();
+      markLastAssistantInterrupted(key);
+      // Explicit server-side cancel — the gateway proxy never forwards the
+      // client disconnect, so aborting the reader alone leaves the backend
+      // generating. Best-effort: the reader is already stopped regardless.
+      void client
+        .mutate({ mutation: MASTRA_CHAT_CANCEL, variables: { threadId } })
+        .catch(() => {
+          // ignore — the client stream is already stopped
+        });
     },
 
     sendMessage: (
@@ -515,8 +624,12 @@ export const useChatStore = create<ChatStoreState>((set, get) => {
     regenerate: (client, agentKey, mastraAgentId) => {
       const agent = get().agents[agentKey];
       if (!agent?.activeThreadId) return;
-      const chat = get().chats[threadKey(agentKey, agent.activeThreadId)];
-      if (!chat || chat.status !== 'ready') return;
+      const key = threadKey(agentKey, agent.activeThreadId);
+      const chat = get().chats[key];
+      // Blocked only while the reply is still being written — a settled thread
+      // (reconcile tail still open) may regenerate; doSend cuts the tail.
+      if (!chat || (isWorkingStatus(chat.status) && !get().threadSettled[key]))
+        return;
       // Skip hidden approve/deny replies — re-ask the real question.
       const lastUser = [...chat.messages]
         .reverse()
@@ -556,13 +669,19 @@ export const selectThreadHydrating = (
   return threadId ? !!s.threadHydrating[threadKey(agentKey, threadId)] : false;
 };
 
+// A thread is "working" while a reply is being produced: in-flight status AND
+// the `finish` chunk hasn't landed yet. Once settled, the still-open reconcile
+// tail must not read as working.
+const threadWorking = (s: ChatStoreState, key: string): boolean =>
+  isWorkingStatus(s.threadStatus[key]) && !s.threadSettled[key];
+
 export const selectIsAgentWorking = (
   s: ChatStoreState,
   agentKey: string,
 ): boolean => {
   const prefix = `${agentKey}:`;
-  return Object.entries(s.threadStatus).some(
-    ([key, status]) => key.startsWith(prefix) && isWorkingStatus(status),
+  return Object.keys(s.threadStatus).some(
+    (key) => key.startsWith(prefix) && threadWorking(s, key),
   );
 };
 
@@ -570,7 +689,17 @@ export const selectThreadWorking = (
   s: ChatStoreState,
   agentKey: string,
   threadId: string,
-): boolean => isWorkingStatus(s.threadStatus[threadKey(agentKey, threadId)]);
+): boolean => threadWorking(s, threadKey(agentKey, threadId));
+
+// Whether the active thread's turn has settled (finish chunk arrived) while
+// its stream is still open — the view's "done writing" override.
+export const selectActiveThreadSettled = (
+  s: ChatStoreState,
+  agentKey: string,
+): boolean => {
+  const threadId = s.agents[agentKey]?.activeThreadId;
+  return threadId ? !!s.threadSettled[threadKey(agentKey, threadId)] : false;
+};
 
 // One-line summary of what the agent is doing right now: the server-pushed
 // activity for any working thread of this agent, or a coarse fallback.
@@ -579,8 +708,8 @@ export const selectAgentActivity = (
   agentKey: string,
 ): string | undefined => {
   const prefix = `${agentKey}:`;
-  for (const [key, status] of Object.entries(s.threadStatus)) {
-    if (!key.startsWith(prefix) || !isWorkingStatus(status)) continue;
+  for (const key of Object.keys(s.threadStatus)) {
+    if (!key.startsWith(prefix) || !threadWorking(s, key)) continue;
     return s.threadActivity[key] ?? 'Working…';
   }
   return undefined;

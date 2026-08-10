@@ -2,7 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import { IconDownload, IconLoader2 } from '@tabler/icons-react';
 import { Button } from 'erxes-ui';
 import '@js-preview/excel/lib/index.css';
-import { DocumentArtifact, documentUrl } from '~/modules/chat/lib/artifacts';
+import {
+  DocumentArtifact,
+  documentUrl,
+  slideUrls,
+} from '~/modules/chat/lib/artifacts';
 
 // Inline document rendering in the Preview panel — fully client-side (no
 // external service, no CDN), so private files never leave the instance:
@@ -24,40 +28,126 @@ interface Disposable {
   dispose?: () => void;
 }
 
+// A generated pptx deck arrives as per-slide PNGs (artifact.slides). Render them
+// directly as framed cards — no OOXML parsing, pixel-faithful to the backend's
+// render — and keep @aiden0z as the fallback for older decks with no slides.
+const SlideImageDeck = ({ artifact }: { artifact: DocumentArtifact }) => {
+  const urls = slideUrls(artifact);
+  return (
+    <div className="ea-scroll ea-pptx-stage h-full w-full overflow-auto">
+      <div className="ea-pptx-deck">
+        {urls.map((url, i) => (
+          <img
+            key={url}
+            src={url}
+            alt={`Slide ${i + 1}`}
+            className="ea-slide-img"
+            loading="lazy"
+            draggable={false}
+          />
+        ))}
+      </div>
+    </div>
+  );
+};
+
 export const DocumentViewer = ({ artifact }: { artifact: DocumentArtifact }) => {
+  if (artifact.format === 'pptx' && artifact.slides?.length) {
+    return <SlideImageDeck artifact={artifact} />;
+  }
+  return <DocumentRenderer artifact={artifact} />;
+};
+
+type DocSource =
+  | { kind: 'pdf'; blob: Blob }
+  | { kind: 'buffer'; buffer: ArrayBuffer };
+
+// The one network read for a document artifact. Lives outside React so no raw
+// fetch runs inside an effect; the AbortSignal wires cancellation through.
+const fetchDocumentSource = async (
+  artifact: DocumentArtifact,
+  signal: AbortSignal,
+): Promise<DocSource> => {
+  const res = await fetch(documentUrl(artifact), {
+    credentials: 'include',
+    signal,
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  if (artifact.format === 'pdf') return { kind: 'pdf', blob: await res.blob() };
+  return { kind: 'buffer', buffer: await res.arrayBuffer() };
+};
+
+interface DocSourceState {
+  source: DocSource | null;
+  error: boolean;
+}
+
+// Data-fetching hook: fetches the artifact bytes with abort-on-unmount and
+// no double-fire/race leak. Rendering the bytes stays in the component.
+const useDocumentSource = (artifact: DocumentArtifact): DocSourceState => {
+  const [state, setState] = useState<DocSourceState>({
+    source: null,
+    error: false,
+  });
+
+  const [prevArtifact, setPrevArtifact] = useState(artifact);
+  if (artifact !== prevArtifact) {
+    setPrevArtifact(artifact);
+    setState({ source: null, error: false });
+  }
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    fetchDocumentSource(artifact, controller.signal)
+      .then((source) => {
+        if (!controller.signal.aborted) setState({ source, error: false });
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setState({ source: null, error: true });
+      });
+
+    return () => controller.abort();
+  }, [artifact]);
+
+  return state;
+};
+
+const DocumentRenderer = ({ artifact }: { artifact: DocumentArtifact }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [phase, setPhase] = useState<Phase>('loading');
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const { source, error } = useDocumentSource(artifact);
 
   useEffect(() => {
+    if (error) {
+      setPhase('error');
+      return;
+    }
+    if (!source) {
+      setPhase('loading');
+      setPdfUrl(null);
+      return;
+    }
+
+    if (source.kind === 'pdf') {
+      const objectUrl = URL.createObjectURL(source.blob);
+      setPdfUrl(objectUrl);
+      setPhase('ready');
+      return () => URL.revokeObjectURL(objectUrl);
+    }
+
+    const container = containerRef.current;
+    if (!container) return;
     let cancelled = false;
     let viewer: DocPreviewer | null = null;
     let pptxViewer: Disposable | null = null;
-    let objectUrl: string | null = null;
-    const container = containerRef.current;
+    container.innerHTML = '';
     setPhase('loading');
-    setPdfUrl(null);
 
     (async () => {
       try {
-        const res = await fetch(documentUrl(artifact), {
-          credentials: 'include',
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-        if (artifact.format === 'pdf') {
-          const blob = await res.blob();
-          if (cancelled) return;
-          objectUrl = URL.createObjectURL(blob);
-          setPdfUrl(objectUrl);
-          setPhase('ready');
-          return;
-        }
-
-        const buffer = await res.arrayBuffer();
-        if (cancelled || !container) return;
-        container.innerHTML = '';
-
+        const { buffer } = source;
         if (artifact.format === 'docx') {
           const { renderAsync } = await import('docx-preview');
           // Library options make it flow to the container width (responsive)
@@ -97,9 +187,8 @@ export const DocumentViewer = ({ artifact }: { artifact: DocumentArtifact }) => 
         /* viewer already torn down */
       }
       if (container) container.innerHTML = '';
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [artifact.fileKey, artifact.format]);
+  }, [source, error, artifact.format]);
 
   return (
     <div className="relative h-full w-full bg-white">
@@ -109,6 +198,7 @@ export const DocumentViewer = ({ artifact }: { artifact: DocumentArtifact }) => 
               src={pdfUrl}
               title={artifact.title}
               className="h-full w-full border-0"
+              sandbox="allow-same-origin allow-popups allow-downloads"
             />
           )
         : null}
@@ -117,7 +207,7 @@ export const DocumentViewer = ({ artifact }: { artifact: DocumentArtifact }) => 
         // renderer draws into the inner "deck" (width-capped + centered); the
         // card styling and the no-clip width rule live in chat.css. We must NOT
         // put max-width on the slides themselves or their layout collapses.
-        <div className="ea-pptx-stage h-full w-full overflow-auto">
+        <div className="ea-scroll ea-pptx-stage h-full w-full overflow-auto">
           <div ref={containerRef} className="ea-pptx-deck" />
         </div>
       )}
@@ -126,8 +216,8 @@ export const DocumentViewer = ({ artifact }: { artifact: DocumentArtifact }) => 
           ref={containerRef}
           className={
             artifact.format === 'docx'
-              ? 'h-full w-full overflow-auto px-6 py-5 text-sm leading-relaxed [&_*]:max-w-full'
-              : 'h-full w-full overflow-auto'
+              ? 'ea-scroll h-full w-full overflow-auto px-6 py-5 text-sm leading-relaxed [&_*]:max-w-full'
+              : 'ea-scroll h-full w-full overflow-auto'
           }
         />
       )}

@@ -65,6 +65,7 @@ const mkRegistry = (ops: Array<Partial<OperationMeta>>): OperationRegistry => {
     list,
     inputTypesMap: {},
     objectFieldsMap: {},
+    enumValuesMap: {},
   };
 };
 

@@ -33,6 +33,7 @@ const historiesParams = `
   targetIds: [String]
   triggerTypes: [String]
   ids:[String]
+  parentExecutionId: String
 `;
 
 const emailTemplateParams = `
@@ -66,10 +67,12 @@ const queries = `
   automationsAiAgentTotalCounts:JSON
   automationsAiAgentDetail(_id:String):JSON
   automationsAiAgentHealth(agentId: String!): AiAgentHealth!
+  automationsAiAgentKnowledgeSourceStatuses(agentId: String!): JSON
   getAutomationWebhookEndpoint(_id:String!,waitEventActionId:String):String
   getAutomationExecutionDetail(executionId: String!): AutomationHistory
   automationEmailTemplates(${emailTemplateParams}): AutomationEmailTemplatesListResponse
   automationEmailTemplateDetail(_id: String!): AutomationEmailTemplate
+  automationWorkflowTemplates(searchValue: String): [AutomationWorkflowTemplate]
 `;
 
 export default queries;

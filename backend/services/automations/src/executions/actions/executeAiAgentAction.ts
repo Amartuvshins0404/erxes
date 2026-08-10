@@ -1,12 +1,17 @@
 import {
+  isAiClassificationResultEmpty,
   loadAiActionMemory,
+  loadAiConversationState,
   parseAiAgentActionConfig,
   parseAiAgentInput,
   persistAiActionMemory,
+  persistAiConversationState,
   runAiAction,
   TAiActionExecutionResult,
+  TAiAgentActionConfig,
 } from '../../ai';
 import { generateModels } from '../../connectionResolver';
+import { buildAiAgentTools } from './aiAgentTools';
 import {
   getContentType,
   getModuleName,
@@ -21,6 +26,7 @@ import { sendCoreModuleProducer } from 'erxes-api-shared/utils';
 type TAiAgentActionWorkerResponse = {
   result: TAiActionExecutionResult;
   nextActionId?: string;
+  attributesEmpty?: boolean;
 };
 
 export const executeAiAgentAction = async (
@@ -30,15 +36,21 @@ export const executeAiAgentAction = async (
 ): Promise<TAiAgentActionWorkerResponse> => {
   try {
     const models = await generateModels(subdomain);
+    const rawActionConfig = normalizeAiAgentActionConfig(
+      parseAiAgentActionConfig(action.config),
+    );
     const parsedActionConfig = parseAiAgentActionConfig(
-      resolveRuntimeConfigValue(
-        parseAiAgentActionConfig(action.config),
-        execution,
-      ),
+      resolveRuntimeConfigValue(rawActionConfig, execution),
     );
     const aiContext = await getAiContext(subdomain, execution);
     const inputData = await getInputData(execution, parsedActionConfig);
     const memory = await loadAiActionMemory({
+      models,
+      execution,
+      actionConfig: parsedActionConfig,
+      aiContext,
+    });
+    const conversationState = await loadAiConversationState({
       models,
       execution,
       actionConfig: parsedActionConfig,
@@ -55,6 +67,13 @@ export const executeAiAgentAction = async (
     if (!agent) {
       throw new Error('AI Agent not found.');
     }
+    const tools = await buildAiAgentTools({
+      subdomain,
+      models,
+      execution,
+      actionConfig: parsedActionConfig,
+    });
+
     const timerLabel = `runAiAction:${execution._id}:${action.id}`;
     console.time(timerLabel);
     const response = await runAiAction({
@@ -66,25 +85,110 @@ export const executeAiAgentAction = async (
       inputData,
       aiContext,
       memory,
+      conversationState,
+      tools: tools.length ? tools : undefined,
     });
     console.timeEnd(timerLabel);
     if (!response) {
       throw new Error('AI agent returned an empty response.');
     }
 
-    await persistAiActionMemory({
+    const attributesEmpty = isAiClassificationResultEmpty(response.result);
+
+    // Writing all-empty attributes would pollute merged memory for the
+    // following messages of the same conversation.
+    if (!attributesEmpty) {
+      await persistAiActionMemory({
+        models,
+        execution,
+        actionConfig: parsedActionConfig,
+        result: response.result,
+        aiContext,
+      });
+    }
+    await persistAiConversationState({
       models,
       execution,
       actionConfig: parsedActionConfig,
-      result: response.result,
       aiContext,
+      state: response.conversationState,
     });
 
-    return response;
+    return {
+      result: response.result,
+      nextActionId: response.nextActionId,
+      attributesEmpty,
+    };
   } catch (error) {
     throw new Error(`AI Agent Action failed: ${error.message}`);
   }
 };
+
+const runtimeTokenRegex = /^\s*\{\{\s*([^{}]+?)\s*\}\}\s*$/;
+const nestedRuntimeTokenRegex =
+  /\{\{\s*(?:trigger|actions\.[^.\s{}]+)\.(\{\{\s*([^{}]+?)\s*\}\})\s*\}\}/g;
+
+const unwrapRuntimeToken = (value?: string) => {
+  const match = value?.match(runtimeTokenRegex);
+
+  return match?.[1]?.trim();
+};
+
+const normalizeAiInputTemplate = (input?: string) => {
+  if (!input) {
+    return input;
+  }
+
+  return input.replace(
+    nestedRuntimeTokenRegex,
+    (_match, _innerToken: string, innerPath: string) => `{{ ${innerPath} }}`,
+  );
+};
+
+const normalizeInputMappingPath = (
+  inputMapping?: TAiAgentActionConfig['inputMapping'],
+) => {
+  if (!inputMapping?.path) {
+    return inputMapping;
+  }
+
+  const unwrappedPath = unwrapRuntimeToken(inputMapping.path);
+
+  if (!unwrappedPath) {
+    return inputMapping;
+  }
+
+  if (inputMapping.source === 'trigger') {
+    return {
+      ...inputMapping,
+      path: unwrappedPath.startsWith('trigger.')
+        ? unwrappedPath.slice(8)
+        : unwrappedPath,
+    };
+  }
+
+  if (inputMapping.source === 'previousAction') {
+    return {
+      ...inputMapping,
+      path: unwrappedPath.startsWith('actions.')
+        ? unwrappedPath.slice(8)
+        : unwrappedPath,
+    };
+  }
+
+  return {
+    ...inputMapping,
+    path: unwrappedPath,
+  };
+};
+
+const normalizeAiAgentActionConfig = (
+  actionConfig: TAiAgentActionConfig,
+): TAiAgentActionConfig => ({
+  ...actionConfig,
+  input: normalizeAiInputTemplate(actionConfig.input),
+  inputMapping: normalizeInputMappingPath(actionConfig.inputMapping),
+});
 
 const getAiContext = async (
   subdomain: string,

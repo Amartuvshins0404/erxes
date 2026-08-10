@@ -7,6 +7,8 @@ import { router as invoiceRoutes } from '@/invoice/routes';
 import { router as listingRoutes } from '@/listing/routes';
 import { router as projectRoutes } from '@/project/routes';
 import { router as unitRoutes } from '@/unit/routes';
+import { router as supplierRoutes } from '@/supplier/profile/routes/webhook';
+import { router as supplierProductRoutes } from '@/supplier/product/routes/webhook';
 import { Router } from 'express';
 import { contextMiddleware } from '~/middlewares/contextMiddleware';
 import { validationMiddleware } from '~/middlewares/validationMiddleware';
@@ -27,6 +29,8 @@ router.use(
     listingRoutes,
     projectRoutes,
     unitRoutes,
+    supplierRoutes,
+    supplierProductRoutes,
   ],
 );
 

@@ -1,4 +1,4 @@
-import { IUserDocument, Resolver } from '../../core-types';
+import { IUserDocument, PermissionScope, Resolver } from '../../core-types';
 import {
   getPlugin,
   sendTRPCMessage,
@@ -31,6 +31,79 @@ const applyPermissions = (
     for (const act of permission.actions || []) {
       actionsMap[act] = true;
     }
+  }
+};
+
+const SCOPE_PRIORITY: Record<PermissionScope, number> = {
+  own: 1,
+  group: 2,
+  all: 3,
+};
+
+type ScopedPermission = {
+  actions?: string[];
+  scope?: PermissionScope;
+};
+
+const applyPermissionScopes = (
+  scopesMap: Record<string, PermissionScope>,
+  permissions: ScopedPermission[],
+) => {
+  for (const permission of permissions) {
+    const scope = permission.scope ?? 'own';
+
+    for (const actionName of permission.actions || []) {
+      const currentScope = scopesMap[actionName];
+
+      if (
+        !currentScope ||
+        SCOPE_PRIORITY[scope] > SCOPE_PRIORITY[currentScope]
+      ) {
+        scopesMap[actionName] = scope;
+      }
+    }
+  }
+};
+
+const applyDefaultGroupScopes = async (
+  scopesMap: Record<string, PermissionScope>,
+  defaultGroupIds: string[],
+) => {
+  const plugins = await getActivePlugins();
+
+  for (const pluginName of plugins) {
+    const plugin = await getPlugin(pluginName);
+    const defaultGroups = plugin?.config?.meta?.permissions?.defaultGroups;
+
+    if (!defaultGroups) continue;
+
+    for (const group of defaultGroups) {
+      if (defaultGroupIds.includes(group.id)) {
+        applyPermissionScopes(scopesMap, group.permissions);
+      }
+    }
+  }
+};
+
+const applyCustomGroupScopes = async (
+  scopesMap: Record<string, PermissionScope>,
+  subdomain: string,
+  customGroupIds: string[],
+) => {
+  const groups: { permissions?: ScopedPermission[] }[] = await sendTRPCMessage({
+    subdomain,
+    pluginName: 'core',
+    method: 'query',
+    module: 'permissionGroups',
+    action: 'find',
+    input: {
+      query: { _id: { $in: customGroupIds } },
+    },
+    defaultValue: [],
+  });
+
+  for (const group of groups) {
+    applyPermissionScopes(scopesMap, group.permissions || []);
   }
 };
 
@@ -107,6 +180,49 @@ export const getGroupActionsMap = async (
   return actionsMap;
 };
 
+export const getGroupActionScopesMap = async (
+  subdomain: string,
+  user: IUserDocument,
+): Promise<Record<string, PermissionScope>> => {
+  const cacheKey = `user_action_scopes_${user._id}`;
+  const cached = await redis.get(cacheKey);
+
+  if (cached) {
+    return JSON.parse(cached) as Record<string, PermissionScope>;
+  }
+
+  const scopesMap: Record<string, PermissionScope> = {};
+  const groupIds = user.permissionGroupIds || [];
+  const defaultGroupIds = groupIds.filter((id) => id.includes(':'));
+  const customGroupIds = groupIds.filter((id) => !id.includes(':'));
+
+  if (defaultGroupIds.length) {
+    await applyDefaultGroupScopes(scopesMap, defaultGroupIds);
+  }
+
+  if (customGroupIds.length) {
+    await applyCustomGroupScopes(scopesMap, subdomain, customGroupIds);
+  }
+
+  applyPermissionScopes(scopesMap, user.customPermissions || []);
+  await redis.set(cacheKey, JSON.stringify(scopesMap));
+
+  return scopesMap;
+};
+
+export const getGroupActionScope = async (
+  subdomain: string,
+  action: string,
+  user?: IUserDocument,
+): Promise<PermissionScope | null> => {
+  if (!user?._id) return null;
+  if (user.isOwner) return 'all';
+
+  const scopesMap = await getGroupActionScopesMap(subdomain, user);
+
+  return scopesMap[action] ?? null;
+};
+
 export const clearGroupActionsCache = async ({
   subdomain,
   userId,
@@ -117,7 +233,7 @@ export const clearGroupActionsCache = async ({
   groupId?: string;
 }) => {
   if (userId) {
-    await redis.del(`user_actions_${userId}`);
+    await redis.del(`user_actions_${userId}`, `user_action_scopes_${userId}`);
   }
 
   if (groupId && subdomain) {
@@ -135,7 +251,7 @@ export const clearGroupActionsCache = async ({
     });
 
     for (const u of users) {
-      await redis.del(`user_actions_${u._id}`);
+      await redis.del(`user_actions_${u._id}`, `user_action_scopes_${u._id}`);
     }
   }
 };
@@ -167,8 +283,8 @@ const getOAuthActionScopeMap = async () => {
         const actionScopes = action.oauthScopes?.length
           ? action.oauthScopes
           : action.oauthScope
-            ? [action.oauthScope]
-            : [];
+          ? [action.oauthScope]
+          : [];
 
         if (actionScopes.length) {
           scopeMap[action.name] = actionScopes;

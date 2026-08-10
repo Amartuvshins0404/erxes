@@ -1,25 +1,38 @@
 import { cloneElement, isValidElement, useId } from 'react';
 import { Card, Label } from 'erxes-ui';
 
-// Shared scaffolding for the plugin's create/edit pages (agents, workflows,
-// schedules) so each page lays out fields the same way.
+// Shared scaffolding for plugin create/edit pages.
 
 /** Card wrapper for one group of related form fields. */
 export const FormSection = ({
   title,
   description,
+  step,
   children,
 }: {
   title: string;
   description?: string;
+  step?: number;
   children: React.ReactNode;
 }) => (
-  <Card className="shadow-none">
-    <Card.Header className="pb-3">
-      <Card.Title className="text-base">{title}</Card.Title>
-      {description && <Card.Description>{description}</Card.Description>}
+  <Card className="overflow-hidden shadow-none">
+    <Card.Header className="border-b bg-muted/20 pb-4">
+      <div className="flex items-start gap-3">
+        {step !== undefined && (
+          <span
+            aria-hidden
+            className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground"
+          >
+            {step}
+          </span>
+        )}
+        <div className="min-w-0 space-y-1">
+          <Card.Title className="text-base">{title}</Card.Title>
+          {description && <Card.Description>{description}</Card.Description>}
+        </div>
+      </div>
     </Card.Header>
-    <Card.Content className="space-y-4">{children}</Card.Content>
+    <Card.Content className="space-y-5 pt-5">{children}</Card.Content>
   </Card>
 );
 

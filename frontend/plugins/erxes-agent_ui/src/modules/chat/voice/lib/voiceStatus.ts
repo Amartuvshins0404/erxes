@@ -2,56 +2,56 @@ import { cleanForSpeech } from './sentences';
 import type { VoicePhase } from '~/modules/chat/voice/hooks/useVoiceConversation';
 
 // Pure mapping from the voice turn's live signals to what the overlay shows
-// while the user waits: a short Mongolian status label plus an optional detail
+// while the user waits: a short status label plus an optional detail
 // subtitle (the agent's concrete activity while it works, or the streamed reply
 // read-along while it speaks). Kept React-free so the wait-window copy is unit
 // testable without rendering the overlay.
 
 export interface VoiceStatusView {
-  // The headline status line (Mongolian primary). Always present.
+  // The headline status line. Always present.
   label: string;
   // A secondary line under it: the server's concrete activity while thinking, or
   // the streaming reply tail while speaking. Absent when there is nothing to add.
   detail?: string;
 }
 
-// Friendly present-continuous label for an in-flight tool call, by tool name.
-// Mongolian primary, matching the calm one-line voice copy. Names mirror the
-// agent's registered tools (see backend mastra/tools + activity-signals.ts);
-// anything unmapped falls back to a generic "using a tool" line.
+// Friendly present-continuous label for an in-flight tool call, by tool name,
+// matching the calm one-line voice copy. Names mirror the agent's registered
+// tools (see backend mastra/tools + activity-signals.ts); anything unmapped
+// falls back to a generic "using a tool" line.
 const TOOL_LABELS: Record<string, string> = {
-  search_erxes_operations: 'Хайж байна…',
-  execute_erxes_operation: 'Ажиллуулж байна…',
-  'company-knowledge': 'Мэдээлэл хайж байна…',
-  'web-search': 'Вэбээс хайж байна…',
-  'fetch-url': 'Холбоос уншиж байна…',
-  calculator: 'Тооцоолж байна…',
-  'render-chart': 'График зурж байна…',
-  'read-attachment': 'Файл уншиж байна…',
-  readAttachment: 'Файл уншиж байна…',
-  'generate-pdf': 'Баримт бэлдэж байна…',
-  'generate-docx': 'Баримт бэлдэж байна…',
-  'generate-xlsx': 'Хүснэгт бэлдэж байна…',
-  request_approval: 'Зөвшөөрөл хүсэж байна…',
-  lookup: 'Хайж байна…',
-  classify: 'Ангилж байна…',
+  search_erxes_operations: 'Searching…',
+  execute_erxes_operation: 'Running…',
+  'company-knowledge': 'Looking up knowledge…',
+  'web-search': 'Searching the web…',
+  'fetch-url': 'Reading the link…',
+  calculator: 'Calculating…',
+  'render-chart': 'Drawing a chart…',
+  'read-attachment': 'Reading the file…',
+  readAttachment: 'Reading the file…',
+  'generate-pdf': 'Preparing a document…',
+  'generate-docx': 'Preparing a document…',
+  'generate-xlsx': 'Preparing a spreadsheet…',
+  request_approval: 'Requesting approval…',
+  lookup: 'Searching…',
+  classify: 'Classifying…',
 };
 
-const GENERIC_TOOL_LABEL = 'Багаж ашиглаж байна…';
+const GENERIC_TOOL_LABEL = 'Using a tool…';
 
 const PHASE_LABELS: Record<VoicePhase, string> = {
-  idle: 'Микрофоныг дараад яриагаа эхлүүлээрэй',
-  listening: 'Сонсож байна…',
-  transcribing: 'Бичиж байна…',
-  thinking: 'Бодож байна…',
-  speaking: 'Хариулж байна…',
-  error: 'Алдаа гарлаа',
+  idle: 'Tap the microphone to start talking',
+  listening: 'Listening…',
+  transcribing: 'Transcribing…',
+  thinking: 'Thinking…',
+  speaking: 'Responding…',
+  error: 'Something went wrong',
 };
 
-/** Mongolian label for a tool call. Workflow tools share one umbrella line. */
+/** Label for a tool call. Workflow tools share one umbrella line. */
 export function toolStatusLabel(toolName: string): string {
   if (TOOL_LABELS[toolName]) return TOOL_LABELS[toolName];
-  if (toolName.startsWith('workflow')) return 'Урсгал боловсруулж байна…';
+  if (toolName.startsWith('workflow')) return 'Processing the workflow…';
   return GENERIC_TOOL_LABEL;
 }
 

@@ -1,7 +1,32 @@
 import { ReactNode, Suspense } from 'react';
-import { Navigate, Route, Routes } from 'react-router';
+import { Navigate, Route, Routes, useLocation } from 'react-router';
 import { Spinner } from 'erxes-ui';
 import { PluginErrorBoundary } from '~/components/PluginErrorBoundary';
+
+/**
+ * Redirect fallback for the `*` (no-match) route that is safe inside a
+ * descendant `<Routes>`.
+ *
+ * The plugin mounts its own `<Routes>` under a host route (`/erxes-agent/*`,
+ * `/settings/erxes-agent/*`). When the user navigates to *another* plugin, that
+ * plugin's remote loads asynchronously and suspends, so React keeps this subtree
+ * mounted while the URL has already become the destination's (e.g.
+ * `/sales/deals`). During that window this `<Routes>` re-renders against the
+ * foreign URL, the `*` route matches, and an unconditional `<Navigate>` here
+ * fires `replace('/erxes-agent/chat')` — canceling the navigation and stranding
+ * the app on a blank page until a manual refresh.
+ *
+ * Guard against that: only redirect when the current path is genuinely inside
+ * this plugin's own base (`defaultPath` minus its last segment). Stray in-plugin
+ * paths still normalize to `defaultPath`; foreign paths render nothing and let
+ * the subtree unmount cleanly.
+ */
+const FallbackRedirect = ({ to }: { to: string }) => {
+  const { pathname } = useLocation();
+  const base = to.slice(0, to.lastIndexOf('/')) || '/';
+  if (pathname !== base && !pathname.startsWith(`${base}/`)) return null;
+  return <Navigate to={to} replace />;
+};
 
 /**
  * Shared route scaffold for the plugin's lazy route modules: the error boundary
@@ -28,7 +53,7 @@ export const PluginRoutesShell = ({
       <Routes>
         <Route index element={<Navigate to={defaultPath} replace />} />
         {children}
-        <Route path="*" element={<Navigate to={defaultPath} replace />} />
+        <Route path="*" element={<FallbackRedirect to={defaultPath} />} />
       </Routes>
     </Suspense>
   </PluginErrorBoundary>

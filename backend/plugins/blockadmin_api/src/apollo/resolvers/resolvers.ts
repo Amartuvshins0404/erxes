@@ -4,6 +4,9 @@ import formCustomResolvers from '@/form/graphql/customResolver';
 import listingCustomResolvers from '@/listing/graphql/resolvers/customResolvers';
 import projectCustomResolvers from '@/project/graphql/resolvers/customResolvers';
 import unitCustomResolvers from '@/unit/graphql/resolvers/customResolvers';
+import { BaSupplier } from '@/supplier/profile/graphql/resolvers/customResolvers/supplier';
+import { BaProduct } from '@/supplier/product/graphql/resolvers/customResolvers/product';
+import { membershipTypeResolvers } from '@/membership/graphql/resolvers/queries/membership';
 
 export const customResolvers = {
   ...unitCustomResolvers,
@@ -11,6 +14,10 @@ export const customResolvers = {
   ...formCustomResolvers,
   ...developerCustomResolvers,
   ...listingCustomResolvers,
+
+  BaSupplier,
+  BaProduct,
+  ...membershipTypeResolvers,
 
   ...cpCustomResolvers,
 };

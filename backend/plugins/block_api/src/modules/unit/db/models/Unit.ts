@@ -2,9 +2,7 @@ import { IUnit, IUnitDocument, ITransferUnit } from '@/unit/@types/unit';
 import { Model } from 'mongoose';
 import { IModels } from '~/connectionResolvers';
 import { unitSchema } from '@/unit/db/definitions/unit';
-import { getPlugin } from 'erxes-api-shared/utils';
 import { blockAgencyTRPCClient } from '~/trpc/blockAgencyTRPCClient';
-import fetch from 'node-fetch';
 
 export interface IUnitModel extends Model<IUnitDocument> {
   getUnit(_id: string): Promise<IUnitDocument>;
@@ -17,32 +15,8 @@ export interface IUnitModel extends Model<IUnitDocument> {
   removeUnit(id: string): Promise<IUnitDocument>;
   getUnitsByZoning(zoning: string): Promise<IUnitDocument[]>;
   transferUnit(payload: ITransferUnit): Promise<IUnitDocument>;
+  toggleUnitLock(_id: string, locked: boolean): Promise<IUnitDocument>;
 }
-
-const notifyAdmin = async (
-  path: string,
-  subdomain: string,
-  entityId: string,
-  input: Partial<IUnit>,
-) => {
-  try {
-    const adminPlugin = await getPlugin('blockadmin');
-    if (!adminPlugin?.address) return;
-
-    fetch(`${adminPlugin.address}/${path}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        subdomain,
-        payload: { entityId, data: { input } },
-      }),
-    }).catch((err) =>
-      console.error(`[${path}] Admin notification failed:`, err.message),
-    );
-  } catch {
-    // non-critical
-  }
-};
 
 export const loadUnitClass = (models: IModels, subdomain: string) => {
   class Unit {
@@ -52,7 +26,6 @@ export const loadUnitClass = (models: IModels, subdomain: string) => {
 
     public static async createUnit(input: IUnit) {
       const unit = await models.Unit.create(input);
-      notifyAdmin('blockCreateUnit', subdomain, unit._id.toString(), input);
       return unit;
     }
 
@@ -60,18 +33,24 @@ export const loadUnitClass = (models: IModels, subdomain: string) => {
       const updatedUnit = await models.Unit.findOneAndUpdate({ _id }, input, {
         new: true,
       });
-      notifyAdmin('blockUpdateUnit', subdomain, _id, input);
       return updatedUnit;
     }
 
     public static async removeUnit(id: string) {
       const unit = await models.Unit.findOneAndDelete({ _id: id });
-      notifyAdmin('blockRemoveUnit', subdomain, id, {});
       return unit;
     }
 
     public static async getUnitsByZoning(zoning: string) {
       return models.Unit.find({ zoning }).sort({ unitNumber: 1 });
+    }
+
+    public static async toggleUnitLock(_id: string, locked: boolean) {
+      return models.Unit.findOneAndUpdate(
+        { _id },
+        { $set: { locked } },
+        { new: true },
+      );
     }
 
     public static async transferUnit(payload: ITransferUnit) {
@@ -137,12 +116,6 @@ export const loadUnitClass = (models: IModels, subdomain: string) => {
             ),
           );
       }
-
-      notifyAdmin('blockTransferUnit', subdomain, unitId, {
-        blockSubdomain: subdomain,
-        agencySubdomain,
-        agencyEntityId: agencyId,
-      });
 
       return updated;
     }

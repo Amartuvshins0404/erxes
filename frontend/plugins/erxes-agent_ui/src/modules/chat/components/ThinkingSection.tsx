@@ -1,47 +1,48 @@
-import { useState } from 'react';
-import { IconChevronRight } from '@tabler/icons-react';
+import { memo } from 'react';
 
-// A reasoning burst as a timeline-step body — always a single line so the trace
-// only ever grows downward (no auto-expand/auto-collapse, which made the whole
-// section jump up and down as each thought streamed in and finished). Live: a
-// shimmering "Thinking…". Settled: "Reasoning". Click to read the full thought.
-export const ThinkingSection = ({
+// A reasoning burst rendered as a timeline-step body: the SHORT THOUGHT shown
+// DIRECTLY — the backend's ≤50-word gist of what the agent is figuring out — as
+// a calm paragraph. No expand, no first-sentence truncation, no raw chain-of-
+// thought dump. While a step is still streaming (its summary not produced yet)
+// it shows a "Thinking…" shimmer; old turns with no stored summary fall back to a
+// clipped lead of the raw reasoning.
+//
+// memo()'d so prior reasoning steps don't re-render on every throttled token of
+// the live turn (only the streaming step's text changes).
+const clipText = (raw: string, max: number): string => {
+  const t = raw.replace(/\s+/g, ' ').trim();
+  if (t.length <= max) return t;
+  return `${t.slice(0, max).trimEnd()}…`;
+};
+
+export const ThinkingSection = memo(function ThinkingSection({
   text,
+  summary,
   live,
 }: {
   text: string;
+  summary?: string;
   live?: boolean;
-}) => {
-  const [expanded, setExpanded] = useState(false);
+}) {
+  const gist = summary?.trim();
+  // While the step is still streaming there's no gist yet — don't flash the raw
+  // reasoning; show a thinking shimmer instead.
+  if (live && !gist) {
+    return (
+      <div className="ea-pop px-1.5 py-1">
+        <span className="ea-shimmer-text text-xs font-medium">Thinking…</span>
+      </div>
+    );
+  }
+
+  const display = gist || clipText(text, 320);
+  if (!display) return null;
 
   return (
-    <div className="ea-pop">
-      <button
-        type="button"
-        onClick={() => setExpanded((v) => !v)}
-        className={`ea-trace-row flex w-full items-center gap-2 px-1.5 py-1 text-left text-xs ${
-          live ? '' : 'text-muted-foreground hover:text-foreground'
-        }`}
-      >
-        {live ? (
-          <span className="ea-shimmer-text font-medium">Thinking…</span>
-        ) : (
-          <span>Reasoning</span>
-        )}
-        <span className="flex-1" />
-        <IconChevronRight
-          className={`size-3 shrink-0 text-muted-foreground opacity-40 transition-transform duration-200 ${
-            expanded ? 'rotate-90' : ''
-          }`}
-        />
-      </button>
-      {expanded && (
-        <div className="ea-expand px-1.5 pb-1.5 pt-0.5">
-          <p className="whitespace-pre-wrap text-xs leading-relaxed text-muted-foreground">
-            {text}
-          </p>
-        </div>
-      )}
+    <div className="ea-pop px-1.5 py-1">
+      <p className="whitespace-pre-wrap text-xs leading-relaxed text-muted-foreground">
+        {display}
+      </p>
     </div>
   );
-};
+});

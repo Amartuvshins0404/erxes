@@ -15,11 +15,124 @@
 // organization/settings config resolvers. We deliberately do NOT pattern-match
 // "config" loosely: plenty of legitimate per-feature config operations exist
 // (a plugin reading its own settings) and must stay usable.
-const BLOCKED_OPERATIONS = new Set<string>([
+//
+// The denylist is grouped into explicitly-named category Sets below, merged into
+// one BLOCKED_OPERATIONS Set. Each category documents WHY its members are unsafe
+// from chat, so the boundary stays auditable and deterministic (no substring
+// matching that could over- or under-block as the schema grows).
+
+// Config store: each of these reads core's Config documents — integration
+// credentials, payment-provider keys, SMTP / API secrets — by querying the
+// whole collection, by code, or straight from the environment.
+const CONFIG_STORE_OPERATIONS = new Set<string>([
   'configs',
   'configsByCode',
   'configsGetValue',
   'configsGetEnv',
+]);
+
+// Config-store clones: per-plugin config resolvers that hit the same secret
+// store under a different field name (accounting, multinventory, PMS, calls,
+// facebook, instagram).
+const CONFIG_STORE_CLONE_OPERATIONS = new Set<string>([
+  'accountingsConfigsByCode',
+  'accountingsConfigs',
+  'mnConfigs',
+  'pmsConfigsGetValue',
+  'callsGetConfigs',
+  'facebookGetConfigs',
+  'instagramGetConfigs',
+]);
+
+// Auth/session: ops that mint or destroy login sessions — running them from
+// chat would let the agent authenticate as someone else or sign users out.
+const AUTH_SESSION_OPERATIONS = new Set<string>([
+  'login',
+  'logout',
+  'loginWithGoogle',
+  'loginWithMagicLink',
+  'usersConfirmInvitation',
+  'usersResendInvitation',
+]);
+
+// Password: anything that initiates or completes a password change/reset, which
+// is an account-takeover primitive.
+const PASSWORD_OPERATIONS = new Set<string>([
+  'forgotPassword',
+  'resetPassword',
+  'usersResetMemberPassword',
+  'usersChangePassword',
+]);
+
+// ClientPortal auth: the end-customer-facing login / registration / OTP / token
+// surface — the same takeover risk as staff auth, for portal users.
+const CLIENT_PORTAL_AUTH_OPERATIONS = new Set<string>([
+  'clientPortalUserLoginWithCredentials',
+  'clientPortalUserLoginWithOTP',
+  'clientPortalUserLoginWithSocial',
+  'clientPortalUserRefreshToken',
+  'clientPortalUserVerify',
+  'clientPortalUserRegisterWithSocial',
+  'clientPortalUserResetPassword',
+  'clientPortalUserForgotPassword',
+  'clientPortalUserRequestOTP',
+  'clientPortalUserChangePassword',
+  'clientPortalUserRegister',
+]);
+
+// Permission/escalation: ops that grant, revoke, or reassign permissions —
+// privilege-escalation primitives if the agent could call them.
+const PERMISSION_ESCALATION_OPERATIONS = new Set<string>([
+  'permissionGroupAdd',
+  'permissionGroupEdit',
+  'permissionGroupRemove',
+  'userAddCustomPermission',
+  'userRemoveCustomPermission',
+  'userUpdatePermissionGroups',
+  'usersUpdatePermissionGroups',
+]);
+
+// Permission recon reads: enumerate the permission model (groups, defaults,
+// modules) — reconnaissance that precedes an escalation attempt.
+const PERMISSION_RECON_OPERATIONS = new Set<string>([
+  'permissionGroups',
+  'permissionGroupDetail',
+  'permissionDefaultGroups',
+  'permissionModules',
+]);
+
+// Credential (apps): the app/API-key management surface — listing, detailing,
+// or minting app credentials hands over machine-to-machine secrets.
+const CREDENTIAL_APP_OPERATIONS = new Set<string>([
+  'apps',
+  'appDetail',
+  'appsAdd',
+  'appsEdit',
+  'appsRevoke',
+  'appsRemove',
+]);
+
+// Credential (oauth): the OAuth-client management surface — same credential
+// exposure as apps, for OAuth client apps.
+const CREDENTIAL_OAUTH_OPERATIONS = new Set<string>([
+  'oauthClientApps',
+  'oauthClientAppDetail',
+  'oauthClientAppsAdd',
+  'oauthClientAppsEdit',
+  'oauthClientAppsRevoke',
+  'oauthClientAppsRemove',
+]);
+
+const BLOCKED_OPERATIONS = new Set<string>([
+  ...CONFIG_STORE_OPERATIONS,
+  ...CONFIG_STORE_CLONE_OPERATIONS,
+  ...AUTH_SESSION_OPERATIONS,
+  ...PASSWORD_OPERATIONS,
+  ...CLIENT_PORTAL_AUTH_OPERATIONS,
+  ...PERMISSION_ESCALATION_OPERATIONS,
+  ...PERMISSION_RECON_OPERATIONS,
+  ...CREDENTIAL_APP_OPERATIONS,
+  ...CREDENTIAL_OAUTH_OPERATIONS,
 ]);
 
 /**

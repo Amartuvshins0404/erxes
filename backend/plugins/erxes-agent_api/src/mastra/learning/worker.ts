@@ -20,7 +20,6 @@ import {
   learningTenant,
   resolveLearningTuning,
 } from './config';
-import { ensureLearningCollection, setLearningVectorStatus } from './store';
 import { distillThread } from './distill';
 import { ExtractionRuntime } from './extractor';
 import {
@@ -78,7 +77,6 @@ async function resolveRuntime(
 /** Decay stale lessons and archive the ones that fell below the floor. */
 async function runHygiene(
   models: IModels,
-  tenant: string,
 ): Promise<{ decayed: number; archived: number }> {
   const tuning = resolveLearningTuning();
   const now = Date.now();
@@ -106,11 +104,6 @@ async function runHygiene(
         { _id: doc._id },
         { $set: { confidence, status: 'archived' } },
       );
-      try {
-        await setLearningVectorStatus(tenant, String(doc._id), 'archived');
-      } catch {
-        // converged on a later sweep
-      }
       archived++;
     } else {
       await models.MastraLearning.updateOne(
@@ -142,7 +135,6 @@ export async function runLearningSweep(
     if (!tenant) return { ...result, error: 'no tenant' };
 
     const models = await generateModels(subdomain);
-    await ensureLearningCollection();
 
     const resolved = await resolveRuntime(models, subdomain);
     if (!resolved)
@@ -178,7 +170,6 @@ export async function runLearningSweep(
         if (tail.length) {
           const distilled = await distillThread({
             models,
-            tenant,
             agentId: thread.agentId || resolved.defaultAgentId,
             ownerResourceId: thread.resourceId,
             messages: tail,
@@ -208,7 +199,7 @@ export async function runLearningSweep(
       }
     }
 
-    const hygiene = await runHygiene(models, tenant);
+    const hygiene = await runHygiene(models);
     result.decayed = hygiene.decayed;
     result.archived = hygiene.archived;
     return result;

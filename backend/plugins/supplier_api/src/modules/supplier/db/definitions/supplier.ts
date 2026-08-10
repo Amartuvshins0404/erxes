@@ -46,6 +46,10 @@ export const supplierSchema = schemaWrapper(
       website: { type: String },
 
       paymentId: { type: String, label: 'Payment method' },
+      posToken: {
+        type: String,
+        label: 'POS exposed to the consumer platform for product sync',
+      },
 
       verificationStatus: {
         type: String,

@@ -1,10 +1,5 @@
-import { ExpectedError } from 'erxes-api-shared/utils';
 import { IContext } from '~/connectionResolvers';
-import {
-  IMastraSkill,
-  SkillScope,
-  SkillStatus,
-} from '@/skills/@types/skills';
+import { IMastraSkill, SkillScope, SkillStatus } from '@/skills/@types/skills';
 import {
   getSkill,
   getSkillVersion,
@@ -13,11 +8,9 @@ import {
   listSkillVersions,
 } from '@/skills/service/skillsService';
 import { getSkillsStore } from '@/skills/store/skillsStore';
-
-const requireUser = (user: IContext['user']): string => {
-  if (!user?._id) throw new ExpectedError('Login required');
-  return user._id;
-};
+import { requireUserId } from '@/_shared/auth';
+import { requireScopedWorkflowAgent } from '@/workflow/authorization';
+import { ERXES_AGENT_ACTIONS } from '~/meta/permissionActions';
 
 export const skillQueries = {
   mastraSkills: async (
@@ -31,8 +24,8 @@ export const skillQueries = {
     },
     { user, subdomain, checkPermission }: IContext,
   ) => {
-    await checkPermission('skillsView');
-    return listSkills(subdomain, requireUser(user), params || {});
+    await checkPermission(ERXES_AGENT_ACTIONS.skills.read);
+    return listSkills(subdomain, requireUserId(user), params || {});
   },
 
   mastraSkill: async (
@@ -40,17 +33,27 @@ export const skillQueries = {
     { _id }: { _id: string },
     { user, subdomain, checkPermission }: IContext,
   ) => {
-    await checkPermission('skillsView');
-    return getSkill(subdomain, requireUser(user), _id);
+    await checkPermission(ERXES_AGENT_ACTIONS.skills.read);
+    return getSkill(subdomain, requireUserId(user), _id);
   },
 
   mastraSkillVersions: async (
     _parent: undefined,
-    { skillId, page, perPage }: { skillId: string; page?: number; perPage?: number },
+    {
+      skillId,
+      page,
+      perPage,
+    }: { skillId: string; page?: number; perPage?: number },
     { user, subdomain, checkPermission }: IContext,
   ) => {
-    await checkPermission('skillsView');
-    return listSkillVersions(subdomain, requireUser(user), skillId, page, perPage);
+    await checkPermission(ERXES_AGENT_ACTIONS.skills.read);
+    return listSkillVersions(
+      subdomain,
+      requireUserId(user),
+      skillId,
+      page,
+      perPage,
+    );
   },
 
   mastraSkillVersion: async (
@@ -58,8 +61,8 @@ export const skillQueries = {
     { _id }: { _id: string },
     { user, subdomain, checkPermission }: IContext,
   ) => {
-    await checkPermission('skillsView');
-    return getSkillVersion(subdomain, requireUser(user), _id);
+    await checkPermission(ERXES_AGENT_ACTIONS.skills.read);
+    return getSkillVersion(subdomain, requireUserId(user), _id);
   },
 
   mastraInvocableSkills: async (
@@ -67,10 +70,18 @@ export const skillQueries = {
     { agentId }: { agentId: string },
     { models, user, subdomain, checkPermission }: IContext,
   ) => {
-    await checkPermission('skillsView');
-    const agent = await models.MastraAgent.findOne({ agentId });
-    const globs = agent?.skills ?? [];
-    return listInvocableSkills(subdomain, requireUser(user), globs);
+    await checkPermission(ERXES_AGENT_ACTIONS.skills.read);
+    await checkPermission(ERXES_AGENT_ACTIONS.agent.chat);
+    const userId = requireUserId(user);
+    const { agent } = await requireScopedWorkflowAgent({
+      models,
+      subdomain,
+      user,
+      action: ERXES_AGENT_ACTIONS.agent.chat,
+      agentId,
+    });
+    const globs = agent.skills ?? [];
+    return listInvocableSkills(subdomain, userId, globs);
   },
 };
 

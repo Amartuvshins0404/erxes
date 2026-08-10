@@ -1,12 +1,25 @@
-import { memo } from 'react';
-import { IconBolt, IconPencil, IconRefresh, IconRepeat } from '@tabler/icons-react';
+import { memo, type ReactNode } from 'react';
+import {
+  IconAlertTriangle,
+  IconBolt,
+  IconPencil,
+  IconRefresh,
+  IconRepeat,
+} from '@tabler/icons-react';
 import { Tooltip } from 'erxes-ui';
 import { AgentUIMessage, ChatAttachment } from '~/modules/chat/types';
 import { asToolPart, messageText } from '~/modules/chat/lib/uiParts';
-import { asArtifactPart, type Artifact } from '~/modules/chat/lib/artifacts';
+import {
+  artifactOutcomes,
+  mergeArtifacts,
+  type Artifact,
+} from '~/modules/chat/lib/artifacts';
 import { AgentAvatar } from '~/modules/chat/components/Avatars';
 import { AgentTrace } from '~/modules/chat/components/AgentTrace';
-import { ArtifactCard } from '~/modules/chat/components/ArtifactCard';
+import {
+  ArtifactCard,
+  ArtifactFailureCard,
+} from '~/modules/chat/components/ArtifactCard';
 import {
   ChatMarkdown,
   StreamingMarkdown,
@@ -21,6 +34,39 @@ const formatTime = (iso?: string): string =>
     minute: '2-digit',
   });
 
+// One icon-only message action (Edit, Resend, Regenerate) — the shared
+// Tooltip+button shape extracted from the three near-identical trees that used
+// to live inline. `aria-label={label}` gives every icon button an accessible
+// name once, here, so screen readers announce the action rather than "button".
+const MessageAction = ({
+  icon,
+  label,
+  onClick,
+  disabled,
+}: {
+  icon: ReactNode;
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+}) => (
+  <Tooltip.Provider>
+    <Tooltip>
+      <Tooltip.Trigger asChild>
+        <button
+          type="button"
+          aria-label={label}
+          onClick={onClick}
+          disabled={disabled}
+          className="size-6 flex items-center justify-center rounded text-muted-foreground transition-colors hover:bg-black/5 hover:text-foreground disabled:opacity-40 dark:hover:bg-white/10"
+        >
+          {icon}
+        </button>
+      </Tooltip.Trigger>
+      <Tooltip.Content>{label}</Tooltip.Content>
+    </Tooltip>
+  </Tooltip.Provider>
+);
+
 // memo() so a streaming turn only re-renders the live bubble, not every prior
 // message — useChat keeps stable refs for settled messages, so shallow prop
 // equality holds provided callers pass stable callbacks.
@@ -34,6 +80,7 @@ export const MessageBubble = memo(function MessageBubble({
   onEditMessage,
   onResendMessage,
   storeArtifacts,
+  debug,
 }: {
   msg: AgentUIMessage;
   isLast: boolean;
@@ -48,6 +95,9 @@ export const MessageBubble = memo(function MessageBubble({
   // Persisted artifacts for this message — used when the live tool parts are
   // gone (after a reload), so the inline cards reappear.
   storeArtifacts?: Artifact[];
+  // The agent's debug setting — when on, the trace shows the full tool-call
+  // timeline; off shows only the turn summary + short thoughts.
+  debug?: boolean;
 }) {
   const text = messageText(msg);
 
@@ -74,35 +124,17 @@ export const MessageBubble = memo(function MessageBubble({
         )}
         {hasText && (
           <div className="flex items-center gap-0.5 pr-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-            <Tooltip.Provider>
-              <Tooltip>
-                <Tooltip.Trigger asChild>
-                  <button
-                    type="button"
-                    onClick={() => onEditMessage(text)}
-                    className="size-6 flex items-center justify-center rounded text-muted-foreground transition-colors hover:bg-black/5 hover:text-foreground dark:hover:bg-white/10"
-                  >
-                    <IconPencil className="size-3.5" />
-                  </button>
-                </Tooltip.Trigger>
-                <Tooltip.Content>Edit</Tooltip.Content>
-              </Tooltip>
-            </Tooltip.Provider>
-            <Tooltip.Provider>
-              <Tooltip>
-                <Tooltip.Trigger asChild>
-                  <button
-                    type="button"
-                    onClick={() => onResendMessage(text, attachments ?? [])}
-                    disabled={chatLoading}
-                    className="size-6 flex items-center justify-center rounded text-muted-foreground transition-colors hover:bg-black/5 hover:text-foreground disabled:opacity-40 dark:hover:bg-white/10"
-                  >
-                    <IconRepeat className="size-3.5" />
-                  </button>
-                </Tooltip.Trigger>
-                <Tooltip.Content>Resend</Tooltip.Content>
-              </Tooltip>
-            </Tooltip.Provider>
+            <MessageAction
+              icon={<IconPencil className="size-3.5" />}
+              label="Edit message"
+              onClick={() => onEditMessage(text)}
+            />
+            <MessageAction
+              icon={<IconRepeat className="size-3.5" />}
+              label="Resend message"
+              onClick={() => onResendMessage(text, attachments ?? [])}
+              disabled={chatLoading}
+            />
             <CopyButton text={text} />
           </div>
         )}
@@ -118,18 +150,32 @@ export const MessageBubble = memo(function MessageBubble({
   );
   // Charts and generated documents surface as prominent ArtifactCards (with a
   // Preview-panel opener), not buried in the collapsed thinking section. Live
-  // turns read them off the tool parts; after a reload (tool parts gone) we fall
-  // back to the persisted store artifacts for this message.
-  const liveArtifacts: Artifact[] = msg.parts.reduce<Artifact[]>((acc, part) => {
-    const tool = asToolPart(part);
-    const artifact = tool ? asArtifactPart(tool) : null;
-    if (artifact) acc.push(artifact);
-    return acc;
-  }, []);
-  const artifacts = liveArtifacts.length
-    ? liveArtifacts
-    : (storeArtifacts ?? []);
+  // turns read them off the tool parts, merged with the persisted store rows
+  // for this message — either source can have holes (a rehydrated tool part
+  // without its artifact blob; a store row whose message link failed), so each
+  // rescues the other.
+  const { artifacts: liveArtifacts, failures: failedArtifactTools } =
+    artifactOutcomes(msg.parts, !streaming);
+  const artifacts = mergeArtifacts(liveArtifacts, storeArtifacts);
+  // A tool that finished without an artifact on it (lost/truncated output, not
+  // an error) may be exactly what a merged store row just rescued — don't show
+  // a failure card next to the rescued chart. Genuine tool errors always show;
+  // artifact-less finishes show only when the store rows don't cover them.
+  const rescuedCount = artifacts.length - liveArtifacts.length;
+  const visibleFailures = failedArtifactTools
+    .filter((t) => t.isError)
+    .concat(
+      failedArtifactTools.filter((t) => !t.isError).slice(rescuedCount),
+    );
   const canRegenerate = isLast && !chatLoading;
+  // A settled assistant turn that produced neither prose nor any artifact —
+  // render an explicit interrupted/empty notice with a retry instead of a blank
+  // reading column (the "agent stopped mid-turn" symptom).
+  const showEmptyState =
+    !streaming &&
+    !text &&
+    artifacts.length === 0 &&
+    failedArtifactTools.length === 0;
   const activeSkills = msg.metadata?.activeSkills;
   const messageId = msg.metadata?.messageId;
   const handleRate =
@@ -140,11 +186,11 @@ export const MessageBubble = memo(function MessageBubble({
   return (
     <div className="flex justify-start items-start gap-3 group ea-msg-in">
       <AgentAvatar live={streaming} />
-      {/* A full-width reading column — NOT shrink-to-fit. Sizing the assistant
-          message to its content made the width snap wider/narrower on every
-          streamed token (live thought tail, tool rows, growing markdown); a
-          stable column keeps it still while text reflows vertically. */}
-      <div className="min-w-0 flex-1 pt-0.5">
+      {/* A borderless reading column (no bubble) so long answers read like a
+          document. Hold full width during streaming so it doesn't snap wider
+          when the first artifact tool call lands mid-turn. */}
+      <div className={`min-w-0 px-1 py-1 ${streaming || artifacts.length > 0 ? 'w-full' : 'w-auto max-w-full'}`}>
+
         {activeSkills && activeSkills.length > 0 && (
           <div className="flex flex-wrap items-center gap-1 mb-1.5">
             {activeSkills.map((name) => (
@@ -159,8 +205,14 @@ export const MessageBubble = memo(function MessageBubble({
             ))}
           </div>
         )}
-        {turnParts.length > 0 && (
-          <AgentTrace parts={turnParts} streaming={streaming} />
+        {(turnParts.length > 0 || msg.metadata?.turnSummary) && (
+          <AgentTrace
+            parts={turnParts}
+            streaming={streaming}
+            summaries={msg.metadata?.reasoningSummaries}
+            turnSummary={msg.metadata?.turnSummary}
+            debug={debug}
+          />
         )}
         {text ? (
           streaming ? (
@@ -174,6 +226,30 @@ export const MessageBubble = memo(function MessageBubble({
             <span className="ea-typing-dot" />
             <span className="ea-typing-dot" />
           </div>
+        ) : showEmptyState ? (
+          // A settled turn with no answer text and no artifact must never read as
+          // a blank bubble — surface the outcome (interrupted mid-tool, or the
+          // model stopped without prose) and offer a retry. Newly-generated turns
+          // carry a backend fallback line, so this mainly catches turns that
+          // dead-ended before that fix and any residual empty edge case.
+          <div className="flex items-center gap-2 py-1 text-xs text-muted-foreground">
+            <IconAlertTriangle className="size-3.5 shrink-0 text-amber-600 dark:text-amber-500" />
+            <span>
+              {msg.metadata?.interrupted
+                ? 'This response was interrupted before it finished.'
+                : 'No response was generated for this message.'}
+            </span>
+            {canRegenerate && (
+              <button
+                type="button"
+                onClick={onRegenerate}
+                className="inline-flex items-center gap-1 text-primary hover:underline"
+              >
+                <IconRefresh className="size-3" />
+                Retry
+              </button>
+            )}
+          </div>
         ) : null}
         {streaming && text && <span className="ea-caret" />}
         {artifacts.length > 0 && (
@@ -183,6 +259,20 @@ export const MessageBubble = memo(function MessageBubble({
                 key={artifact.id || `artifact-${i}`}
                 artifact={artifact}
                 live={streaming}
+              />
+            ))}
+          </div>
+        )}
+        {visibleFailures.length > 0 && (
+          <div className="mt-1">
+            {visibleFailures.map((tool, i) => (
+              <ArtifactFailureCard
+                key={tool.toolCallId || `failed-${i}`}
+                toolName={tool.toolName}
+                errorText={
+                  tool.errorText ||
+                  (tool.output as { message?: string } | undefined)?.message
+                }
               />
             ))}
           </div>
@@ -199,20 +289,11 @@ export const MessageBubble = memo(function MessageBubble({
             </p>
             <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
               {canRegenerate && (
-                <Tooltip.Provider>
-                  <Tooltip>
-                    <Tooltip.Trigger asChild>
-                      <button
-                        type="button"
-                        onClick={onRegenerate}
-                        className="size-6 flex items-center justify-center rounded hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-muted-foreground hover:text-foreground"
-                      >
-                        <IconRefresh className="size-3.5" />
-                      </button>
-                    </Tooltip.Trigger>
-                    <Tooltip.Content>Regenerate</Tooltip.Content>
-                  </Tooltip>
-                </Tooltip.Provider>
+                <MessageAction
+                  icon={<IconRefresh className="size-3.5" />}
+                  label="Regenerate"
+                  onClick={onRegenerate}
+                />
               )}
               {handleRate && (
                 <FeedbackButtons rating={msg.metadata?.rating} onRate={handleRate} />

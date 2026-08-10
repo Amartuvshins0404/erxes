@@ -3,12 +3,25 @@ import {
   IAfterProcessRule,
   sendTRPCMessage,
 } from 'erxes-api-shared/utils';
-import { sendMessage } from '~/modules/admin/utils';
+import { sendMessage } from '~/modules/platform/shared';
+import {
+  buildCategorySnapshot,
+  buildProductSyncPayload,
+  getPosCategoryIds,
+  getSupplierPosToken,
+} from '~/modules/platform/productSync';
+
+const productCreateOrUpdateMutations = ['productsAdd', 'productsEdit'];
+const productCategoryCreateOrUpdateMutations = [
+  'productCategoriesAdd',
+  'productCategoriesEdit',
+];
 
 const mutationNames = [
-  'productsEdit',
+  ...productCreateOrUpdateMutations,
   'productsRemove',
-  'productCategoriesEdit',
+  ...productCategoryCreateOrUpdateMutations,
+  'productCategoriesRemove',
 ];
 
 const allRules: IAfterProcessRule[] = [
@@ -17,6 +30,19 @@ const allRules: IAfterProcessRule[] = [
     mutationNames,
   },
 ];
+
+const isInSelectedPos = async (
+  subdomain: string,
+  categoryId?: string,
+): Promise<boolean> => {
+  if (!categoryId) return false;
+
+  const posToken = await getSupplierPosToken(subdomain);
+  if (!posToken) return false;
+
+  const categoryIds = await getPosCategoryIds(subdomain, posToken);
+  return categoryIds.includes(categoryId);
+};
 
 export const afterProcess: AfterProcessConfigs = {
   rules: allRules,
@@ -42,10 +68,29 @@ export const afterProcess: AfterProcessConfigs = {
       return;
     }
 
-    if (mutationName === 'productCategoriesEdit') {
+    if (mutationName === 'productCategoriesRemove') {
+      const categoryId: string | undefined = args?._id;
+
+      if (!categoryId) return;
+
+      sendMessage({
+        subdomain: ctx.subdomain,
+        path: 'syncProductCategory',
+        payload: {
+          entityId: categoryId,
+          data: { action: 'delete' },
+        },
+      });
+
+      return;
+    }
+
+    if (productCategoryCreateOrUpdateMutations.includes(mutationName)) {
       const category = result;
 
       if (!category?._id) return;
+
+      if (!(await isInSelectedPos(ctx.subdomain, category._id))) return;
 
       sendMessage({
         subdomain: ctx.subdomain,
@@ -53,13 +98,8 @@ export const afterProcess: AfterProcessConfigs = {
         payload: {
           entityId: category._id,
           data: {
-            category: {
-              _id: category._id,
-              name: category.name,
-              code: category.code,
-              order: category.order,
-              parentId: category.parentId,
-            },
+            category: buildCategorySnapshot(category),
+            action: mutationName === 'productCategoriesAdd' ? 'create' : 'update',
           },
         },
       });
@@ -67,8 +107,11 @@ export const afterProcess: AfterProcessConfigs = {
       return;
     }
 
-    // productsEdit
     const product = result;
+
+    if (!product?._id) return;
+
+    if (!(await isInSelectedPos(ctx.subdomain, product.categoryId))) return;
 
     let category: any = null;
 
@@ -87,47 +130,15 @@ export const afterProcess: AfterProcessConfigs = {
       }
     }
 
-    console.log('product', product)
-
     sendMessage({
       subdomain: ctx.subdomain,
       path: 'syncProduct',
-      payload: {
-        entityId: product._id,
-        data: {
-          product: {
-            vendorId: product.vendorId,
-            name: product.name,
-            shortName: product.shortName,
-            code: product.code,
-            type: product.type,
-            description: product.description,
-            barcodes: product.barcodes,
-            variants: product.variants,
-            barcodeDescription: product.barcodeDescription,
-            unitPrice: product.unitPrice,
-            category: category
-              ? {
-                  _id: category._id,
-                  name: category.name,
-                  code: category.code,
-                  order: category.order,
-                  parentId: category.parentId,
-                }
-              : null,
-            propertiesData: product.propertiesData,
-            tagIds: product.tagIds,
-            attachment: product.attachment,
-            attachmentMore: product.attachmentMore,
-            scopeBrandIds: product.scopeBrandIds,
-            uom: product.uom,
-            subUoms: product.subUoms,
-            currency: product.currency,
-            pdfAttachment: product.pdfAttachment,
-          },
-          action: 'update',
-        },
-      },
+      payload: buildProductSyncPayload(
+        product,
+        category,
+        mutationName === 'productsAdd' ? 'create' : 'update',
+        ctx.subdomain,
+      ),
     });
   },
 };

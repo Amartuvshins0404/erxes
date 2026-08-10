@@ -47,6 +47,84 @@ describe('isSecretName', () => {
       expect(isSecretName(code)).toBe(false);
     }
   });
+
+  it('flags secrets stored under non-secret-looking names (Gap #3)', () => {
+    for (const code of [
+      'MAIL_PASS',
+      'SMTP_PASS',
+      'dbPass',
+      'AZURE_STORAGE_CONNECTION_STRING',
+      'dbConnectionString',
+      'SENTRY_DSN',
+      'ERXES_AGENT_EVALUATION_DSN',
+    ]) {
+      expect(isSecretName(code)).toBe(true);
+    }
+  });
+
+  it('keeps redacting PUBLIC_API_KEY-style names (apikey wins over exemption)', () => {
+    for (const code of ['BLOCKADMIN_PUBLIC_API_KEY', 'MUSHOP_PUBLIC_API_KEY']) {
+      expect(isSecretName(code)).toBe(true);
+    }
+  });
+
+  it('does NOT flag public keys ending in "key" (Gap #6)', () => {
+    for (const code of [
+      'publicKey',
+      'publishableKey',
+      'siteKey',
+      'applicationServerKey',
+      'clientPortalPublicKey',
+    ]) {
+      expect(isSecretName(code)).toBe(false);
+    }
+  });
+
+  it('does NOT flag "pass" as a substring (compass/passenger/bypass)', () => {
+    for (const code of [
+      'compass',
+      'bypass',
+      'passenger',
+      'passport',
+      'encompass',
+    ]) {
+      expect(isSecretName(code)).toBe(false);
+    }
+  });
+
+  it('does NOT over-redact leading-"pass" (pass/fail) or "dsn" substrings', () => {
+    for (const code of [
+      'passRate',
+      'passCount',
+      'passMark',
+      'passFail',
+      'CustomFieldsNavigation',
+      'IconCloudSnow',
+      'buildSnapshotMetadata',
+    ]) {
+      expect(isSecretName(code)).toBe(false);
+    }
+  });
+
+  it('flags database/broker connection codes by name (MONGO_URL, REDIS_URL)', () => {
+    for (const code of [
+      'MONGO_URL',
+      'CORE_MONGO_URL',
+      'REDIS_URL',
+      'RABBITMQ_URL',
+    ]) {
+      expect(isSecretName(code)).toBe(true);
+    }
+    // benign *_URL / endpoint codes stay visible (no DB/broker token)
+    for (const code of [
+      'CDN_URL',
+      'API_URL',
+      'ELASTICSEARCH_URL',
+      'MAIN_API_DOMAIN',
+    ]) {
+      expect(isSecretName(code)).toBe(false);
+    }
+  });
 });
 
 describe('redactSecrets', () => {
@@ -138,5 +216,74 @@ describe('redactSecrets', () => {
     const copy = JSON.parse(JSON.stringify(input));
     redactSecrets(input);
     expect(input).toEqual(copy);
+  });
+
+  it('redacts credentials embedded in a string under a benign field name (Gap #3)', () => {
+    expect(redactSecrets({ url: 'mongodb://user:pass@host:27017/db' })).toEqual({
+      url: REDACTED,
+    });
+    expect(
+      redactSecrets({ writeUrl: 'postgres://admin:s3cr3t@db.internal:5432/app' }),
+    ).toEqual({ writeUrl: REDACTED });
+    expect(
+      redactSecrets({ endpoint: 'https://pk_abc:sk_xyz@o1.ingest.sentry.io/1' }),
+    ).toEqual({ endpoint: REDACTED });
+    expect(
+      redactSecrets({
+        storage:
+          'DefaultEndpointsProtocol=https;AccountName=acct;AccountKey=abc123def==;EndpointSuffix=core.windows.net',
+      }),
+    ).toEqual({ storage: REDACTED });
+    expect(redactSecrets('mongodb://user:pass@host/db')).toBe(REDACTED);
+  });
+
+  it('redacts more credential value-shapes under benign names (PEM / bearer / query token)', () => {
+    expect(
+      redactSecrets({
+        cert: '-----BEGIN PRIVATE KEY-----\nMIIE\n-----END PRIVATE KEY-----',
+      }),
+    ).toEqual({ cert: REDACTED });
+    expect(
+      redactSecrets({
+        authHeader: 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9',
+      }),
+    ).toEqual({ authHeader: REDACTED });
+    expect(
+      redactSecrets({ callbackUrl: 'https://api.host/cb?token=sk_live_abc123def' }),
+    ).toEqual({ callbackUrl: REDACTED });
+  });
+
+  it('hides the value of a { code, value } row for embedded-credential codes', () => {
+    expect(
+      redactSecrets([
+        { code: 'MONGO_URL', value: 'mongodb://u:p@h/db' },
+        { code: 'MAIL_PASS', value: 'hunter2' },
+      ]),
+    ).toEqual([
+      { code: 'MONGO_URL', value: REDACTED },
+      { code: 'MAIL_PASS', value: REDACTED },
+    ]);
+  });
+
+  it('does NOT redact benign URLs without a userinfo password', () => {
+    const benign = {
+      a: 'https://erkhet.biz/get-api',
+      b: '${MAIN_API_DOMAIN}/telnyx/webhook',
+      c: 'mongodb://mongo:27017/erxes',
+      d: 'mongodb://mongo/erxes',
+      e: 'https://api.example.com:8080/v1/path',
+      f: 'https://user@host/path',
+    };
+    expect(redactSecrets(benign)).toEqual(benign);
+  });
+
+  it('does NOT redact public keys, but still hides the paired secret (Gap #6)', () => {
+    expect(redactSecrets('pk_live_51ABCxyz')).toBe('pk_live_51ABCxyz');
+    expect(redactSecrets({ publishableKey: 'pk_live_abc' })).toEqual({
+      publishableKey: 'pk_live_abc',
+    });
+    expect(
+      redactSecrets({ publicKey: 'pk-lf-1234', secretKey: 'sk-lf-5678' }),
+    ).toEqual({ publicKey: 'pk-lf-1234', secretKey: REDACTED });
   });
 });

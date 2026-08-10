@@ -28,7 +28,7 @@ export function sanitizeServerError(raw: string): {
     return {
       error: msg,
       instruction:
-        "This operation needs one or more required arguments. Re-read the operation's argument list from search_erxes_operations and call it again WITH those arguments filled in — never call it with empty args.",
+        "This operation needs one or more required arguments. Re-read the loaded operation tool's schema and call it again with those arguments filled in — never call it with empty input.",
     };
   }
   if (INTERNAL_ERROR_RE.test(msg) || looksLikeStackFrame(msg)) {

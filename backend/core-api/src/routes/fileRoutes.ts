@@ -247,7 +247,12 @@ router.post(
 
         res.send(result);
       } catch (e: unknown) {
-        const message = e instanceof Error ? e.message : 'Upload failed';
+        // Some storage-SDK failures throw with an EMPTY message, which used to
+        // produce a bodyless 500 the UI could only render as a mystery. Always
+        // send an actionable reason.
+        const message =
+          (e instanceof Error && e.message) ||
+          'Upload failed — file storage is misconfigured or unreachable. Check UPLOAD_SERVICE_TYPE and its credentials in System configuration → File upload.';
         return res.status(500).send(filterXSS(message));
       }
     });
@@ -487,8 +492,8 @@ router.post(
           const response = await uploadFile(
             `${domain}/gateway`,
             {
-              path: finalPath,
-              originalname: latestInfo.fileName,
+              filepath: finalPath,
+              originalFilename: latestInfo.fileName,
               mimetype: file.mimetype,
               type: file.mimetype,
               size: latestInfo.fileSize,

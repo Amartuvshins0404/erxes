@@ -24,6 +24,7 @@ interface ArtifactRow {
   inline?: boolean;
   size?: number;
   spec?: ChartSpec;
+  definition?: string;
   messageId?: string;
   turnId?: string;
   prompt?: string;
@@ -38,6 +39,10 @@ export interface ArtifactGroup {
   // False groups (legacy rows, or a turn whose id recovery failed) fall back to
   // prompt/order matching on the client (see associateArtifacts).
   linked: boolean;
+  // The stamped assistant-message id (first one seen on this turn's rows).
+  // associateArtifacts uses it to detect a link that points at no message in
+  // the thread — such a group falls back to prompt/order matching too.
+  messageId?: string;
 }
 
 export const useThreadArtifacts = (threadId?: string) => {
@@ -78,7 +83,10 @@ export const useThreadArtifacts = (threadId?: string) => {
         groups.push(group);
       }
       group.items.push(artifact);
-      if (row.messageId) group.linked = true;
+      if (row.messageId) {
+        group.linked = true;
+        group.messageId ??= row.messageId;
+      }
     }
 
     return { artifacts, byMessageId, groups, loading: loading && !data };

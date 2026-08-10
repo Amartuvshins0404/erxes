@@ -1,4 +1,4 @@
-import { normalizeArtifact } from './artifactNormalize';
+import { normalizeArtifact, resolveStorageRef } from './artifactNormalize';
 
 describe('normalizeArtifact', () => {
   // Regression: a pptx document used to render inline but vanish from the Files
@@ -42,6 +42,39 @@ describe('normalizeArtifact', () => {
     expect(a?.id).toBe('doc_3');
   });
 
+  // pptx decks now carry per-slide image refs + a count; both are optional and
+  // non-string slide entries are dropped (permissive, no per-format gate).
+  it('reads slides + slideCount on a pptx document', () => {
+    const a = normalizeArtifact({
+      id: 'deck_1',
+      kind: 'document',
+      format: 'pptx',
+      fileName: 'deck.pptx',
+      fileKey: 'key/deck.pptx',
+      slides: ['key/s1.png', 'data:image/png;base64,AAA', 7, null, 'http://x/s3.png'],
+      slideCount: 3,
+    });
+    expect(a?.kind).toBe('document');
+    expect(a && a.kind === 'document' && a.slides).toEqual([
+      'key/s1.png',
+      'data:image/png;base64,AAA',
+      'http://x/s3.png',
+    ]);
+    expect(a && a.kind === 'document' && a.slideCount).toBe(3);
+  });
+
+  it('leaves slides/slideCount undefined when absent or malformed', () => {
+    const a = normalizeArtifact({
+      id: 'deck_2',
+      kind: 'document',
+      format: 'pptx',
+      fileName: 'deck.pptx',
+      slides: 'not-an-array',
+    });
+    expect(a && a.kind === 'document' && a.slides).toBeUndefined();
+    expect(a && a.kind === 'document' && a.slideCount).toBeUndefined();
+  });
+
   it('normalizes a chart', () => {
     const a = normalizeArtifact({
       id: 'chart_1',
@@ -50,6 +83,68 @@ describe('normalizeArtifact', () => {
       spec: { title: 'Split', series: [], data: [] },
     });
     expect(a).toMatchObject({ id: 'chart_1', kind: 'chart', title: 'Split' });
+  });
+
+  // Regression (#205 follow-up): the consolidated normalizer lost the old array
+  // guard, so a partial chart spec reached <EChart> and could throw. Both series
+  // and data must be arrays or the chart is dropped.
+  it('chart with non-array series → null', () => {
+    expect(
+      normalizeArtifact({
+        id: 'chart_bad',
+        kind: 'chart',
+        title: 'Bad',
+        spec: { title: 'Bad', series: 'nope', data: [] },
+      }),
+    ).toBeNull();
+  });
+
+  it('chart with non-array data → null', () => {
+    expect(
+      normalizeArtifact({
+        id: 'chart_bad2',
+        kind: 'chart',
+        title: 'Bad',
+        spec: { title: 'Bad', series: [], data: undefined },
+      }),
+    ).toBeNull();
+  });
+
+  // Image artifacts (remove-image-background). Both shapes must normalize: a
+  // live tool result (`id`) and a persisted store row (`artifactId`).
+  it('normalizes an image from a tool result', () => {
+    const a = normalizeArtifact({
+      id: 'img_1',
+      kind: 'image',
+      title: 'Red mug',
+      fileName: 'red-mug-nobg.png',
+      mimeType: 'image/png',
+      fileKey: 'private/agent/red-mug-nobg.png',
+      size: 51234,
+      width: 1600,
+      height: 1200,
+    });
+    expect(a).toMatchObject({
+      id: 'img_1',
+      kind: 'image',
+      title: 'Red mug',
+      fileName: 'red-mug-nobg.png',
+      fileKey: 'private/agent/red-mug-nobg.png',
+      width: 1600,
+      height: 1200,
+    });
+  });
+
+  it('reads a persisted image store row (artifactId, sparse fields)', () => {
+    const a = normalizeArtifact({
+      artifactId: 'img_2',
+      kind: 'image',
+      fileKey: 'private/agent/x.png',
+    });
+    expect(a?.id).toBe('img_2');
+    expect(a?.kind).toBe('image');
+    expect(a && a.kind === 'image' && a.fileName).toBe('image.png');
+    expect(a && a.kind === 'image' && a.width).toBeUndefined();
   });
 
   it('rejects non-objects, missing ids, and unknown kinds', () => {
@@ -61,5 +156,26 @@ describe('normalizeArtifact', () => {
     expect(normalizeArtifact({ id: 'x', kind: 'mystery' })).toBeNull();
     // chart without a spec object
     expect(normalizeArtifact({ id: 'c', kind: 'chart' })).toBeNull();
+  });
+});
+
+describe('resolveStorageRef', () => {
+  const API = 'https://api.example.com';
+
+  it('returns data:/http refs unchanged', () => {
+    expect(resolveStorageRef('data:image/png;base64,AAA', API)).toBe(
+      'data:image/png;base64,AAA',
+    );
+    expect(resolveStorageRef('https://cdn/x.png', API)).toBe('https://cdn/x.png');
+  });
+
+  it('routes a storage key through /read-file (inline)', () => {
+    expect(resolveStorageRef('decks/s1.png', API)).toBe(
+      'https://api.example.com/read-file?key=decks%2Fs1.png&inline=true',
+    );
+  });
+
+  it('appends an optional file name', () => {
+    expect(resolveStorageRef('k', API, 'deck.pptx')).toContain('&name=deck.pptx');
   });
 });

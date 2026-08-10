@@ -14,6 +14,12 @@ const FormNavigation = lazy(() =>
   })),
 );
 
+const SupplierNavigation = lazy(() =>
+  import('./modules/navigation/SupplierNavigation').then((module) => ({
+    default: module.SupplierNavigation,
+  })),
+);
+
 export const CONFIG: IUIConfig = {
   name: 'blockadmin',
   path: 'blockadmin',
@@ -34,6 +40,7 @@ export const CONFIG: IUIConfig = {
     ),
     subGroup: () => (
       <Suspense fallback={<div />}>
+        <SupplierNavigation />
         <FormNavigation />
       </Suspense>
     ),

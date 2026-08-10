@@ -1,6 +1,6 @@
 import { useQuery } from '@apollo/client';
 import { useMemo } from 'react';
-import { MTO_ASSOCIATIONS } from '@/association/graphql/associationQueries';
+import { MTO_CATEGORIES } from '@/category/graphql/categoryQueries';
 import { MtoCategory } from '@/category/types/category';
 
 export const getCategoryLabel = (category: Pick<MtoCategory, '_id' | 'name'>) =>
@@ -14,13 +14,13 @@ export const isMainCategory = (category: Pick<MtoCategory, 'level' | 'parentId'>
   !isSubCategory(category);
 
 export const useCategoryOptions = () => {
-  const { data, loading } = useQuery(MTO_ASSOCIATIONS, {
+  const { data, loading } = useQuery(MTO_CATEGORIES, {
     variables: { isActive: true },
   });
 
   const categories = useMemo(
-    () => (data?.mtoAssociations ?? []) as MtoCategory[],
-    [data?.mtoAssociations],
+    () => (data?.mtoCategories ?? []) as MtoCategory[],
+    [data?.mtoCategories],
   );
 
   const mainCategories = useMemo(

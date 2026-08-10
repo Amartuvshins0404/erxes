@@ -14,7 +14,6 @@ import {
 import {
   getNextMonth,
   getToday,
-  regexSearchText,
   escapeRegExp,
   sendTRPCMessage,
 } from 'erxes-api-shared/utils';
@@ -71,6 +70,7 @@ export const generateFilter = async (
     stageChangedStartDate,
     stageChangedEndDate,
     noSkipArchive,
+    status,
     number,
     branchIds,
     departmentIds,
@@ -90,7 +90,9 @@ export const generateFilter = async (
   } = params;
   Object.assign(
     filter,
-    noSkipArchive
+    status
+      ? { status }
+      : noSkipArchive
       ? {}
       : { status: { $ne: SALES_STATUSES.ARCHIVED }, parentId: undefined },
   );
@@ -106,7 +108,6 @@ export const generateFilter = async (
   }
 
   if (assignedUserIds) {
-    // Filter by assigned to no one
     const notAssigned = isListEmpty(assignedUserIds);
 
     filter.assignedUserIds = notAssigned ? [] : { $in: assignedUserIds };
@@ -299,11 +300,11 @@ export const generateFilter = async (
   }
 
   if (search) {
+    const escaped = escapeRegExp(search);
     Object.assign(filter, {
       $or: [
-        regexSearchText(search),
-        { name: { $regex: new RegExp(`.*${escapeRegExp(search)}.*`, 'i') } },
-        { number: { $regex: new RegExp(`.*${escapeRegExp(search)}.*`, 'i') } },
+        { name: { $regex: escaped, $options: 'i' } },
+        { number: { $regex: escaped, $options: 'i' } },
       ],
     });
   }
@@ -371,8 +372,6 @@ export const generateFilter = async (
     filter.tagIds = { $in: tagIds };
   }
 
-  // Pipeline user/department permission check — internal users only.
-  // CP users are not erxes users so this block must be skipped for client portal.
   if (pipelineId && !forClientPortal) {
     const pipeline = await models.Pipelines.getPipeline(pipelineId);
 
@@ -682,6 +681,12 @@ const fetchDeals = async (
   user: IContext['user'],
   forClientPortal = false,
 ) => {
+  const { search, noSkipArchive } = args;
+
+  if (noSkipArchive && search) {
+    args.orderBy = { status: 1, ...args.orderBy };
+  }
+
   const filter = await generateFilter(
     models,
     subdomain,
@@ -699,7 +704,11 @@ const fetchDeals = async (
     list: deals,
     pageInfo,
     totalCount,
-  } = await getItemList(models, subdomain, filter, args, user, getExtraFields);
+  } = await getItemList(models, subdomain, filter, args, user, getExtraFields, {
+    formatter: {
+      modifiedAt: 'date',
+    },
+  });
 
   await enrichDealsWithProducts(subdomain, deals);
 
@@ -776,7 +785,11 @@ export const dealQueries: Record<string, Resolver> = {
       stageId: stage._id,
       pipelineId: pipeline._id,
       boardId: pipeline.boardId,
-      href: `/sales/deals?boardId=${encodeURIComponent(pipeline.boardId)}&pipelineId=${encodeURIComponent(pipeline._id)}&salesItemId=${encodeURIComponent(deal._id)}`,
+      href: `/sales/deals?boardId=${encodeURIComponent(
+        pipeline.boardId,
+      )}&pipelineId=${encodeURIComponent(
+        pipeline._id,
+      )}&salesItemId=${encodeURIComponent(deal._id)}`,
     };
   },
 

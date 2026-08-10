@@ -9,6 +9,7 @@ import {
   Textarea,
   Select,
   Label,
+  Skeleton,
 } from 'erxes-ui';
 import { AgencyProfileSchema } from '../hooks/useAgencyForm';
 import { MultipleDocumentUpload } from './MultipleDocumentUpload';
@@ -21,6 +22,20 @@ import { AgencyEmails } from './AgencyEmails';
 import { AgencyPhones } from './AgencyPhones';
 import { SelectArea } from './SelectArea';
 import { AgencyActionBar } from './AgencyActionBar';
+import { useRemoteComponent } from '../hooks/useRemoteComponent';
+
+interface IEMSelectValue {
+  integrationId: string;
+  widgetBundleUrl: string;
+}
+
+interface SelectErxesMessengerProps {
+  value?: string;
+  onValueChange: (value: IEMSelectValue) => void;
+  placeholder?: string;
+  disabled?: boolean;
+  className?: string;
+}
 
 type Props = {
   form: UseFormReturn<AgencyProfileSchema>;
@@ -444,39 +459,45 @@ export const AgencySocialLinksForm = ({ form }: Props) => (
   </InfoCard>
 );
 
-export const AgencyIntegrationsForm = ({ form }: Props) => (
-  <InfoCard
-    title="Frontline Integrations"
-    description="The erxes messenger widget connected to this agency"
-  >
-    <InfoCard.Content className="grid grid-cols-2">
-      <Form.Field<AgencyProfileSchema, 'messengerIntegrationId'>
-        control={form.control}
-        name="messengerIntegrationId"
-        render={({ field }) => (
-          <Form.Item>
-            <Form.Label>Erxes Messenger Integration Id</Form.Label>
-            <Form.Control>
-              <Input {...field} readOnly placeholder="Not connected" />
-            </Form.Control>
-            <Form.Message />
-          </Form.Item>
-        )}
-      />
+export const AgencyIntegrationsForm = ({ form }: Props) => {
+  const { Component: SelectErxesMessenger } =
+    useRemoteComponent<SelectErxesMessengerProps>(
+      'frontline_ui',
+      'selectErxesMessenger',
+    );
 
-      <Form.Field<AgencyProfileSchema, 'widgetBundleUrl'>
-        control={form.control}
-        name="widgetBundleUrl"
-        render={({ field }) => (
-          <Form.Item>
-            <Form.Label>Widget Bundle Url</Form.Label>
-            <Form.Control>
-              <Input {...field} readOnly placeholder="Not connected" />
-            </Form.Control>
-            <Form.Message />
-          </Form.Item>
-        )}
-      />
-    </InfoCard.Content>
-  </InfoCard>
-);
+  return (
+    <InfoCard
+      title="Frontline Integrations"
+      description="The erxes messenger widget connected to this agency"
+    >
+      <InfoCard.Content className="grid grid-cols-2">
+        <Form.Field<AgencyProfileSchema, 'messengerIntegrationId'>
+          control={form.control}
+          name="messengerIntegrationId"
+          render={({ field }) => (
+            <Form.Item className="col-span-2">
+              <Form.Label>Erxes Messenger</Form.Label>
+              <Form.Control>
+                {SelectErxesMessenger ? (
+                  <SelectErxesMessenger
+                    value={field.value as string}
+                    onValueChange={({ integrationId, widgetBundleUrl }) => {
+                      field.onChange(integrationId);
+                      form.setValue('widgetBundleUrl', widgetBundleUrl);
+                    }}
+                    placeholder="Not connected"
+                    disabled
+                  />
+                ) : (
+                  <Skeleton className="h-9 w-full" />
+                )}
+              </Form.Control>
+              <Form.Message />
+            </Form.Item>
+          )}
+        />
+      </InfoCard.Content>
+    </InfoCard>
+  );
+};

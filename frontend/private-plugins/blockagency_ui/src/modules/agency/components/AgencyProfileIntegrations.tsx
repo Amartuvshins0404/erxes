@@ -1,11 +1,25 @@
-import { Form, InfoCard, Input } from 'erxes-ui';
+import { Form, InfoCard, Skeleton } from 'erxes-ui';
 import { useAgencyInfo } from '../hooks/useAgencyInfo';
 import { useForm } from 'react-hook-form';
 import { AgencyIntegrationsValues } from '../types/form';
 import { agencyIntegrationsSchema } from '../schema/form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useUpdateAgency } from '../hooks/useUpdateAgency';
+import { useRemoteComponent } from '../hooks/useRemoteComponent';
 import React from 'react';
+
+interface IEMSelectValue {
+  integrationId: string;
+  widgetBundleUrl: string;
+}
+
+interface SelectErxesMessengerProps {
+  value?: string;
+  onValueChange: (value: IEMSelectValue) => void;
+  placeholder?: string;
+  disabled?: boolean;
+  className?: string;
+}
 
 export const AgencyProfileIntegrations = () => {
   const { loading } = useAgencyInfo();
@@ -46,6 +60,12 @@ export const AgencyIntegrationsInfo = () => {
 
   const { updateAgency } = useUpdateAgency();
 
+  const { Component: SelectErxesMessenger, loading: remoteLoading } =
+    useRemoteComponent<SelectErxesMessengerProps>(
+      'frontline_ui',
+      'selectErxesMessenger',
+    );
+
   const handleSave = (patch: Partial<AgencyIntegrationsValues>) => {
     const values = { ...form.getValues(), ...patch };
     updateAgency({ variables: { input: values } });
@@ -58,48 +78,30 @@ export const AgencyIntegrationsInfo = () => {
           control={form.control}
           name="messengerIntegrationId"
           render={({ field }) => (
-            <Form.Item>
-              <Form.Label>Erxes Messenger Integration Id</Form.Label>
+            <Form.Item className="col-span-2">
+              <Form.Label>Erxes Messenger</Form.Label>
               <Form.Control>
-                <Input
-                  value={field.value}
-                  onChange={(event) => {
-                    field.onChange(event.currentTarget.value);
-                    handleSave({
-                      messengerIntegrationId: event.currentTarget.value,
-                    });
-                  }}
-                  placeholder="e.g. 64f1c2e2b1a2c3d4e5f6a7b8"
-                />
+                {SelectErxesMessenger ? (
+                  <SelectErxesMessenger
+                    value={field.value}
+                    onValueChange={({ integrationId, widgetBundleUrl }) => {
+                      field.onChange(integrationId);
+                      form.setValue('widgetBundleUrl', widgetBundleUrl);
+                      handleSave({
+                        messengerIntegrationId: integrationId,
+                        widgetBundleUrl,
+                      });
+                    }}
+                    placeholder="Select erxes messenger integration"
+                  />
+                ) : (
+                  <Skeleton className="h-9 w-full" />
+                )}
               </Form.Control>
               <Form.Description>
-                The integration id of the erxes messenger connected to this
-                agency's account.
-              </Form.Description>
-              <Form.Message />
-            </Form.Item>
-          )}
-        />
-
-        <Form.Field<AgencyIntegrationsValues, 'widgetBundleUrl'>
-          control={form.control}
-          name="widgetBundleUrl"
-          render={({ field }) => (
-            <Form.Item>
-              <Form.Label>Widget Bundle Url</Form.Label>
-              <Form.Control>
-                <Input
-                  value={field.value}
-                  onChange={(event) => {
-                    field.onChange(event.currentTarget.value);
-                    handleSave({ widgetBundleUrl: event.currentTarget.value });
-                  }}
-                  placeholder="https://example.com/widgets/build/widgetsBundle.js"
-                />
-              </Form.Control>
-              <Form.Description>
-                The bundle url used to embed the messenger widget on the
-                agency's website.
+                {remoteLoading
+                  ? 'Loading erxes messenger integrations…'
+                  : "The erxes messenger integration connected to this agency's account. Selecting one also sets its widget bundle url."}
               </Form.Description>
               <Form.Message />
             </Form.Item>

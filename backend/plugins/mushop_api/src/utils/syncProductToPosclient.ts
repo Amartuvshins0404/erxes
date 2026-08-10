@@ -81,7 +81,9 @@ export const syncProductToPosclient = async ({
     await crudData(subdomain, posToken, {
       type: 'product',
       action,
-      object: product,
+      external: true,
+      object: { ...product, status: 'active' },
+      updatedDocument: product,
     });
   } catch (e) {
     console.error('syncProductToPosclient error:', e);
@@ -106,5 +108,57 @@ export const removeProductFromPosclient = async ({
     });
   } catch (e) {
     console.error('removeProductFromPosclient error:', e);
+  }
+};
+
+export const syncCategoryToPosclient = async ({
+  subdomain,
+  posToken,
+  category,
+  action = 'update',
+}: {
+  subdomain: string;
+  posToken?: string;
+  category: Record<string, any>;
+  action?: 'create' | 'update';
+}): Promise<void> => {
+  if (!posToken || !category?._id) return;
+
+  const categoryIds = await getPosInitialCategoryIds(subdomain, posToken);
+
+  if (!categoryIds.includes(category._id)) return;
+
+  try {
+    await crudData(subdomain, posToken, {
+      type: 'productCategory',
+      action,
+      external: true,
+      object: category,
+      updatedDocument: category,
+    });
+  } catch (e) {
+    console.error('syncCategoryToPosclient error:', e);
+  }
+};
+
+export const removeCategoryFromPosclient = async ({
+  subdomain,
+  posToken,
+  categoryId,
+}: {
+  subdomain: string;
+  posToken?: string;
+  categoryId: string;
+}): Promise<void> => {
+  if (!posToken || !categoryId) return;
+
+  try {
+    await crudData(subdomain, posToken, {
+      type: 'productCategory',
+      action: 'delete',
+      object: { _id: categoryId },
+    });
+  } catch (e) {
+    console.error('removeCategoryFromPosclient error:', e);
   }
 };

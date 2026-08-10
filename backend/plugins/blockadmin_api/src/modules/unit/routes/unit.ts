@@ -182,6 +182,36 @@ router.post(
 );
 
 router.post(
+  '/blockToggleUnitLock',
+  async (
+    req: IRequest<IUnit, { locked: boolean }>,
+    res: IResponse,
+  ) => {
+    const { models } = res.locals as IContext;
+
+    try {
+      const { subdomain, payload } = req.body || {};
+
+      const { entityId, data } = payload || {};
+
+      const { locked } = data || {};
+
+      const unit = await models.Unit.getUnit(subdomain, entityId);
+
+      await models.Unit.updateUnit(subdomain, entityId, { ...unit, locked });
+
+      return res.status(200).json({
+        success: true,
+      });
+    } catch (error) {
+      return res.status(400).json({
+        error: error.message,
+      });
+    }
+  },
+);
+
+router.post(
   '/blockTransferUnit',
   async (req: IRequest<ITransferUnitPayload>, res: IResponse) => {
     const { models } = res.locals as IContext;

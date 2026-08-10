@@ -14,6 +14,7 @@ import {
   getMastraStore,
   scopedResource,
 } from '~/mastra/memory/mastraMemory';
+import { clampPage } from '@/_shared/auth';
 
 // ── Minimal native shapes we read (Mastra's own types are wider). ───────────
 interface NativeThread {
@@ -58,6 +59,8 @@ interface NativeMemoryFacade {
     filter?: { resourceId?: string; metadata?: Record<string, unknown> };
     orderBy?: { field: string; direction: 'ASC' | 'DESC' };
     perPage?: number | false;
+    // Zero-indexed page for offset pagination (defaults to 0 in the store).
+    page?: number;
   }): Promise<{ threads?: NativeThread[]; total?: number }>;
   createThread(args: {
     threadId: string;
@@ -80,11 +83,8 @@ interface NativeStoreFacade {
     messageIds: string[];
   }): Promise<{ messages: NativeMessage[] }>;
   // Storage-domain message write — patches content as a plain Mongo update.
-  // Deliberately NOT Memory.updateMessages: that one re-embeds the message and
-  // deletes/recreates its Qdrant vectors whenever semantic recall is configured
-  // (which it is here), so a metadata-only patch would pay an embed + vector
-  // round trip and, worse, abandon the whole patch on any embed/Qdrant hiccup.
-  // The store write touches only the message document. See patchNativeMessages.
+  // Deliberately NOT Memory.updateMessages so a metadata-only patch touches only
+  // the message document. See patchNativeMessages.
   updateMessages(args: {
     messages: { id: string; content: Record<string, unknown> }[];
   }): Promise<unknown>;
@@ -110,15 +110,12 @@ async function getNativeStore(subdomain: string): Promise<NativeStoreFacade> {
  * thinking, tool calls, attachments) via the STORAGE domain, bypassing
  * Memory.updateMessages on purpose.
  *
- * Memory.updateMessages re-embeds each message and deletes/recreates its Qdrant
- * vectors whenever semantic recall is on (it always is here). For a metadata-only
- * patch that is pure waste — the embeddable text (content.content) is unchanged —
- * and it is fragile: a single embed or Qdrant error there throws and abandons the
- * turn-end patch, which is exactly what was silently dropping thinking history on
- * reload (and, transitively, nulling the assistant-id the inline artifact cards
- * link to). The store write is a plain Mongo update of the message document: no
- * embeddings, no vector I/O. Best-effort — a write failure is logged, never
- * thrown, so it can't abort the rest of the turn-end work.
+ * Memory.updateMessages carries extra write semantics that can throw and abandon
+ * the turn-end patch — which is exactly what was silently dropping thinking
+ * history on reload (and, transitively, nulling the assistant-id the inline
+ * artifact cards link to). The store write is a plain Mongo update of the message
+ * document. Best-effort — a write failure is logged, never thrown, so it can't
+ * abort the rest of the turn-end work.
  */
 export async function patchNativeMessages(
   subdomain: string,
@@ -165,10 +162,15 @@ export interface ErxesThread {
   threadId: string;
   agentId: string | null;
   title: string;
-  messageCount: number;
   lastMessageAt: Date | null;
   createdAt: Date | null;
   updatedAt: Date | null;
+}
+
+/** A page of a user's threads + the total for the filter (drives "load more"). */
+export interface ErxesThreadPage {
+  list: ErxesThread[];
+  totalCount: number;
 }
 export interface ErxesMessage {
   _id: string;
@@ -183,16 +185,16 @@ export interface ErxesMessage {
   createdAt: Date | null;
 }
 
-/** Translate a native thread (+ its derived message count) to the UI's
- *  MastraThread shape, surfacing agentId from metadata. */
-function toErxesThread(t: NativeThread, messageCount: number): ErxesThread {
+/** Translate a native thread to the UI's MastraThread shape, surfacing agentId
+ *  from metadata. The session list shows only the title, so no message count is
+ *  derived here — see listOwnedThreads. */
+function toErxesThread(t: NativeThread): ErxesThread {
   const meta = (t.metadata ?? {}) as { agentId?: string };
   return {
     _id: t.id,
     threadId: t.id,
     agentId: meta.agentId ?? null,
     title: t.title ?? '',
-    messageCount,
     lastMessageAt: t.updatedAt ?? t.createdAt ?? null,
     createdAt: t.createdAt ?? null,
     updatedAt: t.updatedAt ?? null,
@@ -265,26 +267,47 @@ async function withMessageCounts<T, R>(
   return out;
 }
 
-/** A user's own threads for an agent (newest first), in the UI shape. */
+// Default/max page sizes for the session sidebar. The list is loaded a page at a
+// time (newest first) so its cost stays O(perPage) no matter how many sessions a
+// user accumulates — it never fetches the whole history up front.
+const THREADS_DEFAULT_PER_PAGE = 30;
+const THREADS_MAX_PER_PAGE = 100;
+
+/**
+ * One page of a user's own threads for an agent (newest first), in the UI shape.
+ *
+ * This is a single indexed store read — it deliberately does NOT derive a
+ * per-thread message count. The sidebar renders only the title, and counting
+ * messages meant one extra recall per thread (an N+1 that grew linearly with the
+ * session count and dominated the list's load time). Pagination + dropping that
+ * count keep this O(perPage).
+ *
+ * `page` is 1-indexed at this boundary (GraphQL convention) and mapped to the
+ * store's 0-indexed page.
+ */
 export async function listOwnedThreads(
   subdomain: string,
   userId: string,
   agentId: string,
-): Promise<ErxesThread[]> {
+  page = 1,
+  perPage = THREADS_DEFAULT_PER_PAGE,
+): Promise<ErxesThreadPage> {
   const memory = await getNativeMemory(subdomain);
   const resourceId = scopedResource(subdomain, userId);
+  const { page: safePage, perPage: safePerPage } = clampPage(page, perPage, {
+    def: THREADS_DEFAULT_PER_PAGE,
+    max: THREADS_MAX_PER_PAGE,
+  });
   const res = await memory.listThreads({
     filter: { resourceId, metadata: { agentId } },
     orderBy: { field: 'updatedAt', direction: 'DESC' },
-    perPage: false,
+    perPage: safePerPage,
+    page: safePage - 1,
   });
-  const threads = res?.threads ?? [];
-  return withMessageCounts(
-    memory,
-    threads,
-    (t) => ({ id: t.id, resourceId }),
-    (t, count) => toErxesThread(t, count),
-  );
+  return {
+    list: (res?.threads ?? []).map(toErxesThread),
+    totalCount: res?.total ?? 0,
+  };
 }
 
 /**
@@ -388,6 +411,41 @@ export async function getOwnedThreadMessages(
   return (res?.messages ?? []).map(toErxesMessage);
 }
 
+/**
+ * Read a thread's messages under an EXPLICIT resource — no ownership check.
+ *
+ * SECURITY: this primitive performs NO ownership/authorization check of its own.
+ * Callers MUST authorize (e.g. agent-access) BEFORE calling, and MUST derive
+ * threadId/resourceId from trusted SERVER state — never from raw caller input.
+ * Wiring caller-influenced ids in here would let any caller read any thread.
+ *
+ * Unlike getOwnedThreadMessages this does NOT scope the resource to the viewer:
+ * the caller passes the exact resourceId the thread lives under and is fully
+ * responsible for authorizing the read BEFORE calling. Used by the schedule
+ * transcript query, which authorizes by AGENT ACCESS (canUserAccessAgent) and
+ * then reads the schedule's dedicated output thread under the schedule's OWN
+ * background resource (scopedResource(subdomain, `schedule:<id>`)) — the same
+ * resource its runs wrote under — never the viewer's. A missing thread (schedule
+ * that has not run yet) reads back as an empty transcript rather than throwing.
+ */
+export async function getThreadMessagesByResource(
+  subdomain: string,
+  threadId: string,
+  resourceId: string,
+): Promise<ErxesMessage[]> {
+  const memory = await getNativeMemory(subdomain);
+  const thread = await memory.getThreadById({ threadId, resourceId });
+  if (!thread) return [];
+  const res = await memory.recall({
+    threadId,
+    resourceId,
+    perPage: false,
+    page: 0,
+    orderBy: { field: 'createdAt', direction: 'ASC' },
+  });
+  return (res?.messages ?? []).map(toErxesMessage);
+}
+
 /** Rename a thread the caller owns. Records titleSource='manual' so native
  *  generateTitle (which only fires while the title is empty) never overrides it. */
 export async function renameOwnedThread(
@@ -405,10 +463,7 @@ export async function renameOwnedThread(
     title,
     metadata: { ...(thread.metadata ?? {}), titleSource: 'manual' },
   });
-  return toErxesThread(
-    updated,
-    await countMessages(memory, threadId, resourceId),
-  );
+  return toErxesThread(updated);
 }
 
 /** Delete a thread the caller owns (and its messages + vectors). */
@@ -423,18 +478,6 @@ export async function removeOwnedThread(
   if (!thread) throw new ExpectedError('Thread not found');
   await memory.deleteThread(threadId);
   return { ok: 1 };
-}
-
-/** Throw "Thread not found" unless the caller owns the thread (resource scope). */
-export async function assertOwnedThread(
-  subdomain: string,
-  userId: string,
-  threadId: string,
-): Promise<void> {
-  const memory = await getNativeMemory(subdomain);
-  const resourceId = scopedResource(subdomain, userId);
-  const thread = await memory.getThreadById({ threadId, resourceId });
-  if (!thread) throw new ExpectedError('Thread not found');
 }
 
 /** Current native title for a thread (for the SSE thread_title push). */

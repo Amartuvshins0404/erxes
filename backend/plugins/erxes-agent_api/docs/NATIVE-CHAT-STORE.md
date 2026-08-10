@@ -34,7 +34,7 @@ bridge, for the same irreducible custom core.)
 | List threads / get messages | ✅ `listThreads({ filter:{ resourceId, metadata } })`, `listMessages`, `getThreadById` | **use native** — drop custom read layer |
 | Thread title generation | ✅ `Memory({ options:{ threads:{ generateTitle } } })` | **use native** — drop `titler.ts`'s LLM call (thin precedence guard remains, §6) |
 | Recent-history replay | ✅ `lastMessages` | **use native** — already (#8058) |
-| Semantic recall / working memory | ✅ native + Qdrant | **use native** — already (#8058) |
+| Working memory | ✅ native | **use native** — already (#8058) |
 | Streaming engine | ✅ `agent.stream()` | **use native** — erxes shell just relays chunks |
 | Tool-call / reasoning capture | ✅ native `content.parts` | **use native**, translate to the UI shape |
 | **Auth + tool execution via the erxes gateway** | ❌ Mastra can't (tools are erxes meta-tools, run with the user's token) | **custom** (the agent + tools, unchanged) |
@@ -66,8 +66,8 @@ mastraAgentChat (fallback) ─▶│ erxes shell: auth · tenancy · UI contract
                          agent.generate/stream(msg, { memory:{thread,resource} })
                                             │  (Mastra owns the engine)
                                             ▼
-                  Mastra Memory ── persist · recall · workingMemory · generateTitle
-                    └─ MongoDBStore(erxes_mastra_memory) + QdrantVector
+                  Mastra Memory ── persist · workingMemory · generateTitle
+                    └─ MongoDBStore(erxes_mastra_memory)
                                             │
 UI (unchanged) ◀─ GraphQL/SSE translate native ⇄ MastraThread/MastraMessage ◀─┘
 ```
@@ -183,7 +183,6 @@ When `ERXES_AGENT_NATIVE_CHAT_STORE=enable`:
 | `titler.ts` | LLM-call path removed; only the manual-precedence guard remains (§5) |
 | `learning/worker.ts` | idle/undistilled query + cursor against native threads (`metadata.distilledMessageCount`); messages via native list |
 | feedback (`mastraMessageFeedback`) | keys off the native message id; ownership via `resourceId` |
-| `schedules/runner.ts` | schedule output threads via the native store |
 | `session/db/*` custom models | removed in the final cleanup phase |
 
 ---

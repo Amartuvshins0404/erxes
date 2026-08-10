@@ -1,8 +1,7 @@
 import { CurrencyField, Input, Label, Separator } from 'erxes-ui';
 import { PricingDetail } from '@/pricing/components/PricingDetail';
-import { SelectTenureType } from '@/unit/components/SelectTenureType';
 import { SelectUnitStatus } from '@/unit/components/SelectUnitStatus';
-import { SelectUsageType } from '@/unit/components/SelectUsageType';
+import { SelectUnitType } from '@/unit/components/SelectUnitType';
 import { useUnitContext } from '@/unit/context/unitContext';
 import { useUnitUpdate } from '@/unit/hooks/useUnitUpdate';
 import { useEffect, useState } from 'react';
@@ -34,17 +33,10 @@ export const UnitDetailOverview = () => {
           />
         </div>
         <div className="space-y-2">
-          <Label>Usage Type</Label>
-          <SelectUsageType
+          <Label>Unit Type</Label>
+          <SelectUnitType
             value={unit.type}
             onValueChange={(value) => updateUnit({ type: value })}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label>Tenure Type</Label>
-          <SelectTenureType
-            value={unit.tenureType}
-            onValueChange={(value) => updateUnit({ tenureType: value })}
           />
         </div>
         <div className="space-y-2">
@@ -52,7 +44,6 @@ export const UnitDetailOverview = () => {
           <SelectUnitStatus
             value={unit.status}
             onValueChange={(value) => updateUnit({ status: value })}
-            tenureType={unit.tenureType}
           />
         </div>
       </div>

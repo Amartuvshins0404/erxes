@@ -27,6 +27,8 @@ const mushopMemberships: Resolver = async (
 ) => {
   const { searchValue, status, ...cursorParams } = params;
 
+  await models.Membership.expireStale();
+
   const query: Record<string, any> = {};
 
   if (status) query.status = status;
@@ -68,7 +70,7 @@ const mushopMembershipDetail: Resolver = async (
   { _id },
   { models }: IContext,
 ) => {
-  return models.Membership.findOne({ _id }).lean();
+  return models.Membership.expireIfStale(_id);
 };
 
 export const membershipQueries = {

@@ -1,14 +1,11 @@
 import { ExpectedError } from 'erxes-api-shared/utils';
 import { IContext } from '~/connectionResolvers';
-import { computeLearningStatus } from '~/mastra/learning/config';
 import { MastraLearningStatus } from '@/learning/@types/learning';
-import { assertOwnedThread } from '@/session/nativeStore';
-
-/** Throws unless a logged-in user is on the context; returns their _id. */
-function requireUserId(user: { _id?: string } | null | undefined): string {
-  if (!user?._id) throw new ExpectedError('Login required');
-  return user._id;
-}
+import { assertThreadOwned } from '@/session/nativeStore';
+import { requireUserId } from '@/_shared/auth';
+import { getWorkflowAgentAccess } from '@/workflow/authorization';
+import { requireScopedLearning } from '@/learning/authorization';
+import { ERXES_AGENT_ACTIONS } from '~/meta/permissionActions';
 
 // Field resolver: expose only the COUNT of hashed contributors, never the
 // hashes themselves.
@@ -30,15 +27,30 @@ export const learningQueries = {
       page?: number;
       perPage?: number;
     },
-    { models, user, checkPermission }: IContext,
+    { models, subdomain, user, checkPermission }: IContext,
   ) => {
-    await checkPermission('learningView');
+    await checkPermission(ERXES_AGENT_ACTIONS.learning.read);
     requireUserId(user);
+    const { scope, agentIds } = await getWorkflowAgentAccess({
+      models,
+      subdomain,
+      user,
+      action: ERXES_AGENT_ACTIONS.learning.read,
+    });
+    if (args.agentId && !agentIds.includes(args.agentId)) {
+      throw new ExpectedError('Learning not found');
+    }
+
     return models.MastraLearning.listLearnings(
       {
-        status: args.status as MastraLearningStatus | undefined,
+        status:
+          scope === 'all'
+            ? (args.status as MastraLearningStatus | undefined)
+            : 'approved',
         type: args.type,
         agentId: args.agentId,
+        agentIds: args.agentId ? undefined : agentIds,
+        includeUnassigned: scope !== 'own',
         searchValue: args.searchValue,
       },
       args.page || 1,
@@ -49,31 +61,41 @@ export const learningQueries = {
   mastraLearning: async (
     _: unknown,
     { _id }: { _id: string },
-    { models, user, checkPermission }: IContext,
+    { models, subdomain, user, checkPermission }: IContext,
   ) => {
-    await checkPermission('learningView');
+    await checkPermission(ERXES_AGENT_ACTIONS.learning.read);
     requireUserId(user);
-    return models.MastraLearning.findOne({ _id });
+    const { learning, access } = await requireScopedLearning({
+      models,
+      subdomain,
+      user,
+      action: ERXES_AGENT_ACTIONS.learning.read,
+      learningId: _id,
+    });
+    if (access.scope !== 'all' && learning.status !== 'approved') {
+      throw new ExpectedError('Learning not found');
+    }
+    return learning;
   },
 
   mastraLearningStats: async (
     _: unknown,
     __: unknown,
-    { models, user, checkPermission }: IContext,
+    { models, subdomain, user, checkPermission }: IContext,
   ) => {
-    await checkPermission('learningView');
+    await checkPermission(ERXES_AGENT_ACTIONS.learning.read);
     requireUserId(user);
-    return models.MastraLearning.getStats();
-  },
-
-  mastraLearningStatus: async (
-    _: unknown,
-    __: unknown,
-    { user, checkPermission }: IContext,
-  ) => {
-    await checkPermission('learningView');
-    requireUserId(user);
-    return computeLearningStatus();
+    const { scope, agentIds } = await getWorkflowAgentAccess({
+      models,
+      subdomain,
+      user,
+      action: ERXES_AGENT_ACTIONS.learning.read,
+    });
+    return models.MastraLearning.getStats({
+      agentIds,
+      includeUnassigned: scope !== 'own',
+      approvedOnly: scope !== 'all',
+    });
   },
 
   // The caller's own votes for a thread, keyed by messageId — drives the
@@ -83,9 +105,9 @@ export const learningQueries = {
     { threadId }: { threadId: string },
     { models, user, subdomain, checkPermission }: IContext,
   ) => {
-    await checkPermission('agentsChat');
+    await checkPermission(ERXES_AGENT_ACTIONS.agent.chat);
     const userId = requireUserId(user);
-    await assertOwnedThread(subdomain, userId, threadId);
+    await assertThreadOwned(subdomain, userId, threadId);
     const docs = await models.MastraFeedback.find({ threadId, userId });
     const byMessage: Record<string, { rating: number; comment?: string }> = {};
     for (const d of docs) {

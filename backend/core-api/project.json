@@ -50,6 +50,14 @@
     "docker-build": {
       "dependsOn": ["build"],
       "command": "docker build -f backend/core-api/Dockerfile . -t erxes/erxes-next-core-api"
+    },
+
+    "test": {
+      "executor": "@nx/jest:jest",
+      "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
+      "options": {
+        "jestConfig": "backend/core-api/jest.config.ts"
+      }
     }
   }
 }

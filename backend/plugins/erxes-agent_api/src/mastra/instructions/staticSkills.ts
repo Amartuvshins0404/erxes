@@ -46,18 +46,71 @@ CSV, or XML yourself — the tools do the rendering.
   Put one logical table per sheet; name sheets meaningfully.
 - Do NOT encode a table as markdown here — use the structured sheets.
 
-## generatePptx — input { title, markdown, charts? }
-- Author the deck as Markdown, ONE slide per section. Separate slides with a line
-  containing only \`---\`, OR start each slide with a \`#\` / \`##\` heading.
-- On each slide the FIRST heading becomes the slide title; the remaining lines
-  (bullets / short paragraphs) become the slide's bullet points. Keep bullets
-  short — slides are not paragraphs.
+## generatePptx — input { title, slides, charts? }
+Produce a designer-quality, on-brand deck. \`slides\` is an ordered array (1–40);
+each slide is a self-contained HTML body string. Slides render to branded images
+server-side — author with the FIXED house class vocabulary below (Satori applies
+inline styles + these classes only; flexbox layout, NO grid/float/<style>).
+
+Rules:
+- ONE idea per slide. The canvas is a FIXED 16:9 — a slide that holds more than
+  the budget below is scaled down whole to fit, so its text renders smaller
+  than designed. Stay inside the budget; slides are free, so SPLIT instead:
+  - max 5 bullets per slide, one line (≤ 12 words) each;
+  - a bullet with a bold name + description line counts as TWO lines — max 4
+    of those per slide (or 8 in a two-column row of two \`bullets\` columns);
+  - headline ≤ 6 words; \`lead\` ≤ 2 lines; with a chart on the slide, halve
+    the text budget.
+  A list longer than the budget becomes several slides ("Standouts 1/2",
+  "Standouts 2/2") or a two-column slide — never one overstuffed slide.
+- Every slide's root element is \`<div class="slide ...">\`. Make TITLE and SECTION
+  slides distinct (indigo field, white headline) — do NOT repeat one bland
+  white-title-plus-bullets layout on every slide.
+- Layout is flexbox: compose with \`row\`/\`col\`/\`grow\`/\`gap-*\`/\`between\`/\`items-center\`.
+- Reference a chart with \`<img src="chart:ID">\` (pass it in \`charts\`).
+
+House vocabulary (compose freely, space-separated):
+- Root: \`slide\` (light). Variants: \`slide-indigo\`, \`slide-dark\`, \`slide-soft\`,
+  \`slide-center\` (vertically center content).
+- Flex: \`row\`, \`col\`, \`grow\`, \`grow2\`, \`center\`, \`items-center\`, \`items-start\`,
+  \`between\`, \`justify-center\`, \`justify-end\`, \`wrap\`, \`gap-xs|sm|md|lg\`,
+  \`full-h\`, \`full-w\`, \`mt-auto\`.
+- Spacing: \`mt-sm|md|lg\`, \`mb-sm|md|lg\`.
+- Type: \`eyebrow\` (indigo kicker), \`title\` (hero), \`h1\`, \`h2\`, \`h3\`, \`lead\`,
+  \`body\`, \`small\`, \`bold\`; colors \`text-white\`, \`text-indigo\`, \`text-ink\`,
+  \`text-muted\`, \`text-soft\` (on dark), \`text-center\`.
+- Decoration: \`accent-bar\` (indigo) / \`accent-bar-white\`.
+- Bullets: \`bullets\` wrapper; each item \`<div class="bullet"><span class="dot">
+  </span><span>…</span></div>\` (use \`dot-white\` on dark/indigo).
+- Surfaces: \`card\`, \`card-outline\`, \`card-indigo\`, \`card-soft-indigo\`.
+- Stats: \`stat\` (huge number) + \`stat-label\`.
+- Badges: \`pill\` / \`pill-white\`. Footer: \`footer\`.
+- Chart: wrap the image — \`<div class="chart-frame"><img class="chart" src="chart:ID"></div>\`.
+
+Worked examples (match this shape EXACTLY):
+
+Title slide —
+\`<div class="slide slide-indigo slide-center"><div class="eyebrow text-white">erxes · 2026</div><div class="title text-white mt-md">Customer Growth Review</div><div class="lead text-soft mt-md">Q2 performance and the road ahead</div><div class="footer text-soft">Prepared for the leadership team</div></div>\`
+
+Bullet slide —
+\`<div class="slide"><div class="accent-bar mb-md"></div><div class="h1">What changed this quarter</div><div class="bullets mt-lg"><div class="bullet"><span class="dot"></span><span>Net revenue retention climbed to 118%</span></div><div class="bullet"><span class="dot"></span><span>Onboarding time cut from 14 to 6 days</span></div><div class="bullet"><span class="dot"></span><span>Support CSAT held above 4.6 / 5</span></div></div></div>\`
+
+Two-column with chart —
+\`<div class="slide"><div class="h2 mb-md">Revenue by segment</div><div class="row grow gap-lg items-center"><div class="grow gap-sm"><div class="body">Enterprise overtook SMB for the first time, driving most of the quarter's lift.</div><div class="pill mt-md">+24% QoQ</div></div><div class="grow2"><div class="chart-frame"><img class="chart" src="chart:revenue"></div></div></div></div>\`
+
+Big-stat / section slide —
+\`<div class="slide slide-dark slide-center"><div class="eyebrow">Outcome</div><div class="row items-center gap-lg mt-md"><div class="stat text-white">3.2x</div><div class="col"><div class="h2 text-white">Pipeline created</div><div class="small text-soft">vs. same period last year</div></div></div></div>\`
+
+Two-column list (6–8 name+description items) —
+\`<div class="slide"><div class="accent-bar mb-md"></div><div class="h1">Winter standouts</div><div class="row gap-lg mt-lg"><div class="bullets grow"><div class="bullet"><span class="dot"></span><span><span class="bold">Ndea</span> — $43M AGI lab</span></div><div class="bullet"><span class="dot"></span><span><span class="bold">Beacon</span> — AI primary care</span></div></div><div class="bullets grow"><div class="bullet"><span class="dot"></span><span><span class="bold">Byteport</span> — 10x faster than TCP</span></div><div class="bullet"><span class="dot"></span><span><span class="bold">Silmaril</span> — prompt-injection defense</span></div></div></div></div>\`
 
 ## Embedding a chart in any document or slide
 1. Call **renderChart** first to create the chart; keep its returned chart id + spec.
 2. Pass that chart in the tool's \`charts\` array (each entry is \`{ id, spec }\`).
-3. Reference it in the markdown as an image: \`![Chart title](chart:THAT_ID)\`.
-   (For generateXlsx, passed charts are added on a "Charts" tab — no markdown ref.)
+3. Reference it where the file is authored: in markdown as \`![Chart title](chart:THAT_ID)\`
+   (generatePdf/generateDocx), or in slide HTML as \`<img src="chart:THAT_ID">\`
+   (generatePptx).
+   (For generateXlsx, passed charts are added on a "Charts" tab — no ref needed.)
 The same chart then appears identically in chat and in the file.
 
 ## Reading a file (file_reader)
@@ -80,7 +133,43 @@ The same chart then appears identically in chat and in the file.
 `.trim(),
 };
 
-export const STATIC_SKILLS: StaticSkill[] = [DOCUMENT_CREATION_SKILL];
+const PRODUCT_IMAGE_SKILL: StaticSkill = {
+  name: 'product-image-cleanup',
+  description:
+    'Remove photo backgrounds and set the cut-out as a product image.',
+  triggerTools: ['removeImageBackground'],
+  instructions: `
+When the user wants an image's background removed (typically a product photo),
+call **removeImageBackground**:
+- For an image the user ATTACHED to the message, pass \`key\` — the exact key
+  from the message's "Attached files" manifest.
+- For an image given as a public link, pass \`url\`.
+- \`title\`: a short human name for the result (e.g. the product name).
+
+The transparent PNG opens in the Preview panel automatically. Tell the user in
+ONE plain sentence that it is ready there — never expose file keys, URLs,
+artifact ids, or tool names.
+
+## Setting it as a product image
+Only when the user asks for the cut-out to be put on a product:
+1. Find the product (search by name if you only have a name).
+2. Call the erxes operation \`productsEdit\` with the product's \`_id\` and pass
+   the tool result's \`attachment\` object VERBATIM as the \`attachment\`
+   argument. Do not invent or rewrite its fields.
+If the tool result has NO \`attachment\` field, this instance has no cloud file
+storage — the image can still be downloaded from the Preview panel, but cannot
+be attached to a product; say so plainly.
+
+## Batches
+For several photos, process them one at a time (each call returns its own
+preview + attachment) and keep the user posted on progress.
+`.trim(),
+};
+
+export const STATIC_SKILLS: StaticSkill[] = [
+  DOCUMENT_CREATION_SKILL,
+  PRODUCT_IMAGE_SKILL,
+];
 
 /** Static skills whose trigger tools are present in the bound tool set. */
 export function staticSkillsFor(toolKeys: Iterable<string>): StaticSkill[] {

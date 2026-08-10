@@ -7,11 +7,14 @@ import {
 import { useAutomationNodes } from '@/automations/hooks/useAutomationNodes';
 import { AutomationBuilderTabsType, NodeData } from '@/automations/types';
 import { TAutomationBuilderForm } from '@/automations/utils/automationFormDefinitions';
+import { setAutomationSettingsReturnPath } from '@/automations/utils/settingsReturn';
 import { useMutation } from '@apollo/client';
 import { Node, useReactFlow } from '@xyflow/react';
 import { toast } from 'erxes-ui';
+import { useAtomValue } from 'jotai';
 import { SubmitErrorHandler, useFormContext } from 'react-hook-form';
-import { useNavigate, useParams } from 'react-router';
+import { useLocation, useNavigate, useParams } from 'react-router';
+import { currentUserState } from 'ui-modules';
 
 export const useAutomationHeader = () => {
   const {
@@ -21,8 +24,13 @@ export const useAutomationHeader = () => {
     formState: { isDirty },
   } = useFormContext<TAutomationBuilderForm>();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const currentUser = useAtomValue(currentUserState);
+  const { setQueryParams, detail } = useAutomation();
+  const automationId = detail?._id;
+  const automationCreatedBy = detail?.createdBy;
 
-  const { setQueryParams } = useAutomation();
+  const isAutomationCreator = currentUser?._id === automationCreatedBy;
   const { actions, triggers } = useAutomationNodes();
 
   const { getNode } = useReactFlow();
@@ -116,6 +124,7 @@ export const useAutomationHeader = () => {
       // Use the new error handler
       handleNodeErrors(nodeErrorMap);
     } else {
+      console.log({ errors });
       const errorKeys = Object.keys(errors || {});
       if (errorKeys?.length > 0) {
         const { message, ref } =
@@ -138,6 +147,9 @@ export const useAutomationHeader = () => {
   const toggleTabs = (value: AutomationBuilderTabsType) =>
     setQueryParams({ activeTab: value });
 
+  const gotoAutomationSettings = () =>
+    setAutomationSettingsReturnPath(pathname);
+
   return {
     isDirty,
     loading,
@@ -145,5 +157,9 @@ export const useAutomationHeader = () => {
     handleSave,
     handleError,
     toggleTabs,
+    automationId,
+    automationCreatedBy,
+    isAutomationCreator,
+    gotoAutomationSettings,
   };
 };

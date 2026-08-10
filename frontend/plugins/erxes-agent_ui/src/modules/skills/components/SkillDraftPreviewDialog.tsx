@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useMemo } from 'react';
 import { IconRocket, IconSparkles } from '@tabler/icons-react';
 import { Badge, Button, Dialog, Form, Spinner, toast } from 'erxes-ui';
 import { useForm } from 'react-hook-form';
@@ -7,7 +7,10 @@ import { SkillFormFields } from './SkillFormFields';
 import { useSkill } from '../hooks/useSkill';
 import { useSaveSkill } from '../hooks/useSaveSkill';
 import { useSkillMutations } from '../hooks/useSkillMutations';
-import { showSkillPermissionError, useSkillAccess } from '../hooks/useSkillAccess';
+import {
+  showSkillPermissionError,
+  useSkillAccess,
+} from '../hooks/useSkillAccess';
 import { skillFormToDoc, stringifyMetadata } from '../utils';
 import {
   SKILL_FORM_DEFAULTS,
@@ -32,12 +35,31 @@ export const SkillDraftPreviewDialog = ({
   /** Called after the draft is published/saved so the chat can clear its banner. */
   onDone?: () => void;
 }) => {
-  const { canEdit } = useSkillAccess();
+  const { canEdit, canPublish } = useSkillAccess();
   const { skill, loading } = useSkill(open && skillId ? skillId : undefined);
+
+  // Populate the form from the loaded draft the moment it arrives. Feeding the
+  // distilled skill through react-hook-form's `values` lets RHF reset the fields
+  // on data change directly — no effect faking a "skill loaded" event handler.
+  const values = useMemo<SkillFormValues | undefined>(
+    () =>
+      open && skill
+        ? {
+            name: skill.name || '',
+            description: skill.description || '',
+            instructions: skill.instructions || '',
+            userInvocable: skill.userInvocable ?? true,
+            category: skill.category || '',
+            metadataText: stringifyMetadata(skill.metadata),
+          }
+        : undefined,
+    [open, skill],
+  );
 
   const form = useForm<SkillFormValues>({
     resolver: zodResolver(skillFormSchema),
     defaultValues: SKILL_FORM_DEFAULTS,
+    values,
   });
 
   // No toast on save here — the explicit Save/Publish handlers below own the
@@ -50,19 +72,6 @@ export const SkillDraftPreviewDialog = ({
     onDone?.();
     onOpenChange(false);
   });
-
-  useEffect(() => {
-    if (open && skill) {
-      form.reset({
-        name: skill.name || '',
-        description: skill.description || '',
-        instructions: skill.instructions || '',
-        userInvocable: skill.userInvocable ?? true,
-        category: skill.category || '',
-        metadataText: stringifyMetadata(skill.metadata),
-      });
-    }
-  }, [open, skill, form]);
 
   const toDoc = (values: SkillFormValues) => {
     const { doc, metadataError } = skillFormToDoc(values);
@@ -92,7 +101,7 @@ export const SkillDraftPreviewDialog = ({
 
   const handlePublish = async () => {
     if (!skillId) return;
-    if (!canEdit) return showSkillPermissionError('publish');
+    if (!canEdit || !canPublish) return showSkillPermissionError('publish');
     const doc = toDoc(form.getValues());
     if (!doc) return;
     try {
@@ -149,7 +158,7 @@ export const SkillDraftPreviewDialog = ({
                   type="button"
                   size="sm"
                   onClick={handlePublish}
-                  disabled={saving || publishing || !canEdit}
+                  disabled={saving || publishing || !canEdit || !canPublish}
                 >
                   <IconRocket className="size-4" /> Publish
                 </Button>

@@ -22,8 +22,10 @@ lives in `erxes-private`. So the host cannot provide it by redeploy alone.
 them into the plugin chunk — making charts work against ANY `core_ui` version
 and immune to this host/plugin skew going forward.
 
-**Keep in sync:** these files are copies of
-`frontend/libs/erxes-ui/src/modules/charts/*` and
-`backend/plugins/erxes-agent_api/src/mastra/charts/echartsOption.ts`. The mapper
-must stay behavior-identical across all three so a chart looks the same in chat,
-in the Preview panel, and inside generated PDFs/DOCX/XLSX.
+**Keep in sync:** these files are copies of `frontend/libs/erxes-ui/src/modules/charts/*`.
+The browser mappers (erxes-ui and this local copy) intentionally differ from the backend
+mapper (`echartsOption.ts`) in theme colors, gradients, animations, and drilldown support —
+those are browser-only features that don't make sense in a Node.js PDF/canvas render context.
+What must stay aligned across all three is the **ChartSpec schema** and the **chart-type
+dispatch** (same types produce the same chart shape). When updating this local copy, sync the
+same change to `frontend/libs/erxes-ui/src/modules/charts/` and vice-versa.

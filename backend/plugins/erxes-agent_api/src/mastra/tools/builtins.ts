@@ -7,14 +7,14 @@ import {
   stripAllTags,
   stripScriptAndStyleBlocks,
 } from '~/mastra/html';
-import { companyKnowledgeTool } from '~/mastra/knowledge/knowledgeTool';
-import { agentKnowledgeTool } from '~/mastra/learning/learningTool';
 import { fileReaderTool } from './fileReaderTool';
 import { WORKFLOW_BUILTIN_TOOLS } from './workflowTools';
 import { chartSpecSchema, sanitizeChartSpec } from '~/mastra/charts/chartSpec';
-import { chartArtifactSchema, newArtifactId } from './artifacts';
+import { chartArtifactSchema, diagramArtifactSchema, newArtifactId } from './artifacts';
 import { storeArtifact } from '~/mastra/artifactStore';
 import { DOCUMENT_BUILTIN_TOOLS } from './documentTools';
+import { IMAGE_BUILTIN_TOOLS } from './imageTools';
+import { faviconFor, hostnameOf, SEARCH_ENGINE } from './searchEngine';
 
 const FETCH_TIMEOUT_MS = 10_000;
 const UA = 'Mozilla/5.0 (compatible; erxes-agent/1.0)';
@@ -23,6 +23,10 @@ interface SearchResult {
   title: string;
   url: string;
   snippet: string;
+  // Hostname (e.g. "ycombinator.com") + its real favicon, so the UI can render
+  // a Claude-style result row without constructing any URL itself.
+  source: string;
+  favicon: string;
 }
 
 /** Strip HTML tags, decode entities, and collapse whitespace. */
@@ -60,6 +64,8 @@ async function ddgSearch(
       title: stripTags(match[2]),
       url: target,
       snippet: stripTags(match[3]),
+      source: hostnameOf(target),
+      favicon: faviconFor(target),
     });
   }
   return results;
@@ -74,16 +80,21 @@ export const webSearchTool = createTool({
     limit: z.number().int().min(1).max(10).default(5).describe('Max results'),
   }),
   outputSchema: z.object({
+    // The engine identity (name + real favicon) backs the result-card header,
+    // so the UI never hard-codes which search engine produced these.
+    engine: z.object({ name: z.string(), icon: z.string() }),
     results: z.array(
       z.object({
         title: z.string(),
         url: z.string(),
         snippet: z.string(),
+        source: z.string(),
+        favicon: z.string(),
       }),
     ),
   }),
   execute: async ({ query, limit }) => {
-    return { results: await ddgSearch(query, limit ?? 5) };
+    return { engine: SEARCH_ENGINE, results: await ddgSearch(query, limit ?? 5) };
   },
 });
 
@@ -101,6 +112,9 @@ export const fetchUrlTool = createTool({
   outputSchema: z.object({
     url: z.string(),
     title: z.string(),
+    // Hostname + its real favicon so the UI can render a "Reading <site>" chip.
+    siteName: z.string(),
+    favicon: z.string(),
     content: z.string(),
   }),
   execute: async ({ url }) => {
@@ -122,6 +136,8 @@ export const fetchUrlTool = createTool({
     return {
       url: finalUrl,
       title,
+      siteName: hostnameOf(finalUrl),
+      favicon: faviconFor(finalUrl),
       content: content || 'No readable content found.',
     };
   },
@@ -263,7 +279,15 @@ export const renderChartTool = createTool({
     'stackedBar, pie, donut, radar, combo, or scatter). The chart opens in the ' +
     'Preview panel beside the chat. Use this whenever the user asks to see data ' +
     'as a chart, graph, or plot. The returned chart id can be reused to embed ' +
-    'the same chart inside a generated PDF/DOCX/XLSX document.',
+    'the same chart inside a generated PDF/DOCX/XLSX document. ' +
+    'Use the optional `drilldowns` field to add a clickable detail view: provide ' +
+    'a map of data-row label → sub-ChartSpec. For example, a pie chart of employees ' +
+    'per department can include a drilldown for each department showing the team ' +
+    'breakdown — clicking the slice opens the detail chart automatically. ' +
+    'The optional `controls` array mounts local range/threshold/toggle/param ' +
+    'controls under the chart (applied client-side — they never re-invoke you), ' +
+    'and `formulas` + param controls make series recompute live in the browser, ' +
+    'so parameter-driven what-if charts ARE supported.',
   inputSchema: chartSpecSchema,
   outputSchema: z.object({ artifact: chartArtifactSchema }),
   execute: async (input) => {
@@ -279,17 +303,44 @@ export const renderChartTool = createTool({
   },
 });
 
+export const renderDiagramTool = createTool({
+  id: 'render-diagram',
+  description:
+    'Render a Mermaid diagram (flowchart, sequence, pie, xychart-beta, ' +
+    'quadrantChart, gantt, classDiagram, stateDiagram, erDiagram, etc.) in ' +
+    'the Preview panel. Pass valid Mermaid syntax in `definition`. Use this ' +
+    'for process maps, architecture diagrams, flowcharts, ER diagrams, ' +
+    'market-research visualizations (pie/xychart-beta/quadrantChart), or any ' +
+    'data that is better expressed as a diagram than a chart.',
+  inputSchema: z.object({
+    title: z.string().describe('Short descriptive title for the diagram'),
+    definition: z
+      .string()
+      .describe(
+        'Complete Mermaid diagram definition starting with the type keyword ' +
+          '(e.g. "pie title ...", "flowchart LR", "xychart-beta")',
+      ),
+  }),
+  outputSchema: z.object({ artifact: diagramArtifactSchema }),
+  execute: async ({ title, definition }) => {
+    const artifact = {
+      id: newArtifactId('diagram'),
+      kind: 'diagram' as const,
+      title,
+      definition,
+    };
+    await storeArtifact(artifact);
+    return { artifact };
+  },
+});
+
 // Heterogeneous createTool instances; callers narrow per tool as needed.
 export const BUILTIN_TOOLS: Record<string, ReturnType<typeof createTool>> = {
   webSearch: webSearchTool,
   fetchUrl: fetchUrlTool,
   calculator: calculatorTool,
   renderChart: renderChartTool,
-  // No-ops with a clear message unless ERXES_AGENT_KNOWLEDGE=enable.
-  companyKnowledge: companyKnowledgeTool,
-  // Distilled lessons from past conversations. No-op unless
-  // ERXES_AGENT_LEARNING=enable.
-  agentKnowledge: agentKnowledgeTool,
+  renderDiagram: renderDiagramTool,
   // Reads a file as text — a user attachment by key, or a file the agent
   // generated by artifactId (pdf/docx/xlsx/pptx/csv/…). Also force-bound outside
   // the policy filter — see agentRuntime — so files are always readable.
@@ -300,6 +351,9 @@ export const BUILTIN_TOOLS: Record<string, ReturnType<typeof createTool>> = {
   // Document generators (PDF/DOCX/XLSX). Each returns a downloadable artifact
   // shown in the Preview panel; charts embed via the render-chart spec.
   ...DOCUMENT_BUILTIN_TOOLS,
+  // Image tools (background removal). In-process inference — see imageTools.ts
+  // for the memory guards. Deny per agent via builtin:removeImageBackground.
+  ...IMAGE_BUILTIN_TOOLS,
 };
 
 /** Look up a builtin tool by its registry key, or null when unknown. */

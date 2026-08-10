@@ -1,4 +1,4 @@
-import { RefObject } from 'react';
+import { memo, RefObject } from 'react';
 import {
   IconLoader2,
   IconPaperclip,
@@ -14,7 +14,7 @@ import { VoiceModeToggle } from '~/modules/chat/voice/components/VoiceModeToggle
 
 type AttachmentsBag = ReturnType<typeof useAttachments>;
 
-export const Composer = ({
+export const Composer = memo(({
   input,
   onInputChange,
   onSend,
@@ -54,15 +54,17 @@ export const Composer = ({
   const { pendingAtts, addFiles, removeAttachment, uploadsInFlight, onPaste } =
     attachments;
   return (
-  <div className="p-3 pt-1 bg-background">
+  <div className="px-3 pb-3 pt-1 bg-background">
     <div className="max-w-3xl mx-auto w-full">
+      {/* Claude-style composer: the message fills the top, the controls sit in a
+          quiet row beneath it (tools left, send right). */}
       <div
-        className={`rounded-2xl border bg-background shadow-sm transition-all duration-200 focus-within:border-primary/50 focus-within:shadow-md ${
+        className={`ea-composer rounded-3xl border bg-background shadow-sm transition-all duration-200 focus-within:border-primary/50 focus-within:shadow-md ${
           chatLoading ? 'border-primary/30' : 'border-border'
         }`}
       >
         {pendingAtts.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 px-3 pt-2.5">
+          <div className="flex flex-wrap gap-1.5 px-3.5 pt-3">
             {pendingAtts.map((att) => (
               <ComposerAttachmentChip
                 key={att.id}
@@ -72,39 +74,51 @@ export const Composer = ({
             ))}
           </div>
         )}
-        <div className="flex gap-1.5 items-end p-2">
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          aria-label="Attach files"
+          className="hidden"
+          onChange={(e) => {
+            if (e.target.files?.length) addFiles(e.target.files);
+            e.target.value = '';
+          }}
+        />
+        <div className="px-3.5 pt-3">
+          <Textarea
+            ref={textareaRef}
+            value={input}
+            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
+              onInputChange(e.target.value)
+            }
+            onKeyDown={onKeyDown}
+            onPaste={onPaste}
+            placeholder={`Message ${agentName}…`}
+            rows={1}
+            className="ea-composer-textarea w-full min-h-6 max-h-44 resize-none bg-transparent text-sm leading-relaxed"
+          />
+        </div>
+        <div className="flex items-center gap-1 px-2 pb-2 pt-1">
           {attachmentsEnabled && (
-            <>
-              <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                aria-label="Attach files"
-                className="hidden"
-                onChange={(e) => {
-                  if (e.target.files?.length) addFiles(e.target.files);
-                  e.target.value = '';
-                }}
-              />
-              <Tooltip.Provider>
-                <Tooltip>
-                  <Tooltip.Trigger asChild>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="size-9 shrink-0 text-muted-foreground hover:text-primary transition-colors"
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={chatLoading || pendingAtts.length >= 10}
-                    >
-                      <IconPaperclip className="size-4" />
-                    </Button>
-                  </Tooltip.Trigger>
-                  <Tooltip.Content>
-                    Attach files (images, PDF, Excel, Word, …)
-                  </Tooltip.Content>
-                </Tooltip>
-              </Tooltip.Provider>
-            </>
+            <Tooltip.Provider>
+              <Tooltip>
+                <Tooltip.Trigger asChild>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="size-9 shrink-0 rounded-full text-muted-foreground hover:text-primary transition-colors"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={chatLoading || pendingAtts.length >= 10}
+                  >
+                    <IconPaperclip className="size-4" />
+                  </Button>
+                </Tooltip.Trigger>
+                <Tooltip.Content>
+                  Attach files (images, PDF, Excel, Word, …)
+                </Tooltip.Content>
+              </Tooltip>
+            </Tooltip.Provider>
           )}
           <ReasoningEffortControl
             value={reasoningEffort}
@@ -118,18 +132,7 @@ export const Composer = ({
             onConfigure={onVoiceSetup}
             disabled={chatLoading}
           />
-          <Textarea
-            ref={textareaRef}
-            value={input}
-            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
-              onInputChange(e.target.value)
-            }
-            onKeyDown={onKeyDown}
-            onPaste={onPaste}
-            placeholder={`Message ${agentName}…`}
-            rows={1}
-            className="ea-composer-textarea flex-1 min-h-9 max-h-40 resize-none py-2 bg-transparent"
-          />
+          <span className="flex-1" />
           {chatLoading ? (
             <Tooltip.Provider>
               <Tooltip>
@@ -137,7 +140,7 @@ export const Composer = ({
                   <Button
                     size="icon"
                     variant="outline"
-                    className="size-9 shrink-0 border-primary/40 text-primary hover:bg-primary/8 transition-all"
+                    className="size-9 shrink-0 rounded-full border-primary/40 text-primary hover:bg-primary/8 transition-all"
                     onClick={onStop}
                   >
                     <IconPlayerStopFilled className="size-4" />
@@ -149,7 +152,8 @@ export const Composer = ({
           ) : (
             <Button
               size="icon"
-              className="size-9 shrink-0 transition-transform duration-150 hover:scale-105 active:scale-95 disabled:scale-100"
+              aria-label="Send message"
+              className="size-9 shrink-0 rounded-full transition-transform duration-150 hover:scale-105 active:scale-95 disabled:scale-100"
               onClick={onSend}
               disabled={!input.trim() || uploadsInFlight}
             >
@@ -169,4 +173,5 @@ export const Composer = ({
     </div>
   </div>
   );
-};
+});
+Composer.displayName = 'Composer';

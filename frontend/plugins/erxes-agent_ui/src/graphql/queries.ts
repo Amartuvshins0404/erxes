@@ -9,10 +9,11 @@ export const AGENT_FIELDS = gql`
     instructions
     provider
     model
-    toolPolicy
-    allowedTools
+    grantGroupId
+    skills
     destructiveOps
     memoryEnabled
+    debug
     maxSteps
     temperature
     isEnabled
@@ -20,10 +21,21 @@ export const AGENT_FIELDS = gql`
     teamId
     departmentId
     unitId
-    createdBy
     isOwnAgent
     createdAt
     updatedAt
+    capabilities {
+      canReadConfig
+      canChat
+      canEdit
+      canRemove
+      canShare
+      canTransferOwnership
+      canManageGrant
+      canReadWorkflows
+      canReadSkills
+      canReadLearnings
+    }
   }
 `;
 
@@ -32,31 +44,21 @@ export const WORKFLOW_FIELDS = gql`
     _id
     name
     description
+    agentId
     definition
     version
     isEnabled
-    createdAt
-    updatedAt
-  }
-`;
-
-export const SCHEDULE_FIELDS = gql`
-  fragment ScheduleFields on MastraSchedule {
-    _id
-    name
-    description
-    agentId
-    cron
-    timezone
-    prompt
-    isEnabled
-    threadId
-    lastRunAt
-    lastStatus
-    lastError
-    lastReply
-    lastDurationMs
-    runCount
+    approvalStatus
+    approvedByUserId
+    approvedAt
+    capabilities {
+      canUpdate
+      canRemove
+      canRun
+      canApprove
+      canSchedule
+      canReadRuns
+    }
     createdAt
     updatedAt
   }
@@ -83,18 +85,26 @@ export const MASTRA_AGENTS_MAIN = gql`
         name
         agentId
         description
-        provider
-        model
-        toolPolicy
-        allowedTools
         isEnabled
         visibility
         teamId
         departmentId
         unitId
-        createdBy
         isOwnAgent
         createdAt
+        workflowsCount
+        capabilities {
+          canReadConfig
+          canChat
+          canEdit
+          canRemove
+          canShare
+          canTransferOwnership
+          canManageGrant
+          canReadWorkflows
+          canReadSkills
+          canReadLearnings
+        }
       }
       totalCount
     }
@@ -111,14 +121,16 @@ export const MASTRA_AGENT = gql`
 `;
 
 export const MASTRA_THREADS = gql`
-  query MastraThreads($agentId: String!) {
-    mastraThreads(agentId: $agentId) {
-      _id
-      threadId
-      title
-      messageCount
-      lastMessageAt
-      createdAt
+  query MastraThreads($agentId: String!, $page: Int, $perPage: Int) {
+    mastraThreads(agentId: $agentId, page: $page, perPage: $perPage) {
+      list {
+        _id
+        threadId
+        title
+        lastMessageAt
+        createdAt
+      }
+      totalCount
     }
   }
 `;
@@ -184,20 +196,6 @@ export const MASTRA_VOICE_CATALOG = gql`
       id
       label
       gender
-    }
-  }
-`;
-
-export const MASTRA_AVAILABLE_ERXES_TOOLS = gql`
-  query MastraAvailableErxesTools {
-    mastraAvailableErxesTools {
-      plugin
-      module
-      operation
-      operationType
-      description
-      graphqlArgs
-      returnType
     }
   }
 `;
@@ -271,27 +269,6 @@ export const MASTRA_SETTINGS = gql`
         enabled
       }
       advancedMemory
-      advancedMemoryStatus {
-        enabled
-        embedder
-        embedderModel
-        qdrantUrl
-        qdrantReachable
-        collection
-      }
-      knowledgeStatus {
-        enabled
-        embedder
-        embedderModel
-        qdrantUrl
-        qdrantReachable
-        collection
-        enabledTypes
-        lastSweepAt
-        pointCount
-        types
-        lastError
-      }
     }
   }
 `;
@@ -317,19 +294,29 @@ export const MASTRA_USER_AGENT_QUOTA = gql`
 
 export const AGENT_FORM_BRANCHES = gql`
   query AgentFormBranches {
-    branches { _id title }
+    branches {
+      _id
+      title
+    }
   }
 `;
 
 export const AGENT_FORM_DEPARTMENTS = gql`
   query AgentFormDepartments {
-    departments { _id title }
+    departments {
+      _id
+      title
+    }
   }
 `;
 
 export const AGENT_FORM_UNITS = gql`
   query AgentFormUnits {
-    units { _id title departmentId }
+    units {
+      _id
+      title
+      departmentId
+    }
   }
 `;
 
@@ -375,20 +362,6 @@ export const MASTRA_LEARNING_STATS = gql`
   }
 `;
 
-export const MASTRA_LEARNING_STATUS = gql`
-  query MastraLearningStatus {
-    mastraLearningStatus {
-      enabled
-      embedder
-      embedderModel
-      qdrantUrl
-      collection
-      autoPromoteMinSources
-      autoPromoteMinConfidence
-    }
-  }
-`;
-
 export const MASTRA_MESSAGE_FEEDBACKS = gql`
   query MastraMessageFeedbacks($threadId: String!) {
     mastraMessageFeedbacks(threadId: $threadId)
@@ -396,8 +369,8 @@ export const MASTRA_MESSAGE_FEEDBACKS = gql`
 `;
 
 export const MASTRA_WORKFLOWS = gql`
-  query MastraWorkflows {
-    mastraWorkflows {
+  query MastraWorkflows($agentId: String) {
+    mastraWorkflows(agentId: $agentId) {
       ...WorkflowFields
     }
   }
@@ -412,24 +385,6 @@ export const MASTRA_WORKFLOW = gql`
     }
   }
   ${WORKFLOW_FIELDS}
-`;
-
-export const MASTRA_SCHEDULES = gql`
-  query MastraSchedules {
-    mastraSchedules {
-      ...ScheduleFields
-    }
-  }
-  ${SCHEDULE_FIELDS}
-`;
-
-export const MASTRA_SCHEDULE = gql`
-  query MastraSchedule($_id: String!) {
-    mastraSchedule(_id: $_id) {
-      ...ScheduleFields
-    }
-  }
-  ${SCHEDULE_FIELDS}
 `;
 
 export const MASTRA_WORKFLOW_RUNS = gql`

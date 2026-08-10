@@ -29,6 +29,14 @@ export interface AgentMessageMetadata {
   // turn — set by the stream's final `finish` chunk. Drives the "Skills applied"
   // badge on the assistant message.
   activeSkills?: string[];
+  // Per-reasoning-step short summaries ("short thoughts"), index-aligned to the
+  // turn's reasoning parts (holes may be null). Stamped from the live stream on
+  // finish; hydrated from persisted meta on reload. Drives the gist shown on each
+  // reasoning step in the run timeline.
+  reasoningSummaries?: (string | null)[];
+  // One-line "what this turn accomplished" headline, shown as the collapsed
+  // run-timeline header. Stamped post-finish from the stream / hydrated on reload.
+  turnSummary?: string;
   // Files attached to a user message.
   attachments?: ChatAttachment[];
   // Approve/deny replies are sent to continue a gated turn without showing a
@@ -45,6 +53,14 @@ export type AgentDataParts = {
   activity: { text: string };
   'thread-title': { threadId: string; title: string };
   heartbeat: Record<string, never>;
+  // All per-step "short thoughts" for the turn, index-aligned to its reasoning
+  // parts (holes null), streamed once after `finish` (the backend summarizes them
+  // in a single batched call). Stamped onto the last assistant message's metadata
+  // (transient — never added to the message).
+  'reasoning-summaries': { summaries: (string | null)[] };
+  // The whole-turn headline, streamed once after `finish`. Stamped onto the
+  // last assistant message's metadata (transient — never added to the message).
+  'turn-summary': { text: string };
   // The native assistant-message id, reconciled AFTER the `finish` chunk: the
   // backend now closes the message immediately and persists off the critical
   // path, so the id the thumbs feedback rates arrives here once the background
@@ -121,15 +137,18 @@ export interface ChatAttachment {
   size?: number;
 }
 
-// A file in the composer, before the message is sent.
+// A file in the composer, before the message is sent. Files are STAGED on
+// selection ('ready') and only uploaded when the message is actually sent, so
+// picking a file never costs a network round-trip until the user commits.
 export interface PendingAttachment {
   id: string;
   name: string;
   type: string;
   size: number;
+  file?: File; // the staged file, uploaded on send (cleared once uploaded; absent for oversize)
   url?: string; // storage key once uploaded
   previewUrl?: string; // local object URL for image thumbnails
-  status: 'uploading' | 'done' | 'error';
+  status: 'ready' | 'uploading' | 'done' | 'error';
   error?: string;
 }
 
@@ -157,6 +176,11 @@ export interface DbMessageMeta {
   thinking?: string;
   toolCalls?: DbToolCall[];
   interrupted?: boolean;
+  // Per-reasoning-step summaries, index-aligned to the turn's reasoning parts
+  // (holes are null) — re-renders the "short thoughts" on reload.
+  reasoningSummaries?: (string | null)[];
+  // Whole-turn headline — the collapsed run-timeline header on reload.
+  turnSummary?: string;
 }
 
 // Mastra's native AI SDK v5 turn parts, as stored on `content.parts` and surfaced
@@ -207,13 +231,16 @@ export interface IMastraThread {
   _id: string;
   threadId: string;
   title: string;
-  messageCount: number;
   lastMessageAt?: string | null;
   createdAt?: string | null;
 }
 
 export interface IMastraThreadsResponse {
-  mastraThreads: IMastraThread[];
+  mastraThreads: {
+    __typename?: 'MastraThreadListResponse';
+    list: IMastraThread[];
+    totalCount: number;
+  };
 }
 
 // ── Reasoning effort (composer power-user control) ───────────────────────────

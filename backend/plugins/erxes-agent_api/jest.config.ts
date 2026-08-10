@@ -16,6 +16,15 @@ export default {
       },
     ],
   },
+  // Transpile three deps that Jest's CommonJS loader can't take as-shipped:
+  //  - yoga-wasm-web is ESM-only (Satori's layout engine); ts-jest -> CJS.
+  //  - yoga-layout ships raw TS/ESM sources (@react-pdf/layout's engine).
+  //  - pptxgenjs is CJS but uses `import('node:fs')`; transpiling downlevels
+  //    that dynamic import to require() so the deck write works without the
+  //    --experimental-vm-modules flag. All run natively in the prod build.
+  transformIgnorePatterns: [
+    '/node_modules/\\.pnpm/(?!(yoga-wasm-web|yoga-layout|pptxgenjs)@)',
+  ],
   moduleFileExtensions: ['ts', 'js', 'html'],
   moduleNameMapper: {
     '^~/(.*)$': '<rootDir>/src/$1',

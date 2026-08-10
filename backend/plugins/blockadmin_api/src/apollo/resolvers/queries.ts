@@ -16,6 +16,10 @@ import { unitLeadQueries } from '@/unit/graphql/resolvers/queries/unitLead';
 import { cpBlockQueries } from '~/modules/clientportal/graphql/resolvers/queries';
 import { formQueries } from '~/modules/form/graphql/queries';
 import { listingQueries } from '@/listing/graphql/resolvers/queries/listing';
+import { supplierQueries } from '@/supplier/profile/graphql/resolvers/queries/supplier';
+import { productQueries } from '@/supplier/product/graphql/resolvers/queries/product';
+import { membershipQueries } from '@/membership/graphql/resolvers/queries/membership';
+import { membershipPlanQueries } from '@/membership/graphql/resolvers/queries/membershipPlan';
 
 export const queries = {
   ...agencyQueries,
@@ -35,6 +39,10 @@ export const queries = {
   ...invoiceQueries,
   ...formQueries,
   ...listingQueries,
+  ...supplierQueries,
+  ...productQueries,
+  ...membershipQueries,
+  ...membershipPlanQueries,
 
   ...cpBlockQueries,
 };

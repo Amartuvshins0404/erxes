@@ -1,15 +1,21 @@
-import { getPlugins, getPluginAddress } from 'erxes-api-shared/utils';
+import {
+  getActivePlugins,
+  getPlugins,
+  getPluginAddress,
+} from 'erxes-api-shared/utils';
 import { getCurrentAuth } from '../requestContext';
 import type { OperationMeta } from './operationRegistry';
 import {
   buildGraphqlOperation,
   buildZodSchemaFromArgs,
   chooseResponseFields,
+  coercePerArg,
   graphqlTypeToString,
   withNeutralDefaults,
   type GqlArgDef,
   type GqlFieldDef,
   type GqlTypeRef,
+  type SchemaMaps,
 } from './schemaIntrospect';
 import {
   deriveModule,
@@ -22,11 +28,18 @@ import {
   looksLikeStackFrame,
   sanitizeServerError,
 } from './serverErrorClassifier';
-import { redactSecrets } from './secretRedaction';
+import { redactSecrets, REDACTED } from './secretRedaction';
+import { scrubArgs } from './argScrub';
+import {
+  findEntityKeyInError,
+  lookupCandidates,
+  resolveIdArgs,
+  type EntityResolverDeps,
+} from './entityResolver';
 
 // Re-export the introspection + humanisation surface so existing importers
 // (metaTools, operationRegistry, tests) keep their `from './erxesTools'` paths.
-export type { GqlArgDef, GqlFieldDef, GqlTypeRef };
+export type { GqlArgDef, GqlFieldDef, GqlTypeRef, SchemaMaps };
 export { graphqlTypeToString, sanitizeServerError };
 
 /** Connection settings for reaching the erxes gateway (API URL + app token). */
@@ -47,6 +60,7 @@ interface IntrospectedNamedType {
   kind: string;
   inputFields?: GqlArgDef[] | null;
   fields?: GqlFieldDef[] | null;
+  enumValues?: Array<{ name: string }> | null;
 }
 
 // The gateway's userMiddleware only accepts `Authorization: Bearer <token>`
@@ -97,106 +111,42 @@ async function gqlCall<TData = Record<string, unknown>>(
   }
 }
 
-/** Minimal `{ _id, name }` record shape returned by board/pipeline/stage queries. */
-interface IdNameRecord {
-  _id: string;
-  name?: string;
-}
-
-/** One auto-resolved entity option offered back to the model. */
-interface ResolvedEntityOption {
-  stageId?: string;
-  stageName?: string;
-  name?: string;
-}
-
 /**
- * Returns a deduplicated list of { stageId, stageName } across all boards/pipelines.
- * Only stageName is exposed to the LLM — the raw ObjectId is resolved internally.
+ * Gateway access the entity resolver needs, bound to this request's auth. Every
+ * candidate lookup runs through the same `gqlCall` (Bearer + tenant hostname)
+ * the operation itself uses. The cache scope carries subdomain AND userId —
+ * entity visibility (pipelines, stages, customers) is per-user, so cached rows
+ * must never cross users.
  */
-async function resolveAvailableStages(
+function makeResolverDeps(
   apiUrl: string,
   authHeaders: Record<string, string>,
-): Promise<ResolvedEntityOption[]> {
-  const boardsData = await gqlCall<{ salesBoards?: IdNameRecord[] }>(
-    apiUrl,
-    authHeaders,
-    '{ salesBoards { _id name } }',
-  );
-  const boards = boardsData?.salesBoards ?? [];
-  const seen = new Set<string>();
-  const stages: ResolvedEntityOption[] = [];
-
-  for (const board of boards.slice(0, 5)) {
-    const pipData = await gqlCall<{
-      salesPipelines?: { list?: IdNameRecord[] };
-    }>(
-      apiUrl,
-      authHeaders,
-      `{ salesPipelines(boardId: "${board._id}") { list { _id name } } }`,
-    );
-    const pipelines = pipData?.salesPipelines?.list ?? [];
-
-    for (const pipeline of pipelines.slice(0, 5)) {
-      const stData = await gqlCall<{ salesStages?: IdNameRecord[] }>(
-        apiUrl,
-        authHeaders,
-        `{ salesStages(pipelineId: "${pipeline._id}") { _id name } }`,
-      );
-      for (const stage of stData?.salesStages ?? []) {
-        if (seen.has(stage._id)) continue;
-        seen.add(stage._id);
-        stages.push({ stageId: stage._id, stageName: stage.name });
-      }
-    }
-  }
-  return stages;
+): EntityResolverDeps {
+  const auth = getCurrentAuth();
+  return {
+    runQuery: (query) => gqlCall(apiUrl, authHeaders, query),
+    scope: `${auth?.subdomain || ''}::${auth?.userId || ''}`,
+  };
 }
 
-// Entity → auto-resolver function.  Add new entities here as needed.
-type EntityResolver = (
-  apiUrl: string,
-  headers: Record<string, string>,
-) => Promise<ResolvedEntityOption[]>;
-const ENTITY_RESOLVERS: Record<
-  string,
-  { key: string; resolver: EntityResolver }
-> = {
-  stage: { key: 'availableStages', resolver: resolveAvailableStages },
-};
-
 /**
- * Map an actionable "not found"/validation error onto a structured failure
- * payload that carries real, currently-available entity options.
+ * Map a server-side "<Entity> not found" error onto a structured failure that
+ * carries the real candidates for that entity, so the model can retry with an
+ * exact id. Unmapped entities keep the plain sanitized error.
  */
 async function buildNotFoundResult(
   rawMessage: string,
-  apiUrl: string,
-  authHeaders: Record<string, string>,
+  deps: EntityResolverDeps,
 ): Promise<Record<string, unknown>> {
-  const lower = rawMessage.toLowerCase();
-  for (const [entity, { resolver }] of Object.entries(ENTITY_RESOLVERS)) {
-    const mentionsEntity = lower.includes(entity);
-    // Catch all actionable errors: "not found", "not provided" (GraphQL required-field
-    // validation), "invalid", and "required" — not just the "not found" case.
-    const isActionable =
-      lower.includes('not found') ||
-      lower.includes('not provided') ||
-      lower.includes('invalid') ||
-      lower.includes('required');
-    if (mentionsEntity && isActionable) {
-      const items = await resolver(apiUrl, authHeaders);
-      const names = items
-        .map((item) => item.stageName ?? item.name)
-        .filter(Boolean);
+  const entity = findEntityKeyInError(rawMessage);
+  if (entity) {
+    const candidates = await lookupCandidates(entity, deps);
+    if (candidates.length) {
       return {
         success: false,
-        availableStages: names,
-        instruction: names.length
-          ? `Call dealsAdd immediately with: { stageId: "${
-              names[0]
-            }", name: "deal name" }. Available stages: ${names.join(', ')}.`
-          : `No ${entity}s found. Make sure the erxes sales plugin is configured and has at least one board with a pipeline and stage.`,
+        ...sanitizeServerError(rawMessage),
+        candidates,
+        instruction: `The ${entity} you specified was not found. Retry this operation with the exact "id" value of the intended ${entity} from the candidates list — never a name.`,
       };
     }
   }
@@ -208,28 +158,29 @@ async function buildNotFoundResult(
 export interface ErxesOperationRef {
   operation: string;
   operationType: 'query' | 'mutation';
+  plugin: string;
   graphqlArgs?: GqlArgDef[];
   returnType?: GqlTypeRef | null;
 }
 
-/** True when the string looks like a 24-hex-char MongoDB ObjectId. */
-const isValidObjectId = (value?: string): boolean =>
-  /^[a-f0-9]{24}$/i.test(value ?? '');
-
 /**
- * Auth headers for gateway calls: the calling user's request header when
- * present, otherwise the configured app token (bot/no-session calls).
+ * Auth headers for gateway calls: the calling user's login token as a Bearer,
+ * otherwise the configured app token (bot/no-session calls). The decoded
+ * `userHeader` is NEVER sent outbound — it stays in requestContext for INTERNAL
+ * gating only (requireTeamMember, currentUserId, resource scoping). Exported so
+ * the header contract can be unit-tested in isolation.
  */
-function buildAuthHeaders(
+export function buildAuthHeaders(
   appToken: string,
   processId?: string,
 ): Record<string, string> {
   const reqAuth = getCurrentAuth();
   const authHeaders: Record<string, string> = {};
-  if (reqAuth?.userHeader) {
-    authHeaders['user'] = reqAuth.userHeader;
-  } else if (reqAuth?.token || appToken) {
-    authHeaders['Authorization'] = asBearer(reqAuth?.token || appToken);
+  // Forward identity as `Authorization: Bearer <token>` only (the gateway's
+  // userMiddleware resolves the request as that user); never a `user` header.
+  const bearer = reqAuth?.token || appToken;
+  if (bearer) {
+    authHeaders['Authorization'] = asBearer(bearer);
   }
   if (reqAuth?.subdomain) {
     // The gateway resolves the tenant via getSubdomain(), which reads the
@@ -244,90 +195,63 @@ function buildAuthHeaders(
   return authHeaders;
 }
 
-/** Outcome of the dealsAdd stage pre-flight: updated args, or a structured failure. */
-type StagePreflight =
-  | { ok: true; args: Record<string, unknown> }
-  | { ok: false; failure: Record<string, unknown> };
-
-/**
- * dealsAdd pre-flight. LLMs naturally express intent with stage NAMES (e.g.
- * "Test for Ai"), not MongoDB ObjectIds — auto-resolve any name sent as
- * stageId → real ObjectId transparently, so the LLM never has to know or
- * remember the raw database ID.
- */
-async function resolveDealsAddStageArg(
-  initialArgs: Record<string, unknown>,
-  apiUrl: string,
-  authHeaders: Record<string, string>,
-): Promise<StagePreflight> {
-  let resolvedArgs = initialArgs;
-  // dealsAdd takes flat top-level args: dealsAdd(name, stageId, ...) — no doc wrapper.
-  // Strip surrounding quotes LLMs sometimes add: '"Test for Ai"' → 'Test for Ai'
-  const rawStageId = resolvedArgs.stageId;
-  let stageId =
-    typeof rawStageId === 'string'
-      ? rawStageId.replace(/^["']|["']$/g, '').trim()
-      : undefined;
-
-  if (isValidObjectId(stageId)) return { ok: true, args: resolvedArgs };
-
-  const stages = await resolveAvailableStages(apiUrl, authHeaders);
-
-  if (stageId) {
-    // Fuzzy-match the name the LLM sent against real stage names.
-    const needle = stageId.toLowerCase().trim();
-    const match =
-      stages.find(
-        (stage) => (stage.stageName || '').toLowerCase() === needle,
-      ) ||
-      stages.find((stage) =>
-        (stage.stageName || '').toLowerCase().includes(needle),
-      );
-    if (match) {
-      resolvedArgs = { ...resolvedArgs, stageId: match.stageId };
-      stageId = match.stageId;
-    }
-  }
-
-  // If only one stage exists, pick it automatically — no need to ask.
-  if (!isValidObjectId(stageId) && stages.length === 1) {
-    resolvedArgs = { ...resolvedArgs, stageId: stages[0].stageId };
-    stageId = stages[0].stageId;
-  }
-
-  if (!isValidObjectId(stageId)) {
-    const stageNames = stages.map((stage) => stage.stageName);
-    return {
-      ok: false,
-      failure: {
-        success: false,
-        availableStages: stageNames,
-        instruction: stages.length
-          ? `Call dealsAdd immediately with: { stageId: "${
-              stageNames[0] ?? 'stage name'
-            }", name: "deal name" }. Available stages: ${stageNames.join(
-              ', ',
-            )}.`
-          : 'No stages exist. Tell the user to create a Board with a Pipeline and Stage in erxes Sales first.',
-      },
-    };
-  }
-
-  return { ok: true, args: resolvedArgs };
-}
-
 /** Joins GraphQL error messages into one semicolon-separated string. */
 const joinErrors = (errs: Array<{ message: string }>): string =>
   errs.map((err) => err.message).join('; ');
+
+// The agent has no way to read or inject secret VALUES — that path is
+// deliberately closed (see secretRedaction). Blocked secret material in ANY
+// operation's args (queries included; the guard runs op-wide as a uniform net,
+// though writes are where corruption bites) is refused. Two shapes:
+//   1. invented reference syntax — `{{secret:CODE}}` / `{{keep}}` — which, with
+//      no server-side resolver, would land as a literal placeholder in a
+//      credential field and silently break the integration;
+//   2. the redactor's own REDACTED sentinel — echoed back in a read-modify-write
+//      it would overwrite the real stored secret with the placeholder string.
+// Both mean the same fix: OMIT that field. configsUpdate is a partial upsert, so
+// an omitted key keeps its stored value untouched. Refusing the whole op (rather
+// than silently stripping the field) is deliberate — stripping would WIPE the
+// secret on replace-on-edit sinks; the instruction tells the model to retry.
+const SECRET_REF_RE = /\{\{\s*(?:secret\s*:|keep\s*\}\})/i;
+
+/** True when any string leaf in the args carries blocked secret material. */
+function hasBlockedSecretMaterial(value: unknown, depth = 0): boolean {
+  // Fail SAFE past the defensive depth cap (mirrors secretRedaction): if the
+  // tree can't be fully scanned, REFUSE rather than let unvetted material
+  // through. Real argument trees never approach this depth.
+  if (depth > 16) return true;
+  if (typeof value === 'string')
+    return SECRET_REF_RE.test(value) || value.includes(REDACTED);
+  if (Array.isArray(value))
+    return value.some((v) => hasBlockedSecretMaterial(v, depth + 1));
+  if (value && typeof value === 'object') {
+    return Object.values(value as Record<string, unknown>).some((v) =>
+      hasBlockedSecretMaterial(v, depth + 1),
+    );
+  }
+  return false;
+}
+
+/** Structured refusal returned when the model uses secret-reference syntax. */
+function secretRefRefusedResult() {
+  return {
+    success: false,
+    error: 'Secret references are not supported.',
+    instruction:
+      'You cannot read or set secret values (API tokens, passwords and keys are ' +
+      'hidden). To update a configuration that already contains a secret while ' +
+      'changing other fields, send ONLY the fields you are changing — omitted keys ' +
+      'keep their stored values. Never invent a secret value or paste one the user gave you.',
+  };
+}
 
 /**
  * Runs a single erxes GraphQL operation by name on the user's behalf and returns
  * its result (or a structured { success:false, … } payload the model can act on).
  *
- * This is the shared execution core behind the `execute_erxes_operation`
- * meta-tool. It owns everything that used to live in the per-operation tool:
+ * This is the shared execution core behind every exact operation tool. It owns:
  *   • coercing LLM-supplied args through the operation's Zod schema,
- *   • the dealsAdd stage-NAME → ObjectId pre-flight,
+ *   • resolving entity NAMES in *Id/*Ids args → real ids (membership-based),
  *   • building a valid GraphQL operation + response selection,
  *   • turning "not found"/validation errors into actionable instructions.
  *
@@ -338,8 +262,7 @@ export async function executeErxesOperation(
   op: ErxesOperationRef,
   rawArgs: Record<string, unknown>,
   settings: ErxesToolSettings | null,
-  inputTypesMap?: Record<string, GqlArgDef[]>,
-  objectFieldsMap?: Record<string, GqlFieldDef[]>,
+  schemaMaps?: Partial<SchemaMaps>,
   processId?: string,
   requestedFields?: string[],
 ): Promise<unknown> {
@@ -356,34 +279,55 @@ export async function executeErxesOperation(
 
     // Coerce the model's args through the per-operation Zod schema (numbers sent
     // as strings, JSON-as-string arrays/objects, date normalisation, …). The
-    // execute meta-tool passes a plain object, so this is where validation runs;
-    // on failure we fall back to the raw args so a usable call still goes out.
-    const inputSchema = buildZodSchemaFromArgs(args, inputTypesMap);
-    const parsed = inputSchema.safeParse(rawArgs || {});
-    let resolvedArgs: Record<string, unknown> = parsed.success
-      ? { ...(parsed.data as Record<string, unknown>) }
-      : { ...(rawArgs || {}) };
+    // execute meta-tool passes a plain object, so this is where validation runs.
+    // Coercion is per-arg: each field is parsed against its own schema and kept
+    // when it validates, otherwise passed through raw — so one bad sibling no
+    // longer discards the coercion of every other field.
+    const inputSchema = buildZodSchemaFromArgs(
+      args,
+      schemaMaps?.inputTypesMap,
+      schemaMaps?.enumValuesMap,
+    );
+    let resolvedArgs: Record<string, unknown> = coercePerArg(
+      inputSchema,
+      rawArgs || {},
+    );
 
-    // Auth must be resolved first — needed for any pre-flight stage lookups.
-    const authHeaders = buildAuthHeaders(token, processId);
+    // Strip high-risk keys the agent must never set (e.g. usersEdit password /
+    // email / groupIds, usersInvite permissionGroupIds) before the args become a
+    // GraphQL call — the arg-scoped complement to the full-operation denylist.
+    resolvedArgs = scrubArgs(erxesOperation, resolvedArgs);
 
-    if (erxesOperation === 'dealsAdd') {
-      const preflight = await resolveDealsAddStageArg(
-        resolvedArgs,
-        apiUrl,
-        authHeaders,
-      );
-      if (!preflight.ok) return preflight.failure;
-      resolvedArgs = preflight.args;
+    // Refuse blocked secret material — invented reference syntax
+    // ({{secret:CODE}} / {{keep}}) or an echoed REDACTED sentinel. There is NO
+    // server-side secret resolver by design; letting either through would
+    // silently corrupt a credential field. The guard sits at this shared
+    // chokepoint so both the chat meta-tool and the workflow runtime are covered;
+    // the chat path audits the refusal via recordAction (the args it logs hold
+    // only placeholders, never a real secret).
+    if (hasBlockedSecretMaterial(resolvedArgs)) {
+      return secretRefRefusedResult();
     }
 
-    // Build the GraphQL operation after stageId has been resolved. Choose a
+    // Auth must be resolved first — needed for the entity-resolver lookups.
+    const authHeaders = buildAuthHeaders(token, processId);
+    const resolverDeps = makeResolverDeps(apiUrl, authHeaders);
+
+    const idResolution = await resolveIdArgs(
+      resolvedArgs,
+      resolverDeps,
+      op.plugin,
+    );
+    if (!idResolution.ok) return idResolution.failure;
+    resolvedArgs = idResolution.args;
+
+    // Build the GraphQL operation after ids have been resolved. Choose a
     // VALID response selection derived from the schema (so types without a
     // `name` field, like User, still produce a runnable query).
     const finalResponseFields = chooseResponseFields(
       erxesOperation,
       op.returnType,
-      objectFieldsMap,
+      schemaMaps?.objectFieldsMap,
       requestedFields,
     );
 
@@ -421,7 +365,7 @@ export async function executeErxesOperation(
     }
 
     if (data?.errors) {
-      return buildNotFoundResult(joinErrors(data.errors), apiUrl, authHeaders);
+      return buildNotFoundResult(joinErrors(data.errors), resolverDeps);
     }
     // Redact secret VALUES (storage/SES/Cloudflare keys, ERP tokens, integration
     // passwords) before the result reaches the model. Reads like `configs`
@@ -440,17 +384,20 @@ export async function executeErxesOperation(
   }
 }
 
+// The type { name kind ofType … } sub-selection shared by every named-type
+// introspection query.
+const TYPE_REF_SELECTION =
+  'type { name kind ofType { name kind ofType { name kind ofType { name kind } } } }';
+
 /**
- * Walk `__schema { types }` once and project each named type onto a map keyed by
- * type name. `selector` is the introspection sub-selection (inputFields / fields),
- * `pick` returns the field list to store for a matching type (or undefined to
- * skip it). The shared core behind fetchInputTypesMap / fetchObjectFieldsMap.
+ * Fetch `__schema { types }` with the given per-type sub-selection. The shared
+ * scaffold behind fetchInputSchemaMaps / fetchObjectFieldsMap — one round-trip
+ * per call, and any failure degrades to an empty list rather than throwing.
  */
-async function introspectNamedTypes<TField>(
+async function introspectSchemaTypes(
   settings: ErxesToolSettings | null,
-  selector: string,
-  pick: (namedType: IntrospectedNamedType) => TField[] | null | undefined,
-): Promise<Record<string, TField[]>> {
+  selection: string,
+): Promise<IntrospectedNamedType[]> {
   const apiUrl = settings?.erxesApiUrl || 'http://localhost:4000';
   const token = settings?.erxesApiToken || '';
 
@@ -459,10 +406,7 @@ async function introspectNamedTypes<TField>(
       types {
         name
         kind
-        ${selector} {
-          name
-          type { name kind ofType { name kind ofType { name kind ofType { name kind } } } }
-        }
+        ${selection}
       }
     }
   }`;
@@ -471,34 +415,65 @@ async function introspectNamedTypes<TField>(
     const data = await gqlFetch<{
       data?: { __schema?: { types?: IntrospectedNamedType[] } };
     }>(apiUrl, token ? { Authorization: asBearer(token) } : {}, { query });
-    const types = data?.data?.__schema?.types || [];
-    const map: Record<string, TField[]> = {};
-    for (const namedType of types) {
-      const fields = pick(namedType);
-      if (fields?.length) map[namedType.name] = fields;
-    }
-    return map;
+    return data?.data?.__schema?.types || [];
   } catch {
-    return {};
+    return [];
   }
 }
 
+/** Project named types onto a name-keyed map, skipping empty picks. */
+function mapNamedTypes<TField>(
+  types: IntrospectedNamedType[],
+  pick: (namedType: IntrospectedNamedType) => TField[] | null | undefined,
+): Record<string, TField[]> {
+  const map: Record<string, TField[]> = {};
+  for (const namedType of types) {
+    const fields = pick(namedType);
+    if (fields?.length) map[namedType.name] = fields;
+  }
+  return map;
+}
+
+/** The two input-side maps the Zod builders consume, fetched in one pass. */
+export interface InputSchemaMaps {
+  inputTypesMap: Record<string, GqlArgDef[]>;
+  enumValuesMap: Record<string, string[]>;
+}
+
 /**
- * Fetches all INPUT_OBJECT type definitions so graphqlTypeToZod can build real
- * Zod schemas for them instead of falling back to z.any().
+ * Fetches all INPUT_OBJECT field definitions AND every ENUM's value names in a
+ * single `__schema { types }` round-trip, so graphqlTypeToZod builds real
+ * object/enum schemas (and argSignature surfaces field breakdowns + allowed
+ * values) instead of falling back to z.unknown(). A failed introspection
+ * degrades to empty maps — it never fails the registry build.
  */
-export function fetchInputTypesMap(
+export async function fetchInputSchemaMaps(
   settings: ErxesToolSettings | null,
-): Promise<Record<string, GqlArgDef[]>> {
-  return introspectNamedTypes(settings, 'inputFields', (namedType) =>
-    namedType.kind === 'INPUT_OBJECT' ? namedType.inputFields : undefined,
+): Promise<InputSchemaMaps> {
+  const types = await introspectSchemaTypes(
+    settings,
+    `inputFields { name ${TYPE_REF_SELECTION} }
+        enumValues(includeDeprecated: false) { name }`,
   );
+  return {
+    inputTypesMap: mapNamedTypes(types, (namedType) =>
+      namedType.kind === 'INPUT_OBJECT' ? namedType.inputFields : undefined,
+    ),
+    enumValuesMap: mapNamedTypes(types, (namedType) =>
+      namedType.kind === 'ENUM'
+        ? (namedType.enumValues || [])
+            .map((value) => value.name)
+            .filter(Boolean)
+        : undefined,
+    ),
+  };
 }
 
 // ─── Plugin ownership via live subgraph introspection ────────────────────────
 //
 // Source of truth for "which plugin owns this operation": introspect each
-// ENABLED plugin's own subgraph (discovered through erxes service discovery)
+// configured or gateway-active plugin's own subgraph (discovered through erxes
+// service discovery)
 // and record every Query/Mutation field it declares. This:
 //   • only ever sees enabled/running plugins (disabled ones aren't registered),
 //   • re-derives from the live schema on every call (auto-adapts to changes),
@@ -513,7 +488,14 @@ async function fetchPluginMap(token: string): Promise<Map<string, string>> {
 
   let plugins: string[] = [];
   try {
-    plugins = await getPlugins(); // ['core', ...ENABLED_PLUGINS, ...only-api]
+    const [configuredPlugins, activePlugins] = await Promise.all([
+      getPlugins(),
+      getActivePlugins().catch(() => []),
+    ]);
+    // Plugin workloads can have a narrower ENABLED_PLUGINS value than the
+    // gateway. Include the gateway's Redis-backed active list so ownership does
+    // not fall back to operation-name prefixes for those subgraphs.
+    plugins = [...new Set([...configuredPlugins, ...activePlugins])];
   } catch {
     return map;
   }
@@ -559,10 +541,14 @@ async function fetchPluginMap(token: string): Promise<Map<string, string>> {
  * Introspect all OBJECT types → their fields, so chooseResponseFields can build
  * a valid selection set for any return type (replacing the naive `_id name`).
  */
-export function fetchObjectFieldsMap(
+export async function fetchObjectFieldsMap(
   settings: ErxesToolSettings | null,
 ): Promise<Record<string, GqlFieldDef[]>> {
-  return introspectNamedTypes(settings, 'fields', (namedType) =>
+  const types = await introspectSchemaTypes(
+    settings,
+    `fields { name ${TYPE_REF_SELECTION} }`,
+  );
+  return mapNamedTypes(types, (namedType) =>
     namedType.kind === 'OBJECT' && !String(namedType.name).startsWith('__')
       ? namedType.fields
       : undefined,
@@ -649,11 +635,13 @@ export async function fetchAvailableErxesTools(
       // Always skip internal and ClientPortal operations
       if (SKIP_RE.test(field.name)) continue;
 
-      const plugin = pluginMap.get(field.name) ?? detectPlugin(field.name);
+      const attributedPlugin = pluginMap.get(field.name);
+      const plugin = attributedPlugin ?? detectPlugin(field.name);
       if (!plugin) continue;
 
       tools.push({
         plugin,
+        pluginAttribution: attributedPlugin ? 'subgraph' : 'fallback',
         module: deriveModule(field.name),
         operation: field.name,
         operationType: opType,

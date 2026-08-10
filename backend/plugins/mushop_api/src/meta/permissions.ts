@@ -95,11 +95,6 @@ export const permissions: IPermissionConfig = {
           description: 'Change supplier tier level',
         },
         {
-          title: 'Update supplier POS',
-          name: 'mushopUpdateSupplierPos',
-          description: 'Assign or change the POS configuration for a supplier',
-        },
-        {
           title: 'Update supplier Mushop POS',
           name: 'mushopUpdateSupplierMushopPos',
           description: 'Assign or change the Mushop POS configuration for a supplier',
@@ -244,7 +239,6 @@ export const permissions: IPermissionConfig = {
             'showMushopSuppliers',
             'mushopUpdateSupplierVerificationStatus',
             'mushopUpdateSupplierTier',
-            'mushopUpdateSupplierPos',
             'mushopUpdateSupplierMushopPos',
           ],
           scope: 'all',

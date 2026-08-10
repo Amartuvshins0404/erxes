@@ -1,4 +1,5 @@
 import { IUserDocument } from 'erxes-api-shared/core-types';
+import { getEnv } from 'erxes-api-shared/utils';
 
 import { IModels } from '~/connectionResolvers';
 import { SERVER_STATUSES } from './constants';
@@ -7,6 +8,52 @@ import {
   assertIdentifierManageAccess,
   isAdminUser,
 } from '~/modules/assistantOrg/permissions';
+
+const getManagedDeployerUrl = () =>
+  (getEnv({ name: 'MANAGED_OPENCLAW_DEPLOYER_URL' }).trim() || getEnv({ name: 'DEPLOYER_URL' }).trim() || 'https://deployer.erxes.io')
+    .replace(/\/$/, '');
+
+const getManagedDeployerSecret = () =>
+  (process.env.MANAGED_OPENCLAW_DEPLOYER_SECRET || '').trim();
+
+async function notifyDeployerSetupSync(
+  serverName: string | undefined,
+  action: 'install' | 'remove',
+  type: 'plugin' | 'skill',
+  identifier: string,
+): Promise<void> {
+  if (!serverName) return;
+  const secret = getManagedDeployerSecret();
+  if (!secret) return;
+
+  const url = `${getManagedDeployerUrl()}/agents/${encodeURIComponent(serverName)}/setup-sync`;
+  const body = JSON.stringify({ action, type, identifier });
+  const headers = {
+    'Content-Type': 'application/json',
+    'x-erxes-managed-deployer-secret': secret,
+  };
+
+  // Retry up to 3 times with backoff so transient deployer downtime doesn't
+  // silently lose the sync. Never throws — install must always succeed for the user.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers,
+        body,
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (res.ok) return;
+      // 4xx from deployer = bad request, no point retrying
+      if (res.status >= 400 && res.status < 500) return;
+    } catch {
+      // network error, retry
+    }
+    if (attempt < 2) {
+      await new Promise(r => setTimeout(r, 500 * Math.pow(2, attempt))); // 500ms, 1s
+    }
+  }
+}
 
 const SECRET_FIELD_PATTERN = /(token|api[_-]?key|secret|password)/i;
 const SECRET_STRING_PATTERN =
@@ -365,6 +412,7 @@ export async function callManagedRuntimeOperation({
   requireAdmin = false,
   message,
   mapResult,
+  setupSync,
 }: {
   models: IModels;
   user?: IUserDocument;
@@ -376,6 +424,7 @@ export async function callManagedRuntimeOperation({
   requireAdmin?: boolean;
   message: string;
   mapResult: (payload: JsonRecord) => RuntimeGraphQLResult;
+  setupSync?: { action: 'install' | 'remove'; type: 'plugin' | 'skill' };
 }) {
   if (requireAdmin) {
     await assertManagedRuntimeMutationAccess(models, agentId, user);
@@ -400,6 +449,15 @@ export async function callManagedRuntimeOperation({
       status: result.status,
       durationMs: Date.now() - startedAt,
     });
+
+    if (result.ok && setupSync && identifier && server?.name) {
+      notifyDeployerSetupSync(
+        server.name,
+        setupSync.action,
+        setupSync.type,
+        identifier,
+      ).catch(() => undefined);
+    }
 
     return result;
   } catch (error) {

@@ -1,5 +1,8 @@
 import { IContext } from '~/connectionResolvers';
-import { MUSHOP_PRODUCT_STATUS } from '@/product/db/definitions/product';
+import {
+  MUSHOP_PRODUCT_STATUS,
+  MUSHOP_PRODUCT_STATE,
+} from '@/product/db/definitions/product';
 import {
   removeProductFromPosclient,
   syncProductToPosclient,
@@ -197,6 +200,7 @@ export const productMutations = {
     const filter: Record<string, any> = {
       status: MUSHOP_PRODUCT_STATUS.APPROVED,
       categoryId: { $exists: true, $ne: null },
+      state: { $ne: MUSHOP_PRODUCT_STATE.DELETED },
     };
 
     if (supplierId) {

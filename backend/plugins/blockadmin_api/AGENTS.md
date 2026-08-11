@@ -33,6 +33,7 @@
 - Mirrors a `block_api` org's signed contracts (create/update/status-change/manual-resync all funnel through one upsert-by-`{subdomain, entityId}` path), their full payment/transaction schedules (bulk-replaced on every sync), and customer identity links (`BlockCustomer`, verified against erxes core by email/phone before linking, keyed by `customerId` = core's customer id).
 - Mirrors `block_api` offers the same way once their `status` becomes `sent` (create/update/send-email all funnel through `Offer.upsertSentOffer`) — draft offers are never synced. Does not recompute invoices/payment schedules for offers (that stays org-side in `block_api`); this is a pure state mirror, not a business-logic duplicate.
 - Client-portal GraphQL surface (`clientportal` module) exposing a customer's contracts and offers, per-contract payment schedule, and a computed summary (totals + next payment) — intentionally NOT subdomain-scoped, since a customer may hold contracts/offers across multiple orgs. The list queries (`cpBlockAdminGetContracts`/`cpBlockAdminGetOffers`) are scoped to the authenticated `cpUser`'s own `BlockCustomer`, but the single-record detail queries that take an id argument (`cpBlockAdminGetContractPayments`/`cpBlockAdminGetContractSummary`/`cpBlockAdminGetOffer`) currently do **not** verify the requested record belongs to that `cpUser` — see Local Invariants.
+- `CpBlockOffer.paymentSchedule` computes an offer's full barter/down-payment/progress-payment/completion-payment breakdown (rows + total) on the fly from `paymentPlan` — the same computation `block_ui`'s `OfferDetailSheet` does client-side, ported so the client portal doesn't need offer-payment-plan math duplicated on every consumer.
 - Exposes blockadmin GraphQL schema sections through `src/apollo/schema/schema.ts`.
 - Daily BullMQ-scheduled worker (`src/worker/`) that sends client-portal payment reminder/overdue notifications for every org's contract payments in one global scan (no per-org loop needed, since `ContractPayment` rows already carry their own `subdomain`).
 
@@ -46,7 +47,7 @@
 | Supplier models | `backend/plugins/blockadmin_api/src/modules/supplier/db/loadModels.ts` | Registers `block_admin_suppliers` and `block_admin_supplier_products` models |
 | Contract | `backend/plugins/blockadmin_api/src/modules/contract/` | Mirrored `Contract`/`ContractPayment`/`Offer` schemas, models, webhook routes (`routes/contract.ts`, `routes/payment.ts`, `routes/offer.ts`) |
 | BlockCustomer | `backend/plugins/blockadmin_api/src/modules/blockCustomer/` | Customer identity link (`customerId` ↔ org `entityId`), core-verified via `utils.ts#resolveBlockCustomer`, webhook route in `routes/blockCustomer.ts` |
-| Client portal | `backend/plugins/blockadmin_api/src/modules/clientportal/` | `cp*`-prefixed GraphQL queries for the authenticated customer's contracts/offers/payments/summary, plus building/project/unit/developer read models. Custom resolvers add `unitDetail`/`project`/`unitType` to both `CpBlockContract` and `CpBlockOffer` (same `unit → zoning → building → project` chain). |
+| Client portal | `backend/plugins/blockadmin_api/src/modules/clientportal/` | `cp*`-prefixed GraphQL queries for the authenticated customer's contracts/offers/payments/summary, plus building/project/unit/developer read models. Custom resolvers add `unitDetail`/`project`/`unitType` to both `CpBlockContract` and `CpBlockOffer` (same `unit → zoning → building → project` chain), and `paymentSchedule` to `CpBlockOffer` (`utils/offerPaymentSchedule.ts`, computed on the fly from `paymentPlan`, not stored). |
 | `schemaWrapper` | `backend/plugins/blockadmin_api/src/utils.ts` | Adds `subdomain`/`entityId` (default `ObjectId`, overridable via `entityIdType`) and a unique `{subdomain, entityId}` index to every blockadmin schema |
 | Apollo wiring | `backend/plugins/blockadmin_api/src/apollo/` | Combines blockadmin schemas, queries, mutations, and custom resolvers |
 | Worker | `backend/plugins/blockadmin_api/src/worker/` | `index.ts` wires a BullMQ `upsertJobScheduler` (queue `blockadmin-payment-reminders`, daily `0 9 * * *` at `Asia/Ulaanbaatar`) to a consumer; `paymentReminders.ts` holds the actual scan/notify logic |
@@ -109,6 +110,7 @@
 - Offer intentionally has no `blockGetOffers`-equivalent invoice-generation logic in blockadmin — that math (discount/down-payment/installment/interest) is block_api's job; blockadmin only ever mirrors the offer's own fields once `sent`, the same way it mirrors contract payments as already-computed rows rather than recomputing a payment plan itself.
 - Client-portal single-record detail queries (`cpBlockAdminGetContractPayments`/`cpBlockAdminGetContractSummary`/`cpBlockAdminGetOffer`) look up strictly by the id argument (`Contract.findOne({_id})`/`Offer.findOne({_id})`) with no check that the record belongs to the requesting `cpUser` — any authenticated cp user can currently fetch any contract's payments/summary or any offer by guessing/enumerating its `_id`. This was already true for contracts before the offer queries were added; the offer queries were built to match that existing pattern rather than introduce a new, inconsistent one. Fixing it (e.g. re-adding an ownership join through `BlockCustomer`) needs to cover contracts and offers together.
 - `CpBlockOfferPaymentPlan` is a client-portal-only type, deliberately **not** reusing the admin-facing `BlockAdminOfferPaymentPlan` — the admin type has a non-null `type: BlockAdminProjectPaymentPlanType!` field that block_api never actually populates (Offer's org-side payment plan has no `type` field at all), so querying it would throw "Cannot return null for non-nullable field". Do not reuse `BlockAdminOfferPaymentPlan` for client-portal or admin-panel work without fixing that field first.
+- `clientportal/utils/offerPaymentSchedule.ts#buildOfferPaymentSchedule` is a line-for-line port of `block_ui`'s `OfferDetailSheet.tsx`'s `OfferSchedule` component (installment-date generation, interest calc, barter/down/completion split). If that frontend calculation ever changes, this file must change with it or the two surfaces will silently disagree on the same offer's numbers — there is no shared package between the two today.
 
 ## Validation
 
@@ -121,6 +123,12 @@
 ## Recent Changes
 
 <!-- Newest first. Keep at most 10 entries. -->
+
+### `2026-08-11` — Offer payment schedule resolver
+
+- **Summary:** Added `CpBlockOffer.paymentSchedule` (`rows: [CpBlockOfferScheduleRow], total: Float`), a computed field returning an offer's full barter/down-payment/progress-payment/completion-payment breakdown — a line-for-line TypeScript port of `block_ui`'s `OfferDetailSheet.tsx#OfferSchedule` calculation (installment-date generation by frequency, FLAT/REDUCING/default interest, discount/barter/down/completion splits), so client-portal consumers get the same numbers without re-implementing that math.
+- **Affected areas:** `src/modules/clientportal/utils/offerPaymentSchedule.ts` (new), `src/modules/clientportal/graphql/resolvers/customResolvers/offer.ts`, `src/modules/clientportal/graphql/schemas/offer.ts`.
+- **Contracts changed:** Added field `CpBlockOffer.paymentSchedule: CpBlockOfferPaymentSchedule` and types `CpBlockOfferPaymentSchedule`/`CpBlockOfferScheduleRow`.
 
 ### `2026-08-11` — Client-portal Offer queries
 
@@ -176,10 +184,5 @@
 - **Affected areas:** `src/modules/clientportal/graphql/resolvers/queries/contract.ts`.
 - **Contracts changed:** `cpBlockAdminGetContracts[]._id` now returns the org-side contract id (matches `Contract.entityId`) instead of blockAdmin's internal document `_id`.
 
-### `2026-08-10` — Fixed immutable `_id` error on contract re-sync
-
-- **Summary:** `Contract.upsertSignedContract` spread the mirrored `input` (which carries block_api's own contract `_id`) directly into a Mongo `$set`, so any re-sync of an already-mirrored contract (e.g. `block_api`'s new manual sync) failed with "Performing an update on the path '_id' would modify the immutable field '_id'". Now strips `_id` from the mirrored fields before the `$set`.
-- **Affected areas:** `src/modules/contract/db/models/Contract.ts`.
-- **Contracts changed:** None (webhook payload shape unchanged; fixes a latent bug in how it was applied).
 
 

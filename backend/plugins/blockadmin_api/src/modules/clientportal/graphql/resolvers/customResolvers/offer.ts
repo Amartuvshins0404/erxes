@@ -1,7 +1,9 @@
 import { IContext } from '~/connectionResolvers';
 import { IOfferDocument } from '@/contract/@types/offer';
+import { buildOfferPaymentSchedule } from '@/clientportal/utils/offerPaymentSchedule';
 
 export default {
+  paymentSchedule: (offer: IOfferDocument) => buildOfferPaymentSchedule(offer),
   // `unit` is already a raw unit-id string on CpBlockOffer, so the full
   // record is exposed here under a different field name.
   unitDetail: async (

@@ -29,6 +29,18 @@ export const types = `
     completionPaymentDateLabel: String
   }
 
+  type CpBlockOfferScheduleRow {
+    label: String
+    date: Date
+    type: String
+    amount: Float
+  }
+
+  type CpBlockOfferPaymentSchedule {
+    rows: [CpBlockOfferScheduleRow]
+    total: Float
+  }
+
   type CpBlockOffer {
     _id: String
     unit: String
@@ -42,6 +54,7 @@ export const types = `
     status: CpBlockOfferStatus
     endDate: Date
     paymentPlan: CpBlockOfferPaymentPlan
+    paymentSchedule: CpBlockOfferPaymentSchedule
   }
 `;
 

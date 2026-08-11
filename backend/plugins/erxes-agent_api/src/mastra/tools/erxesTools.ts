@@ -1,11 +1,8 @@
-import {
-  getActivePlugins,
-  getPlugins,
-  getPluginAddress,
-} from 'erxes-api-shared/utils';
+import { getPluginAddress } from 'erxes-api-shared/utils';
 import { gql } from 'graphql-tag';
 import { getCurrentAuth } from '../requestContext';
 import type { OperationMeta } from './operationRegistry';
+import { fetchSubgraphSdls } from './subgraphSchemaSource';
 import {
   buildGraphqlOperation,
   buildZodSchemaFromArgs,
@@ -400,50 +397,14 @@ const addPluginOperationsFromSdl = (
 //   • needs no static prefix lists or public supergraph SDL access.
 async function fetchPluginMap(): Promise<Map<string, string>> {
   const map = new Map<string, string>();
-
-  let plugins: string[] = [];
-  try {
-    const [configuredPlugins, activePlugins] = await Promise.all([
-      getPlugins(),
-      getActivePlugins().catch(() => []),
-    ]);
-    // Plugin workloads can have a narrower ENABLED_PLUGINS value than the
-    // gateway. Include the gateway's Redis-backed active list so ownership does
-    // not fall back to operation-name prefixes for those subgraphs.
-    plugins = [...new Set([...configuredPlugins, ...activePlugins])];
-  } catch {
-    return map;
+  const sdls = await fetchSubgraphSdls();
+  for (const [name, sdl] of sdls) {
+    try {
+      addPluginOperationsFromSdl(map, name, sdl);
+    } catch {
+      // Unparseable SDL — its ops just won't be categorized via this map.
+    }
   }
-
-  await Promise.all(
-    plugins.map(async (name) => {
-      try {
-        const address = await getPluginAddress(name);
-        if (!address) return;
-
-        const json = await gqlFetch<{
-          data?: {
-            _service?: {
-              sdl?: string | null;
-            } | null;
-          };
-        }>(
-          address,
-          {},
-          {
-            query: '{ _service { sdl } }',
-          },
-        );
-        const sdl = json?.data?._service?.sdl;
-        if (!sdl) return;
-
-        addPluginOperationsFromSdl(map, name, sdl);
-      } catch {
-        // Plugin unreachable — its ops just won't be categorized via this map.
-      }
-    }),
-  );
-
   return map;
 }
 

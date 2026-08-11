@@ -6,7 +6,7 @@
 - **Project:** `erxes-agent_api`
 - **Layer:** Backend API
 - **Path:** `backend/plugins/erxes-agent_api`
-- **Last synchronized:** `2026-08-11a`
+- **Last synchronized:** `2026-08-11`
 
 ## Scope
 
@@ -71,7 +71,7 @@
 - Operation discovery must survive a blocked, hidden, or introspection-disabled gateway `/graphql`: when the gateway yields zero operations, the registry rebuilds from each subgraph's federation SDL (`_service { sdl }` on internal addresses), applying the same internal/client-portal skip rules and security strip as the gateway path.
 - Direct operation, file, and standalone execution admits at most ten unique calls per turn; identical calls share one promise and state-changing calls execute serially.
 - An exact repeated call forces a text-only model step using the tool-result messages already present for that turn.
-- Provider completion recovery adds at most one corrective model request; the guard retries on language-agnostic trailing promise patterns (e.g. English "I'm fetching", Mongolian "татаж байна") even after a step that already invoked tools, so the model cannot end a turn on a "fetching…" promise.
+- Provider completion recovery adds at most one corrective model request.
 - Thread titles and activity labels must not trigger auxiliary model requests.
 - Agent execution must start from an authenticated user request; the plugin must not subscribe to notifications, register automation actions, or run a scheduler.
 - Plugin source must not import another plugin or require private changes to core/shared code.
@@ -85,12 +85,6 @@
 ## Recent Changes
 
 <!-- Newest first. Keep at most 10 entries. -->
-
-### `2026-08-11` — Catch non-English trailing promises in the completion guard
-
-- **Summary:** Extends the provider-completion guard so it can detect trailing "I'm fetching" phrasings in English (`I'm [verb]ing`) and Mongolian present-continuous (`татаж байна`, `үзэж байгаа`), and removes the `toolCallCount > 0 → no retry` short-circuit so a step that already called tools but ended with a promise text is still retried. Prevents the model from ending a turn on "fetching…" and leaving the chat UI's spinner stuck.
-- **Affected areas:** `src/mastra/providerOutputGuard.ts`.
-- **Contracts changed:** None
 
 ### `2026-08-11` — Subgraph SDL fallback for operation discovery
 
@@ -145,3 +139,9 @@
 - **Summary:** Removed the custom workflow DSL, compiler, runtime, storage, API, tools, schedules, and automation hooks while keeping agent chat and normal Mastra execution.
 - **Affected areas:** Workflow module, Mastra workflow runtime and tools, scheduling, automation metadata, permissions, GraphQL assembly, models, Studio, docs, and tests.
 - **Contracts changed:** Removed all custom workflow GraphQL operations, permission actions, agent workflow counts, automation metadata, and workflow tools.
+
+### `2026-08-06` — Remove retired chat knowledge extraction
+
+- **Summary:** Removed chat knowledge extraction, derived prompt context, ratings, data models, settings, permissions, and API contracts while keeping native Mastra memory and skills.
+- **Affected areas:** `src/mastra`, agent/session preparation, settings, permissions, locales, model registration, and GraphQL assembly.
+- **Contracts changed:** Removed the retired knowledge and message-rating operations, settings fields, and permissions.

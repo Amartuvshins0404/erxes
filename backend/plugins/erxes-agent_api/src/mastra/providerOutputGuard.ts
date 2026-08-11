@@ -66,22 +66,12 @@ export function sanitizeProviderText(raw: string): {
 
 const ACTION_VERB =
   '(?:fetch|pull|research|look up|check|build|create|write|generate|open|run|continue|gather|review|inspect|prepare|update|save|publish|deploy|finish|complete|implement)';
-// Present-continuous English: "fetching", "I'm fetching", "I am just fetching…".
-// Kimi K3's English replies frequently include the "I'm" prefix and the bare
-// form above missed them — leaving the model free to end a turn on a promise.
 const ACTION_IN_PROGRESS =
-  /^(?:(?:i['’]?m|i am)\s+(?:just\s+)?)?(?:fetching|building|creating|writing|generating|opening|running|continuing|gathering|reviewing|inspecting|preparing|updating|saving|publishing|deploying|finishing|completing|implementing)\b/i;
+  /^(?:fetching|building|creating|writing|generating|opening|running|continuing|gathering|reviewing|inspecting|preparing|updating|saving|publishing|deploying|finishing|completing|implementing)\b/i;
 const DIRECT_ACTION = new RegExp(
   `^(?:(?:let me|i(?: need to| am going to))\\s+${ACTION_VERB}\\b|now,?\\s*i(?:['’]ll| will)\\s+${ACTION_VERB}\\b|i(?:['’]ll| will)\\s+${ACTION_VERB}\\b[^.!?]*\\b(?:now|next|first|then|right away)\\b)`,
   'i',
 );
-// Mongolian present-continuous: verb in -ж form + auxiliary байна/байгаа/байв.
-// Example: "татаж байна" (is pulling), "үзэж байгаа" (is viewing). Without this
-// the guard misses Kimi K3's Mongolian "I'm fetching" phrasings, which it
-// emits after tool calls return empty — the original stuck-turn symptom on the
-// test deployment.
-const MONGOLIAN_CONTINUOUS_RE =
-  /[а-яөүё]+ж\s+бай(на|гаа|ж|в|гүй)\s*\.?\s*$/i;
 
 /** A reply ending in an immediate promised action is progress, not an answer. */
 export function looksLikeIncompleteProgress(text: string): boolean {
@@ -91,9 +81,7 @@ export function looksLikeIncompleteProgress(text: string): boolean {
   const sentences = normalized.split(/(?<=[.!?])\s+/);
   const lastSentence = sentences[sentences.length - 1];
   return (
-    ACTION_IN_PROGRESS.test(lastSentence) ||
-    DIRECT_ACTION.test(lastSentence) ||
-    MONGOLIAN_CONTINUOUS_RE.test(lastSentence)
+    ACTION_IN_PROGRESS.test(lastSentence) || DIRECT_ACTION.test(lastSentence)
   );
 }
 
@@ -107,14 +95,10 @@ export interface ProviderStepCompletion {
 }
 
 export function shouldRetryProviderStep(step: ProviderStepCompletion): boolean {
-  // Mid-tool state — the model is asking for more tools; no retry needed.
-  if (step.finishReason === 'tool-calls') return false;
-  // Empty closing text after a step that already called tools is the
-  // "tool-results-are-the-answer" shape — let finalizeTurn synthesize the reply
-  // instead of forcing another round-trip.
-  const sanitized = sanitizeProviderText(step.text ?? '').text;
-  if (!sanitized) return false;
-  return looksLikeIncompleteProgress(sanitized);
+  if (step.toolCallCount > 0) return false;
+  return looksLikeIncompleteProgress(
+    sanitizeProviderText(step.text ?? '').text,
+  );
 }
 
 /**

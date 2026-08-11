@@ -9,6 +9,8 @@ import {
   BlockProjectPaymentPlanInterestType,
 } from '@/project/@types/payment';
 import { IContext } from '~/connectionResolvers';
+import { sendMessageAwait, syncCustomerToBlockAdmin } from '@/admin/utils';
+import { buildOfferMirrorInput } from '@/contract/utils/offerMirror';
 
 function stripNulls<T extends Record<string, any>>(obj: T): Partial<T> {
   return Object.fromEntries(
@@ -31,6 +33,10 @@ export const offerMutations = {
 
     if (!unit) {
       throw new Error('Unit not found');
+    }
+
+    if (unit.locked) {
+      throw new Error('Cannot create offer: unit is locked');
     }
 
 
@@ -174,14 +180,60 @@ export const offerMutations = {
 
   blockSendOfferEmail: async (
     _parent: undefined,
-    { _id }: { _id: string },
+    args: { _id: string; input?: IOffer },
     { models }: IContext,
   ) => {
-    await models.Offer.updateOne(
-      { _id },
-      { $set: { status: OfferStatus.SENT } },
-    );
-    return 'success';
+    const updated = await models.Offer.updateOffer(args._id, {
+      status: OfferStatus.SENT,
+    } as IOffer);
+
+    // blockSendOfferEmail's own args shape ({_id}) carries no offer fields,
+    // so reshape the mirrored payload to what block-admin's webhook route
+    // expects (matching blockUpdateContractStatus's pattern for Contract).
+    if (updated) {
+      args.input = buildOfferMirrorInput(updated);
+    }
+
+    return updated;
+  },
+
+  // Manual re-sync for a single offer: on-demand version of the automatic
+  // sent-offer mirror, for use from a UI-triggered "sync" action.
+  blockManualSyncOffer: async (
+    _parent: undefined,
+    { offerId }: { offerId: string },
+    { models, subdomain }: IContext & { subdomain: string },
+  ) => {
+    const offer = await models.Offer.getOffer(offerId);
+
+    if (!offer) {
+      throw new Error('Offer not found');
+    }
+
+    if (offer.status !== OfferStatus.SENT) {
+      throw new Error('Only sent offers can be synced to Block Platform');
+    }
+
+    if (offer.customerId) {
+      await syncCustomerToBlockAdmin(subdomain, offer.customerId, models);
+    }
+
+    const response = await sendMessageAwait({
+      subdomain,
+      path: 'blockUpdateOffer',
+      payload: {
+        entityId: offer._id,
+        data: {
+          input: buildOfferMirrorInput(offer),
+        },
+      },
+    });
+
+    if (response?.error) {
+      throw new Error(response.error);
+    }
+
+    return offer;
   },
 };
 

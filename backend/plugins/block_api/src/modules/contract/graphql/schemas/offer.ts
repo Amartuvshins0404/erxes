@@ -108,7 +108,8 @@ export const types = `
 export const mutations = `
   blockCreateOffer(input: BlockOfferInput!): BlockOffer
   blockUpdateOffer(_id: String!, input: BlockOfferInput!): BlockOffer
-  blockSendOfferEmail(_id: String!): String
+  blockSendOfferEmail(_id: String!): BlockOffer
+  blockManualSyncOffer(offerId: String!): BlockOffer
 `;
 
 export const queries = `

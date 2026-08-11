@@ -13,6 +13,11 @@ export interface IOfferModel extends Model<IOfferDocument> {
     entityId: string,
     input: IOffer,
   ): Promise<IOfferDocument>;
+  upsertSentOffer(
+    subdomain: string,
+    entityId: string,
+    input: IOffer,
+  ): Promise<IOfferDocument>;
   deleteOffer(
     subdomain: string,
     entityId: string,
@@ -51,6 +56,22 @@ export const loadOfferClass = (models: IModels) => {
       const { _id } = await models.Offer.getOffer(subdomain, entityId);
 
       return models.Offer.findOneAndDelete({ _id });
+    }
+
+    // An offer may become "sent" via create, edit, or the send-email action —
+    // any of which can be block-admin's first encounter with it — so this
+    // upserts rather than requiring a prior create (mirrors
+    // Contract.upsertSignedContract).
+    public static async upsertSentOffer(
+      subdomain: string,
+      entityId: string,
+      input: IOffer,
+    ) {
+      return models.Offer.findOneAndUpdate(
+        { subdomain, entityId },
+        { $set: { ...input, subdomain, entityId } },
+        { upsert: true, new: true },
+      );
     }
   }
 

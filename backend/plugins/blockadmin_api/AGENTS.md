@@ -31,6 +31,7 @@
 - Stores supplier products synced from supplier tenants, including initial category snapshots, attachments, status, state, and source `entityId`.
 - Supports product approval/rejection, category assignment, soft-delete by source entity IDs, and supplier verification/tier updates.
 - Mirrors a `block_api` org's signed contracts (create/update/status-change/manual-resync all funnel through one upsert-by-`{subdomain, entityId}` path), their full payment/transaction schedules (bulk-replaced on every sync), and customer identity links (`BlockCustomer`, verified against erxes core by email/phone before linking, keyed by `customerId` = core's customer id).
+- Mirrors `block_api` offers the same way once their `status` becomes `sent` (create/update/send-email all funnel through `Offer.upsertSentOffer`) — draft offers are never synced. Does not recompute invoices/payment schedules for offers (that stays org-side in `block_api`); this is a pure state mirror, not a business-logic duplicate.
 - Client-portal GraphQL surface (`clientportal` module) exposing a customer's contracts, per-contract payment schedule, and a computed summary (totals + next payment) — intentionally NOT subdomain-scoped, since a customer may hold contracts across multiple orgs; ownership is instead verified per-request against the authenticated `cpUser`.
 - Exposes blockadmin GraphQL schema sections through `src/apollo/schema/schema.ts`.
 - Daily BullMQ-scheduled worker (`src/worker/`) that sends client-portal payment reminder/overdue notifications for every org's contract payments in one global scan (no per-org loop needed, since `ContractPayment` rows already carry their own `subdomain`).
@@ -49,7 +50,7 @@
 | `schemaWrapper` | `backend/plugins/blockadmin_api/src/utils.ts` | Adds `subdomain`/`entityId` (default `ObjectId`, overridable via `entityIdType`) and a unique `{subdomain, entityId}` index to every blockadmin schema |
 | Apollo wiring | `backend/plugins/blockadmin_api/src/apollo/` | Combines blockadmin schemas, queries, mutations, and custom resolvers |
 | Worker | `backend/plugins/blockadmin_api/src/worker/` | `index.ts` wires a BullMQ `upsertJobScheduler` (queue `blockadmin-payment-reminders`, daily `0 9 * * *` at `Asia/Ulaanbaatar`) to a consumer; `paymentReminders.ts` holds the actual scan/notify logic |
-| cp notifications | `backend/plugins/blockadmin_api/src/utils/cpNotify.ts` | Shared `notifyBlockCustomer(models, subdomain, orgCustomerId, data)` — resolves an org-side customer id through `BlockCustomer` to a verified core customer id, looks up its client-portal users (`cpUsers.list`, grouped by `clientPortalId`), and sends `cpNotifications.create`. Used by both the payment reminder worker and the contract-signed webhook route. |
+| cp notifications | `backend/plugins/blockadmin_api/src/utils/cpNotify.ts` | Shared `notifyBlockCustomer(models, subdomain, orgCustomerId, data)` — resolves an org-side customer id through `BlockCustomer` to a verified core customer id, looks up its client-portal users (`cpUsers.list`, grouped by `clientPortalId`), and sends `cpNotifications.create`. Used by the payment reminder worker and the contract-signed/offer-sent webhook routes. |
 
 ## Contracts
 
@@ -103,6 +104,9 @@
 - The worker resolves a payment's client-portal users via `BlockCustomer.findOne({subdomain: payment.subdomain, entityId: payment.customerId})` to get the verified `customerId`, then passes *that* as `cpUsers.list`'s `erxesCustomerId` — `payment.customerId` itself is block_api's org-side reference, not the value `cpUsers.list` expects (fixed 2026-08-11; see Local Invariants above).
 - `notifyBlockCustomer` (`src/utils/cpNotify.ts`) is the one place that resolves an org-side customer id to client-portal users and sends a notification; any new notification trigger should call it rather than re-deriving the `BlockCustomer` → `cpUsers.list` → `cpNotifications.create` chain.
 - The "new contract" notification in `contract/routes/contract.ts`'s `syncIfSigned` fires exactly once, only when `Contract.findOne({subdomain, entityId})` found nothing *before* the upsert — i.e. on whichever of block_api's three mirror entry points (create/update/status-change) happens to be blockadmin's first encounter with that contract. It must never fire on a re-sync of an already-mirrored contract (including `blockManualSyncContract`'s repeat syncs).
+- `contract/routes/offer.ts`'s `syncIfSent` mirrors that exact pattern for Offer (`syncIfSigned` → `syncIfSent`, `Contract.upsertSignedContract` → `Offer.upsertSentOffer`, gated on `status === 'sent'` instead of `'signed'`, "new offer" notification fires once on first-ever sync). Any future Offer mirror change should stay symmetric with Contract's — don't let the two drift apart.
+- Every mirrored entity's schema-level Mongoose `ref` on its `unit` field must point at `block_admin_units` (blockadmin's own collection), not `block_units` (block_api's org-side collection name) — `ref` doesn't affect query correctness (nothing here calls `.populate()`), but a wrong value is a copy-paste tell that the field itself may also be unresolved; `Offer.unit`'s `ref` had this exact bug (fixed 2026-08-11, matching the same fix already applied to `Contract.unit`) — always resolve an incoming `input.unit` (block_api's org-side unit id) through `Unit.getUnit(subdomain, input.unit)` to get blockadmin's own unit `_id` before storing it.
+- Offer intentionally has no `blockGetOffers`-equivalent invoice-generation logic in blockadmin — that math (discount/down-payment/installment/interest) is block_api's job; blockadmin only ever mirrors the offer's own fields once `sent`, the same way it mirrors contract payments as already-computed rows rather than recomputing a payment plan itself.
 
 ## Validation
 
@@ -115,6 +119,12 @@
 ## Recent Changes
 
 <!-- Newest first. Keep at most 10 entries. -->
+
+### `2026-08-11` — Offer sync rebuilt to mirror Contract's pattern
+
+- **Summary:** Rewrote `contract/routes/offer.ts` from scratch: it previously re-implemented block_api's entire invoice-generation math (discount/down-payment/installment/interest), with a live duplicate-create bug (`Offer.createOffer` called twice per non-installment offer), a hung response on the installment path (no `res.json` ever sent), and `blockSendOfferEmail`'s route always receiving `entityId: undefined` since block_api's old resolver returned a bare string. Replaced with `syncIfSent`, the exact `syncIfSigned` pattern: gate on `status === 'sent'`, upsert via new `Offer.upsertSentOffer`, and send a "Танд үнийн санал ирлээ" notification via `notifyBlockCustomer` on first-ever sync. Also fixed `Offer.unit`'s stray `ref: 'block_units'` (should reference blockadmin's own `block_admin_units`, matching Contract's already-fixed `ref`).
+- **Affected areas:** `src/modules/contract/routes/offer.ts`, `src/modules/contract/db/models/Offer.ts`, `src/modules/contract/db/definitions/offer.ts`.
+- **Contracts changed:** None (webhook payload shapes unchanged); depends on `block_api`'s `blockSendOfferEmail` now returning the offer document (see block_api's guide).
 
 ### `2026-08-11` — New-contract notification, extracted shared cp-notify helper
 
@@ -170,8 +180,3 @@
 - **Affected areas:** Documentation only.
 - **Contracts changed:** None.
 
-### `2026-08-09` — `Supplier product webhook contract documented`
-
-- **Summary:** Documented the existing blockadmin supplier/product webhook receivers and invariants for the supplier-to-blockadmin product sync fix.
-- **Affected areas:** `src/modules/supplier/profile/routes/webhook.ts`, `src/modules/supplier/product/routes/webhook.ts`, `src/modules/supplier/product/db/models/Product.ts`
-- **Contracts changed:** None.

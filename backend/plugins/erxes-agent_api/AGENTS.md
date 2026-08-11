@@ -6,7 +6,7 @@
 - **Project:** `erxes-agent_api`
 - **Layer:** Backend API
 - **Path:** `backend/plugins/erxes-agent_api`
-- **Last synchronized:** `2026-08-10`
+- **Last synchronized:** `2026-08-11`
 
 ## Scope
 
@@ -24,7 +24,7 @@
 - Runs blocking and SSE-streamed Mastra agent turns as linked AI team-member accounts with tenant and permission isolation.
 - Creates agents with private, people-shared, or organization visibility, permission groups, additional-tool allowlists, provider/model settings, and active state.
 - Persists chats, working memory, attachments, and artifacts in the native Mastra-backed stores.
-- Discovers permitted erxes operations through Mastra ToolSearchProcessor over live GraphQL introspection, with exact live argument schemas and conservative standalone-tool scoping.
+- Discovers permitted erxes operations through Mastra ToolSearchProcessor over live GraphQL introspection, with exact live argument schemas and conservative standalone-tool scoping; when the gateway `/graphql` is blocked or introspection is disabled, the registry rebuilds itself from each subgraph's federation SDL on its internal address.
 - Creates documents, charts, diagrams, and websites when those tools are enabled for the selected agent.
 - Loads plugin-owned `SKILL.md` files through Mastra `Workspace` and `LocalSkillSource`; Mastra provides skill discovery and read tools at runtime.
 - Bounds malformed-provider recovery, unique tool executions, exact duplicate calls, and state-changing tool concurrency per turn.
@@ -68,6 +68,7 @@
 - Destructive mutations always require explicit user approval; agent configuration cannot bypass that check.
 - Tool permissions remain authoritative; turn scoping never grants a tool and preserves all approved standalone tools when wording is ambiguous.
 - Mastra searches only the live, policy-scoped exact erxes operation tools; operation arguments use exact schema values and never trigger entity name-to-ID resolution.
+- Operation discovery must survive a blocked, hidden, or introspection-disabled gateway `/graphql`: when the gateway yields zero operations, the registry rebuilds from each subgraph's federation SDL (`_service { sdl }` on internal addresses), applying the same internal/client-portal skip rules and security strip as the gateway path.
 - Direct operation, file, and standalone execution admits at most ten unique calls per turn; identical calls share one promise and state-changing calls execute serially.
 - An exact repeated call forces a text-only model step using the tool-result messages already present for that turn.
 - Provider completion recovery adds at most one corrective model request.
@@ -84,6 +85,12 @@
 ## Recent Changes
 
 <!-- Newest first. Keep at most 10 entries. -->
+
+### `2026-08-11` — Subgraph SDL fallback for operation discovery
+
+- **Summary:** When the gateway `/graphql` is blocked, hidden, or introspection-disabled, the operation registry rebuilds its operations and schema maps from each subgraph's federation SDL on internal addresses, keeping search/execute operation tools functional.
+- **Affected areas:** `src/mastra/tools/subgraphSchemaSource.ts` (new), `src/mastra/tools/erxesTools.ts`, `src/mastra/tools/operationRegistry.ts`, and tests.
+- **Contracts changed:** None
 
 ### `2026-08-10` — Finish Kimi operation turns
 
@@ -138,9 +145,3 @@
 - **Summary:** Removed chat knowledge extraction, derived prompt context, ratings, data models, settings, permissions, and API contracts while keeping native Mastra memory and skills.
 - **Affected areas:** `src/mastra`, agent/session preparation, settings, permissions, locales, model registration, and GraphQL assembly.
 - **Contracts changed:** Removed the retired knowledge and message-rating operations, settings fields, and permissions.
-
-### `2026-08-06` — Remove retired response analysis
-
-- **Summary:** Removed the external analysis client, runtime response checks, metadata, settings, export, dependencies, and deploy files.
-- **Affected areas:** Agent runtime and stream metadata, settings, session types, locales, dependencies, deployment files, and tests.
-- **Contracts changed:** Removed the retired analysis settings fields and chat message metadata field.

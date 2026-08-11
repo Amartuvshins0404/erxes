@@ -9,6 +9,7 @@ import {
   type SchemaMaps,
 } from './erxesTools';
 import { isSecurityBlockedOperation } from './securityGuard';
+import { fetchSubgraphSchemaBundle } from './subgraphSchemaSource';
 
 // One discovered erxes GraphQL operation (query or mutation) the agent can run.
 export interface OperationMeta {
@@ -112,11 +113,27 @@ export async function getOperationRegistry(
   const previous = lastGood.get(key);
 
   try {
-    const [operations, inputSchemaMaps, objectFieldsMap] = await Promise.all([
+    let [operations, inputSchemaMaps, objectFieldsMap] = await Promise.all([
       fetchAvailableErxesTools(settings),
       fetchInputSchemaMaps(settings),
       fetchObjectFieldsMap(settings),
     ]);
+
+    // Gateway introspection unavailable (blocked/hidden `/graphql`, disabled
+    // introspection, gateway down): rebuild the full registry input from each
+    // subgraph's federation SDL on its internal address — the same network
+    // path operation execution already uses, so discovery keeps working.
+    if (!operations.length) {
+      const bundle = await fetchSubgraphSchemaBundle();
+      if (bundle.operations.length) {
+        operations = bundle.operations;
+        inputSchemaMaps = {
+          inputTypesMap: bundle.inputTypesMap,
+          enumValuesMap: bundle.enumValuesMap,
+        };
+        objectFieldsMap = bundle.objectFieldsMap;
+      }
+    }
 
     if (!operations.length && previous) {
       // Introspection failed/empty — serve the last good registry.

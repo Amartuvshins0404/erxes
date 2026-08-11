@@ -97,9 +97,6 @@ export const cpContractQueries = {
     return summarizePayments(payments);
   },
 
-  // User-wide equivalents of the two queries above: aggregate across every
-  // contract this customer holds (possibly across multiple orgs), instead of
-  // one contractId at a time.
   cpBlockAdminGetPayments: async (
     _parent: undefined,
     _args: undefined,

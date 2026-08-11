@@ -6,7 +6,7 @@
 - **Project:** `blockadmin_api`
 - **Layer:** `Backend API`
 - **Path:** `backend/plugins/blockadmin_api`
-- **Last synchronized:** `2026-08-10`
+- **Last synchronized:** `2026-08-11`
 
 ## Scope
 
@@ -33,6 +33,7 @@
 - Mirrors a `block_api` org's signed contracts (create/update/status-change/manual-resync all funnel through one upsert-by-`{subdomain, entityId}` path), their full payment/transaction schedules (bulk-replaced on every sync), and customer identity links (`BlockCustomer`, verified against erxes core by email/phone before linking, keyed by `customerId` = core's customer id).
 - Client-portal GraphQL surface (`clientportal` module) exposing a customer's contracts, per-contract payment schedule, and a computed summary (totals + next payment) — intentionally NOT subdomain-scoped, since a customer may hold contracts across multiple orgs; ownership is instead verified per-request against the authenticated `cpUser`.
 - Exposes blockadmin GraphQL schema sections through `src/apollo/schema/schema.ts`.
+- Daily BullMQ-scheduled worker (`src/worker/`) that sends client-portal payment reminder/overdue notifications for every org's contract payments in one global scan (no per-org loop needed, since `ContractPayment` rows already carry their own `subdomain`).
 
 ## Architecture
 
@@ -47,6 +48,8 @@
 | Client portal | `backend/plugins/blockadmin_api/src/modules/clientportal/` | `cp*`-prefixed GraphQL queries for the authenticated customer's contracts/payments/summary, plus building/project/unit/developer read models |
 | `schemaWrapper` | `backend/plugins/blockadmin_api/src/utils.ts` | Adds `subdomain`/`entityId` (default `ObjectId`, overridable via `entityIdType`) and a unique `{subdomain, entityId}` index to every blockadmin schema |
 | Apollo wiring | `backend/plugins/blockadmin_api/src/apollo/` | Combines blockadmin schemas, queries, mutations, and custom resolvers |
+| Worker | `backend/plugins/blockadmin_api/src/worker/` | `index.ts` wires a BullMQ `upsertJobScheduler` (queue `blockadmin-payment-reminders`, daily `0 9 * * *` at `Asia/Ulaanbaatar`) to a consumer; `paymentReminders.ts` holds the actual scan/notify logic |
+| cp notifications | `backend/plugins/blockadmin_api/src/utils/cpNotify.ts` | Shared `notifyBlockCustomer(models, subdomain, orgCustomerId, data)` — resolves an org-side customer id through `BlockCustomer` to a verified core customer id, looks up its client-portal users (`cpUsers.list`, grouped by `clientPortalId`), and sends `cpNotifications.create`. Used by both the payment reminder worker and the contract-signed webhook route. |
 
 ## Contracts
 
@@ -69,6 +72,7 @@
 - Supplier payload shape `{ subdomain, payload: { entityId, entityIds, data } }`.
 - Contract/customer webhook payload shape `{ subdomain, payload: { entityId, data: { input? , email?, phone?, payments? } } }`, HMAC-signed with `BLOCK_ADMIN_SECRET`, sent by `block_api`'s `sendMessage`/`sendMessageAwait`.
 - `sendTRPCMessage` to erxes core (via `BlockCustomer`'s `resolveBlockCustomer`) to independently verify a customer's email/phone before linking — never trusts the webhook payload's identity claim alone.
+- `sendTRPCMessage` to erxes core's `cpUsers.list`/`cpNotifications.create` tRPC routes, via the shared `notifyBlockCustomer` helper (used by the payment reminder worker and the contract-signed webhook route) — addressed at the *relevant record's own* `subdomain` (the originating org), never blockadmin's own worker-local subdomain.
 - Public `erxes-api-shared` utilities and GraphQL JSON/scalar conventions.
 
 ## Data and State
@@ -82,7 +86,7 @@
 - `block_admin_contract_payments` is wholesale-replaced (`deleteMany` + `insertMany`) on every sync — never patched row by row — keyed by `{subdomain, contractId}`.
 - `block_admin_customers` (`BlockCustomer`) stores `{customerId, subdomain, entityId}` only (no PII); `entityId` uses `String` (core customer ids are `mongooseStringRandomId`-based, not ObjectIds) via `schemaWrapper`'s `entityIdType` override — every other blockadmin schema keeps the default `ObjectId` `entityId`.
 - Client-portal queries intentionally do not filter by `subdomain` — a customer's contracts are looked up purely by `customerId` across all orgs; per-contract queries additionally verify ownership via `BlockCustomer` → `Contract.customerId`.
-- `ContractPayment` rows carry their own `customerId` (mirrored from block_api's payment rows, which inherit it from their parent contract), so user-wide payment/summary queries can query `ContractPayment` directly without joining through `Contract` first.
+- `ContractPayment` rows carry their own `customerId` (mirrored from block_api's payment rows, which inherit it from their parent contract), so user-wide payment/summary queries can query `ContractPayment` directly without joining through `Contract` first — but this `customerId` is block_api's org-side reference (mirrors `BlockCustomer.entityId`), not the verified core customer id (`BlockCustomer.customerId`). Client-portal queries filter by `blockCustomer.entityId` (correct); anything that needs the *verified* core customer id (e.g. calling core's `cpUsers`/`cpNotifications` tRPC routes) must resolve it through `BlockCustomer.findOne({subdomain, entityId: payment.customerId})` first.
 
 ## Local Invariants
 
@@ -95,6 +99,10 @@
 - `Contract.status` here is a fixed enum (`reserved|draft|signed|lost|cancelled`) mirroring `block_api`'s per-org `ContractStatus.type`, never a raw per-org `ContractStatus._id` reference.
 - `Contract.upsertSignedContract` is the single upsert path for all three of block_api's mirror entry points (create/update/status-change) plus manual re-sync — any of them may be blockadmin's first encounter with a given contract, so it must always upsert, never assume prior existence.
 - `BlockCustomer.resolveBlockCustomer` always re-verifies identity against erxes core by email/phone before linking/upserting; it never trusts a client-supplied `entityId`-only claim.
+- The payment reminder worker (`src/worker/paymentReminders.ts`) runs once daily and sends exactly two kinds of notification with no persisted "already sent" state: upcoming reminders at 5/3/1 days before `dueDate` (each a distinct calendar-day bucket, so a once-daily cron naturally fires each at most once) and overdue reminders for every unpaid/partial payment whose `dueDate` has passed (these resend every run — that's intentional, not a bug). Every `sendTRPCMessage` call it makes must use the *payment's* `subdomain`, not the worker's own fixed `WORKER_SUBDOMAIN` — the former addresses the originating org's core-api (where the actual cpUser/cpNotification records live), the latter only selects blockadmin's own local DB connection.
+- The worker resolves a payment's client-portal users via `BlockCustomer.findOne({subdomain: payment.subdomain, entityId: payment.customerId})` to get the verified `customerId`, then passes *that* as `cpUsers.list`'s `erxesCustomerId` — `payment.customerId` itself is block_api's org-side reference, not the value `cpUsers.list` expects (fixed 2026-08-11; see Local Invariants above).
+- `notifyBlockCustomer` (`src/utils/cpNotify.ts`) is the one place that resolves an org-side customer id to client-portal users and sends a notification; any new notification trigger should call it rather than re-deriving the `BlockCustomer` → `cpUsers.list` → `cpNotifications.create` chain.
+- The "new contract" notification in `contract/routes/contract.ts`'s `syncIfSigned` fires exactly once, only when `Contract.findOne({subdomain, entityId})` found nothing *before* the upsert — i.e. on whichever of block_api's three mirror entry points (create/update/status-change) happens to be blockadmin's first encounter with that contract. It must never fire on a re-sync of an already-mirrored contract (including `blockManualSyncContract`'s repeat syncs).
 
 ## Validation
 
@@ -102,10 +110,23 @@
 - `pnpm nx build blockadmin_api`
 - Blockadmin smoke scenario: send a signed `POST /webhook/syncProduct` payload with `BLOCK_ADMIN_SECRET`; `block_admin_supplier_products` upserts by source `entityId`.
 - Contract smoke scenario: sign a contract in `block_api`, confirm `block_admin_contracts`/`block_admin_contract_payments` reflect it; call the same sync again (e.g. via `block_api`'s `blockManualSyncContract`) and confirm it upserts cleanly with no immutable-field error and no duplicate payment rows.
+- Worker smoke scenario: seed a `ContractPayment` with `dueDate` 1/3/5 days out and one with a past `dueDate`, both `status: 'unpaid'` with a real `customerId`; manually invoke `runPaymentReminders` (or wait for the `0 9 * * *` `Asia/Ulaanbaatar` schedule) and confirm a `cpNotifications.create` call fires for each, addressed at the payment's own `subdomain`.
 
 ## Recent Changes
 
 <!-- Newest first. Keep at most 10 entries. -->
+
+### `2026-08-11` — New-contract notification, extracted shared cp-notify helper
+
+- **Summary:** Contract sync now sends a Mongolian "you have a new contract" client-portal notification exactly once, on whichever webhook call first creates a contract's `block_admin_contracts` record (`syncIfSigned` now checks `Contract.findOne` before the upsert, not just for `signedAt`). Extracted the `BlockCustomer` → `cpUsers.list` → `cpNotifications.create` chain (previously duplicated inline in the payment reminder worker) into a shared `notifyBlockCustomer(models, subdomain, orgCustomerId, data)` helper in `src/utils/cpNotify.ts`, and switched the worker to call it instead.
+- **Affected areas:** `src/utils/cpNotify.ts` (new), `src/modules/contract/routes/contract.ts`, `src/worker/paymentReminders.ts`.
+- **Contracts changed:** None (adds a new outbound `cpNotifications.create` call on contract creation; no inbound contract changes).
+
+### `2026-08-11` — Daily payment reminder/overdue notification worker
+
+- **Summary:** Added a BullMQ daily-scheduled worker (runs `0 9 * * *` at `Asia/Ulaanbaatar`, i.e. 9am Mongolia local time) that scans every org's `ContractPayment` rows in one global pass (no per-org loop, since rows carry their own `subdomain`) and sends client-portal notifications in Mongolian: an upcoming-payment reminder at 5/3/1 days before `dueDate`, and an overdue reminder every day a payment stays unpaid/partial past its `dueDate`. Resolves each payment's client-portal users via `BlockCustomer.findOne({subdomain, entityId: payment.customerId})` → verified core `customerId` → `cpUsers.list` (grouped by `clientPortalId`, since a customer could theoretically have cp users on more than one portal) → `cpNotifications.create`, all addressed at the payment's own `subdomain` (not blockadmin's own worker-local one). Notification text is hardcoded Mongolian (no i18n lookup); dates format via `toLocaleDateString('mn-MN')`; the overdue message states the actual number of days overdue (`daysBetween(payment.dueDate, today)`), not a generic "overdue" phrase.
+- **Affected areas:** `src/worker/index.ts` (new), `src/worker/paymentReminders.ts` (new), `src/main.ts` (added `onServerInit` wiring `initMQWorkers(redis)`).
+- **Contracts changed:** None (consumes core's existing `cpUsers.list`/`cpNotifications.create` tRPC routes; adds no new inbound contract).
 
 ### `2026-08-10` — Added `unitDetail`/`project`/`unitType` to the client-portal Contract custom resolver
 

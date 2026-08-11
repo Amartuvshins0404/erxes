@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { IContext } from '~/connectionResolvers';
 import { IRequest, IResponse } from '~/types';
+import { notifyBlockCustomer } from '~/utils/cpNotify';
 import { ContractStatus, IContract } from '../@types/contract';
 
 const router: Router = Router();
@@ -22,10 +23,30 @@ const syncIfSigned = async (
     throw new Error(`Unit "${input.unit}" not found in subdomain "${subdomain}"`);
   }
 
-  return models.Contract.upsertSignedContract(subdomain, entityId, {
-    ...input,
-    unit: unit._id,
-  });
+  // Whether block-admin has ever seen this contract before must be checked
+  // BEFORE the upsert, so the "you have a new contract" notification fires
+  // exactly once, on the sync that first creates the record here.
+  const existing = await models.Contract.findOne({ subdomain, entityId });
+
+  const contract = await models.Contract.upsertSignedContract(
+    subdomain,
+    entityId,
+    { ...input, unit: unit._id },
+  );
+
+  if (!existing && contract?.customerId) {
+    await notifyBlockCustomer(models, subdomain, contract.customerId, {
+      title: 'Шинэ гэрээ',
+      message: `Танд ${
+        contract.number ? `"${contract.number}" дугаартай ` : ''
+      }үл хөдлөх хөрөнгийн гэрээ үүслээ.`,
+      type: 'success',
+      contentType: 'blockadmin:contract',
+      contentTypeId: contract._id,
+    });
+  }
+
+  return contract;
 };
 
 router.post(

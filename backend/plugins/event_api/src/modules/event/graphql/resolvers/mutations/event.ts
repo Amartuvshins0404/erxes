@@ -37,7 +37,9 @@ export const eventMutations: Record<string, Resolver> = {
     const result = await models.Events.removeEvents(_ids);
 
     await Promise.all(
-      _ids.map((eventId) => refreshEventKnowledgeSource({ subdomain, eventId })),
+      _ids.map((eventId) =>
+        refreshEventKnowledgeSource({ subdomain, eventId }),
+      ),
     );
 
     return result;

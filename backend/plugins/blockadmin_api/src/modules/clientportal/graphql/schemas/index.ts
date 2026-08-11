@@ -20,12 +20,18 @@ import {
   types as cpContractTypes,
 } from './contract';
 
+import {
+  queries as cpOfferQueries,
+  types as cpOfferTypes,
+} from './offer';
+
 export const types = `
     ${cpProjectTypes}
     ${cpDeveloperTypes}
     ${cpBuildingTypes}
     ${cpUnitTypes}
     ${cpContractTypes}
+    ${cpOfferTypes}
 `;
 
 export const queries = `
@@ -34,4 +40,5 @@ export const queries = `
     ${cpBuildingQueries}
     ${cpUnitQueries}
     ${cpContractQueries}
+    ${cpOfferQueries}
 `;

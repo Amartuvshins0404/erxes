@@ -32,7 +32,7 @@
 - Supports product approval/rejection, category assignment, soft-delete by source entity IDs, and supplier verification/tier updates.
 - Mirrors a `block_api` org's signed contracts (create/update/status-change/manual-resync all funnel through one upsert-by-`{subdomain, entityId}` path), their full payment/transaction schedules (bulk-replaced on every sync), and customer identity links (`BlockCustomer`, verified against erxes core by email/phone before linking, keyed by `customerId` = core's customer id).
 - Mirrors `block_api` offers the same way once their `status` becomes `sent` (create/update/send-email all funnel through `Offer.upsertSentOffer`) — draft offers are never synced. Does not recompute invoices/payment schedules for offers (that stays org-side in `block_api`); this is a pure state mirror, not a business-logic duplicate.
-- Client-portal GraphQL surface (`clientportal` module) exposing a customer's contracts, per-contract payment schedule, and a computed summary (totals + next payment) — intentionally NOT subdomain-scoped, since a customer may hold contracts across multiple orgs; ownership is instead verified per-request against the authenticated `cpUser`.
+- Client-portal GraphQL surface (`clientportal` module) exposing a customer's contracts and offers, per-contract payment schedule, and a computed summary (totals + next payment) — intentionally NOT subdomain-scoped, since a customer may hold contracts/offers across multiple orgs. The list queries (`cpBlockAdminGetContracts`/`cpBlockAdminGetOffers`) are scoped to the authenticated `cpUser`'s own `BlockCustomer`, but the single-record detail queries that take an id argument (`cpBlockAdminGetContractPayments`/`cpBlockAdminGetContractSummary`/`cpBlockAdminGetOffer`) currently do **not** verify the requested record belongs to that `cpUser` — see Local Invariants.
 - Exposes blockadmin GraphQL schema sections through `src/apollo/schema/schema.ts`.
 - Daily BullMQ-scheduled worker (`src/worker/`) that sends client-portal payment reminder/overdue notifications for every org's contract payments in one global scan (no per-org loop needed, since `ContractPayment` rows already carry their own `subdomain`).
 
@@ -46,7 +46,7 @@
 | Supplier models | `backend/plugins/blockadmin_api/src/modules/supplier/db/loadModels.ts` | Registers `block_admin_suppliers` and `block_admin_supplier_products` models |
 | Contract | `backend/plugins/blockadmin_api/src/modules/contract/` | Mirrored `Contract`/`ContractPayment`/`Offer` schemas, models, webhook routes (`routes/contract.ts`, `routes/payment.ts`, `routes/offer.ts`) |
 | BlockCustomer | `backend/plugins/blockadmin_api/src/modules/blockCustomer/` | Customer identity link (`customerId` ↔ org `entityId`), core-verified via `utils.ts#resolveBlockCustomer`, webhook route in `routes/blockCustomer.ts` |
-| Client portal | `backend/plugins/blockadmin_api/src/modules/clientportal/` | `cp*`-prefixed GraphQL queries for the authenticated customer's contracts/payments/summary, plus building/project/unit/developer read models |
+| Client portal | `backend/plugins/blockadmin_api/src/modules/clientportal/` | `cp*`-prefixed GraphQL queries for the authenticated customer's contracts/offers/payments/summary, plus building/project/unit/developer read models. Custom resolvers add `unitDetail`/`project`/`unitType` to both `CpBlockContract` and `CpBlockOffer` (same `unit → zoning → building → project` chain). |
 | `schemaWrapper` | `backend/plugins/blockadmin_api/src/utils.ts` | Adds `subdomain`/`entityId` (default `ObjectId`, overridable via `entityIdType`) and a unique `{subdomain, entityId}` index to every blockadmin schema |
 | Apollo wiring | `backend/plugins/blockadmin_api/src/apollo/` | Combines blockadmin schemas, queries, mutations, and custom resolvers |
 | Worker | `backend/plugins/blockadmin_api/src/worker/` | `index.ts` wires a BullMQ `upsertJobScheduler` (queue `blockadmin-payment-reminders`, daily `0 9 * * *` at `Asia/Ulaanbaatar`) to a consumer; `paymentReminders.ts` holds the actual scan/notify logic |
@@ -63,8 +63,8 @@
 - GraphQL supplier profile queries/mutations with `ba*` operation names.
 - GraphQL supplier product queries/mutations with `ba*` operation names.
 - GraphQL client-portal queries — all require an authenticated `cpUser` (`erxesCustomerId`):
-  - `cpBlockAdminGetContracts` — every contract this customer holds, across all orgs.
-  - `cpBlockAdminGetContractPayments(contractId)` / `cpBlockAdminGetContractSummary(contractId)` — scoped to one contract; verify the contract belongs to the requesting customer via `getOwnedContract` before returning data.
+  - `cpBlockAdminGetContracts` / `cpBlockAdminGetOffers` — every contract/offer this customer holds, across all orgs, scoped via the requesting `cpUser`'s `BlockCustomer`.
+  - `cpBlockAdminGetContractPayments(contractId)` / `cpBlockAdminGetContractSummary(contractId)` / `cpBlockAdminGetOffer(offerId)` — look up the single record by its blockadmin `_id` (the same `_id` the list queries return); do **not** currently verify it belongs to the requesting `cpUser` (see Local Invariants).
   - `cpBlockAdminGetPayments` / `cpBlockAdminGetSummary` — the same payments/summary shape aggregated across *every* contract the customer holds (no `contractId`), by querying `ContractPayment` directly on `customerId` rather than joining through `Contract`.
 
 ### Consumes
@@ -107,6 +107,8 @@
 - `contract/routes/offer.ts`'s `syncIfSent` mirrors that exact pattern for Offer (`syncIfSigned` → `syncIfSent`, `Contract.upsertSignedContract` → `Offer.upsertSentOffer`, gated on `status === 'sent'` instead of `'signed'`, "new offer" notification fires once on first-ever sync). Any future Offer mirror change should stay symmetric with Contract's — don't let the two drift apart.
 - Every mirrored entity's schema-level Mongoose `ref` on its `unit` field must point at `block_admin_units` (blockadmin's own collection), not `block_units` (block_api's org-side collection name) — `ref` doesn't affect query correctness (nothing here calls `.populate()`), but a wrong value is a copy-paste tell that the field itself may also be unresolved; `Offer.unit`'s `ref` had this exact bug (fixed 2026-08-11, matching the same fix already applied to `Contract.unit`) — always resolve an incoming `input.unit` (block_api's org-side unit id) through `Unit.getUnit(subdomain, input.unit)` to get blockadmin's own unit `_id` before storing it.
 - Offer intentionally has no `blockGetOffers`-equivalent invoice-generation logic in blockadmin — that math (discount/down-payment/installment/interest) is block_api's job; blockadmin only ever mirrors the offer's own fields once `sent`, the same way it mirrors contract payments as already-computed rows rather than recomputing a payment plan itself.
+- Client-portal single-record detail queries (`cpBlockAdminGetContractPayments`/`cpBlockAdminGetContractSummary`/`cpBlockAdminGetOffer`) look up strictly by the id argument (`Contract.findOne({_id})`/`Offer.findOne({_id})`) with no check that the record belongs to the requesting `cpUser` — any authenticated cp user can currently fetch any contract's payments/summary or any offer by guessing/enumerating its `_id`. This was already true for contracts before the offer queries were added; the offer queries were built to match that existing pattern rather than introduce a new, inconsistent one. Fixing it (e.g. re-adding an ownership join through `BlockCustomer`) needs to cover contracts and offers together.
+- `CpBlockOfferPaymentPlan` is a client-portal-only type, deliberately **not** reusing the admin-facing `BlockAdminOfferPaymentPlan` — the admin type has a non-null `type: BlockAdminProjectPaymentPlanType!` field that block_api never actually populates (Offer's org-side payment plan has no `type` field at all), so querying it would throw "Cannot return null for non-nullable field". Do not reuse `BlockAdminOfferPaymentPlan` for client-portal or admin-panel work without fixing that field first.
 
 ## Validation
 
@@ -119,6 +121,12 @@
 ## Recent Changes
 
 <!-- Newest first. Keep at most 10 entries. -->
+
+### `2026-08-11` — Client-portal Offer queries
+
+- **Summary:** Added `cpBlockAdminGetOffers` (list, scoped via `BlockCustomer`) and `cpBlockAdminGetOffer(offerId)` (single-record lookup by `_id`), matching `cpBlockAdminGetContracts`'s current pattern exactly — including that the single-record query does not verify ownership (see Local Invariants). `CpBlockOffer` gets the same `unitDetail`/`project`/`unitType` custom-resolver treatment as `CpBlockContract`. Deliberately did not reuse the admin-facing `BlockAdminOfferPaymentPlan` type (it has a landmine non-null `type` field block_api never populates) — defined a clean `CpBlockOfferPaymentPlan` instead.
+- **Affected areas:** `src/modules/clientportal/graphql/schemas/offer.ts` (new), `src/modules/clientportal/graphql/resolvers/queries/offer.ts` (new), `src/modules/clientportal/graphql/resolvers/customResolvers/offer.ts` (new), `src/modules/clientportal/graphql/schemas/index.ts`, `src/modules/clientportal/graphql/resolvers/queries/index.ts`, `src/modules/clientportal/graphql/resolvers/customResolvers/index.ts`.
+- **Contracts changed:** Added GraphQL queries `cpBlockAdminGetOffers: [CpBlockOffer]` and `cpBlockAdminGetOffer(offerId: String!): CpBlockOffer`.
 
 ### `2026-08-11` — Offer sync rebuilt to mirror Contract's pattern
 
@@ -174,9 +182,4 @@
 - **Affected areas:** `src/modules/contract/db/models/Contract.ts`.
 - **Contracts changed:** None (webhook payload shape unchanged; fixes a latent bug in how it was applied).
 
-### `2026-08-10` — Documented contract/customer/client-portal mirror surface
-
-- **Summary:** Synchronized this guide with the contract, customer-link, and client-portal mirroring work built up over prior sessions (previously undocumented here) — signed-contract mirroring, bulk payment/transaction sync, core-verified customer linking, and the non-subdomain-scoped client-portal contract queries.
-- **Affected areas:** Documentation only.
-- **Contracts changed:** None.
 

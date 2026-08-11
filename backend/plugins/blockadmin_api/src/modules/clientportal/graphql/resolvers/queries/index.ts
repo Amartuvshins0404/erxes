@@ -5,6 +5,7 @@ import { cpDeveloperQueries } from './developer';
 import { cpListingQueries } from './listing';
 import { cpProjectQueries } from './project';
 import { cpUnitQueries } from './unit';
+import { cpOfferQueries } from './offer';
 
 export const cpBlockQueries = {
   ...cpProjectQueries,
@@ -14,4 +15,5 @@ export const cpBlockQueries = {
   ...cpContractQueries,
   ...cpAgencyQueries,
   ...cpListingQueries,
+  ...cpOfferQueries,
 };

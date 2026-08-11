@@ -26,6 +26,7 @@ import {
   queries as cpListingQueries,
   types as cpListingTypes,
 } from './listing';
+import { queries as cpOfferQueries, types as cpOfferTypes } from './offer';
 
 export const types = `
     ${cpProjectTypes}
@@ -35,6 +36,7 @@ export const types = `
     ${cpContractTypes}
     ${cpAgencyTypes}
     ${cpListingTypes}
+    ${cpOfferTypes}
 `;
 
 export const queries = `
@@ -45,4 +47,5 @@ export const queries = `
     ${cpContractQueries}
     ${cpAgencyQueries}
     ${cpListingQueries}
+    ${cpOfferQueries}
 `;

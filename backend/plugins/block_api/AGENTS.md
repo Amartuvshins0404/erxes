@@ -6,7 +6,7 @@
 - **Project:** `block_api`
 - **Layer:** `Backend API`
 - **Path:** `backend/plugins/block_api`
-- **Last synchronized:** `2026-08-10`
+- **Last synchronized:** `2026-08-11`
 
 ## Scope
 
@@ -28,6 +28,7 @@
 - Contract payment schedule generation from a contract's `paymentPlan` (`ContractPayment.regenerateForContract`), with transaction tracking (`ContractPaymentTransaction`) and per-payment status recomputation from transactions.
 - Automatic mirroring to block-admin: customer sync (`blockSyncCustomer`), contract mirror + payment/transaction sync fire automatically whenever a contract's resolved status becomes `signed` (create, update, or status-change paths) or is cancelled.
 - On-demand manual re-sync of a single signed contract (`blockManualSyncContract`) — same pipeline as the automatic signed-path sync, triggered by a widget instead of a status transition.
+- Offer mirroring to block-admin, mirroring Contract's design: `Offer.updateOffer` throws `'Sent offers cannot be edited'` once `status === 'sent'` (5-minute revert window, same pattern as Contract), and `blockCreateOffer`/`blockUpdateOffer`/`blockSendOfferEmail` all auto-mirror via `wrapMutationResolver` — block-admin only actually syncs the offer once its status is `sent`. On-demand manual re-sync of a single sent offer (`blockManualSyncOffer`) mirrors `blockManualSyncContract`'s design.
 - Every mutation in `resolvers.Mutation` is globally wrapped by `wrapMutationResolver` (`src/main.ts`), which fires a best-effort webhook to `${BLOCK_ADMIN_API_URL}/webhook/{mutationName}` after any mutation that returns a truthy entity — most of these paths have no matching route in `blockadmin_api` and are ignored there; only the explicitly-built webhook paths below are consumed.
 
 ## Architecture
@@ -71,6 +72,10 @@
 - `wrapMutationResolver` mutates and forwards the same `args`/`input` object reference used to call the resolver; resolvers may intentionally mutate `input` in place (e.g. resolving `status` to its semantic type) to control what gets mirrored, without touching the generic wrapper.
 - `sendMessage` (fire-and-forget) never throws or surfaces errors to the caller — only `sendMessageAwait` (used for `customerSync` and the manual contract mirror) can raise/report `.error` and should be checked when the caller needs to know the sync actually succeeded.
 - `BLOCK_ADMIN_API_URL` must point directly at the gateway's `/pl:blockadmin` route (no `/gateway` prefix) — the gateway does not register that prefix internally.
+- `Unit.locked` (manual admin toggle via `blockToggleUnitLock`, independent of contract signing status) must be checked before creating any record that claims a unit — `blockCreateContract`, `blockCreateOppty`, and `blockCreateOffer` all throw `'Cannot create <thing>: unit is locked'` when `unit.locked` is true. Any new "claim a unit" mutation must add the same guard. Note this is separate from a unit's `activeContract.statusType === 'signed'` (computed dynamically from its contracts, not a stored flag) — frontend unit-selectors additionally disable already-signed units in the UI, but that check is not currently mirrored server-side for any of the three mutations.
+- Offer's `status` (`draft|sent`) is a plain enum stored directly on the document — unlike Contract's status (an ObjectId reference into a per-org `ContractStatus` collection), there is no lookup/resolve-to-semantic-type step needed before mirroring an offer.
+- `blockSendOfferEmail`'s own GraphQL args (`{_id}`) carry no offer fields, so — like `blockUpdateContractStatus` does for Contract — it must mutate `args.input` in place after computing the updated offer, or `wrapMutationResolver`'s auto-forwarded webhook payload has nothing for block-admin's route to mirror. `contract/utils/offerMirror.ts#buildOfferMirrorInput` is the one place that builds this shape; `blockSendOfferEmail`, `blockUpdateOffer`, and `blockManualSyncOffer` all use it — keep it as the single source rather than reconstructing the field list at each call site.
+- `blockUpdateOffer` must always reshape `args.input` to the full DB record via `buildOfferMirrorInput(updated)` after the write, even though its GraphQL arg is a full `BlockOfferInput!` — the frontend's status-only Select (`OfferDetailSheet.handleStatusChange`) calls this same mutation with a deliberately partial input (no `customerId`, `paymentPlan`, etc.), so forwarding the caller's raw `input` as-is silently drops fields block-admin's `syncIfSent` needs (this was the root cause of the "offer sent" notification not firing — fixed 2026-08-11). Contract avoids this class of bug entirely by routing status-only changes through a dedicated `blockUpdateContractStatus` mutation instead of overloading `blockUpdateContract`; Offer instead fixes it by making the shared update path always mirror complete data regardless of what was sent.
 
 ## Validation
 
@@ -82,6 +87,30 @@
 ## Recent Changes
 
 <!-- Newest first. Keep at most 10 entries. -->
+
+### `2026-08-11` — Fixed offer-sent notification not firing
+
+- **Summary:** `OfferDetailSheet`'s status Select calls `blockUpdateOffer` with a partial input (no `customerId`), and that mutation forwarded the caller's raw `input` as-is to the mirror webhook — so on the sync that should have created block-admin's first record for a newly-sent offer, `customerId` was missing and the "you have a new offer" notification's guard (`offer?.customerId`) silently skipped it. `blockUpdateOffer` now always reshapes `args.input` to the full DB record via `buildOfferMirrorInput(updated)` after the write, the same way `blockSendOfferEmail` already did.
+- **Affected areas:** `src/modules/contract/graphql/resolvers/mutations/offer.ts`.
+- **Contracts changed:** None (webhook payload shape unchanged; now always carries complete data instead of whatever the caller partially sent).
+
+### `2026-08-11` — Manual offer sync mutation
+
+- **Summary:** Added `blockManualSyncOffer(offerId)`, the on-demand version of the automatic sent-offer mirror (customer link sync + offer mirror), for use from a UI-triggered "sync" action — mirrors `blockManualSyncContract`'s design. Extracted the offer-mirror-payload construction (previously inlined in `blockSendOfferEmail`) into a shared `contract/utils/offerMirror.ts#buildOfferMirrorInput`, now used by both.
+- **Affected areas:** `src/modules/contract/graphql/resolvers/mutations/offer.ts`, `src/modules/contract/graphql/schemas/offer.ts`, `src/modules/contract/utils/offerMirror.ts` (new).
+- **Contracts changed:** Added GraphQL mutation `blockManualSyncOffer(offerId: String!): BlockOffer`.
+
+### `2026-08-11` — Sent offers mirrored to block-admin and made immutable
+
+- **Summary:** `Offer.updateOffer` now throws `'Sent offers cannot be edited'` once an offer's `status` is `sent` (same 5-minute revert-window pattern as Contract). `blockSendOfferEmail` now goes through `Offer.updateOffer` (previously used a raw un-guarded `updateOne`) and returns the updated offer document instead of the string `'success'`, reshaping `args.input` in place afterward so its auto-forwarded mirror payload carries full offer fields (it previously carried none, since `{_id}` is all its own GraphQL args ever had).
+- **Affected areas:** `src/modules/contract/db/models/Offer.ts`, `src/modules/contract/graphql/resolvers/mutations/offer.ts`, `src/modules/contract/graphql/schemas/offer.ts`.
+- **Contracts changed:** `blockSendOfferEmail`'s return type changed from `String` to `BlockOffer`.
+
+### `2026-08-11` — Offer creation now blocks locked units
+
+- **Summary:** `blockCreateOffer` had no unit guard at all (any unit, including a locked one, could have an offer created against it) — added the same `unit.locked` check `blockCreateContract`/`blockCreateOppty` already use, throwing `'Cannot create offer: unit is locked'`.
+- **Affected areas:** `src/modules/contract/graphql/resolvers/mutations/offer.ts`.
+- **Contracts changed:** None (existing mutation now rejects a previously-allowed input in a locked-unit edge case).
 
 ### `2026-08-10` — Manual contract sync mutation
 

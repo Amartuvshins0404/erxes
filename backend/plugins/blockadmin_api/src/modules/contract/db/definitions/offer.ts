@@ -50,7 +50,11 @@ export const offerSchema = schemaWrapper(
     {
       number: { type: String, required: true },
       currency: { type: String, required: true },
-      unit: { type: Schema.Types.ObjectId, ref: 'block_units', required: true },
+      unit: {
+        type: Schema.Types.ObjectId,
+        ref: 'block_admin_units',
+        required: true,
+      },
       date: { type: Date, required: true },
       amount: { type: Number, required: true },
       amountType: { type: String, enum: Object.values(OfferAmountType) },

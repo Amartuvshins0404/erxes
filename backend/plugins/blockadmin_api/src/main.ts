@@ -1,9 +1,10 @@
-import { startPlugin } from 'erxes-api-shared/utils';
+import { redis, startPlugin } from 'erxes-api-shared/utils';
 import resolvers from '~/apollo/resolvers';
 import { typeDefs } from '~/apollo/typeDefs';
 import { generateModels } from '~/connectionResolvers';
 import { payments } from '~/meta/payments';
 import { router } from '~/routes';
+import { initMQWorkers } from '~/worker';
 
 startPlugin({
   name: 'blockadmin',
@@ -19,6 +20,9 @@ startPlugin({
     context.models = models;
 
     return context;
+  },
+  onServerInit: async () => {
+    await initMQWorkers(redis);
   },
   meta: {
     payments,

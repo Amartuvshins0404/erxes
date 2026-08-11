@@ -417,7 +417,6 @@ export function RegistrationSchemasBuilderPage() {
                   <Select
                     value={membershipTypeId || undefined}
                     onValueChange={setMembershipTypeId}
-                    disabled={Boolean(selectedId)}
                   >
                     <Select.Trigger>
                       <Select.Value placeholder="Select membership type" />

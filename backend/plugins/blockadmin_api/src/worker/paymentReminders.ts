@@ -1,6 +1,5 @@
-import { IContractPaymentDocument } from '@/contract/@types/payment';
 import { IModels } from '~/connectionResolvers';
-import { notifyBlockCustomer } from '~/utils/cpNotify';
+import { notifyPayment, paymentLabel } from '@/contract/utils/paymentNotify';
 
 const REMINDER_DAYS_BEFORE = [5, 3, 1];
 const UNSETTLED_STATUSES = ['unpaid', 'partial'];
@@ -24,32 +23,6 @@ const daysBetween = (from: Date, to: Date) =>
 
 const formatDate = (date?: Date) =>
   date ? new Date(date).toLocaleDateString('mn-MN') : '';
-
-const paymentLabel = (payment: IContractPaymentDocument) =>
-  payment.label ||
-  (payment.contractNumber
-    ? `${payment.contractNumber} #${payment.index + 1}`
-    : `#${payment.index + 1}`);
-
-const notifyPayment = async (
-  models: IModels,
-  payment: IContractPaymentDocument,
-  data: {
-    title: string;
-    message: string;
-    type: 'warning' | 'error';
-  },
-) => {
-  if (!payment.customerId) {
-    return;
-  }
-
-  await notifyBlockCustomer(models, payment.subdomain, payment.customerId, {
-    ...data,
-    contentType: 'blockadmin:contractPayment',
-    contentTypeId: payment._id,
-  });
-};
 
 export const sendUpcomingPaymentReminders = async (models: IModels) => {
   const today = startOfDay(new Date());

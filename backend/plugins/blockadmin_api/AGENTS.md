@@ -36,6 +36,7 @@
 - `CpBlockOffer.paymentSchedule` computes an offer's full barter/down-payment/progress-payment/completion-payment breakdown (rows + total) on the fly from `paymentPlan` — the same computation `block_ui`'s `OfferDetailSheet` does client-side, ported so the client portal doesn't need offer-payment-plan math duplicated on every consumer.
 - Exposes blockadmin GraphQL schema sections through `src/apollo/schema/schema.ts`.
 - Daily BullMQ-scheduled worker (`src/worker/`) that sends client-portal payment reminder/overdue notifications for every org's contract payments in one global scan (no per-org loop needed, since `ContractPayment` rows already carry their own `subdomain`).
+- `blockSyncContractPayments`'s webhook route sends a "payment successful" notification the moment a specific payment row transitions into `paid` status, detected by diffing the schedule's prior statuses (fetched before the bulk replace) against the newly-synced rows — payments are always mirrored as a full wholesale replace, never a per-row update, so this diff is the only way to know which row just changed.
 
 ## Architecture
 
@@ -45,7 +46,7 @@
 | Supplier profile | `backend/plugins/blockadmin_api/src/modules/supplier/profile/` | Supplier profile schema, model, GraphQL API, and `updateSupplier` webhook |
 | Supplier product | `backend/plugins/blockadmin_api/src/modules/supplier/product/` | Supplier product schema, model, GraphQL API, and product/category sync webhooks |
 | Supplier models | `backend/plugins/blockadmin_api/src/modules/supplier/db/loadModels.ts` | Registers `block_admin_suppliers` and `block_admin_supplier_products` models |
-| Contract | `backend/plugins/blockadmin_api/src/modules/contract/` | Mirrored `Contract`/`ContractPayment`/`Offer` schemas, models, webhook routes (`routes/contract.ts`, `routes/payment.ts`, `routes/offer.ts`) |
+| Contract | `backend/plugins/blockadmin_api/src/modules/contract/` | Mirrored `Contract`/`ContractPayment`/`Offer` schemas, models, webhook routes (`routes/contract.ts`, `routes/payment.ts`, `routes/offer.ts`); `utils/paymentNotify.ts` holds the shared `paymentLabel`/`notifyPayment` helpers used by both the payment-paid webhook trigger and the worker |
 | BlockCustomer | `backend/plugins/blockadmin_api/src/modules/blockCustomer/` | Customer identity link (`customerId` ↔ org `entityId`), core-verified via `utils.ts#resolveBlockCustomer`, webhook route in `routes/blockCustomer.ts` |
 | Client portal | `backend/plugins/blockadmin_api/src/modules/clientportal/` | `cp*`-prefixed GraphQL queries for the authenticated customer's contracts/offers/payments/summary, plus building/project/unit/developer read models. Custom resolvers add `unitDetail`/`project`/`unitType` to both `CpBlockContract` and `CpBlockOffer` (same `unit → zoning → building → project` chain), and `paymentSchedule` to `CpBlockOffer` (`utils/offerPaymentSchedule.ts`, computed on the fly from `paymentPlan`, not stored). |
 | `schemaWrapper` | `backend/plugins/blockadmin_api/src/utils.ts` | Adds `subdomain`/`entityId` (default `ObjectId`, overridable via `entityIdType`) and a unique `{subdomain, entityId}` index to every blockadmin schema |
@@ -102,6 +103,7 @@
 - `Contract.upsertSignedContract` is the single upsert path for all three of block_api's mirror entry points (create/update/status-change) plus manual re-sync — any of them may be blockadmin's first encounter with a given contract, so it must always upsert, never assume prior existence.
 - `BlockCustomer.resolveBlockCustomer` always re-verifies identity against erxes core by email/phone before linking/upserting; it never trusts a client-supplied `entityId`-only claim.
 - The payment reminder worker (`src/worker/paymentReminders.ts`) runs once daily and sends exactly two kinds of notification with no persisted "already sent" state: upcoming reminders at 5/3/1 days before `dueDate` (each a distinct calendar-day bucket, so a once-daily cron naturally fires each at most once) and overdue reminders for every unpaid/partial payment whose `dueDate` has passed (these resend every run — that's intentional, not a bug). Every `sendTRPCMessage` call it makes must use the *payment's* `subdomain`, not the worker's own fixed `WORKER_SUBDOMAIN` — the former addresses the originating org's core-api (where the actual cpUser/cpNotification records live), the latter only selects blockadmin's own local DB connection.
+- The "payment paid" notification (`routes/payment.ts`) fires per-row, once, exactly when a payment's status transitions into `paid` on a given sync — detected by fetching the schedule's prior statuses *before* `replaceForContract`'s delete+reinsert and diffing against the newly-synced rows by `String(entityId)` (must stringify — `entityId` is a Mongoose ObjectId, and comparing ObjectId instances directly by `===`/Map-key never matches even for the same underlying id). On a contract's very first-ever payment sync there is no prior state to diff against, so any row synced already-`paid` (e.g. backdated historical data) will spuriously notify once — accepted as a minor edge case, not fixed.
 - The worker resolves a payment's client-portal users via `BlockCustomer.findOne({subdomain: payment.subdomain, entityId: payment.customerId})` to get the verified `customerId`, then passes *that* as `cpUsers.list`'s `erxesCustomerId` — `payment.customerId` itself is block_api's org-side reference, not the value `cpUsers.list` expects (fixed 2026-08-11; see Local Invariants above).
 - `notifyBlockCustomer` (`src/utils/cpNotify.ts`) is the one place that resolves an org-side customer id to client-portal users and sends a notification; any new notification trigger should call it rather than re-deriving the `BlockCustomer` → `cpUsers.list` → `cpNotifications.create` chain.
 - The "new contract" notification in `contract/routes/contract.ts`'s `syncIfSigned` fires exactly once, only when `Contract.findOne({subdomain, entityId})` found nothing *before* the upsert — i.e. on whichever of block_api's three mirror entry points (create/update/status-change) happens to be blockadmin's first encounter with that contract. It must never fire on a re-sync of an already-mirrored contract (including `blockManualSyncContract`'s repeat syncs).
@@ -123,6 +125,12 @@
 ## Recent Changes
 
 <!-- Newest first. Keep at most 10 entries. -->
+
+### `2026-08-11` — Payment-paid notification
+
+- **Summary:** Added a "Таны {label} төлбөр амжилттай хийгдлээ." notification, sent from `blockSyncContractPayments`'s webhook route the moment a payment row transitions into `paid` status (detected by diffing prior schedule statuses, fetched before the bulk replace, against the newly-synced rows by stringified `entityId`). Extracted `paymentLabel`/`notifyPayment` out of the worker into a shared `contract/utils/paymentNotify.ts`, now used by both the worker and this new trigger. Also fixed the "offer sent" notification not firing (see `block_api`'s guide for the actual root cause — `blockUpdateOffer` wasn't reshaping its mirrored payload).
+- **Affected areas:** `src/modules/contract/routes/payment.ts`, `src/modules/contract/utils/paymentNotify.ts` (new), `src/worker/paymentReminders.ts`.
+- **Contracts changed:** None (webhook payload shape unchanged; adds an outbound `cpNotifications.create` call, no new inbound contract).
 
 ### `2026-08-11` — Offer payment schedule resolver
 
@@ -178,11 +186,6 @@
 - **Affected areas:** `src/modules/clientportal/graphql/resolvers/queries/contract.ts`, `src/modules/clientportal/graphql/schemas/contract.ts`.
 - **Contracts changed:** Added GraphQL queries `cpBlockAdminGetPayments: [CpBlockPayment]` and `cpBlockAdminGetSummary: CpBlockContractSummary`; added fields `CpBlockPayment.contractId`/`contractNumber`.
 
-### `2026-08-10` — Fixed `_id`/`entityId` mismatch breaking client-portal payment/summary lookups
-
-- **Summary:** `cpBlockAdminGetContracts` returned blockAdmin's own internal Mongo `_id` as each contract's `_id`, but `cpBlockAdminGetContractPayments`/`cpBlockAdminGetContractSummary` (and `ContractPayment.contractId`) key off `entityId` (block_api's org-side contract id) — a different value — so a client round-tripping the list's `_id` into either follow-up query always got an empty/null result. `cpBlockAdminGetContracts` now returns `entityId` as `_id`.
-- **Affected areas:** `src/modules/clientportal/graphql/resolvers/queries/contract.ts`.
-- **Contracts changed:** `cpBlockAdminGetContracts[]._id` now returns the org-side contract id (matches `Contract.entityId`) instead of blockAdmin's internal document `_id`.
 
 
 

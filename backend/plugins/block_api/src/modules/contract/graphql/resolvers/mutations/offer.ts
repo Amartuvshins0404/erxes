@@ -169,13 +169,26 @@ export const offerMutations = {
 
   blockUpdateOffer: async (
     _parent: undefined,
-    { _id, input }: { _id: string; input: IOffer },
+    args: { _id: string; input: IOffer },
     { models }: IContext,
   ) => {
-    if (input.paymentPlan) {
-      input.paymentPlan = stripNulls(input.paymentPlan) as typeof input.paymentPlan;
+    if (args.input.paymentPlan) {
+      args.input.paymentPlan = stripNulls(
+        args.input.paymentPlan,
+      ) as typeof args.input.paymentPlan;
     }
-    return models.Offer.updateOffer(_id, input);
+
+    const updated = await models.Offer.updateOffer(args._id, args.input);
+
+    // The status-only Select in OfferDetailSheet calls this mutation with a
+    // partial input (no customerId, etc.) — reshape the mirrored payload to
+    // the full DB record so block-admin always gets complete data regardless
+    // of what the caller happened to send (matches blockSendOfferEmail).
+    if (updated) {
+      args.input = buildOfferMirrorInput(updated);
+    }
+
+    return updated;
   },
 
   blockSendOfferEmail: async (

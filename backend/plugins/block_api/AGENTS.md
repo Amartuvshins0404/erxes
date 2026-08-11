@@ -74,7 +74,8 @@
 - `BLOCK_ADMIN_API_URL` must point directly at the gateway's `/pl:blockadmin` route (no `/gateway` prefix) — the gateway does not register that prefix internally.
 - `Unit.locked` (manual admin toggle via `blockToggleUnitLock`, independent of contract signing status) must be checked before creating any record that claims a unit — `blockCreateContract`, `blockCreateOppty`, and `blockCreateOffer` all throw `'Cannot create <thing>: unit is locked'` when `unit.locked` is true. Any new "claim a unit" mutation must add the same guard. Note this is separate from a unit's `activeContract.statusType === 'signed'` (computed dynamically from its contracts, not a stored flag) — frontend unit-selectors additionally disable already-signed units in the UI, but that check is not currently mirrored server-side for any of the three mutations.
 - Offer's `status` (`draft|sent`) is a plain enum stored directly on the document — unlike Contract's status (an ObjectId reference into a per-org `ContractStatus` collection), there is no lookup/resolve-to-semantic-type step needed before mirroring an offer.
-- `blockSendOfferEmail`'s own GraphQL args (`{_id}`) carry no offer fields, so — like `blockUpdateContractStatus` does for Contract — it must mutate `args.input` in place after computing the updated offer, or `wrapMutationResolver`'s auto-forwarded webhook payload has nothing for block-admin's route to mirror. `contract/utils/offerMirror.ts#buildOfferMirrorInput` is the one place that builds this shape; both `blockSendOfferEmail` and `blockManualSyncOffer` use it — keep it as the single source rather than reconstructing the field list at each call site.
+- `blockSendOfferEmail`'s own GraphQL args (`{_id}`) carry no offer fields, so — like `blockUpdateContractStatus` does for Contract — it must mutate `args.input` in place after computing the updated offer, or `wrapMutationResolver`'s auto-forwarded webhook payload has nothing for block-admin's route to mirror. `contract/utils/offerMirror.ts#buildOfferMirrorInput` is the one place that builds this shape; `blockSendOfferEmail`, `blockUpdateOffer`, and `blockManualSyncOffer` all use it — keep it as the single source rather than reconstructing the field list at each call site.
+- `blockUpdateOffer` must always reshape `args.input` to the full DB record via `buildOfferMirrorInput(updated)` after the write, even though its GraphQL arg is a full `BlockOfferInput!` — the frontend's status-only Select (`OfferDetailSheet.handleStatusChange`) calls this same mutation with a deliberately partial input (no `customerId`, `paymentPlan`, etc.), so forwarding the caller's raw `input` as-is silently drops fields block-admin's `syncIfSent` needs (this was the root cause of the "offer sent" notification not firing — fixed 2026-08-11). Contract avoids this class of bug entirely by routing status-only changes through a dedicated `blockUpdateContractStatus` mutation instead of overloading `blockUpdateContract`; Offer instead fixes it by making the shared update path always mirror complete data regardless of what was sent.
 
 ## Validation
 
@@ -86,6 +87,12 @@
 ## Recent Changes
 
 <!-- Newest first. Keep at most 10 entries. -->
+
+### `2026-08-11` — Fixed offer-sent notification not firing
+
+- **Summary:** `OfferDetailSheet`'s status Select calls `blockUpdateOffer` with a partial input (no `customerId`), and that mutation forwarded the caller's raw `input` as-is to the mirror webhook — so on the sync that should have created block-admin's first record for a newly-sent offer, `customerId` was missing and the "you have a new offer" notification's guard (`offer?.customerId`) silently skipped it. `blockUpdateOffer` now always reshapes `args.input` to the full DB record via `buildOfferMirrorInput(updated)` after the write, the same way `blockSendOfferEmail` already did.
+- **Affected areas:** `src/modules/contract/graphql/resolvers/mutations/offer.ts`.
+- **Contracts changed:** None (webhook payload shape unchanged; now always carries complete data instead of whatever the caller partially sent).
 
 ### `2026-08-11` — Manual offer sync mutation
 

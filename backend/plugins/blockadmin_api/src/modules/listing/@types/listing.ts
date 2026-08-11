@@ -26,6 +26,13 @@ export interface IBlockAdminListingSpecs {
   builtYear?: string;
 }
 
+export interface IBlockAdminListingAgent {
+  _id?: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  email?: string | null;
+}
+
 export interface IBlockAdminListing extends IBlock {
   title: string;
   type: 'sale' | 'rent' | 'lease';
@@ -39,6 +46,7 @@ export interface IBlockAdminListing extends IBlock {
   featuredImg?: string;
   viewCount?: number;
   isFeatured?: boolean;
+  agent?: IBlockAdminListingAgent | null;
 }
 
 export interface IBlockAdminListingDocument

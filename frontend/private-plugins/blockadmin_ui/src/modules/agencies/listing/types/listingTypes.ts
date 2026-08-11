@@ -37,6 +37,13 @@ export interface IAdminListing {
   isFeatured?: boolean;
   createdAt?: string;
   updatedAt?: string;
+  agent?: {
+    _id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+  };
+  agencyId?: string;
 }
 
 export interface IAdminListingStats {
@@ -47,7 +54,10 @@ export interface IAdminListingStats {
 }
 
 export interface AdminListingFilter {
-  status?: string;
-  searchValue?: string;
+  [key: string]: string | undefined;
   subdomain?: string;
+  searchValue?: string;
+  status?: string;
+  city?: string;
+  district?: string;
 }

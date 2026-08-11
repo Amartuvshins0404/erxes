@@ -32,6 +32,8 @@ export interface IBlockAgency {
   socialLinks: Partial<Record<ISocialPlatform, string>>;
   operationArea: IBlockAgencyOperationArea;
   fieldsOfExpertise: IBlockAgencyFieldOfExpertise;
+  messengerIntegrationId: string;
+  widgetBundleUrl: string;
   verificationStatus: string;
   rejectionReasons?: string[];
   rejectionNotes?: string;

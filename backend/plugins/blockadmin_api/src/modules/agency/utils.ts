@@ -2,7 +2,7 @@ import { FilterQuery } from 'mongoose';
 import { AgencyQueryParams, IBlockAgencyDocument } from './@types/agency';
 
 export const generateFilter = async (params: AgencyQueryParams) => {
-  const { searchValue, city, district } = params;
+  const { searchValue, city, district, verificationStatus } = params;
 
   const filter: FilterQuery<IBlockAgencyDocument> = {};
 
@@ -16,6 +16,10 @@ export const generateFilter = async (params: AgencyQueryParams) => {
 
   if (district) {
     filter['operationArea.district'] = district;
+  }
+
+  if (verificationStatus) {
+    filter.verificationStatus = verificationStatus;
   }
 
   return filter;

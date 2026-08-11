@@ -23,6 +23,13 @@ export interface IBlockListingSpecs {
   builtYear?: string;
 }
 
+export interface IBlockListingAgent {
+  _id: string;
+  firstName: string | null;
+  lastName: string | null;
+  email: string | null;
+}
+
 export interface IBlockListing {
   title: string;
   type?: 'sale' | 'rent' | 'lease';
@@ -37,6 +44,7 @@ export interface IBlockListing {
   viewCount?: number;
   isFeatured?: boolean;
   memberId?: string;
+  agent?: IBlockListingAgent | null;
 }
 
 export interface IBlockListingDocument extends IBlockListing, Document<string> {

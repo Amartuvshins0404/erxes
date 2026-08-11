@@ -1,21 +1,30 @@
 import { IContext } from '~/connectionResolvers';
 import { IBlockListing } from '~/modules/listing/@types/listing';
+import { resolveListingAgent } from '~/modules/listing/utils';
 
 export const blockListingMutations = {
   blockCreateListing: async (
     _root: undefined,
     { input }: { input: IBlockListing },
-    { models }: IContext,
+    { models, subdomain }: IContext,
   ) => {
-    return models.BlockListing.createListing(input);
+    const listing = await models.BlockListing.createListing(input);
+
+    input.agent = await resolveListingAgent(input.memberId, subdomain, models);
+
+    return listing;
   },
 
   blockUpdateListingGeneralInfo: async (
     _root: undefined,
     { _id, input }: { _id: string; input: IBlockListing },
-    { models }: IContext,
+    { models, subdomain }: IContext,
   ) => {
-    return models.BlockListing.updateListing({ _id, input });
+    const listing = await models.BlockListing.updateListing({ _id, input });
+
+    input.agent = await resolveListingAgent(input.memberId, subdomain, models);
+
+    return listing;
   },
 
   blockRemoveListing: async (

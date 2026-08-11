@@ -79,3 +79,8 @@ export const agencySocialLinksSchema = z.object({
     .record(z.enum(socialPlatforms), z.string().url().optional())
     .optional(),
 });
+
+export const agencyIntegrationsSchema = z.object({
+  messengerIntegrationId: z.string().optional(),
+  widgetBundleUrl: z.string().optional(),
+});

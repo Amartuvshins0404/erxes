@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import { Resolver } from 'erxes-api-shared/core-types';
 import fetch from 'node-fetch';
 
-const { BLOCKAGENT_API_URL, BLOCK_ADMIN_SECRET } = process.env;
+const { BLOCK_ADMIN_API_URL, BLOCK_ADMIN_SECRET } = process.env;
 
 interface IData {
   [key: string]: any;
@@ -55,10 +55,10 @@ const buildPayload = (
 };
 
 const sendMessage = ({ subdomain, path, payload }: SendMessagePayload) => {
-  const API_ENDPOINT = `${BLOCKAGENT_API_URL}/webhook/${path}`;
+  const API_ENDPOINT = `${BLOCK_ADMIN_API_URL}/webhook/${path}`;
 
-  if (!BLOCKAGENT_API_URL || !BLOCK_ADMIN_SECRET) {
-    return console.error('BLOCKAGENT_API_URL or BLOCK_ADMIN_SECRET is not set');
+  if (!BLOCK_ADMIN_API_URL || !BLOCK_ADMIN_SECRET) {
+    return console.error('BLOCK_ADMIN_API_URL or BLOCK_ADMIN_SECRET is not set');
   }
 
   try {

@@ -1,6 +1,6 @@
 import { useQuery } from '@apollo/client';
 import { GET_AGENCIES } from '../graphql';
-import { IAgency } from '../types';
+import { IAgency } from '../types/agencyTypes';
 
 export type AgenciesFilterVars = {
   searchValue?: string;

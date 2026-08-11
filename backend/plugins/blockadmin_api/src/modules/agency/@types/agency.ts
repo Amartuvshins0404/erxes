@@ -33,6 +33,8 @@ export interface IBlockAgency extends IBlock {
   socialLinks: Partial<Record<ISocialPlatform, string>>;
   operationArea: IBlockAgencyOperationArea;
   fieldsOfExpertise: IBlockAgencyFieldOfExpertise;
+  messengerIntegrationId: string;
+  widgetBundleUrl: string;
   verificationStatus: string;
   rejectionReasons?: string[];
   rejectionNotes?: string;

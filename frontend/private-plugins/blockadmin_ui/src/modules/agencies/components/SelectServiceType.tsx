@@ -3,7 +3,7 @@ import { SERVICE_LABELS } from '../constants';
 import React, { useCallback, useMemo, useState } from 'react';
 import { IconX } from '@tabler/icons-react';
 
-type ServiceKey = keyof typeof SERVICE_LABELS;
+export type ServiceKey = keyof typeof SERVICE_LABELS;
 
 interface SelectServiceProps {
   value: ServiceKey[];

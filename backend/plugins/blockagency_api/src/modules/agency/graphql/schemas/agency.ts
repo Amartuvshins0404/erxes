@@ -35,6 +35,8 @@ export const types = `
     dateFounded: String
     operationArea: AgencyOperationArea
     fieldsOfExpertise: AgencyFieldOfExpertise
+    messengerIntegrationId: String
+    widgetBundleUrl: String
     verificationStatus: AgencyVerificationStatus
     rejectionReasons: [String]
     rejectionNotes: String
@@ -82,6 +84,8 @@ export const types = `
     dateFounded: String
     operationArea: AgencyOperationAreaInput
     fieldsOfExpertise: AgencyFieldOfExpertiseInput
+    messengerIntegrationId: String
+    widgetBundleUrl: String
   }
 `;
 

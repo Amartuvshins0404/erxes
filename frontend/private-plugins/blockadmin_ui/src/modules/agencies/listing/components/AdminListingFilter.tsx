@@ -1,5 +1,16 @@
-import { Input } from 'erxes-ui';
-import { AdminListingFilter } from '../types';
+import {
+  Combobox,
+  Command,
+  Filter,
+  Popover,
+  useMultiQueryState,
+  useQueryState,
+  useRemoveQueryStateByKey,
+} from 'erxes-ui';
+import { SelectArea } from '@/agencies/components/SelectArea';
+import { AgenciesListingsTotalCount } from './AgenciesListingsTotalCount';
+import { useState } from 'react';
+import { IconCircleDashed } from '@tabler/icons-react';
 
 const STATUS_TABS = [
   { label: 'All', value: '' },
@@ -9,44 +20,116 @@ const STATUS_TABS = [
   { label: 'Sold', value: 'sold' },
 ] as const;
 
-type Props = {
-  filter: AdminListingFilter;
-  onFilterChange: (filter: AdminListingFilter) => void;
-};
+export const AdminListingFilterBar = () => {
+  const [queries] = useMultiQueryState<{
+    searchValue: string;
+    city: string;
+    district: string;
+  }>(['searchValue', 'city', 'district']);
 
-export const AdminListingFilterBar = ({ filter, onFilterChange }: Props) => {
-  const handleStatusChange = (status: string) =>
-    onFilterChange({ ...filter, status: status || undefined });
-
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) =>
-    onFilterChange({ ...filter, searchValue: e.target.value || undefined });
-
+  const hasFilters = Object.values(queries || {}).some(
+    (value) => value !== null,
+  );
   return (
-    <div className="flex items-center gap-4 px-8 py-2 w-full">
-      <div className="flex items-center gap-1 bg-accent rounded-lg p-1">
-        {STATUS_TABS.map(({ label, value }) => {
-          const isActive = (filter.status ?? '') === value;
-          return (
-            <button
-              key={value}
-              onClick={() => handleStatusChange(value)}
-              className={`px-3 py-1.5 text-sm rounded-md transition-colors font-medium ${
-                isActive
-                  ? 'bg-background text-foreground shadow-sm'
-                  : 'text-accent-foreground hover:text-foreground'
-              }`}
-            >
-              {label}
-            </button>
-          );
-        })}
-      </div>
-      <Input
-        placeholder="Search listings..."
-        value={filter.searchValue ?? ''}
-        onChange={handleSearchChange}
-        className="max-w-xs h-8"
-      />
-    </div>
+    <Filter id="ba-agencies-listings-filter">
+      <Filter.Bar>
+        <Filter.Popover>
+          <Filter.Trigger isFiltered={hasFilters} />
+          <Combobox.Content>
+            <Filter.View>
+              <Command>
+                <Filter.CommandInput placeholder="Filter" variant="secondary" />
+                <Command.List>
+                  <Filter.SearchValueTrigger />
+                  <StatusFilterItem />
+                  <SelectArea.CityFilterItem />
+                  <SelectArea.DistrictFilterItem />
+                </Command.List>
+              </Command>
+            </Filter.View>
+            <StatusFilterView />
+            <SelectArea.CityFilterView />
+            <SelectArea.DistrictFilterView />
+          </Combobox.Content>
+        </Filter.Popover>
+
+        <Filter.Dialog>
+          <Filter.View filterKey="searchValue" inDialog>
+            <Filter.DialogStringView filterKey="searchValue" label="Search" />
+          </Filter.View>
+        </Filter.Dialog>
+
+        <Filter.SearchValueBarItem />
+        <StatusFilterChip />
+        <SelectArea.CityFilterChip />
+        <SelectArea.DistrictFilterChip />
+        <AgenciesListingsTotalCount />
+      </Filter.Bar>
+    </Filter>
   );
 };
+
+const StatusCommandContent = ({ onDone }: { onDone?: () => void }) => {
+  const [status, setStatus] = useQueryState<string>('status');
+  const removeQuery = useRemoveQueryStateByKey();
+
+  const handleSelect = (value: string) => {
+    if (value === '') {
+      removeQuery('status');
+      onDone?.();
+    } else {
+      setStatus(value);
+      onDone?.();
+    }
+  };
+
+  return (
+    <Command>
+      <Command.List className="p-1">
+        {STATUS_TABS.map(({ label, value }) => (
+          <Filter.CommandItem
+            key={value}
+            value={value}
+            onSelect={() => handleSelect(value)}
+            className={status === value ? 'text-primary' : ''}
+          >
+            {label}
+          </Filter.CommandItem>
+        ))}
+      </Command.List>
+    </Command>
+  );
+};
+
+const StatusFilterChip = () => {
+  const [status] = useQueryState<string>('status');
+  const [open, setOpen] = useState<boolean>(false);
+
+  return (
+    <Filter.BarItem queryKey="status">
+      <Filter.BarName>
+        <IconCircleDashed /> Status
+      </Filter.BarName>
+      <Popover open={open} onOpenChange={setOpen}>
+        <Popover.Trigger asChild>
+          <Filter.BarButton>{status}</Filter.BarButton>
+        </Popover.Trigger>
+        <Combobox.Content className="w-60">
+          <StatusCommandContent onDone={() => setOpen(false)} />
+        </Combobox.Content>
+      </Popover>
+    </Filter.BarItem>
+  );
+};
+
+const StatusFilterView = () => (
+  <Filter.View filterKey="status">
+    <StatusCommandContent />
+  </Filter.View>
+);
+
+const StatusFilterItem = () => (
+  <Filter.Item value="status">
+    <IconCircleDashed /> Status
+  </Filter.Item>
+);

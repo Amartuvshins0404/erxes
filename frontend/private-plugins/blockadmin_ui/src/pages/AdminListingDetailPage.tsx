@@ -8,8 +8,6 @@ import {
 import { Link } from 'react-router-dom';
 import { IconListDetails } from '@tabler/icons-react';
 import { PageHeader } from 'ui-modules';
-import { AgenciesBreadcrumb } from '@/agencies/components/AgenciesBreadcrumb';
-import { AgenciesSubNav } from '@/agencies/components/AgenciesSubNav';
 import { AdminListingDetailProfile } from '@/agencies/listing/components/AdminListingDetailProfile';
 import { AdminListingDetailSidebar } from '@/agencies/listing/components/AdminListingDetailSidebar';
 import { AdminListingDetailTabs } from '@/agencies/listing/components/AdminListingDetailTabs';
@@ -18,25 +16,26 @@ import { useAdminListingDetail } from '@/agencies/listing/hooks/useAdminListingD
 const ListingDetailBreadcrumb = () => {
   const { listing } = useAdminListingDetail();
   return (
-    <>
-      <Breadcrumb.Separator />
-      <Breadcrumb.Item>
-        <Button variant="ghost" asChild>
-          <Link to="/blockadmin/agencies/listing">
-            <IconListDetails className="text-accent-foreground" />
-            Listing
-          </Link>
-        </Button>
-      </Breadcrumb.Item>
-      {listing?.title && (
-        <>
-          <Breadcrumb.Separator />
+    <Breadcrumb>
+      <Breadcrumb.List className="gap-1">
+        <Breadcrumb.Item>
+          <Button variant="ghost" asChild>
+            <Link to="/blockadmin/agencies/listing">
+              <IconListDetails className="text-accent-foreground" />
+              Listing
+            </Link>
+          </Button>
+        </Breadcrumb.Item>
+        <Breadcrumb.Separator />
+        {listing?.title && (
           <Breadcrumb.Item>
-            <Breadcrumb.Page>{listing.title}</Breadcrumb.Page>
+            <Button variant="ghost">
+              <Breadcrumb.Page>{listing.title}</Breadcrumb.Page>
+            </Button>
           </Breadcrumb.Item>
-        </>
-      )}
-    </>
+        )}
+      </Breadcrumb.List>
+    </Breadcrumb>
   );
 };
 
@@ -45,14 +44,11 @@ export const AdminListingDetailPage = () => {
     <PageContainer>
       <PageHeader>
         <PageHeader.Start>
-          <AgenciesBreadcrumb>
-            <ListingDetailBreadcrumb />
-          </AgenciesBreadcrumb>
+          <ListingDetailBreadcrumb />
           <Separator.Inline />
           <PageHeader.FavoriteToggleButton />
         </PageHeader.Start>
       </PageHeader>
-      <AgenciesSubNav />
       <div className="flex flex-col flex-auto overflow-hidden">
         <AdminListingDetailProfile />
         <div className="flex flex-auto overflow-hidden">

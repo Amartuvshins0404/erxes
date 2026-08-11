@@ -1,5 +1,4 @@
 import { UseFormReturn } from 'react-hook-form';
-import { IconPlus, IconTrash } from '@tabler/icons-react';
 import { SelectPropertyType } from './SelectPropertyType';
 import { SelectService } from './SelectServiceType';
 import { SelectClientType } from './SelectClientType';
@@ -8,14 +7,14 @@ import {
   InfoCard,
   Input,
   Textarea,
-  Button,
   Select,
   Label,
+  Skeleton,
 } from 'erxes-ui';
 import { AgencyProfileSchema } from '../hooks/useAgencyForm';
 import { MultipleDocumentUpload } from './MultipleDocumentUpload';
 import { UploadImage } from '@/block/components/upload';
-import { SocialPlatform } from '../types';
+import { SocialPlatform } from '../types/agencyTypes';
 import { useEffect, useState } from 'react';
 import { socialPlatforms } from '../constants/social-platforms';
 import { SocialLinkInput } from './SocialLinkInput';
@@ -23,15 +22,28 @@ import { AgencyEmails } from './AgencyEmails';
 import { AgencyPhones } from './AgencyPhones';
 import { SelectArea } from './SelectArea';
 import { AgencyActionBar } from './AgencyActionBar';
+import { useRemoteComponent } from '../hooks/useRemoteComponent';
+
+interface IEMSelectValue {
+  integrationId: string;
+  widgetBundleUrl: string;
+}
+
+interface SelectErxesMessengerProps {
+  value?: string;
+  onValueChange: (value: IEMSelectValue) => void;
+  placeholder?: string;
+  disabled?: boolean;
+  className?: string;
+}
 
 type Props = {
   form: UseFormReturn<AgencyProfileSchema>;
 };
 
-export const AgencyInfoForm = ({ form }: Props) => {
+export const AgencyGeneralForm = ({ form }: Props) => {
   const logo = form.watch('logo');
   const coverImage = form.watch('coverImage');
-  const city = form.watch('operationArea.city');
 
   return (
     <div className="space-y-3">
@@ -174,156 +186,158 @@ export const AgencyInfoForm = ({ form }: Props) => {
           />
         </InfoCard.Content>
       </InfoCard>
+    </div>
+  );
+};
 
-      <div className="grid grid-cols-2">
-        <Form.Field<AgencyProfileSchema, 'documents'>
+export const AgencyDocumentsForm = ({ form }: Props) => (
+  <div className="grid grid-cols-2">
+    <Form.Field<AgencyProfileSchema, 'documents'>
+      control={form.control}
+      name="documents"
+      render={({ field }) => (
+        <Form.Item className="col-span-2">
+          <Form.Label>Documents</Form.Label>
+          <Form.Control>
+            <MultipleDocumentUpload
+              value={field.value as string[]}
+              onChange={field.onChange}
+            />
+          </Form.Control>
+          <Form.Description>
+            Байгууллагын холбогдох баримт бичигийг энэ хэсэгт оруулна.
+          </Form.Description>
+          <Form.Message />
+        </Form.Item>
+      )}
+    />
+  </div>
+);
+
+export const AgencyFieldsOfActivityForm = ({ form }: Props) => (
+  <InfoCard title="Field of Activity">
+    <InfoCard.Content className="grid grid-cols-3">
+      <Form.Field<AgencyProfileSchema, 'fieldsOfExpertise.propertyTypes'>
+        control={form.control}
+        name="fieldsOfExpertise.propertyTypes"
+        render={({ field }) => (
+          <Form.Item>
+            <Form.Label>Property Types</Form.Label>
+            <Form.Control>
+              <SelectPropertyType
+                value={
+                  field.value as (
+                    | 'RESIDENTIAL'
+                    | 'HOUSE'
+                    | 'LAND'
+                    | 'COMMERCIAL'
+                    | 'OFFICE'
+                  )[]
+                }
+                onValueChange={field.onChange}
+              />
+            </Form.Control>
+            <Form.Message />
+          </Form.Item>
+        )}
+      />
+
+      <Form.Field<AgencyProfileSchema, 'fieldsOfExpertise.services'>
+        control={form.control}
+        name="fieldsOfExpertise.services"
+        render={({ field }) => (
+          <Form.Item>
+            <Form.Label>Services</Form.Label>
+            <Form.Control>
+              <SelectService
+                value={
+                  field.value as (
+                    | 'SALES'
+                    | 'RENTAL'
+                    | 'BROKERAGE'
+                    | 'VALUATION'
+                    | 'INVESTMENT_ADVISORY'
+                    | 'PROPERTY_MANAGEMENT'
+                  )[]
+                }
+                onValueChange={field.onChange}
+              />
+            </Form.Control>
+            <Form.Message />
+          </Form.Item>
+        )}
+      />
+
+      <Form.Field<AgencyProfileSchema, 'fieldsOfExpertise.clientTypes'>
+        control={form.control}
+        name="fieldsOfExpertise.clientTypes"
+        render={({ field }) => (
+          <Form.Item>
+            <Form.Label>Client Types</Form.Label>
+            <Form.Control>
+              <SelectClientType
+                value={
+                  field.value as (
+                    | 'INDIVIDUAL_BUYER'
+                    | 'INVESTOR'
+                    | 'CORPORATE_CLIENT'
+                    | 'DEVELOPER'
+                  )[]
+                }
+                onValueChange={field.onChange}
+              />
+            </Form.Control>
+            <Form.Message />
+          </Form.Item>
+        )}
+      />
+    </InfoCard.Content>
+  </InfoCard>
+);
+
+export const AgencyOperationAreaForm = ({ form }: Props) => {
+  const city = form.watch('operationArea.city');
+
+  return (
+    <InfoCard title="Operation Area">
+      <InfoCard.Content className="grid grid-cols-2">
+        <Form.Field<AgencyProfileSchema, 'operationArea.city'>
           control={form.control}
-          name="documents"
+          name="operationArea.city"
           render={({ field }) => (
-            <Form.Item className="col-span-2">
-              <Form.Label>Documents</Form.Label>
+            <Form.Item>
+              <Form.Label>City</Form.Label>
               <Form.Control>
-                <MultipleDocumentUpload
-                  value={field.value as string[]}
-                  onChange={field.onChange}
-                />
+                <SelectArea city={city} onCityChange={field.onChange}>
+                  <SelectArea.City />
+                </SelectArea>
               </Form.Control>
-              <Form.Description>
-                Байгууллагын холбогдох баримт бичигийг энэ хэсэгт оруулна.
-              </Form.Description>
               <Form.Message />
             </Form.Item>
           )}
         />
-      </div>
 
-      <InfoCard title="Field of Activity">
-        <InfoCard.Content className="grid grid-cols-3">
-          <Form.Field<AgencyProfileSchema, 'fieldsOfExpertise.propertyTypes'>
-            control={form.control}
-            name="fieldsOfExpertise.propertyTypes"
-            render={({ field }) => (
-              <Form.Item>
-                <Form.Label>Property Types</Form.Label>
-                <Form.Control>
-                  <SelectPropertyType
-                    value={
-                      field.value as (
-                        | 'RESIDENTIAL'
-                        | 'HOUSE'
-                        | 'LAND'
-                        | 'COMMERCIAL'
-                        | 'OFFICE'
-                      )[]
-                    }
-                    onValueChange={field.onChange}
-                  />
-                </Form.Control>
-                <Form.Message />
-              </Form.Item>
-            )}
-          />
-
-          <Form.Field<AgencyProfileSchema, 'fieldsOfExpertise.services'>
-            control={form.control}
-            name="fieldsOfExpertise.services"
-            render={({ field }) => (
-              <Form.Item>
-                <Form.Label>Services</Form.Label>
-                <Form.Control>
-                  <SelectService
-                    value={
-                      field.value as (
-                        | 'SALES'
-                        | 'RENTAL'
-                        | 'BROKERAGE'
-                        | 'VALUATION'
-                        | 'INVESTMENT_ADVISORY'
-                        | 'PROPERTY_MANAGEMENT'
-                      )[]
-                    }
-                    onValueChange={field.onChange}
-                  />
-                </Form.Control>
-                <Form.Message />
-              </Form.Item>
-            )}
-          />
-
-          <Form.Field<AgencyProfileSchema, 'fieldsOfExpertise.clientTypes'>
-            control={form.control}
-            name="fieldsOfExpertise.clientTypes"
-            render={({ field }) => (
-              <Form.Item>
-                <Form.Label>Client Types</Form.Label>
-                <Form.Control>
-                  <SelectClientType
-                    value={
-                      field.value as (
-                        | 'INDIVIDUAL_BUYER'
-                        | 'INVESTOR'
-                        | 'CORPORATE_CLIENT'
-                        | 'DEVELOPER'
-                      )[]
-                    }
-                    onValueChange={field.onChange}
-                  />
-                </Form.Control>
-                <Form.Message />
-              </Form.Item>
-            )}
-          />
-        </InfoCard.Content>
-      </InfoCard>
-
-      <InfoCard title="Operation Area">
-        <InfoCard.Content className="grid grid-cols-2">
-          <Form.Field<AgencyProfileSchema, 'operationArea.city'>
-            control={form.control}
-            name="operationArea.city"
-            render={({ field }) => (
-              <Form.Item>
-                <Form.Label>City</Form.Label>
-                <Form.Control>
-                  <SelectArea city={city} onCityChange={field.onChange}>
-                    <SelectArea.City />
-                  </SelectArea>
-                </Form.Control>
-                <Form.Message />
-              </Form.Item>
-            )}
-          />
-
-          <Form.Field<AgencyProfileSchema, 'operationArea.district'>
-            control={form.control}
-            name="operationArea.district"
-            render={({ field }) => (
-              <Form.Item>
-                <Form.Label>District</Form.Label>
-                <Form.Control>
-                  <SelectArea
-                    city={city}
-                    district={field.value}
-                    onDistrictChange={field.onChange}
-                  >
-                    <SelectArea.District />
-                  </SelectArea>
-                </Form.Control>
-                <Form.Message />
-              </Form.Item>
-            )}
-          />
-        </InfoCard.Content>
-      </InfoCard>
-
-      <ContactInfoSection form={form} />
-
-      <InfoCard title="Social links">
-        <InfoCard.Content>
-          <SocialLinksField form={form} />
-        </InfoCard.Content>
-      </InfoCard>
-    </div>
+        <Form.Field<AgencyProfileSchema, 'operationArea.district'>
+          control={form.control}
+          name="operationArea.district"
+          render={({ field }) => (
+            <Form.Item>
+              <Form.Label>District</Form.Label>
+              <Form.Control>
+                <SelectArea
+                  city={city}
+                  district={field.value}
+                  onDistrictChange={field.onChange}
+                >
+                  <SelectArea.District />
+                </SelectArea>
+              </Form.Control>
+              <Form.Message />
+            </Form.Item>
+          )}
+        />
+      </InfoCard.Content>
+    </InfoCard>
   );
 };
 
@@ -386,7 +400,7 @@ export const ContactInfoSection = ({
   );
 };
 
-export const SocialLinksField = ({
+const SocialLinksField = ({
   form,
   disabled = false,
 }: {
@@ -434,5 +448,56 @@ export const SocialLinksField = ({
         ))}
       </div>
     </fieldset>
+  );
+};
+
+export const AgencySocialLinksForm = ({ form }: Props) => (
+  <InfoCard title="Social links">
+    <InfoCard.Content>
+      <SocialLinksField form={form} />
+    </InfoCard.Content>
+  </InfoCard>
+);
+
+export const AgencyIntegrationsForm = ({ form }: Props) => {
+  const { Component: SelectErxesMessenger } =
+    useRemoteComponent<SelectErxesMessengerProps>(
+      'frontline_ui',
+      'selectErxesMessenger',
+    );
+
+  return (
+    <InfoCard
+      title="Frontline Integrations"
+      description="The erxes messenger widget connected to this agency"
+    >
+      <InfoCard.Content className="grid grid-cols-2">
+        <Form.Field<AgencyProfileSchema, 'messengerIntegrationId'>
+          control={form.control}
+          name="messengerIntegrationId"
+          render={({ field }) => (
+            <Form.Item className="col-span-2">
+              <Form.Label>Erxes Messenger</Form.Label>
+              <Form.Control>
+                {SelectErxesMessenger ? (
+                  <SelectErxesMessenger
+                    value={field.value as string}
+                    onValueChange={({ integrationId, widgetBundleUrl }) => {
+                      field.onChange(integrationId);
+                      form.setValue('widgetBundleUrl', widgetBundleUrl);
+                    }}
+                    placeholder="Not connected"
+                    disabled
+                  />
+                ) : (
+                  <Skeleton className="h-9 w-full" />
+                )}
+              </Form.Control>
+              <Form.Message />
+            </Form.Item>
+          )}
+        />
+      </InfoCard.Content>
+    </InfoCard>
   );
 };

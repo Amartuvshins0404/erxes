@@ -1,4 +1,4 @@
-import { socialPlatforms } from './constants/social-platforms';
+import { socialPlatforms } from '../constants/social-platforms';
 
 export interface IAgencyOperationArea {
   city: string;
@@ -31,6 +31,8 @@ export interface IAgency {
   dateFounded: string;
   operationArea: IAgencyOperationArea;
   fieldsOfExpertise: IAgencyFieldOfExpertise;
+  messengerIntegrationId?: string;
+  widgetBundleUrl?: string;
   verificationStatus: string;
 }
 
@@ -42,3 +44,5 @@ export enum AgencyRejectionReasons {
   DUPLICATE_ACCOUNT = 'Duplicate account',
   SUSPICIOUS_ACTIVITY = 'Suspicious activity',
 }
+
+export type TViewMode = 'grid' | 'list';

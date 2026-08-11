@@ -9,6 +9,7 @@ import {
   agencySocialLinksSchema,
   agencyGeneralInfoSchema,
   agencyContactInfoSchema,
+  agencyIntegrationsSchema,
 } from '../schema/form';
 import { socialPlatforms } from '../constants/social-platforms';
 
@@ -33,3 +34,5 @@ export type AgencyOperationAreasValues = z.infer<
 >;
 
 export type AgencySocialLinksValues = z.infer<typeof agencySocialLinksSchema>;
+
+export type AgencyIntegrationsValues = z.infer<typeof agencyIntegrationsSchema>;

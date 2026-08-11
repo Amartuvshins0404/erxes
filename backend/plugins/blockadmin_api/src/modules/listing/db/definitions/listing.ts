@@ -44,6 +44,12 @@ export const listingSchema = schemaWrapper(
       featuredImg: { type: String },
       viewCount: { type: Number, default: 0 },
       isFeatured: { type: Boolean, default: false },
+      agent: {
+        _id: { type: String },
+        firstName: { type: String },
+        lastName: { type: String },
+        email: { type: String },
+      },
     },
     { timestamps: true },
   ),

@@ -3,7 +3,7 @@ import { CLIENT_TYPE_LABELS } from '../constants';
 import React, { useCallback, useMemo, useState } from 'react';
 import { IconX } from '@tabler/icons-react';
 
-type ClientTypeKey = keyof typeof CLIENT_TYPE_LABELS;
+export type ClientTypeKey = keyof typeof CLIENT_TYPE_LABELS;
 
 interface SelectClientTypeProps {
   value: ClientTypeKey[];

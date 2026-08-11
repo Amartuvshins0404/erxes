@@ -28,6 +28,8 @@ export const GET_AGENCY_INFO = gql`
         services
         clientTypes
       }
+      messengerIntegrationId
+      widgetBundleUrl
     }
   }
 `;
@@ -49,6 +51,13 @@ export const GET_AGENCY_MEMBERS = gql`
       city
       certificatePhotos
       agencyId
+      member {
+        _id
+        details {
+          avatar
+          fullName
+        }
+      }
     }
   }
 `;

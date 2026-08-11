@@ -1,24 +1,50 @@
-import { Input } from 'erxes-ui';
-import { AgenciesFilterVars } from '../hooks/useAgencies';
+import { Combobox, Command, Filter, useMultiQueryState } from 'erxes-ui';
+import { SelectArea } from './SelectArea';
+import { AgenciesTotalCount } from './AgenciesTotalCount';
 
-type Props = {
-  filter: AgenciesFilterVars;
-  onFilterChange: (filter: AgenciesFilterVars) => void;
-};
+export const AgenciesFilter = () => {
+  const [queries] = useMultiQueryState<{
+    searchValue: string;
+    city: string;
+    district: string;
+  }>(['searchValue', 'city', 'district']);
 
-export const AgenciesFilter = ({ filter, onFilterChange }: Props) => {
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    onFilterChange({ ...filter, searchValue: e.target.value || undefined });
-  };
+  const hasFilters = Object.values(queries || {}).some(
+    (value) => value !== null,
+  );
 
   return (
-    <div className="flex items-center gap-4 px-8 py-2 w-full">
-      <Input
-        placeholder="Search agencies..."
-        value={filter.searchValue ?? ''}
-        onChange={handleSearchChange}
-        className="max-w-xs h-8"
-      />
-    </div>
+    <Filter id="ba-agencies-filter">
+      <Filter.Bar>
+        <Filter.Popover>
+          <Filter.Trigger isFiltered={hasFilters} />
+          <Combobox.Content>
+            <Filter.View>
+              <Command>
+                <Filter.CommandInput placeholder="Filter" variant="secondary" />
+                <Command.List>
+                  <Filter.SearchValueTrigger />
+                  <SelectArea.CityFilterItem />
+                  <SelectArea.DistrictFilterItem />
+                </Command.List>
+              </Command>
+            </Filter.View>
+            <SelectArea.CityFilterView />
+            <SelectArea.DistrictFilterView />
+          </Combobox.Content>
+        </Filter.Popover>
+
+        <Filter.Dialog>
+          <Filter.View filterKey="searchValue" inDialog>
+            <Filter.DialogStringView filterKey="searchValue" label="Search" />
+          </Filter.View>
+        </Filter.Dialog>
+
+        <Filter.SearchValueBarItem />
+        <SelectArea.CityFilterChip />
+        <SelectArea.DistrictFilterChip />
+        <AgenciesTotalCount />
+      </Filter.Bar>
+    </Filter>
   );
 };

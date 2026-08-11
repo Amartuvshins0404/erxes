@@ -1,4 +1,15 @@
-export type BlockUnitStatus = 'available' | 'reserved' | 'sold' | 'leased';
+import { IUnit } from 'ui-modules/modules/structure/types/Unit';
+
+export type BlockUnitStatus =
+  | 'vacant'
+  | 'reserved'
+  | 'leased'
+  | 'leaseExpireSoon'
+  | 'leaseRenewal'
+  | 'underFitout'
+  | 'cancelled'
+  | 'internalUse'
+  | 'onHold';
 
 export interface IBlockAgencyUnit {
   _id: string;
@@ -14,11 +25,11 @@ export interface IBlockAgencyUnit {
   assignedAt?: string;
   createdAt?: string;
   updatedAt?: string;
+  member?: IUnit;
 }
 
 export interface IUnitStatusCounts {
-  available: number;
+  vacant: number;
   reserved: number;
-  sold: number;
   leased: number;
 }

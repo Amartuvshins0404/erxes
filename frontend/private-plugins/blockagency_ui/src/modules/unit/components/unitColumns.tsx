@@ -4,6 +4,7 @@ import { format } from 'date-fns';
 import { IBlockAgencyUnit } from '../types/unit';
 import { SelectMember } from './SelectMember';
 import { SelectUnitStatus } from './SelectUnitStatus';
+import { SelectUnitStatuses } from './SelectUnitStatuses';
 
 export const unitColumns: ColumnDef<IBlockAgencyUnit>[] = [
   {
@@ -56,26 +57,19 @@ export const unitColumns: ColumnDef<IBlockAgencyUnit>[] = [
     header: 'status',
     size: 120,
     cell: ({ row }) => (
-      <RecordTableInlineCell>
-        <SelectUnitStatus
-          unitId={row.original._id}
-          status={row.original.status}
-        />
-      </RecordTableInlineCell>
+      <SelectUnitStatuses.InlineCell value={row.original.status} />
     ),
   },
   {
     id: 'memberId',
     accessorKey: 'memberId',
     header: 'member',
-    size: 160,
+    size: 120,
     cell: ({ row }) => (
-      <RecordTableInlineCell>
-        <SelectMember
-          unitId={row.original._id}
-          memberId={row.original.memberId}
-        />
-      </RecordTableInlineCell>
+      <SelectMember
+        unitId={row.original._id}
+        memberId={row.original.memberId}
+      />
     ),
   },
   {

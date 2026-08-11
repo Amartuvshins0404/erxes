@@ -22,10 +22,18 @@ export const types = `
     builtYear: String
   }
 
+  type BlockAdminListingAgent {
+    _id: String
+    firstName: String
+    lastName: String
+    email: String
+  }
+
   type BlockAdminListing {
     _id: String
     entityId: String
     subdomain: String
+    agencyId: String
     title: String
     type: String
     propertyType: String
@@ -38,8 +46,9 @@ export const types = `
     featuredImg: String
     viewCount: Float
     isFeatured: Boolean
-    createdAt: String
-    updatedAt: String
+    agent: BlockAdminListingAgent
+    createdAt: Date
+    updatedAt: Date
   }
 
   input BlockAdminListingStatusInput {

@@ -3,6 +3,7 @@ export const types = `
     _id: String
     agencyId: String
     memberId: String
+    member: User @provides(fields: "_id")
     description: String
     country: String
     city: String

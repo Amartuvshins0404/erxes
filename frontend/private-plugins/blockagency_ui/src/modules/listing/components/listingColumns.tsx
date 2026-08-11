@@ -9,7 +9,7 @@ import {
   toast,
   useConfirm,
 } from 'erxes-ui';
-import { format } from 'date-fns';
+import { format, formatDate } from 'date-fns';
 import { IconPencil, IconTrash } from '@tabler/icons-react';
 import { useNavigate } from 'react-router';
 import { useRemoveListing } from '../hooks/useRemoveListing';
@@ -72,10 +72,10 @@ export const listingColumns: ColumnDef<IListingInline>[] = [
               cell.getValue() === 'active'
                 ? 'success'
                 : cell.getValue() === 'inactive'
-                  ? 'warning'
-                  : cell.getValue() === 'sold'
-                    ? 'info'
-                    : 'secondary'
+                ? 'warning'
+                : cell.getValue() === 'sold'
+                ? 'info'
+                : 'secondary'
             }
           >
             {cell.row.original.status}
@@ -105,7 +105,7 @@ export const listingColumns: ColumnDef<IListingInline>[] = [
     cell: ({ cell }) => {
       return (
         <RecordTableInlineCell className="text-xs font-medium text-muted-foreground">
-          {format(Number(cell.getValue()), 'yyyy-MM-dd HH:mm')}
+          {formatDate(cell.getValue() as Date, 'yyyy-mm-dd')}
         </RecordTableInlineCell>
       );
     },

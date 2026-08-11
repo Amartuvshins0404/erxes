@@ -23,7 +23,7 @@ const buildFilter = ({
   if (status) {
     // Legacy records without a status field are treated as 'available'
     filter.status =
-      status === 'available' ? { $in: ['available', null, undefined] } : status;
+      status === 'vacant' ? { $in: ['vacant', null, undefined] } : status;
   }
   return filter;
 };
@@ -71,17 +71,17 @@ export const blockUnitQueries = {
     { models }: IContext,
   ) => {
     const base = buildFilter({ agencyId, projectId });
-    const [reserved, sold, leased, total] = await Promise.all([
+    const [reserved, leased, sold, total] = await Promise.all([
       models.BlockUnitAssignment.countDocuments({
         ...base,
         status: 'reserved',
       }),
-      models.BlockUnitAssignment.countDocuments({ ...base, status: 'sold' }),
       models.BlockUnitAssignment.countDocuments({ ...base, status: 'leased' }),
+      models.BlockUnitAssignment.countDocuments({ ...base, status: 'sold' }),
       models.BlockUnitAssignment.countDocuments(base),
     ]);
     // Legacy records without a status field count as available
-    const available = total - reserved - sold - leased;
-    return { available, reserved, sold, leased };
+    const available = total - reserved - leased - sold;
+    return { available, reserved, leased, sold };
   },
 };

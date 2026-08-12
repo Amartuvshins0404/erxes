@@ -132,7 +132,7 @@ const AgentNavRow = ({
         <Collapsible.Trigger asChild>
           <Sidebar.MenuButton className="group/agent-row">
             <Link to={`/erxes-agent/chat/${agent._id}`}>
-              <AgentAvatar />
+              <AgentAvatar name={agent.accountName} live={working} />
               <span className="truncate">{agent.accountName}</span>
               {working && (
                 <IconLoader2 className="size-3.5 animate-spin text-primary shrink-0" />

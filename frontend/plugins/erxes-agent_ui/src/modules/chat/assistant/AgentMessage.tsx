@@ -28,6 +28,7 @@ import {
 } from '~/modules/chat/components/ArtifactCard';
 import { MessageAttachments } from '~/modules/chat/components/MessageAttachments';
 import { ToolFallback } from '~/modules/chat/assistant/ToolFallback';
+import { WebSearchTool } from '~/modules/chat/assistant/WebSearchTool';
 
 // 32px quiet icon button, background-only hover — the clone's action control.
 const actionClass =
@@ -160,7 +161,10 @@ const AssistantMessageRow = () => {
                 <MarkdownTextPrimitive />
               </div>
             ),
-            tools: { Fallback: ToolFallback },
+            tools: {
+              by_name: { webSearch: WebSearchTool },
+              Fallback: ToolFallback,
+            },
           }}
         />
         {artifacts.length > 0 && (

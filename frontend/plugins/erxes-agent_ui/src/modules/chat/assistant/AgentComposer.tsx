@@ -1,12 +1,15 @@
 import { useCallback, useRef } from 'react';
-import { ComposerPrimitive, useComposerRuntime } from '@assistant-ui/react';
 import {
+  ComposerPrimitive,
+  useComposer,
+  useComposerRuntime,
+} from '@assistant-ui/react';
+import {
+  IconArrowUp,
   IconLoader2,
-  IconPaperclip,
-  IconPlayerStopFilled,
-  IconSend,
+  IconPlus,
 } from '@tabler/icons-react';
-import { Button, Tooltip } from 'erxes-ui';
+import { Tooltip } from 'erxes-ui';
 import type { ReasoningEffort } from '~/modules/chat/types';
 import type { useAttachments } from '~/modules/chat/hooks/useAttachments';
 import { ComposerAttachmentChip } from '~/modules/chat/components/ComposerAttachmentChip';
@@ -14,10 +17,14 @@ import { ReasoningEffortControl } from '~/modules/chat/components/ReasoningEffor
 
 type AttachmentsBag = ReturnType<typeof useAttachments>;
 
-// The composer: assistant-ui primitives for the input (autosize, focus
-// management) wrapped around the erxes send pipeline (staged attachment
-// uploads + per-send body extras). Text state lives in the runtime composer;
-// the actual send reads it and goes through the page's handler.
+const quietBtn =
+  'flex size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-black/[0.07] hover:text-foreground dark:hover:bg-white/15 disabled:opacity-40';
+
+// The composer in the ChatGPT-clone style: rounded-[28px] surface, attachment
+// chips on top, quiet circular controls, and a single high-contrast primary
+// action (black square-stop while running, arrow-up send otherwise). assistant-
+// ui primitives own the input (autosize, focus); the erxes send pipeline owns
+// the actual send (staged uploads + body extras).
 export const AgentComposer = ({
   onSend,
   onStop,
@@ -38,6 +45,7 @@ export const AgentComposer = ({
   onReasoningEffortChange: (effort?: ReasoningEffort) => void;
 }) => {
   const composerRuntime = useComposerRuntime();
+  const isEmpty = useComposer((s) => s.isEmpty);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { pendingAtts, addFiles, removeAttachment, uploadsInFlight, onPaste } =
     attachments;
@@ -61,16 +69,14 @@ export const AgentComposer = ({
   };
 
   return (
-    <div className="px-3 pb-3 pt-1 bg-background">
-      <div className="max-w-3xl mx-auto w-full">
+    <div className="px-4 pb-3 pt-1">
+      <div className="mx-auto w-full max-w-3xl">
         <ComposerPrimitive.Root
           data-agent-composer
-          className={`ea-composer rounded-3xl border bg-background shadow-sm transition-all duration-200 focus-within:border-primary/50 focus-within:shadow-md ${
-            chatLoading ? 'border-primary/30' : 'border-border'
-          }`}
+          className="flex w-full flex-col rounded-[28px] border border-[#e5e5e5] bg-white px-2 py-2 shadow-[0_2px_6px_-2px_rgba(0,0,0,0.05)] transition-colors focus-within:border-[#d0d0d0] dark:border-transparent dark:bg-[#212121] dark:shadow-[inset_0_0_1px_0_rgba(255,255,255,0.2)]"
         >
           {pendingAtts.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 px-3.5 pt-3">
+            <div className="flex flex-row flex-wrap gap-2 px-1 pt-1 pb-2">
               {pendingAtts.map((att) => (
                 <ComposerAttachmentChip
                   key={att.id}
@@ -91,32 +97,20 @@ export const AgentComposer = ({
               e.target.value = '';
             }}
           />
-          <div className="px-3.5 pt-3">
-            <ComposerPrimitive.Input
-              submitOnEnter={false}
-              cancelOnEscape={false}
-              addAttachmentOnPaste={false}
-              onKeyDown={handleKeyDown}
-              onPaste={onPaste}
-              placeholder={`Message ${agentName}…`}
-              rows={1}
-              className="ea-composer-textarea w-full min-h-6 max-h-44 resize-none bg-transparent text-sm leading-relaxed focus:outline-none"
-            />
-          </div>
-          <div className="flex items-center gap-1 px-2 pb-2 pt-1">
+          <div className="flex items-end gap-1">
             {attachmentsEnabled && (
               <Tooltip.Provider>
                 <Tooltip>
                   <Tooltip.Trigger asChild>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="size-9 shrink-0 rounded-full text-muted-foreground hover:text-primary transition-colors"
+                    <button
+                      type="button"
+                      aria-label="Add photos & files"
+                      className={quietBtn}
                       onClick={() => fileInputRef.current?.click()}
                       disabled={chatLoading || pendingAtts.length >= 10}
                     >
-                      <IconPaperclip className="size-4" />
-                    </Button>
+                      <IconPlus className="size-5" />
+                    </button>
                   </Tooltip.Trigger>
                   <Tooltip.Content>
                     Attach files (images, PDF, Excel, Word, …)
@@ -124,46 +118,58 @@ export const AgentComposer = ({
                 </Tooltip>
               </Tooltip.Provider>
             )}
-            <ReasoningEffortControl
-              value={reasoningEffort}
-              onChange={onReasoningEffortChange}
-              disabled={chatLoading}
+            <ComposerPrimitive.Input
+              autoFocus
+              submitOnEnter={false}
+              cancelOnEscape={false}
+              addAttachmentOnPaste={false}
+              onKeyDown={handleKeyDown}
+              onPaste={onPaste}
+              placeholder={`Message ${agentName}…`}
+              rows={1}
+              className="max-h-52 min-h-9 flex-1 resize-none bg-transparent py-1.5 pr-2 pl-1 text-base outline-none placeholder:text-muted-foreground/70"
             />
-            <span className="flex-1" />
-            {chatLoading ? (
-              <Tooltip.Provider>
-                <Tooltip>
-                  <Tooltip.Trigger asChild>
-                    <Button
-                      size="icon"
-                      variant="outline"
-                      className="size-9 shrink-0 rounded-full border-primary/40 text-primary hover:bg-primary/8 transition-all"
-                      onClick={onStop}
-                    >
-                      <IconPlayerStopFilled className="size-4" />
-                    </Button>
-                  </Tooltip.Trigger>
-                  <Tooltip.Content>Stop generating (Esc)</Tooltip.Content>
-                </Tooltip>
-              </Tooltip.Provider>
-            ) : (
-              <Button
-                size="icon"
-                aria-label="Send message"
-                className="size-9 shrink-0 rounded-full transition-transform duration-150 hover:scale-105 active:scale-95 disabled:scale-100"
-                onClick={() => void send()}
-                disabled={uploadsInFlight}
-              >
-                {uploadsInFlight ? (
-                  <IconLoader2 className="size-4 animate-spin" />
-                ) : (
-                  <IconSend className="size-4" />
-                )}
-              </Button>
-            )}
+            <div className="flex shrink-0 items-center gap-1">
+              <ReasoningEffortControl
+                value={reasoningEffort}
+                onChange={onReasoningEffortChange}
+                disabled={chatLoading}
+              />
+              {chatLoading ? (
+                <Tooltip.Provider>
+                  <Tooltip>
+                    <Tooltip.Trigger asChild>
+                      <button
+                        type="button"
+                        aria-label="Stop generating (Esc)"
+                        className="flex size-9 items-center justify-center rounded-full bg-[#0d0d0d] text-white dark:bg-white dark:text-black"
+                        onClick={onStop}
+                      >
+                        <div className="size-2.5 rounded-[2px] bg-current" />
+                      </button>
+                    </Tooltip.Trigger>
+                    <Tooltip.Content>Stop generating (Esc)</Tooltip.Content>
+                  </Tooltip>
+                </Tooltip.Provider>
+              ) : (
+                <button
+                  type="button"
+                  aria-label="Send message"
+                  className="flex size-9 items-center justify-center rounded-full bg-[#0d0d0d] text-white transition-opacity disabled:opacity-30 dark:bg-white dark:text-black"
+                  onClick={() => void send()}
+                  disabled={isEmpty || uploadsInFlight}
+                >
+                  {uploadsInFlight ? (
+                    <IconLoader2 className="size-5 animate-spin" />
+                  ) : (
+                    <IconArrowUp className="size-5" />
+                  )}
+                </button>
+              )}
+            </div>
           </div>
         </ComposerPrimitive.Root>
-        <p className="text-[11px] text-muted-foreground mt-1.5 pl-1 text-center">
+        <p className="pt-1.5 text-center text-xs text-muted-foreground">
           Enter to send · Shift+Enter for new line · Esc to stop
           {attachmentsEnabled && ' · drop or paste files to attach'}
         </p>

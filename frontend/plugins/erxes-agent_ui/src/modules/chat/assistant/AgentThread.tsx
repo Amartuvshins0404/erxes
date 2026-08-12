@@ -3,9 +3,9 @@ import {
   useComposerRuntime,
   useThread,
 } from '@assistant-ui/react';
-import { IconArrowDown } from '@tabler/icons-react';
+import { IconChevronDown } from '@tabler/icons-react';
 import { Badge, Skeleton } from 'erxes-ui';
-import { AgentAvatar, AgentMark } from '~/modules/chat/components/Avatars';
+import { AgentMark } from '~/modules/chat/components/Avatars';
 import { AgentMessage } from '~/modules/chat/assistant/AgentMessage';
 import { focusAgentComposer } from '~/modules/chat/assistant/chatContexts';
 import type { IChatAgent } from '~/modules/chat/hooks/useChatAgents';
@@ -13,18 +13,13 @@ import type { IChatAgent } from '~/modules/chat/hooks/useChatAgents';
 // Dots row shown while the turn runs but no assistant message exists yet —
 // once the assistant message streams, its inline parts carry the status.
 const ThinkingRow = () => {
-  const lastRole = useThread(
-    (s) => s.messages[s.messages.length - 1]?.role,
-  );
+  const lastRole = useThread((s) => s.messages[s.messages.length - 1]?.role);
   if (lastRole === 'assistant') return null;
   return (
-    <div className="flex justify-start items-start gap-3">
-      <AgentAvatar live />
-      <div className="flex items-center gap-1.5 py-2">
-        <span className="ea-typing-dot" />
-        <span className="ea-typing-dot" />
-        <span className="ea-typing-dot" />
-      </div>
+    <div className="mx-auto flex w-full max-w-3xl items-center gap-1.5 py-2">
+      <span className="ea-typing-dot" />
+      <span className="ea-typing-dot" />
+      <span className="ea-typing-dot" />
     </div>
   );
 };
@@ -44,47 +39,48 @@ const ThreadEmptyState = ({
     focusAgentComposer();
   };
   return (
-    <div className="flex flex-col items-center justify-center min-h-[55vh] text-center gap-3 ea-msg-in">
-      <AgentMark size="lg" />
-      <div className="space-y-1">
-        <p className="text-xl font-semibold tracking-tight">
+    <div className="flex grow flex-col items-center justify-center px-4 pb-[16vh] text-center">
+      <div className="mx-auto flex w-full max-w-3xl flex-col items-center gap-4">
+        <AgentMark size="lg" />
+        <h1 className="text-2xl leading-7 font-normal">
           {agent.accountName}
-        </p>
+        </h1>
         {agent.accountDescription && (
-          <p className="mx-auto max-w-sm text-sm text-muted-foreground">
+          <p className="max-w-sm text-sm text-muted-foreground">
             {agent.accountDescription}
           </p>
         )}
-      </div>
-      <Badge variant="secondary" className="font-mono text-xs mt-1">
-        {agent.provider === agent.model
-          ? agent.model
-          : `${agent.provider} · ${agent.model}`}
-      </Badge>
-      <div className="mt-3 flex flex-wrap justify-center gap-2 max-w-md">
-        {[
-          'What can you do?',
-          'Summarize my open tickets',
-          attachmentsEnabled
-            ? 'Read the file I attach and summarize it'
-            : 'List the latest customers',
-        ].map((s) => (
-          <button
-            key={s}
-            type="button"
-            onClick={() => pick(s)}
-            className="ea-pop ea-suggestion"
-          >
-            {s}
-          </button>
-        ))}
+        <Badge variant="secondary" className="font-mono text-xs">
+          {agent.provider === agent.model
+            ? agent.model
+            : `${agent.provider} · ${agent.model}`}
+        </Badge>
+        <div className="mt-2 flex flex-wrap justify-center gap-2 max-w-md">
+          {[
+            'What can you do?',
+            'Summarize my open tickets',
+            attachmentsEnabled
+              ? 'Read the file I attach and summarize it'
+              : 'List the latest customers',
+          ].map((s) => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => pick(s)}
+              className="ea-pop ea-suggestion"
+            >
+              {s}
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );
 };
 
-// The assistant-ui thread: viewport (auto-scroll), messages with our renderers,
-// a jump-to-latest affordance — all stock primitives, no custom scroll math.
+// The assistant-ui thread in the ChatGPT-clone layout: centered max-w-3xl
+// column, generous gaps, a floating jump-to-latest pill — all stock
+// primitives, no custom scroll math.
 export const AgentThread = ({
   agent,
   messagesLoading,
@@ -95,37 +91,35 @@ export const AgentThread = ({
   attachmentsEnabled: boolean;
 }) => (
   <ThreadPrimitive.Root className="relative flex-1 flex flex-col min-h-0">
-    <ThreadPrimitive.Viewport className="ea-scroll flex-1 overflow-y-auto p-4">
-      <div className="max-w-3xl mx-auto w-full space-y-6">
-        {messagesLoading ? (
-          <div className="p-2 space-y-3">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <Skeleton key={i} className="h-16 w-2/3 rounded-2xl" />
-            ))}
-          </div>
-        ) : (
-          <>
-            <ThreadPrimitive.Empty>
-              <ThreadEmptyState
-                agent={agent}
-                attachmentsEnabled={attachmentsEnabled}
-              />
-            </ThreadPrimitive.Empty>
-            <ThreadPrimitive.Messages components={{ Message: AgentMessage }} />
-            <ThreadPrimitive.If running>
-              <ThinkingRow />
-            </ThreadPrimitive.If>
-          </>
-        )}
-      </div>
+    <ThreadPrimitive.Viewport className="ea-scroll flex grow flex-col gap-8 overflow-y-auto px-4 pt-8 pb-4">
+      {messagesLoading ? (
+        <div className="mx-auto w-full max-w-3xl space-y-3 p-2">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Skeleton key={i} className="h-16 w-2/3 rounded-2xl" />
+          ))}
+        </div>
+      ) : (
+        <>
+          <ThreadPrimitive.Empty>
+            <ThreadEmptyState
+              agent={agent}
+              attachmentsEnabled={attachmentsEnabled}
+            />
+          </ThreadPrimitive.Empty>
+          <ThreadPrimitive.Messages components={{ Message: AgentMessage }} />
+          <ThreadPrimitive.If running>
+            <ThinkingRow />
+          </ThreadPrimitive.If>
+        </>
+      )}
     </ThreadPrimitive.Viewport>
     <ThreadPrimitive.ScrollToBottom asChild>
       <button
         type="button"
-        className="ea-pop absolute bottom-4 right-4 z-10 flex items-center gap-1.5 rounded-full border border-border bg-background/95 backdrop-blur px-3 py-1.5 text-xs shadow-md hover:border-primary/40 hover:text-primary transition-colors"
+        aria-label="Scroll to bottom"
+        className="absolute bottom-4 right-4 z-10 flex items-center justify-center rounded-full border border-border bg-background p-2 shadow-sm transition-colors hover:border-primary/40 hover:text-primary"
       >
-        <IconArrowDown className="size-3.5" />
-        Latest
+        <IconChevronDown className="size-4" />
       </button>
     </ThreadPrimitive.ScrollToBottom>
   </ThreadPrimitive.Root>

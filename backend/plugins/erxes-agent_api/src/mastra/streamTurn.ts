@@ -258,78 +258,54 @@ async function finalizeTurn(params: {
     writer.write({ type: 'text-end', id });
   }
 
-  // Close the assistant message NOW — the full reply already streamed, so nothing
-  // user-visible should wait on the turn-end DB write. The native message id
-  // (rated without a reload) and the thread title are reconciled over the
-  // still-open stream once the background persist resolves; on a reload the
-  // message recovers its id from the store regardless.
+  // Persist BEFORE closing the turn: the `finish` chunk carries the reconciled
+  // native message id in messageMetadata, which the AI SDK applies to the
+  // assistant message and flips the turn to 'ready' at stream close. There is
+  // no post-finish reconcile tail — the stream ends right after `finish`.
+  // Bounded titling: a slow/failed title never delays the close beyond the
+  // race window (it self-persists for the next session-list load anyway).
+  let nativeAssistantId: string | null = null;
+  try {
+    const { titlePromise, assistantMessageId } = await persistTurn({
+      models,
+      prepared,
+      reply,
+      // Mastra's assigned id for this turn's assistant row, captured off the
+      // stream's `start` chunk — the id the client rates without a reload.
+      assistantMessageId: acc.messageId,
+      replaceNativeText: bufferProviderText || deliveryCorrected,
+      interrupted,
+      failed,
+      hasArtifacts: (prepared.authCtx.artifactCount ?? 0) > 0,
+    });
+    nativeAssistantId = assistantMessageId;
+
+    const title = await Promise.race([
+      titlePromise,
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 8000)),
+    ]);
+    if (title && !clientGone()) {
+      writer.write({
+        type: 'data-thread-title',
+        data: { threadId: prepared.sessionId, title },
+        transient: true,
+      });
+    }
+  } catch (e) {
+    console.warn(
+      `[mastra chat] persist/title reconcile failed: ${
+        (e as Error)?.message || e
+      }`,
+    );
+  }
+
   writer.write({
     type: 'finish',
     messageMetadata: {
-      messageId: null,
+      messageId: nativeAssistantId,
       interrupted,
     },
   });
-
-  // Persistence is off the critical path. The user-visible reply is already
-  // complete; this reconciles the native id, attachments, and title.
-  const persistPromise = persistTurn({
-    models,
-    prepared,
-    reply,
-    // Mastra's assigned id for this turn's assistant row, captured off the
-    // stream's `start` chunk — the id the client rates without a reload.
-    assistantMessageId: acc.messageId,
-    replaceNativeText: bufferProviderText || deliveryCorrected,
-    interrupted,
-    failed,
-    hasArtifacts: (prepared.authCtx.artifactCount ?? 0) > 0,
-  });
-
-  if (clientGone()) {
-    // Nobody is waiting — let the write finish in the background, surfacing any
-    // failure so a lost turn is visible.
-    void persistPromise.catch((e) =>
-      console.warn(
-        `[mastra chat] background persist failed: ${
-          (e as Error)?.message || e
-        }`,
-      ),
-    );
-  } else {
-    // Client still connected: forward the reconciled native id + the new sidebar
-    // title over the already-open stream. This runs AFTER `finish`, so it is off
-    // the felt path — the user has the complete, rendered reply. Bounded titling:
-    // a slow/failed title never hangs the stream (it self-persists for the next
-    // session-list load).
-    try {
-      const { titlePromise, assistantMessageId } = await persistPromise;
-      if (assistantMessageId && !clientGone()) {
-        writer.write({
-          type: 'data-message-id',
-          data: { messageId: assistantMessageId },
-          transient: true,
-        });
-      }
-      const title = await Promise.race([
-        titlePromise,
-        new Promise<null>((resolve) => setTimeout(() => resolve(null), 8000)),
-      ]);
-      if (title && !clientGone()) {
-        writer.write({
-          type: 'data-thread-title',
-          data: { threadId: prepared.sessionId, title },
-          transient: true,
-        });
-      }
-    } catch (e) {
-      console.warn(
-        `[mastra chat] persist/title reconcile failed: ${
-          (e as Error)?.message || e
-        }`,
-      );
-    }
-  }
 }
 
 // The full assistant turn for POST /chat/stream: prepare → set up deterministic

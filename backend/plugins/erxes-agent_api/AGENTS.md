@@ -6,7 +6,7 @@
 - **Project:** `erxes-agent_api`
 - **Layer:** Backend API
 - **Path:** `backend/plugins/erxes-agent_api`
-- **Last synchronized:** `2026-08-12`
+- **Last synchronized:** `2026-08-13`
 
 ## Scope
 
@@ -50,7 +50,7 @@
 ### Provides
 
 - Plugin-prefixed GraphQL queries and mutations for agents, providers, settings, sessions, and artifacts.
-- `POST /chat/stream` SSE chat transport and plugin-owned file/artifact routes.
+- `POST /chat/stream` SSE chat transport and plugin-owned file/artifact routes. The stream closes immediately after the `finish` chunk, which carries the reconciled native message id and interrupted flag in `messageMetadata`; the only post-text transient data part is `data-thread-title` (sent before `finish`).
 
 ### Consumes
 
@@ -89,6 +89,12 @@
 ## Recent Changes
 
 <!-- Newest first. Keep at most 10 entries. -->
+
+### `2026-08-13` — Library-native stream close
+
+- **Summary:** The chat stream now persists before writing `finish`, carries the reconciled message id in `finish` `messageMetadata`, sends the thread title before `finish`, and closes immediately — removing the post-finish reconcile tail (`data-message-id`) so the stock AI SDK transport/status lifecycle applies unchanged.
+- **Affected areas:** `src/mastra/streamTurn.ts`.
+- **Contracts changed:** `POST /chat/stream` no longer emits the transient `data-message-id` part; `finish` `messageMetadata.messageId` now holds the native assistant id (previously always null at finish time).
 
 ### `2026-08-12` — Empty-result envelopes and guaranteed turn finalization
 
@@ -143,9 +149,3 @@
 - **Summary:** Removed notification-triggered turns, scheduling, background principals, and background runtime hooks while keeping on-demand chat.
 - **Affected areas:** Plugin startup, agent turn identity, tools, permissions, locales, and docs.
 - **Contracts changed:** Removed notification and background runtime hooks.
-
-### `2026-08-06` — Remove custom agent workflows
-
-- **Summary:** Removed the custom workflow DSL, compiler, runtime, storage, API, tools, schedules, and automation hooks while keeping agent chat and normal Mastra execution.
-- **Affected areas:** Workflow module, Mastra workflow runtime and tools, scheduling, automation metadata, permissions, GraphQL assembly, models, Studio, docs, and tests.
-- **Contracts changed:** Removed all custom workflow GraphQL operations, permission actions, agent workflow counts, automation metadata, and workflow tools.

@@ -34,10 +34,6 @@ export type AgentDataParts = {
   activity: { text: string };
   'thread-title': { threadId: string; title: string };
   heartbeat: Record<string, never>;
-  // The native assistant-message id, reconciled after the `finish` chunk when
-  // the background persistence write resolves. Patched onto the latest
-  // assistant message's metadata for artifact links and message-pair deletion.
-  'message-id': { messageId: string };
 };
 
 export type AgentUIMessage = UIMessage<AgentMessageMetadata, AgentDataParts>;

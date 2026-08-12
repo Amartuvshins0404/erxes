@@ -73,6 +73,12 @@ const DIRECT_ACTION = new RegExp(
   'i',
 );
 
+// Mongolian equivalents of the same not-an-answer closers: the progressive
+// "…-ж/ч байна" ("is ~ing": "татаж байна", "шалгаж байна") and the deferred
+// "хүлээнэ үү" ("please wait"). Replies are written in the user's language, so
+// an MN-only turn must trip the same guard the EN patterns above catch.
+const MN_IN_PROGRESS = /(?:[жч]\s*байна|хүлээнэ\s*үү)[.!?…]*$/u;
+
 /** A reply ending in an immediate promised action is progress, not an answer. */
 export function looksLikeIncompleteProgress(text: string): boolean {
   const normalized = text.replace(/\s+/g, ' ').trim();
@@ -81,7 +87,9 @@ export function looksLikeIncompleteProgress(text: string): boolean {
   const sentences = normalized.split(/(?<=[.!?])\s+/);
   const lastSentence = sentences[sentences.length - 1];
   return (
-    ACTION_IN_PROGRESS.test(lastSentence) || DIRECT_ACTION.test(lastSentence)
+    ACTION_IN_PROGRESS.test(lastSentence) ||
+    DIRECT_ACTION.test(lastSentence) ||
+    MN_IN_PROGRESS.test(lastSentence)
   );
 }
 

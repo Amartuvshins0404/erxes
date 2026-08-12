@@ -6,7 +6,7 @@
 - **Project:** `erxes-agent_api`
 - **Layer:** Backend API
 - **Path:** `backend/plugins/erxes-agent_api`
-- **Last synchronized:** `2026-08-11`
+- **Last synchronized:** `2026-08-12`
 
 ## Scope
 
@@ -23,12 +23,15 @@
 
 - Runs blocking and SSE-streamed Mastra agent turns as linked AI team-member accounts with tenant and permission isolation.
 - Creates agents with private, people-shared, or organization visibility, permission groups, additional-tool allowlists, provider/model settings, and active state.
-- Persists chats, working memory, attachments, and artifacts in the native Mastra-backed stores.
+- Persists chats, working memory, attachments, and artifacts in the native Mastra-backed stores; message persistence itself is Mastra-native (`savePerStep` incremental saves), with the plugin reconciling only erxes metadata, attachments, and zero-step failure rows.
 - Discovers permitted erxes operations through Mastra ToolSearchProcessor over live GraphQL introspection, with exact live argument schemas and conservative standalone-tool scoping; when the gateway `/graphql` is blocked or introspection is disabled, the registry rebuilds itself from each subgraph's federation SDL on its internal address.
 - Creates documents, charts, diagrams, and websites when those tools are enabled for the selected agent.
 - Loads plugin-owned `SKILL.md` files through Mastra `Workspace` and `LocalSkillSource`; Mastra provides skill discovery and read tools at runtime.
 - Bounds malformed-provider recovery, unique tool executions, exact duplicate calls, and state-changing tool concurrency per turn.
 - Derives chat titles from the first meaningful request without a provider call.
+- Wraps empty operation results (`{}`/`[]`/`null`) in an explicit `resultCount: 0` envelope with filter-check/pivot guidance instead of forwarding an anonymous empty payload.
+- Anchors the system prompt to the current date and guards every provider (not only Kimi) against settling on progress narration, including Mongolian progressive endings.
+- Finalizes every streamed turn with a persisted assistant reply: mid-stream provider failures append a plain-language failure note, and error/abort finishes create the assistant row Mastra never saved.
 
 ## Architecture
 
@@ -72,6 +75,7 @@
 - Direct operation, file, and standalone execution admits at most ten unique calls per turn; identical calls share one promise and state-changing calls execute serially.
 - An exact repeated call forces a text-only model step using the tool-result messages already present for that turn.
 - Provider completion recovery adds at most one corrective model request.
+- A streamed turn never ends silently: finalization always emits and persists a closing reply, creating the native assistant row directly when the model run finished in error or abort before any step completed (later steps are already persisted natively via `savePerStep`).
 - Thread titles and activity labels must not trigger auxiliary model requests.
 - Agent execution must start from an authenticated user request; the plugin must not subscribe to notifications, register automation actions, or run a scheduler.
 - Plugin source must not import another plugin or require private changes to core/shared code.
@@ -85,6 +89,12 @@
 ## Recent Changes
 
 <!-- Newest first. Keep at most 10 entries. -->
+
+### `2026-08-12` — Empty-result envelopes and guaranteed turn finalization
+
+- **Summary:** Empty operation results now reach the model as an explicit `resultCount: 0` envelope with pivot guidance, the prompt anchors the current date and empty-result pivot rules, progress-narration replies (English and Mongolian) are rejected for all providers, failed/interrupted streams still emit and persist a closing assistant message, and message persistence delegates to Mastra-native `savePerStep` incremental saves on both streamed and blocking turns.
+- **Affected areas:** `src/mastra/tools/emptyResult.ts` (new), `src/mastra/tools/erxesTools.ts`, `src/mastra/instructions/routing.ts`, `src/mastra/agentRuntime.ts`, `src/mastra/providerOutputGuard.ts`, `src/mastra/streamTurn.ts`, `src/modules/agent/run.ts`, `src/modules/agent/persist.ts`, `src/modules/session/nativeStore.ts`.
+- **Contracts changed:** None
 
 ### `2026-08-11` — Subgraph SDL fallback for operation discovery
 
@@ -139,9 +149,3 @@
 - **Summary:** Removed the custom workflow DSL, compiler, runtime, storage, API, tools, schedules, and automation hooks while keeping agent chat and normal Mastra execution.
 - **Affected areas:** Workflow module, Mastra workflow runtime and tools, scheduling, automation metadata, permissions, GraphQL assembly, models, Studio, docs, and tests.
 - **Contracts changed:** Removed all custom workflow GraphQL operations, permission actions, agent workflow counts, automation metadata, and workflow tools.
-
-### `2026-08-06` — Remove retired chat knowledge extraction
-
-- **Summary:** Removed chat knowledge extraction, derived prompt context, ratings, data models, settings, permissions, and API contracts while keeping native Mastra memory and skills.
-- **Affected areas:** `src/mastra`, agent/session preparation, settings, permissions, locales, model registration, and GraphQL assembly.
-- **Contracts changed:** Removed the retired knowledge and message-rating operations, settings fields, and permissions.

@@ -70,6 +70,19 @@ interface NativeMemoryFacade {
     title: string;
     metadata?: Record<string, unknown>;
   }): Promise<NativeThread>;
+  // Mastra Message v2 write — used to create an assistant row when the model
+  // run finished in error/abort and native persistence was skipped entirely.
+  saveMessages(args: {
+    messages: {
+      id: string;
+      role: string;
+      threadId: string;
+      resourceId: string;
+      createdAt: Date;
+      content: Record<string, unknown>;
+      type?: string;
+    }[];
+  }): Promise<unknown>;
   updateThread(args: {
     id: string;
     title: string;
@@ -130,6 +143,57 @@ export async function patchNativeMessages(
         (e as Error)?.message || e
       }`,
     );
+  }
+}
+
+/**
+ * Create an assistant message row directly.
+ *
+ * Mastra persists a turn's messages only on a successful finish — error and
+ * abort finishes write nothing, which used to leave failed turns as a bare
+ * user question with no answer at all. When finalization still produced a
+ * user-facing reply (an interruption/failure line), this inserts the row the
+ * native save skipped. Best-effort like patchNativeMessages: a write failure
+ * is logged, never thrown. Returns the new message id (or null on failure).
+ */
+export async function createNativeAssistantMessage(params: {
+  subdomain: string;
+  threadId: string;
+  resourceId: string;
+  reply: string;
+  metadata?: Record<string, unknown>;
+}): Promise<string | null> {
+  const { subdomain, threadId, resourceId, reply, metadata } = params;
+  try {
+    const memory = await getNativeMemory(subdomain);
+    const id = `erxes-finalized-${Date.now()}-${Math.random()
+      .toString(36)
+      .slice(2, 10)}`;
+    await memory.saveMessages({
+      messages: [
+        {
+          id,
+          role: 'assistant',
+          threadId,
+          resourceId,
+          createdAt: new Date(),
+          content: {
+            format: 2,
+            parts: [{ type: 'text', text: reply }],
+            content: reply,
+            ...(metadata ? { metadata: { erxes: metadata } } : {}),
+          },
+        },
+      ],
+    });
+    return id;
+  } catch (e) {
+    console.warn(
+      `[native-chat-store] assistant row create skipped: ${
+        (e as Error)?.message || e
+      }`,
+    );
+    return null;
   }
 }
 
@@ -307,11 +371,12 @@ export async function resourceHasThreads(
  * immediately listable (listOwnedThreads filters on metadata.agentId) and
  * survives a reload that happens WHILE the agent is still running.
  *
- * Without this the thread is created and tagged only at turn-end: Mastra does
- * not persist a thread until the run finishes (no savePerStep), and the agentId
- * tag is written by patchNativeTurn after the stream loop. So refreshing mid-run
- * — which also aborts the SSE run — left no agentId-tagged thread for the
- * sidebar query to find, and the in-flight session vanished.
+ * Without this the thread is created and tagged only at step/turn boundaries:
+ * Mastra persists natively per completed generation step (savePerStep), and
+ * the agentId tag is written by patchNativeTurn after the stream loop. So
+ * refreshing mid-run — which also aborts the SSE run — could leave no
+ * agentId-tagged thread for the sidebar query to find, and the in-flight
+ * session vanished.
  *
  * Idempotent: creates the thread when absent, back-fills the binding when an
  * existing thread is missing/stale on it, and no-ops otherwise. The caller gates

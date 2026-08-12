@@ -41,6 +41,9 @@ export async function runAgentTurn(params: {
   const genOpts = {
     activeTools,
     instructions: params.turnInstructions,
+    // Native incremental persistence — completed steps survive a later
+    // failure/abort (same behavior as the streamed path's savePerStep).
+    savePerStep: true,
     ...(memory ? { memory } : {}),
   };
   // With a memory binding, hand generate() the new user message as a STRING —

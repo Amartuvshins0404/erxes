@@ -4,6 +4,7 @@ import {
   getNativeMemory,
   ensureThreadRegistered,
   patchNativeMessages,
+  createNativeAssistantMessage,
 } from '@/session/nativeStore';
 import { IMastraChatAttachment } from '@/session/@types/session';
 import { MemoryBinding, PreparedTurn } from '@/agent/types';
@@ -16,6 +17,9 @@ export async function persistTurn(params: {
   // Replace native intermediate text blocks with the guarded final reply.
   replaceNativeText?: boolean;
   interrupted?: boolean;
+  // The model stream failed outright — native persistence definitely skipped
+  // this turn, so a reply row must be created, not just patched.
+  failed?: boolean;
   hasArtifacts?: boolean;
 }): Promise<{
   titlePromise: Promise<string | null>;
@@ -26,6 +30,7 @@ export async function persistTurn(params: {
     reply,
     assistantMessageId,
     interrupted,
+    failed,
     hasArtifacts,
     replaceNativeText,
   } = params;
@@ -52,6 +57,7 @@ export async function persistTurn(params: {
         assistantMessageId,
         turnStartedAt: prepared.authCtx?.turnStartedAt,
         interrupted,
+        failed,
         replaceNativeText,
       });
     } catch (e) {
@@ -158,10 +164,11 @@ export async function patchNativeTurn(params: {
   assistantMessageId?: string;
   turnStartedAt?: Date;
   interrupted?: boolean;
+  failed?: boolean;
   replaceNativeText?: boolean;
 }): Promise<string | null> {
   const { subdomain, binding, agentId, reply, attachments } = params;
-  const { assistantMessageId, interrupted, replaceNativeText } = params;
+  const { assistantMessageId, interrupted, failed, replaceNativeText } = params;
   const { turnStartedAt } = params;
 
   // A stopped turn keeps its state so a reload shows the "stopped" badge
@@ -236,6 +243,22 @@ export async function patchNativeTurn(params: {
         },
       ]);
     }
+  }
+
+  // Error/abort finishes skip Mastra's native save entirely — no assistant row
+  // will ever appear no matter how long we wait. When finalization still
+  // produced a user-facing reply, create the row directly so the thread shows
+  // the outcome instead of a bare question. (Successful turns always have the
+  // native row; creating there would double-persist.)
+  if (!assistantMsg && reply && (interrupted || failed)) {
+    const createdId = await createNativeAssistantMessage({
+      subdomain,
+      threadId: binding.thread,
+      resourceId: binding.resource,
+      reply,
+      metadata: assistantMeta,
+    });
+    return assistantMessageId ?? createdId;
   }
 
   if (wantAssistant && assistantMsg) {

@@ -130,7 +130,7 @@ const enforceDelegatedPermissionCeiling = async ({
 };
 
 // Increment this whenever routing.ts, the meta-tools, or provider logic changes.
-const ROUTING_VERSION = 40;
+const ROUTING_VERSION = 41;
 
 export interface AgentPromptContext {
   agentInstructions: string;

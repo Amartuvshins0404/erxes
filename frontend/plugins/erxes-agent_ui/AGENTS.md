@@ -6,7 +6,7 @@
 - **Project:** `erxes-agent_ui`
 - **Layer:** Frontend UI
 - **Path:** `frontend/plugins/erxes-agent_ui`
-- **Last synchronized:** `2026-08-07`
+- **Last synchronized:** `2026-08-13`
 
 ## Scope
 
@@ -53,7 +53,7 @@
 ## Data and State
 
 - Apollo Client owns server state; settings mutations refetch `MASTRA_SETTINGS` immediately after save.
-- Chat session and stream state remain inside `src/modules/chat`; component-local interactions use React state.
+- Live chat turns are owned by AI SDK `Chat` instances (one per agent+thread) behind a small zustand registry; the stock `DefaultChatTransport` speaks to the SSE endpoint, whose `finish` chunk metadata supplies the native message id. Session/activity signals mirror into the registry only for background-thread badges.
 - Settings forms use React Hook Form values validated by Zod schemas in `src/pages/settings/validations.ts`.
 
 ## Local Invariants
@@ -72,6 +72,12 @@
 ## Recent Changes
 
 <!-- Newest first. Keep at most 10 entries. -->
+
+### `2026-08-13` — Stock AI SDK chat transport
+
+- **Summary:** Dropped the custom settling transport, settled flags, idle handoff, and message-id reconcile parts now that the backend closes the stream at `finish` with the native id in `messageMetadata`; the chat runs on the stock `DefaultChatTransport` and status lifecycle.
+- **Affected areas:** `src/modules/chat/lib/chatTransport.ts`, `src/modules/chat/store/chatStore.ts`, `src/modules/chat/hooks/useChatView.ts`, `src/modules/chat/types.ts`.
+- **Contracts changed:** Consumes `finish` `messageMetadata.messageId` instead of the removed transient `data-message-id` part.
 
 ### `2026-08-07` — Enforce agent rail access
 

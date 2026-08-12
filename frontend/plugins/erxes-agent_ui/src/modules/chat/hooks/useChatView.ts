@@ -4,7 +4,6 @@ import { useChat } from '@ai-sdk/react';
 import { AgentChatState, AgentUIMessage } from '~/modules/chat/types';
 import {
   selectActiveChat,
-  selectActiveThreadSettled,
   selectAgentActivity,
   selectAgentShell,
   selectHasUnread,
@@ -32,10 +31,6 @@ export const useAgentChatView = (agentId?: string): AgentChatView => {
   const shell = useChatStore(useShallow((s) => selectAgentShell(s, key)));
   const chat = useChatStore((s) => selectActiveChat(s, key));
   const messagesLoading = useChatStore((s) => selectThreadHydrating(s, key));
-  // After the `finish` chunk the reply is done writing, but the stream stays
-  // open for the server's reconcile tail — status alone would keep the UI in
-  // "working" mode (stop button, shimmer) for those extra seconds.
-  const settled = useChatStore((s) => selectActiveThreadSettled(s, key));
   const { messages, status, error, regenerate } = useChat({
     chat,
     experimental_throttle: 50,
@@ -55,7 +50,7 @@ export const useAgentChatView = (agentId?: string): AgentChatView => {
   return {
     ...shell,
     messages,
-    loading: (status === 'submitted' || status === 'streaming') && !settled,
+    loading: status === 'submitted' || status === 'streaming',
     messagesLoading,
     error,
     retry,

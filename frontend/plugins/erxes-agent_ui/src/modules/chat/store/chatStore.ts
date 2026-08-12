@@ -79,11 +79,6 @@ interface ChatStoreState {
   threadStatus: Record<string, ChatStatus>;
   threadActivity: Record<string, string | undefined>;
   threadHydrating: Record<string, boolean>;
-  // The turn's `finish` chunk has arrived, but the stream is still open for the
-  // server's reconcile tail (turn summary, message id, title). The reply is done
-  // writing — the UI must leave "working" mode even though status is still
-  // 'streaming' (the AI SDK only flips it back when the stream closes).
-  threadSettled: Record<string, boolean>;
   unreadAgents: string[];
   currentViewedAgentId?: string;
 
@@ -137,22 +132,6 @@ export const useChatStore = create<ChatStoreState>((set, get) => {
   const setThreadActivity = (key: string, text: string | undefined) =>
     set((s) => ({ threadActivity: { ...s.threadActivity, [key]: text } }));
 
-  const setThreadSettled = (key: string, settled: boolean) =>
-    set((s) => ({ threadSettled: { ...s.threadSettled, [key]: settled } }));
-
-  // Resolves once the chat's request loop is idle (status left submitted /
-  // streaming) — used to hand off cleanly from a cut reconcile tail to the
-  // next turn without racing the SDK's own teardown.
-  const statusIdle = (chat: Chat<AgentUIMessage>): Promise<void> =>
-    new Promise((resolve) => {
-      if (!isWorkingStatus(chat.status)) return resolve();
-      const unsub = chat['~registerStatusCallback'](() => {
-        if (isWorkingStatus(chat.status)) return;
-        unsub();
-        resolve();
-      });
-    });
-
   // Patch the metadata of a thread's most recent assistant message. Reassigning
   // chat.messages makes a post-`finish` reconcile render without a reload.
   const patchLastAssistantMeta = (
@@ -172,18 +151,10 @@ export const useChatStore = create<ChatStoreState>((set, get) => {
     }
   };
 
-  // Stamp the reconciled native id (sent via a transient `data-message-id` part
-  // after `finish`) onto the latest assistant message for artifact links and
-  // persisted message-pair deletion.
-  const reconcileAssistantMessageId = (key: string, messageId: string) => {
-    if (!messageId) return;
-    patchLastAssistantMeta(key, { messageId });
-  };
-
   // Stamp the latest assistant message of a thread as `interrupted` so the
   // "stopped" badge shows the instant the user clicks Stop — even mid-Thinking,
   // before any text streamed and before the aborted stream could send `finish`.
-  // Mirrors reconcileAssistantMessageId: reassigning chat.messages re-renders.
+  // Reassigning chat.messages re-renders.
   const markLastAssistantInterrupted = (key: string) => {
     const chat = get().chats[key];
     if (!chat) return;
@@ -245,12 +216,10 @@ export const useChatStore = create<ChatStoreState>((set, get) => {
     const chat = new Chat<AgentUIMessage>({
       id: threadId,
       messages: initialMessages,
-      // The `finish` chunk marks the reply done writing; the stream stays open
-      // for the reconcile tail, so flag the thread settled to end "working"
-      // mode now instead of at stream close (seconds later).
-      transport: createChatTransport(mastraAgentId, threadId, () =>
-        setThreadSettled(key, true),
-      ),
+      // The backend closes the stream right after `finish`, whose
+      // messageMetadata carries the reconciled native message id — the SDK
+      // stamps it onto the assistant message itself.
+      transport: createChatTransport(mastraAgentId, threadId),
       onData: (part) => {
         if (part.type === 'data-activity') {
           setThreadActivity(key, part.data.text);
@@ -261,10 +230,6 @@ export const useChatStore = create<ChatStoreState>((set, get) => {
             part.data.threadId || threadId,
             part.data.title,
           );
-        } else if (part.type === 'data-message-id') {
-          // Reconcile the native id onto the latest assistant message after the
-          // off-critical-path persistence finishes. A reload also restores it.
-          reconcileAssistantMessageId(key, part.data.messageId);
         }
         // data-heartbeat is dropped — it only keeps the proxy socket warm.
       },
@@ -305,21 +270,11 @@ export const useChatStore = create<ChatStoreState>((set, get) => {
     if (!threadId) return;
 
     const chat = ensureChat(client, agentKey, mastraAgentId, threadId, []);
-    const key = threadKey(agentKey, threadId);
     // Never start a second turn on a thread whose reply is still being written
     // — a concurrent send (regenerate, suggestion, double Enter) would
-    // interleave two replies. After the `finish` chunk the reply is complete
-    // but the stream stays open for the reconcile tail: a send there is
-    // legitimate, so cut the tail and hand off (the persist already runs
-    // server-side; the title self-heals on the next session-list load).
-    if (isWorkingStatus(chat.status)) {
-      if (!get().threadSettled[key]) return;
-      setThreadSettled(key, false); // claim the send — a second Enter drops above
-      void chat.stop();
-      await statusIdle(chat);
-    } else {
-      setThreadSettled(key, false); // clear the previous turn's stale flag
-    }
+    // interleave two replies. The stream closes right after `finish`, so an
+    // idle status means the turn is fully done.
+    if (isWorkingStatus(chat.status)) return;
 
     // Surface the session in the sidebar the instant the first message is sent.
     prependThreadToCache(client, mastraAgentId, threadId);
@@ -352,7 +307,6 @@ export const useChatStore = create<ChatStoreState>((set, get) => {
     threadStatus: {},
     threadActivity: {},
     threadHydrating: {},
-    threadSettled: {},
     unreadAgents: [],
     currentViewedAgentId: undefined,
 
@@ -450,18 +404,15 @@ export const useChatStore = create<ChatStoreState>((set, get) => {
         const threadStatus = { ...s.threadStatus };
         const threadActivity = { ...s.threadActivity };
         const threadHydrating = { ...s.threadHydrating };
-        const threadSettled = { ...s.threadSettled };
         delete chats[key];
         delete threadStatus[key];
         delete threadActivity[key];
         delete threadHydrating[key];
-        delete threadSettled[key];
         return {
           chats,
           threadStatus,
           threadActivity,
           threadHydrating,
-          threadSettled,
         };
       });
       // Drop the active selection so the view's bootstrap re-selects the next
@@ -514,10 +465,8 @@ export const useChatStore = create<ChatStoreState>((set, get) => {
       if (!agent?.activeThreadId) return;
       const key = threadKey(agentKey, agent.activeThreadId);
       const chat = get().chats[key];
-      // Blocked only while the reply is still being written — a settled thread
-      // (reconcile tail still open) may regenerate; doSend cuts the tail.
-      if (!chat || (isWorkingStatus(chat.status) && !get().threadSettled[key]))
-        return;
+      // Blocked only while the reply is still being written.
+      if (!chat || isWorkingStatus(chat.status)) return;
       // Skip hidden approve/deny replies — re-ask the real question.
       const lastUser = [...chat.messages]
         .reverse()
@@ -557,11 +506,10 @@ export const selectThreadHydrating = (
   return threadId ? !!s.threadHydrating[threadKey(agentKey, threadId)] : false;
 };
 
-// A thread is "working" while a reply is being produced: in-flight status AND
-// the `finish` chunk hasn't landed yet. Once settled, the still-open reconcile
-// tail must not read as working.
+// A thread is "working" while a reply is being produced: the stream closes
+// right after `finish`, so an in-flight status is the whole story.
 const threadWorking = (s: ChatStoreState, key: string): boolean =>
-  isWorkingStatus(s.threadStatus[key]) && !s.threadSettled[key];
+  isWorkingStatus(s.threadStatus[key]);
 
 export const selectIsAgentWorking = (
   s: ChatStoreState,
@@ -578,16 +526,6 @@ export const selectThreadWorking = (
   agentKey: string,
   threadId: string,
 ): boolean => threadWorking(s, threadKey(agentKey, threadId));
-
-// Whether the active thread's turn has settled (finish chunk arrived) while
-// its stream is still open — the view's "done writing" override.
-export const selectActiveThreadSettled = (
-  s: ChatStoreState,
-  agentKey: string,
-): boolean => {
-  const threadId = s.agents[agentKey]?.activeThreadId;
-  return threadId ? !!s.threadSettled[threadKey(agentKey, threadId)] : false;
-};
 
 // One-line summary of what the agent is doing right now: the server-pushed
 // activity for any working thread of this agent, or a coarse fallback.

@@ -21,6 +21,7 @@ import { IMastraChatAttachment } from '@/session/@types/session';
 import { UITurnAccumulator } from '@/agent/uiTurn';
 import {
   INCOMPLETE_PROVIDER_REPLY,
+  looksLikeIncompleteProgress,
   resolveGuardedReply,
   shouldGuardProviderCompletion,
 } from './providerOutputGuard';
@@ -82,6 +83,12 @@ async function foldModelStream(params: {
         abortSignal: controller.signal,
         activeTools: prepared.activeTools,
         instructions: prepared.turnInstructions,
+        // Native incremental persistence: Mastra flushes the message list to
+        // memory storage after every generation step, so completed steps survive
+        // even when a later step fails or the turn is aborted. The turn-end
+        // reconcile in persistTurn then only patches metadata/attachments (and,
+        // for zero-step provider failures, creates the row natively skipped).
+        savePerStep: true,
         ...(memoryBinding ? { memory: memoryBinding } : {}),
         ...(reasoningOptions ? { providerOptions: reasoningOptions } : {}),
       });
@@ -135,6 +142,9 @@ async function finalizeTurn(params: {
   message: string;
   bufferProviderText: boolean;
   guardProviderText: boolean;
+  // Set when foldModelStream threw — the turn failed before the model
+  // finished, so tool state may be partial and no native row will exist.
+  streamError?: unknown;
 }): Promise<void> {
   const {
     writer,
@@ -146,9 +156,11 @@ async function finalizeTurn(params: {
     message,
     bufferProviderText,
     guardProviderText,
+    streamError,
   } = params;
   const { agent, authCtx } = prepared;
 
+  const failed = streamError !== undefined && streamError !== null;
   const interrupted = controller.signal.aborted;
   const guarded = guardProviderText
     ? resolveGuardedReply({
@@ -159,13 +171,44 @@ async function finalizeTurn(params: {
   let reply: string | null = guarded ? guarded.text : acc.text || null;
   let emitReply = bufferProviderText;
 
+  // Non-guarded providers: a tool turn that settles on progress narration
+  // ("checking…", "шалгаж байна") is not an answer. Drop it so the turn falls
+  // through to synthesis/fallback instead of persisting a dead end — the
+  // already-streamed progress text stays, the real answer is appended below.
+  if (
+    reply &&
+    !guarded &&
+    !interrupted &&
+    !failed &&
+    acc.toolResults().length > 0 &&
+    looksLikeIncompleteProgress(reply)
+  ) {
+    reply = null;
+  }
+
+  // A failed stream that already produced text would otherwise look like a
+  // complete (if odd) reply. Append an explicit note — streamed now (unless the
+  // provider text is still buffered) and persisted with the reply.
+  if (failed && reply) {
+    const note =
+      'Something went wrong while I was working on that. Please try again.';
+    if (!emitReply) {
+      const id = `fail-${Date.now()}`;
+      writer.write({ type: 'text-start', id });
+      writer.write({ type: 'text-delta', id, delta: `\n\n${note}` });
+      writer.write({ type: 'text-end', id });
+    }
+    reply = `${reply}\n\n${note}`;
+  }
+
   if (!reply) {
     // No answer text streamed. When the turn ran to completion the model ended
     // on tool calls without prose — synthesize a summary from the tool results
     // (synthesizeFromToolResults skips synthesis when nothing real came back, so
-    // we never fabricate success). An interrupted turn leaves tool calls
-    // half-done, so we don't synthesize; we go straight to the fallback below.
-    if (!interrupted) {
+    // we never fabricate success). An interrupted or failed turn leaves tool
+    // calls half-done, so we don't synthesize; we go straight to the fallback
+    // below.
+    if (!interrupted && !failed) {
       const toolResults = acc.toolResults();
       if (toolResults.length) {
         reply = await synthesizeFromToolResults({
@@ -185,6 +228,8 @@ async function finalizeTurn(params: {
     if (!reply) {
       reply = interrupted
         ? 'This response was interrupted before it finished. Please tap retry to continue.'
+        : failed
+        ? 'Something went wrong while I was working on that. Please try again.'
         : guarded?.incomplete
         ? INCOMPLETE_PROVIDER_REPLY
         : "I couldn't produce a response for that. Please try again.";
@@ -236,6 +281,8 @@ async function finalizeTurn(params: {
     // stream's `start` chunk — the id the client rates without a reload.
     assistantMessageId: acc.messageId,
     replaceNativeText: bufferProviderText || deliveryCorrected,
+    interrupted,
+    failed,
     hasArtifacts: (prepared.authCtx.artifactCount ?? 0) > 0,
   });
 
@@ -350,15 +397,27 @@ export async function streamAgentTurn(
       toolSignal: toolStatusLine,
     });
 
-    await foldModelStream({
-      writer,
-      controller,
-      prepared,
-      reasoningOptions,
-      acc,
-      activity,
-      bufferProviderText,
-    });
+    // A provider/network failure mid-stream must not strand the user on a dead
+    // stream: capture it and still finalize, so the turn ends with a streamed
+    // AND persisted closing message instead of nothing (the route's onError is
+    // the last resort for failures before this point).
+    let streamError: unknown = null;
+    try {
+      await foldModelStream({
+        writer,
+        controller,
+        prepared,
+        reasoningOptions,
+        acc,
+        activity,
+        bufferProviderText,
+      });
+    } catch (err) {
+      streamError = err;
+      console.error(
+        `[mastra chat] model stream failed: ${(err as Error)?.message || err}`,
+      );
+    }
 
     activity.stop();
 
@@ -372,6 +431,7 @@ export async function streamAgentTurn(
       message,
       bufferProviderText,
       guardProviderText,
+      streamError,
     });
   } finally {
     activity?.stop();

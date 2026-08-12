@@ -23,6 +23,7 @@ import {
 } from './serverErrorClassifier';
 import { redactSecrets, REDACTED } from './secretRedaction';
 import { scrubArgs } from './argScrub';
+import { withEmptyResultGuidance } from './emptyResult';
 
 // Re-export the introspection surface used by the registry and tests.
 export type { GqlArgDef, GqlFieldDef, GqlTypeRef, SchemaMaps };
@@ -266,7 +267,11 @@ export async function executeErxesOperation(
     // otherwise dump raw credentials into the transcript and on to the LLM
     // provider; this is the single chokepoint all agent operations route
     // through, so the guard holds for every operation, current and future.
-    return redactSecrets(data?.data?.[erxesOperation] ?? null);
+    // Empty success payloads ({}/[]/null) get an explicit 0-records envelope so
+    // the model pivots or reports instead of retrying a bare anonymous `{}`.
+    return withEmptyResultGuidance(
+      redactSecrets(data?.data?.[erxesOperation] ?? null),
+    );
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return {

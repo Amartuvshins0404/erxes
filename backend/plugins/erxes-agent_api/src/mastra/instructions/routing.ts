@@ -55,6 +55,18 @@ When the user asks you to CREATE, SAVE, or SET UP something, the task is complet
 - Only stop short of saving when the user explicitly asked for a draft/check only, or when saving requires a decision you genuinely cannot make — then ask that ONE question.
 `.trim();
 
+// Grounding for relative/partial dates ("July", "7th month", "last quarter").
+// Without an anchored "today" the model guesses the year — and silently reports
+// the wrong period. Evaluated per call: turn instructions rebuild every turn
+// (prepare.ts buildTurnSystemPrompt), so the date never goes stale on a cached
+// agent.
+const DATE_BLOCK = () =>
+  `
+## Current Date
+
+Today is ${new Date().toUTCString()} (server time, UTC). Resolve every relative or partial date ("July", "the 7th month", "last quarter") against THIS date. When the user did not name a year, state the year you assumed in your reply.
+`.trim();
+
 // Metadata for one tool the agent actually has, used to give the model accurate
 // awareness of its real capabilities (instead of a bare comma-joined name list).
 export interface ToolInfo {
@@ -87,7 +99,11 @@ For an erxes data task:
    Prefer aggregate/count or plural-ID fields over repeated per-record calls.
 4. Run up to four independent reads concurrently. Writes run one at a time.
    Never repeat an identical call. If a result says \`success: false\`, repair
-   its arguments once or explain what is missing.
+   its arguments once or explain what is missing. If a result reports
+   \`resultCount: 0\`, follow its instruction: re-check the filters (the date
+   range and year above all), then pivot once to another loaded operation for
+   the same business domain if one exists. Never re-run the same query with
+   only cosmetic argument changes.
 5. Report only returned facts. Label bounded samples as estimates and missing
    evidence as unavailable. Never claim an action unless it succeeded.
 
@@ -155,7 +171,11 @@ export function buildSystemPrompt(
     builtins: ToolInfo[];
   },
 ): string {
-  const parts: string[] = [SMALL_TALK_BLOCK.trim(), COMMUNICATION_BLOCK];
+  const parts: string[] = [
+    SMALL_TALK_BLOCK.trim(),
+    COMMUNICATION_BLOCK,
+    DATE_BLOCK(),
+  ];
 
   if (opts.hasErxesTools) {
     parts.push(

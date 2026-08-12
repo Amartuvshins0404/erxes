@@ -39,8 +39,6 @@ export const AgentMark = ({
   );
 };
 
-// One component per file: the message avatar and the waiting indicator now live
-// in their own modules. Re-exported here so existing `Avatars` imports keep
+// One component per file: re-exported here so existing `Avatars` imports keep
 // working.
 export { AgentAvatar } from '~/modules/chat/components/AgentAvatar';
-export { WaitingIndicator } from '~/modules/chat/components/WaitingIndicator';

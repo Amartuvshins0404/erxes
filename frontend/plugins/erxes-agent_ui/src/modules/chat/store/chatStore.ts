@@ -132,25 +132,6 @@ export const useChatStore = create<ChatStoreState>((set, get) => {
   const setThreadActivity = (key: string, text: string | undefined) =>
     set((s) => ({ threadActivity: { ...s.threadActivity, [key]: text } }));
 
-  // Patch the metadata of a thread's most recent assistant message. Reassigning
-  // chat.messages makes a post-`finish` reconcile render without a reload.
-  const patchLastAssistantMeta = (
-    key: string,
-    metaPatch: Partial<NonNullable<AgentUIMessage['metadata']>>,
-  ) => {
-    const chat = get().chats[key];
-    if (!chat) return;
-    const msgs = chat.messages;
-    for (let i = msgs.length - 1; i >= 0; i--) {
-      if (msgs[i].role === 'assistant') {
-        chat.messages = msgs.map((m, idx) =>
-          idx === i ? { ...m, metadata: { ...m.metadata, ...metaPatch } } : m,
-        );
-        return;
-      }
-    }
-  };
-
   // Stamp the latest assistant message of a thread as `interrupted` so the
   // "stopped" badge shows the instant the user clicks Stop — even mid-Thinking,
   // before any text streamed and before the aborted stream could send `finish`.

@@ -26,6 +26,8 @@
 - Supports private, people-shared, and organization visibility, permission groups, additional-tool allowlists, provider/model settings, and active state.
 - Manages providers and tenant runtime settings; Settings opens Providers by default.
 - Streams native agent chat parts, tool activity, attachments, artifacts, and session updates.
+- Renders the chat conversation on assistant-ui primitives (`ThreadPrimitive`, `MessagePrimitive`, `ComposerPrimitive`, streaming markdown) over the AI SDK chat runtime; tool calls display as inline per-call status lines.
+- Hosts the nested module navigation in the main sidebar: a "Chat" group whose agent rows lazy-expand to their sessions, plus the flat "Agents" manage link.
 
 ## Architecture
 
@@ -33,7 +35,9 @@
 | ---------- | ------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
 | Federation | `frontend/plugins/erxes-agent_ui/module-federation.config.ts` | Exposes config, main/settings routes, and widgets.                                   |
 | Routes     | `frontend/plugins/erxes-agent_ui/src/modules`                 | Lazy-loaded main and settings route trees with permission gates.                     |
-| Chat       | `frontend/plugins/erxes-agent_ui/src/modules/chat`            | Session list, SSE assistant rendering, tool status, composer, artifacts, and errors. |
+| Chat       | `frontend/plugins/erxes-agent_ui/src/modules/chat`            | Page shell, session bootstrap, SSE stream state, artifacts, approvals, and preview.  |
+| Assistant  | `frontend/plugins/erxes-agent_ui/src/modules/chat/assistant`  | assistant-ui thread, message rows, composer, and per-message extras mapping.         |
+| Navigation | `frontend/plugins/erxes-agent_ui/src/modules/navigation`      | Nested main-sidebar tree (agents → lazy sessions) and settings navigation.           |
 | Settings   | `frontend/plugins/erxes-agent_ui/src/pages/settings`          | Provider and tenant runtime settings forms, validation, and mutation feedback.       |
 | GraphQL    | `frontend/plugins/erxes-agent_ui/src/graphql`                 | Plugin-prefixed queries, mutations, and subscriptions consumed by the UI.            |
 
@@ -54,6 +58,7 @@
 
 - Apollo Client owns server state; settings mutations refetch `MASTRA_SETTINGS` immediately after save.
 - Live chat turns are owned by AI SDK `Chat` instances (one per agent+thread) behind a small zustand registry; the stock `DefaultChatTransport` speaks to the SSE endpoint, whose `finish` chunk metadata supplies the native message id. Session/activity signals mirror into the registry only for background-thread badges.
+- The conversation view runs on `@assistant-ui/react` primitives via `useAISDKRuntime(chatHelpers)`; sends go through the store's pipeline (staged attachment uploads and per-send body extras), not the runtime composer send.
 - Settings forms use React Hook Form values validated by Zod schemas in `src/pages/settings/validations.ts`.
 
 ## Local Invariants
@@ -72,6 +77,12 @@
 ## Recent Changes
 
 <!-- Newest first. Keep at most 10 entries. -->
+
+### `2026-08-13` — assistant-ui chat surface and nested sidebar navigation
+
+- **Summary:** Rebuilt the conversation view on assistant-ui primitives (thread, message rows with streaming markdown and inline per-call tool status, composer) over the AI SDK chat runtime, replacing the custom message list/bubble/composer/waiting components and the summarized activity line; moved the agent/session browser into the main sidebar as a nested "Chat" tree with lazy session loading, deleting the in-page side panel.
+- **Affected areas:** `src/modules/chat/assistant` (new), `src/modules/chat/ChatPage.tsx`, `src/modules/navigation/AgentChatNavTree.tsx` (new), `src/config.tsx`, `src/modules/chat/hooks/useChatView.ts`; removed `MessageList`, `MessageBubble`, `Composer`, `WaitingIndicator`, `ChatMarkdown`, `ChatSidePanel`, `AgentRail`, `SessionList`, `MastraNavigation` and related hooks.
+- **Contracts changed:** None
 
 ### `2026-08-13` — Stock AI SDK chat transport
 
@@ -126,9 +137,3 @@
 - **Summary:** Removed response analysis controls, settings fields, GraphQL selections, validation, locale use, and metadata types.
 - **Affected areas:** General settings, settings GraphQL documents and types, and chat message metadata.
 - **Contracts changed:** Removed the retired analysis fields from settings reads, saves, and chat metadata.
-
-### `2026-08-06` — Remove obsolete summarizer settings
-
-- **Summary:** Removed unused provider/model controls after chat labels became deterministic, and made router singleton sharing independent of Nx's version-qualified pnpm graph nodes.
-- **Affected areas:** General settings form/validation/types, settings GraphQL documents, and Module Federation sharing.
-- **Contracts changed:** Removed `summarizerProvider` and `summarizerModel` from the settings UI contract.

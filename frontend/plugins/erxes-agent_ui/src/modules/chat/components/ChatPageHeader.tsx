@@ -1,9 +1,4 @@
-import {
-  IconFiles,
-  IconLayoutSidebar,
-  IconMessageCircle,
-  IconPlus,
-} from '@tabler/icons-react';
+import { IconFiles, IconMessageCircle, IconPlus } from '@tabler/icons-react';
 import { Breadcrumb, Button } from 'erxes-ui';
 import { PageHeader } from 'ui-modules';
 import { previewStore } from '~/modules/chat/preview/previewStore';
@@ -14,30 +9,16 @@ export const ChatPageHeader = ({
   hasAgent,
   agentName,
   agentId,
-  asDrawer,
-  onToggleSidebar,
   onNewThread,
 }: {
   hasAgent: boolean;
   agentName?: string;
   agentId?: string;
-  asDrawer: boolean;
-  onToggleSidebar: () => void;
   onNewThread: () => void;
 }) => {
   return (
     <PageHeader>
       <PageHeader.Start>
-        {asDrawer && (
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onToggleSidebar}
-            aria-label="Toggle sessions"
-          >
-            <IconLayoutSidebar className="size-4" />
-          </Button>
-        )}
         <Breadcrumb>
           <Breadcrumb.List className="gap-1">
             <Breadcrumb.Item>

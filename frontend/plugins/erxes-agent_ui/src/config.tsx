@@ -39,6 +39,11 @@ export const CONFIG: IUIConfig = {
   },
   modules: [
     {
+      name: 'erxes AI Agents',
+      icon: IconRobot,
+      path: 'erxes-agent',
+    },
+    {
       name: 'agents',
       icon: IconRobot,
       path: 'erxes-agent/agents',

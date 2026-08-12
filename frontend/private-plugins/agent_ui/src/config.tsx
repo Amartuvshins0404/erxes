@@ -31,5 +31,10 @@ export const CONFIG: IUIConfig = {
       icon: IconCode,
       path: 'agent/agents',
     },
+    {
+      name: 'Company Brain',
+      icon: IconSparkles,
+      path: 'agent',
+    },
   ],
 };

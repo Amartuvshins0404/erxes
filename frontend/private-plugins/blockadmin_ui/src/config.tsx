@@ -25,6 +25,11 @@ export const CONFIG: IUIConfig = {
   path: 'blockadmin',
   modules: [
     {
+      name: 'developers',
+      icon: IconBlocks,
+      path: 'blockadmin/developers',
+    },
+    {
       name: 'blockadmin',
       icon: IconBlocks,
       path: 'blockadmin',

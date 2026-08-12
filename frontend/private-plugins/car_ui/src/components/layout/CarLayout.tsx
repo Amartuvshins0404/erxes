@@ -2,15 +2,7 @@ import type { ReactNode } from 'react';
 import { IconCarSuv, IconFolders } from '@tabler/icons-react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { useEffect } from 'react';
-import { useSetAtom } from 'jotai';
-import {
-  activePluginState,
-  Breadcrumb,
-  Button,
-  PageContainer,
-  Separator,
-} from 'erxes-ui';
+import { Breadcrumb, Button, PageContainer, Separator } from 'erxes-ui';
 import { PageHeader } from 'ui-modules';
 
 import { CarSidebar } from './CarSidebar';
@@ -22,9 +14,6 @@ const moduleIconByKey = {
   categories: IconFolders,
 };
 
-const isCarRoute = (pathname: string) =>
-  pathname === '/car' || pathname.startsWith('/car/');
-
 export const CarLayout = ({
   activeModule,
   actions,
@@ -35,22 +24,11 @@ export const CarLayout = ({
   children: ReactNode;
 }) => {
   const { t } = useTranslation('car');
-  const setActivePlugin = useSetAtom(activePluginState);
   const ActiveIcon = moduleIconByKey[activeModule];
   const activeLabel =
     activeModule === 'categories'
       ? t('Categories', { defaultValue: 'Categories' })
       : t('Cars', { defaultValue: 'Cars' });
-
-  useEffect(() => {
-    return () => {
-      window.setTimeout(() => {
-        if (!isCarRoute(window.location.pathname)) {
-          setActivePlugin(null);
-        }
-      });
-    };
-  }, [setActivePlugin]);
 
   return (
     <PageContainer>
@@ -75,9 +53,7 @@ export const CarLayout = ({
                 <Button variant="ghost" asChild>
                   <Link
                     to={
-                      activeModule === 'categories'
-                        ? '/car/categories'
-                        : '/car'
+                      activeModule === 'categories' ? '/car/categories' : '/car'
                     }
                   >
                     <ActiveIcon />

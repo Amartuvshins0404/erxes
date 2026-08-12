@@ -34,6 +34,11 @@ export const CONFIG: IUIConfig = {
 
   modules: [
     {
+      name: 'agency profile',
+      icon: IconBuildingCommunity,
+      path: 'blockagency/agency-profile',
+    },
+    {
       name: 'agency',
       icon: IconBuildingCommunity,
       path: 'blockagency',

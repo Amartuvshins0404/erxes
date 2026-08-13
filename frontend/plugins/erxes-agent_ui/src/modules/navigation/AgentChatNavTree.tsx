@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Link, useLocation, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useApolloClient } from '@apollo/client';
 import {
+  IconCaretRightFilled,
   IconLoader2,
   IconPlus,
   IconRobot,
@@ -9,10 +10,12 @@ import {
 } from '@tabler/icons-react';
 import {
   AlertDialog,
+  Button,
   Collapsible,
   NavigationMenuGroup,
   NavigationMenuLinkItem,
   Sidebar,
+  Skeleton,
 } from 'erxes-ui';
 import { usePermissionCheck } from 'ui-modules';
 import { ERXES_AGENT_ACTIONS } from '~/permissions';
@@ -22,46 +25,14 @@ import {
   useAgentWorking,
   useHasAnyActivity,
 } from '~/modules/chat/hooks/useChatView';
-import { useChatAgents, type IChatAgent } from '~/modules/chat/hooks/useChatAgents';
+import {
+  useChatAgents,
+  type IChatAgent,
+} from '~/modules/chat/hooks/useChatAgents';
 import { useMastraThreads } from '~/modules/chat/hooks/useMastraThreads';
 import { useRemoveMastraThread } from '~/modules/chat/hooks/useRemoveMastraThread';
 
-// Session row: deep-link to the conversation; delete on hover with a confirm.
-const SessionNavRow = ({
-  agent,
-  thread,
-  active,
-  onDelete,
-}: {
-  agent: IChatAgent;
-  thread: { _id: string; threadId: string; title: string };
-  active: boolean;
-  onDelete: (threadId: string) => void;
-}) => (
-  <Sidebar.SubItem className="group/session-row">
-    <Sidebar.SubButton asChild isActive={active}>
-      <Link to={`/erxes-agent/chat/${agent._id}?thread=${thread.threadId}`}>
-        <span className="truncate">
-          {thread.title || 'Untitled conversation'}
-        </span>
-        <button
-          type="button"
-          aria-label="Delete conversation"
-          className="ml-auto invisible group-hover/session-row:visible text-muted-foreground hover:text-destructive"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            onDelete(thread.threadId);
-          }}
-        >
-          <IconTrash className="size-3.5" />
-        </button>
-      </Link>
-    </Sidebar.SubButton>
-  </Sidebar.SubItem>
-);
-
-// Lazy per-agent session list — only queried/rendered once the row expands.
+// Per-agent session list — skipped entirely while the row is collapsed.
 const AgentSessions = ({
   agent,
   onDelete,
@@ -76,38 +47,45 @@ const AgentSessions = ({
   const onAgentPath = pathname === `/erxes-agent/chat/${agent._id}`;
 
   if (loading) {
+    return <Skeleton className="w-28 h-4 ml-8 my-1" />;
+  }
+  if (threads.length === 0) {
     return (
-      <Sidebar.SubItem>
-        <span className="flex items-center gap-2 px-2 py-1 text-xs text-muted-foreground">
-          <IconLoader2 className="size-3 animate-spin" /> Loading…
-        </span>
-      </Sidebar.SubItem>
+      <div className="text-sm text-muted-foreground ml-8 my-2">
+        No conversations yet
+      </div>
     );
   }
   return (
     <>
       {threads.map((thread) => (
-        <SessionNavRow
+        <NavigationMenuLinkItem
           key={thread.threadId}
-          agent={agent}
-          thread={thread}
-          active={onAgentPath && activeThread === thread.threadId}
-          onDelete={onDelete}
+          name={thread.title || 'Untitled conversation'}
+          path={`erxes-agent/chat/${agent._id}?thread=${thread.threadId}`}
+          isActive={onAgentPath && activeThread === thread.threadId}
+          action={
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Delete conversation"
+              className="size-6 shrink-0 text-muted-foreground hover:text-destructive"
+              onClick={(e) => {
+                e.preventDefault();
+                onDelete(thread.threadId);
+              }}
+            >
+              <IconTrash className="size-3.5" />
+            </Button>
+          }
         />
       ))}
-      {threads.length === 0 && (
-        <Sidebar.SubItem>
-          <span className="px-2 py-1 text-xs text-muted-foreground">
-            No conversations yet
-          </span>
-        </Sidebar.SubItem>
-      )}
     </>
   );
 };
 
-// One agent row in the Chat tree: expand to browse its sessions, + starts a
-// fresh conversation with it. Working/unread badges mirror the chat rail.
+// One agent row: click opens its chat, the caret expands its sessions (lazy),
+// + starts a fresh conversation. Working/unread badges mirror the chat rail.
 const AgentNavRow = ({
   agent,
   onDeleteSession,
@@ -116,51 +94,68 @@ const AgentNavRow = ({
   onDeleteSession: (agentId: string, threadId: string) => void;
 }) => {
   const apolloClient = useApolloClient();
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
   const working = useAgentWorking(agent._id);
   const unread = useAgentUnread(agent._id);
+  const isActive = pathname.startsWith(`/erxes-agent/chat/${agent._id}`);
   const [open, setOpen] = useState(false);
 
   const newThread = (e: React.MouseEvent) => {
     e.stopPropagation();
     chatStore.newDraft(apolloClient, agent._id, agent._id);
+    navigate(`/erxes-agent/chat/${agent._id}`);
   };
 
   return (
-    <Collapsible open={open} onOpenChange={setOpen}>
-      <Sidebar.MenuItem>
+    <Collapsible className="group/agent" open={open} onOpenChange={setOpen}>
+      <div className="flex items-center w-full">
+        <Button
+          variant={isActive ? 'secondary' : 'ghost'}
+          className="justify-start gap-2 overflow-hidden text-left flex-auto min-w-0 py-1.5 px-2 h-auto font-normal"
+          onClick={() => {
+            navigate(`/erxes-agent/chat/${agent._id}`);
+            if (!isActive) setOpen(true);
+          }}
+        >
+          <IconRobot className="size-3.5 shrink-0 text-muted-foreground" />
+          <span className="flex-1 min-w-0 truncate">{agent.accountName}</span>
+          {working && (
+            <IconLoader2 className="size-3.5 shrink-0 animate-spin text-primary" />
+          )}
+          {unread && !working && (
+            <span className="size-2 shrink-0 rounded-full bg-red-500" />
+          )}
+          <span
+            role="button"
+            aria-label="New conversation"
+            className="shrink-0 invisible group-hover/agent:visible text-muted-foreground hover:text-foreground"
+            onClick={newThread}
+          >
+            <IconPlus className="size-4" />
+          </span>
+        </Button>
         <Collapsible.Trigger asChild>
-          <Sidebar.MenuButton className="group/agent-row">
-            <Link to={`/erxes-agent/chat/${agent._id}`}>
-              <IconRobot className="size-4 shrink-0 text-muted-foreground" />
-              <span className="truncate">{agent.accountName}</span>
-              {working && (
-                <IconLoader2 className="size-3.5 animate-spin text-primary shrink-0" />
-              )}
-              {unread && !working && (
-                <span className="size-2 rounded-full bg-red-500 shrink-0" />
-              )}
-              <span
-                role="button"
-                aria-label="New conversation"
-                className="ml-auto invisible group-hover/agent-row:visible text-muted-foreground hover:text-foreground"
-                onClick={newThread}
-              >
-                <IconPlus className="size-4" />
-              </span>
-            </Link>
-          </Sidebar.MenuButton>
+          <Button
+            variant="ghost"
+            className="shrink-0 size-6 p-0"
+            aria-label={`Conversations with ${agent.accountName}`}
+            aria-expanded={open}
+          >
+            <IconCaretRightFilled className="size-3 transition-transform group-data-[state=open]/agent:rotate-90 text-muted-foreground" />
+          </Button>
         </Collapsible.Trigger>
-        <Collapsible.Content>
-          <Sidebar.Sub>
-            {open && (
-              <AgentSessions
-                agent={agent}
-                onDelete={(threadId) => onDeleteSession(agent._id, threadId)}
-              />
-            )}
-          </Sidebar.Sub>
-        </Collapsible.Content>
-      </Sidebar.MenuItem>
+      </div>
+      <Collapsible.Content>
+        <Sidebar.Menu>
+          {open && (
+            <AgentSessions
+              agent={agent}
+              onDelete={(threadId) => onDeleteSession(agent._id, threadId)}
+            />
+          )}
+        </Sidebar.Menu>
+      </Collapsible.Content>
     </Collapsible>
   );
 };
@@ -200,12 +195,11 @@ export const AgentChatNavTree = () => {
           ) : undefined
         }
       >
-        {loading && (
-          <Sidebar.MenuItem>
-            <span className="flex items-center gap-2 px-2 py-1 text-xs text-muted-foreground">
-              <IconLoader2 className="size-3 animate-spin" /> Loading…
-            </span>
-          </Sidebar.MenuItem>
+        {loading && <Skeleton className="w-28 h-4 ml-2 my-1" />}
+        {!loading && agents.length === 0 && (
+          <div className="text-sm text-muted-foreground px-2 my-1">
+            No agents yet
+          </div>
         )}
         {agents.map((agent) => (
           <AgentNavRow
@@ -216,13 +210,6 @@ export const AgentChatNavTree = () => {
             }
           />
         ))}
-        {!loading && agents.length === 0 && (
-          <Sidebar.MenuItem>
-            <span className="px-2 py-1 text-xs text-muted-foreground">
-              No agents yet
-            </span>
-          </Sidebar.MenuItem>
-        )}
       </NavigationMenuGroup>
       {hasActionPermission(ERXES_AGENT_ACTIONS.agent.readSummary) && (
         <NavigationMenuLinkItem
@@ -231,7 +218,10 @@ export const AgentChatNavTree = () => {
           path="erxes-agent/agents"
         />
       )}
-      <AlertDialog open={!!pendingDelete} onOpenChange={(open) => !open && setPendingDelete(null)}>
+      <AlertDialog
+        open={!!pendingDelete}
+        onOpenChange={(open) => !open && setPendingDelete(null)}
+      >
         <AlertDialog.Content>
           <AlertDialog.Header>
             <AlertDialog.Title>Delete conversation?</AlertDialog.Title>

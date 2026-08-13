@@ -6,8 +6,8 @@ import { IMastraChatAttachment } from '@/session/@types/session';
 import { MemoryContext } from '~/mastra/memory/types';
 
 // Shared chat-turn types used across the staged turn pipeline (prepare → run →
-// persist) and its fallback synthesis. Co-located so each stage file imports
-// the same contract without a circular dependency through the orchestrator.
+// persist). Co-located so each stage file imports the same contract without a
+// circular dependency through the orchestrator.
 
 // How many recent messages of a session to replay as LLM context.
 // 12 covers most conversations; reduces DB load + LLM token overhead per turn.

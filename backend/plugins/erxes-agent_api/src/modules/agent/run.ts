@@ -6,18 +6,11 @@ import {
   TurnAuthCtx,
   TurnMessage,
 } from '@/agent/types';
-import {
-  buildFallbackFromResults,
-  isRealToolData,
-  isSearchResult,
-} from '@/agent/fallback';
 import { ensureWebsiteDeliveryReply } from '@/agent/websiteDelivery';
-import { stalledAfterToolSearch } from '~/mastra/providerOutputGuard';
 
 // Turn execution (blocking). Runs a single agent turn over the full
-// conversation array and returns the reply text (or null). With native
-// multi-step generate() the model produces the final answer itself; only a turn
-// that ends with tool calls but no text gets synthesized. Throws a user-facing
+// conversation array and returns the model's reply text (or null). The model
+// owns the turn ending; its answer is returned as-is. Throws a user-facing
 // message on hard failures.
 export async function runAgentTurn(params: {
   agent: TurnAgent;
@@ -27,17 +20,8 @@ export async function runAgentTurn(params: {
   memory?: MemoryBinding;
   activeTools: string[];
   turnInstructions: string;
-  guardProviderCompletion: boolean;
 }): Promise<string | null> {
-  const {
-    agent,
-    convo,
-    message,
-    authCtx,
-    memory,
-    activeTools,
-    guardProviderCompletion,
-  } = params;
+  const { agent, convo, message, authCtx, memory, activeTools } = params;
   const genOpts = {
     activeTools,
     instructions: params.turnInstructions,
@@ -57,38 +41,18 @@ export async function runAgentTurn(params: {
       agent.generate(input, genOpts),
     );
 
-    const uniqueResults = dedupeToolResults([
+    if (!result.text) return null;
+
+    const publishAttempted = dedupeToolResults([
       ...(result.toolResults || []),
       ...(result.steps || []).flatMap((step) => step.toolResults || []),
-    ]);
-    const publishAttempted = uniqueResults.some(
+    ]).some(
       (toolResult) =>
         (toolResult.toolName || toolResult.name) === 'publishWebsite',
     );
 
-    const incompleteText =
-      guardProviderCompletion &&
-      !!result.text &&
-      stalledAfterToolSearch(uniqueResults);
-
-    if (result.text && !incompleteText) {
-      return ensureWebsiteDeliveryReply({
-        reply: result.text,
-        publishAttempted,
-        websiteArtifactCount: authCtx.websiteArtifactCount,
-      });
-    }
-
-    if (!uniqueResults.length) return result.text || null;
-
-    const reply = await synthesizeFromToolResults({
-      agent,
-      message,
-      authCtx,
-      toolResults: uniqueResults,
-    });
     return ensureWebsiteDeliveryReply({
-      reply,
+      reply: result.text,
       publishAttempted,
       websiteArtifactCount: authCtx.websiteArtifactCount,
     });
@@ -161,69 +125,4 @@ export function dedupeToolResults(
     const id = tr.toolCallId || tr.id || JSON.stringify(tr);
     return seenIds.has(id) ? false : (seenIds.add(id), true);
   });
-}
-
-// Turn a set of tool results into a one-or-two sentence human answer. Skips
-// synthesis when nothing real came back (synthesis would fabricate success).
-export async function synthesizeFromToolResults(params: {
-  agent: TurnAgent;
-  message: string;
-  authCtx: TurnAuthCtx;
-  toolResults: ToolResultLike[];
-}): Promise<string> {
-  const { agent, message, authCtx, toolResults } = params;
-
-  // Catalog navigation is not an action result; only direct operation/builtin
-  // results decide whether the turn produced something real to report.
-  const seenResults = new Set<string>();
-  const actionResults = toolResults.filter((tr) => {
-    if (isSearchResult(tr)) return false;
-    const name = tr.toolName || tr.name || 'tool';
-    const data = tr.result ?? tr;
-    const key = `${name}\u0000${JSON.stringify(data)}`;
-    if (seenResults.has(key)) return false;
-    seenResults.add(key);
-    return true;
-  });
-  const hasRealResult = actionResults.some((tr) =>
-    isRealToolData(tr.result ?? tr),
-  );
-  const fallback = buildFallbackFromResults(toolResults);
-
-  if (!hasRealResult) {
-    return fallback || 'Something went wrong. Please try again.';
-  }
-
-  // All tool calls succeeded — synthesise from action results only.
-  const toolContext = actionResults
-    .map((tr) => {
-      const name = tr.toolName || tr.name || 'tool';
-      const data = tr.result ?? tr;
-      return `[${name}]:\n${
-        typeof data === 'string' ? data : JSON.stringify(data, null, 2)
-      }`;
-    })
-    .join('\n\n');
-
-  const synthesisMessages: TurnMessage[] = [
-    {
-      role: 'user',
-      content: `Report the following tool results accurately to the user in one or two sentences. Do not call any tools. Do not invent information not present in the results.\n\nUser request: ${message}\n\n${toolContext}`,
-    },
-  ];
-
-  try {
-    const synthesis = await runWithAuth(authCtx, () =>
-      agent.generate(synthesisMessages, {
-        maxSteps: 1,
-        activeTools: [],
-        toolChoice: 'none',
-        instructions:
-          'Summarize supplied tool results accurately in one or two sentences. Never call tools.',
-      }),
-    );
-    return synthesis.text || fallback || 'Done.';
-  } catch {
-    return fallback || 'Done.';
-  }
 }

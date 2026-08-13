@@ -48,13 +48,9 @@ interface RequestAuth {
   /** Per-turn exact-call cache. Repeated model calls share the first promise,
    *  including failures, so one broken dependency cannot create a retry storm. */
   toolCallCache?: Map<string, Promise<unknown>>;
-  /** Tool names the model called more than once with identical arguments. */
-  repeatedToolNames?: Set<string>;
-  /** Number of unique tool executions admitted during this turn. */
+  /** Number of tool invocations admitted during this turn. */
   toolCallCount?: number;
-  /** Interactive read turns stop offering tools after this many unique calls. */
-  toolAnswerLimit?: number;
-  /** Hard stop for unique tool executions; defaults to ten. */
+  /** Hard stop for tool invocations; defaults to ten. */
   toolCallLimit?: number;
   /** Serial tail for state-changing tools while reads run concurrently. */
   mutationTail?: Promise<void>;
@@ -89,19 +85,6 @@ export function getCurrentAuth(): RequestAuth | undefined {
   return authStorage.getStore();
 }
 
-/** Exact-call repetitions observed by tool wrappers in the active turn. */
-export function getRepeatedToolNames(): readonly string[] {
-  return [...(authStorage.getStore()?.repeatedToolNames ?? [])];
-}
-
-/** Whether this turn has enough unique tool calls to require a final answer. */
-export function shouldCompleteToolUse(): boolean {
-  const auth = authStorage.getStore();
-  return Boolean(
-    auth?.toolAnswerLimit && (auth.toolCallCount ?? 0) >= auth.toolAnswerLimit,
-  );
-}
-
 /**
  * Execute an exact tool call at most once in the active turn. Concurrent
  * duplicates share the same promise; rejected calls remain cached for the turn
@@ -117,12 +100,10 @@ export async function runToolOnce<T>(
 
   const key = exactToolCallKey(toolName, args);
   auth.toolCallCache ??= new Map<string, Promise<unknown>>();
-  const existing = auth.toolCallCache.get(key);
-  if (existing) {
-    auth.repeatedToolNames ??= new Set<string>();
-    auth.repeatedToolNames.add(toolName);
-    return existing as Promise<T>;
-  }
+
+  // Every invocation — first or exact repeat — spends from the same budget,
+  // so a stuck model repeating one cached call still hits the hard stop
+  // instead of looping forever at zero cost.
   const limit = auth.toolCallLimit ?? 10;
   const count = auth.toolCallCount ?? 0;
   if (count >= limit) {
@@ -131,6 +112,11 @@ export async function runToolOnce<T>(
     );
   }
   auth.toolCallCount = count + 1;
+
+  const existing = auth.toolCallCache.get(key);
+  if (existing) {
+    return existing as Promise<T>;
+  }
 
   const pending = Promise.resolve().then(execute);
   auth.toolCallCache.set(key, pending);

@@ -25,15 +25,6 @@ export interface TurnToolScopeInput {
   skillsEnabled?: boolean;
 }
 
-export const resolveToolAnswerLimit = (
-  activeToolNames: string[],
-  hasErxesOperations: boolean,
-) =>
-  hasErxesOperations &&
-  !activeToolNames.some((name) => STANDALONE_TOOL_NAMES[name])
-    ? 2
-    : undefined;
-
 /**
  * Keep every permission-approved erxes operation name active so
  * ToolSearchProcessor can activate a searched tool, but expose standalone

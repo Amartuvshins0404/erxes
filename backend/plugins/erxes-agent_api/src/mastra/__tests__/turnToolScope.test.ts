@@ -1,7 +1,4 @@
-import {
-  resolveToolAnswerLimit,
-  selectTurnActiveTools,
-} from '../turnToolScope';
+import { selectTurnActiveTools } from '../turnToolScope';
 
 const available = [
   'deals',
@@ -18,18 +15,6 @@ const available = [
   'publishWebsite',
   'fileReader',
 ];
-
-describe('resolveToolAnswerLimit', () => {
-  it('caps matched reads after two calls', () => {
-    expect(resolveToolAnswerLimit(['deals', 'search_tools'], true)).toBe(2);
-  });
-
-  it('does not cap turns that need a standalone tool', () => {
-    expect(
-      resolveToolAnswerLimit(['deals', 'search_tools', 'generatePptx'], true),
-    ).toBeUndefined();
-  });
-});
 
 describe('selectTurnActiveTools', () => {
   it('keeps permitted operation names active for dynamic loading', () => {

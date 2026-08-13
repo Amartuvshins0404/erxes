@@ -96,15 +96,4 @@ export class UITurnAccumulator {
     );
     if (existing) existing.result = result;
   }
-
-  /** Tool results gathered this turn for the no-prose synthesis fallback. */
-  toolResults(): { toolCallId?: string; toolName: string; result: unknown }[] {
-    return this.toolCalls
-      .filter((tool) => tool.result !== undefined)
-      .map((tool) => ({
-        toolCallId: tool.toolCallId,
-        toolName: tool.toolName,
-        result: tool.result,
-      }));
-  }
 }

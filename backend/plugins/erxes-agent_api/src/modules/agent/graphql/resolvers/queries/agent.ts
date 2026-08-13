@@ -6,7 +6,6 @@ import { agentAccessFilter, requireScopedAgent } from '@/agent/authorization';
 import { requireActionScope } from '@/_shared/authorization';
 import { requireUserId } from '@/_shared/auth';
 import { ERXES_AGENT_ACTIONS } from '~/meta/permissionActions';
-import { shouldGuardProviderCompletion } from '~/mastra/providerOutputGuard';
 import {
   agentAccountAppId,
   agentAccountName,
@@ -198,9 +197,6 @@ export const agentQueries = {
       memory: memoryBinding,
       activeTools: prepared.activeTools,
       turnInstructions: prepared.turnInstructions,
-      guardProviderCompletion:
-        prepared.activeTools.length > 0 &&
-        shouldGuardProviderCompletion(prepared.agentConfig.model),
     });
 
     await persistTurn({

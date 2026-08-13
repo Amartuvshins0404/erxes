@@ -24,13 +24,13 @@
 - Runs blocking and SSE-streamed Mastra agent turns as linked AI team-member accounts with tenant and permission isolation.
 - Creates agents with private, people-shared, or organization visibility, permission groups, additional-tool allowlists, provider/model settings, and active state.
 - Persists chats, working memory, attachments, and artifacts in the native Mastra-backed stores; message persistence itself is Mastra-native (`savePerStep` incremental saves), with the plugin reconciling only erxes metadata, attachments, and zero-step failure rows.
-- Discovers permitted erxes operations through Mastra ToolSearchProcessor over live GraphQL introspection, with exact live argument schemas and conservative standalone-tool scoping; when the gateway `/graphql` is blocked or introspection is disabled, the registry rebuilds itself from each subgraph's federation SDL on its internal address.
+- Discovers permitted erxes operations through `ErxesToolSearchProcessor` (a Mastra ToolSearchProcessor subclass that states loaded tools arrive on the next step, not the next turn) over live GraphQL introspection, with exact live argument schemas and conservative standalone-tool scoping; when the gateway `/graphql` is blocked or introspection is disabled, the registry rebuilds itself from each subgraph's federation SDL on its internal address.
 - Creates documents, charts, diagrams, and websites when those tools are enabled for the selected agent.
 - Loads plugin-owned `SKILL.md` files through Mastra `Workspace` and `LocalSkillSource`; Mastra provides skill discovery and read tools at runtime.
 - Bounds malformed-provider recovery, unique tool executions, exact duplicate calls, and state-changing tool concurrency per turn.
 - Derives chat titles from the first meaningful request without a provider call.
 - Wraps empty operation results (`{}`/`[]`/`null`) in an explicit `resultCount: 0` envelope with filter-check/pivot guidance instead of forwarding an anonymous empty payload.
-- Anchors the system prompt to the current date and guards every provider (not only Kimi) against settling on progress narration, including Mongolian progressive endings.
+- Anchors the system prompt to the current date and detects unfinished turns structurally — a text-only step whose last tool activity is a tool search with never-invoked results — regardless of reply language, forcing one corrective tool call instead of pattern-matching narration.
 - Finalizes every streamed turn with a persisted assistant reply: mid-stream provider failures append a plain-language failure note, and error/abort finishes create the assistant row Mastra never saved.
 
 ## Architecture
@@ -73,8 +73,9 @@
 - Mastra searches only the live, policy-scoped exact erxes operation tools; operation arguments use exact schema values and never trigger entity name-to-ID resolution.
 - Operation discovery must survive a blocked, hidden, or introspection-disabled gateway `/graphql`: when the gateway yields zero operations, the registry rebuilds from each subgraph's federation SDL (`_service { sdl }` on internal addresses), applying the same internal/client-portal skip rules and security strip as the gateway path.
 - Direct operation, file, and standalone execution admits at most ten unique calls per turn; identical calls share one promise and state-changing calls execute serially.
+- The agentic loop has no step ceiling (`stopWhen: []`); it ends when the model stops calling tools, with runaway execution bounded by the unique-call, repetition, and concurrency budgets above.
 - An exact repeated call forces a text-only model step using the tool-result messages already present for that turn.
-- Provider completion recovery adds at most one corrective model request.
+- Provider completion recovery adds at most one corrective model request, triggered only by the structural search-stall signal and always with `toolChoice: 'required'`.
 - A streamed turn never ends silently: finalization always emits and persists a closing reply, creating the native assistant row directly when the model run finished in error or abort before any step completed (later steps are already persisted natively via `savePerStep`).
 - Thread titles and activity labels must not trigger auxiliary model requests.
 - Agent execution must start from an authenticated user request; the plugin must not subscribe to notifications, register automation actions, or run a scheduler.
@@ -82,6 +83,7 @@
 
 ## Validation
 
+- `pnpm nx lint erxes-agent_api`
 - `pnpm nx build erxes-agent_api`
 - `pnpm nx test erxes-agent_api`
 - Smoke: run plain-text, calculator, operation-count, operation-list, and ambiguous document requests; confirm plain text completes without tools, tool-backed replies contain the observed result, matched simple operation reads execute at most two unique calls, ambiguous wording retains approved capabilities, and no mutation is offered for read-only intent.
@@ -89,6 +91,12 @@
 ## Recent Changes
 
 <!-- Newest first. Keep at most 10 entries. -->
+
+### `2026-08-13` — Unbounded steps and structural stall recovery
+
+- **Summary:** Agent turns no longer carry an eight-step ceiling; `ErxesToolSearchProcessor` corrects Mastra's "available on your next turn" wording to the factual next-step behavior at every emission site; and unfinished-turn detection is structural (a text-only step whose last tool activity is an unacted tool search) instead of English/Mongolian narration regexes, always forcing one corrective tool call on retry.
+- **Affected areas:** `src/mastra/agentRuntime.ts`, `src/mastra/toolSearch.ts` (new), `src/mastra/providerOutputGuard.ts`, `src/mastra/streamTurn.ts`, `src/modules/agent/run.ts`, and tests.
+- **Contracts changed:** None
 
 ### `2026-08-13` — Library-native stream close
 
@@ -143,9 +151,3 @@
 - **Summary:** Removed custom skill persistence, CRUD, publishing, versioning, permissions, agent assignment, distillation, seeding, and API contracts while retaining Mastra-native file skills.
 - **Affected areas:** Runtime agent workspace, skill files, agent schema, GraphQL assembly, chat transport, permissions, and build assets.
 - **Contracts changed:** Removed all `mastraSkill*` operations, agent `skills` fields, skill permission actions, and slash-activation payload metadata.
-
-### `2026-08-06` — Remove notifications and background execution
-
-- **Summary:** Removed notification-triggered turns, scheduling, background principals, and background runtime hooks while keeping on-demand chat.
-- **Affected areas:** Plugin startup, agent turn identity, tools, permissions, locales, and docs.
-- **Contracts changed:** Removed notification and background runtime hooks.

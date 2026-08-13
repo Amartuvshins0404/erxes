@@ -21,9 +21,9 @@ import { IMastraChatAttachment } from '@/session/@types/session';
 import { UITurnAccumulator } from '@/agent/uiTurn';
 import {
   INCOMPLETE_PROVIDER_REPLY,
-  looksLikeIncompleteProgress,
   resolveGuardedReply,
   shouldGuardProviderCompletion,
+  stalledAfterToolSearch,
 } from './providerOutputGuard';
 import { ensureWebsiteDeliveryReply } from '@/agent/websiteDelivery';
 
@@ -164,27 +164,25 @@ async function finalizeTurn(params: {
 
   const failed = streamError !== undefined && streamError !== null;
   const interrupted = controller.signal.aborted;
+  // Structural stall: the turn's tool activity ends on a tool search whose
+  // discovered tools were never called — the model stopped mid-work.
+  const stalled = stalledAfterToolSearch(acc.toolResults());
   const guarded = guardProviderText
     ? resolveGuardedReply({
         latestText: acc.latestText,
         allText: acc.text,
+        stalled,
       })
     : undefined;
   let reply: string | null = guarded ? guarded.text : acc.text || null;
   let emitReply = bufferProviderText;
 
-  // Non-guarded providers: a tool turn that settles on progress narration
-  // ("checking…", "шалгаж байна") is not an answer. Drop it so the turn falls
-  // through to synthesis/fallback instead of persisting a dead end — the
-  // already-streamed progress text stays, the real answer is appended below.
-  if (
-    reply &&
-    !guarded &&
-    !interrupted &&
-    !failed &&
-    acc.toolResults().length > 0 &&
-    looksLikeIncompleteProgress(reply)
-  ) {
+  // Non-guarded providers: a turn that stalls right after a tool search has no
+  // real result to report, so its closing text cannot be an answer. Drop it so
+  // the turn falls through to synthesis/fallback instead of persisting a dead
+  // end — the already-streamed progress text stays, the real answer is
+  // appended below.
+  if (reply && !guarded && !interrupted && !failed && stalled) {
     reply = null;
   }
 

@@ -8,7 +8,13 @@ import {
   shouldGuardProviderCompletion,
   shouldGuardProviderOutput,
   shouldRetryProviderStep,
+  stalledAfterToolSearch,
 } from '../providerOutputGuard';
+
+const SEARCH_RESULT = {
+  results: [{ name: 'deals', description: 'deals query', score: 7.8 }],
+  message: 'Found and loaded 1 tool(s): deals.',
+};
 
 describe('providerOutputGuard', () => {
   it('allows one corrective provider retry', () => {
@@ -36,11 +42,44 @@ describe('providerOutputGuard', () => {
     ).toEqual({ text: 'Final answer.', leakedReasoning: true });
   });
 
+  it('detects a stall structurally from tool-call order, in any language', () => {
+    expect(
+      stalledAfterToolSearch([
+        { toolName: 'deals', result: { list: [], totalCount: 0 } },
+        { toolName: 'search_tools', result: SEARCH_RESULT },
+      ]),
+    ).toBe(true);
+    expect(
+      stalledAfterToolSearch([
+        { toolName: 'search_tools', result: SEARCH_RESULT },
+        { toolName: 'deals', result: { list: [], totalCount: 0 } },
+      ]),
+    ).toBe(false);
+  });
+
+  it('does not treat an empty search or real work as a stall', () => {
+    expect(
+      stalledAfterToolSearch([
+        {
+          toolName: 'search_tools',
+          result: { results: [], message: 'No tools found.' },
+        },
+      ]),
+    ).toBe(false);
+    expect(
+      stalledAfterToolSearch([
+        { toolName: 'deals', result: { list: [], totalCount: 0 } },
+      ]),
+    ).toBe(false);
+    expect(stalledAfterToolSearch([])).toBe(false);
+  });
+
   it('keeps a completed answer after a leaked reasoning separator', () => {
     expect(
       resolveGuardedReply({
         latestText: 'hidden reasoning<|close|>think<|sep|>The report is ready.',
         allText: 'hidden reasoning<|close|>think<|sep|>The report is ready.',
+        stalled: false,
       }),
     ).toEqual({
       text: 'The report is ready.',
@@ -49,13 +88,13 @@ describe('providerOutputGuard', () => {
     });
   });
 
-  it('leaves unfinished narration empty so tool results can become the answer', () => {
+  it('leaves a stalled reply empty so tool results can become the answer', () => {
     expect(
       resolveGuardedReply({
-        latestText:
-          'Good data. Fetching two detailed sources for the landing page.',
+        latestText: 'Good data. Fetching two detailed sources now.',
         allText:
-          'private chain<|close|>think<|sep|>Good data. Fetching two detailed sources for the landing page.',
+          'private chain<|close|>think<|sep|>Good data. Fetching two detailed sources now.',
+        stalled: true,
       }),
     ).toEqual({
       text: null,
@@ -64,76 +103,34 @@ describe('providerOutputGuard', () => {
     });
   });
 
-  it('retries stalled continuations before ending the turn', () => {
-    for (const text of [
-      'Let me update my notes and build the landing page now.',
-      'I’ll pull up the teams on your system now.',
-    ]) {
-      expect(
-        shouldRetryProviderStep({
-          text,
-          toolCallCount: 0,
-          finishReason: 'stop',
-        }),
-      ).toBe(true);
-    }
-  });
-
-  it('retries the reported build promise instead of settling it', () => {
+  it('retries a text-only step that stalls right after a tool search', () => {
     expect(
       shouldRetryProviderStep({
-        text: 'I have all the research. Building the site now — single HTML file with GSAP animations and interactive charts.',
         toolCallCount: 0,
-        finishReason: 'stop',
+        toolActivity: [{ toolName: 'search_tools', result: SEARCH_RESULT }],
       }),
     ).toBe(true);
   });
 
-  it('retries long multi-sentence narration that still promises the build', () => {
+  it('does not retry completed work or steps that invoke a tool', () => {
     expect(
       shouldRetryProviderStep({
-        text:
-          "Research is already complete and in memory, so I'm building the site right away — a dark, YC-orange landing page with GSAP animations and Chart.js charts, published straight to Preview. " +
-          "I have all the research I need from earlier. Now I'll build the landing website — a single self-contained HTML file with GSAP animations, Chart.js charts, dark theme with YC orange. Let me check what's in the workspace first, then build.",
         toolCallCount: 0,
-        finishReason: 'stop',
-      }),
-    ).toBe(true);
-  });
-
-  it('does not retry completed answers or steps that invoke a tool', () => {
-    expect(
-      shouldRetryProviderStep({
-        text: 'The landing page is ready in Preview.',
-        toolCallCount: 0,
-        finishReason: 'stop',
+        toolActivity: [
+          { toolName: 'search_tools', result: SEARCH_RESULT },
+          { toolName: 'deals', result: { list: [], totalCount: 0 } },
+        ],
       }),
     ).toBe(false);
     expect(
       shouldRetryProviderStep({
-        text: '',
         toolCallCount: 1,
-        finishReason: 'tool-calls',
+        toolActivity: [{ toolName: 'search_tools', result: SEARCH_RESULT }],
       }),
     ).toBe(false);
   });
 
-  it('keeps ordinary future-tense answers', () => {
-    for (const text of [
-      'I’ll build a report if you ask for one.',
-      'I’ll build another report if requested. The current total is 12.',
-    ]) {
-      expect(
-        shouldRetryProviderStep({
-          text,
-          toolCallCount: 0,
-          finishReason: 'stop',
-        }),
-      ).toBe(false);
-    }
-  });
-
-  it('only forces a tool call when the provider requires it', () => {
+  it('forces a tool call on the corrective retry', () => {
     const guard = new ProviderCompletionGuard();
     const messages: unknown[] = [];
     const args = (retryCount: number) =>
@@ -151,9 +148,38 @@ describe('providerOutputGuard', () => {
       messages,
       toolChoice: 'required',
     });
-    expect(
-      new ProviderCompletionGuard(false).processInputStep(args(1)),
-    ).toBeUndefined();
+  });
+
+  it('aborts a step that stops right after a tool search', () => {
+    const guard = new ProviderCompletionGuard();
+    const state: Record<string, unknown> = {};
+    const messages: unknown[] = [];
+    guard.processInputStep({
+      retryCount: 0,
+      messages,
+      activeTools: ['search_tools'],
+      state,
+    } as never);
+    const abort = jest.fn();
+
+    guard.processOutputStep({
+      text: 'Let me check the deals next.',
+      toolCalls: [],
+      steps: [
+        {
+          toolResults: [{ toolName: 'search_tools', result: SEARCH_RESULT }],
+        },
+      ],
+      retryCount: 0,
+      state,
+      messages,
+      abort,
+    } as never);
+
+    expect(abort).toHaveBeenCalledWith(expect.any(String), {
+      retry: true,
+      metadata: { finishReason: undefined },
+    });
   });
 
   it('does not retry when the turn has no active tools', () => {
@@ -169,8 +195,13 @@ describe('providerOutputGuard', () => {
     const abort = jest.fn();
 
     const result = guard.processOutputStep({
-      text: 'I’ll pull up the teams on your system now.',
+      text: 'Let me check the deals next.',
       toolCalls: [],
+      steps: [
+        {
+          toolResults: [{ toolName: 'search_tools', result: SEARCH_RESULT }],
+        },
+      ],
       retryCount: 0,
       state,
       messages,
@@ -187,20 +218,28 @@ describe('providerOutputGuard', () => {
       type: 'tool-invocation',
       toolInvocation: { toolName: 'webSearch' },
     };
-    const result = sanitizePersistedProviderOutput(
-      'Good data. Fetching another source.',
-      [
-        { type: 'text', text: 'hidden<|close|>think<|sep|>progress' },
-        reasoning,
-        tool,
-        { type: 'text', text: 'more progress' },
-      ],
-    );
+    const result = sanitizePersistedProviderOutput('The answer.', [
+      { type: 'text', text: 'hidden<|close|>think<|sep|>The ' },
+      reasoning,
+      tool,
+      { type: 'text', text: 'answer.' },
+    ]);
 
-    expect(result.content).toBe(INCOMPLETE_PROVIDER_REPLY);
+    expect(result.content).toBe('The answer.');
     expect(result.parts).toEqual([
       reasoning,
       tool,
+      { type: 'text', text: 'The answer.' },
+    ]);
+  });
+
+  it('falls back when a persisted leaked turn has no visible text', () => {
+    const result = sanitizePersistedProviderOutput('', [
+      { type: 'text', text: 'hidden<|close|>think<|sep|>' },
+    ]);
+
+    expect(result.content).toBe(INCOMPLETE_PROVIDER_REPLY);
+    expect(result.parts).toEqual([
       { type: 'text', text: INCOMPLETE_PROVIDER_REPLY },
     ]);
   });

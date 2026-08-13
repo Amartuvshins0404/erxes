@@ -1,7 +1,5 @@
 import { Agent } from '@mastra/core/agent';
-import { ToolSearchProcessor } from '@mastra/core/processors';
 import type { ToolsInput } from '@mastra/core/agent';
-import { stepCountIs } from 'ai';
 import { ExpectedError } from 'erxes-api-shared/utils';
 import type { IModels } from '~/connectionResolvers';
 import type { IMastraAgentDocument } from '@/agent/@types/agent';
@@ -33,8 +31,8 @@ import {
   PROVIDER_COMPLETION_MAX_RETRIES,
   ProviderCompletionGuard,
   shouldGuardProviderCompletion,
-  shouldGuardProviderOutput,
 } from './providerOutputGuard';
+import { ErxesToolSearchProcessor } from './toolSearch';
 import { getRuntimeSkillsWorkspace } from './runtimeSkills';
 import { createTerminalTool } from './tools/terminalTool';
 import {
@@ -457,15 +455,13 @@ export async function getOrCreateAgent(
   const hasExecutableTools = hasErxes || toolNames.length > 0;
   const completionGuard =
     hasExecutableTools && shouldGuardProviderCompletion(agentConfig.model)
-      ? new ProviderCompletionGuard(
-          shouldGuardProviderOutput(agentConfig.model),
-        )
+      ? new ProviderCompletionGuard()
       : null;
 
   const inputProcessors = [
     ...(hasErxes
       ? [
-          new ToolSearchProcessor({
+          new ErxesToolSearchProcessor({
             tools: operationTools,
             search: { topK: 3, minScore: 0.1, autoLoad: true },
             storage: 'context',
@@ -494,9 +490,10 @@ export async function getOrCreateAgent(
       : {}),
     ...(runtimeSkillsWorkspace ? { workspace: runtimeSkillsWorkspace } : {}),
     defaultOptions: {
-      // Eight model steps cover multi-part work while preventing a malformed
-      // provider response from running an unbounded tool loop.
-      stopWhen: [stepCountIs(8)],
+      // No step ceiling: the loop ends when the model stops calling tools.
+      // Tool execution itself stays bounded by the per-turn unique-call and
+      // repetition budgets, so an unbounded step count cannot run away.
+      stopWhen: [],
       // Independent reads may execute together. Exact GraphQL mutations and
       // state-changing standalone tools share the per-turn serial queue.
       toolCallConcurrency: 4,

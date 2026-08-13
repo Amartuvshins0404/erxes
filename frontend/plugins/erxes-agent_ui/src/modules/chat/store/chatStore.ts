@@ -14,7 +14,6 @@ import {
   ReasoningEffort,
   REASONING_EFFORT_OPTIONS,
 } from '~/modules/chat/types';
-import { generateThreadId } from '~/modules/chat/lib/ids';
 import { messageText } from '~/modules/chat/lib/uiParts';
 import { metaToUIMessages } from '~/modules/chat/lib/messageMapping';
 import { createChatTransport } from '~/modules/chat/lib/chatTransport';
@@ -88,15 +87,34 @@ interface ChatStoreState {
     agentKey: string,
     effort: ReasoningEffort | undefined,
   ) => void;
-  newDraft: (client: Client, agentKey: string, mastraAgentId: string) => void;
-  selectSession: (
+  // Mirror of the runtime's main-thread selection: which conversation the
+  // agent's view renders and sends go to. The remote-thread-list runtime owns
+  // selection; this keeps the store-based readers (view, send path) in sync.
+  setActiveThread: (
+    agentKey: string,
+    threadId: string | undefined,
+    isDraft: boolean,
+  ) => void;
+  // Idempotent Chat factory used by the per-thread runtime hook — returns the
+  // live ref when the thread is already bound (never recreates a streaming
+  // Chat).
+  ensureThreadChat: (
+    client: Client,
+    agentKey: string,
+    mastraAgentId: string,
+    threadId: string,
+  ) => Chat<AgentUIMessage>;
+  // Load a persisted thread's messages into its Chat — only when the Chat is
+  // still empty and idle, so a live/background stream is never overwritten.
+  hydrateThread: (
     client: Client,
     agentKey: string,
     mastraAgentId: string,
     threadId: string,
   ) => Promise<void>;
-  // Drop a removed thread's Chat + signals. The cached session list is filtered
-  // by useRemoveMastraThread; this only clears store-side state.
+  // Drop a removed thread's Chat + signals. The cached session list is
+  // filtered by the thread-list adapter's delete; this only clears store-side
+  // state.
   discardMessagePair: (
     agentKey: string,
     threadId: string,
@@ -242,11 +260,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => {
     approvedOperations?: ApprovedOp[],
     hidden?: boolean,
   ) => {
-    let agent = get().agents[agentKey] ?? EMPTY_AGENT;
-    if (!agent.activeThreadId) {
-      get().newDraft(client, agentKey, mastraAgentId);
-      agent = get().agents[agentKey] ?? EMPTY_AGENT;
-    }
+    const agent = get().agents[agentKey] ?? EMPTY_AGENT;
     const threadId = agent.activeThreadId;
     if (!threadId) return;
 
@@ -323,29 +337,21 @@ export const useChatStore = create<ChatStoreState>((set, get) => {
       patchAgent(agentKey, { reasoningEffort: effort });
     },
 
-    newDraft: (client, agentKey, mastraAgentId) => {
-      const threadId = generateThreadId();
-      ensureChat(client, agentKey, mastraAgentId, threadId, []);
-      patchAgent(agentKey, {
-        activeThreadId: threadId,
-        isDraft: true,
-        mastraAgentId,
-      });
+    setActiveThread: (agentKey, threadId, isDraft) => {
+      patchAgent(agentKey, { activeThreadId: threadId, isDraft });
     },
 
-    selectSession: async (client, agentKey, mastraAgentId, threadId) => {
-      patchAgent(agentKey, {
-        activeThreadId: threadId,
-        isDraft: false,
-        mastraAgentId,
-      });
+    ensureThreadChat: (client, agentKey, mastraAgentId, threadId) =>
+      ensureChat(client, agentKey, mastraAgentId, threadId, []),
 
+    hydrateThread: async (client, agentKey, mastraAgentId, threadId) => {
       const key = threadKey(agentKey, threadId);
-      // An existing Chat (revisited, or streaming in the background) keeps its
-      // live state — never reload over it.
-      if (get().chats[key]) return;
-
       const chat = ensureChat(client, agentKey, mastraAgentId, threadId, []);
+      // Never reload over a live thread (revisit or background stream), and
+      // don't stack a second hydration for the same thread.
+      if (chat.messages.length > 0 || isWorkingStatus(chat.status)) return;
+      if (get().threadHydrating[key]) return;
+
       set((s) => ({ threadHydrating: { ...s.threadHydrating, [key]: true } }));
       try {
         const { data } = await client.query<MastraThreadMessagesResponse>({
@@ -353,7 +359,11 @@ export const useChatStore = create<ChatStoreState>((set, get) => {
           variables: { threadId },
           fetchPolicy: 'network-only',
         });
-        chat.messages = metaToUIMessages(data?.mastraThreadMessages ?? []);
+        // A send may have started while the query was in flight — only fill a
+        // still-empty chat.
+        if (chat.messages.length === 0) {
+          chat.messages = metaToUIMessages(data?.mastraThreadMessages ?? []);
+        }
       } catch {
         // leave the chat empty — the composer still works
       } finally {
@@ -531,8 +541,9 @@ type StoreActionKey =
   | 'setCurrentAgent'
   | 'markRead'
   | 'setReasoningEffort'
-  | 'newDraft'
-  | 'selectSession'
+  | 'setActiveThread'
+  | 'ensureThreadChat'
+  | 'hydrateThread'
   | 'discardMessagePair'
   | 'discardThread'
   | 'stop'
@@ -545,8 +556,9 @@ const ACTION_KEYS: StoreActionKey[] = [
   'setCurrentAgent',
   'markRead',
   'setReasoningEffort',
-  'newDraft',
-  'selectSession',
+  'setActiveThread',
+  'ensureThreadChat',
+  'hydrateThread',
   'discardMessagePair',
   'discardThread',
   'stop',

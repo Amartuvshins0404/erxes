@@ -8,9 +8,9 @@ const MastraSettingsNavigation = lazy(() =>
   })),
 );
 
-const AgentChatNavTree = lazy(() =>
-  import('@/navigation/AgentChatNavTree').then((module) => ({
-    default: module.AgentChatNavTree,
+const AgentNavLinks = lazy(() =>
+  import('@/navigation/AgentNavLinks').then((module) => ({
+    default: module.AgentNavLinks,
   })),
 );
 
@@ -33,7 +33,7 @@ export const CONFIG: IUIConfig = {
     icon: IconRobot,
     content: () => (
       <Suspense fallback={<div />}>
-        <AgentChatNavTree />
+        <AgentNavLinks />
       </Suspense>
     ),
   },

@@ -14,7 +14,7 @@ export const ChatPageHeader = ({
   hasAgent: boolean;
   agentName?: string;
   agentId?: string;
-  onNewThread: () => void;
+  onNewThread?: () => void;
 }) => {
   return (
     <PageHeader>

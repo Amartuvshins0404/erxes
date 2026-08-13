@@ -83,6 +83,12 @@
 
 <!-- Newest first. Keep at most 10 entries. -->
 
+### `2026-08-13` — Fix session ping-pong in runtime sync
+
+- **Summary:** Selecting two sessions in a row no longer blink-loops between them: the URL→runtime effect now reads the runtime via `getState()` (no reactive dep) and the runtime→URL effect reads the param through a ref, so each direction fires only from its own source.
+- **Affected areas:** `src/modules/chat/runtime/ChatRuntimeSync.tsx`.
+- **Contracts changed:** None
+
 ### `2026-08-13` — Custom chat sidebar on the assistant-ui remote thread list
 
 - **Summary:** Moved session browsing out of the core sidebar into a chat-workspace sidebar built on `ThreadListPrimitive`/`ThreadListItemPrimitive`, backed by a per-agent `unstable_useRemoteThreadListRuntime` whose adapter serves the mastra session GraphQL contract (list/fetch/initialize/rename/delete; title generation reads the backend-persisted title after the first turn). Core navigation is now flat Chat / Agents links; `?thread=` deep-links, browser Back, delete-with-confirm, and re-homing all sync through `ChatRuntimeSync`.
@@ -136,10 +142,3 @@
 - **Summary:** Removed reasoning and tool trace views, debug controls, trace-only state, and parsers while keeping assistant replies, tool status, approvals, artifacts, and errors.
 - **Affected areas:** Chat components, stream hydration, artifact and tool readers, agent forms, GraphQL documents, styles, and types.
 - **Contracts changed:** Removed `debug` from agent reads and writes and removed trace-only stream data parts.
-
-### `2026-08-06` — Remove custom skills CMS UI
-
-- **Summary:** Removed skill admin routes, screens, GraphQL documents, permissions, agent assignment, chat distillation, and slash activation UI.
-- **Affected areas:** Main and settings navigation, routes, agent detail, chat composer and transport, GraphQL selections, and types.
-- **Contracts changed:** Removed use of all `mastraSkill*` operations, agent `skills` fields, and skill activation request metadata.
-

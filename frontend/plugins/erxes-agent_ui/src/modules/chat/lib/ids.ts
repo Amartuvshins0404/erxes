@@ -5,6 +5,3 @@ export const randomIdSuffix = (length: number): string => {
   crypto.getRandomValues(bytes);
   return Array.from(bytes, (b) => (b % 36).toString(36)).join('');
 };
-
-export const generateThreadId = (): string =>
-  `thread-${Date.now()}-${randomIdSuffix(7)}`;

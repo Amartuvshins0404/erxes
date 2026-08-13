@@ -8,12 +8,6 @@ const MastraSettingsNavigation = lazy(() =>
   })),
 );
 
-const AgentChatNavTree = lazy(() =>
-  import('@/navigation/AgentChatNavTree').then((module) => ({
-    default: module.AgentChatNavTree,
-  })),
-);
-
 export const CONFIG: IUIConfig = {
   // MF remote name uses underscores (Nx convention); permissionName is the
   // backend plugin name used for permission checks.
@@ -27,15 +21,11 @@ export const CONFIG: IUIConfig = {
     </Suspense>
   ),
   navigationGroup: {
-    // Display label in the sidebar plugin list (also the group key — only the
-    // plugin's own permission name must stay `erxes_agent`).
+    // Rail label + icon only. No `content` on purpose: core skips the
+    // sub-module panel when a group has no contents, and the plugin renders
+    // its own in-page sidebar (agents + conversations) instead.
     name: 'erxes AI Agents',
     icon: IconRobot,
-    content: () => (
-      <Suspense fallback={<div />}>
-        <AgentChatNavTree />
-      </Suspense>
-    ),
   },
   modules: [
     {

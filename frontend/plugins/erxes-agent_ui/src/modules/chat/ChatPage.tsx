@@ -2,28 +2,23 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useApolloClient } from '@apollo/client';
 import { useTranslation } from 'react-i18next';
 import { useToast } from 'erxes-ui';
-import { useParams, useSearchParams } from 'react-router-dom';
-import { AssistantRuntimeProvider } from '@assistant-ui/react';
-import { useAISDKRuntime } from '@assistant-ui/react-ai-sdk';
+import { useParams, useNavigate } from 'react-router-dom';
+import { useAssistantRuntime } from '@assistant-ui/react';
 import type {
   ChatAttachment,
   ApprovedOp,
   ReasoningEffort,
 } from '~/modules/chat/types';
+import type { IChatAgent } from '~/modules/chat/hooks/useChatAgents';
 import { chatStore } from '~/modules/chat/store/chatStore';
 import {
   useChatAgents,
   useAttachmentsEnabled,
 } from '~/modules/chat/hooks/useChatAgents';
 import { useAgentChatView } from '~/modules/chat/hooks/useChatView';
-import { useMastraThreads } from '~/modules/chat/hooks/useMastraThreads';
-import { useRemoveMastraThread } from '~/modules/chat/hooks/useRemoveMastraThread';
 import { useAttachments } from '~/modules/chat/hooks/useAttachments';
 import { useThreadArtifacts } from '~/modules/chat/hooks/useThreadArtifacts';
-import { useSessionBootstrap } from '~/modules/chat/hooks/useSessionBootstrap';
-import { withThreadParam } from '~/modules/chat/lib/threadParam';
 import { ChatPageHeader } from '~/modules/chat/components/ChatPageHeader';
-import { DeleteSessionDialog } from '~/modules/chat/components/DeleteSessionDialog';
 import { DeleteMessagePairDialog } from '~/modules/chat/components/DeleteMessagePairDialog';
 import {
   AmbientBackdrop,
@@ -46,6 +41,9 @@ import {
   MessageExtrasContext,
 } from '~/modules/chat/assistant/chatContexts';
 import { buildMessageExtras } from '~/modules/chat/assistant/messageExtras';
+import { MastraAgentRuntimeProvider } from '~/modules/chat/runtime/MastraAgentRuntime';
+import { ChatRuntimeSync } from '~/modules/chat/runtime/ChatRuntimeSync';
+import { AgentChatSidebar } from '~/modules/chat/sidebar/AgentChatSidebar';
 import '~/modules/chat/chat.css';
 
 interface PendingMessagePairDelete {
@@ -63,36 +61,24 @@ const isStringArray = (value: unknown): value is string[] =>
   Array.isArray(value) &&
   value.every((item: unknown) => typeof item === 'string');
 
-export const ChatPage = () => {
+// One agent's chat workspace: header, session sidebar, conversation, and the
+// artifact preview — all under the agent's remote-thread-list runtime.
+const AgentChatWorkspace = ({
+  agent,
+  agents,
+  attachmentsEnabled,
+}: {
+  agent: IChatAgent;
+  agents: IChatAgent[];
+  attachmentsEnabled: boolean;
+}) => {
   const { t } = useTranslation('mastra');
   const { toast } = useToast();
-  const { agentId } = useParams<{ agentId: string }>();
-  // The active conversation is addressable via ?thread=<id>. Selecting a session
-  // writes it (push, so browser Back walks between conversations); reload/deep-
-  // link restores it (useSessionBootstrap). An agent-only URL keeps the old
-  // behavior — bootstrap opens the most-recent thread or a fresh draft.
-  const [, setSearchParams] = useSearchParams();
-  const setThreadParam = useCallback(
-    (threadId: string | undefined, replace = false) =>
-      setSearchParams((prev) => withThreadParam(prev, threadId), { replace }),
-    [setSearchParams],
-  );
-  // Thread id awaiting delete confirmation — drives the styled AlertDialog that
-  // replaced the native window.confirm().
-  const [pendingDelete, setPendingDelete] = useState<string | null>(null);
-  const [pendingMessageDelete, setPendingMessageDelete] =
-    useState<PendingMessagePairDelete | null>(null);
-  const [messageDeleteLoading, setMessageDeleteLoading] = useState(false);
+  const agentId = agent._id;
+  const runtime = useAssistantRuntime();
   const apolloClient = useApolloClient();
 
-  const { agents } = useChatAgents();
-  const attachmentsEnabled = useAttachmentsEnabled();
-
-  const selectedAgent = useMemo(
-    () => agents.find((agent) => agent._id === agentId) ?? null,
-    [agents, agentId],
-  );
-  const view = useAgentChatView(selectedAgent?._id);
+  const view = useAgentChatView(agentId);
 
   const {
     activeThreadId,
@@ -102,33 +88,16 @@ export const ChatPage = () => {
     messagesLoading,
     error: chatError,
     retry,
-    chatHelpers,
   } = view;
 
-  // The assistant-ui runtime wraps the active thread's AI SDK chat; primitives
-  // below (thread, composer) read it via context.
-  const runtime = useAISDKRuntime(chatHelpers);
-
-  // The persisted session list lives in the Apollo cache, not the chat store.
-  // Paginated: older sessions load on demand as the sidebar scrolls.
-  const {
-    threads,
-    loading: threadsLoading,
-    refetch: refetchThreads,
-  } = useMastraThreads(selectedAgent?._id);
-  const sessionsLoaded = !!selectedAgent && !threadsLoading;
-  const { removeThread, loading: sessionDeleteLoading } = useRemoveMastraThread(
-    selectedAgent?._id,
-  );
+  const [pendingMessageDelete, setPendingMessageDelete] =
+    useState<PendingMessagePairDelete | null>(null);
+  const [messageDeleteLoading, setMessageDeleteLoading] = useState(false);
 
   // The chat↔preview split row — PreviewResizer sets --ea-preview-w on it.
   const splitRef = useRef<HTMLDivElement>(null);
 
   const attachments = useAttachments(attachmentsEnabled);
-
-  // Session state-machine (slug→id redirect, ?thread= deep-link, current-agent
-  // tracking, bootstrap/re-home) lives in the hook.
-  useSessionBootstrap(selectedAgent, threads, sessionsLoaded);
 
   // Artifact Preview panel (charts / generated documents). Switching agent or
   // thread clears any open preview — it belongs to the prior conversation.
@@ -156,30 +125,11 @@ export const ChatPage = () => {
     [messages, chatLoading, storeArtifactsByMessage],
   );
 
-  // Sidebar handlers are wrapped in useCallback so their identities stay stable
-  // across streamed-token / keystroke re-renders.
+  // New chat = a fresh draft thread owned by the runtime (synced to the store
+  // and URL by ChatRuntimeSync).
   const handleNewThread = useCallback(() => {
-    if (!agentId || !selectedAgent) return;
-    chatStore.newDraft(apolloClient, agentId, selectedAgent._id);
-    // A draft isn't persisted yet, so it has nothing to address — drop ?thread=
-    // and let reload/back fall back to the agent's default (most-recent/draft).
-    setThreadParam(undefined);
-  }, [apolloClient, agentId, selectedAgent, setThreadParam]);
-
-  const confirmDelete = useCallback(async () => {
-    if (!agentId || !pendingDelete) return;
-    const result = await removeThread(pendingDelete).catch(() => null);
-    if (!result?.data?.mastraThreadRemove) return;
-
-    // The cached list filter (hook) + local state teardown (store); the
-    // bootstrap effect re-selects the next session if this one was active.
-    const wasActive = pendingDelete === activeThreadId;
-    chatStore.discardThread(agentId, pendingDelete);
-    setPendingDelete(null);
-    // Drop the deleted thread from the URL so it doesn't point at a dead session
-    // and the bootstrap effect is free to re-home to the next one.
-    if (wasActive) setThreadParam(undefined, true);
-  }, [agentId, pendingDelete, activeThreadId, removeThread, setThreadParam]);
+    void runtime.threads.switchToNewThread();
+  }, [runtime]);
 
   const handleDeleteMessage = useCallback(
     (uiMessageId: string, persistedMessageId: string) => {
@@ -215,7 +165,6 @@ export const ChatPage = () => {
           pendingMessageDelete.uiMessageId,
           deletedIds,
         );
-        void refetchThreads().catch(() => undefined);
         void refetchThreadArtifactsIntoCache(
           apolloClient,
           pendingMessageDelete.threadId,
@@ -239,7 +188,6 @@ export const ChatPage = () => {
     apolloClient,
     messageDeleteLoading,
     pendingMessageDelete,
-    refetchThreads,
     t,
     toast,
   ]);
@@ -257,20 +205,20 @@ export const ChatPage = () => {
       approvedOperations?: ApprovedOp[],
       hidden?: boolean,
     ) => {
-      if (!selectedAgent || !agentId) return;
+      if (!agentId) return;
       // Fire-and-forget: the store holds the Apollo client reference so the
       // request continues even if the user navigates away before it completes.
       chatStore.sendMessage(
         apolloClient,
         agentId,
-        selectedAgent._id,
+        agentId,
         message,
         atts,
         approvedOperations,
         hidden,
       );
     },
-    [apolloClient, agentId, selectedAgent],
+    [apolloClient, agentId],
   );
 
   // A destructive op the agent is waiting on (derived from the last turn) — drives
@@ -297,27 +245,20 @@ export const ChatPage = () => {
   // upload failure nothing is sent — the composer keeps its text and chips.
   const handleSend = useCallback(
     async (message: string) => {
-      if (
-        !message.trim() ||
-        !selectedAgent ||
-        chatLoading ||
-        !agentId ||
-        attachments.uploadsInFlight
-      )
-        return;
+      if (!message.trim() || chatLoading || attachments.uploadsInFlight) return;
       const { attachments: atts, ok } = await attachments.uploadAll();
       if (!ok) return;
       attachments.clear();
       sendMessage(message.trim(), atts);
     },
-    [agentId, selectedAgent, chatLoading, attachments, sendMessage],
+    [chatLoading, attachments, sendMessage],
   );
 
   // Re-ask the question that produced the last reply (with its attachments).
   const handleRegenerate = useCallback(() => {
-    if (!agentId || !selectedAgent || chatLoading) return;
-    chatStore.regenerate(apolloClient, agentId, selectedAgent._id);
-  }, [apolloClient, agentId, selectedAgent, chatLoading]);
+    if (chatLoading) return;
+    chatStore.regenerate(apolloClient, agentId, agentId);
+  }, [apolloClient, agentId, chatLoading]);
 
   // Send a past user message again as a fresh turn (carries its attachments).
   const handleResendMessage = useCallback(
@@ -329,12 +270,12 @@ export const ChatPage = () => {
   );
 
   const handleStop = () => {
-    if (agentId) chatStore.stop(apolloClient, agentId);
+    chatStore.stop(apolloClient, agentId);
   };
 
   const handleReasoningEffortChange = useCallback(
     (effort?: ReasoningEffort) => {
-      if (agentId) chatStore.setReasoningEffort(agentId, effort);
+      chatStore.setReasoningEffort(agentId, effort);
     },
     [agentId],
   );
@@ -349,86 +290,76 @@ export const ChatPage = () => {
   );
 
   return (
-    <div className="flex flex-col h-full">
+    <>
+      <ChatRuntimeSync agentId={agentId} />
       <ChatPageHeader
-        hasAgent={!!selectedAgent}
-        agentName={selectedAgent?.accountName}
-        agentId={selectedAgent?._id}
+        hasAgent
+        agentName={agent.accountName}
+        agentId={agentId}
         onNewThread={handleNewThread}
       />
 
-      <div ref={splitRef} className="flex flex-1 overflow-hidden relative">
-        {/* ── Chat area ── */}
-        <div
-          className="flex-1 flex flex-col overflow-hidden relative"
-          onDragEnter={attachments.onDragEnter}
-          onDragOver={attachments.onDragOver}
-          onDragLeave={attachments.onDragLeave}
-          onDrop={attachments.onDrop}
-        >
-          {attachments.isDragging && selectedAgent && <DropOverlay />}
+      <div className="flex flex-1 overflow-hidden relative">
+        <AgentChatSidebar agents={agents} activeAgentId={agentId} />
 
-          {selectedAgent && chatLoading && <AmbientBackdrop />}
+        <div ref={splitRef} className="flex flex-1 overflow-hidden relative">
+          {/* ── Chat area ── */}
+          <div
+            className="flex-1 flex flex-col overflow-hidden relative"
+            onDragEnter={attachments.onDragEnter}
+            onDragOver={attachments.onDragOver}
+            onDragLeave={attachments.onDragLeave}
+            onDrop={attachments.onDrop}
+          >
+            {attachments.isDragging && <DropOverlay />}
 
-          {!selectedAgent ? (
-            <SelectAgentEmpty />
-          ) : (
-            <AssistantRuntimeProvider runtime={runtime}>
-              <MessageExtrasContext.Provider value={messageExtras}>
-                <ChatMessageActionsContext.Provider value={messageActions}>
-                  <AgentThread
-                    agent={selectedAgent}
-                    messagesLoading={messagesLoading}
-                    attachmentsEnabled={attachmentsEnabled}
-                  />
-                </ChatMessageActionsContext.Provider>
-              </MessageExtrasContext.Provider>
+            {chatLoading && <AmbientBackdrop />}
 
-              {chatError && !chatLoading && (
-                <ChatErrorBanner
-                  message={chatError.message}
-                  onRetry={handleRetry}
+            <MessageExtrasContext.Provider value={messageExtras}>
+              <ChatMessageActionsContext.Provider value={messageActions}>
+                <AgentThread
+                  agent={agent}
+                  messagesLoading={messagesLoading}
+                  attachmentsEnabled={attachmentsEnabled}
                 />
-              )}
+              </ChatMessageActionsContext.Provider>
+            </MessageExtrasContext.Provider>
 
-              {approval && !chatLoading && (
-                <ApprovalBar
-                  prompt={approval.prompt}
-                  busy={chatLoading}
-                  onApprove={handleApprove}
-                  onDeny={handleDeny}
-                />
-              )}
-
-              <AgentComposer
-                onSend={handleSend}
-                onStop={handleStop}
-                chatLoading={chatLoading}
-                attachmentsEnabled={attachmentsEnabled}
-                attachments={attachments}
-                agentName={selectedAgent.accountName}
-                reasoningEffort={reasoningEffort}
-                onReasoningEffortChange={handleReasoningEffortChange}
+            {chatError && !chatLoading && (
+              <ChatErrorBanner
+                message={chatError.message}
+                onRetry={handleRetry}
               />
-            </AssistantRuntimeProvider>
+            )}
+
+            {approval && !chatLoading && (
+              <ApprovalBar
+                prompt={approval.prompt}
+                busy={chatLoading}
+                onApprove={handleApprove}
+                onDeny={handleDeny}
+              />
+            )}
+
+            <AgentComposer
+              onSend={handleSend}
+              onStop={handleStop}
+              chatLoading={chatLoading}
+              attachmentsEnabled={attachmentsEnabled}
+              attachments={attachments}
+              agentName={agent.accountName}
+              reasoningEffort={reasoningEffort}
+              onReasoningEffortChange={handleReasoningEffortChange}
+            />
+          </div>
+
+          {/* ── Artifact Preview panel (charts / generated documents) ── */}
+          {previewOpen && !previewFullscreen && (
+            <PreviewResizer splitRef={splitRef} />
           )}
+          {previewOpen && <PreviewPanel threadId={activeThreadId} />}
         </div>
-
-        {/* ── Artifact Preview panel (charts / generated documents) ── */}
-        {previewOpen && selectedAgent && !previewFullscreen && (
-          <PreviewResizer splitRef={splitRef} />
-        )}
-        {previewOpen && selectedAgent && (
-          <PreviewPanel threadId={activeThreadId} />
-        )}
       </div>
-
-      <DeleteSessionDialog
-        loading={sessionDeleteLoading}
-        open={!!pendingDelete}
-        onOpenChange={(open) => !open && setPendingDelete(null)}
-        onConfirm={confirmDelete}
-      />
 
       <DeleteMessagePairDialog
         open={!!pendingMessageDelete}
@@ -436,6 +367,56 @@ export const ChatPage = () => {
         onOpenChange={(open) => !open && setPendingMessageDelete(null)}
         onConfirm={confirmDeleteMessage}
       />
+    </>
+  );
+};
+
+export const ChatPage = () => {
+  const { agentId } = useParams<{ agentId: string }>();
+  const navigate = useNavigate();
+  const { agents } = useChatAgents();
+  const attachmentsEnabled = useAttachmentsEnabled();
+
+  const selectedAgent = useMemo(
+    () => agents.find((agent) => agent._id === agentId) ?? null,
+    [agents, agentId],
+  );
+
+  // Track the viewed agent (clears its unread badge); clear on navigate away.
+  useEffect(() => {
+    chatStore.setCurrentAgent(agentId);
+    return () => chatStore.setCurrentAgent(undefined);
+  }, [agentId]);
+
+  // An agent-less /chat URL lands on the first available agent.
+  useEffect(() => {
+    if (!agentId && agents.length > 0) {
+      navigate(`/erxes-agent/chat/${agents[0]._id}`, { replace: true });
+    }
+  }, [agentId, agents, navigate]);
+
+  return (
+    <div className="flex flex-col h-full">
+      {selectedAgent ? (
+        <MastraAgentRuntimeProvider
+          key={selectedAgent._id}
+          agentKey={selectedAgent._id}
+          mastraAgentId={selectedAgent._id}
+        >
+          <AgentChatWorkspace
+            agent={selectedAgent}
+            agents={agents}
+            attachmentsEnabled={attachmentsEnabled}
+          />
+        </MastraAgentRuntimeProvider>
+      ) : (
+        <>
+          <ChatPageHeader hasAgent={false} />
+          <div className="flex flex-1 overflow-hidden relative">
+            <SelectAgentEmpty />
+          </div>
+        </>
+      )}
     </div>
   );
 };

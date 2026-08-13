@@ -23,7 +23,7 @@ const PageContent = ({ content }: { content: string }) => {
   const long = content.length > PREVIEW_CHARS;
   return (
     <div>
-      <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/90">
+      <p className="whitespace-pre-wrap break-words text-sm leading-relaxed ea-text-90">
         {expanded || !long ? content : `${content.slice(0, PREVIEW_CHARS)}…`}
       </p>
       {long && (

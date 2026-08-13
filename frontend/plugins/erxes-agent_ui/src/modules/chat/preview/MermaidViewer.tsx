@@ -24,13 +24,13 @@ export const MermaidViewer = ({ definition, height = '100%', debounceMs = 0 }: M
   return (
     <div className="relative w-full h-full" style={{ minHeight: 200 }}>
       {phase === 'loading' && (
-        <div className="absolute inset-0 flex items-center justify-center bg-background/60">
+        <div className="absolute inset-0 flex items-center justify-center ea-bg-60">
           <IconLoader2 className="size-6 animate-spin text-muted-foreground" />
         </div>
       )}
       {phase === 'error' && (
         <div className="p-4 space-y-2">
-          <p className="text-sm font-medium text-destructive/80">
+          <p className="text-sm font-medium ea-text-destructive-80">
             Diagram syntax error
             {errorMsg ? ': ' : ''}
             <span className="font-mono text-xs">{errorMsg}</span>
@@ -39,7 +39,7 @@ export const MermaidViewer = ({ definition, height = '100%', debounceMs = 0 }: M
             <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground">
               Show source
             </summary>
-            <pre className="mt-2 text-xs font-mono text-muted-foreground whitespace-pre-wrap leading-relaxed bg-muted/40 rounded-lg p-3">
+            <pre className="mt-2 text-xs font-mono text-muted-foreground whitespace-pre-wrap leading-relaxed ea-bg-muted-40 rounded-lg p-3">
               {cleaned}
             </pre>
           </details>

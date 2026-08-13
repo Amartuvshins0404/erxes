@@ -37,8 +37,9 @@ import { FetchUrlTool } from '~/modules/chat/assistant/FetchUrlTool';
 import { WebSearchTool } from '~/modules/chat/assistant/WebSearchTool';
 
 // 32px quiet icon button, background-only hover — the clone's action control.
+// ea-quiet-btn owns the hover wash (plugin-unique utilities don't reach prod).
 const actionClass =
-  'flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-black/[0.07] hover:text-foreground dark:hover:bg-white/15';
+  'ea-quiet-btn flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:text-foreground';
 
 const MessageAction = ({
   icon,
@@ -107,12 +108,12 @@ const UserMessageRow = () => {
         <MessageAttachments attachments={attachments} />
       )}
       {hasText && (
-        <div className="max-w-[70%] rounded-[22px] bg-[#0d0d0d] px-4 py-2.5 leading-6 text-white dark:bg-[#ececec] dark:text-[#0d0d0d]">
-          <p className="text-[15px] whitespace-pre-wrap break-words">{text}</p>
+        <div className="ea-user-bubble">
+          <p className="ea-text-15 whitespace-pre-wrap break-words">{text}</p>
         </div>
       )}
       {(hasText || persistedMessageId) && (
-        <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+        <div className="ea-reveal flex items-center gap-0.5">
           {hasText && (
             <>
               <MessageAction
@@ -159,7 +160,7 @@ const AssistantMessageRow = () => {
 
   return (
     <MessagePrimitive.Root className="mx-auto flex w-full max-w-3xl flex-col group ea-msg-in">
-      <div className="text-[15px] leading-7">
+      <div className="ea-text-15 leading-7">
         <MessagePrimitive.Parts
           components={{
             Text: () => (
@@ -239,7 +240,7 @@ const AssistantMessageRow = () => {
             />
           </MessagePrimitive.If>
           {metadata.interrupted && (
-            <span className="ml-1 text-[11px] text-amber-600 dark:text-amber-500">
+            <span className="ea-text-11 ml-1 text-amber-600">
               · stopped
             </span>
           )}

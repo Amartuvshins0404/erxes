@@ -49,7 +49,7 @@ const AgentRow = ({
         'flex items-center gap-2 rounded-md px-2 py-1.5 text-sm min-w-0 transition-colors',
         isActive
           ? 'bg-accent text-accent-foreground font-medium'
-          : 'text-foreground/80 hover:bg-accent/60',
+          : 'ea-side-row',
       )}
     >
       <IconRobot className="size-4 shrink-0 text-muted-foreground" />
@@ -77,14 +77,13 @@ const SessionListItem = () => {
     <ThreadListItemPrimitive.Root
       className={cn(
         'group/session relative flex items-center rounded-md transition-colors',
-        item.isMain ? 'bg-accent/70' : 'hover:bg-accent/50',
+        item.isMain ? 'ea-side-active' : 'ea-side-session',
       )}
     >
       <ThreadListItemPrimitive.Trigger
         className={cn(
           'flex min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm',
-          item.isMain ? 'font-medium' : 'font-normal text-foreground/80',
-        )}
+          item.isMain ? 'font-medium' : 'ea-side-row font-normal',  )}
       >
         <span className="min-w-0 flex-1 truncate">
           <ThreadListItemPrimitive.Title fallback="New chat" />
@@ -96,7 +95,7 @@ const SessionListItem = () => {
       <button
         type="button"
         aria-label="Delete conversation"
-        className="absolute right-1 top-1/2 flex size-5 -translate-y-1/2 items-center justify-center rounded-md bg-sidebar text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-destructive focus-visible:opacity-100 group-hover/session:opacity-100 [&>svg]:size-3.5"
+        className="ea-icon-btn ea-reveal ea-center-y absolute right-1 flex size-5 items-center justify-center rounded-md bg-sidebar text-muted-foreground hover:bg-accent hover:text-destructive"
         onClick={(event) => {
           event.stopPropagation();
           requestDelete(threadId);
@@ -118,9 +117,9 @@ const SessionList = () => {
     <ThreadListPrimitive.Root className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-2 pb-2">
       {isLoading && (
         <div className="flex flex-col gap-2 px-2 py-1.5">
-          <Skeleton className="h-3.5 w-3/4" />
-          <Skeleton className="h-3.5 w-2/3" />
-          <Skeleton className="h-3.5 w-3/4" />
+          <Skeleton className="h-3.5 ea-w-3-4" />
+          <Skeleton className="h-3.5 ea-w-2-3" />
+          <Skeleton className="h-3.5 ea-w-3-4" />
         </div>
       )}
       {!isLoading && isEmpty && (
@@ -210,7 +209,7 @@ export const AgentChatSidebar = ({
         <div className="border-t p-2">
           <Link
             to="/erxes-agent/agents"
-            className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-foreground/80 transition-colors hover:bg-accent/60"
+            className="ea-side-row flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors"
           >
             <IconSettings className="size-4 shrink-0 text-muted-foreground" />
             <span className="min-w-0 flex-1 truncate">Manage agents</span>

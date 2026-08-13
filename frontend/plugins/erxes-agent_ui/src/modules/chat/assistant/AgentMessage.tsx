@@ -28,6 +28,11 @@ import {
 } from '~/modules/chat/components/ArtifactCard';
 import { MessageAttachments } from '~/modules/chat/components/MessageAttachments';
 import { ToolFallback } from '~/modules/chat/assistant/ToolFallback';
+import { ToolGroupBlock } from '~/modules/chat/assistant/ToolGroupBlock';
+import {
+  ReasoningGroup,
+  ReasoningPart,
+} from '~/modules/chat/assistant/ReasoningBlock';
 import { WebSearchTool } from '~/modules/chat/assistant/WebSearchTool';
 
 // 32px quiet icon button, background-only hover — the clone's action control.
@@ -161,6 +166,9 @@ const AssistantMessageRow = () => {
                 <MarkdownTextPrimitive />
               </div>
             ),
+            Reasoning: ReasoningPart,
+            ReasoningGroup,
+            ToolGroup: ToolGroupBlock,
             tools: {
               by_name: { webSearch: WebSearchTool },
               Fallback: ToolFallback,

@@ -25,7 +25,6 @@ import {
 import { useChatAgents, type IChatAgent } from '~/modules/chat/hooks/useChatAgents';
 import { useMastraThreads } from '~/modules/chat/hooks/useMastraThreads';
 import { useRemoveMastraThread } from '~/modules/chat/hooks/useRemoveMastraThread';
-import { AgentAvatar } from '~/modules/chat/components/Avatars';
 
 // Session row: deep-link to the conversation; delete on hover with a confirm.
 const SessionNavRow = ({
@@ -132,7 +131,7 @@ const AgentNavRow = ({
         <Collapsible.Trigger asChild>
           <Sidebar.MenuButton className="group/agent-row">
             <Link to={`/erxes-agent/chat/${agent._id}`}>
-              <AgentAvatar name={agent.accountName} live={working} />
+              <IconRobot className="size-4 shrink-0 text-muted-foreground" />
               <span className="truncate">{agent.accountName}</span>
               {working && (
                 <IconLoader2 className="size-3.5 animate-spin text-primary shrink-0" />

@@ -100,7 +100,9 @@ async function foldModelStream(params: {
         modelStream as unknown as MastraModelOutput,
         {
           from: 'agent',
-          sendReasoning: false,
+          // Reasoning streams through so the UI can show the model's thoughts
+          // (Grok-style thought rows); native persistence keeps the parts.
+          sendReasoning: true,
           sendSources: false,
           sendFinish: false,
         },

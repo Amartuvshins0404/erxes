@@ -17,8 +17,8 @@ export const ComposerAttachmentChip = ({
   <div
     className={`ea-pop flex items-center gap-1.5 rounded-lg border px-2 py-1 text-xs max-w-56 transition-colors ${
       att.status === 'error'
-        ? 'border-destructive/40 bg-destructive/8 text-destructive'
-        : 'border-border bg-muted/50 hover:bg-muted'
+        ? 'ea-border-destructive-40 ea-bg-destructive-8 text-destructive'
+        : 'border-border ea-bg-muted-50 hover:bg-muted'
     }`}
     title={att.status === 'error' ? att.error : att.name}
   >
@@ -30,7 +30,7 @@ export const ComposerAttachmentChip = ({
       <img
         src={att.previewUrl}
         alt={att.name}
-        className="size-6 shrink-0 rounded object-cover border border-border/60"
+        className="size-6 shrink-0 rounded object-cover border ea-border-60"
       />
     ) : (
       <IconFileText className="size-3.5 shrink-0 text-muted-foreground" />
@@ -44,7 +44,7 @@ export const ComposerAttachmentChip = ({
     <button
       type="button"
       onClick={onRemove}
-      className="shrink-0 rounded hover:bg-black/8 dark:hover:bg-white/10 p-0.5 text-muted-foreground hover:text-foreground transition-colors"
+      className="shrink-0 rounded ea-quiet-btn  p-0.5 text-muted-foreground hover:text-foreground transition-colors"
     >
       <IconX className="size-3" />
     </button>

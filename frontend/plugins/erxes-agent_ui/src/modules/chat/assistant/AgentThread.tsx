@@ -39,7 +39,7 @@ const ThreadEmptyState = ({
     focusAgentComposer();
   };
   return (
-    <div className="flex grow flex-col items-center justify-center px-4 pb-[16vh] text-center">
+    <div className="ea-thread-bottom flex grow flex-col items-center justify-center px-4 text-center">
       <div className="mx-auto flex w-full max-w-3xl flex-col items-center gap-4">
         <AgentMark size="lg" />
         <h1 className="text-2xl leading-7 font-normal">
@@ -95,7 +95,7 @@ export const AgentThread = ({
       {messagesLoading ? (
         <div className="mx-auto w-full max-w-3xl space-y-3 p-2">
           {Array.from({ length: 3 }).map((_, i) => (
-            <Skeleton key={i} className="h-16 w-2/3 rounded-2xl" />
+            <Skeleton key={i} className="h-16 ea-w-2-3 rounded-2xl" />
           ))}
         </div>
       ) : (
@@ -117,7 +117,7 @@ export const AgentThread = ({
       <button
         type="button"
         aria-label="Scroll to bottom"
-        className="absolute bottom-4 right-4 z-10 flex items-center justify-center rounded-full border border-border bg-background p-2 shadow-sm transition-colors hover:border-primary/40 hover:text-primary"
+        className="absolute bottom-4 right-4 z-10 flex items-center justify-center rounded-full border border-border bg-background p-2 shadow-sm transition-colors ea-hover-border-primary-40 hover:text-primary"
       >
         <IconChevronDown className="size-4" />
       </button>

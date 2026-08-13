@@ -30,7 +30,7 @@ export const DeleteMessagePairDialog = ({
           <AlertDialog.Action
             disabled={loading}
             onClick={onConfirm}
-            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            className="bg-destructive text-destructive-foreground ea-hover-destructive-90"
           >
             {loading ? t('deleting') : t('delete')}
           </AlertDialog.Action>

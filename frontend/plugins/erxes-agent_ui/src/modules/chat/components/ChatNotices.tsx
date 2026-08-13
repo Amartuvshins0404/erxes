@@ -8,7 +8,7 @@ import { Button, Empty } from 'erxes-ui';
 
 // Drag-over affordance shown while files are dragged onto the chat area.
 export const DropOverlay = () => (
-  <div className="ea-pop absolute inset-3 z-20 rounded-2xl border-2 border-dashed border-primary/50 bg-primary/6 backdrop-blur-[2px] flex flex-col items-center justify-center gap-2 pointer-events-none">
+  <div className="ea-pop ea-drop-overlay absolute inset-3 z-20 rounded-2xl border-2 border-dashed flex flex-col items-center justify-center gap-2 pointer-events-none">
     <IconFileUpload className="size-9 text-primary" />
     <p className="text-sm font-medium text-primary">Drop files to attach</p>
     <p className="text-xs text-muted-foreground">
@@ -54,7 +54,7 @@ export const ChatErrorBanner = ({
   onRetry: () => void;
 }) => (
   <div className="max-w-3xl mx-auto w-full px-3 pb-1.5">
-    <div className="flex items-center gap-2 rounded-lg border border-destructive/40 bg-destructive/8 px-3 py-2 text-xs">
+    <div className="flex items-center gap-2 rounded-lg border ea-border-destructive-40 ea-bg-destructive-8 px-3 py-2 text-xs">
       <IconAlertTriangle className="size-4 shrink-0 text-destructive" />
       <span
         className="min-w-0 flex-1 truncate text-destructive"

@@ -36,12 +36,12 @@ const ReasoningOption = ({
     <div className="flex min-w-0 flex-1 flex-col gap-1">
       <span
         className={`text-sm leading-none ${
-          selected ? 'font-medium text-foreground' : 'text-foreground/90'
+          selected ? 'font-medium text-foreground' : 'ea-text-90'
         }`}
       >
         {label}
       </span>
-      <span className="text-[11px] leading-snug text-muted-foreground">
+      <span className="ea-text-11 leading-snug text-muted-foreground">
         {hint}
       </span>
     </div>
@@ -113,7 +113,7 @@ export const ReasoningEffortControl = memo(({
         sideOffset={8}
         className="w-60 overflow-hidden p-0"
       >
-        <div className="px-3 pb-1.5 pt-2.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground/80">
+        <div className="ea-text-11 ea-muted-80 px-3 pb-1.5 pt-2.5 font-medium uppercase tracking-wide">
           Thinking level
         </div>
         <Command shouldFilter={false}>

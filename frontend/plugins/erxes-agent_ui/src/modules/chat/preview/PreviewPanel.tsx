@@ -122,11 +122,11 @@ const FileRow = ({
       className={cn(
         'flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors',
         active
-          ? 'border-primary/40 bg-primary/5'
-          : 'border-border/70 bg-background/60 hover:border-border hover:bg-accent/40',
+          ? 'ea-border-primary-40 ea-bg-primary-5'
+          : 'ea-border-70 ea-bg-60 hover:border-border ea-hover-accent-40',
       )}
     >
-      <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+      <div className="flex size-9 shrink-0 items-center justify-center rounded-lg ea-bg-primary-10 text-primary">
         <Icon className="size-5" />
       </div>
       <div className="min-w-0 flex-1">
@@ -161,7 +161,7 @@ const GroupedFiles = ({
     <div className="space-y-4">
       {groups.map((group, gi) => (
         <div key={group.turnId} className="space-y-1.5">
-          <p className="truncate px-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          <p className="ea-text-11 truncate px-1 font-semibold uppercase tracking-wider text-muted-foreground">
             {group.prompt || `Conversation ${gi + 1}`}
           </p>
           <ul className="space-y-1.5">
@@ -304,7 +304,7 @@ const ItemView = ({
         >
           <IconArrowLeft className="size-4" />
         </Button>
-        <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+        <span className="ea-text-10 rounded bg-muted px-1.5 py-0.5 font-semibold uppercase tracking-wider text-muted-foreground">
           {typeLabel}
         </span>
         <div className="min-w-0 flex-1">

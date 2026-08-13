@@ -18,7 +18,7 @@ import { ReasoningEffortControl } from '~/modules/chat/components/ReasoningEffor
 type AttachmentsBag = ReturnType<typeof useAttachments>;
 
 const quietBtn =
-  'flex size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-black/[0.07] hover:text-foreground dark:hover:bg-white/15 disabled:opacity-40';
+  'ea-quiet-btn flex size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground disabled:opacity-40';
 
 // The composer in the ChatGPT-clone style: rounded-[28px] surface, attachment
 // chips on top, quiet circular controls, and a single high-contrast primary
@@ -73,7 +73,7 @@ export const AgentComposer = ({
       <div className="mx-auto w-full max-w-3xl">
         <ComposerPrimitive.Root
           data-agent-composer
-          className="flex w-full flex-col rounded-[28px] border border-[#e5e5e5] bg-white px-2 py-2 shadow-[0_2px_6px_-2px_rgba(0,0,0,0.05)] transition-colors focus-within:border-[#d0d0d0] dark:border-transparent dark:bg-[#212121] dark:shadow-[inset_0_0_1px_0_rgba(255,255,255,0.2)]"
+          className="ea-composer flex w-full flex-col border bg-white px-2 py-2 transition-colors"
         >
           {pendingAtts.length > 0 && (
             <div className="flex flex-row flex-wrap gap-2 px-1 pt-1 pb-2">
@@ -127,7 +127,7 @@ export const AgentComposer = ({
               onPaste={onPaste}
               placeholder={`Message ${agentName}…`}
               rows={1}
-              className="max-h-52 min-h-9 flex-1 resize-none bg-transparent py-1.5 pr-2 pl-1 text-base outline-none placeholder:text-muted-foreground/70"
+              className="ea-composer-input max-h-52 min-h-9 flex-1 resize-none bg-transparent py-1.5 pr-2 pl-1 text-base outline-none"
             />
             <div className="flex shrink-0 items-center gap-1">
               <ReasoningEffortControl
@@ -142,10 +142,10 @@ export const AgentComposer = ({
                       <button
                         type="button"
                         aria-label="Stop generating (Esc)"
-                        className="flex size-9 items-center justify-center rounded-full bg-[#0d0d0d] text-white dark:bg-white dark:text-black"
+                        className="ea-send-btn flex size-9 items-center justify-center rounded-full"
                         onClick={onStop}
                       >
-                        <div className="size-2.5 rounded-[2px] bg-current" />
+                        <div className="ea-stop-square size-2.5" />
                       </button>
                     </Tooltip.Trigger>
                     <Tooltip.Content>Stop generating (Esc)</Tooltip.Content>
@@ -155,7 +155,7 @@ export const AgentComposer = ({
                 <button
                   type="button"
                   aria-label="Send message"
-                  className="flex size-9 items-center justify-center rounded-full bg-[#0d0d0d] text-white transition-opacity disabled:opacity-30 dark:bg-white dark:text-black"
+                  className="ea-send-btn flex size-9 items-center justify-center rounded-full transition-opacity disabled:opacity-30"
                   onClick={() => void send()}
                   disabled={isEmpty || uploadsInFlight}
                 >

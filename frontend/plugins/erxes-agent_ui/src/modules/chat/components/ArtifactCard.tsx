@@ -116,9 +116,9 @@ const DiagramPreview = ({
   usePresentIfLive(artifact, live);
 
   return (
-    <div className="ea-pop my-2 overflow-hidden rounded-xl border border-border/70 bg-background">
+    <div className="ea-pop my-2 overflow-hidden rounded-xl border ea-border-70 bg-background">
       {/* Card header */}
-      <div className="flex items-center gap-2 px-3 py-2 bg-muted/30 border-b border-border/50">
+      <div className="flex items-center gap-2 px-3 py-2 ea-bg-muted-30 border-b ea-border-50">
         <IconHierarchy className="size-4 text-primary shrink-0" />
         <p className="flex-1 min-w-0 truncate text-sm font-medium">
           {artifact.title}
@@ -159,8 +159,8 @@ const DocumentCard = ({
     .join(' · ');
 
   return (
-    <div className="ea-pop my-2 flex items-center gap-3 rounded-xl border border-border/70 bg-background/60 px-3 py-2.5 hover:border-border transition-colors">
-      <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+    <div className="ea-pop my-2 flex items-center gap-3 rounded-xl border ea-border-70 ea-bg-60 px-3 py-2.5 hover:border-border transition-colors">
+      <div className="flex size-9 shrink-0 items-center justify-center rounded-lg ea-bg-primary-10 text-primary">
         <Icon className="size-5" />
       </div>
       <div className="min-w-0 flex-1">
@@ -211,8 +211,8 @@ const WebsiteCard = ({
     .join(' · ');
 
   return (
-    <div className="ea-pop my-2 overflow-hidden rounded-xl border border-border/70 bg-background">
-      <div className="flex items-center gap-2 bg-muted/30 px-3 py-2.5">
+    <div className="ea-pop my-2 overflow-hidden rounded-xl border ea-border-70 bg-background">
+      <div className="flex items-center gap-2 ea-bg-muted-30 px-3 py-2.5">
         <IconWorldWww className="size-4 shrink-0 text-primary" />
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium">{artifact.title}</p>
@@ -249,9 +249,9 @@ const ImageCard = ({
   usePresentIfLive(artifact, live);
 
   return (
-    <div className="ea-pop my-2 overflow-hidden rounded-xl border border-border/70 bg-background">
+    <div className="ea-pop my-2 overflow-hidden rounded-xl border ea-border-70 bg-background">
       {/* Card header */}
-      <div className="flex items-center gap-2 px-3 py-2 bg-muted/30 border-b border-border/50">
+      <div className="flex items-center gap-2 px-3 py-2 ea-bg-muted-30 border-b ea-border-50">
         <IconPhoto className="size-4 text-primary shrink-0" />
         <p className="flex-1 min-w-0 truncate text-sm font-medium">
           {artifact.title}
@@ -312,8 +312,8 @@ export const ArtifactFailureCard = ({
   const noun =
     FAILURE_NOUNS[toolName.toLowerCase().replace(/[-_\s]/g, '')] ?? 'document';
   return (
-    <div className="ea-pop my-2 flex items-center gap-3 rounded-xl border border-border/70 bg-background/60 px-3 py-2.5">
-      <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-destructive/10 text-destructive">
+    <div className="ea-pop my-2 flex items-center gap-3 rounded-xl border ea-border-70 ea-bg-60 px-3 py-2.5">
+      <div className="flex size-9 shrink-0 items-center justify-center rounded-lg ea-bg-destructive-10 text-destructive">
         <IconAlertTriangle className="size-5" />
       </div>
       <div className="min-w-0 flex-1">

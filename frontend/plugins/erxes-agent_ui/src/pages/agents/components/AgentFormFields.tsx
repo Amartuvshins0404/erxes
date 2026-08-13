@@ -6,6 +6,10 @@ import { Alert, Form, Input, RadioGroup, Switch, Textarea } from 'erxes-ui';
 import { Trans, useTranslation } from 'react-i18next';
 import { UseFormReturn, useWatch } from 'react-hook-form';
 import { SelectMember } from 'ui-modules';
+// Plugin-owned CSS (ea-form-grid): the host global CSS doesn't carry
+// plugin-unique utilities in production, and this page sits outside the
+// chat chunk graph that otherwise loads chat.css.
+import '~/modules/chat/chat.css';
 import {
   SelectModel,
   SelectProvider,
@@ -31,7 +35,7 @@ const AgentFormSection = ({
   description: string;
   children: ReactNode;
 }) => (
-  <section className="grid gap-4 border-b py-4 last:border-b-0 md:grid-cols-[minmax(0,14rem)_minmax(0,1fr)] md:gap-6">
+  <section className="ea-form-grid grid gap-4 border-b py-4 last:border-b-0">
     <header className="space-y-1">
       <h2 className="text-sm font-semibold">{title}</h2>
       <p className="text-sm leading-relaxed text-muted-foreground">

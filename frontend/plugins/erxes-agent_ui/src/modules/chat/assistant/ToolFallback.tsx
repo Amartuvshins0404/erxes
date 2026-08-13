@@ -27,7 +27,7 @@ export const JsonBlock = ({ value }: { value: string }) => {
   const long = value.length > TRUNCATE_AT;
   return (
     <div>
-      <pre className="rounded-md bg-muted/50 p-2.5 text-xs whitespace-pre-wrap break-words text-foreground/90">
+      <pre className="rounded-md ea-bg-muted-50 p-2.5 text-xs whitespace-pre-wrap break-words ea-text-90">
         {expanded || !long ? value : `${value.slice(0, TRUNCATE_AT)}…`}
       </pre>
       {long && (

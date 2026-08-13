@@ -17,7 +17,7 @@ export const MessageAttachments = ({
   const files = attachments.filter((a) => !isImageAttachment(a));
 
   return (
-    <div className="flex flex-col items-end gap-1.5 max-w-[78%]">
+    <div className="ea-attachments flex flex-col items-end gap-1.5">
       {images.length > 0 && (
         <div className="flex flex-wrap justify-end gap-1.5">
           {images.map((att, i) => (
@@ -27,12 +27,12 @@ export const MessageAttachments = ({
               target="_blank"
               rel="noreferrer"
               title={att.name}
-              className="group/img block overflow-hidden rounded-xl border border-border bg-muted shadow-sm hover:shadow-md hover:border-primary/40 transition-all"
+              className="group/img block overflow-hidden rounded-xl border border-border bg-muted shadow-sm hover:shadow-md ea-hover-border-primary-40 transition-all"
             >
               <img
                 src={attachmentSrc(att)}
                 alt={att.name}
-                className="block max-h-64 max-w-72 h-auto w-auto transition-transform duration-300 group-hover/img:scale-[1.02]"
+                className="ea-img-zoom block max-h-64 max-w-72 h-auto w-auto"
               />
             </a>
           ))}
@@ -44,9 +44,9 @@ export const MessageAttachments = ({
           href={attachmentSrc(att)}
           target="_blank"
           rel="noreferrer"
-          className="flex items-center gap-2.5 rounded-xl border border-border bg-background px-3 py-2 text-xs shadow-sm hover:border-primary/40 hover:bg-primary/4 transition-colors max-w-64"
+          className="flex items-center gap-2.5 rounded-xl border border-border bg-background px-3 py-2 text-xs shadow-sm ea-hover-border-primary-40 ea-hover-bg-primary-4 transition-colors max-w-64"
         >
-          <span className="size-8 shrink-0 rounded-lg bg-primary/10 flex items-center justify-center">
+          <span className="size-8 shrink-0 rounded-lg ea-bg-primary-10 flex items-center justify-center">
             <IconFileText className="size-4 text-primary" />
           </span>
           <span className="min-w-0">

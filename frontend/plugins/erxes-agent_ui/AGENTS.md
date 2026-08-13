@@ -27,8 +27,8 @@
 - Manages providers and tenant runtime settings; Settings opens Providers by default.
 - Streams native agent chat parts, tool activity, attachments, artifacts, and session updates.
 - Renders the chat conversation on assistant-ui primitives (`ThreadPrimitive`, `MessagePrimitive`, `ComposerPrimitive`, streaming markdown) over the AI SDK chat runtime; tool calls display as inline per-call status lines with dedicated readable renderers for web-search and fetch-url results.
-- Hosts a custom chat workspace sidebar: agents up top and the active agent's conversations below as an assistant-ui thread list (`ThreadListPrimitive` / `ThreadListItemPrimitive`) driven by a remote-thread-list runtime over the mastra session GraphQL contract.
-- The core sidebar holds only flat Chat / Agents deep-links.
+- Hosts a custom chat workspace sidebar: agents up top and the active agent's conversations below as an assistant-ui thread list (`ThreadListPrimitive` / `ThreadListItemPrimitive`) driven by a remote-thread-list runtime over the mastra session GraphQL contract, plus a permission-gated "Manage agents" footer link.
+- The plugin registers no core sub-module panel (`navigationGroup` carries only the rail label/icon), so entering the plugin shows only the plugin's own sidebar.
 
 ## Architecture
 
@@ -40,7 +40,7 @@
 | Runtime    | `frontend/plugins/erxes-agent_ui/src/modules/chat/runtime`    | Remote-thread-list runtime: mastra GraphQL adapter, per-thread runtime hook, URL/store sync. |
 | Sidebar    | `frontend/plugins/erxes-agent_ui/src/modules/chat/sidebar`    | Chat workspace sidebar (agents + assistant-ui conversation thread list).             |
 | Assistant  | `frontend/plugins/erxes-agent_ui/src/modules/chat/assistant`  | assistant-ui thread, message rows, composer, and per-message extras mapping.         |
-| Navigation | `frontend/plugins/erxes-agent_ui/src/modules/navigation`      | Flat core-sidebar links, agent favorites, and settings navigation.                   |
+| Navigation | `frontend/plugins/erxes-agent_ui/src/modules/navigation`      | Agent favorites and settings navigation (no core sub-module panel).        |
 | Settings   | `frontend/plugins/erxes-agent_ui/src/pages/settings`          | Provider and tenant runtime settings forms, validation, and mutation feedback.       |
 | GraphQL    | `frontend/plugins/erxes-agent_ui/src/graphql`                 | Plugin-prefixed queries, mutations, and subscriptions consumed by the UI.            |
 
@@ -82,6 +82,12 @@
 ## Recent Changes
 
 <!-- Newest first. Keep at most 10 entries. -->
+
+### `2026-08-13` — Drop the core sub-module panel
+
+- **Summary:** The plugin no longer registers `navigationGroup.content`, so core renders no sub-module sidebar for it; agent/conversation browsing lives entirely in the plugin's own chat sidebar, which gained a permission-gated "Manage agents" footer link.
+- **Affected areas:** `src/config.tsx`, `src/modules/chat/sidebar/AgentChatSidebar.tsx`; removed `src/modules/navigation/AgentNavLinks.tsx`.
+- **Contracts changed:** None
 
 ### `2026-08-13` — Fix session ping-pong in runtime sync
 
@@ -136,9 +142,3 @@
 - **Summary:** Kept one full agent admin under `/erxes-agent/agents`, reduced setup to people-only sharing and core runtime controls, and changed chat edit to navigate to the full config route.
 - **Affected areas:** Agent form/types/GraphQL/cache, chat rail, route trees, Settings navigation, locales, and stale tests.
 - **Contracts changed:** Removed agent team/department audiences, per-agent memory/temperature/destructive fields, Settings agent routes, and the in-chat editor.
-
-### `2026-08-06` — Remove end-user trace UI
-
-- **Summary:** Removed reasoning and tool trace views, debug controls, trace-only state, and parsers while keeping assistant replies, tool status, approvals, artifacts, and errors.
-- **Affected areas:** Chat components, stream hydration, artifact and tool readers, agent forms, GraphQL documents, styles, and types.
-- **Contracts changed:** Removed `debug` from agent reads and writes and removed trace-only stream data parts.

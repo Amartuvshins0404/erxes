@@ -11,9 +11,12 @@ import {
   IconLoader2,
   IconPlus,
   IconRobot,
+  IconSettings,
   IconTrash,
 } from '@tabler/icons-react';
 import { Button, cn, Skeleton, useToast } from 'erxes-ui';
+import { usePermissionCheck } from 'ui-modules';
+import { ERXES_AGENT_ACTIONS } from '~/permissions';
 import type { IChatAgent } from '~/modules/chat/hooks/useChatAgents';
 import {
   useAgentUnread,
@@ -140,6 +143,7 @@ export const AgentChatSidebar = ({
   activeAgentId: string;
 }) => {
   const { toast } = useToast();
+  const { hasActionPermission } = usePermissionCheck();
   const runtime = useAssistantRuntime();
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -202,6 +206,17 @@ export const AgentChatSidebar = ({
       <SessionDeleteContext.Provider value={setPendingDelete}>
         <SessionList />
       </SessionDeleteContext.Provider>
+      {hasActionPermission(ERXES_AGENT_ACTIONS.agent.readSummary) && (
+        <div className="border-t p-2">
+          <Link
+            to="/erxes-agent/agents"
+            className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-foreground/80 transition-colors hover:bg-accent/60"
+          >
+            <IconSettings className="size-4 shrink-0 text-muted-foreground" />
+            <span className="min-w-0 flex-1 truncate">Manage agents</span>
+          </Link>
+        </div>
+      )}
       <DeleteSessionDialog
         loading={deleting}
         open={!!pendingDelete}

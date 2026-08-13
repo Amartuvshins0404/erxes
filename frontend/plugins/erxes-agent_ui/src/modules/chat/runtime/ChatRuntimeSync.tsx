@@ -13,6 +13,11 @@ import { withThreadParam } from '~/modules/chat/lib/threadParam';
 // Ownership: the runtime owns "which conversation is open" (sidebar clicks,
 // New chat, delete re-homing); the URL owns deep-links and browser Back; the
 // store mirrors the result so the send path and badges keep working.
+//
+// Loop safety: each direction reacts ONLY to its own source's changes. The
+// URL effect reads the runtime via getState() (no reactive dep), and the
+// runtime effect reads the param through a ref — otherwise a completed switch
+// would re-trigger the opposite direction and ping-pong between two sessions.
 export const ChatRuntimeSync = ({ agentId }: { agentId: string }) => {
   const runtime = useAssistantRuntime();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -27,22 +32,27 @@ export const ChatRuntimeSync = ({ agentId }: { agentId: string }) => {
         ?.status,
   );
 
+  // Latest param for the runtime→URL effect without depending on it.
+  const threadParamRef = useRef(threadParam);
+  useEffect(() => {
+    threadParamRef.current = threadParam;
+  }, [threadParam]);
+
   // The initial home (most-recent session) applies exactly once per mounted
   // agent — later "draft" states are user-driven (New chat) and must stick.
   const homedRef = useRef(false);
 
   // URL → runtime: deep-link / browser Back opens the addressed conversation.
   useEffect(() => {
-    if (isLoading) return;
-    if (threadParam && threadParam !== mainThreadId) {
-      void runtime.threads.switchToThread(threadParam).catch(() => {
-        // Unknown/dead session — drop the param so the page settles.
-        setSearchParams((prev) => withThreadParam(prev, undefined), {
-          replace: true,
-        });
+    if (isLoading || !threadParam) return;
+    if (threadParam === runtime.threads.getState().mainThreadId) return;
+    void runtime.threads.switchToThread(threadParam).catch(() => {
+      // Unknown/dead session — drop the param so the page settles.
+      setSearchParams((prev) => withThreadParam(prev, undefined), {
+        replace: true,
       });
-    }
-  }, [isLoading, threadParam, mainThreadId, runtime, setSearchParams]);
+    });
+  }, [isLoading, threadParam, runtime, setSearchParams]);
 
   // Initial home: with no deep-link, open the most recent session (or stay on
   // the fresh draft when the agent has none).
@@ -57,14 +67,15 @@ export const ChatRuntimeSync = ({ agentId }: { agentId: string }) => {
   // Runtime → URL + store mirror.
   useEffect(() => {
     if (isLoading || !mainThreadId || !mainStatus) return;
+    const param = threadParamRef.current;
     if (mainStatus === 'new') {
       chatStore.setActiveThread(agentId, mainThreadId, true);
-      if (threadParam) {
+      if (param) {
         setSearchParams((prev) => withThreadParam(prev, undefined));
       }
     } else {
       chatStore.setActiveThread(agentId, mainThreadId, false);
-      if (threadParam !== mainThreadId) {
+      if (param !== mainThreadId) {
         setSearchParams((prev) => withThreadParam(prev, mainThreadId));
       }
     }
@@ -72,7 +83,6 @@ export const ChatRuntimeSync = ({ agentId }: { agentId: string }) => {
     isLoading,
     mainThreadId,
     mainStatus,
-    threadParam,
     agentId,
     setSearchParams,
   ]);

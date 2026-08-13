@@ -33,6 +33,7 @@ import {
   ReasoningGroup,
   ReasoningPart,
 } from '~/modules/chat/assistant/ReasoningBlock';
+import { FetchUrlTool } from '~/modules/chat/assistant/FetchUrlTool';
 import { WebSearchTool } from '~/modules/chat/assistant/WebSearchTool';
 
 // 32px quiet icon button, background-only hover — the clone's action control.
@@ -170,7 +171,7 @@ const AssistantMessageRow = () => {
             ReasoningGroup,
             ToolGroup: ToolGroupBlock,
             tools: {
-              by_name: { webSearch: WebSearchTool },
+              by_name: { fetchUrl: FetchUrlTool, webSearch: WebSearchTool },
               Fallback: ToolFallback,
             },
           }}

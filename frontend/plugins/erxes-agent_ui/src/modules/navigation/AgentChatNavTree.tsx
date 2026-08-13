@@ -1,5 +1,10 @@
 import { useState } from 'react';
-import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import {
+  Link,
+  useLocation,
+  useNavigate,
+  useSearchParams,
+} from 'react-router-dom';
 import { useApolloClient } from '@apollo/client';
 import {
   IconCaretRightFilled,
@@ -47,7 +52,7 @@ const AgentSessions = ({
   const onAgentPath = pathname === `/erxes-agent/chat/${agent._id}`;
 
   return (
-    <Sidebar.Sub>
+    <Sidebar.Sub className="border-l border-border/70">
       {loading && (
         <Sidebar.SubItem className="px-2 py-1.5">
           <Skeleton className="w-3/4 h-3.5" />
@@ -60,25 +65,36 @@ const AgentSessions = ({
       )}
       {!loading &&
         threads.map((thread) => (
-          <NavigationMenuLinkItem
+          <Sidebar.SubItem
             key={thread.threadId}
-            name={thread.title || 'Untitled conversation'}
-            path={`erxes-agent/chat/${agent._id}?thread=${thread.threadId}`}
-            isActive={onAgentPath && activeThread === thread.threadId}
-            action={
-              <Sidebar.MenuAction
-                showOnHover
-                aria-label="Delete conversation"
-                className="text-muted-foreground hover:text-destructive [&>svg]:size-3.5"
-                onClick={(e) => {
-                  e.preventDefault();
-                  onDelete(thread.threadId);
-                }}
+            className="group/session relative min-w-0"
+          >
+            <Sidebar.SubButton
+              asChild
+              size="sm"
+              isActive={onAgentPath && activeThread === thread.threadId}
+              className="w-full font-normal"
+            >
+              <Link
+                to={`/erxes-agent/chat/${agent._id}?thread=${thread.threadId}`}
               >
-                <IconTrash />
-              </Sidebar.MenuAction>
-            }
-          />
+                <span className="min-w-0 flex-1 truncate">
+                  {thread.title || 'Untitled conversation'}
+                </span>
+              </Link>
+            </Sidebar.SubButton>
+            <button
+              type="button"
+              aria-label="Delete conversation"
+              className="absolute right-1 top-1/2 flex size-5 -translate-y-1/2 items-center justify-center rounded-md bg-sidebar text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-destructive focus-visible:opacity-100 group-hover/session:opacity-100 [&>svg]:size-3.5"
+              onClick={(e) => {
+                e.preventDefault();
+                onDelete(thread.threadId);
+              }}
+            >
+              <IconTrash />
+            </button>
+          </Sidebar.SubItem>
         ))}
     </Sidebar.Sub>
   );
@@ -109,7 +125,7 @@ const AgentNavRow = ({
 
   return (
     <Collapsible className="group/agent" open={open} onOpenChange={setOpen}>
-      <Sidebar.MenuItem className="flex items-center">
+      <Sidebar.MenuItem className="flex items-center gap-0.5 pr-1">
         <Sidebar.MenuButton
           isActive={isActive}
           className="flex-1 min-w-0 font-normal"

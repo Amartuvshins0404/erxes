@@ -26,7 +26,7 @@
 - Supports private, people-shared, and organization visibility, permission groups, additional-tool allowlists, provider/model settings, and active state.
 - Manages providers and tenant runtime settings; Settings opens Providers by default.
 - Streams native agent chat parts, tool activity, attachments, artifacts, and session updates.
-- Renders the chat conversation on assistant-ui primitives (`ThreadPrimitive`, `MessagePrimitive`, `ComposerPrimitive`, streaming markdown) over the AI SDK chat runtime; tool calls display as inline per-call status lines.
+- Renders the chat conversation on assistant-ui primitives (`ThreadPrimitive`, `MessagePrimitive`, `ComposerPrimitive`, streaming markdown) over the AI SDK chat runtime; tool calls display as inline per-call status lines with dedicated readable renderers for web-search and fetch-url results.
 - Hosts the nested module navigation in the main sidebar: a "Chat" group whose agent rows lazy-expand to their sessions, plus the flat "Agents" manage link.
 
 ## Architecture
@@ -78,6 +78,18 @@
 
 <!-- Newest first. Keep at most 10 entries. -->
 
+### `2026-08-13` — Sidebar session rows redesigned
+
+- **Summary:** Rebuilt the sidebar conversation rows on `Sidebar.SubItem` + `Sidebar.SubButton` with a left tree-guide border; the delete control is now a hover/focus-revealed icon button absolutely centered (`top-1/2 -translate-y-1/2`) over a solid `bg-sidebar` chip, replacing the misaligned `NavigationMenuLinkItem` + `Sidebar.MenuAction` pairing, and the agent row gained consistent action spacing.
+- **Affected areas:** `src/modules/navigation/AgentChatNavTree.tsx`.
+- **Contracts changed:** None
+
+### `2026-08-13` — Readable fetchUrl tool results
+
+- **Summary:** Added a dedicated `fetchUrl` tool renderer that shows the fetched page as a readable card (favicon, linked title, site name, plain-text content behind a "Read more" toggle) instead of dumping the raw JSON payload; unexpected result shapes still fall back to the capped JSON block.
+- **Affected areas:** `src/modules/chat/assistant/FetchUrlTool.tsx` (new), `src/modules/chat/assistant/AgentMessage.tsx`.
+- **Contracts changed:** None
+
 ### `2026-08-13` — Sidebar session rows use sidebar primitives
 
 - **Summary:** Fixed the session delete button floating below its row by switching it to `Sidebar.MenuAction` (absolute, vertically centered, hover-revealed); sessions now indent under their agent via `Sidebar.Sub`, the agent row uses `Sidebar.MenuButton` for consistent hover/active states, and the new-conversation control is a real icon button.
@@ -126,20 +138,3 @@
 - **Affected areas:** GraphQL documents, permissions, navigation metadata, and Module Federation exposes.
 - **Contracts changed:** Removed background execution and schedule controls and the `./automationsWidget` expose.
 
-### `2026-08-06` — Remove custom agent workflow UI
-
-- **Summary:** Removed workflow pages, graph, chat mode, automation widget, routes, navigation, API documents, permissions, exports, and tests.
-- **Affected areas:** Main and agent routes, chat UI, navigation, config, GraphQL documents, Module Federation, permissions, and automation widgets.
-- **Contracts changed:** Removed custom workflow routes, navigation modules, GraphQL operations, permission keys, and the `./automationsWidget` expose.
-
-### `2026-08-06` — Remove retired chat knowledge UI
-
-- **Summary:** Removed pages, routes, agent tabs, settings controls, GraphQL documents, permissions, message ratings, and related trace labels.
-- **Affected areas:** Main and agent routes, chat UI/store, general settings, GraphQL documents, permissions, and types.
-- **Contracts changed:** Removed the retired knowledge and message-rating operations and settings fields.
-
-### `2026-08-06` — Remove retired response analysis settings
-
-- **Summary:** Removed response analysis controls, settings fields, GraphQL selections, validation, locale use, and metadata types.
-- **Affected areas:** General settings, settings GraphQL documents and types, and chat message metadata.
-- **Contracts changed:** Removed the retired analysis fields from settings reads, saves, and chat metadata.

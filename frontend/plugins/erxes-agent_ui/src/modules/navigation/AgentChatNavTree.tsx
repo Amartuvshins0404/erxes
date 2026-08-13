@@ -46,41 +46,41 @@ const AgentSessions = ({
   const activeThread = searchParams.get('thread');
   const onAgentPath = pathname === `/erxes-agent/chat/${agent._id}`;
 
-  if (loading) {
-    return <Skeleton className="w-28 h-4 ml-8 my-1" />;
-  }
-  if (threads.length === 0) {
-    return (
-      <div className="text-sm text-muted-foreground ml-8 my-2">
-        No conversations yet
-      </div>
-    );
-  }
   return (
-    <>
-      {threads.map((thread) => (
-        <NavigationMenuLinkItem
-          key={thread.threadId}
-          name={thread.title || 'Untitled conversation'}
-          path={`erxes-agent/chat/${agent._id}?thread=${thread.threadId}`}
-          isActive={onAgentPath && activeThread === thread.threadId}
-          action={
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label="Delete conversation"
-              className="size-6 shrink-0 text-muted-foreground hover:text-destructive"
-              onClick={(e) => {
-                e.preventDefault();
-                onDelete(thread.threadId);
-              }}
-            >
-              <IconTrash className="size-3.5" />
-            </Button>
-          }
-        />
-      ))}
-    </>
+    <Sidebar.Sub>
+      {loading && (
+        <Sidebar.SubItem className="px-2 py-1.5">
+          <Skeleton className="w-3/4 h-3.5" />
+        </Sidebar.SubItem>
+      )}
+      {!loading && threads.length === 0 && (
+        <Sidebar.SubItem className="text-xs text-muted-foreground px-2 py-1.5">
+          No conversations yet
+        </Sidebar.SubItem>
+      )}
+      {!loading &&
+        threads.map((thread) => (
+          <NavigationMenuLinkItem
+            key={thread.threadId}
+            name={thread.title || 'Untitled conversation'}
+            path={`erxes-agent/chat/${agent._id}?thread=${thread.threadId}`}
+            isActive={onAgentPath && activeThread === thread.threadId}
+            action={
+              <Sidebar.MenuAction
+                showOnHover
+                aria-label="Delete conversation"
+                className="text-muted-foreground hover:text-destructive [&>svg]:size-3.5"
+                onClick={(e) => {
+                  e.preventDefault();
+                  onDelete(thread.threadId);
+                }}
+              >
+                <IconTrash />
+              </Sidebar.MenuAction>
+            }
+          />
+        ))}
+    </Sidebar.Sub>
   );
 };
 
@@ -109,52 +109,55 @@ const AgentNavRow = ({
 
   return (
     <Collapsible className="group/agent" open={open} onOpenChange={setOpen}>
-      <div className="flex items-center w-full">
-        <Button
-          variant={isActive ? 'secondary' : 'ghost'}
-          className="justify-start gap-2 overflow-hidden text-left flex-auto min-w-0 py-1.5 px-2 h-auto font-normal"
+      <Sidebar.MenuItem className="flex items-center">
+        <Sidebar.MenuButton
+          isActive={isActive}
+          className="flex-1 min-w-0 font-normal"
           onClick={() => {
             navigate(`/erxes-agent/chat/${agent._id}`);
             if (!isActive) setOpen(true);
           }}
         >
-          <IconRobot className="size-3.5 shrink-0 text-muted-foreground" />
-          <span className="flex-1 min-w-0 truncate">{agent.accountName}</span>
+          <IconRobot className="text-muted-foreground" />
+          <span className="min-w-0 flex-1 truncate">
+            {agent.accountName}
+          </span>
           {working && (
             <IconLoader2 className="size-3.5 shrink-0 animate-spin text-primary" />
           )}
           {unread && !working && (
             <span className="size-2 shrink-0 rounded-full bg-red-500" />
           )}
-          <span
-            role="button"
-            aria-label="New conversation"
-            className="shrink-0 invisible group-hover/agent:visible text-muted-foreground hover:text-foreground"
-            onClick={newThread}
-          >
-            <IconPlus className="size-4" />
-          </span>
+        </Sidebar.MenuButton>
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="New conversation"
+          title="New conversation"
+          className="size-6 shrink-0 invisible group-hover/agent:visible group-focus-within/agent:visible text-muted-foreground hover:text-foreground"
+          onClick={newThread}
+        >
+          <IconPlus className="size-4" />
         </Button>
         <Collapsible.Trigger asChild>
           <Button
             variant="ghost"
-            className="shrink-0 size-6 p-0"
+            size="icon"
+            className="size-6 shrink-0 text-muted-foreground hover:text-foreground"
             aria-label={`Conversations with ${agent.accountName}`}
             aria-expanded={open}
           >
-            <IconCaretRightFilled className="size-3 transition-transform group-data-[state=open]/agent:rotate-90 text-muted-foreground" />
+            <IconCaretRightFilled className="size-3 transition-transform group-data-[state=open]/agent:rotate-90" />
           </Button>
         </Collapsible.Trigger>
-      </div>
+      </Sidebar.MenuItem>
       <Collapsible.Content>
-        <Sidebar.Menu>
-          {open && (
-            <AgentSessions
-              agent={agent}
-              onDelete={(threadId) => onDeleteSession(agent._id, threadId)}
-            />
-          )}
-        </Sidebar.Menu>
+        {open && (
+          <AgentSessions
+            agent={agent}
+            onDelete={(threadId) => onDeleteSession(agent._id, threadId)}
+          />
+        )}
       </Collapsible.Content>
     </Collapsible>
   );
@@ -195,11 +198,15 @@ export const AgentChatNavTree = () => {
           ) : undefined
         }
       >
-        {loading && <Skeleton className="w-28 h-4 ml-2 my-1" />}
+        {loading && (
+          <Sidebar.MenuItem className="px-2 py-1.5">
+            <Skeleton className="w-3/4 h-3.5" />
+          </Sidebar.MenuItem>
+        )}
         {!loading && agents.length === 0 && (
-          <div className="text-sm text-muted-foreground px-2 my-1">
+          <Sidebar.MenuItem className="text-xs text-muted-foreground px-2 py-1.5">
             No agents yet
-          </div>
+          </Sidebar.MenuItem>
         )}
         {agents.map((agent) => (
           <AgentNavRow

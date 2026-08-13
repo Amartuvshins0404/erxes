@@ -78,6 +78,12 @@
 
 <!-- Newest first. Keep at most 10 entries. -->
 
+### `2026-08-13` — Sidebar session rows use sidebar primitives
+
+- **Summary:** Fixed the session delete button floating below its row by switching it to `Sidebar.MenuAction` (absolute, vertically centered, hover-revealed); sessions now indent under their agent via `Sidebar.Sub`, the agent row uses `Sidebar.MenuButton` for consistent hover/active states, and the new-conversation control is a real icon button.
+- **Affected areas:** `src/modules/navigation/AgentChatNavTree.tsx`.
+- **Contracts changed:** None
+
 ### `2026-08-13` — assistant-ui chat surface and nested sidebar navigation
 
 - **Summary:** Rebuilt the conversation view on assistant-ui primitives (thread, message rows with streaming markdown and inline per-call tool status, composer) over the AI SDK chat runtime, replacing the custom message list/bubble/composer/waiting components and the summarized activity line; moved the agent/session browser into the main sidebar as a nested "Chat" tree with lazy session loading, deleting the in-page side panel.

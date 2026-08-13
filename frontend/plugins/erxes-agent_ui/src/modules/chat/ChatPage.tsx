@@ -2,8 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useApolloClient } from '@apollo/client';
 import { useTranslation } from 'react-i18next';
 import { useToast } from 'erxes-ui';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { IconArrowDown } from '@tabler/icons-react';
+import { useParams, useSearchParams } from 'react-router-dom';
+import { AssistantRuntimeProvider } from '@assistant-ui/react';
+import { useAISDKRuntime } from '@assistant-ui/react-ai-sdk';
 import type {
   ChatAttachment,
   ApprovedOp,
@@ -16,15 +17,12 @@ import {
 } from '~/modules/chat/hooks/useChatAgents';
 import { useAgentChatView } from '~/modules/chat/hooks/useChatView';
 import { useMastraThreads } from '~/modules/chat/hooks/useMastraThreads';
-import { useRenameMastraThread } from '~/modules/chat/hooks/useRenameMastraThread';
 import { useRemoveMastraThread } from '~/modules/chat/hooks/useRemoveMastraThread';
 import { useAttachments } from '~/modules/chat/hooks/useAttachments';
 import { useThreadArtifacts } from '~/modules/chat/hooks/useThreadArtifacts';
 import { useSessionBootstrap } from '~/modules/chat/hooks/useSessionBootstrap';
 import { withThreadParam } from '~/modules/chat/lib/threadParam';
-import { useIsNarrow } from '~/modules/chat/hooks/useIsNarrow';
 import { ChatPageHeader } from '~/modules/chat/components/ChatPageHeader';
-import { ChatSidePanel } from '~/modules/chat/components/ChatSidePanel';
 import { DeleteSessionDialog } from '~/modules/chat/components/DeleteSessionDialog';
 import { DeleteMessagePairDialog } from '~/modules/chat/components/DeleteMessagePairDialog';
 import {
@@ -33,8 +31,6 @@ import {
   DropOverlay,
   SelectAgentEmpty,
 } from '~/modules/chat/components/ChatNotices';
-import { MessageList } from '~/modules/chat/components/MessageList';
-import { Composer } from '~/modules/chat/components/Composer';
 import { ApprovalBar } from '~/modules/chat/components/ApprovalBar';
 import { PreviewResizer } from '~/modules/chat/components/PreviewResizer';
 import { PreviewPanel } from '~/modules/chat/preview/PreviewPanel';
@@ -43,6 +39,13 @@ import { pendingApproval } from '~/modules/chat/lib/uiParts';
 import { MASTRA_MESSAGE_PAIR_REMOVE } from '~/graphql/mutations';
 import { refetchThreadArtifactsIntoCache } from '~/modules/chat/threadsCache';
 import { associateArtifacts } from '~/modules/chat/lib/artifacts';
+import { AgentThread } from '~/modules/chat/assistant/AgentThread';
+import { AgentComposer } from '~/modules/chat/assistant/AgentComposer';
+import {
+  ChatMessageActionsContext,
+  MessageExtrasContext,
+} from '~/modules/chat/assistant/chatContexts';
+import { buildMessageExtras } from '~/modules/chat/assistant/messageExtras';
 import '~/modules/chat/chat.css';
 
 interface PendingMessagePairDelete {
@@ -60,31 +63,20 @@ const isStringArray = (value: unknown): value is string[] =>
   Array.isArray(value) &&
   value.every((item: unknown) => typeof item === 'string');
 
-// Distance (px) from the bottom under which we keep following streamed output.
-const SCROLL_PIN_THRESHOLD = 120;
-// Distance (px) from the bottom past which the "Latest" jump button appears.
-const SCROLL_BUTTON_THRESHOLD = 280;
-
 export const ChatPage = () => {
   const { t } = useTranslation('mastra');
   const { toast } = useToast();
   const { agentId } = useParams<{ agentId: string }>();
-  const navigate = useNavigate();
   // The active conversation is addressable via ?thread=<id>. Selecting a session
   // writes it (push, so browser Back walks between conversations); reload/deep-
   // link restores it (useSessionBootstrap). An agent-only URL keeps the old
   // behavior — bootstrap opens the most-recent thread or a fresh draft.
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [, setSearchParams] = useSearchParams();
   const setThreadParam = useCallback(
     (threadId: string | undefined, replace = false) =>
       setSearchParams((prev) => withThreadParam(prev, threadId), { replace }),
     [setSearchParams],
   );
-  const [railOpen, setRailOpen] = useState(!agentId);
-  // Below `md` the sessions side panel becomes an off-canvas drawer; closed by
-  // default so the message column keeps full width. Desktop ignores this.
-  const isNarrow = useIsNarrow();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   // Thread id awaiting delete confirmation — drives the styled AlertDialog that
   // replaced the native window.confirm().
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
@@ -93,7 +85,7 @@ export const ChatPage = () => {
   const [messageDeleteLoading, setMessageDeleteLoading] = useState(false);
   const apolloClient = useApolloClient();
 
-  const { agents, loading: agentsLoading } = useChatAgents();
+  const { agents } = useChatAgents();
   const attachmentsEnabled = useAttachmentsEnabled();
 
   const selectedAgent = useMemo(
@@ -104,78 +96,39 @@ export const ChatPage = () => {
 
   const {
     activeThreadId,
-    isDraft,
     reasoningEffort,
     messages,
     loading: chatLoading,
     messagesLoading,
     error: chatError,
     retry,
+    chatHelpers,
   } = view;
+
+  // The assistant-ui runtime wraps the active thread's AI SDK chat; primitives
+  // below (thread, composer) read it via context.
+  const runtime = useAISDKRuntime(chatHelpers);
 
   // The persisted session list lives in the Apollo cache, not the chat store.
   // Paginated: older sessions load on demand as the sidebar scrolls.
   const {
     threads,
     loading: threadsLoading,
-    error: threadsError,
     refetch: refetchThreads,
-    hasMore: hasMoreSessions,
-    loadingMore: loadingMoreSessions,
-    loadMore: loadMoreSessions,
   } = useMastraThreads(selectedAgent?._id);
   const sessionsLoaded = !!selectedAgent && !threadsLoading;
-  const retrySessions = useCallback(() => {
-    void refetchThreads().catch(() => undefined);
-  }, [refetchThreads]);
-  const { renameThread } = useRenameMastraThread();
   const { removeThread, loading: sessionDeleteLoading } = useRemoveMastraThread(
     selectedAgent?._id,
   );
 
-  const [input, setInput] = useState('');
-  const [showScrollDown, setShowScrollDown] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const messagesBoxRef = useRef<HTMLDivElement>(null);
   // The chat↔preview split row — PreviewResizer sets --ea-preview-w on it.
   const splitRef = useRef<HTMLDivElement>(null);
-  // Decays the ghost scrollbar's `.is-scrolling` state after scrolling stops.
-  const scrollFadeTimer = useRef<ReturnType<typeof setTimeout>>();
-  // Whether the view is pinned to the bottom. Gates streaming auto-scroll so a
-  // user who scrolled up to read history isn't yanked back on every token.
-  const atBottomRef = useRef(true);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const attachments = useAttachments(attachmentsEnabled);
 
   // Session state-machine (slug→id redirect, ?thread= deep-link, current-agent
-  // tracking, bootstrap/re-home) lives in the hook so the view keeps only its
-  // own scroll/focus/autogrow effects.
+  // tracking, bootstrap/re-home) lives in the hook.
   useSessionBootstrap(selectedAgent, threads, sessionsLoaded);
-
-  // Keep the view pinned to the bottom — also while a reply streams (the last
-  // message grows in place). `messages` is a fresh array on every throttled
-  // streaming update, so following it re-fires this effect as the reply grows.
-  useEffect(() => {
-    if (atBottomRef.current) {
-      // Instant while a reply streams: smooth-following every throttled token
-      // re-fires the animation before it settles, which reads as the view
-      // bouncing up and down. A one-shot smooth scroll is fine once it's idle.
-      messagesEndRef.current?.scrollIntoView({
-        behavior: chatLoading ? 'auto' : 'smooth',
-      });
-    }
-  }, [messages, chatLoading]);
-
-  // Switching threads re-pins to the bottom of the freshly loaded conversation.
-  useEffect(() => {
-    atBottomRef.current = true;
-  }, [activeThreadId]);
-
-  useEffect(() => {
-    if (!chatLoading) textareaRef.current?.focus();
-  }, [chatLoading, activeThreadId]);
 
   // Artifact Preview panel (charts / generated documents). Switching agent or
   // thread clears any open preview — it belongs to the prior conversation.
@@ -183,21 +136,12 @@ export const ChatPage = () => {
   // The split handle only makes sense while the panel is docked beside the
   // chat — in fullscreen the panel is a fixed overlay with nothing to resize.
   const previewFullscreen = previewStore((s) => s.fullscreen);
-  // Agents/sessions column auto-collapse — driven by PreviewResizer when a
-  // drag squeezes the chat column; always restored once the preview closes.
-  const [sideCollapsed, setSideCollapsed] = useState(false);
-  useEffect(() => {
-    if (!previewOpen) setSideCollapsed(false);
-  }, [previewOpen]);
   useEffect(() => {
     previewStore.getState().close();
   }, [agentId, activeThreadId]);
 
   // Persisted artifacts for this thread — re-renders the inline chat cards on
   // reload (live tool parts don't survive). Apollo dedupes with the Files panel.
-  // Backend-linked groups attach by messageId; any unlinked group (legacy rows /
-  // a turn whose id recovery failed) is matched to its assistant bubble by the
-  // originating prompt + chat order so its cards still reappear.
   const { byMessageId, groups: artifactGroups } =
     useThreadArtifacts(activeThreadId);
   const storeArtifactsByMessage = useMemo(
@@ -205,17 +149,15 @@ export const ChatPage = () => {
     [messages, byMessageId, artifactGroups],
   );
 
-  // Auto-grow the textarea with its content (capped via max-h on the element).
-  useEffect(() => {
-    const el = textareaRef.current;
-    if (!el) return;
-    el.style.height = 'auto';
-    el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
-  }, [input]);
+  // Per-message extras for the assistant-ui rows (streaming flag, pair ids,
+  // merged live+store artifact outcomes).
+  const messageExtras = useMemo(
+    () => buildMessageExtras(messages, chatLoading, storeArtifactsByMessage),
+    [messages, chatLoading, storeArtifactsByMessage],
+  );
 
   // Sidebar handlers are wrapped in useCallback so their identities stay stable
-  // across streamed-token / keystroke re-renders — that's what lets the memoized
-  // SessionList / AgentRail skip re-rendering while a reply streams.
+  // across streamed-token / keystroke re-renders.
   const handleNewThread = useCallback(() => {
     if (!agentId || !selectedAgent) return;
     chatStore.newDraft(apolloClient, agentId, selectedAgent._id);
@@ -223,35 +165,6 @@ export const ChatPage = () => {
     // and let reload/back fall back to the agent's default (most-recent/draft).
     setThreadParam(undefined);
   }, [apolloClient, agentId, selectedAgent, setThreadParam]);
-
-  const handleSelectSession = useCallback(
-    (threadId: string) => {
-      // On narrow screens the sidebar is a drawer over the chat — close it.
-      setSidebarOpen(false);
-      if (!agentId || !selectedAgent || threadId === activeThreadId) return;
-      chatStore.selectSession(
-        apolloClient,
-        agentId,
-        selectedAgent._id,
-        threadId,
-      );
-      // Make the conversation addressable: push ?thread= so reload restores it
-      // and browser Back returns to the previously viewed conversation.
-      setThreadParam(threadId);
-    },
-    [apolloClient, agentId, selectedAgent, activeThreadId, setThreadParam],
-  );
-
-  // Open the confirmation dialog; the teardown itself runs in confirmDelete once
-  // the user confirms (replaces the native window.confirm()).
-  const handleDeleteSession = useCallback(
-    (e: React.MouseEvent | React.KeyboardEvent, threadId: string) => {
-      e.stopPropagation();
-      if (!agentId || !selectedAgent) return;
-      setPendingDelete(threadId);
-    },
-    [agentId, selectedAgent],
-  );
 
   const confirmDelete = useCallback(async () => {
     if (!agentId || !pendingDelete) return;
@@ -331,24 +244,6 @@ export const ChatPage = () => {
     toast,
   ]);
 
-  const handleRenameSession = useCallback(
-    (id: string, threadId: string, title: string) => {
-      renameThread(id, threadId, title);
-    },
-    [renameThread],
-  );
-
-  const handleRailOpen = useCallback(() => setRailOpen(true), []);
-
-  const handleAgentSelect = useCallback(
-    (id: string) => {
-      navigate(`/erxes-agent/chat/${id}`);
-      setRailOpen(false);
-      setSidebarOpen(false);
-    },
-    [navigate],
-  );
-
   // Retry a turn that errored mid-stream (drives the error banner's action).
   const handleRetry = useCallback(() => {
     if (chatLoading) return;
@@ -363,8 +258,6 @@ export const ChatPage = () => {
       hidden?: boolean,
     ) => {
       if (!selectedAgent || !agentId) return;
-      // Sending re-pins to the bottom so the user follows their own message.
-      atBottomRef.current = true;
       // Fire-and-forget: the store holds the Apollo client reference so the
       // request continues even if the user navigates away before it completes.
       chatStore.sendMessage(
@@ -400,46 +293,31 @@ export const ChatPage = () => {
     );
   };
 
-  const handleSend = async () => {
-    if (
-      !input.trim() ||
-      !selectedAgent ||
-      chatLoading ||
-      !agentId ||
-      attachments.uploadsInFlight
-    )
-      return;
-    const message = input.trim();
-    // Files are staged, not uploaded, until now — upload them as part of sending.
-    // If any upload fails, abort: keep the composer's text + chips so the user
-    // can retry (send again) or remove the offending file. Nothing is sent.
-    const { attachments: atts, ok } = await attachments.uploadAll();
-    if (!ok) return;
-    attachments.clear();
-    setInput('');
-    sendMessage(message, atts);
-  };
+  // The composer's send: upload staged files first, then fire the turn. On any
+  // upload failure nothing is sent — the composer keeps its text and chips.
+  const handleSend = useCallback(
+    async (message: string) => {
+      if (
+        !message.trim() ||
+        !selectedAgent ||
+        chatLoading ||
+        !agentId ||
+        attachments.uploadsInFlight
+      )
+        return;
+      const { attachments: atts, ok } = await attachments.uploadAll();
+      if (!ok) return;
+      attachments.clear();
+      sendMessage(message.trim(), atts);
+    },
+    [agentId, selectedAgent, chatLoading, attachments, sendMessage],
+  );
 
   // Re-ask the question that produced the last reply (with its attachments).
-  // The store reads the last user message off the active Chat, so this callback
-  // stays referentially stable across streamed tokens — the memoized message
-  // rows depend on it not changing every chunk.
   const handleRegenerate = useCallback(() => {
     if (!agentId || !selectedAgent || chatLoading) return;
     chatStore.regenerate(apolloClient, agentId, selectedAgent._id);
   }, [apolloClient, agentId, selectedAgent, chatLoading]);
-
-  // Load a past user message back into the composer to tweak before sending.
-  const handleEditMessage = useCallback((value: string) => {
-    setInput(value);
-    // Focus and drop the caret at the end so it's ready to edit immediately.
-    requestAnimationFrame(() => {
-      const el = textareaRef.current;
-      if (!el) return;
-      el.focus();
-      el.setSelectionRange(el.value.length, el.value.length);
-    });
-  }, []);
 
   // Send a past user message again as a fresh turn (carries its attachments).
   const handleResendMessage = useCallback(
@@ -454,8 +332,6 @@ export const ChatPage = () => {
     if (agentId) chatStore.stop(apolloClient, agentId);
   };
 
-  // Composer callback props, stabilized so the memoized Composer /
-  // ReasoningEffortControl don't re-render on every streamed token.
   const handleReasoningEffortChange = useCallback(
     (effort?: ReasoningEffort) => {
       if (agentId) chatStore.setReasoningEffort(agentId, effort);
@@ -463,45 +339,14 @@ export const ChatPage = () => {
     [agentId],
   );
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
-    if (e.key === 'Escape' && chatLoading) {
-      e.preventDefault();
-      handleStop();
-    }
-  };
-
-  const handleMessagesScroll = () => {
-    const el = messagesBoxRef.current;
-    if (!el) return;
-    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-    atBottomRef.current = distanceFromBottom < SCROLL_PIN_THRESHOLD;
-    setShowScrollDown(distanceFromBottom > SCROLL_BUTTON_THRESHOLD);
-    // Ghost scrollbar (chat.css .ea-scroll): visible while scrolling, gone at
-    // rest. Class toggled directly on the node — no re-render per scroll tick.
-    el.classList.add('is-scrolling');
-    clearTimeout(scrollFadeTimer.current);
-    scrollFadeTimer.current = setTimeout(
-      () => el.classList.remove('is-scrolling'),
-      800,
-    );
-  };
-
-  useEffect(() => () => clearTimeout(scrollFadeTimer.current), []);
-
-  const scrollToBottom = () => {
-    atBottomRef.current = true;
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  const showAgentRail = !selectedAgent || railOpen;
-  // Below `md`, once an agent is picked the side panel slides in over the chat
-  // as a drawer instead of holding a fixed 240px column. Without a selected
-  // agent it stays in flow so the AgentRail is always reachable.
-  const asDrawer = isNarrow && !!selectedAgent;
+  const messageActions = useMemo(
+    () => ({
+      onRegenerate: handleRegenerate,
+      onDeleteMessage: handleDeleteMessage,
+      onResendMessage: handleResendMessage,
+    }),
+    [handleRegenerate, handleDeleteMessage, handleResendMessage],
+  );
 
   return (
     <div className="flex flex-col h-full">
@@ -509,38 +354,10 @@ export const ChatPage = () => {
         hasAgent={!!selectedAgent}
         agentName={selectedAgent?.accountName}
         agentId={selectedAgent?._id}
-        asDrawer={asDrawer}
-        onToggleSidebar={() => setSidebarOpen((v) => !v)}
         onNewThread={handleNewThread}
       />
 
       <div ref={splitRef} className="flex flex-1 overflow-hidden relative">
-        <ChatSidePanel
-          asDrawer={asDrawer}
-          sidebarOpen={sidebarOpen}
-          onCloseSidebar={() => setSidebarOpen(false)}
-          showAgentRail={showAgentRail}
-          agents={agents}
-          agentsLoading={agentsLoading}
-          agentId={agentId}
-          onAgentSelect={handleAgentSelect}
-          hasAgent={!!selectedAgent}
-          threads={threads}
-          sessionsLoaded={sessionsLoaded}
-          isDraft={isDraft}
-          activeThreadId={activeThreadId}
-          hasMoreSessions={hasMoreSessions}
-          loadingMoreSessions={loadingMoreSessions}
-          onLoadMore={loadMoreSessions}
-          onSelectSession={handleSelectSession}
-          onNewThread={handleNewThread}
-          onDeleteSession={handleDeleteSession}
-          onRenameSession={handleRenameSession}
-          onRailOpen={handleRailOpen}
-          sessionsError={!!threadsError}
-          onRetrySessions={retrySessions}
-        />
-
         {/* ── Chat area ── */}
         <div
           className="flex-1 flex flex-col overflow-hidden relative"
@@ -556,37 +373,16 @@ export const ChatPage = () => {
           {!selectedAgent ? (
             <SelectAgentEmpty />
           ) : (
-            <>
-              <MessageList
-                agent={selectedAgent}
-                messages={messages}
-                messagesLoading={messagesLoading}
-                chatLoading={chatLoading}
-                attachmentsEnabled={attachmentsEnabled}
-                boxRef={messagesBoxRef}
-                endRef={messagesEndRef}
-                onScroll={handleMessagesScroll}
-                onSuggestion={(text) => {
-                  setInput(text);
-                  textareaRef.current?.focus();
-                }}
-                onRegenerate={handleRegenerate}
-                onEditMessage={handleEditMessage}
-                onResendMessage={handleResendMessage}
-                onDeleteMessage={handleDeleteMessage}
-                storeArtifactsByMessage={storeArtifactsByMessage}
-              />
-
-              {showScrollDown && (
-                <button
-                  type="button"
-                  onClick={scrollToBottom}
-                  className="ea-pop absolute bottom-28 right-4 z-10 flex items-center gap-1.5 rounded-full border border-border bg-background/95 backdrop-blur px-3 py-1.5 text-xs shadow-md hover:border-primary/40 hover:text-primary transition-colors"
-                >
-                  <IconArrowDown className="size-3.5" />
-                  Latest
-                </button>
-              )}
+            <AssistantRuntimeProvider runtime={runtime}>
+              <MessageExtrasContext.Provider value={messageExtras}>
+                <ChatMessageActionsContext.Provider value={messageActions}>
+                  <AgentThread
+                    agent={selectedAgent}
+                    messagesLoading={messagesLoading}
+                    attachmentsEnabled={attachmentsEnabled}
+                  />
+                </ChatMessageActionsContext.Provider>
+              </MessageExtrasContext.Provider>
 
               {chatError && !chatLoading && (
                 <ChatErrorBanner
@@ -604,32 +400,23 @@ export const ChatPage = () => {
                 />
               )}
 
-              <Composer
-                input={input}
-                onInputChange={setInput}
+              <AgentComposer
                 onSend={handleSend}
                 onStop={handleStop}
-                onKeyDown={handleKeyDown}
                 chatLoading={chatLoading}
                 attachmentsEnabled={attachmentsEnabled}
                 attachments={attachments}
                 agentName={selectedAgent.accountName}
                 reasoningEffort={reasoningEffort}
                 onReasoningEffortChange={handleReasoningEffortChange}
-                textareaRef={textareaRef}
-                fileInputRef={fileInputRef}
               />
-            </>
+            </AssistantRuntimeProvider>
           )}
         </div>
 
         {/* ── Artifact Preview panel (charts / generated documents) ── */}
         {previewOpen && selectedAgent && !previewFullscreen && (
-          <PreviewResizer
-            splitRef={splitRef}
-            sideCollapsed={sideCollapsed}
-            onSideCollapsedChange={setSideCollapsed}
-          />
+          <PreviewResizer splitRef={splitRef} />
         )}
         {previewOpen && selectedAgent && (
           <PreviewPanel threadId={activeThreadId} />

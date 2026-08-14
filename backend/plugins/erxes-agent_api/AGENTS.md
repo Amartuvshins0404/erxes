@@ -57,7 +57,7 @@
 ### Consumes
 
 - `erxes-api-shared` authentication, permission, service-discovery, agent-tool types (`AgentToolDescriptor`/`AgentToolManifest`), and core types.
-- Published plugin capability contracts: `GET /agent-tools/manifest` for discovery and `POST /agent-tools/call` for execution as the linked agent account (userId in the `x-trpc-context` header); the serving plugin enforces descriptor permissions authoritatively.
+- Published plugin capability contracts: `GET /agent-tools/manifest` for discovery and `POST /agent-tools/call` for execution as the linked agent account. Both carry the HMAC-signed `x-erxes-agent-auth` header (tenant for manifests, tenant + acting user for calls; mutation correlation id travels in the reserved `__processId` input key); the serving plugin verifies the signature and enforces descriptor permissions authoritatively.
 - Mastra Agent, Memory, processors, `Workspace`, `LocalSkillSource`, and storage APIs.
 
 ## Data and State
@@ -93,6 +93,12 @@
 ## Recent Changes
 
 <!-- Newest first. Keep at most 10 entries. -->
+
+### `2026-08-14` — Signed agent-tools auth header
+
+- **Summary:** Native capability discovery and execution now authenticate with the HMAC-signed `x-erxes-agent-auth` header (shared `JWT_TOKEN_SECRET`, short expiry) instead of the reversible `x-trpc-context` header, matching the hardened platform contract; the mutation correlation id moves from the header context into the reserved `__processId` input key.
+- **Affected areas:** `src/mastra/tools/nativeTools.ts` (`fetchPluginManifest`, `callNativeTool`).
+- **Contracts changed:** `GET /agent-tools/manifest` and `POST /agent-tools/call` requests must carry a valid `x-erxes-agent-auth` header; unsigned requests are rejected with 401 by the platform.
 
 ### `2026-08-14` — Remove the isolated terminal tool
 

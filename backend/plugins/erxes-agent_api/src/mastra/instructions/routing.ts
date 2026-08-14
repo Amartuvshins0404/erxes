@@ -154,6 +154,22 @@ You have no action tools available. Answer from general knowledge and conversati
 If the user asks you to read or change erxes data, explain that this agent is not configured with access to do that.
 `.trim();
 
+// The ask_user contract: one clarifying question with structured choices when
+// the missing detail changes the outcome — then the turn ends and the chat's
+// question card collects the answer. Guessing instead of asking is the failure
+// this prevents; so is answering your own question.
+const ASK_USER_BLOCK = `
+## Asking the User a Question
+
+When a request is ambiguous and the missing detail changes what you would do (which record, which period, which format, …), call ask_user ONCE: a short question plus up to four concrete options, each option a real choice the user can tap. Add a one-line description only when a label needs context.
+
+Rules:
+- NEVER ask when the request is already actionable — act first, ask only when a wrong guess would waste the turn.
+- At most ONE ask_user call per turn, and never re-ask what the user already answered.
+- After calling ask_user, END your turn immediately: no summary, no narration, and NEVER answer your own question.
+- The user's next message answers it. When it does, treat that answer as the missing detail and continue the original task immediately. If it says the question was skipped, proceed with your best judgment and say what you assumed.
+`.trim();
+
 /**
  * Builds the full system prompt for an agent.
  *
@@ -175,6 +191,7 @@ export function buildSystemPrompt(
     SMALL_TALK_BLOCK.trim(),
     COMMUNICATION_BLOCK,
     DATE_BLOCK(),
+    ASK_USER_BLOCK,
   ];
 
   if (opts.hasErxesTools) {

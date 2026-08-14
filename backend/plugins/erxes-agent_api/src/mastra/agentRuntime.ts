@@ -12,7 +12,7 @@ import {
   getNativeToolRegistry,
   type NativeToolRegistry,
 } from './tools/nativeTools';
-import { buildErxesSupportTools } from './tools/metaTools';
+import { askUserTool, buildErxesSupportTools } from './tools/metaTools';
 import {
   isBuiltinAllowed,
   hasAnyOperation,
@@ -253,6 +253,16 @@ function assembleAgentTools(params: {
   if (hasErxes) {
     Object.assign(tools, buildErxesSupportTools());
   }
+
+  // ask_user is a conversation capability, not a scoped capability: every
+  // agent can hit an ambiguous request, so it is always bound and always
+  // active (selectTurnActiveTools never filters it out).
+  tools.ask_user = askUserTool;
+  builtinInfos.push({
+    id: 'ask_user',
+    name: 'ask_user',
+    description: askUserTool.description,
+  });
 
   // Standalone builtin tools, filtered by policy.
   for (const [key, tool] of Object.entries(BUILTIN_TOOLS)) {

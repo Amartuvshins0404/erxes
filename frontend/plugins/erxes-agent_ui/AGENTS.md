@@ -27,7 +27,10 @@
 - Manages providers and tenant runtime settings; Settings opens Providers by default.
 - General settings include a Sandbox mode select (`onserver` built-in vs `isolated` OpenSandbox); OpenSandbox URL/API-key fields render only in isolated mode.
 - Streams native agent chat parts, tool activity, attachments, artifacts, and session updates.
-- Renders the chat conversation on assistant-ui primitives (`ThreadPrimitive`, `MessagePrimitive`, `ComposerPrimitive`, streaming markdown) over the AI SDK chat runtime; tool calls display as inline per-call status lines with dedicated readable renderers for web-search and fetch-url results.
+- Renders the chat conversation on assistant-ui primitives (`ThreadPrimitive`, `MessagePrimitive`, `ComposerPrimitive`, streaming markdown) over the AI SDK chat runtime; tool calls render on the assistant-ui tool-fallback architecture (scroll-locked collapsible, shimmer-while-running, elapsed duration) with structured args/results (key-value rows, mini tables, empty/error envelopes) — never raw JSON — plus dedicated renderers for web-search (sources list) and fetch-url (page card).
+- Shows "thinking"/activity with `thinking-orbs` (`ThinkingOrb`): a size-64 orb while the turn spins up, size-20 per-tool-state orbs (`searching`, `connecting`, `solving`, `composing`, `shaping`, `listening`) on running tool rows.
+- Renders the agent's `ask_user` clarifying questions as an interactive card (numbered options, free-text "Something else", Skip) docked after the message parts; answers replay as hidden user messages quoting the question.
+- Quiet one-line status rows for plumbing tools (`calculator`, `request_approval`, `search_tools`, artifact tools) whose real output lives in other surfaces.
 - Hosts a custom chat workspace sidebar: agents up top and the active agent's conversations below as an assistant-ui thread list (`ThreadListPrimitive` / `ThreadListItemPrimitive`) driven by a remote-thread-list runtime over the mastra session GraphQL contract, plus a permission-gated "Manage agents" footer link.
 - The plugin registers no core sub-module panel (`navigationGroup` carries only the rail label/icon), so entering the plugin shows only the plugin's own sidebar.
 
@@ -64,6 +67,7 @@
 - Live chat turns are owned by AI SDK `Chat` instances (one per agent+thread) behind a small zustand registry; the stock `DefaultChatTransport` speaks to the SSE endpoint, whose `finish` chunk metadata supplies the native message id. Session/activity signals mirror into the registry only for background-thread badges.
 - Conversation selection is owned by an assistant-ui `unstable_useRemoteThreadListRuntime` per agent: a plugin adapter (`chat/runtime/mastraThreadListAdapter.ts`) maps the mastra session queries/mutations onto the remote-thread-list contract (thread ids are client-generated; `initialize` is an id passthrough, archiving is unsupported). `ChatRuntimeSync` keeps `?thread=`, the runtime main thread, and the store's per-agent active selection in two-way sync.
 - The conversation view runs on `@assistant-ui/react` primitives via per-thread `useAISDKRuntime(chatHelpers)` instances (one hook instance per alive thread, mounted by the remote list runtime); sends go through the store's pipeline (staged attachment uploads and per-send body extras), not the runtime composer send.
+- `ask_user` answers replay through `chatStore.sendMessage` as hidden user messages (`formatAskUserAnswer`/`formatAskUserSkip` in `chat/types.ts` — the quote anchors backend keyword tool-scoping); `AskUserCard` parses the convention back for the answered receipt, so state survives reloads without extra persistence.
 - Settings forms use React Hook Form values validated by Zod schemas in `src/pages/settings/validations.ts`.
 
 ## Local Invariants
@@ -85,11 +89,13 @@
 
 <!-- Newest first. Keep at most 10 entries. -->
 
-### `2026-08-14` — Sandbox mode selector in general settings
+### `2026-08-15` — Tool activity redesign, thinking orbs, and ask_user cards
 
-- **Summary:** General settings now offer a Sandbox mode select (`onserver` built-in restricted realm, default, vs `isolated` OpenSandbox); the OpenSandbox URL/API-key fields render only in isolated mode, are cleared when switching back to on-server, and the Zod schema strips them on submit so stale values are never sent.
-- **Affected areas:** `src/pages/settings/GeneralSettingsPage.tsx`, `src/pages/settings/validations.ts`, `src/pages/settings/types.ts`, `src/graphql/queries.ts`, `src/graphql/mutations.ts`.
-- **Contracts changed:** Consumes the new `sandboxMode` field on the `MastraSettings` type and the `MastraSettingsInput` save input.
+- **Summary:** Rebuilt the tool-call surface on the official assistant-ui tool-fallback architecture (scroll-locked collapsibles, shimmer-while-running, per-call elapsed time) with structured args/results — key-value rows, capped mini tables for record lists, and notes for the empty/error envelopes — replacing every raw JSON dump; webSearch/fetchUrl render ChatGPT-style "Searching <query>" status lines and favicon source lists; `thinking-orbs` drives the turn-level Thinking orb and per-tool running states; the agent's `ask_user` questions render as an interactive option card (single/multi select, free-text, Skip) whose answer replays as a hidden user message; plumbing tools (calculator, approvals, tool search, artifact generators) are quiet one-liners.
+- **Affected areas:** `src/modules/chat/assistant/` (rewritten `ToolFallback`/`WebSearchTool`/`FetchUrlTool`/`ToolGroupBlock`; new `toolValue.tsx`, `QuietTools.tsx`, `AskUserTool.tsx`), `AgentThread.tsx` (orb ThinkingRow), `chat/types.ts` (ask_user contract), `chatContexts.ts`, `ChatPage.tsx` (answer/skip handlers), `chat.css` (`ea-kv`, `ea-tool-table`, `ea-clamp-2`, `ea-ask-*`; removed `ea-typing-dot`), root `package.json` (+`thinking-orbs`).
+- **Contracts changed:** Consumes the backend's new `ask_user` tool (args `{question, options, selectionMode}`, result `{awaitingUserAnswer: true, …}`); GraphQL contracts unchanged.
+
+### `2026-08-14` — Sandbox mode selector in general settings
 
 ### `2026-08-13` — Production-safe chat surface styles
 

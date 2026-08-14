@@ -9,6 +9,10 @@ import type {
   ApprovedOp,
   ReasoningEffort,
 } from '~/modules/chat/types';
+import {
+  formatAskUserAnswer,
+  formatAskUserSkip,
+} from '~/modules/chat/types';
 import type { IChatAgent } from '~/modules/chat/hooks/useChatAgents';
 import { chatStore } from '~/modules/chat/store/chatStore';
 import {
@@ -241,6 +245,25 @@ const AgentChatWorkspace = ({
     );
   };
 
+  // The ask_user card answers as a hidden send quoting the question — the
+  // quote anchors the backend's keyword tool-scoping to the original task, and
+  // the convention parses back into the card's answered receipt on reload.
+  const handleAnswerQuestion = useCallback(
+    (question: string, answer: string) => {
+      if (chatLoading || !answer.trim()) return;
+      sendMessage(formatAskUserAnswer(question, answer.trim()), [], undefined, true);
+    },
+    [chatLoading, sendMessage],
+  );
+
+  const handleSkipQuestion = useCallback(
+    (question: string) => {
+      if (chatLoading) return;
+      sendMessage(formatAskUserSkip(question), [], undefined, true);
+    },
+    [chatLoading, sendMessage],
+  );
+
   // The composer's send: upload staged files first, then fire the turn. On any
   // upload failure nothing is sent — the composer keeps its text and chips.
   const handleSend = useCallback(
@@ -285,8 +308,16 @@ const AgentChatWorkspace = ({
       onRegenerate: handleRegenerate,
       onDeleteMessage: handleDeleteMessage,
       onResendMessage: handleResendMessage,
+      onAnswerQuestion: handleAnswerQuestion,
+      onSkipQuestion: handleSkipQuestion,
     }),
-    [handleRegenerate, handleDeleteMessage, handleResendMessage],
+    [
+      handleRegenerate,
+      handleDeleteMessage,
+      handleResendMessage,
+      handleAnswerQuestion,
+      handleSkipQuestion,
+    ],
   );
 
   return (

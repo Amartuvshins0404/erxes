@@ -38,8 +38,86 @@ export type AgentDataParts = {
 
 export type AgentUIMessage = UIMessage<AgentMessageMetadata, AgentDataParts>;
 
-// ── Approval (erxes-only, unchanged) ─────────────────────────────────────────
+// ── ask_user (structured question the agent asks mid-conversation) ───────────
+//
+// Mirrors the input contract of Mastra's built-in askUserTool. The backend
+// tool returns the payload as a plain tool result (`awaitingUserAnswer: true`)
+// and ends the turn; the chat renders an interactive card, and the answer is
+// replayed as the user's next (hidden) message — the same pattern as
+// request_approval.
 
+export interface AskUserOption {
+  label: string;
+  description?: string;
+}
+
+export type AskUserSelectionMode = 'single_select' | 'multi_select';
+
+export interface AskUserQuestion {
+  question: string;
+  options: AskUserOption[];
+  selectionMode?: AskUserSelectionMode;
+}
+
+/** Narrow an ask_user tool call's args to the question payload. */
+export const asAskUserQuestion = (input: unknown): AskUserQuestion | null => {
+  const q = input as
+    | {
+        question?: unknown;
+        options?: unknown;
+        selectionMode?: unknown;
+      }
+    | null
+    | undefined;
+  if (!q || typeof q.question !== 'string' || !q.question.trim()) return null;
+  const options = Array.isArray(q.options)
+    ? q.options
+        .filter(
+          (o): o is { label: string; description?: string } =>
+            !!o &&
+            typeof (o as { label?: unknown }).label === 'string' &&
+            !!(o as { label: string }).label.trim(),
+        )
+        .map((o) => ({
+          label: o.label,
+          ...(typeof o.description === 'string'
+            ? { description: o.description }
+            : {}),
+        }))
+    : [];
+  const selectionMode: AskUserSelectionMode | undefined =
+    q.selectionMode === 'multi_select'
+      ? 'multi_select'
+      : options.length
+      ? 'single_select'
+      : undefined;
+  return { question: q.question, options, selectionMode };
+};
+
+/** True while the ask_user result says the turn is waiting on the user. */
+export const isAwaitingUserAnswer = (result: unknown): boolean =>
+  !!result &&
+  typeof result === 'object' &&
+  (result as { awaitingUserAnswer?: unknown }).awaitingUserAnswer === true;
+
+// The answer is replayed as a hidden user message quoting the question (the
+// quote keeps the backend's keyword tool-scoping anchored to the original
+// task). The card parses the convention back to render the answered state.
+export const formatAskUserAnswer = (
+  question: string,
+  answer: string,
+): string => `Regarding your question "${question}": ${answer}`;
+
+export const formatAskUserSkip = (question: string): string =>
+  `Regarding your question "${question}": (skipped — proceed with your best judgment)`;
+
+const ASK_USER_ANSWER_RE = /^Regarding your question "[\s\S]*?": ([\s\S]+)$/;
+
+/** Extract the answer text from a formatted ask_user reply, or null. */
+export const parseAskUserAnswer = (text: string): string | null =>
+  ASK_USER_ANSWER_RE.exec(text.trim())?.[1] ?? null;
+
+// ── Approval (erxes-only, unchanged) ─────────────────────────────────────────
 // A destructive operation the user approves from the chat (echoed back on the
 // next turn so the backend runs the otherwise-gated delete/merge).
 export interface ApprovedOp {

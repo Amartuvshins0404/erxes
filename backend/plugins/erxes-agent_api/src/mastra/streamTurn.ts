@@ -23,6 +23,7 @@ import {
   shouldBufferProviderText,
 } from './providerOutputGuard';
 import { ensureWebsiteDeliveryReply } from '@/agent/websiteDelivery';
+import { isAwaitingUserAnswer } from './tools/metaTools';
 
 // Validated POST /chat/stream payload. All shape-checking for the untrusted
 // request body lives in routes.ts (parseChatStreamBody); this is the contract it
@@ -194,10 +195,17 @@ async function finalizeTurn(params: {
   // The model owns the turn ending; its answer is never second-guessed or
   // rewritten. Only a hard failure, an interruption, or the tool-budget hard
   // stop that left no text gets a plain-language note so the user isn't
-  // stranded on a blank bubble.
+  // stranded on a blank bubble. A turn that ended on ask_user is waiting on
+  // the user's answer — the chat renders the question card, so it never gets
+  // a closing note either (the card IS the outcome).
+  const askedUser = acc.toolCalls.some(
+    (toolCall) =>
+      toolCall.toolName === 'ask_user' &&
+      isAwaitingUserAnswer(toolCall.result),
+  );
   const budgetExhausted =
     (authCtx.toolCallCount ?? 0) >= (authCtx.toolCallLimit ?? 50);
-  if (!reply && (interrupted || failed || budgetExhausted)) {
+  if (!reply && !askedUser && (interrupted || failed || budgetExhausted)) {
     reply = interrupted
       ? 'This response was interrupted before it finished. Please tap retry to continue.'
       : failed

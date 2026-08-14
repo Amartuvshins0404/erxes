@@ -35,6 +35,35 @@ import {
 } from '~/modules/chat/assistant/ReasoningBlock';
 import { FetchUrlTool } from '~/modules/chat/assistant/FetchUrlTool';
 import { WebSearchTool } from '~/modules/chat/assistant/WebSearchTool';
+import {
+  ArtifactToolNote,
+  CalculatorTool,
+  RequestApprovalNote,
+  ToolSearchNote,
+} from '~/modules/chat/assistant/QuietTools';
+import {
+  AskUserCard,
+  AskUserToolNote,
+} from '~/modules/chat/assistant/AskUserTool';
+
+// Tools whose payload is plumbing (artifact spec, approval request, discovery
+// step) render as quiet one-line status rows — the ArtifactCard / ApprovalBar
+// surfaces carry their real content. ask_user's row is quiet too; the
+// interactive question card renders once per message (AskUserCard) so a
+// collapsed tool group can never swallow it.
+const QUIET_TOOLS = {
+  calculator: CalculatorTool,
+  request_approval: RequestApprovalNote,
+  search_tools: ToolSearchNote,
+  ask_user: AskUserToolNote,
+  renderChart: ArtifactToolNote,
+  renderDiagram: ArtifactToolNote,
+  generatePdf: ArtifactToolNote,
+  generateDocx: ArtifactToolNote,
+  generateXlsx: ArtifactToolNote,
+  generatePptx: ArtifactToolNote,
+  removeImageBackground: ArtifactToolNote,
+};
 
 // 32px quiet icon button, background-only hover — the clone's action control.
 // ea-quiet-btn owns the hover wash (plugin-unique utilities don't reach prod).
@@ -153,6 +182,15 @@ const AssistantMessageRow = () => {
     agentMeta<AgentMessageMetadata>(s.metadata),
   );
   const text = useMessage(messageText);
+  // A turn that ended on ask_user renders the question card instead of text —
+  // it must never trip the blank-bubble guard below.
+  const endsOnQuestion = useMessage((s) =>
+    s.content.some(
+      (p) =>
+        p.type === 'tool-call' &&
+        (p as { toolName?: string }).toolName === 'ask_user',
+    ),
+  );
   const extras = useContext(MessageExtrasContext).get(id);
   const streaming = !!extras?.streaming;
   const artifacts = extras?.artifacts ?? [];
@@ -172,7 +210,11 @@ const AssistantMessageRow = () => {
             ReasoningGroup,
             ToolGroup: ToolGroupBlock,
             tools: {
-              by_name: { fetchUrl: FetchUrlTool, webSearch: WebSearchTool },
+              by_name: {
+                fetchUrl: FetchUrlTool,
+                webSearch: WebSearchTool,
+                ...QUIET_TOOLS,
+              },
               Fallback: ToolFallback,
             },
           }}
@@ -188,6 +230,7 @@ const AssistantMessageRow = () => {
             ))}
           </div>
         )}
+        <AskUserCard />
         {failures.length > 0 && (
           <div className="mt-2">
             {failures.map((tool, i) => (
@@ -200,9 +243,11 @@ const AssistantMessageRow = () => {
           </div>
         )}
         {/* A settled turn with no answer text and no artifact must never read
-            as a blank bubble — surface the outcome and offer a retry. */}
+            as a blank bubble — surface the outcome and offer a retry. A turn
+            that ended on ask_user renders the question card instead. */}
         {!streaming &&
           !text.trim() &&
+          !endsOnQuestion &&
           artifacts.length === 0 &&
           failures.length === 0 && (
             <div className="flex items-center gap-2 py-1 text-xs text-muted-foreground">

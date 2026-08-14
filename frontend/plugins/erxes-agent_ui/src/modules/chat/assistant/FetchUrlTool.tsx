@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import type { ToolCallMessagePartProps } from '@assistant-ui/react';
 import { IconWorld } from '@tabler/icons-react';
-import { JsonBlock, ToolShell } from '~/modules/chat/assistant/ToolFallback';
+import { ToolShell } from '~/modules/chat/assistant/ToolFallback';
+import { JsonBlock } from '~/modules/chat/assistant/toolValue';
 
 interface FetchUrlResult {
   url?: string;
@@ -15,6 +16,14 @@ const isFetchUrlResult = (value: unknown): value is FetchUrlResult =>
   !!value &&
   typeof value === 'object' &&
   typeof (value as FetchUrlResult).content === 'string';
+
+const hostname = (url: string): string => {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return url;
+  }
+};
 
 const PREVIEW_CHARS = 700;
 
@@ -39,8 +48,12 @@ const PageContent = ({ content }: { content: string }) => {
   );
 };
 
+// fetchUrl gets the same search-engine shell as webSearch: "Fetching <host>"
+// while running, then "Fetched <title>" expanding to the readable page card —
+// favicon, linked title, site name, plain-text content behind "Read more".
 export const FetchUrlTool = ({
   toolName,
+  args,
   result,
   isError,
   status,
@@ -48,9 +61,32 @@ export const FetchUrlTool = ({
   const running = status?.type === 'running' || result === undefined;
   const parsed = isFetchUrlResult(result) ? result : undefined;
 
+  const argUrl =
+    args && typeof args === 'object' && 'url' in args
+      ? String((args as { url?: unknown }).url ?? '')
+      : '';
+  const target = parsed?.url || argUrl;
+  const host = target ? hostname(target) : '';
+
+  const label = running ? (
+    <>
+      Fetching {host && <span className="ea-muted-80">{host}</span>}
+    </>
+  ) : (
+    <>
+      Fetched{' '}
+      <span className="ea-muted-80">
+        {parsed?.title || host || 'page'}
+      </span>
+    </>
+  );
+
   return (
     <ToolShell
       toolName={toolName}
+      label={label}
+      icon={IconWorld}
+      runningState="connecting"
       isError={isError}
       running={running}
       incomplete={status?.type === 'incomplete'}
@@ -74,7 +110,7 @@ export const FetchUrlTool = ({
                   href={parsed.url}
                   target="_blank"
                   rel="noreferrer"
-                  className="block truncate text-sm text-primary hover:underline"
+                  className="block truncate text-sm font-medium text-foreground hover:underline"
                 >
                   {parsed.title || parsed.url}
                 </a>

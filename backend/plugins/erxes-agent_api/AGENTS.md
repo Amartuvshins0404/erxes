@@ -29,6 +29,7 @@
 - Runs LLM-written JavaScript through the opt-in `run-code` builtin with an injected `erxes` SDK (`erxes.call`/`erxes.list`) bridging into the native capability layer; the tenant `sandboxMode` setting selects an in-process `node:vm` realm (`onserver`, default) or the OpenSandbox container (`isolated`, deterministic memoized replay over workspace files — zero egress).
 - Loads plugin-owned `SKILL.md` files through Mastra `Workspace` and `LocalSkillSource`; Mastra provides skill discovery and read tools at runtime.
 - Bounds unique tool executions and state-changing tool concurrency per turn; every tool invocation (first or exact repeat) spends from the same 50-call hard stop so a repeat loop cannot spin forever.
+- Asks structured clarifying questions through `ask_user` (`src/mastra/tools/metaTools.ts`): same input contract as Mastra's built-in `askUserTool` (question/options/selectionMode), but returns the payload as a plain tool result (`awaitingUserAnswer: true`) and ends the turn instead of suspending the run — the UI renders the question card and the answer arrives as the next user message (the `request_approval` replay pattern; no Mastra snapshot storage required).
 - Derives chat titles from the first meaningful request without a provider call.
 - Wraps empty operation results (`{}`/`[]`/`null`) in an explicit `resultCount: 0` envelope with filter-check/pivot guidance instead of forwarding an anonymous empty payload.
 - Anchors the system prompt to the current date and lets the native Mastra loop own turn lifecycle: a turn ends when the model itself answers or when the 50-call tool budget is spent (the only hard stop), with no other step ceiling or completion guard.
@@ -93,6 +94,12 @@
 ## Recent Changes
 
 <!-- Newest first. Keep at most 10 entries. -->
+
+### `2026-08-15` — Structured ask_user questions
+
+- **Summary:** Agents can ask the user a clarifying question with structured choices: the new always-bound `ask_user` tool (Mastra built-in contract, non-suspending execution) ends the turn with an `awaitingUserAnswer` result, the system prompt gained an "Asking the User" block (act-first, one question per turn, never self-answer), and turn finalization never writes a closing note while a question is pending so the turn never closes over the card. Answers continue as ordinary next user messages.
+- **Affected areas:** `src/mastra/tools/metaTools.ts` (tool + `isAwaitingUserAnswer`), `src/mastra/agentRuntime.ts` (unconditional registration, ROUTING_VERSION 42), `src/mastra/instructions/routing.ts`, `src/mastra/streamTurn.ts` (no closing note for pending questions), `src/mastra/tools/__tests__/askUserTool.test.ts` (new).
+- **Contracts changed:** `POST /chat/stream` turns may now end with an `ask_user` tool part carrying `{ awaitingUserAnswer: true, question, options, selectionMode }` and no reply text; no other stream contract changes.
 
 ### `2026-08-14` — Signed agent-tools auth header
 

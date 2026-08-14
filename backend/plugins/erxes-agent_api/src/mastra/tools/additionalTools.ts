@@ -1,5 +1,3 @@
-import { ExpectedError } from 'erxes-api-shared/utils';
-
 /**
  * User-selectable capabilities that are independent from erxes operation
  * permissions. Local skills and file reading are governed elsewhere and do
@@ -16,26 +14,13 @@ export const ADDITIONAL_TOOL_KEYS = [
   'generateXlsx',
   'generatePptx',
   'removeImageBackground',
-  'terminal',
+  'runCode',
 ] as const;
 
 export type AdditionalToolKey = (typeof ADDITIONAL_TOOL_KEYS)[number];
-const additionalToolKeys: Record<AdditionalToolKey, true> = {
-  webSearch: true,
-  fetchUrl: true,
-  calculator: true,
-  renderChart: true,
-  renderDiagram: true,
-  generatePdf: true,
-  generateDocx: true,
-  generateXlsx: true,
-  generatePptx: true,
-  removeImageBackground: true,
-  terminal: true,
-};
 
-// Enable safe local capabilities for new and legacy agents. Network access and
-// terminal execution remain opt-in.
+// Enable safe local capabilities for new and legacy agents. Network access
+// and code mode remain opt-in.
 export const DEFAULT_ADDITIONAL_TOOL_KEYS: AdditionalToolKey[] = [
   'calculator',
   'renderChart',
@@ -55,11 +40,8 @@ export const normalizeAdditionalToolKeys = (
   const normalized = [...new Set(requested.map((key) => key.trim()))].filter(
     Boolean,
   );
-  const unknown = normalized.filter(
-    (key) => !additionalToolKeys[key as AdditionalToolKey],
-  );
-  if (unknown.length) {
-    throw new ExpectedError(`Unknown additional tool: ${unknown.join(', ')}`);
-  }
+  // Retired keys (e.g. the removed terminal tool) are dropped silently so
+  // agents saved with them keep working; the catalog above is the only
+  // source of truth for what can run.
   return ADDITIONAL_TOOL_KEYS.filter((key) => normalized.includes(key));
 };

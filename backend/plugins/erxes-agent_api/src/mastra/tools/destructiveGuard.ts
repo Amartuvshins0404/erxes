@@ -1,15 +1,17 @@
-import { OperationMeta } from './operationRegistry';
+import type { AgentToolDescriptor } from 'erxes-api-shared/utils';
 import { ApprovedOp } from '../requestContext';
 
-// erxes mutation names are suffix-based: customersRemove, dealsRemove,
-// segmentsDelete, customersMerge, companiesMerge. Match those verbs anywhere in
-// the operation name. We gate only mutations, so reads are never affected.
+// Destructive capabilities irreversibly destroy or merge data. Model tools
+// mark remove ops directly; tRPC mutations are matched on the remove/delete/
+// merge/destroy verbs in their id — the same verb gate the GraphQL operation
+// names used. We gate only mutations, so reads are never affected.
 const DESTRUCTIVE_NAME = /(remove|delete|merge|destroy)/i;
 
-/** True when `op` is a mutation that irreversibly destroys or merges data. */
-export function isDestructiveOperation(op: OperationMeta): boolean {
-  if (op.operationType !== 'mutation') return false;
-  return DESTRUCTIVE_NAME.test(op.operation);
+/** True when `tool` irreversibly destroys or merges data. */
+export function isDestructiveTool(tool: AgentToolDescriptor): boolean {
+  if (tool.method !== 'mutation') return false;
+  if (tool.kind === 'model') return tool.op === 'remove';
+  return DESTRUCTIVE_NAME.test(tool.id);
 }
 
 /**

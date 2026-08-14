@@ -29,20 +29,36 @@ export const PROVIDER_FORM_DEFAULTS: ProviderFormValues = {
   isEnabled: true,
 };
 
-export const generalSettingsSchema = z.object({
-  erxesApiUrl: z.string(),
-  memoryEnabled: z.boolean(),
-  attachmentsEnabled: z.boolean(),
-  backgroundRemovalEnabled: z.boolean(),
-  openSandboxApiUrl: z
-    .string()
-    .max(2048)
-    .refine(
-      (value) => !value || /^https?:\/\//i.test(value),
-      'OpenSandbox API URL must start with http:// or https://',
-    ),
-  openSandboxApiKey: z.string().max(512),
-});
+export const generalSettingsSchema = z
+  .object({
+    erxesApiUrl: z.string(),
+    memoryEnabled: z.boolean(),
+    attachmentsEnabled: z.boolean(),
+    backgroundRemovalEnabled: z.boolean(),
+    sandboxMode: z.enum(['onserver', 'isolated']),
+    openSandboxApiUrl: z.string().max(2048),
+    openSandboxApiKey: z.string().max(512),
+  })
+  .superRefine((values, ctx) => {
+    // The URL format rule only applies in isolated mode; in onserver mode the
+    // fields are hidden and stripped by the transform below.
+    if (
+      values.sandboxMode === 'isolated' &&
+      values.openSandboxApiUrl &&
+      !/^https?:\/\//i.test(values.openSandboxApiUrl)
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['openSandboxApiUrl'],
+        message: 'OpenSandbox API URL must start with http:// or https://',
+      });
+    }
+  })
+  .transform((values) =>
+    values.sandboxMode === 'onserver'
+      ? { ...values, openSandboxApiUrl: '', openSandboxApiKey: '' }
+      : values,
+  );
 
 export type GeneralSettingsValues = z.infer<typeof generalSettingsSchema>;
 
@@ -51,6 +67,7 @@ export const GENERAL_SETTINGS_DEFAULTS: GeneralSettingsValues = {
   memoryEnabled: true,
   attachmentsEnabled: true,
   backgroundRemovalEnabled: true,
+  sandboxMode: 'onserver',
   openSandboxApiUrl: '',
   openSandboxApiKey: '',
 };

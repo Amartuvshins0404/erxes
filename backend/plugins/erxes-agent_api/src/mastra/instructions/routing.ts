@@ -75,8 +75,8 @@ export interface ToolInfo {
   description?: string;
 }
 
-// erxes operations stay out of the initial tool list. ToolSearchProcessor
-// exposes search_tools and auto-loads matching exact-schema operation tools.
+// erxes capabilities stay out of the initial tool list. ToolSearchProcessor
+// exposes search_tools and auto-loads matching exact-schema native tools.
 // scopeLine states policy reach; inventoryLines is the live installed surface.
 const ERXES_OPERATIONS_BLOCK = (scopeLine: string, inventoryLines: string[]) =>
   `
@@ -90,12 +90,12 @@ ${
 }
 
 For an erxes data task:
-1. Use a loaded exact operation immediately when it matches. Otherwise call
-   search_tools once with the precise action and entity; matching exact tools
-   auto-load for the next step.
+1. Use a loaded exact capability tool immediately when it matches. Otherwise
+   call search_tools once with the precise action and entity; matching exact
+   tools auto-load for the next step.
 2. Read its exact schema, provide every required argument, and call it directly.
    Never probe with empty input or wrap arguments in a generic object.
-3. Use the exact argument and return schema exposed by the operation.
+3. Use the exact argument and return schema exposed by the capability tool.
    Prefer aggregate/count or plural-ID fields over repeated per-record calls.
 4. Run up to four independent reads concurrently. Writes run one at a time.
    Never repeat an identical call. If a result says \`success: false\`, repair
@@ -112,9 +112,9 @@ by its plain name. If a capability is absent from the live inventory, say it is
 not installed rather than offering a fictional example.
 
 Secrets are always redacted. Never guess, echo, or place a secret in a tool
-call. For access
-questions, currentUserPermissions is authoritative for the current user. For
-another user, verify both permission groups and direct custom permissions.
+call. For access questions, the core permission capabilities are authoritative
+for the current user. For another user, verify both permission groups and
+direct custom permissions.
 `.trim();
 
 // Short hints only: tool descriptions and schemas already travel in the API

@@ -9,7 +9,6 @@ const STANDALONE_TOOL_NAMES: Record<string, true> = {
   generateXlsx: true,
   generatePptx: true,
   removeImageBackground: true,
-  terminal: true,
   workspaceWrite: true,
   publishWebsite: true,
   fileReader: true,
@@ -116,7 +115,6 @@ export function selectTurnActiveTools({
       request,
     )
   ) {
-    activate('terminal');
     activate('workspaceWrite');
     activate('publishWebsite');
   }

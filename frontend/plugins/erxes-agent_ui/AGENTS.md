@@ -6,7 +6,7 @@
 - **Project:** `erxes-agent_ui`
 - **Layer:** Frontend UI
 - **Path:** `frontend/plugins/erxes-agent_ui`
-- **Last synchronized:** `2026-08-13`
+- **Last synchronized:** `2026-08-14`
 
 ## Scope
 
@@ -25,6 +25,7 @@
 - Lists, creates, edits, and chats with permission-scoped AI team members from the main `/erxes-agent/agents` area.
 - Supports private, people-shared, and organization visibility, permission groups, additional-tool allowlists, provider/model settings, and active state.
 - Manages providers and tenant runtime settings; Settings opens Providers by default.
+- General settings include a Sandbox mode select (`onserver` built-in vs `isolated` OpenSandbox); OpenSandbox URL/API-key fields render only in isolated mode.
 - Streams native agent chat parts, tool activity, attachments, artifacts, and session updates.
 - Renders the chat conversation on assistant-ui primitives (`ThreadPrimitive`, `MessagePrimitive`, `ComposerPrimitive`, streaming markdown) over the AI SDK chat runtime; tool calls display as inline per-call status lines with dedicated readable renderers for web-search and fetch-url results.
 - Hosts a custom chat workspace sidebar: agents up top and the active agent's conversations below as an assistant-ui thread list (`ThreadListPrimitive` / `ThreadListItemPrimitive`) driven by a remote-thread-list runtime over the mastra session GraphQL contract, plus a permission-gated "Manage agents" footer link.
@@ -84,6 +85,12 @@
 
 <!-- Newest first. Keep at most 10 entries. -->
 
+### `2026-08-14` — Sandbox mode selector in general settings
+
+- **Summary:** General settings now offer a Sandbox mode select (`onserver` built-in restricted realm, default, vs `isolated` OpenSandbox); the OpenSandbox URL/API-key fields render only in isolated mode, are cleared when switching back to on-server, and the Zod schema strips them on submit so stale values are never sent.
+- **Affected areas:** `src/pages/settings/GeneralSettingsPage.tsx`, `src/pages/settings/validations.ts`, `src/pages/settings/types.ts`, `src/graphql/queries.ts`, `src/graphql/mutations.ts`.
+- **Contracts changed:** Consumes the new `sandboxMode` field on the `MastraSettings` type and the `MastraSettingsInput` save input.
+
 ### `2026-08-13` — Production-safe chat surface styles
 
 - **Summary:** Fixed the prod-test rendering (white user bubble, unstyled send button, invisible hover controls) by moving every plugin-unique Tailwind utility off the chat surface into self-contained `ea-*` classes in `chat.css` — the deployed host CSS is built without scanning this plugin, so arbitrary values, opacity modifiers, and group/data variants were all missing in production.
@@ -137,9 +144,3 @@
 - **Summary:** Dropped the custom settling transport, settled flags, idle handoff, and message-id reconcile parts now that the backend closes the stream at `finish` with the native id in `messageMetadata`; the chat runs on the stock `DefaultChatTransport` and status lifecycle.
 - **Affected areas:** `src/modules/chat/lib/chatTransport.ts`, `src/modules/chat/store/chatStore.ts`, `src/modules/chat/hooks/useChatView.ts`, `src/modules/chat/types.ts`.
 - **Contracts changed:** Consumes `finish` `messageMetadata.messageId` instead of the removed transient `data-message-id` part.
-
-### `2026-08-07` — Enforce agent rail access
-
-- **Summary:** Hides agent settings links without edit access and refreshes the access-filtered chat agent list after saves.
-- **Affected areas:** Agent rail permissions, save mutation cache handling, and stale cache tests.
-- **Contracts changed:** None

@@ -15,6 +15,8 @@ export const types = `
     attachmentsEnabled: Boolean
     attachmentStorage: MastraAttachmentStorageStatus
     backgroundRemovalEnabled: Boolean
+    # run-code sandbox backend: "onserver" (default) or "isolated".
+    sandboxMode: String
     openSandboxApiUrl: String
     hasOpenSandboxApiKey: Boolean!
     openSandboxApiKeyHint: String
@@ -25,6 +27,8 @@ export const types = `
     memoryEnabled: Boolean
     attachmentsEnabled: Boolean
     backgroundRemovalEnabled: Boolean
+    # run-code sandbox backend: "onserver" or "isolated".
+    sandboxMode: String
     openSandboxApiUrl: String
     # Write-only. Blank preserves the currently stored key.
     openSandboxApiKey: String

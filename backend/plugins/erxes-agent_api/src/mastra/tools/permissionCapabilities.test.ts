@@ -29,7 +29,7 @@ import {
   resolveAgentPermissions,
 } from './permissionCapabilities';
 
-const registry = { operations: new Map(), list: [] };
+const registry = { tools: new Map(), list: [] };
 
 beforeEach(() => {
   sendTRPCMessage.mockReset().mockResolvedValue([]);
@@ -71,14 +71,14 @@ describe('permission-derived agent capabilities', () => {
   it('adds only the optional tools explicitly selected for an agent', () => {
     const result = deriveAgentAllowedTools([], registry, [
       'webSearch',
-      'terminal',
+      'runCode',
     ]);
 
     expect(result).toEqual(
       expect.arrayContaining([
         'dealsView',
         'builtin:webSearch',
-        'builtin:terminal',
+        'builtin:runCode',
       ]),
     );
     expect(result).not.toContain('builtin:calculator');

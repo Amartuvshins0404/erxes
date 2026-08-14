@@ -1,46 +1,75 @@
-import type { OperationMeta } from './operationRegistry';
-import { deriveModule } from './humanize';
+import type { AgentToolDescriptor } from 'erxes-api-shared/utils';
 import {
   actionsToAllowedTools,
   assertAllowedToolsInvariant,
-  isReadActionName,
-  readEntity,
   type GroupPermission,
   type RegistryView,
 } from './actionsToAllowedTools';
 
 // --- fixtures --------------------------------------------------------------
 
-const op = (
-  operation: string,
-  operationType: 'query' | 'mutation',
-  plugin: string,
-  module: string,
-): OperationMeta => ({
-  operation,
-  operationType,
+const modelTool = (
+  modelName: string,
+  op: 'find' | 'findOne' | 'count' | 'create' | 'update' | 'remove',
+  plugin = 'sales',
+): AgentToolDescriptor => {
+  const module = modelName.charAt(0).toLowerCase() + modelName.slice(1);
+  const actionByOp: Record<string, string> = {
+    find: 'Show',
+    findOne: 'Show',
+    count: 'Show',
+    create: 'Create',
+    update: 'Update',
+    remove: 'Remove',
+  };
+  return {
+    id: `${plugin}.model.${modelName}.${op}`,
+    kind: 'model',
+    plugin,
+    module,
+    method: op === 'find' || op === 'findOne' || op === 'count'
+      ? 'query'
+      : 'mutation',
+    destructive: op === 'create' || op === 'update' || op === 'remove',
+    description: '',
+    inputFields: null,
+    modelName,
+    op,
+    permission: { module, action: `${module}${actionByOp[op]}` },
+  };
+};
+
+const trpcTool = (
+  path: string,
+  plugin = 'sales',
+  permission: AgentToolDescriptor['permission'] = null,
+): AgentToolDescriptor => ({
+  id: `${plugin}.trpc.${path}`,
+  kind: 'trpc',
   plugin,
-  module,
+  module: path.split('.')[0],
+  method: 'query',
+  destructive: false,
   description: '',
-  graphqlArgs: [],
-  returnType: null,
+  inputFields: null,
+  permission,
+  path,
 });
 
-// A small, realistic sales surface: deal reads (query) + writes (mutation).
-const OPS: OperationMeta[] = [
-  op('deals', 'query', 'sales', 'deals'),
-  op('dealDetail', 'query', 'sales', 'deal'),
-  op('dealsAdd', 'mutation', 'sales', 'deals'),
-  op('dealsEdit', 'mutation', 'sales', 'deals'),
-  op('dealsRemove', 'mutation', 'sales', 'deals'),
-  op('boardsAdd', 'mutation', 'sales', 'boards'),
+// A small, realistic sales surface: deal reads + writes + a tRPC procedure.
+const TOOLS: AgentToolDescriptor[] = [
+  modelTool('Deals', 'find'),
+  modelTool('Deals', 'findOne'),
+  modelTool('Deals', 'create'),
+  modelTool('Deals', 'update'),
+  modelTool('Deals', 'remove'),
+  trpcTool('deal.findOne'),
 ];
 
-const registry = (list: OperationMeta[] = OPS): RegistryView => {
-  const operations = new Map<string, OperationMeta>();
-  // Last-wins on duplicate name mirrors the real registry's Map build.
-  for (const o of list) operations.set(o.operation, o);
-  return { operations, list };
+const registry = (list: AgentToolDescriptor[] = TOOLS): RegistryView => {
+  const tools = new Map<string, AgentToolDescriptor>();
+  for (const tool of list) tools.set(tool.id, tool);
+  return { tools, list };
 };
 
 const perm = (
@@ -49,94 +78,59 @@ const perm = (
   actions: string[],
 ): GroupPermission => ({ plugin, module, actions, scope: 'all' });
 
-// --- helpers ---------------------------------------------------------------
-
-describe('read-action heuristics', () => {
-  it('recognizes show* and *Read gates', () => {
-    expect(isReadActionName('showDeals')).toBe(true);
-    expect(isReadActionName('posOrderRead')).toBe(true);
-    expect(isReadActionName('dealsAdd')).toBe(false);
-  });
-
-  it('normalizes the read entity for module matching', () => {
-    expect(readEntity('showDeals')).toBe('deal'); // strip show + plural s
-    expect(readEntity('posOrderRead')).toBe('posorder');
-  });
-});
-
 // --- mapping ---------------------------------------------------------------
 
 describe('actionsToAllowedTools', () => {
-  it('maps write actions to their exact operation names', () => {
+  it('emits model tools whose permission action is granted', () => {
     const out = actionsToAllowedTools(
-      [perm('sales', 'deal', ['dealsAdd', 'dealsEdit'])],
+      [perm('sales', 'deal', ['dealsShow'])],
       registry(),
     );
-    expect(out).toEqual(['dealsAdd', 'dealsEdit']); // sorted + exact
+    expect(out).toEqual(['sales.model.Deals.find', 'sales.model.Deals.findOne']);
   });
 
-  it("maps a show/read gate to the module's read (query) ops only", () => {
+  it('emits write tools only for their granted action', () => {
     const out = actionsToAllowedTools(
-      [perm('sales', 'deal', ['showDeals'])],
+      [perm('sales', 'deal', ['dealsCreate', 'dealsRemove'])],
       registry(),
     );
-    // Both deal queries (module "deals" and "deal" collapse to "deal"); NO writes.
-    expect(out).toEqual(['dealDetail', 'deals']);
-    expect(out).not.toContain('dealsAdd');
-  });
-
-  it('combines reads + writes for a full-module grant, deduped + sorted', () => {
-    const out = actionsToAllowedTools(
-      [
-        perm('sales', 'deal', [
-          'showDeals',
-          'dealsAdd',
-          'dealsAdd',
-          'dealsEdit',
-        ]),
-      ],
-      registry(),
-    );
-    expect(out).toEqual(['dealDetail', 'deals', 'dealsAdd', 'dealsEdit']);
-  });
-
-  it('scopes exact matches to the granted plugin (ignores same-named foreign op)', () => {
-    // A registry where the only 'dealsAdd' belongs to plugin 'other'.
-    const foreign = registry([op('dealsAdd', 'mutation', 'other', 'deals')]);
-    // A SALES grant of dealsAdd must NOT emit the foreign 'other' op (plugin
-    // mismatch → fail-closed drop).
-    expect(
-      actionsToAllowedTools([perm('sales', 'deal', ['dealsAdd'])], foreign),
-    ).toEqual([]);
-    // The matching plugin's grant emits it.
-    expect(
-      actionsToAllowedTools([perm('other', 'deals', ['dealsAdd'])], foreign),
-    ).toEqual(['dealsAdd']);
-  });
-
-  it('maps permission-first write names to same-module operation verbs', () => {
-    const taskModule = deriveModule('createTask');
-    expect(taskModule).toBe('task');
-
-    const operationRegistry = registry([
-      op('createTask', 'mutation', 'operation', taskModule),
-      op('updateTask', 'mutation', 'operation', deriveModule('updateTask')),
-      op('removeTask', 'mutation', 'operation', deriveModule('removeTask')),
-      op(
-        'createProject',
-        'mutation',
-        'operation',
-        deriveModule('createProject'),
-      ),
+    expect(out).toEqual([
+      'sales.model.Deals.create',
+      'sales.model.Deals.remove',
     ]);
+    expect(out).not.toContain('sales.model.Deals.update');
+  });
 
+  it('matches modules tolerantly across singular/plural and case', () => {
     const out = actionsToAllowedTools(
-      [perm('operation', 'task', ['taskCreate', 'taskUpdate', 'taskRemove'])],
-      operationRegistry,
+      [perm('sales', 'Deal', ['dealsShow'])],
+      registry(),
     );
+    expect(out).toContain('sales.model.Deals.find');
+  });
 
-    expect(out).toEqual(['createTask', 'removeTask', 'updateTask']);
-    expect(out).not.toContain('createProject');
+  it('scopes emissions to the granted plugin', () => {
+    const out = actionsToAllowedTools(
+      [perm('other', 'deal', ['dealsShow'])],
+      registry(),
+    );
+    expect(out).toEqual([]);
+  });
+
+  it('treats an empty plugin entry as a wildcard', () => {
+    const out = actionsToAllowedTools(
+      [{ module: 'deal', actions: ['dealsShow'], scope: 'all' }],
+      registry(),
+    );
+    expect(out).toEqual(['sales.model.Deals.find', 'sales.model.Deals.findOne']);
+  });
+
+  it('emits permission-less tRPC tools when any action matches plugin+module', () => {
+    const out = actionsToAllowedTools(
+      [perm('sales', 'deal', ['dealsShow'])],
+      registry(),
+    );
+    expect(out).toContain('sales.trpc.deal.findOne');
   });
 
   it('drops the "*" wildcard (grants nothing server-side → stays in lock-step)', () => {
@@ -147,17 +141,18 @@ describe('actionsToAllowedTools', () => {
     expect(out).toEqual([]);
   });
 
-  it('drops unresolved actions with no matching op (fail-closed)', () => {
+  it('drops unresolved actions with no matching tool (fail-closed)', () => {
     const out = actionsToAllowedTools(
-      [perm('sales', 'deal', ['dealsTeleport', 'dealsAdd'])],
+      [perm('sales', 'deal', ['dealsTeleport', 'dealsShow'])],
       registry(),
     );
-    expect(out).toEqual(['dealsAdd']); // the unknown action is silently dropped
+    expect(out).not.toContain('sales.model.Deals.create');
+    expect(out).toContain('sales.model.Deals.find');
   });
 
-  it('returns [] for an empty registry (introspection unavailable → fail closed)', () => {
+  it('returns [] for an empty registry (manifests unavailable → fail closed)', () => {
     const out = actionsToAllowedTools(
-      [perm('sales', 'deal', ['dealsAdd', 'showDeals'])],
+      [perm('sales', 'deal', ['dealsShow'])],
       registry([]),
     );
     expect(out).toEqual([]);
@@ -173,7 +168,7 @@ describe('actionsToAllowedTools', () => {
 
 describe('assertAllowedToolsInvariant', () => {
   it('passes for legitimately derived output', () => {
-    const perms = [perm('sales', 'deal', ['showDeals', 'dealsAdd'])];
+    const perms = [perm('sales', 'deal', ['dealsShow'])];
     const out = actionsToAllowedTools(perms, registry());
     expect(() =>
       assertAllowedToolsInvariant(out, perms, registry()),
@@ -190,24 +185,23 @@ describe('assertAllowedToolsInvariant', () => {
     ).not.toThrow();
   });
 
-  it('throws when an emitted op is NOT covered by any granted action', () => {
-    // dealsRemove was never granted — a mapper bug that emitted it must be caught.
+  it('throws when an emitted tool is NOT covered by any granted permission', () => {
     expect(() =>
       assertAllowedToolsInvariant(
-        ['dealsRemove'],
-        [perm('sales', 'deal', ['dealsAdd'])],
+        ['sales.model.Deals.remove'],
+        [perm('sales', 'deal', ['dealsShow'])],
         registry(),
       ),
     ).toThrow(/not covered/i);
   });
 
-  it('throws when an emitted op is unknown to the registry', () => {
+  it('throws when an emitted tool is unknown to the registry', () => {
     expect(() =>
       assertAllowedToolsInvariant(
-        ['ghostOp'],
-        [perm('sales', 'deal', ['ghostOp'])],
+        ['sales.model.Ghost.find'],
+        [perm('sales', 'deal', ['dealsShow'])],
         registry(),
       ),
-    ).toThrow(/not a known operation/i);
+    ).toThrow(/not a known tool/i);
   });
 });

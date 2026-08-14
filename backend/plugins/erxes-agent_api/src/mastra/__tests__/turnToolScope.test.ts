@@ -10,7 +10,6 @@ const available = [
   'fetchUrl',
   'calculator',
   'renderChart',
-  'terminal',
   'workspaceWrite',
   'publishWebsite',
   'fileReader',
@@ -44,7 +43,6 @@ describe('selectTurnActiveTools', () => {
     for (const hidden of [
       'generatePdf',
       'generateXlsx',
-      'terminal',
       'publishWebsite',
       'fileReader',
     ]) {
@@ -70,7 +68,7 @@ describe('selectTurnActiveTools', () => {
     });
 
     expect(active).toEqual(
-      expect.arrayContaining(['terminal', 'workspaceWrite', 'publishWebsite']),
+      expect.arrayContaining(['workspaceWrite', 'publishWebsite']),
     );
     expect(active).not.toContain('generatePptx');
   });

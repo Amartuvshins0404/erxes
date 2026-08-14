@@ -1,5 +1,5 @@
 import { sendTRPCMessage } from 'erxes-api-shared/utils';
-import type { OperationRegistry } from './operationRegistry';
+import type { NativeToolRegistry } from './nativeTools';
 import { BUILTIN_TOOLS } from './builtins';
 import {
   actionsToAllowedTools,
@@ -27,7 +27,7 @@ export const resolveAgentGrantPolicy = async ({
 }: {
   subdomain?: string;
   grantGroupId?: string | null;
-  registry: OperationRegistry;
+  registry: NativeToolRegistry;
 }): Promise<ToolPolicy> => {
   const groupId = grantGroupId?.trim();
   if (!subdomain || !groupId) return builtinOnlyPolicy();

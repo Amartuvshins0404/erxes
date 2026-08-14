@@ -1,11 +1,11 @@
 import { createTool, type Tool } from '@mastra/core/tools';
 import { z } from 'zod';
 import {
-  encodeTRPCContextHeader,
+  agentToolsAuthHeaderName,
+  encodeAgentToolsAuthHeader,
   ExpectedError,
   getPlugin,
   getPlugins,
-  trpcContextHeaderName,
   type AgentToolDescriptor,
   type AgentToolField,
   type AgentToolManifest,
@@ -69,7 +69,7 @@ async function fetchPluginManifest(
   const res = await fetch(joinAddress(address, '/agent-tools/manifest'), {
     method: 'GET',
     headers: {
-      [trpcContextHeaderName]: encodeTRPCContextHeader(subdomain, 'query', {}),
+      [agentToolsAuthHeaderName]: encodeAgentToolsAuthHeader(subdomain),
     },
   });
   if (!res.ok) return [];
@@ -179,13 +179,17 @@ export async function callNativeTool(opts: {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        [trpcContextHeaderName]: encodeTRPCContextHeader(
+        // Identity travels only in the HMAC-signed auth header; the plugin
+        // verifies it against the shared secret before enforcing permissions.
+        [agentToolsAuthHeaderName]: encodeAgentToolsAuthHeader(
           subdomain,
-          'mutation',
-          { userId, processId },
+          userId,
         ),
       },
-      body: JSON.stringify({ toolId, input }),
+      body: JSON.stringify({
+        toolId,
+        input: processId ? { ...input, __processId: processId } : input,
+      }),
     });
   } catch {
     throw new ExpectedError(

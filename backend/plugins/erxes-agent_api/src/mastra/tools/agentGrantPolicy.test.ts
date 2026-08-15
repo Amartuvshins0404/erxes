@@ -27,6 +27,7 @@ const dealFind: AgentToolDescriptor = {
   modelName: 'Deals',
   op: 'find',
   permission: { module: 'deals', action: 'dealsShow' },
+  agentUsable: true,
 };
 
 const registry = {

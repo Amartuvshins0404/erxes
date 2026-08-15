@@ -27,6 +27,12 @@ interface AgentToolBase {
   description: string;
   inputFields: AgentToolField[] | null; // null = free-form object input
   permission: AgentToolPermission | null;
+  /**
+   * true = the plugin declared this tool agent-callable (tRPC: has agent
+   * meta permission; model: permission resolved). false = inventory-only,
+   * never callable — listed so consumers can show the full surface.
+   */
+  agentUsable: boolean;
 }
 
 export type AgentModelToolDescriptor = AgentToolBase & {

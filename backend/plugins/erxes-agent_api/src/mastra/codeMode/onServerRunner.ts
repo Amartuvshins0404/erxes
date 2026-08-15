@@ -1,5 +1,6 @@
 import vm from 'node:vm';
 import { ExpectedError } from 'erxes-api-shared/utils';
+import type { IModels } from '~/connectionResolvers';
 import { getNativeToolRegistry } from '~/mastra/tools/nativeTools';
 import type {
   CodeExecutionAuth,
@@ -16,6 +17,7 @@ const DEFAULT_TIMEOUT_SECONDS = 30;
 const MAX_SET_TIMEOUT_MS = 10_000;
 
 export interface OnServerCodeInput {
+  models: IModels;
   auth: CodeExecutionAuth;
   code: string;
   timeoutSeconds?: number;
@@ -67,11 +69,12 @@ const isSyntaxError = (error: unknown): boolean =>
  * new realm itself; there is no process, require, fetch, or Buffer.
  */
 export const runCodeOnServer = async ({
+  models,
   auth,
   code,
   timeoutSeconds,
 }: OnServerCodeInput): Promise<CodeExecutionResult> => {
-  const registry = await getNativeToolRegistry(auth.subdomain);
+  const registry = await getNativeToolRegistry(auth.subdomain, { models });
   const tools = registry.list.map((descriptor) => ({
     id: descriptor.id,
     kind: descriptor.kind,
@@ -99,6 +102,7 @@ export const runCodeOnServer = async ({
           toolId,
           input,
           isMutation: descriptor?.method === 'mutation',
+          models,
         });
       };
       const next = tail.then(execute);

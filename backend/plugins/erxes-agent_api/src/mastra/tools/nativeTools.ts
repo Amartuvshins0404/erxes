@@ -10,6 +10,7 @@ import {
   type AgentToolField,
   type AgentToolManifest,
 } from 'erxes-api-shared/utils';
+import type { IModels } from '~/connectionResolvers';
 import { auditErrorMessage } from './metaTools';
 import {
   destructiveApprovalRequiredResult,
@@ -44,7 +45,7 @@ const cache = new Map<string, { registry: NativeToolRegistry; at: number }>();
 
 // Never fetch our own manifest: the agent plugin's tools are not erxes
 // capabilities, and self-calls would recurse through the discovery path.
-const SELF_PLUGIN_NAME = 'erxes-agent';
+export const SELF_PLUGIN_NAME = 'erxes-agent';
 
 interface SuccessEnvelope<TData> {
   status: 'success';
@@ -61,23 +62,38 @@ type ResponseEnvelope<TData> = SuccessEnvelope<TData> | ErrorEnvelope;
 const joinAddress = (address: string, path: string): string =>
   `${address.replace(/\/+$/, '')}${path}`;
 
-/** Fetch one plugin's tool manifest; any failure degrades to an empty list. */
-async function fetchPluginManifest(
+export interface PluginManifestResult {
+  /** false when the endpoint did not answer with a success envelope. */
+  supported: boolean;
+  tools: AgentToolDescriptor[];
+}
+
+/**
+ * Fetch one plugin's tool manifest; HTTP and envelope failures report
+ * `supported: false` with an empty list (transport errors still throw to the
+ * caller, which treats them the same).
+ */
+export async function fetchPluginManifest(
   subdomain: string,
   address: string,
-): Promise<AgentToolDescriptor[]> {
+): Promise<PluginManifestResult> {
   const res = await fetch(joinAddress(address, '/agent-tools/manifest'), {
     method: 'GET',
     headers: {
       [agentToolsAuthHeaderName]: encodeAgentToolsAuthHeader(subdomain),
     },
   });
-  if (!res.ok) return [];
+  if (!res.ok) return { supported: false, tools: [] };
   const envelope = (await res
     .json()
     .catch(() => null)) as ResponseEnvelope<AgentToolManifest> | null;
-  if (!envelope || envelope.status !== 'success' || !envelope.data) return [];
-  return Array.isArray(envelope.data.tools) ? envelope.data.tools : [];
+  if (!envelope || envelope.status !== 'success' || !envelope.data) {
+    return { supported: false, tools: [] };
+  }
+  return {
+    supported: true,
+    tools: Array.isArray(envelope.data.tools) ? envelope.data.tools : [],
+  };
 }
 
 /**
@@ -86,10 +102,18 @@ async function fetchPluginManifest(
  * that is down, unaddressable, or answers an error envelope is skipped
  * silently — discovery is best-effort and fail-closed (an empty registry
  * grants no tools).
+ *
+ * Two filters always apply on top of the raw manifests:
+ *  - descriptors marked `agentUsable: false` are inventory-only and never
+ *    enter the executable surface;
+ *  - the tenant's plugin curation is default-deny: a plugin contributes
+ *    tools only when its curation row exists with `enabled: true`, minus any
+ *    `disabledTools` entries. Without tenant `models` no curation rows can
+ *    be read, so every plugin is denied.
  */
 export async function getNativeToolRegistry(
   subdomain: string,
-  opts?: { force?: boolean },
+  opts?: { force?: boolean; models?: IModels },
 ): Promise<NativeToolRegistry> {
   const cached = cache.get(subdomain);
   if (cached && !opts?.force && Date.now() - cached.at < TTL_MS) {
@@ -100,6 +124,13 @@ export async function getNativeToolRegistry(
   const byPlugin = new Map<string, AgentToolDescriptor[]>();
 
   try {
+    const curations = opts?.models
+      ? await opts.models.MastraPluginToolCuration.find({}).lean()
+      : [];
+    const curationByPlugin = new Map(
+      curations.map((row) => [row.plugin, row]),
+    );
+
     const pluginNames = await getPlugins();
     const manifests = await Promise.all(
       pluginNames
@@ -109,7 +140,8 @@ export async function getNativeToolRegistry(
             const plugin = await getPlugin(name);
             const address = plugin?.address?.trim();
             if (!address) return [];
-            return await fetchPluginManifest(subdomain, address);
+            const manifest = await fetchPluginManifest(subdomain, address);
+            return manifest.tools;
           } catch {
             // Per-plugin failure must not take down tenant-wide discovery.
             return [];
@@ -119,6 +151,10 @@ export async function getNativeToolRegistry(
 
     for (const descriptors of manifests) {
       for (const descriptor of descriptors) {
+        if (descriptor.agentUsable === false) continue;
+        const curation = curationByPlugin.get(descriptor.plugin);
+        if (!curation || curation.enabled !== true) continue;
+        if (curation.disabledTools?.includes(descriptor.id)) continue;
         if (tools.has(descriptor.id)) continue;
         tools.set(descriptor.id, descriptor);
         const group = byPlugin.get(descriptor.plugin) ?? [];
@@ -156,10 +192,11 @@ export async function callNativeTool(opts: {
   processId?: string;
   toolId: string;
   input?: Record<string, unknown>;
+  models?: IModels;
 }): Promise<unknown> {
-  const { subdomain, userId, processId, toolId, input } = opts;
+  const { subdomain, userId, processId, toolId, input, models } = opts;
 
-  const registry = await getNativeToolRegistry(subdomain);
+  const registry = await getNativeToolRegistry(subdomain, { models });
   const descriptor = registry.tools.get(toolId);
   if (!descriptor) {
     throw new ExpectedError(`Unknown agent tool '${toolId}'`);
@@ -288,8 +325,9 @@ export function buildNativeOperationTools(params: {
   registry: NativeToolRegistry;
   policy: ToolPolicy;
   recordAction?: (entry: AgentActionInput) => void;
+  models?: IModels;
 }): Record<string, Tool> {
-  const { registry, policy, recordAction } = params;
+  const { registry, policy, recordAction, models } = params;
   const tools: Record<string, Tool> = {};
   // Sanitized Mastra name → canonical descriptor (execution never trusts the
   // model-visible name to be a real capability).
@@ -365,6 +403,7 @@ export function buildNativeOperationTools(params: {
               processId,
               toolId: descriptor.id,
               input: callArgs,
+              models,
             });
             return withEmptyResultGuidance(data);
           } catch (error) {

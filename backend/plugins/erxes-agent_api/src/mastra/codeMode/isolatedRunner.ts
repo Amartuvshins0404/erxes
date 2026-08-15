@@ -223,6 +223,7 @@ const answerBridgeCall = async (
   auth: CodeExecutionAuth,
   registry: NativeToolRegistry,
   record: BridgeCallRecord,
+  models: IModels,
 ): Promise<void> => {
   try {
     const descriptor = registry.tools.get(record.toolId);
@@ -234,6 +235,7 @@ const answerBridgeCall = async (
           ? (record.input as Record<string, unknown>)
           : undefined,
       isMutation: descriptor?.method === 'mutation',
+      models,
     });
     const serialized = JSON.stringify(data === undefined ? null : data);
     if (Buffer.byteLength(serialized) > MAX_BRIDGE_RESULT_BYTES) {
@@ -278,7 +280,7 @@ export const runCodeIsolated = async ({
   // Fail fast through the existing config path before touching the workspace.
   resolveOpenSandboxRuntimeConfig(settings);
 
-  const registry = await getNativeToolRegistry(auth.subdomain);
+  const registry = await getNativeToolRegistry(auth.subdomain, { models });
   const state: BridgeState = {
     tools: registry.list.map((descriptor) => ({
       id: descriptor.id,
@@ -360,7 +362,7 @@ export const runCodeIsolated = async ({
         status: 'pending',
       };
       state.calls.push(record);
-      await answerBridgeCall(auth, registry, record);
+      await answerBridgeCall(auth, registry, record, models);
     }
 
     if (deadline - Date.now() <= 0) {

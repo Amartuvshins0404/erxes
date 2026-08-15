@@ -36,6 +36,7 @@ const modelTool = (
     modelName,
     op,
     permission: { module, action: `${module}${actionByOp[op]}` },
+    agentUsable: true,
   };
 };
 
@@ -53,6 +54,7 @@ const trpcTool = (
   description: '',
   inputFields: null,
   permission,
+  agentUsable: true,
   path,
 });
 

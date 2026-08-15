@@ -26,6 +26,7 @@
 - Supports private, people-shared, and organization visibility, permission groups, additional-tool allowlists, provider/model settings, and active state.
 - Manages providers and tenant runtime settings; Settings opens Providers by default.
 - General settings include a Sandbox mode select (`onserver` built-in vs `isolated` OpenSandbox); OpenSandbox URL/API-key fields render only in isolated mode.
+- Admin-gated Plugin tools page (`/settings/erxes-agent/plugin-tools`) toggles per-plugin agent capability access (default off, `No endpoint` when unsupported) and per-tool disable switches; non-agent-callable tools show a muted badge instead of a switch.
 - Streams native agent chat parts, tool activity, attachments, artifacts, and session updates.
 - Renders the chat conversation on assistant-ui primitives (`ThreadPrimitive`, `MessagePrimitive`, `ComposerPrimitive`, streaming markdown) over the AI SDK chat runtime; a turn's reasoning bursts and tool calls group into ONE ChatGPT-style process line — while working it shows the current step's real, content-derived title (a reasoning step's title is distilled from its own text, a tool step shows its per-tool label), settled it shows the existing summary — and clicking it opens the right preview panel with the whole process as titled steps (status icon + bold title + content: full reasoning text for reasoning steps, params/result/sources per tool call, separators between steps). Reasoning never renders as rows in the message body and nothing expands inline. Tool args/results render structured (key-value rows, capped mini tables, web-search sources list) — never raw JSON.
 - Shows "thinking"/activity with `thinking-orbs` (`ThinkingOrb`): a size-64 orb while the turn spins up, size-20 per-step-state orbs (`searching`, `connecting`, `solving`, `composing`, `shaping`, `listening`) on the running process line and the panel's active step.
@@ -58,7 +59,7 @@
 
 ### Consumes
 
-- The `erxes-agent_api` GraphQL schema, chat SSE endpoint, and plugin file/artifact routes.
+- The `erxes-agent_api` GraphQL schema, chat SSE endpoint, plugin file/artifact routes, and the plugin-tools curation REST endpoints (`GET/POST /pl:erxes-agent/plugin-tools(/:curation)`).
 - Public `erxes-ui` and `ui-modules` components, Apollo Client, React Router, and React Hook Form with Zod.
 
 ## Data and State
@@ -88,6 +89,12 @@
 ## Recent Changes
 
 <!-- Newest first. Keep at most 10 entries. -->
+
+### `2026-08-15` — Plugin tools settings page (REST transport)
+
+- **Summary:** Added an admin-gated Plugin tools settings page (`/settings/erxes-agent/plugin-tools`) listing one collapsible card per plugin — header enable switch, `No endpoint` and `N unavailable` badges, module-grouped tool rows with kind/mutation/destructive badges, dimmed permission actions, and per-tool disable switches (non-agent-callable tools render a muted badge instead); every toggle saves the full `{plugin, enabled, disabledTools}` and refetches. The page uses a fetch-based `usePluginTools` hook against the plugin's REST endpoints instead of GraphQL.
+- **Affected areas:** `src/pages/settings/PluginToolsPage.tsx` (new), `src/pages/settings/hooks/usePluginTools.ts` (new fetch hook), `src/modules/MastraSettings.tsx` (route), `src/modules/MastraSettingsNavigation.tsx` (nav item).
+- **Contracts changed:** Consumes the backend REST endpoints `GET /pl:erxes-agent/plugin-tools` (full per-plugin inventory incl. `disabledTools` and `agentUsable=false` entries) and `POST /pl:erxes-agent/plugin-tools/curation` (upsert `{plugin, enabled, disabledTools}`); no GraphQL surface for curation.
 
 ### `2026-08-15` — Debug mode removed; process line always opens the panel
 
@@ -137,11 +144,5 @@
 
 - **Summary:** Fixed the prod-test rendering (white user bubble, unstyled send button, invisible hover controls) by moving every plugin-unique Tailwind utility off the chat surface into self-contained `ea-*` classes in `chat.css` — the deployed host CSS is built without scanning this plugin, so arbitrary values, opacity modifiers, and group/data variants were all missing in production.
 - **Affected areas:** `src/modules/chat/chat.css`, chat assistant/components/preview/sidebar files, `src/pages/agents/components/AgentFormFields.tsx` (now imports chat.css for `ea-form-grid`).
-- **Contracts changed:** None
-
-### `2026-08-13` — Drop the core sub-module panel
-
-- **Summary:** The plugin no longer registers `navigationGroup.content`, so core renders no sub-module sidebar for it; agent/conversation browsing lives entirely in the plugin's own chat sidebar, which gained a permission-gated "Manage agents" footer link.
-- **Affected areas:** `src/config.tsx`, `src/modules/chat/sidebar/AgentChatSidebar.tsx`; removed `src/modules/navigation/AgentNavLinks.tsx`.
 - **Contracts changed:** None
 

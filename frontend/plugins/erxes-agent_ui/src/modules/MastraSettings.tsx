@@ -17,6 +17,12 @@ const GeneralSettingsPage = lazy(() =>
   })),
 );
 
+const PluginToolsPage = lazy(() =>
+  import('~/pages/settings/PluginToolsPage').then((m) => ({
+    default: m.PluginToolsPage,
+  })),
+);
+
 const AgentsIndexPage = lazy(() =>
   import('~/pages/agents/AgentsIndexPage').then((m) => ({
     default: m.AgentsIndexPage,
@@ -95,6 +101,10 @@ export const MastraSettings = () => {
       <Route
         path="/general"
         element={<AdminRoute element={<GeneralSettingsPage />} />}
+      />
+      <Route
+        path="/plugin-tools"
+        element={<AdminRoute element={<PluginToolsPage />} />}
       />
     </PluginRoutesShell>
   );

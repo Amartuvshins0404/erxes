@@ -255,6 +255,7 @@ const buildModelTools = (
       description: describe(def.verb),
       inputFields: def.inputFields,
       permission,
+      agentUsable: true,
     });
   }
 
@@ -327,15 +328,18 @@ const extractTrpcInputFields = (
 };
 
 /**
- * Build the tool descriptor for one tRPC procedure, or null when the
- * procedure declares no agent permission — tRPC tools are admit-only via
- * `.meta({ agent: { permission } })` so nothing is callable by default.
+ * Build the tool descriptor for one tRPC procedure. Procedures opting in via
+ * `.meta({ agent: { permission } })` are agent-callable (`agentUsable: true`)
+ * and keep their declared permission; every other procedure is still listed
+ * as inventory (`agentUsable: false`, no permission, never destructive) so
+ * consumers can show the plugin's full surface — the call endpoint rejects
+ * those ids.
  */
 const buildTrpcTool = (
   plugin: string,
   path: string,
   proc: AgentTrpcProcedure,
-): AgentToolDescriptor | null => {
+): AgentToolDescriptor => {
   // tRPC v11 router internals: `_def.procedures` is a flat path -> procedure
   // record; procedure type lives at `_def.type`.
   const procDef = proc?._def;
@@ -349,7 +353,19 @@ const buildTrpcTool = (
   )?.agent;
 
   if (!agentMeta?.permission?.action) {
-    return null;
+    return {
+      id: `${plugin}.trpc.${path}`,
+      kind: 'trpc',
+      plugin,
+      module: path.split('.')[0],
+      method,
+      destructive: false,
+      description: `tRPC procedure ${path} (not agent-callable)`,
+      inputFields: extractTrpcInputFields(proc),
+      permission: null,
+      agentUsable: false,
+      path,
+    };
   }
 
   return {
@@ -363,6 +379,7 @@ const buildTrpcTool = (
       agentMeta.description || `Call ${plugin} tRPC procedure ${path}`,
     inputFields: extractTrpcInputFields(proc),
     permission: agentMeta.permission,
+    agentUsable: true,
     path,
   };
 };
@@ -370,8 +387,9 @@ const buildTrpcTool = (
 /**
  * Derive the agent tool manifest for a plugin. Model tools are emitted only
  * for models on the explicit `includeModels` allow list whose operations
- * resolve to registered permission actions; tRPC tools only for procedures
- * declaring an agent permission.
+ * resolve to registered permission actions; every tRPC procedure is listed —
+ * those declaring an agent permission as agent-callable tools, the rest as
+ * inventory-only (`agentUsable: false`) entries.
  */
 export const buildAgentToolManifest = (opts: {
   plugin: string;
@@ -418,18 +436,15 @@ export const buildAgentToolManifest = (opts: {
 
   for (const [path, rawProc] of Object.entries(procedures)) {
     // tRPC internals are external to this module; entries are narrowed
-    // structurally and anything without agent metadata is dropped below.
+    // structurally and anything without agent metadata is listed as
+    // inventory-only below.
     const proc = rawProc as AgentTrpcProcedure;
 
     if (proc?._def?.type === 'subscription') {
       continue;
     }
 
-    const tool = buildTrpcTool(plugin, path, proc);
-
-    if (tool) {
-      tools.push(tool);
-    }
+    tools.push(buildTrpcTool(plugin, path, proc));
   }
 
   /** Match a tool against the configured exclude prefixes. */

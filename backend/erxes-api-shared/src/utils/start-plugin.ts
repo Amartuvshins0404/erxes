@@ -130,8 +130,9 @@ type ConfigTypes = {
     ) => Promise<TContext>;
   };
   /**
-   * Agent capability endpoints are opt-in. `true` exposes only curated tRPC
-   * tools (procedures declaring `.meta({ agent: ... })`); the options object
+   * Agent capability endpoints are always mounted; `agentTools` only tunes
+   * tool derivation. Every tRPC procedure is listed (only those declaring
+   * `.meta({ agent: ... })` are agent-callable); the options object
    * additionally allows exposing selected models as CRUD tools.
    */
   agentTools?:
@@ -163,7 +164,7 @@ export async function startPlugin(
     apolloServerContext,
     trpcAppRouter,
     onServerInit,
-    // agent capability endpoints (opt-in)
+    // agent capability derivation config (endpoints always mount)
     agentTools,
     // meta
     meta,
@@ -279,20 +280,16 @@ export async function startPlugin(
     );
   }
 
-  if (agentTools) {
-    mountAgentTools(app, {
-      plugin: name,
-      trpcRouter: trpcAppRouter?.router,
-      createContext: trpcAppRouter?.createContext,
-      exclude: typeof agentTools === 'object' ? agentTools.exclude : [],
-      includeModels:
-        typeof agentTools === 'object' ? agentTools.includeModels : undefined,
-      modelPermissions:
-        typeof agentTools === 'object'
-          ? agentTools.modelPermissions
-          : undefined,
-    });
-  }
+  mountAgentTools(app, {
+    plugin: name,
+    trpcRouter: trpcAppRouter?.router,
+    createContext: trpcAppRouter?.createContext,
+    exclude: typeof agentTools === 'object' ? agentTools.exclude : [],
+    includeModels:
+      typeof agentTools === 'object' ? agentTools.includeModels : undefined,
+    modelPermissions:
+      typeof agentTools === 'object' ? agentTools.modelPermissions : undefined,
+  });
 
   app.use((req: any, _res, next) => {
     if (req.rawBody === undefined) {

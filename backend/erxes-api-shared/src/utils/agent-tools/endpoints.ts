@@ -606,6 +606,16 @@ export const mountAgentTools = (
           .json(err(new Error(`Unknown agent tool '${toolId}'`)));
       }
 
+      // Inventory-only entries are listed in the manifest for curation UIs
+      // but are never callable, even directly by id.
+      if (descriptor.agentUsable === false) {
+        return res
+          .status(403)
+          .json(
+            err(new Error(`Agent tool '${toolId}' is not agent-callable`)),
+          );
+      }
+
       // Fail closed: a tool without a declared permission is never callable.
       if (!descriptor.permission) {
         return res

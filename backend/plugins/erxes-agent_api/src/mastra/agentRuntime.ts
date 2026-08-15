@@ -247,6 +247,7 @@ function assembleAgentTools(params: {
         registry,
         policy,
         recordAction,
+        models,
       })
     : {};
 
@@ -372,7 +373,7 @@ export async function getOrCreateAgent(
     agentConfig,
     subdomain: subdomain || 'os',
   });
-  const registry = await getNativeToolRegistry(subdomain || 'os');
+  const registry = await getNativeToolRegistry(subdomain || 'os', { models });
   const allowedTools = await resolveAgentAllowedTools({
     subdomain: subdomain || 'os',
     permissionGroupIds: account.permissionGroupIds ?? [],

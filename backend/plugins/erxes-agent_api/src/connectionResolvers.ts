@@ -20,6 +20,11 @@ import {
   loadSettingsClass,
   IMastraSettingsModel,
 } from '@/settings/db/models/Settings';
+import { IPluginToolCurationDocument } from '@/plugintools/@types/pluginTools';
+import {
+  loadPluginToolCurationClass,
+  IPluginToolCurationModel,
+} from '@/plugintools/db/models/PluginTools';
 import {
   loadWorkingMemoryClass,
   IMastraWorkingMemoryModel,
@@ -40,6 +45,7 @@ export interface IModels {
   MastraAgentActionLog: IMastraAgentActionLogModel;
   MastraProvider: IMastraProviderModel;
   MastraSettings: IMastraSettingsModel;
+  MastraPluginToolCuration: IPluginToolCurationModel;
   MastraWorkingMemory: IMastraWorkingMemoryModel;
   MastraArtifact: IMastraArtifactModel;
   MastraSandboxSession: IMastraSandboxSessionModel;
@@ -74,6 +80,11 @@ export const loadClasses = (db: mongoose.Connection): IModels => {
     IMastraSettingsDocument,
     IMastraSettingsModel
   >('mastra_settings', loadSettingsClass(models));
+
+  models.MastraPluginToolCuration = db.model<
+    IPluginToolCurationDocument,
+    IPluginToolCurationModel
+  >('erxes_agent_plugin_tool_curations', loadPluginToolCurationClass(models));
 
   models.MastraWorkingMemory = db.model<
     IMastraWorkingMemoryDocument,

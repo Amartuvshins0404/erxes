@@ -87,8 +87,9 @@ export const executeCodeModeCall = async (opts: {
   toolId: string;
   input?: Record<string, unknown>;
   isMutation: boolean;
+  models?: IModels;
 }): Promise<unknown> => {
-  const { auth, toolId, input, isMutation } = opts;
+  const { auth, toolId, input, isMutation, models } = opts;
   return runToolOnce(`run-code:${toolId}`, input ?? {}, () => {
     const execute = () =>
       callNativeTool({
@@ -97,6 +98,7 @@ export const executeCodeModeCall = async (opts: {
         processId: isMutation ? makeAgentProcessId() : undefined,
         toolId,
         input,
+        models,
       });
     return isMutation ? runMutationSerially(execute) : execute();
   });

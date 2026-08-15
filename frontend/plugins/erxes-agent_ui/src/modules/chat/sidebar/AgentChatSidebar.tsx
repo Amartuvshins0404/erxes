@@ -14,7 +14,7 @@ import {
   IconSettings,
   IconTrash,
 } from '@tabler/icons-react';
-import { Button, cn, Skeleton, useToast } from 'erxes-ui';
+import { Button, cn, Separator, Skeleton, useToast } from 'erxes-ui';
 import { usePermissionCheck } from 'ui-modules';
 import { ERXES_AGENT_ACTIONS } from '~/permissions';
 import type { IChatAgent } from '~/modules/chat/hooks/useChatAgents';
@@ -32,6 +32,12 @@ const SessionDeleteContext = createContext<(threadId: string) => void>(
   () => undefined,
 );
 
+// One row geometry shared by agent rows and conversation rows — full-width
+// h-10 click target, same padding and type, so both halves of the sidebar
+// read as one design. Hovers stay on host-guaranteed utilities / ea-* classes.
+const sideRow =
+  'flex h-10 w-full items-center justify-start gap-2 rounded-md px-3 text-left text-sm transition-colors';
+
 const AgentRow = ({
   agent,
   isActive,
@@ -46,10 +52,10 @@ const AgentRow = ({
     <Link
       to={`/erxes-agent/chat/${agent._id}`}
       className={cn(
-        'flex items-center gap-2 rounded-md px-2 py-1.5 text-sm min-w-0 transition-colors',
+        sideRow,
         isActive
           ? 'bg-accent text-accent-foreground font-medium'
-          : 'ea-side-row',
+          : 'text-muted-foreground hover:bg-accent',
       )}
     >
       <IconRobot className="size-4 shrink-0 text-muted-foreground" />
@@ -76,14 +82,15 @@ const SessionListItem = () => {
   return (
     <ThreadListItemPrimitive.Root
       className={cn(
-        'group/session relative flex items-center rounded-md transition-colors',
-        item.isMain ? 'ea-side-active' : 'ea-side-session',
+        'group/session relative w-full rounded-md transition-colors',
+        item.isMain ? 'ea-side-active' : 'hover:bg-accent',
       )}
     >
       <ThreadListItemPrimitive.Trigger
         className={cn(
-          'flex min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm',
-          item.isMain ? 'font-medium' : 'ea-side-row font-normal',  )}
+          sideRow,
+          item.isMain ? 'font-medium' : 'font-normal text-muted-foreground',
+        )}
       >
         <span className="min-w-0 flex-1 truncate">
           <ThreadListItemPrimitive.Title fallback="New chat" />
@@ -114,16 +121,16 @@ const SessionList = () => {
   );
 
   return (
-    <ThreadListPrimitive.Root className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-2 pb-2">
+    <ThreadListPrimitive.Root className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-auto pb-2">
       {isLoading && (
-        <div className="flex flex-col gap-2 px-2 py-1.5">
+        <div className="flex flex-col gap-2 px-3 py-1.5">
           <Skeleton className="h-3.5 ea-w-3-4" />
           <Skeleton className="h-3.5 ea-w-2-3" />
           <Skeleton className="h-3.5 ea-w-3-4" />
         </div>
       )}
       {!isLoading && isEmpty && (
-        <p className="px-2 py-1.5 text-xs text-muted-foreground">
+        <p className="px-3 py-1.5 text-xs text-muted-foreground">
           No conversations yet
         </p>
       )}
@@ -132,8 +139,10 @@ const SessionList = () => {
   );
 };
 
-// The chat workspace sidebar: agents up top, the active agent's conversations
-// below — an assistant-ui thread list driven by the remote mastra sessions.
+// The chat workspace sidebar: agents and the active agent's conversations
+// split the height 50/50 — each half has its own header and scroll region.
+// The conversation list is an assistant-ui thread list driven by the remote
+// mastra sessions.
 export const AgentChatSidebar = ({
   agents,
   activeAgentId,
@@ -174,42 +183,49 @@ export const AgentChatSidebar = ({
 
   return (
     <aside className="flex w-60 shrink-0 flex-col overflow-hidden border-r bg-sidebar">
-      <div className="flex flex-col gap-0.5 overflow-y-auto p-2">
-        <p className="px-2 pb-1 text-xs font-medium text-muted-foreground">
-          Agents
-        </p>
-        {agents.map((agent) => (
-          <AgentRow
-            key={agent._id}
-            agent={agent}
-            isActive={agent._id === activeAgentId}
-          />
-        ))}
+      {/* Agents — one half of the split. */}
+      <div className="flex min-h-0 flex-1 flex-col">
+        <div className="flex items-center px-3 pt-2 pb-1">
+          <p className="text-xs font-medium text-muted-foreground">Agents</p>
+        </div>
+        <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-auto pb-2">
+          {agents.map((agent) => (
+            <AgentRow
+              key={agent._id}
+              agent={agent}
+              isActive={agent._id === activeAgentId}
+            />
+          ))}
+        </div>
       </div>
-      <div className="flex items-center justify-between gap-1 border-t px-4 pt-2 pb-1">
-        <p className="text-xs font-medium text-muted-foreground">
-          Conversations
-        </p>
-        <ThreadListPrimitive.New asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label="New conversation"
-            title="New conversation"
-            className="size-6 text-muted-foreground hover:text-foreground"
-          >
-            <IconPlus className="size-4" />
-          </Button>
-        </ThreadListPrimitive.New>
+      <Separator />
+      {/* Conversations of the active agent — the other half. */}
+      <div className="flex min-h-0 flex-1 flex-col">
+        <div className="flex items-center justify-between gap-1 px-3 pt-2 pb-1">
+          <p className="text-xs font-medium text-muted-foreground">
+            Conversations
+          </p>
+          <ThreadListPrimitive.New asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="New conversation"
+              title="New conversation"
+              className="size-6 text-muted-foreground hover:text-foreground"
+            >
+              <IconPlus className="size-4" />
+            </Button>
+          </ThreadListPrimitive.New>
+        </div>
+        <SessionDeleteContext.Provider value={setPendingDelete}>
+          <SessionList />
+        </SessionDeleteContext.Provider>
       </div>
-      <SessionDeleteContext.Provider value={setPendingDelete}>
-        <SessionList />
-      </SessionDeleteContext.Provider>
       {hasActionPermission(ERXES_AGENT_ACTIONS.agent.readSummary) && (
-        <div className="border-t p-2">
+        <div className="shrink-0 border-t border-border p-2">
           <Link
             to="/erxes-agent/agents"
-            className="ea-side-row flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors"
+            className={cn(sideRow, 'text-muted-foreground hover:bg-accent')}
           >
             <IconSettings className="size-4 shrink-0 text-muted-foreground" />
             <span className="min-w-0 flex-1 truncate">Manage agents</span>

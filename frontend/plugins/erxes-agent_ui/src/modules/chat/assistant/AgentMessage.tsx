@@ -1,4 +1,4 @@
-import { useContext } from 'react';
+import { useContext, type PropsWithChildren } from 'react';
 import {
   MessagePrimitive,
   useComposerRuntime,
@@ -15,7 +15,10 @@ import {
 } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import { Tooltip } from 'erxes-ui';
-import type { AgentMessageMetadata } from '~/modules/chat/types';
+import {
+  parseAskUserAnswer,
+  type AgentMessageMetadata,
+} from '~/modules/chat/types';
 import {
   agentMeta,
   ChatMessageActionsContext,
@@ -27,48 +30,62 @@ import {
   ArtifactFailureCard,
 } from '~/modules/chat/components/ArtifactCard';
 import { MessageAttachments } from '~/modules/chat/components/MessageAttachments';
-import { ToolFallback } from '~/modules/chat/assistant/ToolFallback';
 import { ToolGroupBlock } from '~/modules/chat/assistant/ToolGroupBlock';
-import {
-  ReasoningGroup,
-  ReasoningPart,
-} from '~/modules/chat/assistant/ReasoningBlock';
-import { FetchUrlTool } from '~/modules/chat/assistant/FetchUrlTool';
-import { WebSearchTool } from '~/modules/chat/assistant/WebSearchTool';
-import {
-  ArtifactToolNote,
-  CalculatorTool,
-  RequestApprovalNote,
-  ToolSearchNote,
-} from '~/modules/chat/assistant/QuietTools';
-import {
-  AskUserCard,
-  AskUserToolNote,
-} from '~/modules/chat/assistant/AskUserTool';
-
-// Tools whose payload is plumbing (artifact spec, approval request, discovery
-// step) render as quiet one-line status rows — the ArtifactCard / ApprovalBar
-// surfaces carry their real content. ask_user's row is quiet too; the
-// interactive question card renders once per message (AskUserCard) so a
-// collapsed tool group can never swallow it.
-const QUIET_TOOLS = {
-  calculator: CalculatorTool,
-  request_approval: RequestApprovalNote,
-  search_tools: ToolSearchNote,
-  ask_user: AskUserToolNote,
-  renderChart: ArtifactToolNote,
-  renderDiagram: ArtifactToolNote,
-  generatePdf: ArtifactToolNote,
-  generateDocx: ArtifactToolNote,
-  generateXlsx: ArtifactToolNote,
-  generatePptx: ArtifactToolNote,
-  removeImageBackground: ArtifactToolNote,
-};
+import { AskUserCard } from '~/modules/chat/assistant/AskUserTool';
 
 // 32px quiet icon button, background-only hover — the clone's action control.
 // ea-quiet-btn owns the hover wash (plugin-unique utilities don't reach prod).
 const actionClass =
   'ea-quiet-btn flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:text-foreground';
+
+// Mirrors assistant-ui's internal MessagePartGroup (not exported at the root).
+type MessagePartGroup = { groupKey: string | undefined; indices: number[] };
+
+const TOOL_ACTIVITY_GROUP = 'ea-tool-activity';
+
+// Grouping handed to assistant-ui's Unstable_PartsGrouped: every activity part
+// of the turn — reasoning bursts AND tool calls — lands in ONE activity group
+// (a single ChatGPT-style process line instead of per-part rows), spliced in
+// at the position of the first activity part; all other parts render ungrouped
+// in place. Reasoning never renders as rows in the message body.
+const groupTurnActivity = (
+  parts: readonly { type: string }[],
+): MessagePartGroup[] => {
+  const groups: MessagePartGroup[] = [];
+  const activityIndices: number[] = [];
+  let activityGroupAt = -1;
+  parts.forEach((part, index) => {
+    if (part.type === 'tool-call' || part.type === 'reasoning') {
+      if (activityIndices.length === 0) activityGroupAt = groups.length;
+      activityIndices.push(index);
+      return;
+    }
+    groups.push({ groupKey: undefined, indices: [index] });
+  });
+  if (activityIndices.length > 0) {
+    groups.splice(activityGroupAt, 0, {
+      groupKey: TOOL_ACTIVITY_GROUP,
+      indices: activityIndices,
+    });
+  }
+  return groups;
+};
+
+// Routes each library-formed group to its chrome: the single process line, or
+// an ungrouped passthrough.
+const PartGroup = ({
+  groupKey,
+  indices,
+  children,
+}: PropsWithChildren<{ groupKey: string | undefined; indices: number[] }>) => {
+  if (groupKey === TOOL_ACTIVITY_GROUP) {
+    return <ToolGroupBlock indices={indices} />;
+  }
+  return children;
+};
+
+// PascalCase alias for the library primitive (react/jsx-pascal-case).
+const PartsGrouped = MessagePrimitive.Unstable_PartsGrouped;
 
 const MessageAction = ({
   icon,
@@ -120,7 +137,11 @@ const UserMessageRow = () => {
   const persistedMessageId = extras.get(id)?.persistedMessageId;
 
   // Approve/deny replies continue a gated turn without a visible user bubble.
-  if (metadata.hidden) return null;
+  // ask_user answer/skip replays hide by CONVENTION, not only metadata: the
+  // persisted row carries no hidden flag, so after reload the metadata path
+  // alone misses them and the bubble would show next to the card's receipt
+  // (which parses the same convention back — see AskUserCard).
+  if (metadata.hidden || parseAskUserAnswer(text)) return null;
 
   const attachments = metadata.attachments;
   const hasText = !!text.trim();
@@ -199,24 +220,19 @@ const AssistantMessageRow = () => {
   return (
     <MessagePrimitive.Root className="mx-auto flex w-full max-w-3xl flex-col group ea-msg-in">
       <div className="ea-text-15 leading-7">
-        <MessagePrimitive.Parts
+        <PartsGrouped
+          groupingFunction={groupTurnActivity}
           components={{
             Text: () => (
               <div className="ea-md">
                 <MarkdownTextPrimitive />
               </div>
             ),
-            Reasoning: ReasoningPart,
-            ReasoningGroup,
-            ToolGroup: ToolGroupBlock,
-            tools: {
-              by_name: {
-                fetchUrl: FetchUrlTool,
-                webSearch: WebSearchTool,
-                ...QUIET_TOOLS,
-              },
-              Fallback: ToolFallback,
-            },
+            Group: PartGroup,
+            // Activity parts never render individually — the ToolGroupBlock
+            // group swallows them (it renders no children), so the per-part
+            // fallback is inert by construction.
+            tools: { Fallback: () => null },
           }}
         />
         {artifacts.length > 0 && (

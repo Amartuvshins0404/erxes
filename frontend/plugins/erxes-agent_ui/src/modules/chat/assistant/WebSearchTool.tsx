@@ -1,9 +1,10 @@
-import type { ToolCallMessagePartProps } from '@assistant-ui/react';
-import { IconExternalLink, IconWorld } from '@tabler/icons-react';
-import { ToolShell } from '~/modules/chat/assistant/ToolFallback';
-import { JsonBlock } from '~/modules/chat/assistant/toolValue';
+import { IconExternalLink } from '@tabler/icons-react';
 
-interface WebSearchResultItem {
+// webSearch result plumbing shared by the preview panel's tool-activity view —
+// the inline per-call renderer is gone (the turn's activity renders behind the
+// single process line), so only the sources list remains.
+
+export interface WebSearchResultItem {
   title?: string;
   url?: string;
   snippet?: string;
@@ -16,7 +17,7 @@ interface WebSearchResult {
   results?: WebSearchResultItem[];
 }
 
-const isWebSearchResult = (value: unknown): value is WebSearchResult =>
+export const isWebSearchResult = (value: unknown): value is WebSearchResult =>
   !!value &&
   typeof value === 'object' &&
   Array.isArray((value as WebSearchResult).results);
@@ -70,68 +71,24 @@ const SourceRow = ({ item }: { item: WebSearchResultItem }) => (
   </li>
 );
 
-// webSearch gets the search-engine treatment: a shimmering "Searching <query>"
-// line while running, then "Searched <query> · N sources" expanding to the
-// source list — never the raw JSON payload.
-export const WebSearchTool = ({
-  toolName,
-  args,
-  result,
-  isError,
-  status,
-}: ToolCallMessagePartProps) => {
-  const running = status?.type === 'running' || result === undefined;
-  const parsed = isWebSearchResult(result) ? result : undefined;
-  const query =
-    args && typeof args === 'object' && 'query' in args
-      ? String((args as { query?: unknown }).query ?? '')
-      : '';
-
-  const results = parsed?.results ?? [];
+// The capped sources list — used by the preview panel's tool-activity view.
+export const SourcesList = ({
+  results,
+}: {
+  results: WebSearchResultItem[];
+}) => {
   const shown = results.slice(0, SOURCES_CAP);
-
-  const label = (
-    <>
-      {running ? 'Searching' : 'Searched'}{' '}
-      {query && <span className="ea-muted-80">“{query}”</span>}
-      {!running && results.length > 0 && (
-        <span className="ea-muted-80">
-          {' '}
-          · {results.length} {results.length === 1 ? 'source' : 'sources'}
-        </span>
-      )}
-    </>
-  );
-
   return (
-    <ToolShell
-      toolName={toolName}
-      label={label}
-      icon={IconWorld}
-      runningState="searching"
-      isError={isError}
-      running={running}
-      incomplete={status?.type === 'incomplete'}
-    >
-      {parsed ? (
-        <ul className="flex flex-col gap-3">
-          {shown.map((item, i) => (
-            <SourceRow key={item.url ?? i} item={item} />
-          ))}
-          {results.length > shown.length && (
-            <li className="text-xs text-muted-foreground">
-              +{results.length - shown.length} more{' '}
-              {results.length - shown.length === 1 ? 'source' : 'sources'}
-            </li>
-          )}
-        </ul>
-      ) : result !== undefined ? (
-        <JsonBlock
-          value={
-            typeof result === 'string' ? result : JSON.stringify(result, null, 2)
-          }
-        />
-      ) : undefined}
-    </ToolShell>
+    <ul className="flex flex-col gap-3">
+      {shown.map((item, i) => (
+        <SourceRow key={item.url ?? i} item={item} />
+      ))}
+      {results.length > shown.length && (
+        <li className="text-xs text-muted-foreground">
+          +{results.length - shown.length} more{' '}
+          {results.length - shown.length === 1 ? 'source' : 'sources'}
+        </li>
+      )}
+    </ul>
   );
 };

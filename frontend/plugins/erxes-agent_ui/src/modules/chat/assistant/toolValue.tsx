@@ -89,10 +89,20 @@ export const pickPrimaryArray = (
 
 // ─── Formatting ─────────────────────────────────────────────────────────────
 
+// camelCase / plugin-prefixed operation names → plain words ("posOrdersSummary"
+// → "pos orders summary"). Lives with the value helpers (not in a component
+// file) so the step model and the preview panel can use it without pulling in
+// tool chrome.
+export const humanizeToolName = (name: string): string =>
+  name
+    .replace(/^tool[-_]/, '')
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/[_-]+/g, ' ')
+    .toLowerCase();
+
 // camelCase / snake_case / plugin prefixes → sentence label ("totalCount" →
 // "Total count").
-export const humanizeKey = (key: string): string => {
-  const words = key
+export const humanizeKey = (key: string): string => {  const words = key
     .replace(/^tool[-_]/, '')
     .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
     .replace(/[_-]+/g, ' ')

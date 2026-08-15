@@ -30,7 +30,7 @@ const THUMB_CLASS =
 // Dual-thumb window slider. erxes-ui's Slider hardcodes a single thumb, so this
 // renders the same radix primitive with two — using the exact class strings the
 // shared slider ships, which keeps them in the host CSS through the production
-// purge (same rule as .ea-preview-dock in chat.css).
+// purge (same rule as .ea-user-bubble in chat.css).
 const RangeSlider = (
   props: ComponentPropsWithoutRef<typeof SliderPrimitive.Root>,
 ) => (

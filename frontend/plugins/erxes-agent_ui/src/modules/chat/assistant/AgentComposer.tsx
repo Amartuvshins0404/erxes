@@ -127,7 +127,8 @@ export const AgentComposer = ({
               onPaste={onPaste}
               placeholder={`Message ${agentName}…`}
               rows={1}
-              className="ea-composer-input max-h-52 min-h-9 flex-1 resize-none bg-transparent py-1.5 pr-2 pl-1 text-base outline-none"
+              maxRows={8}
+              className="ea-composer-input max-h-40 min-h-9 flex-1 resize-none overflow-auto bg-transparent py-1.5 pr-2 pl-1 text-base outline-none"
             />
             <div className="flex shrink-0 items-center gap-1">
               <ReasoningEffortControl

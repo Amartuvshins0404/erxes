@@ -64,6 +64,17 @@
   background: #212121;
   box-shadow: inset 0 0 1px 0 rgba(255, 255, 255, 0.2);
 }
+/* Composer input cap — react-textarea-autosize stamps an inline
+   `height … !important` on every measure; `maxRows` caps that height
+   library-side and ChatPage forces a re-measure (window resize) once the
+   preview split settles, so the used box stays one line until real content
+   grows it. This rule remains the visual clamp and keeps the overflow
+   scrolling inside the textarea. Kept as an ea-* rule because max-h-40 may
+   not exist in the host CSS. */
+.ea-composer-input {
+  max-height: 10rem;
+  overflow-y: auto;
+}
 .ea-composer-input::placeholder {
   color: color-mix(in oklch, var(--muted-foreground) 70%, transparent);
 }
@@ -774,35 +785,10 @@
   pointer-events: none;
 }
 
-/* ── Artifact preview panel layout ────────────────────────────────────────
-   The docked preview is a right-side column beside the chat that collapses to
-   a full-area overlay on narrow screens. These layout rules MUST live here, not
-   as Tailwind utilities: the docking relied on plugin-unique responsive +
-   arbitrary-value utilities (lg:static, lg:w-[42%], lg:min-w-[360px], …) that
-   are purged from the production host CSS. There they vanished and the panel
-   fell back to its bare `absolute inset-0` overlay — rendering as a full-screen
-   takeover instead of docking to the side. Driven off design tokens so it
-   survives the purge (same rule as .ea-user-bubble above). */
-.ea-preview-dock {
-  position: absolute;
-  inset: 0;
-  z-index: 30;
-  display: flex;
-  flex-direction: column;
-  background: var(--background);
-  border-left: 1px solid var(--border);
-}
-@media (min-width: 1024px) {
-  .ea-preview-dock {
-    position: static;
-    z-index: auto;
-    /* Width is user-adjustable via the split handle (PreviewResizer sets the
-       variable on the split container in px); 42% is the untouched default. */
-    width: var(--ea-preview-w, 42%);
-    min-width: 320px;
-    max-width: 75%;
-  }
-}
+/* ── Artifact preview panel ─────────────────────────────────────────────────
+   The docked preview lives in the second pane of the chat page's Resizable
+   split (ChatPage) — the drag handle and sizing are the library's. Only the
+   fullscreen file-list sidebar rule below remains plugin-owned. */
 
 /* ── Chat ↔ Preview split handle ──────────────────────────────────────────
    The draggable divider between the chat column and the docked Preview panel

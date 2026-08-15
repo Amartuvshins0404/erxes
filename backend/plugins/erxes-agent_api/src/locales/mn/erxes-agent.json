@@ -39,6 +39,8 @@
   "general-settings-api-url-label": "erxes API URL",
   "general-settings-api-url-placeholder": "http://localhost:4000",
   "general-settings-api-url-description": "erxes хэрэгслүүд GraphQL gateway рүү хүсэлт илгээхэд энэ хаягийг ашиглана.",
+  "general-settings-debug-title": "Дебаг горим",
+  "general-settings-debug-description": "Чат дэх хэрэгслийн дуудалт бүрийн бүрэн параметр болон хариулыг өргөтгөсөн байдлаар харуулна. Зөвхөн энэ хөтөчид хадгалагдаж шууд хэрэгжинэ — бусад хэрэглэгчдэд нөлөөлөхгүй.",
   "general-settings-memory-label": "Агентын санах ой",
   "general-settings-memory-description": "Чатын түүхийг хадгалж, сүүлийн түүхийг сэргээх, утгын хайлт болон ажлын санах ойг бүх агентын хувьд ажиллуулна.",
   "general-settings-attachments-label": "Чатад файл хавсаргах",

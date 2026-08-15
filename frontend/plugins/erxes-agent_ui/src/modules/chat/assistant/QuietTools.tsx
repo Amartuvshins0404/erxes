@@ -13,7 +13,7 @@ import {
   IconX,
 } from '@tabler/icons-react';
 import { ThinkingOrb, type OrbState } from 'thinking-orbs';
-import { humanizeToolName } from '~/modules/chat/assistant/ToolFallback';
+import { humanizeToolName } from '~/modules/chat/assistant/toolValue';
 
 // Quiet one-liners for tools whose real output lives elsewhere (artifact card,
 // approval bar, question card) or whose payload is a single scalar

@@ -6,7 +6,7 @@
 - **Project:** `erxes-agent_api`
 - **Layer:** Backend API
 - **Path:** `backend/plugins/erxes-agent_api`
-- **Last synchronized:** `2026-08-14`
+- **Last synchronized:** `2026-08-15`
 
 ## Scope
 
@@ -95,6 +95,12 @@
 
 <!-- Newest first. Keep at most 10 entries. -->
 
+### `2026-08-15` — Debug-mode locale strings removed
+
+- **Summary:** The UI's Debug mode setting was removed (the process line always opens the activity panel now), so the `general-settings-debug-*` strings were dropped from `src/locales/{en,mn}/erxes-agent.json`.
+- **Affected areas:** `src/locales/en/erxes-agent.json`, `src/locales/mn/erxes-agent.json`.
+- **Contracts changed:** None
+
 ### `2026-08-15` — Structured ask_user questions
 
 - **Summary:** Agents can ask the user a clarifying question with structured choices: the new always-bound `ask_user` tool (Mastra built-in contract, non-suspending execution) ends the turn with an `awaitingUserAnswer` result, the system prompt gained an "Asking the User" block (act-first, one question per turn, never self-answer), and turn finalization never writes a closing note while a question is pending so the turn never closes over the card. Answers continue as ordinary next user messages.
@@ -172,9 +178,3 @@
 - **Summary:** Removed team and department audiences, per-agent memory/temperature/destructive choices, and duplicate settings/chat editors while keeping people sharing, permission groups, CRUD, and approval enforcement.
 - **Affected areas:** Agent schema, GraphQL, authorization, migration cleanup, runtime guardrails, setup form, routes, settings navigation, chat rail, locales, and stale docs/tests.
 - **Contracts changed:** Removed `audienceTeamIds`, `audienceDepartmentIds`, `destructiveOps`, `memoryEnabled`, and `temperature` from agent contracts; shared visibility now accepts people only.
-
-### `2026-08-07` — Simplify dynamic operation tools
-
-- **Summary:** Removed static operation hints, entity auto-resolution, custom response-field controls, operation preloading, and configuration-key discovery while retaining live introspection, exact tools, and safety gates.
-- **Affected areas:** `src/mastra/tools`, turn preparation and execution, routing instructions, and tool-scope tests.
-- **Contracts changed:** Removed the `list_config_keys` and `__responseFields` tool surfaces; operation descriptions and argument schemas now come from live GraphQL introspection.

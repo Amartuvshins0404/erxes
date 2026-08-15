@@ -27,7 +27,7 @@
 - Manages providers and tenant runtime settings; Settings opens Providers by default.
 - General settings include a Sandbox mode select (`onserver` built-in vs `isolated` OpenSandbox); OpenSandbox URL/API-key fields render only in isolated mode.
 - Streams native agent chat parts, tool activity, attachments, artifacts, and session updates.
-- Renders the chat conversation on assistant-ui primitives (`ThreadPrimitive`, `MessagePrimitive`, `ComposerPrimitive`, streaming markdown) over the AI SDK chat runtime; a turn's reasoning bursts and tool calls group into ONE ChatGPT-style process line — while working it shows the current step's real, content-derived title (a reasoning step's title is distilled from its own text, a tool step shows its per-tool label), settled it shows the existing summary — and clicking it opens the right preview panel with the whole process as titled steps (status icon + bold title + content: full reasoning text for reasoning steps, params/result/sources per tool call, separators between steps). Reasoning never renders as rows in the message body and nothing expands inline — debug mode alone swaps the line for the inline process stepper whose rows open the panel scoped to one step. Tool args/results render structured (key-value rows, capped mini tables, web-search sources list) — never raw JSON.
+- Renders the chat conversation on assistant-ui primitives (`ThreadPrimitive`, `MessagePrimitive`, `ComposerPrimitive`, streaming markdown) over the AI SDK chat runtime; a turn's reasoning bursts and tool calls group into ONE ChatGPT-style process line — while working it shows the current step's real, content-derived title (a reasoning step's title is distilled from its own text, a tool step shows its per-tool label), settled it shows the existing summary — and clicking it opens the right preview panel with the whole process as titled steps (status icon + bold title + content: full reasoning text for reasoning steps, params/result/sources per tool call, separators between steps). Reasoning never renders as rows in the message body and nothing expands inline. Tool args/results render structured (key-value rows, capped mini tables, web-search sources list) — never raw JSON.
 - Shows "thinking"/activity with `thinking-orbs` (`ThinkingOrb`): a size-64 orb while the turn spins up, size-20 per-step-state orbs (`searching`, `connecting`, `solving`, `composing`, `shaping`, `listening`) on the running process line and the panel's active step.
 - Renders the agent's `ask_user` clarifying questions as an interactive card (numbered options, free-text "Something else", Skip) docked after the message parts; answers replay as hidden user messages quoting the question.
 - The preview panel (file list, single artifact, tool-activity view) docks beside the chat in the second pane of an erxes-ui `Resizable` split (`autoSaveId`-persisted, min 20%) and can go fullscreen as a fixed overlay; tool-activity fullscreen skips the file-list sidebar.
@@ -89,6 +89,12 @@
 
 <!-- Newest first. Keep at most 10 entries. -->
 
+### `2026-08-15` — Debug mode removed; process line always opens the panel
+
+- **Summary:** Deleted the Debug mode setting entirely (settings switch, `chatDebugModeAtom`/`useChatDebugMode`, the `debugMode.ts` module, and its EN/MN locale strings) — the single process line now always opens the right activity panel on click, and the debug-only inline stepper in the message body is gone, so there is exactly one activity UX with no `debugMode` branches.
+- **Affected areas:** `src/modules/chat/assistant/ToolGroupBlock.tsx` (panel-open button only; `StepRow`/Collapsible path removed), `src/modules/chat/debugMode.ts` (deleted), `src/pages/settings/GeneralSettingsPage.tsx` (debug card removed), `backend/plugins/erxes-agent_api/src/locales/{en,mn}/erxes-agent.json` (debug strings removed).
+- **Contracts changed:** None
+
 ### `2026-08-15` — Hidden ask_user replays and collapsible panel tool calls
 
 - **Summary:** Replayed ask_user answers never render as user bubbles anymore — `UserMessageRow` now hides any message matching the `formatAskUserAnswer`/`formatAskUserSkip` convention via `parseAskUserAnswer` (the `hidden` flag is in-memory only, so metadata-based hiding broke after reload); and in the activity panel, tool-call steps are individually collapsible (default collapsed, title row is the trigger with a rotating chevron) while thought/phase steps keep their always-visible title + text.
@@ -137,11 +143,5 @@
 
 - **Summary:** The plugin no longer registers `navigationGroup.content`, so core renders no sub-module sidebar for it; agent/conversation browsing lives entirely in the plugin's own chat sidebar, which gained a permission-gated "Manage agents" footer link.
 - **Affected areas:** `src/config.tsx`, `src/modules/chat/sidebar/AgentChatSidebar.tsx`; removed `src/modules/navigation/AgentNavLinks.tsx`.
-- **Contracts changed:** None
-
-### `2026-08-13` — Fix session ping-pong in runtime sync
-
-- **Summary:** Selecting two sessions in a row no longer blink-loops between them: the URL→runtime effect now reads the runtime via `getState()` (no reactive dep) and the runtime→URL effect reads the param through a ref, so each direction fires only from its own source.
-- **Affected areas:** `src/modules/chat/runtime/ChatRuntimeSync.tsx`.
 - **Contracts changed:** None
 

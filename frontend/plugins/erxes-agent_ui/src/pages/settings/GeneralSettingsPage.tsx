@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   IconBrain,
-  IconBug,
   IconCheck,
   IconDatabase,
   IconKey,
@@ -14,7 +13,6 @@ import { Badge, Button, Card, Form, Input, Select, Switch, toast } from 'erxes-u
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useGeneralSettings } from './hooks/useGeneralSettings';
-import { useChatDebugMode } from '~/modules/chat/debugMode';
 import {
   GENERAL_SETTINGS_DEFAULTS,
   GeneralSettingsValues,
@@ -24,7 +22,6 @@ import {
 export const GeneralSettingsPage = () => {
   const { t } = useTranslation('erxes-agent');
   const { settings, save, saving } = useGeneralSettings();
-  const [debugMode, setDebugMode] = useChatDebugMode();
 
   const form = useForm<GeneralSettingsValues>({
     resolver: zodResolver(generalSettingsSchema),
@@ -432,32 +429,6 @@ export const GeneralSettingsPage = () => {
             </div>
           </form>
         </Form>
-
-        <Card className="mt-4 border shadow-none">
-          <Card.Content className="p-4 sm:p-5">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex min-w-0 flex-1 items-start gap-3">
-                <IconBug
-                  aria-hidden
-                  className="mt-0.5 size-4 shrink-0 text-muted-foreground"
-                />
-                <div className="min-w-0">
-                  <h2 className="text-base font-semibold">
-                    {t('general-settings-debug-title')}
-                  </h2>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {t('general-settings-debug-description')}
-                  </p>
-                </div>
-              </div>
-              <Switch
-                checked={debugMode}
-                onCheckedChange={setDebugMode}
-                aria-label={t('general-settings-debug-title')}
-              />
-            </div>
-          </Card.Content>
-        </Card>
       </div>
     </div>
   );

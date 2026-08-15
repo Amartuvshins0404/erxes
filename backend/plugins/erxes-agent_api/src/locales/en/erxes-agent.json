@@ -39,8 +39,6 @@
   "general-settings-api-url-label": "erxes API URL",
   "general-settings-api-url-placeholder": "http://localhost:4000",
   "general-settings-api-url-description": "Used by erxes tools to send requests to the GraphQL gateway.",
-  "general-settings-debug-title": "Debug mode",
-  "general-settings-debug-description": "Show every tool call's full arguments and response in chat, expanded by default. Saved on this browser only, applies instantly, and does not affect other viewers.",
   "general-settings-memory-label": "Agent memory",
   "general-settings-memory-description": "Stores chat history and powers recent-history replay, semantic recall, and working memory for every agent.",
   "general-settings-attachments-label": "Chat file attachments",

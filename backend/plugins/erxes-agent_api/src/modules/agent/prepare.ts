@@ -301,8 +301,6 @@ export async function prepareChatTurn(
   ]);
 
   const activeTools = selectTurnActiveTools({
-    message,
-    attachmentCount: attachments?.length ?? 0,
     availableToolNames: Object.keys(tools),
     hasErxesOperations: promptContext.operationToolNames.length > 0,
     skillsEnabled: promptContext.hasRuntimeSkills,

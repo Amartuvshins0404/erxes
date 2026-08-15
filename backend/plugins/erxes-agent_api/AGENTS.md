@@ -72,7 +72,7 @@
 
 - Every interactive operation executes as the selected agent's linked core account while preserving the initiating human separately for ownership and approval.
 - Destructive mutations always require explicit user approval; agent configuration cannot bypass that check.
-- Tool permissions remain authoritative; turn scoping never grants a tool and preserves all approved standalone tools when wording is ambiguous.
+- Tool permissions remain authoritative; every approved tool (builtins included) is active on every turn and the model decides what to call — no keyword scoping. Only the erxes operation catalog stays search-gated via `search_tools`.
 - Mastra searches only the live, policy-scoped native capability tools; tool arguments follow the manifest's flat input fields and never trigger entity name-to-ID resolution.
 - Capability discovery is best-effort per plugin: a failed or unreachable `/agent-tools/manifest` skips that plugin (fail-closed), and the agent's own plugin is excluded from discovery to avoid recursion.
 - Direct operation, file, and standalone execution admits at most ten invocations per turn; identical calls share one promise and state-changing calls execute serially.
@@ -94,6 +94,12 @@
 ## Recent Changes
 
 <!-- Newest first. Keep at most 10 entries. -->
+
+### `2026-08-15` — Always-on approved tools (keyword scoping removed)
+
+- **Summary:** `selectTurnActiveTools` no longer regex-gates standalone builtins per turn (the gate hid `webSearch`/`fetchUrl` on phrasing like "research …", and the model then wrongly concluded it had no internet access); every permission-approved tool in the turn's toolset is now active and the model decides, while the erxes operation catalog stays model-searchable via `search_tools`.
+- **Affected areas:** `src/mastra/turnToolScope.ts` (simplified to always-on), `src/modules/agent/prepare.ts` (call site), `src/mastra/__tests__/turnToolScope.test.ts` (rewritten for always-on).
+- **Contracts changed:** None
 
 ### `2026-08-15` — Debug-mode locale strings removed
 
@@ -154,27 +160,3 @@
 - **Summary:** Empty operation results now reach the model as an explicit `resultCount: 0` envelope with pivot guidance, the prompt anchors the current date and empty-result pivot rules, progress-narration replies (English and Mongolian) are rejected for all providers, failed/interrupted streams still emit and persist a closing assistant message, and message persistence delegates to Mastra-native `savePerStep` incremental saves on both streamed and blocking turns.
 - **Affected areas:** `src/mastra/tools/emptyResult.ts` (new), `src/mastra/tools/erxesTools.ts`, `src/mastra/instructions/routing.ts`, `src/mastra/agentRuntime.ts`, `src/mastra/providerOutputGuard.ts`, `src/mastra/streamTurn.ts`, `src/modules/agent/run.ts`, `src/modules/agent/persist.ts`, `src/modules/session/nativeStore.ts`.
 - **Contracts changed:** None
-
-### `2026-08-11` — Subgraph SDL fallback for operation discovery
-
-- **Summary:** When the gateway `/graphql` is blocked, hidden, or introspection-disabled, the operation registry rebuilds its operations and schema maps from each subgraph's federation SDL on internal addresses, keeping search/execute operation tools functional.
-- **Affected areas:** `src/mastra/tools/subgraphSchemaSource.ts` (new), `src/mastra/tools/erxesTools.ts`, `src/mastra/tools/operationRegistry.ts`, and tests.
-- **Contracts changed:** None
-
-### `2026-08-10` — Finish Kimi operation turns
-
-- **Summary:** Guards immediate Kimi coding tool-work promises without forcing duplicate tools or changing plain future-tense answers, and makes streamed and blocking chats answer from completed, deduplicated operation results.
-- **Affected areas:** Agent runtime, provider-scoped completion guard, streamed and blocking turn finalization, GraphQL chat, and regression tests.
-- **Contracts changed:** None
-
-### `2026-08-07` — Fix dynamic operation routing
-
-- **Summary:** Keeps permitted operation tools active for ToolSearchProcessor, adds compact live-name search terms, and tests direct subgraph execution with exact IDs.
-- **Affected areas:** Turn tool scope, operation tool descriptions, and authentication tests.
-- **Contracts changed:** None
-
-### `2026-08-07` — Simplify agent setup and access
-
-- **Summary:** Removed team and department audiences, per-agent memory/temperature/destructive choices, and duplicate settings/chat editors while keeping people sharing, permission groups, CRUD, and approval enforcement.
-- **Affected areas:** Agent schema, GraphQL, authorization, migration cleanup, runtime guardrails, setup form, routes, settings navigation, chat rail, locales, and stale docs/tests.
-- **Contracts changed:** Removed `audienceTeamIds`, `audienceDepartmentIds`, `destructiveOps`, `memoryEnabled`, and `temperature` from agent contracts; shared visibility now accepts people only.

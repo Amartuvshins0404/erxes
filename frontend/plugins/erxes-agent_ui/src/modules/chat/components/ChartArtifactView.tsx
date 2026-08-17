@@ -25,7 +25,7 @@ const fmtCompact = (v: number): string =>
   fmtChartValue(Math.round(v * 100) / 100);
 
 const THUMB_CLASS =
-  'block h-4 w-4 rounded-full border border-primary/50 bg-background shadow transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50';
+  'ea-thumb block h-4 w-4 rounded-full border bg-background shadow transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50';
 
 // Dual-thumb window slider. erxes-ui's Slider hardcodes a single thumb, so this
 // renders the same radix primitive with two — using the exact class strings the
@@ -38,7 +38,7 @@ const RangeSlider = (
     className="relative flex w-full touch-none select-none items-center"
     {...props}
   >
-    <SliderPrimitive.Track className="relative h-1.5 w-full grow overflow-hidden rounded-full bg-primary/20">
+    <SliderPrimitive.Track className="relative h-1.5 w-full grow overflow-hidden rounded-full ea-bg-primary-20">
       <SliderPrimitive.Range className="absolute h-full bg-primary" />
     </SliderPrimitive.Track>
     <SliderPrimitive.Thumb className={THUMB_CLASS} aria-label="Range start" />
@@ -202,7 +202,7 @@ export const ChartArtifactView = forwardRef<
 
       {/* Headline totals — hairline-separated stat tiles. */}
       {totals.length > 0 && (
-        <div className="flex shrink-0 items-start justify-around gap-2 border-t border-border/50 px-3 py-3">
+        <div className="flex shrink-0 items-start justify-around gap-2 border-t ea-border-50 px-3 py-3">
           {totals.map((t) => (
             <div key={t.label} className="min-w-0 text-center">
               <p className="truncate text-sm text-muted-foreground" title={t.label}>
@@ -221,7 +221,7 @@ export const ChartArtifactView = forwardRef<
 
       {/* Control panel — only when the AI declared controls for this chart. */}
       {controls.length > 0 && (
-        <div className="shrink-0 space-y-3 border-t border-border/50 px-3 py-3">
+        <div className="shrink-0 space-y-3 border-t ea-border-50 px-3 py-3">
           {controls.map((item) => (
             <ChartControlRow key={item.id} item={item} artifact={artifact} />
           ))}

@@ -14,7 +14,7 @@ interface PanZoomControlsProps {
 }
 
 const PanZoomControls = ({ scaleLabel, zoomBy, resetFit }: PanZoomControlsProps) => (
-  <div className="absolute top-2 right-2 z-10 flex items-center gap-0.5 rounded-lg border border-border/60 bg-background/85 backdrop-blur-sm p-0.5 shadow-sm">
+  <div className="absolute top-2 right-2 z-10 flex items-center gap-0.5 rounded-lg border ea-border-60 ea-bg-85 backdrop-blur-sm p-0.5 shadow-sm">
     <button
       type="button"
       onClick={() => zoomBy(ZOOM_FACTOR)}
@@ -23,7 +23,7 @@ const PanZoomControls = ({ scaleLabel, zoomBy, resetFit }: PanZoomControlsProps)
     >
       <IconPlus className="size-3.5" />
     </button>
-    <span className="px-1 text-[10px] font-mono text-muted-foreground min-w-[34px] text-center tabular-nums">
+    <span className="ea-text-10 ea-scale-label px-1 font-mono text-muted-foreground text-center tabular-nums">
       {scaleLabel}
     </span>
     <button
@@ -34,7 +34,7 @@ const PanZoomControls = ({ scaleLabel, zoomBy, resetFit }: PanZoomControlsProps)
     >
       <IconMinus className="size-3.5" />
     </button>
-    <div className="w-px h-3.5 bg-border/60 mx-0.5" />
+    <div className="w-px h-3.5 ea-bg-border-60 mx-0.5" />
     <button
       type="button"
       onClick={resetFit}
@@ -71,7 +71,7 @@ export const PanZoomSvg = ({ svgHtml, height = 340, className }: PanZoomSvgProps
       <PanZoomControls scaleLabel={scaleLabel} zoomBy={zoomBy} resetFit={resetFit} />
 
       {/* Keyboard hint */}
-      <div className="absolute bottom-2 left-2 z-10 text-[10px] text-muted-foreground/45 pointer-events-none select-none leading-none">
+      <div className="ea-text-10 ea-hint absolute bottom-2 left-2 z-10 pointer-events-none select-none leading-none">
         scroll · drag · click node · R to reset
       </div>
 
@@ -95,7 +95,7 @@ export const PanZoomSvg = ({ svgHtml, height = 340, className }: PanZoomSvgProps
           ref={canvasRef}
           style={{ transformOrigin: '0 0' }}
           // Override any hardcoded background Mermaid bakes into the SVG root.
-          className="[&_svg]:block [&_svg]:!bg-transparent"
+          className="ea-svg-canvas"
           // eslint-disable-next-line react/no-danger
           dangerouslySetInnerHTML={{ __html: processedSvg }}
         />

@@ -110,13 +110,13 @@ const ViewerTabs = ({
 
       <Tabs.Content
         value="code"
-        className="m-0 min-h-0 flex-1 data-[state=active]:flex"
+        className="ea-tab-flex m-0 min-h-0 flex-1"
       >
         {code}
       </Tabs.Content>
       <Tabs.Content
         value="preview"
-        className="m-0 min-h-0 flex-1 data-[state=active]:flex"
+        className="ea-tab-flex m-0 min-h-0 flex-1"
       >
         {preview}
       </Tabs.Content>

@@ -4,7 +4,6 @@ import { useChat } from '@ai-sdk/react';
 import { AgentChatState, AgentUIMessage } from '~/modules/chat/types';
 import {
   selectActiveChat,
-  selectActiveThreadSettled,
   selectAgentActivity,
   selectAgentShell,
   selectHasUnread,
@@ -16,12 +15,14 @@ import {
 
 // What the conversation view renders: the agent's shell state plus the active
 // thread's live message state, read straight off the bound AI SDK `Chat`.
+// `chatHelpers` is the raw useChat return — the assistant-ui runtime wraps it.
 export interface AgentChatView extends AgentChatState {
   messages: AgentUIMessage[];
-  loading: boolean; // a reply is being written (in flight AND not yet settled)
+  loading: boolean; // a reply is being written
   messagesLoading: boolean; // hydrating this thread's history from the DB
   error?: Error;
   retry: () => void; // re-run the failed turn (clears error, re-requests)
+  chatHelpers: ReturnType<typeof useChat<AgentUIMessage>>;
 }
 
 // The active agent's session + conversation view. `useChat` binds to the active
@@ -32,14 +33,11 @@ export const useAgentChatView = (agentId?: string): AgentChatView => {
   const shell = useChatStore(useShallow((s) => selectAgentShell(s, key)));
   const chat = useChatStore((s) => selectActiveChat(s, key));
   const messagesLoading = useChatStore((s) => selectThreadHydrating(s, key));
-  // After the `finish` chunk the reply is done writing, but the stream stays
-  // open for the server's reconcile tail — status alone would keep the UI in
-  // "working" mode (stop button, shimmer) for those extra seconds.
-  const settled = useChatStore((s) => selectActiveThreadSettled(s, key));
-  const { messages, status, error, regenerate } = useChat({
+  const chatHelpers = useChat<AgentUIMessage>({
     chat,
     experimental_throttle: 50,
   });
+  const { messages, status, error, regenerate } = chatHelpers;
   // Retry a turn that errored mid-stream. `regenerate` drops the failed
   // assistant message (or re-requests from the last user message when the
   // error hit before one existed) and clears the error state itself. Carry the
@@ -55,10 +53,11 @@ export const useAgentChatView = (agentId?: string): AgentChatView => {
   return {
     ...shell,
     messages,
-    loading: (status === 'submitted' || status === 'streaming') && !settled,
+    loading: status === 'submitted' || status === 'streaming',
     messagesLoading,
     error,
     retry,
+    chatHelpers,
   };
 };
 

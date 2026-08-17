@@ -23,6 +23,7 @@ import {
   INCOMPLETE_PROVIDER_REPLY,
   resolveGuardedReply,
   shouldGuardProviderCompletion,
+  stalledAfterToolSearch,
 } from './providerOutputGuard';
 import { ensureWebsiteDeliveryReply } from '@/agent/websiteDelivery';
 
@@ -82,6 +83,12 @@ async function foldModelStream(params: {
         abortSignal: controller.signal,
         activeTools: prepared.activeTools,
         instructions: prepared.turnInstructions,
+        // Native incremental persistence: Mastra flushes the message list to
+        // memory storage after every generation step, so completed steps survive
+        // even when a later step fails or the turn is aborted. The turn-end
+        // reconcile in persistTurn then only patches metadata/attachments (and,
+        // for zero-step provider failures, creates the row natively skipped).
+        savePerStep: true,
         ...(memoryBinding ? { memory: memoryBinding } : {}),
         ...(reasoningOptions ? { providerOptions: reasoningOptions } : {}),
       });
@@ -93,7 +100,9 @@ async function foldModelStream(params: {
         modelStream as unknown as MastraModelOutput,
         {
           from: 'agent',
-          sendReasoning: false,
+          // Reasoning streams through so the UI can show the model's thoughts
+          // (Grok-style thought rows); native persistence keeps the parts.
+          sendReasoning: true,
           sendSources: false,
           sendFinish: false,
         },
@@ -135,6 +144,9 @@ async function finalizeTurn(params: {
   message: string;
   bufferProviderText: boolean;
   guardProviderText: boolean;
+  // Set when foldModelStream threw — the turn failed before the model
+  // finished, so tool state may be partial and no native row will exist.
+  streamError?: unknown;
 }): Promise<void> {
   const {
     writer,
@@ -146,26 +158,57 @@ async function finalizeTurn(params: {
     message,
     bufferProviderText,
     guardProviderText,
+    streamError,
   } = params;
   const { agent, authCtx } = prepared;
 
+  const failed = streamError !== undefined && streamError !== null;
   const interrupted = controller.signal.aborted;
+  // Structural stall: the turn's tool activity ends on a tool search whose
+  // discovered tools were never called — the model stopped mid-work.
+  const stalled = stalledAfterToolSearch(acc.toolResults());
   const guarded = guardProviderText
     ? resolveGuardedReply({
         latestText: acc.latestText,
         allText: acc.text,
+        stalled,
       })
     : undefined;
   let reply: string | null = guarded ? guarded.text : acc.text || null;
   let emitReply = bufferProviderText;
 
+  // Non-guarded providers: a turn that stalls right after a tool search has no
+  // real result to report, so its closing text cannot be an answer. Drop it so
+  // the turn falls through to synthesis/fallback instead of persisting a dead
+  // end — the already-streamed progress text stays, the real answer is
+  // appended below.
+  if (reply && !guarded && !interrupted && !failed && stalled) {
+    reply = null;
+  }
+
+  // A failed stream that already produced text would otherwise look like a
+  // complete (if odd) reply. Append an explicit note — streamed now (unless the
+  // provider text is still buffered) and persisted with the reply.
+  if (failed && reply) {
+    const note =
+      'Something went wrong while I was working on that. Please try again.';
+    if (!emitReply) {
+      const id = `fail-${Date.now()}`;
+      writer.write({ type: 'text-start', id });
+      writer.write({ type: 'text-delta', id, delta: `\n\n${note}` });
+      writer.write({ type: 'text-end', id });
+    }
+    reply = `${reply}\n\n${note}`;
+  }
+
   if (!reply) {
     // No answer text streamed. When the turn ran to completion the model ended
     // on tool calls without prose — synthesize a summary from the tool results
     // (synthesizeFromToolResults skips synthesis when nothing real came back, so
-    // we never fabricate success). An interrupted turn leaves tool calls
-    // half-done, so we don't synthesize; we go straight to the fallback below.
-    if (!interrupted) {
+    // we never fabricate success). An interrupted or failed turn leaves tool
+    // calls half-done, so we don't synthesize; we go straight to the fallback
+    // below.
+    if (!interrupted && !failed) {
       const toolResults = acc.toolResults();
       if (toolResults.length) {
         reply = await synthesizeFromToolResults({
@@ -185,6 +228,8 @@ async function finalizeTurn(params: {
     if (!reply) {
       reply = interrupted
         ? 'This response was interrupted before it finished. Please tap retry to continue.'
+        : failed
+        ? 'Something went wrong while I was working on that. Please try again.'
         : guarded?.incomplete
         ? INCOMPLETE_PROVIDER_REPLY
         : "I couldn't produce a response for that. Please try again.";
@@ -213,76 +258,54 @@ async function finalizeTurn(params: {
     writer.write({ type: 'text-end', id });
   }
 
-  // Close the assistant message NOW — the full reply already streamed, so nothing
-  // user-visible should wait on the turn-end DB write. The native message id
-  // (rated without a reload) and the thread title are reconciled over the
-  // still-open stream once the background persist resolves; on a reload the
-  // message recovers its id from the store regardless.
+  // Persist BEFORE closing the turn: the `finish` chunk carries the reconciled
+  // native message id in messageMetadata, which the AI SDK applies to the
+  // assistant message and flips the turn to 'ready' at stream close. There is
+  // no post-finish reconcile tail — the stream ends right after `finish`.
+  // Bounded titling: a slow/failed title never delays the close beyond the
+  // race window (it self-persists for the next session-list load anyway).
+  let nativeAssistantId: string | null = null;
+  try {
+    const { titlePromise, assistantMessageId } = await persistTurn({
+      models,
+      prepared,
+      reply,
+      // Mastra's assigned id for this turn's assistant row, captured off the
+      // stream's `start` chunk — the id the client rates without a reload.
+      assistantMessageId: acc.messageId,
+      replaceNativeText: bufferProviderText || deliveryCorrected,
+      interrupted,
+      failed,
+      hasArtifacts: (prepared.authCtx.artifactCount ?? 0) > 0,
+    });
+    nativeAssistantId = assistantMessageId;
+
+    const title = await Promise.race([
+      titlePromise,
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 8000)),
+    ]);
+    if (title && !clientGone()) {
+      writer.write({
+        type: 'data-thread-title',
+        data: { threadId: prepared.sessionId, title },
+        transient: true,
+      });
+    }
+  } catch (e) {
+    console.warn(
+      `[mastra chat] persist/title reconcile failed: ${
+        (e as Error)?.message || e
+      }`,
+    );
+  }
+
   writer.write({
     type: 'finish',
     messageMetadata: {
-      messageId: null,
+      messageId: nativeAssistantId,
       interrupted,
     },
   });
-
-  // Persistence is off the critical path. The user-visible reply is already
-  // complete; this reconciles the native id, attachments, and title.
-  const persistPromise = persistTurn({
-    models,
-    prepared,
-    reply,
-    // Mastra's assigned id for this turn's assistant row, captured off the
-    // stream's `start` chunk — the id the client rates without a reload.
-    assistantMessageId: acc.messageId,
-    replaceNativeText: bufferProviderText || deliveryCorrected,
-    hasArtifacts: (prepared.authCtx.artifactCount ?? 0) > 0,
-  });
-
-  if (clientGone()) {
-    // Nobody is waiting — let the write finish in the background, surfacing any
-    // failure so a lost turn is visible.
-    void persistPromise.catch((e) =>
-      console.warn(
-        `[mastra chat] background persist failed: ${
-          (e as Error)?.message || e
-        }`,
-      ),
-    );
-  } else {
-    // Client still connected: forward the reconciled native id + the new sidebar
-    // title over the already-open stream. This runs AFTER `finish`, so it is off
-    // the felt path — the user has the complete, rendered reply. Bounded titling:
-    // a slow/failed title never hangs the stream (it self-persists for the next
-    // session-list load).
-    try {
-      const { titlePromise, assistantMessageId } = await persistPromise;
-      if (assistantMessageId && !clientGone()) {
-        writer.write({
-          type: 'data-message-id',
-          data: { messageId: assistantMessageId },
-          transient: true,
-        });
-      }
-      const title = await Promise.race([
-        titlePromise,
-        new Promise<null>((resolve) => setTimeout(() => resolve(null), 8000)),
-      ]);
-      if (title && !clientGone()) {
-        writer.write({
-          type: 'data-thread-title',
-          data: { threadId: prepared.sessionId, title },
-          transient: true,
-        });
-      }
-    } catch (e) {
-      console.warn(
-        `[mastra chat] persist/title reconcile failed: ${
-          (e as Error)?.message || e
-        }`,
-      );
-    }
-  }
 }
 
 // The full assistant turn for POST /chat/stream: prepare → set up deterministic
@@ -350,15 +373,27 @@ export async function streamAgentTurn(
       toolSignal: toolStatusLine,
     });
 
-    await foldModelStream({
-      writer,
-      controller,
-      prepared,
-      reasoningOptions,
-      acc,
-      activity,
-      bufferProviderText,
-    });
+    // A provider/network failure mid-stream must not strand the user on a dead
+    // stream: capture it and still finalize, so the turn ends with a streamed
+    // AND persisted closing message instead of nothing (the route's onError is
+    // the last resort for failures before this point).
+    let streamError: unknown = null;
+    try {
+      await foldModelStream({
+        writer,
+        controller,
+        prepared,
+        reasoningOptions,
+        acc,
+        activity,
+        bufferProviderText,
+      });
+    } catch (err) {
+      streamError = err;
+      console.error(
+        `[mastra chat] model stream failed: ${(err as Error)?.message || err}`,
+      );
+    }
 
     activity.stop();
 
@@ -372,6 +407,7 @@ export async function streamAgentTurn(
       message,
       bufferProviderText,
       guardProviderText,
+      streamError,
     });
   } finally {
     activity?.stop();

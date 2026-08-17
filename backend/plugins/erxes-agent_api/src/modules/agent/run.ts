@@ -12,7 +12,7 @@ import {
   isSearchResult,
 } from '@/agent/fallback';
 import { ensureWebsiteDeliveryReply } from '@/agent/websiteDelivery';
-import { looksLikeIncompleteProgress } from '~/mastra/providerOutputGuard';
+import { stalledAfterToolSearch } from '~/mastra/providerOutputGuard';
 
 // Turn execution (blocking). Runs a single agent turn over the full
 // conversation array and returns the reply text (or null). With native
@@ -41,6 +41,9 @@ export async function runAgentTurn(params: {
   const genOpts = {
     activeTools,
     instructions: params.turnInstructions,
+    // Native incremental persistence — completed steps survive a later
+    // failure/abort (same behavior as the streamed path's savePerStep).
+    savePerStep: true,
     ...(memory ? { memory } : {}),
   };
   // With a memory binding, hand generate() the new user message as a STRING —
@@ -66,8 +69,7 @@ export async function runAgentTurn(params: {
     const incompleteText =
       guardProviderCompletion &&
       !!result.text &&
-      uniqueResults.length > 0 &&
-      looksLikeIncompleteProgress(result.text);
+      stalledAfterToolSearch(uniqueResults);
 
     if (result.text && !incompleteText) {
       return ensureWebsiteDeliveryReply({

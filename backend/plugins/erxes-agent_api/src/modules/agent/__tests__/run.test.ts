@@ -6,16 +6,11 @@ const teams = [
 ];
 
 describe('tool result synthesis', () => {
-  it('replaces blocking progress text with the completed operation result', async () => {
-    const generate = jest
-      .fn()
-      .mockResolvedValueOnce({
-        text: 'I’ll pull up the teams on your system now.',
-        toolResults: [{ toolName: 'getTeams', result: teams }],
-      })
-      .mockResolvedValueOnce({
-        text: 'The system has Demo Team and Sales.',
-      });
+  it('keeps reply text when the turn produced real tool results', async () => {
+    const generate = jest.fn().mockResolvedValue({
+      text: 'The system has Demo Team and Sales.',
+      toolResults: [{ toolName: 'getTeams', result: teams }],
+    });
 
     const reply = await runAgentTurn({
       agent: { generate } as never,
@@ -28,34 +23,54 @@ describe('tool result synthesis', () => {
     });
 
     expect(reply).toBe('The system has Demo Team and Sales.');
-    expect(generate).toHaveBeenCalledTimes(2);
-    expect(generate.mock.calls[1][1]).toEqual(
-      expect.objectContaining({
-        activeTools: [],
-        toolChoice: 'none',
-      }),
-    );
+    expect(generate).toHaveBeenCalledTimes(1);
   });
 
-  it('keeps progress-like text from providers that do not need the guard', async () => {
+  it('replaces a reply that stalls right after a tool search', async () => {
+    const searchResult = {
+      results: [{ name: 'getTeams', description: 'teams query', score: 9 }],
+      message: 'Found and loaded 1 tool(s): getTeams.',
+    };
     const generate = jest.fn().mockResolvedValue({
-      text: 'I’ll build another report if requested. The current total is 12.',
-      toolResults: [{ toolName: 'getTeams', result: teams }],
+      text: 'I will look up the teams next.',
+      toolResults: [{ toolName: 'search_tools', result: searchResult }],
     });
 
     const reply = await runAgentTurn({
       agent: { generate } as never,
-      convo: [{ role: 'user', content: 'What is the current total?' }],
-      message: 'What is the current total?',
+      convo: [{ role: 'user', content: 'What teams exist?' }],
+      message: 'What teams exist?',
+      authCtx: {},
+      activeTools: ['search_tools'],
+      turnInstructions: '',
+      guardProviderCompletion: true,
+    });
+
+    expect(reply).toBe('Something went wrong. Please try again.');
+    expect(generate).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps search-stalled text from providers that do not need the guard', async () => {
+    const searchResult = {
+      results: [{ name: 'getTeams', description: 'teams query', score: 9 }],
+      message: 'Found and loaded 1 tool(s): getTeams.',
+    };
+    const generate = jest.fn().mockResolvedValue({
+      text: 'I will look up the teams next.',
+      toolResults: [{ toolName: 'search_tools', result: searchResult }],
+    });
+
+    const reply = await runAgentTurn({
+      agent: { generate } as never,
+      convo: [{ role: 'user', content: 'What teams exist?' }],
+      message: 'What teams exist?',
       authCtx: {},
       activeTools: ['search_tools'],
       turnInstructions: '',
       guardProviderCompletion: false,
     });
 
-    expect(reply).toBe(
-      'I’ll build another report if requested. The current total is 12.',
-    );
+    expect(reply).toBe('I will look up the teams next.');
     expect(generate).toHaveBeenCalledTimes(1);
   });
 

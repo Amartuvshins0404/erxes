@@ -6,7 +6,7 @@
 - **Project:** `erxes-agent_ui`
 - **Layer:** Frontend UI
 - **Path:** `frontend/plugins/erxes-agent_ui`
-- **Last synchronized:** `2026-08-07`
+- **Last synchronized:** `2026-08-13`
 
 ## Scope
 
@@ -26,6 +26,9 @@
 - Supports private, people-shared, and organization visibility, permission groups, additional-tool allowlists, provider/model settings, and active state.
 - Manages providers and tenant runtime settings; Settings opens Providers by default.
 - Streams native agent chat parts, tool activity, attachments, artifacts, and session updates.
+- Renders the chat conversation on assistant-ui primitives (`ThreadPrimitive`, `MessagePrimitive`, `ComposerPrimitive`, streaming markdown) over the AI SDK chat runtime; tool calls display as inline per-call status lines with dedicated readable renderers for web-search and fetch-url results.
+- Hosts a custom chat workspace sidebar: agents up top and the active agent's conversations below as an assistant-ui thread list (`ThreadListPrimitive` / `ThreadListItemPrimitive`) driven by a remote-thread-list runtime over the mastra session GraphQL contract, plus a permission-gated "Manage agents" footer link.
+- The plugin registers no core sub-module panel (`navigationGroup` carries only the rail label/icon), so entering the plugin shows only the plugin's own sidebar.
 
 ## Architecture
 
@@ -33,7 +36,11 @@
 | ---------- | ------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
 | Federation | `frontend/plugins/erxes-agent_ui/module-federation.config.ts` | Exposes config, main/settings routes, and widgets.                                   |
 | Routes     | `frontend/plugins/erxes-agent_ui/src/modules`                 | Lazy-loaded main and settings route trees with permission gates.                     |
-| Chat       | `frontend/plugins/erxes-agent_ui/src/modules/chat`            | Session list, SSE assistant rendering, tool status, composer, artifacts, and errors. |
+| Chat       | `frontend/plugins/erxes-agent_ui/src/modules/chat`            | Page shell, SSE stream state, artifacts, approvals, and preview.                     |
+| Runtime    | `frontend/plugins/erxes-agent_ui/src/modules/chat/runtime`    | Remote-thread-list runtime: mastra GraphQL adapter, per-thread runtime hook, URL/store sync. |
+| Sidebar    | `frontend/plugins/erxes-agent_ui/src/modules/chat/sidebar`    | Chat workspace sidebar (agents + assistant-ui conversation thread list).             |
+| Assistant  | `frontend/plugins/erxes-agent_ui/src/modules/chat/assistant`  | assistant-ui thread, message rows, composer, and per-message extras mapping.         |
+| Navigation | `frontend/plugins/erxes-agent_ui/src/modules/navigation`      | Agent favorites and settings navigation (no core sub-module panel).        |
 | Settings   | `frontend/plugins/erxes-agent_ui/src/pages/settings`          | Provider and tenant runtime settings forms, validation, and mutation feedback.       |
 | GraphQL    | `frontend/plugins/erxes-agent_ui/src/graphql`                 | Plugin-prefixed queries, mutations, and subscriptions consumed by the UI.            |
 
@@ -53,7 +60,9 @@
 ## Data and State
 
 - Apollo Client owns server state; settings mutations refetch `MASTRA_SETTINGS` immediately after save.
-- Chat session and stream state remain inside `src/modules/chat`; component-local interactions use React state.
+- Live chat turns are owned by AI SDK `Chat` instances (one per agent+thread) behind a small zustand registry; the stock `DefaultChatTransport` speaks to the SSE endpoint, whose `finish` chunk metadata supplies the native message id. Session/activity signals mirror into the registry only for background-thread badges.
+- Conversation selection is owned by an assistant-ui `unstable_useRemoteThreadListRuntime` per agent: a plugin adapter (`chat/runtime/mastraThreadListAdapter.ts`) maps the mastra session queries/mutations onto the remote-thread-list contract (thread ids are client-generated; `initialize` is an id passthrough, archiving is unsupported). `ChatRuntimeSync` keeps `?thread=`, the runtime main thread, and the store's per-agent active selection in two-way sync.
+- The conversation view runs on `@assistant-ui/react` primitives via per-thread `useAISDKRuntime(chatHelpers)` instances (one hook instance per alive thread, mounted by the remote list runtime); sends go through the store's pipeline (staged attachment uploads and per-send body extras), not the runtime composer send.
 - Settings forms use React Hook Form values validated by Zod schemas in `src/pages/settings/validations.ts`.
 
 ## Local Invariants
@@ -61,8 +70,10 @@
 - GraphQL operation names remain prefixed with `Mastra` and unique repository-wide.
 - Every mutation provides error feedback and updates or refetches the affected Apollo data.
 - Routes and federation exposes stay lazy-loaded and aligned with `src/config.tsx`.
+- Thread ids are generated by the assistant-ui remote list runtime (`__LOCALID_*` for drafts) and passed through to the backend unchanged; never remap them in the adapter.
 - UI primitives come from `erxes-ui`; plugin code never imports another plugin.
 - Runtime settings expose only behavior the backend currently executes.
+- The host global CSS is built without this plugin's source, so plugin-unique Tailwind utilities (arbitrary values, `/<pct>` opacity modifiers, named group/data variants) never reach production. Any style not guaranteed by the host must be an `ea-*` class in `src/modules/chat/chat.css` (import it directly in pages outside the chat chunk graph).
 
 ## Validation
 
@@ -73,56 +84,62 @@
 
 <!-- Newest first. Keep at most 10 entries. -->
 
+### `2026-08-13` — Production-safe chat surface styles
+
+- **Summary:** Fixed the prod-test rendering (white user bubble, unstyled send button, invisible hover controls) by moving every plugin-unique Tailwind utility off the chat surface into self-contained `ea-*` classes in `chat.css` — the deployed host CSS is built without scanning this plugin, so arbitrary values, opacity modifiers, and group/data variants were all missing in production.
+- **Affected areas:** `src/modules/chat/chat.css`, chat assistant/components/preview/sidebar files, `src/pages/agents/components/AgentFormFields.tsx` (now imports chat.css for `ea-form-grid`).
+- **Contracts changed:** None
+
+### `2026-08-13` — Drop the core sub-module panel
+
+- **Summary:** The plugin no longer registers `navigationGroup.content`, so core renders no sub-module sidebar for it; agent/conversation browsing lives entirely in the plugin's own chat sidebar, which gained a permission-gated "Manage agents" footer link.
+- **Affected areas:** `src/config.tsx`, `src/modules/chat/sidebar/AgentChatSidebar.tsx`; removed `src/modules/navigation/AgentNavLinks.tsx`.
+- **Contracts changed:** None
+
+### `2026-08-13` — Fix session ping-pong in runtime sync
+
+- **Summary:** Selecting two sessions in a row no longer blink-loops between them: the URL→runtime effect now reads the runtime via `getState()` (no reactive dep) and the runtime→URL effect reads the param through a ref, so each direction fires only from its own source.
+- **Affected areas:** `src/modules/chat/runtime/ChatRuntimeSync.tsx`.
+- **Contracts changed:** None
+
+### `2026-08-13` — Custom chat sidebar on the assistant-ui remote thread list
+
+- **Summary:** Moved session browsing out of the core sidebar into a chat-workspace sidebar built on `ThreadListPrimitive`/`ThreadListItemPrimitive`, backed by a per-agent `unstable_useRemoteThreadListRuntime` whose adapter serves the mastra session GraphQL contract (list/fetch/initialize/rename/delete; title generation reads the backend-persisted title after the first turn). Core navigation is now flat Chat / Agents links; `?thread=` deep-links, browser Back, delete-with-confirm, and re-homing all sync through `ChatRuntimeSync`.
+- **Affected areas:** `src/modules/chat/runtime/` (new: adapter, provider, sync), `src/modules/chat/sidebar/AgentChatSidebar.tsx` (new), `src/modules/chat/ChatPage.tsx`, `src/modules/chat/store/chatStore.ts` (`setActiveThread`/`ensureThreadChat`/`hydrateThread` replace `newDraft`/`selectSession`), `src/modules/navigation/AgentNavLinks.tsx` (new), `src/config.tsx`; removed `AgentChatNavTree`, `useSessionBootstrap`, `useMastraThreads`, `useRemoveMastraThread`.
+- **Contracts changed:** None
+
+### `2026-08-13` — Sidebar session rows redesigned
+
+- **Summary:** Rebuilt the sidebar conversation rows on `Sidebar.SubItem` + `Sidebar.SubButton` with a left tree-guide border; the delete control is now a hover/focus-revealed icon button absolutely centered (`top-1/2 -translate-y-1/2`) over a solid `bg-sidebar` chip, replacing the misaligned `NavigationMenuLinkItem` + `Sidebar.MenuAction` pairing, and the agent row gained consistent action spacing.
+- **Affected areas:** `src/modules/navigation/AgentChatNavTree.tsx`.
+- **Contracts changed:** None
+
+### `2026-08-13` — Readable fetchUrl tool results
+
+- **Summary:** Added a dedicated `fetchUrl` tool renderer that shows the fetched page as a readable card (favicon, linked title, site name, plain-text content behind a "Read more" toggle) instead of dumping the raw JSON payload; unexpected result shapes still fall back to the capped JSON block.
+- **Affected areas:** `src/modules/chat/assistant/FetchUrlTool.tsx` (new), `src/modules/chat/assistant/AgentMessage.tsx`.
+- **Contracts changed:** None
+
+### `2026-08-13` — Sidebar session rows use sidebar primitives
+
+- **Summary:** Fixed the session delete button floating below its row by switching it to `Sidebar.MenuAction` (absolute, vertically centered, hover-revealed); sessions now indent under their agent via `Sidebar.Sub`, the agent row uses `Sidebar.MenuButton` for consistent hover/active states, and the new-conversation control is a real icon button.
+- **Affected areas:** `src/modules/navigation/AgentChatNavTree.tsx`.
+- **Contracts changed:** None
+
+### `2026-08-13` — assistant-ui chat surface and nested sidebar navigation
+
+- **Summary:** Rebuilt the conversation view on assistant-ui primitives (thread, message rows with streaming markdown and inline per-call tool status, composer) over the AI SDK chat runtime, replacing the custom message list/bubble/composer/waiting components and the summarized activity line; moved the agent/session browser into the main sidebar as a nested "Chat" tree with lazy session loading, deleting the in-page side panel.
+- **Affected areas:** `src/modules/chat/assistant` (new), `src/modules/chat/ChatPage.tsx`, `src/modules/navigation/AgentChatNavTree.tsx` (new), `src/config.tsx`, `src/modules/chat/hooks/useChatView.ts`; removed `MessageList`, `MessageBubble`, `Composer`, `WaitingIndicator`, `ChatMarkdown`, `ChatSidePanel`, `AgentRail`, `SessionList`, `MastraNavigation` and related hooks.
+- **Contracts changed:** None
+
+### `2026-08-13` — Stock AI SDK chat transport
+
+- **Summary:** Dropped the custom settling transport, settled flags, idle handoff, and message-id reconcile parts now that the backend closes the stream at `finish` with the native id in `messageMetadata`; the chat runs on the stock `DefaultChatTransport` and status lifecycle.
+- **Affected areas:** `src/modules/chat/lib/chatTransport.ts`, `src/modules/chat/store/chatStore.ts`, `src/modules/chat/hooks/useChatView.ts`, `src/modules/chat/types.ts`.
+- **Contracts changed:** Consumes `finish` `messageMetadata.messageId` instead of the removed transient `data-message-id` part.
+
 ### `2026-08-07` — Enforce agent rail access
 
 - **Summary:** Hides agent settings links without edit access and refreshes the access-filtered chat agent list after saves.
 - **Affected areas:** Agent rail permissions, save mutation cache handling, and stale cache tests.
 - **Contracts changed:** None
-
-### `2026-08-07` — Simplify agent setup and navigation
-
-- **Summary:** Kept one full agent admin under `/erxes-agent/agents`, reduced setup to people-only sharing and core runtime controls, and changed chat edit to navigate to the full config route.
-- **Affected areas:** Agent form/types/GraphQL/cache, chat rail, route trees, Settings navigation, locales, and stale tests.
-- **Contracts changed:** Removed agent team/department audiences, per-agent memory/temperature/destructive fields, Settings agent routes, and the in-chat editor.
-
-### `2026-08-06` — Remove end-user trace UI
-
-- **Summary:** Removed reasoning and tool trace views, debug controls, trace-only state, and parsers while keeping assistant replies, tool status, approvals, artifacts, and errors.
-- **Affected areas:** Chat components, stream hydration, artifact and tool readers, agent forms, GraphQL documents, styles, and types.
-- **Contracts changed:** Removed `debug` from agent reads and writes and removed trace-only stream data parts.
-
-### `2026-08-06` — Remove custom skills CMS UI
-
-- **Summary:** Removed skill admin routes, screens, GraphQL documents, permissions, agent assignment, chat distillation, and slash activation UI.
-- **Affected areas:** Main and settings navigation, routes, agent detail, chat composer and transport, GraphQL selections, and types.
-- **Contracts changed:** Removed use of all `mastraSkill*` operations, agent `skills` fields, and skill activation request metadata.
-
-### `2026-08-06` — Remove background execution UI
-
-- **Summary:** Removed background execution controls, schedule contracts, and the automations widget.
-- **Affected areas:** GraphQL documents, permissions, navigation metadata, and Module Federation exposes.
-- **Contracts changed:** Removed background execution and schedule controls and the `./automationsWidget` expose.
-
-### `2026-08-06` — Remove custom agent workflow UI
-
-- **Summary:** Removed workflow pages, graph, chat mode, automation widget, routes, navigation, API documents, permissions, exports, and tests.
-- **Affected areas:** Main and agent routes, chat UI, navigation, config, GraphQL documents, Module Federation, permissions, and automation widgets.
-- **Contracts changed:** Removed custom workflow routes, navigation modules, GraphQL operations, permission keys, and the `./automationsWidget` expose.
-
-### `2026-08-06` — Remove retired chat knowledge UI
-
-- **Summary:** Removed pages, routes, agent tabs, settings controls, GraphQL documents, permissions, message ratings, and related trace labels.
-- **Affected areas:** Main and agent routes, chat UI/store, general settings, GraphQL documents, permissions, and types.
-- **Contracts changed:** Removed the retired knowledge and message-rating operations and settings fields.
-
-### `2026-08-06` — Remove retired response analysis settings
-
-- **Summary:** Removed response analysis controls, settings fields, GraphQL selections, validation, locale use, and metadata types.
-- **Affected areas:** General settings, settings GraphQL documents and types, and chat message metadata.
-- **Contracts changed:** Removed the retired analysis fields from settings reads, saves, and chat metadata.
-
-### `2026-08-06` — Remove obsolete summarizer settings
-
-- **Summary:** Removed unused provider/model controls after chat labels became deterministic, and made router singleton sharing independent of Nx's version-qualified pnpm graph nodes.
-- **Affected areas:** General settings form/validation/types, settings GraphQL documents, and Module Federation sharing.
-- **Contracts changed:** Removed `summarizerProvider` and `summarizerModel` from the settings UI contract.

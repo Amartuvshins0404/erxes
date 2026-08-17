@@ -14,7 +14,9 @@
   "dependencies": {
     "@zxing/library": "^0.21.3",
     "erxes-api-shared": "workspace:^",
-    "sharp": "^0.33.0"
+    "sharp": "^0.33.0",
+    "graphql-tag": "^2.12.6"
+
   },
   "devDependencies": {}
 }

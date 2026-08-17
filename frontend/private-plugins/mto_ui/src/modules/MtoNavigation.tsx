@@ -13,12 +13,7 @@ export const MtoNavigation = () => {
 
   return (
     <>
-      <NavigationMenuLinkItem
-        name="Mto"
-        icon={IconActivity}
-        pathPrefix="mto"
-        path=""
-      />
+
       {!isSlaveMode && (
         <NavigationMenuLinkItem
           name="Categories"

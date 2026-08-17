@@ -28,8 +28,7 @@ const toToolItem = (descriptor: AgentToolDescriptor): MastraPluginToolItem => ({
   method: descriptor.method ?? null,
   destructive: descriptor.destructive ?? null,
   description: descriptor.description ?? null,
-  // Manifests pre-dating `agentUsable` listed only callable tools.
-  agentUsable: descriptor.agentUsable !== false,
+  agentUsable: Boolean(descriptor.permission?.action),
   permissionAction: descriptor.permission?.action ?? null,
 });
 

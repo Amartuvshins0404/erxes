@@ -27,9 +27,10 @@ const modelTool = (
     kind: 'model',
     plugin,
     module,
-    method: op === 'find' || op === 'findOne' || op === 'count'
-      ? 'query'
-      : 'mutation',
+    method:
+      op === 'find' || op === 'findOne' || op === 'count'
+        ? 'query'
+        : 'mutation',
     destructive: op === 'create' || op === 'update' || op === 'remove',
     description: '',
     inputFields: null,
@@ -65,7 +66,7 @@ const TOOLS: AgentToolDescriptor[] = [
   modelTool('Deals', 'create'),
   modelTool('Deals', 'update'),
   modelTool('Deals', 'remove'),
-  trpcTool('deal.findOne'),
+  trpcTool('deal.findOne', 'sales', { module: 'deal', action: 'dealsShow' }),
 ];
 
 const registry = (list: AgentToolDescriptor[] = TOOLS): RegistryView => {
@@ -88,7 +89,11 @@ describe('actionsToAllowedTools', () => {
       [perm('sales', 'deal', ['dealsShow'])],
       registry(),
     );
-    expect(out).toEqual(['sales.model.Deals.find', 'sales.model.Deals.findOne']);
+    expect(out).toEqual([
+      'sales.model.Deals.find',
+      'sales.model.Deals.findOne',
+      'sales.trpc.deal.findOne',
+    ]);
   });
 
   it('emits write tools only for their granted action', () => {
@@ -101,6 +106,7 @@ describe('actionsToAllowedTools', () => {
       'sales.model.Deals.remove',
     ]);
     expect(out).not.toContain('sales.model.Deals.update');
+    expect(out).not.toContain('sales.trpc.deal.findOne');
   });
 
   it('matches modules tolerantly across singular/plural and case', () => {
@@ -124,15 +130,25 @@ describe('actionsToAllowedTools', () => {
       [{ module: 'deal', actions: ['dealsShow'], scope: 'all' }],
       registry(),
     );
-    expect(out).toEqual(['sales.model.Deals.find', 'sales.model.Deals.findOne']);
+    expect(out).toEqual([
+      'sales.model.Deals.find',
+      'sales.model.Deals.findOne',
+      'sales.trpc.deal.findOne',
+    ]);
   });
 
-  it('emits permission-less tRPC tools when any action matches plugin+module', () => {
+  it('emits tRPC tools only when their permission action matches', () => {
     const out = actionsToAllowedTools(
       [perm('sales', 'deal', ['dealsShow'])],
       registry(),
     );
     expect(out).toContain('sales.trpc.deal.findOne');
+
+    const denied = actionsToAllowedTools(
+      [perm('sales', 'deal', ['dealsOther'])],
+      registry(),
+    );
+    expect(denied).not.toContain('sales.trpc.deal.findOne');
   });
 
   it('drops the "*" wildcard (grants nothing server-side → stays in lock-step)', () => {

@@ -10,7 +10,6 @@ const DESTRUCTIVE_NAME = /(remove|delete|merge|destroy)/i;
 /** True when `tool` irreversibly destroys or merges data. */
 export function isDestructiveTool(tool: AgentToolDescriptor): boolean {
   if (tool.method !== 'mutation') return false;
-  if (tool.kind === 'model') return tool.op === 'remove';
   return DESTRUCTIVE_NAME.test(tool.id);
 }
 

@@ -127,9 +127,7 @@ export async function getNativeToolRegistry(
     const curations = opts?.models
       ? await opts.models.MastraPluginToolCuration.find({}).lean()
       : [];
-    const curationByPlugin = new Map(
-      curations.map((row) => [row.plugin, row]),
-    );
+    const curationByPlugin = new Map(curations.map((row) => [row.plugin, row]));
 
     const pluginNames = await getPlugins();
     const manifests = await Promise.all(
@@ -151,7 +149,6 @@ export async function getNativeToolRegistry(
 
     for (const descriptors of manifests) {
       for (const descriptor of descriptors) {
-        if (descriptor.agentUsable === false) continue;
         const curation = curationByPlugin.get(descriptor.plugin);
         if (!curation || curation.enabled !== true) continue;
         if (curation.disabledTools?.includes(descriptor.id)) continue;

@@ -66,10 +66,7 @@ const permissionCovers = (
     return actions.includes(tool.permission.action);
   }
 
-  // tRPC tools without a derived permission: allowed when the agent holds any
-  // concrete action on that plugin + module ("*" grants nothing server-side,
-  // so it stays dropped here too — lock-step with the permission service).
-  return actions.some((action) => action && action !== '*');
+  return false;
 };
 
 /**

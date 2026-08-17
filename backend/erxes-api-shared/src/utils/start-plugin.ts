@@ -49,7 +49,7 @@ import {
   leaveErxesGateway,
 } from './service-discovery';
 import { createTRPCContext } from './trpc';
-import { AgentModelPermissionMap, mountAgentTools } from './agent-tools';
+import { mountAgentTools } from './agent-tools';
 import { applyTrustProxy, getSubdomain } from './utils';
 import * as Sentry from '@sentry/node';
 
@@ -130,17 +130,14 @@ type ConfigTypes = {
     ) => Promise<TContext>;
   };
   /**
-   * Agent capability endpoints are always mounted; `agentTools` only tunes
-   * tool derivation. Every tRPC procedure is listed (only those declaring
-   * `.meta({ agent: ... })` are agent-callable); the options object
-   * additionally allows exposing selected models as CRUD tools.
+   * Agent capability endpoints are opt-in. Exposes only curated tRPC tools
+   * (procedures declaring `.meta({ agent: { permission } })`); model CRUD is
+   * intentionally not exposed.
    */
   agentTools?:
     | true
     | {
         exclude?: string[];
-        includeModels?: string[];
-        modelPermissions?: AgentModelPermissionMap;
       };
   meta?: IMeta;
 };
@@ -164,7 +161,7 @@ export async function startPlugin(
     apolloServerContext,
     trpcAppRouter,
     onServerInit,
-    // agent capability derivation config (endpoints always mount)
+    // agent capability endpoints (opt-in)
     agentTools,
     // meta
     meta,
@@ -280,16 +277,14 @@ export async function startPlugin(
     );
   }
 
-  mountAgentTools(app, {
-    plugin: name,
-    trpcRouter: trpcAppRouter?.router,
-    createContext: trpcAppRouter?.createContext,
-    exclude: typeof agentTools === 'object' ? agentTools.exclude : [],
-    includeModels:
-      typeof agentTools === 'object' ? agentTools.includeModels : undefined,
-    modelPermissions:
-      typeof agentTools === 'object' ? agentTools.modelPermissions : undefined,
-  });
+  if (agentTools) {
+    mountAgentTools(app, {
+      plugin: name,
+      trpcRouter: trpcAppRouter?.router,
+      createContext: trpcAppRouter?.createContext,
+      exclude: typeof agentTools === 'object' ? agentTools.exclude : [],
+    });
+  }
 
   app.use((req: any, _res, next) => {
     if (req.rawBody === undefined) {

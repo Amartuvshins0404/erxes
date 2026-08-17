@@ -11,7 +11,6 @@ describe('buildSystemPrompt', () => {
     });
 
     expect(prompt).toContain('Configured capabilities: calculator');
-    expect(prompt).not.toContain('For PPTX');
     expect(prompt).not.toContain('Charts:');
   });
 
@@ -21,15 +20,14 @@ describe('buildSystemPrompt', () => {
       scopeLine: '',
       builtins: [
         {
-          id: 'generatePptx',
-          name: 'generatePptx',
-          description: 'Generate a presentation',
+          id: 'renderChart',
+          name: 'renderChart',
+          description: 'Render a chart',
         },
       ],
     });
 
-    expect(prompt).toContain('For PPTX');
-    expect(prompt).not.toContain('Charts:');
+    expect(prompt).toContain('Charts:');
     expect(prompt.length).toBeLessThan(10_000);
   });
 });

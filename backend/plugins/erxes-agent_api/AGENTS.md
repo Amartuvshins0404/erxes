@@ -6,7 +6,7 @@
 - **Project:** `erxes-agent_api`
 - **Layer:** Backend API
 - **Path:** `backend/plugins/erxes-agent_api`
-- **Last synchronized:** `2026-08-15`
+- **Last synchronized:** `2026-08-17`
 
 ## Scope
 
@@ -99,6 +99,12 @@
 
 <!-- Newest first. Keep at most 10 entries. -->
 
+### `2026-08-17` — Strict tRPC-only agent tool curation
+
+- **Summary:** Aligned native capability discovery with the strict admit-only tRPC platform: only procedures declaring `.meta({ agent: { description, permission } })` are exposed or executable, permission-less fallbacks and model CRUD checks are removed, and tests are updated to enforce declared permissions.
+- **Affected areas:** `src/mastra/tools/actionsToAllowedTools.ts`, `src/mastra/tools/destructiveGuard.ts`, `src/mastra/tools/nativeTools.ts`, `src/modules/plugintools/inventory.ts`, unit tests.
+- **Contracts changed:** All uncurated/permission-less tRPC procedures are strictly forbidden; only explicit `.meta({ agent })` procedures are admitted.
+
 ### `2026-08-15` — Per-plugin agent-tool curation (REST surface)
 
 - **Summary:** Added a per-tenant curation surface for which plugins agents may use: `PluginToolCuration` (collection `erxes_agent_plugin_tool_curations`) stores `enabled` + `disabledTools` per plugin (default-deny — a plugin contributes no capability tools until enabled), exposed to the admin UI as REST routes `GET /pl:erxes-agent/plugin-tools` (`settings.statusRead`) and `POST /pl:erxes-agent/plugin-tools/curation` (`settings.manage`) through the gateway proxy; the native tool registry always drops `agentUsable=false` manifest entries and skips disabled/disabled-tool plugins, and curation writes invalidate the registry cache immediately.
@@ -152,9 +158,3 @@
 - **Summary:** Operation discovery and execution now run over each plugin's native agent-tools endpoints (`GET /agent-tools/manifest` + `POST /agent-tools/call`) instead of gateway/subgraph GraphQL introspection; the registry aggregates per-tenant manifests with a 60s cache, policy scoping derives from descriptor permissions (plugin + tolerant module + action match, any-action for permission-less tRPC tools), destructive native mutations keep the same approval flow, and the old introspection/SDL/arg-coercion machinery is deleted in a hard cutover.
 - **Affected areas:** `src/mastra/tools/nativeTools.ts` (new), `src/mastra/tools/scope.ts`, `actionsToAllowedTools.ts`, `agentGrantPolicy.ts`, `destructiveGuard.ts`, `metaTools.ts`, `src/mastra/agentRuntime.ts`, `src/mastra/instructions/routing.ts`; deleted `operationRegistry.ts`, `erxesTools.ts`, `operationTools.ts`, `schemaIntrospect.ts`, `subgraphSchemaSource.ts`, `argScrub.ts`, `serverErrorClassifier.ts`, `humanize.ts`, `securityGuard.ts` and their dedicated tests.
 - **Contracts changed:** None (this plugin's provided contracts are unchanged; it now consumes the shared `/agent-tools/*` endpoints instead of gateway GraphQL).
-
-### `2026-08-13` — Strip custom turn-lifecycle guards
-
-- **Summary:** Removed the custom guard stack that fought the native loop — the step ceiling (`stopWhen: []` now), the two-call answer budget, the completion-guard retry processor, the repeated-call filter, finalize-time stall heuristics, and the tool-result synthesis/fallback rewriters — so a turn ends only when the model itself answers and its answer is delivered as-is; every tool invocation now spends from the ten-call hard stop (repeats included) as the sole runaway breaker, keeping only provider-compat sanitization, failure/abort notes, and the tool-search wording correction.
-- **Affected areas:** `src/mastra/agentRuntime.ts`, `src/mastra/providerOutputGuard.ts`, `src/mastra/requestContext.ts`, `src/mastra/streamTurn.ts`, `src/mastra/turnToolScope.ts`, `src/mastra/toolSearch.ts`, `src/modules/agent/prepare.ts`, `src/modules/agent/run.ts`, `src/modules/agent/turn.ts`, `src/modules/agent/uiTurn.ts`, `src/modules/agent/graphql/resolvers/queries/agent.ts`; deleted `repeatedToolCallFilter.ts`, `fallback.ts`, and stale guard/budget/fallback tests.
-- **Contracts changed:** None

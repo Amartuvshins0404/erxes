@@ -103,7 +103,6 @@ startPlugin({
     context.instanceId = instanceId; // This will be set from header in master mode
     context.masterClient = masterClient;
     context.masterUrl = masterUrl;
-    console.log('mode',mode);
     return context;
   },
   meta: {

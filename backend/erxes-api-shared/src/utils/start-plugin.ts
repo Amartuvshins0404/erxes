@@ -130,13 +130,15 @@ type ConfigTypes = {
     ) => Promise<TContext>;
   };
   /**
-   * tRPC procedure paths to exclude from the agent capability manifest.
-   * Agent-tools endpoints are mounted automatically on every plugin that
-   * supplies a `trpcAppRouter`. Only procedures declaring
-   * `.meta({ agent: { permission } })` appear in the manifest; this list
-   * removes specific annotated procedures when needed.
+   * Agent capability endpoints are opt-in. Exposes only curated tRPC tools
+   * (procedures declaring `.meta({ agent: { permission } })`); model CRUD is
+   * intentionally not exposed.
    */
-  agentToolsExclude?: string[];
+  agentTools?:
+    | true
+    | {
+        exclude?: string[];
+      };
   meta?: IMeta;
 };
 
@@ -159,8 +161,8 @@ export async function startPlugin(
     apolloServerContext,
     trpcAppRouter,
     onServerInit,
-    // agent capability endpoint exclusions
-    agentToolsExclude,
+    // agent capability endpoints (opt-in)
+    agentTools,
     // meta
     meta,
   } = configs || {};
@@ -275,16 +277,12 @@ export async function startPlugin(
     );
   }
 
-  // Agent capability endpoints are mounted automatically on every plugin with
-  // a tRPC router. The manifest is admit-only: only procedures declaring
-  // `.meta({ agent: { permission } })` are exposed, so an empty router
-  // produces an empty manifest and zero callable tools.
-  if (trpcAppRouter) {
+  if (agentTools) {
     mountAgentTools(app, {
       plugin: name,
-      trpcRouter: trpcAppRouter.router,
-      createContext: trpcAppRouter.createContext,
-      exclude: agentToolsExclude || [],
+      trpcRouter: trpcAppRouter?.router,
+      createContext: trpcAppRouter?.createContext,
+      exclude: typeof agentTools === 'object' ? agentTools.exclude : [],
     });
   }
 

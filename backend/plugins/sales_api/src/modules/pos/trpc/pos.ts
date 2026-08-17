@@ -70,6 +70,12 @@ export const posTrpcRouter = t.router({
         return await getBranchesUtil(subdomain, models, posToken);
       }),
     ordersDeliveryInfo: t.procedure
+      .meta({
+        agent: {
+          description: 'POS order delivery status',
+          permission: { module: 'sales', action: 'showDeals' },
+        },
+      })
       .input(z.any())
       .query(async ({ ctx, input }) => {
         const { orderId } = input;
@@ -183,17 +189,33 @@ export const posTrpcRouter = t.router({
       }),
   }),
   orders: t.router({
-    findOne: t.procedure.input(z.any()).query(async ({ ctx, input }) => {
-      const { models } = ctx;
-      const query = input?.query || input?.selector || input;
+    findOne: t.procedure
+      .meta({
+        agent: {
+          description: 'Find one POS order',
+          permission: { module: 'sales', action: 'showDeals' },
+        },
+      })
+      .input(z.any())
+      .query(async ({ ctx, input }) => {
+        const { models } = ctx;
+        const query = input?.query || input?.selector || input;
 
-      if (!query || !Object.keys(query).length) {
-        return {};
-      }
+        if (!query || !Object.keys(query).length) {
+          return {};
+        }
 
-      return await models.PosOrders.findOne(query).lean();
-    }),
-    find: t.procedure.input(z.any()).query(async ({ ctx, input }) => {
+        return await models.PosOrders.findOne(query).lean();
+      }),
+    find: t.procedure
+      .meta({
+        agent: {
+          description: 'Find POS orders',
+          permission: { module: 'sales', action: 'showDeals' },
+        },
+      })
+      .input(z.any())
+      .query(async ({ ctx, input }) => {
       const { models } = ctx;
       const { query, skip, limit, sort = {} } = input || {};
 

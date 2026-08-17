@@ -6,7 +6,7 @@
 - **Project:** `sales_api`
 - **Layer:** `Backend API`
 - **Path:** `backend/plugins/sales_api`
-- **Last synchronized:** `2026-08-15`
+- **Last synchronized:** `2026-08-17`
 
 ## Scope
 
@@ -34,10 +34,9 @@
   `documents`, `fields`).
 - Declares a curated agent-tool surface: 21 tRPC procedures carry
   `.meta({ agent: { permission } })` (all reads plus the three deal writes via
-  `dealsAdd`/`dealsEdit`/`dealsRemove`), and
-  `agentTools: { includeModels: ['Deals'] }` exposes the Deals model as CRUD
-  tools whose permission actions resolve (`showDeals`/`dealsAdd`/`dealsEdit`/
-  `dealsRemove`). Raw-mongo, system-user, and POS-device-sync procedures stay
+  `dealsAdd`/`dealsEdit`/`dealsRemove`), gated by the deals module permissions
+  (`showDeals`/`dealsAdd`/`dealsEdit`/`dealsRemove`). The platform exposes only
+  tRPC tools; raw-mongo, system-user, and POS-device-sync procedures stay
   inventory-only (`agentUsable=false`).
 - Sales pipelines persist `propertyIds`; create and edit validate every id
   against Core `sales:deal` fields before writing it.
@@ -101,15 +100,27 @@
 
 <!-- Newest first. Keep at most 10 entries. -->
 
+### `2026-08-17` — Align agent tools with tRPC-only platform
+
+- **Summary:** Sales agent tools now expose only tRPC procedures via
+  `.meta({ agent: { description, permission } })`; the Deals model CRUD surface
+  is dropped to match the platform's last open-source change (only tRPC tools
+  are allowed).
+- **Affected areas:** `src/modules/sales/trpc/deal.ts`,
+  `src/modules/pos/trpc/pos.ts`, `src/modules/sales/trpc/document.ts`,
+  `src/trpc/init-trpc.ts`.
+- **Contracts changed:** agent-usable tool declarations added (21 tRPC
+  procedures, `showDeals`/`dealsAdd`/`dealsEdit`/`dealsRemove`); no public
+  GraphQL or tRPC contract changes; no `agentTools` model config.
+
 ### `2026-08-15` — Adopt the `/agent-tools` platform
 
 - **Summary:** Exposes a curated agent-callable surface: 21 tRPC procedures
   (`deal`, `stage`, `pipeline`, `pos`, `orders`, `documents`, `fields`)
-  declared via `.meta({ agent: { permission } })` and Deals model CRUD via
-  `agentTools: { includeModels: ['Deals'] }`.
+  declared via `.meta({ agent: { permission } })`.
 - **Affected areas:** `src/modules/sales/trpc/deal.ts`,
   `src/modules/pos/trpc/pos.ts`, `src/modules/sales/trpc/document.ts`,
-  `src/trpc/init-trpc.ts`, `src/main.ts`.
+  `src/trpc/init-trpc.ts`.
 - **Contracts changed:** new agent-usable tool declarations; no public
   GraphQL or tRPC contract changes.
 

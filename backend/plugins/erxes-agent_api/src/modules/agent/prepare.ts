@@ -15,10 +15,7 @@ import { IMastraProviderDocument } from '@/provider/@types/provider';
 import { IMastraSettingsDocument } from '@/settings/@types/settings';
 import { resolveAgentPrincipal } from '~/mastra/auth/agentPrincipal';
 import { deriveThreadTitle } from '~/mastra/titler';
-import {
-  resolveToolAnswerLimit,
-  selectTurnActiveTools,
-} from '~/mastra/turnToolScope';
+import { selectTurnActiveTools } from '~/mastra/turnToolScope';
 import {
   MemoryBinding,
   PreparedTurn,
@@ -310,10 +307,6 @@ export async function prepareChatTurn(
     hasErxesOperations: promptContext.operationToolNames.length > 0,
     skillsEnabled: promptContext.hasRuntimeSkills,
   });
-  const toolAnswerLimit = resolveToolAnswerLimit(
-    activeTools,
-    promptContext.operationToolNames.length > 0,
-  );
   const turnInstructions = buildTurnSystemPrompt(promptContext, activeTools);
 
   await preRegisterThread({
@@ -335,7 +328,6 @@ export async function prepareChatTurn(
     backgroundRemovalEnabled: settings.backgroundRemovalEnabled !== false,
     resourceId,
     approvedOps: approvedOperations,
-    toolAnswerLimit,
   };
 
   return {

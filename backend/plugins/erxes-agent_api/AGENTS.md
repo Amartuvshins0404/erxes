@@ -27,11 +27,11 @@
 - Discovers permitted erxes operations through `ErxesToolSearchProcessor` (a Mastra ToolSearchProcessor subclass that states loaded tools arrive on the next step, not the next turn) over live GraphQL introspection, with exact live argument schemas and conservative standalone-tool scoping; when the gateway `/graphql` is blocked or introspection is disabled, the registry rebuilds itself from each subgraph's federation SDL on its internal address.
 - Creates documents, charts, diagrams, and websites when those tools are enabled for the selected agent.
 - Loads plugin-owned `SKILL.md` files through Mastra `Workspace` and `LocalSkillSource`; Mastra provides skill discovery and read tools at runtime.
-- Bounds malformed-provider recovery, unique tool executions, exact duplicate calls, and state-changing tool concurrency per turn.
+- Bounds unique tool executions and state-changing tool concurrency per turn; every tool invocation (first or exact repeat) spends from the same ten-call hard stop so a repeat loop cannot spin forever.
 - Derives chat titles from the first meaningful request without a provider call.
 - Wraps empty operation results (`{}`/`[]`/`null`) in an explicit `resultCount: 0` envelope with filter-check/pivot guidance instead of forwarding an anonymous empty payload.
-- Anchors the system prompt to the current date and detects unfinished turns structurally — a text-only step whose last tool activity is a tool search with never-invoked results — regardless of reply language, forcing one corrective tool call instead of pattern-matching narration.
-- Finalizes every streamed turn with a persisted assistant reply: mid-stream provider failures append a plain-language failure note, and error/abort finishes create the assistant row Mastra never saved.
+- Anchors the system prompt to the current date and lets the native Mastra loop own turn lifecycle: a turn ends only when the model itself answers, with no step ceiling, call budget, or completion guard.
+- Streams the model's reply as-is: mid-stream provider failures append a plain-language failure note, and error/abort finishes with no text create the assistant row Mastra never saved. A completed turn's text is never rewritten, synthesized, or replaced.
 
 ## Architecture
 
@@ -72,11 +72,10 @@
 - Tool permissions remain authoritative; turn scoping never grants a tool and preserves all approved standalone tools when wording is ambiguous.
 - Mastra searches only the live, policy-scoped exact erxes operation tools; operation arguments use exact schema values and never trigger entity name-to-ID resolution.
 - Operation discovery must survive a blocked, hidden, or introspection-disabled gateway `/graphql`: when the gateway yields zero operations, the registry rebuilds from each subgraph's federation SDL (`_service { sdl }` on internal addresses), applying the same internal/client-portal skip rules and security strip as the gateway path.
-- Direct operation, file, and standalone execution admits at most ten unique calls per turn; identical calls share one promise and state-changing calls execute serially.
-- The agentic loop has no step ceiling (`stopWhen: []`); it ends when the model stops calling tools, with runaway execution bounded by the unique-call, repetition, and concurrency budgets above.
-- An exact repeated call forces a text-only model step using the tool-result messages already present for that turn.
-- Provider completion recovery adds at most one corrective model request, triggered only by the structural search-stall signal and always with `toolChoice: 'required'`.
-- A streamed turn never ends silently: finalization always emits and persists a closing reply, creating the native assistant row directly when the model run finished in error or abort before any step completed (later steps are already persisted natively via `savePerStep`).
+- Direct operation, file, and standalone execution admits at most ten invocations per turn; identical calls share one promise and state-changing calls execute serially.
+- The agentic loop has no step ceiling (`stopWhen: []`) and no answer budget; a turn ends only when the model itself answers. No custom completion guards or forced text-only steps — the only processors are tool search and the memory replay filter.
+- Provider-specific code is limited to compatibility (Kimi reasoning-separator sanitization/buffering), never turn-lifecycle control.
+- The model's answer is never inspected or rewritten: no synthesis-from-results, no fallback text, no completeness checks. Only a hard failure or abort with no text produces a plain-language closing note (creating the native assistant row directly when the run finished before any step completed; later steps are already persisted natively via `savePerStep`).
 - Thread titles and activity labels must not trigger auxiliary model requests.
 - Agent execution must start from an authenticated user request; the plugin must not subscribe to notifications, register automation actions, or run a scheduler.
 - Plugin source must not import another plugin or require private changes to core/shared code.
@@ -92,10 +91,10 @@
 
 <!-- Newest first. Keep at most 10 entries. -->
 
-### `2026-08-13` — Unbounded steps and structural stall recovery
+### `2026-08-13` — Strip custom turn-lifecycle guards
 
-- **Summary:** Agent turns no longer carry an eight-step ceiling; `ErxesToolSearchProcessor` corrects Mastra's "available on your next turn" wording to the factual next-step behavior at every emission site; and unfinished-turn detection is structural (a text-only step whose last tool activity is an unacted tool search) instead of English/Mongolian narration regexes, always forcing one corrective tool call on retry.
-- **Affected areas:** `src/mastra/agentRuntime.ts`, `src/mastra/toolSearch.ts` (new), `src/mastra/providerOutputGuard.ts`, `src/mastra/streamTurn.ts`, `src/modules/agent/run.ts`, and tests.
+- **Summary:** Removed the custom guard stack that fought the native loop — the step ceiling (`stopWhen: []` now), the two-call answer budget, the completion-guard retry processor, the repeated-call filter, finalize-time stall heuristics, and the tool-result synthesis/fallback rewriters — so a turn ends only when the model itself answers and its answer is delivered as-is; every tool invocation now spends from the ten-call hard stop (repeats included) as the sole runaway breaker, keeping only provider-compat sanitization, failure/abort notes, and the tool-search wording correction.
+- **Affected areas:** `src/mastra/agentRuntime.ts`, `src/mastra/providerOutputGuard.ts`, `src/mastra/requestContext.ts`, `src/mastra/streamTurn.ts`, `src/mastra/turnToolScope.ts`, `src/mastra/toolSearch.ts`, `src/modules/agent/prepare.ts`, `src/modules/agent/run.ts`, `src/modules/agent/turn.ts`, `src/modules/agent/uiTurn.ts`, `src/modules/agent/graphql/resolvers/queries/agent.ts`; deleted `repeatedToolCallFilter.ts`, `fallback.ts`, and stale guard/budget/fallback tests.
 - **Contracts changed:** None
 
 ### `2026-08-13` — Library-native stream close

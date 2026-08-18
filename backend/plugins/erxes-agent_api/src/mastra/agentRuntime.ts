@@ -26,12 +26,6 @@ import { isWorkspaceMemoryEnabled } from './memory/config';
 import { getMastraMemory } from './memory/mastraMemory';
 import { withToolExecutionControl } from './requestContext';
 import { ToolCallSignalFilter } from './memory/toolCallSignalFilter';
-import { RepeatedToolCallFilter } from './repeatedToolCallFilter';
-import {
-  PROVIDER_COMPLETION_MAX_RETRIES,
-  ProviderCompletionGuard,
-  shouldGuardProviderCompletion,
-} from './providerOutputGuard';
 import { ErxesToolSearchProcessor } from './toolSearch';
 import { getRuntimeSkillsWorkspace } from './runtimeSkills';
 import { createTerminalTool } from './tools/terminalTool';
@@ -452,12 +446,9 @@ export async function getOrCreateAgent(
 
   // Native Mastra skills load from plugin-owned SKILL.md files. Passing this
   // workspace makes Mastra add its skill discovery processor and skill tools.
-  const hasExecutableTools = hasErxes || toolNames.length > 0;
-  const completionGuard =
-    hasExecutableTools && shouldGuardProviderCompletion(agentConfig.model)
-      ? new ProviderCompletionGuard()
-      : null;
-
+  // Processors stay minimal on purpose: tool search (dynamic operation
+  // loading) and the memory replay filter (provider compatibility). The turn
+  // ends when the model itself answers — no custom completion guards.
   const inputProcessors = [
     ...(hasErxes
       ? [
@@ -469,10 +460,7 @@ export async function getOrCreateAgent(
         ]
       : []),
     ...(memory ? [new ToolCallSignalFilter()] : []),
-    ...(completionGuard ? [completionGuard] : []),
-    ...(hasExecutableTools ? [new RepeatedToolCallFilter()] : []),
   ];
-  const outputProcessors = completionGuard ? [completionGuard] : [];
 
   const agent = new Agent({
     id: agentConfig._id,
@@ -482,17 +470,11 @@ export async function getOrCreateAgent(
     ...(memory ? { memory } : {}),
     tools: toolNames.length ? controlledTools : undefined,
     ...(inputProcessors.length ? { inputProcessors } : {}),
-    ...(outputProcessors.length
-      ? {
-          outputProcessors,
-          maxProcessorRetries: PROVIDER_COMPLETION_MAX_RETRIES,
-        }
-      : {}),
     ...(runtimeSkillsWorkspace ? { workspace: runtimeSkillsWorkspace } : {}),
     defaultOptions: {
       // No step ceiling: the loop ends when the model stops calling tools.
-      // Tool execution itself stays bounded by the per-turn unique-call and
-      // repetition budgets, so an unbounded step count cannot run away.
+      // Runaway tool execution is bounded by the per-turn invocation hard
+      // stop in runToolOnce, so an unbounded step count cannot run away.
       stopWhen: [],
       // Independent reads may execute together. Exact GraphQL mutations and
       // state-changing standalone tools share the per-turn serial queue.

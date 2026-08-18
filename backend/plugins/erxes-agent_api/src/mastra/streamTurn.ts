@@ -14,16 +14,13 @@ import { runWithAuth, ApprovedOp } from './requestContext';
 import {
   prepareChatTurn,
   persistTurn,
-  synthesizeFromToolResults,
   type PreparedTurn,
 } from '@/agent/turn';
 import { IMastraChatAttachment } from '@/session/@types/session';
 import { UITurnAccumulator } from '@/agent/uiTurn';
 import {
-  INCOMPLETE_PROVIDER_REPLY,
-  resolveGuardedReply,
-  shouldGuardProviderCompletion,
-  stalledAfterToolSearch,
+  sanitizeProviderText,
+  shouldBufferProviderText,
 } from './providerOutputGuard';
 import { ensureWebsiteDeliveryReply } from '@/agent/websiteDelivery';
 
@@ -141,9 +138,7 @@ async function finalizeTurn(params: {
   clientGone: () => boolean;
   prepared: PreparedTurn;
   acc: UITurnAccumulator;
-  message: string;
   bufferProviderText: boolean;
-  guardProviderText: boolean;
   // Set when foldModelStream threw — the turn failed before the model
   // finished, so tool state may be partial and no native row will exist.
   streamError?: unknown;
@@ -155,36 +150,19 @@ async function finalizeTurn(params: {
     clientGone,
     prepared,
     acc,
-    message,
     bufferProviderText,
-    guardProviderText,
     streamError,
   } = params;
-  const { agent, authCtx } = prepared;
+  const { authCtx } = prepared;
 
   const failed = streamError !== undefined && streamError !== null;
   const interrupted = controller.signal.aborted;
-  // Structural stall: the turn's tool activity ends on a tool search whose
-  // discovered tools were never called — the model stopped mid-work.
-  const stalled = stalledAfterToolSearch(acc.toolResults());
-  const guarded = guardProviderText
-    ? resolveGuardedReply({
-        latestText: acc.latestText,
-        allText: acc.text,
-        stalled,
-      })
-    : undefined;
-  let reply: string | null = guarded ? guarded.text : acc.text || null;
+  // Buffered providers (Kimi via custom gateways) can leak a reasoning
+  // separator late in the stream; only the sanitized text is user-visible.
+  let reply: string | null = bufferProviderText
+    ? sanitizeProviderText(acc.text).text || null
+    : acc.text || null;
   let emitReply = bufferProviderText;
-
-  // Non-guarded providers: a turn that stalls right after a tool search has no
-  // real result to report, so its closing text cannot be an answer. Drop it so
-  // the turn falls through to synthesis/fallback instead of persisting a dead
-  // end — the already-streamed progress text stays, the real answer is
-  // appended below.
-  if (reply && !guarded && !interrupted && !failed && stalled) {
-    reply = null;
-  }
 
   // A failed stream that already produced text would otherwise look like a
   // complete (if odd) reply. Append an explicit note — streamed now (unless the
@@ -201,44 +179,18 @@ async function finalizeTurn(params: {
     reply = `${reply}\n\n${note}`;
   }
 
-  if (!reply) {
-    // No answer text streamed. When the turn ran to completion the model ended
-    // on tool calls without prose — synthesize a summary from the tool results
-    // (synthesizeFromToolResults skips synthesis when nothing real came back, so
-    // we never fabricate success). An interrupted or failed turn leaves tool
-    // calls half-done, so we don't synthesize; we go straight to the fallback
-    // below.
-    if (!interrupted && !failed) {
-      const toolResults = acc.toolResults();
-      if (toolResults.length) {
-        reply = await synthesizeFromToolResults({
-          agent,
-          message,
-          authCtx,
-          toolResults,
-        });
-      }
-    }
-    // Safety net: a turn must never dead-end as a blank bubble. If nothing
-    // streamed and synthesis produced nothing (interrupted mid-tool, or the
-    // model stopped on a tool call whose result carried nothing to report),
-    // write an explicit line so the user always sees — and can retry — the
-    // outcome. This is streamed AND persisted (persistTurn takes `reply`), so it
-    // survives a reload too.
-    if (!reply) {
-      reply = interrupted
-        ? 'This response was interrupted before it finished. Please tap retry to continue.'
-        : failed
-        ? 'Something went wrong while I was working on that. Please try again.'
-        : guarded?.incomplete
-        ? INCOMPLETE_PROVIDER_REPLY
-        : "I couldn't produce a response for that. Please try again.";
-    }
+  // The model owns the turn ending; its answer is never second-guessed or
+  // rewritten. Only a hard failure or interruption that left no text gets a
+  // plain-language note so the user isn't stranded on a blank bubble.
+  if (!reply && (interrupted || failed)) {
+    reply = interrupted
+      ? 'This response was interrupted before it finished. Please tap retry to continue.'
+      : 'Something went wrong while I was working on that. Please try again.';
     emitReply = true;
   }
 
   let deliveryCorrected = false;
-  if (!interrupted) {
+  if (!interrupted && reply) {
     const corrected = ensureWebsiteDeliveryReply({
       reply,
       publishAttempted: acc.toolCalls.some(
@@ -251,7 +203,7 @@ async function finalizeTurn(params: {
     emitReply ||= deliveryCorrected;
   }
 
-  if (emitReply) {
+  if (emitReply && reply) {
     const id = interrupted ? `interrupt-${Date.now()}` : `synth-${Date.now()}`;
     writer.write({ type: 'text-start', id });
     writer.write({ type: 'text-delta', id, delta: reply });
@@ -351,11 +303,9 @@ export async function streamAgentTurn(
       prepared.agentConfig.provider,
       reasoningEffort,
     );
-    const guardProviderText =
-      prepared.activeTools.length > 0 &&
-      shouldGuardProviderCompletion(prepared.agentConfig.model);
     const bufferProviderText =
-      guardProviderText ||
+      (prepared.activeTools.length > 0 &&
+        shouldBufferProviderText(prepared.agentConfig.model)) ||
       Object.prototype.hasOwnProperty.call(prepared.tools, 'publishWebsite');
 
     // Tool calls receive an instant deterministic status line. Reasoning uses
@@ -404,9 +354,7 @@ export async function streamAgentTurn(
       clientGone,
       prepared,
       acc,
-      message,
       bufferProviderText,
-      guardProviderText,
       streamError,
     });
   } finally {

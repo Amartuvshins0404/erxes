@@ -1,71 +1,175 @@
-import { useState, type PropsWithChildren } from 'react';
-import { useMessageRuntime } from '@assistant-ui/react';
-import type { ToolCallMessagePart } from '@assistant-ui/react';
+import { type ReactNode } from 'react';
 import {
+  useMessageRuntime,
+  type TextMessagePart,
+  type ToolCallMessagePart,
+} from '@assistant-ui/react';
+import {
+  IconAlertTriangle,
+  IconCheck,
   IconChevronDown,
-  IconLoader2,
-  IconTools,
 } from '@tabler/icons-react';
-import { Collapsible } from 'erxes-ui';
-import { humanizeToolName } from '~/modules/chat/assistant/ToolFallback';
+import { ThinkingOrb } from 'thinking-orbs';
+import {
+  humanizeToolName,
+  isFailureResult,
+  isRecord,
+} from '~/modules/chat/assistant/toolValue';
+import {
+  buildTurnSteps,
+  type TurnActivityItem,
+} from '~/modules/chat/assistant/turnSteps';
+import { previewStore } from '~/modules/chat/preview/previewStore';
 
-// Consecutive tool calls collapse into one summary row — "Ran 3 searches",
-// "Fetched 4 pages", "Used 5 tools" — expanding to the individual fallback
-// rows. A run of identical calls no longer floods the conversation.
-export const ToolGroupBlock = ({
-  startIndex,
-  endIndex,
-  children,
-}: PropsWithChildren<{ startIndex: number; endIndex: number }>) => {
-  const [open, setOpen] = useState(false);
+const settledLabel = (parts: ToolCallMessagePart[]): ReactNode => {
+  const count = parts.length;
+  const names = [...new Set(parts.map((part) => part.toolName))];
+  if (names.length === 1) {
+    const [name] = names;
+    if (name === 'webSearch') {
+      return count === 1 ? 'Searched the web' : `Ran ${count} searches`;
+    }
+    if (name === 'fetchUrl') {
+      return count === 1 ? 'Fetched a page' : `Fetched ${count} pages`;
+    }
+    if (name === 'runCode' || name === 'run-code') {
+      return count === 1 ? 'Ran code' : `Ran code ×${count}`;
+    }
+    return (
+      <>
+        Used <b className="font-medium">{humanizeToolName(name ?? 'tool')}</b>
+        {count > 1 ? ` ×${count}` : ''}
+      </>
+    );
+  }
+  return `Used ${count} tools`;
+};
+
+// Plain-string twin of settledLabel — the activity panel's title basis.
+const settledTitle = (parts: ToolCallMessagePart[]): string => {
+  const count = parts.length;
+  const names = [...new Set(parts.map((part) => part.toolName))];
+  if (names.length === 1) {
+    const [name] = names;
+    if (name === 'webSearch') {
+      return count === 1 ? 'Searched the web' : `Ran ${count} searches`;
+    }
+    if (name === 'fetchUrl') {
+      return count === 1 ? 'Fetched a page' : `Fetched ${count} pages`;
+    }
+    if (name === 'runCode' || name === 'run-code') {
+      return count === 1 ? 'Ran code' : `Ran code ×${count}`;
+    }
+    return `Used ${humanizeToolName(name ?? 'tool')}${
+      count > 1 ? ` ×${count}` : ''
+    }`;
+  }
+  return `Used ${count} tools`;
+};
+
+// All reasoning bursts and tool calls of a turn render behind ONE
+// ChatGPT-style process line: while working it shows the current step's real,
+// content-derived title (a distilled reasoning title or a per-tool label) with
+// a thinking orb; settled it shows the summary ("Used 5 tools"). Clicking the
+// line opens the right activity panel with the full process as titled steps —
+// nothing expands inline and reasoning never renders as message rows.
+// assistant-ui's Unstable_PartsGrouped places every activity part of the
+// message into this single group — see groupTurnActivity in AgentMessage.
+export const ToolGroupBlock = ({ indices }: { indices: number[] }) => {
   const runtime = useMessageRuntime();
 
-  const parts = runtime
-    .getState()
-    .content.slice(startIndex, endIndex + 1)
-    .filter(
-      (p): p is ToolCallMessagePart => p.type === 'tool-call',
-    );
-  const count = endIndex - startIndex + 1;
-  const running = parts.some((p) => p.result === undefined);
-  const names = new Set(parts.map((p) => p.toolName));
-
-  const label = (() => {
-    if (names.size === 1) {
-      const [name] = names;
-      const verb =
-        name === 'webSearch'
-          ? count === 1
-            ? 'Ran 1 search'
-            : `Ran ${count} searches`
-          : name === 'fetchUrl'
-          ? count === 1
-            ? 'Fetched 1 page'
-            : `Fetched ${count} pages`
-          : `Used ${humanizeToolName(name ?? 'tool')} ×${count}`;
-      return verb;
+  const state = runtime.getState();
+  const parts: ToolCallMessagePart[] = [];
+  const activities: TurnActivityItem[] = [];
+  indices.forEach((index) => {
+    const part = state.content[index];
+    if (part?.type === 'reasoning') {
+      activities.push({ kind: 'reasoning', text: part.text });
+      return;
     }
-    return `Used ${count} tools`;
-  })();
+    if (part?.type === 'tool-call') {
+      parts.push(part);
+      activities.push({
+        kind: 'tool',
+        call: {
+          toolCallId: part.toolCallId,
+          toolName: part.toolName,
+          args: part.args,
+          argsText: part.argsText,
+          result: part.result,
+          isError: part.isError,
+        },
+      });
+    }
+  });
+  if (!activities.length) return null;
 
+  const streaming =
+    state.status?.type === 'running' ||
+    parts.some((part) => part.result === undefined);
+  const failed = parts.some(
+    (part) => part.isError || isFailureResult(part.result),
+  );
+  const hasText = state.content
+    .filter((p): p is TextMessagePart => p?.type === 'text')
+    .some((p) => !!p.text.trim());
+  const lastPart = parts[parts.length - 1];
+  const awaitingUserAnswer =
+    lastPart?.toolName === 'ask_user' &&
+    isRecord(lastPart.result) &&
+    lastPart.result.awaitingUserAnswer === true;
+
+  const steps = buildTurnSteps({
+    activities,
+    streaming,
+    hasText,
+    awaitingUserAnswer,
+  });
+  const activeStep = steps.find((step) => step.status === 'active');
+  const working = !!activeStep;
+
+  const statusIcon = working ? (
+    <ThinkingOrb state={activeStep.runningState ?? 'working'} size={20} />
+  ) : failed ? (
+    <IconAlertTriangle className="size-4 shrink-0 text-amber-600 dark:text-amber-500" />
+  ) : (
+    <IconCheck className="size-4 shrink-0" />
+  );
+  const label = (
+    <span
+      className={`min-w-0 break-words leading-5 ${
+        working ? 'ea-shimmer-text' : ''
+      }`}
+    >
+      {working
+        ? activeStep.label
+        : parts.length > 0
+          ? settledLabel(parts)
+          : 'Thought process'}
+    </span>
+  );
+  const lineClass =
+    'flex w-fit max-w-full items-center gap-2 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground';
+
+  // The line opens the right activity panel with the full process.
   return (
-    <Collapsible open={open} onOpenChange={setOpen}>
-      <Collapsible.Trigger className="group/trigger flex w-fit items-center gap-2 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground">
-        {running ? (
-          <IconLoader2 className="size-4 shrink-0 animate-spin [animation-duration:0.6s]" />
-        ) : (
-          <IconTools className="size-4 shrink-0" />
-        )}
-        <span className="leading-none">{label}</span>
-        <IconChevronDown
-          className={`size-4 shrink-0 transition-transform duration-200 ${
-            open ? '' : '-rotate-90'
-          }`}
-        />
-      </Collapsible.Trigger>
-      <Collapsible.Content>
-        <div className="flex flex-col ps-4 pt-1 pb-1">{children}</div>
-      </Collapsible.Content>
-    </Collapsible>
+    <button
+      type="button"
+      className={lineClass}
+      onClick={() =>
+        previewStore.getState().openActivity({
+          steps,
+          title: working
+            ? 'Working…'
+            : parts.length > 0
+              ? settledTitle(parts)
+              : 'Thought process',
+        })
+      }
+    >
+      {statusIcon}
+      {label}
+      <IconChevronDown className="size-4 shrink-0 -rotate-90" />
+    </button>
   );
 };

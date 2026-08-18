@@ -75,8 +75,8 @@ export interface ToolInfo {
   description?: string;
 }
 
-// erxes operations stay out of the initial tool list. ToolSearchProcessor
-// exposes search_tools and auto-loads matching exact-schema operation tools.
+// erxes capabilities stay out of the initial tool list. ToolSearchProcessor
+// exposes search_tools and auto-loads matching exact-schema native tools.
 // scopeLine states policy reach; inventoryLines is the live installed surface.
 const ERXES_OPERATIONS_BLOCK = (scopeLine: string, inventoryLines: string[]) =>
   `
@@ -90,12 +90,12 @@ ${
 }
 
 For an erxes data task:
-1. Use a loaded exact operation immediately when it matches. Otherwise call
-   search_tools once with the precise action and entity; matching exact tools
-   auto-load for the next step.
+1. Use a loaded exact capability tool immediately when it matches. Otherwise
+   call search_tools once with the precise action and entity; matching exact
+   tools auto-load for the next step.
 2. Read its exact schema, provide every required argument, and call it directly.
    Never probe with empty input or wrap arguments in a generic object.
-3. Use the exact argument and return schema exposed by the operation.
+3. Use the exact argument and return schema exposed by the capability tool.
    Prefer aggregate/count or plural-ID fields over repeated per-record calls.
 4. Run up to four independent reads concurrently. Writes run one at a time.
    Never repeat an identical call. If a result says \`success: false\`, repair
@@ -112,9 +112,9 @@ by its plain name. If a capability is absent from the live inventory, say it is
 not installed rather than offering a fictional example.
 
 Secrets are always redacted. Never guess, echo, or place a secret in a tool
-call. For access
-questions, currentUserPermissions is authoritative for the current user. For
-another user, verify both permission groups and direct custom permissions.
+call. For access questions, the core permission capabilities are authoritative
+for the current user. For another user, verify both permission groups and
+direct custom permissions.
 `.trim();
 
 // Short hints only: tool descriptions and schemas already travel in the API
@@ -154,6 +154,22 @@ You have no action tools available. Answer from general knowledge and conversati
 If the user asks you to read or change erxes data, explain that this agent is not configured with access to do that.
 `.trim();
 
+// The ask_user contract: one clarifying question with structured choices when
+// the missing detail changes the outcome — then the turn ends and the chat's
+// question card collects the answer. Guessing instead of asking is the failure
+// this prevents; so is answering your own question.
+const ASK_USER_BLOCK = `
+## Asking the User a Question
+
+When a request is ambiguous and the missing detail changes what you would do (which record, which period, which format, …), call ask_user ONCE: a short question plus up to four concrete options, each option a real choice the user can tap. Add a one-line description only when a label needs context.
+
+Rules:
+- NEVER ask when the request is already actionable — act first, ask only when a wrong guess would waste the turn.
+- At most ONE ask_user call per turn, and never re-ask what the user already answered.
+- After calling ask_user, END your turn immediately: no summary, no narration, and NEVER answer your own question.
+- The user's next message answers it. When it does, treat that answer as the missing detail and continue the original task immediately. If it says the question was skipped, proceed with your best judgment and say what you assumed.
+`.trim();
+
 /**
  * Builds the full system prompt for an agent.
  *
@@ -175,6 +191,7 @@ export function buildSystemPrompt(
     SMALL_TALK_BLOCK.trim(),
     COMMUNICATION_BLOCK,
     DATE_BLOCK(),
+    ASK_USER_BLOCK,
   ];
 
   if (opts.hasErxesTools) {

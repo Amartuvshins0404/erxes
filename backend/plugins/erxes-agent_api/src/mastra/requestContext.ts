@@ -50,7 +50,7 @@ interface RequestAuth {
   toolCallCache?: Map<string, Promise<unknown>>;
   /** Number of tool invocations admitted during this turn. */
   toolCallCount?: number;
-  /** Hard stop for tool invocations; defaults to ten. */
+  /** Hard stop for tool invocations; defaults to fifty. */
   toolCallLimit?: number;
   /** Serial tail for state-changing tools while reads run concurrently. */
   mutationTail?: Promise<void>;
@@ -104,7 +104,7 @@ export async function runToolOnce<T>(
   // Every invocation — first or exact repeat — spends from the same budget,
   // so a stuck model repeating one cached call still hits the hard stop
   // instead of looping forever at zero cost.
-  const limit = auth.toolCallLimit ?? 10;
+  const limit = auth.toolCallLimit ?? 50;
   const count = auth.toolCallCount ?? 0;
   if (count >= limit) {
     throw new Error(

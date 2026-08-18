@@ -6,7 +6,7 @@
 - **Project:** `erxes-agent_api`
 - **Layer:** Backend API
 - **Path:** `backend/plugins/erxes-agent_api`
-- **Last synchronized:** `2026-08-13`
+- **Last synchronized:** `2026-08-17`
 
 ## Scope
 
@@ -24,13 +24,16 @@
 - Runs blocking and SSE-streamed Mastra agent turns as linked AI team-member accounts with tenant and permission isolation.
 - Creates agents with private, people-shared, or organization visibility, permission groups, additional-tool allowlists, provider/model settings, and active state.
 - Persists chats, working memory, attachments, and artifacts in the native Mastra-backed stores; message persistence itself is Mastra-native (`savePerStep` incremental saves), with the plugin reconciling only erxes metadata, attachments, and zero-step failure rows.
-- Discovers permitted erxes operations through `ErxesToolSearchProcessor` (a Mastra ToolSearchProcessor subclass that states loaded tools arrive on the next step, not the next turn) over live GraphQL introspection, with exact live argument schemas and conservative standalone-tool scoping; when the gateway `/graphql` is blocked or introspection is disabled, the registry rebuilds itself from each subgraph's federation SDL on its internal address.
+- Discovers permitted erxes capabilities through `ErxesToolSearchProcessor` (a Mastra ToolSearchProcessor subclass that states loaded tools arrive on the next step, not the next turn) over each plugin's native `GET /agent-tools/manifest` (model + tRPC descriptors with flat input fields and derived permissions), with exact per-tool input schemas and conservative standalone-tool scoping; per-plugin manifest failures are skipped so one down plugin never wipes tenant-wide discovery.
+- Curates each plugin's agent-tool surface per tenant (`PluginToolCuration`, collection `erxes_agent_plugin_tool_curations`): the native tool registry is default-deny — a plugin contributes capability tools only when enabled in settings (minus per-tool `disabledTools`), and `agentUsable=false` manifest entries are inventory-only, never executable; curation writes invalidate the registry cache immediately.
 - Creates documents, charts, diagrams, and websites when those tools are enabled for the selected agent.
+- Runs LLM-written JavaScript through the opt-in `run-code` builtin with an injected `erxes` SDK (`erxes.call`/`erxes.list`) bridging into the native capability layer; the tenant `sandboxMode` setting selects an in-process `node:vm` realm (`onserver`, default) or the OpenSandbox container (`isolated`, deterministic memoized replay over workspace files — zero egress).
 - Loads plugin-owned `SKILL.md` files through Mastra `Workspace` and `LocalSkillSource`; Mastra provides skill discovery and read tools at runtime.
-- Bounds unique tool executions and state-changing tool concurrency per turn; every tool invocation (first or exact repeat) spends from the same ten-call hard stop so a repeat loop cannot spin forever.
+- Bounds unique tool executions and state-changing tool concurrency per turn; every tool invocation (first or exact repeat) spends from the same 50-call hard stop so a repeat loop cannot spin forever.
+- Asks structured clarifying questions through `ask_user` (`src/mastra/tools/metaTools.ts`): same input contract as Mastra's built-in `askUserTool` (question/options/selectionMode), but returns the payload as a plain tool result (`awaitingUserAnswer: true`) and ends the turn instead of suspending the run — the UI renders the question card and the answer arrives as the next user message (the `request_approval` replay pattern; no Mastra snapshot storage required).
 - Derives chat titles from the first meaningful request without a provider call.
 - Wraps empty operation results (`{}`/`[]`/`null`) in an explicit `resultCount: 0` envelope with filter-check/pivot guidance instead of forwarding an anonymous empty payload.
-- Anchors the system prompt to the current date and lets the native Mastra loop own turn lifecycle: a turn ends only when the model itself answers, with no step ceiling, call budget, or completion guard.
+- Anchors the system prompt to the current date and lets the native Mastra loop own turn lifecycle: a turn ends when the model itself answers or when the 50-call tool budget is spent (the only hard stop), with no other step ceiling or completion guard.
 - Streams the model's reply as-is: mid-stream provider failures append a plain-language failure note, and error/abort finishes with no text create the assistant row Mastra never saved. A completed turn's text is never rewritten, synthesized, or replaced.
 
 ## Architecture
@@ -40,22 +43,25 @@
 | Agent runtime    | `backend/plugins/erxes-agent_api/src/mastra/agentRuntime.ts`         | Builds cached Mastra agents, permission-filtered tools, memory, processors, and prompt context. |
 | Turn preparation | `backend/plugins/erxes-agent_api/src/modules/agent/prepare.ts`       | Resolves identity, ownership, active tools, prompt scope, memory, and attachments.              |
 | Turn execution   | `backend/plugins/erxes-agent_api/src/mastra/streamTurn.ts`           | Streams model output, tool activity, guarded replies, and persistence reconciliation.           |
-| Tool execution   | `backend/plugins/erxes-agent_api/src/mastra/tools`                   | Implements operation discovery, erxes calls, files, documents, and workspace tools.             |
+| Tool execution   | `backend/plugins/erxes-agent_api/src/mastra/tools`                   | Implements native capability discovery/calls, files, documents, and workspace tools.        |
+| Code mode        | `backend/plugins/erxes-agent_api/src/mastra/codeMode`                | Dispatches `run-code` executions to the on-server vm realm or the isolated OpenSandbox replay runner, and enforces the 64KB output cap. |
 | Native sessions  | `backend/plugins/erxes-agent_api/src/modules/session/nativeStore.ts` | Translates and owns native thread/message persistence and tenant-scoped session operations.     |
 | Runtime skills   | `backend/plugins/erxes-agent_api/skills`                             | Stores read-only Agent Skills files loaded by the Mastra workspace.                             |
 | GraphQL API      | `backend/plugins/erxes-agent_api/src/modules/*/graphql`              | Exposes agent, provider, settings, session, and artifact contracts.                             |
+| Plugin tool curation | `backend/plugins/erxes-agent_api/src/modules/plugintools`        | Stores per-plugin agent-tool curation and exposes the inventory/curation REST contract.      |
 
 ## Contracts
 
 ### Provides
 
-- Plugin-prefixed GraphQL queries and mutations for agents, providers, settings, sessions, and artifacts.
-- `POST /chat/stream` SSE chat transport and plugin-owned file/artifact routes. The stream closes immediately after the `finish` chunk, which carries the reconciled native message id and interrupted flag in `messageMetadata`; the only post-text transient data part is `data-thread-title` (sent before `finish`).
+- Plugin-prefixed GraphQL queries and mutations for agents, providers, settings, sessions, and artifacts. `MastraSettings`/`MastraSettingsInput` include `sandboxMode` (`"onserver"` | `"isolated"`, default `"onserver"`).
+- `GET /pl:erxes-agent/plugin-tools` (REST, `settings.statusRead`) returns every active plugin's full agent-tool inventory (supported/enabled/disabledTools/tools incl. `agentUsable=false` entries); `POST /pl:erxes-agent/plugin-tools/curation` (REST, `settings.manage`) upserts the plugin's curation row (`enabled`, `disabledTools`) and invalidates the native tool registry. Reached through the gateway proxy with the browser session forwarded as the user header (same auth as `/chat/stream`).
+- `POST /chat/stream` SSE chat transport and plugin-owned file/artifact routes. The stream closes immediately after the `finish` chunk, which carries the reconciled native message id and interrupted flag in `messageMetadata`; the only post-text transient data part is `data-thread-title` (sent before `finish`). Tool input is forwarded only as complete `tool-input-available` chunks — partial `tool-input-start`/`tool-input-delta` chunks are folded server-side but never sent to the client.
 
 ### Consumes
 
-- `erxes-api-shared` authentication, permission, service-discovery, and core types.
-- Published erxes GraphQL/service contracts discovered from the gateway and called as the linked agent account.
+- `erxes-api-shared` authentication, permission, service-discovery, agent-tool types (`AgentToolDescriptor`/`AgentToolManifest`), and core types.
+- Published plugin capability contracts: `GET /agent-tools/manifest` for discovery and `POST /agent-tools/call` for execution as the linked agent account. Both carry the HMAC-signed `x-erxes-agent-auth` header (tenant for manifests, tenant + acting user for calls; mutation correlation id travels in the reserved `__processId` input key); the serving plugin verifies the signature and enforces descriptor permissions authoritatively.
 - Mastra Agent, Memory, processors, `Workspace`, `LocalSkillSource`, and storage APIs.
 
 ## Data and State
@@ -69,11 +75,13 @@
 
 - Every interactive operation executes as the selected agent's linked core account while preserving the initiating human separately for ownership and approval.
 - Destructive mutations always require explicit user approval; agent configuration cannot bypass that check.
-- Tool permissions remain authoritative; turn scoping never grants a tool and preserves all approved standalone tools when wording is ambiguous.
-- Mastra searches only the live, policy-scoped exact erxes operation tools; operation arguments use exact schema values and never trigger entity name-to-ID resolution.
-- Operation discovery must survive a blocked, hidden, or introspection-disabled gateway `/graphql`: when the gateway yields zero operations, the registry rebuilds from each subgraph's federation SDL (`_service { sdl }` on internal addresses), applying the same internal/client-portal skip rules and security strip as the gateway path.
+- Tool permissions remain authoritative; every approved tool (builtins included) is active on every turn and the model decides what to call — no keyword scoping. Only the erxes operation catalog stays search-gated via `search_tools`.
+- Mastra searches only the live, policy-scoped native capability tools; tool arguments follow the manifest's flat input fields and never trigger entity name-to-ID resolution.
+- Capability discovery is best-effort per plugin: a failed or unreachable `/agent-tools/manifest` skips that plugin (fail-closed), and the agent's own plugin is excluded from discovery to avoid recursion.
+- Plugins' agent-tool surface is default-deny until enabled in settings; `agentUsable=false` tools are never executable.
 - Direct operation, file, and standalone execution admits at most ten invocations per turn; identical calls share one promise and state-changing calls execute serially.
-- The agentic loop has no step ceiling (`stopWhen: []`) and no answer budget; a turn ends only when the model itself answers. No custom completion guards or forced text-only steps — the only processors are tool search and the memory replay filter.
+- Sandboxed `erxes.call` invocations (run-code) execute as the agent account serialized through a promise chain and spend from the SAME per-turn budget as any tool: each bridged call goes through `runToolOnce` (50-call hard stop + exact-call dedupe) and mutations join the turn-wide `runMutationSerially` queue — code mode cannot fan out past the turn limit. The serving plugin's permission checks remain authoritative, and agent-side destructive approval does not wrap calls made from inside code mode (v1, documented in the tool description). Isolated mode keeps the zero-egress invariant: the in-container shim mediates calls by deterministic memoized replay over workspace files, never by network or stdin.
+- The agentic loop has no step ceiling beyond the tool budget (`stopWhen: [turnToolBudgetExceeded]`) and no answer budget; a turn ends when the model itself answers or when the 50-call budget is spent, which also emits a plain-language closing note when no reply text exists. No other completion guards or forced text-only steps — the only processors are tool search and the memory replay filter.
 - Provider-specific code is limited to compatibility (Kimi reasoning-separator sanitization/buffering), never turn-lifecycle control.
 - The model's answer is never inspected or rewritten: no synthesis-from-results, no fallback text, no completeness checks. Only a hard failure or abort with no text produces a plain-language closing note (creating the native assistant row directly when the run finished before any step completed; later steps are already persisted natively via `savePerStep`).
 - Thread titles and activity labels must not trigger auxiliary model requests.
@@ -91,62 +99,62 @@
 
 <!-- Newest first. Keep at most 10 entries. -->
 
-### `2026-08-13` — Strip custom turn-lifecycle guards
+### `2026-08-17` — Strict tRPC-only agent tool curation
 
-- **Summary:** Removed the custom guard stack that fought the native loop — the step ceiling (`stopWhen: []` now), the two-call answer budget, the completion-guard retry processor, the repeated-call filter, finalize-time stall heuristics, and the tool-result synthesis/fallback rewriters — so a turn ends only when the model itself answers and its answer is delivered as-is; every tool invocation now spends from the ten-call hard stop (repeats included) as the sole runaway breaker, keeping only provider-compat sanitization, failure/abort notes, and the tool-search wording correction.
-- **Affected areas:** `src/mastra/agentRuntime.ts`, `src/mastra/providerOutputGuard.ts`, `src/mastra/requestContext.ts`, `src/mastra/streamTurn.ts`, `src/mastra/turnToolScope.ts`, `src/mastra/toolSearch.ts`, `src/modules/agent/prepare.ts`, `src/modules/agent/run.ts`, `src/modules/agent/turn.ts`, `src/modules/agent/uiTurn.ts`, `src/modules/agent/graphql/resolvers/queries/agent.ts`; deleted `repeatedToolCallFilter.ts`, `fallback.ts`, and stale guard/budget/fallback tests.
+- **Summary:** Aligned native capability discovery with the strict admit-only tRPC platform: only procedures declaring `.meta({ agent: { description, permission } })` are exposed or executable, permission-less fallbacks and model CRUD checks are removed, and tests are updated to enforce declared permissions.
+- **Affected areas:** `src/mastra/tools/actionsToAllowedTools.ts`, `src/mastra/tools/destructiveGuard.ts`, `src/mastra/tools/nativeTools.ts`, `src/modules/plugintools/inventory.ts`, unit tests.
+- **Contracts changed:** All uncurated/permission-less tRPC procedures are strictly forbidden; only explicit `.meta({ agent })` procedures are admitted.
+
+### `2026-08-15` — Per-plugin agent-tool curation (REST surface)
+
+- **Summary:** Added a per-tenant curation surface for which plugins agents may use: `PluginToolCuration` (collection `erxes_agent_plugin_tool_curations`) stores `enabled` + `disabledTools` per plugin (default-deny — a plugin contributes no capability tools until enabled), exposed to the admin UI as REST routes `GET /pl:erxes-agent/plugin-tools` (`settings.statusRead`) and `POST /pl:erxes-agent/plugin-tools/curation` (`settings.manage`) through the gateway proxy; the native tool registry always drops `agentUsable=false` manifest entries and skips disabled/disabled-tool plugins, and curation writes invalidate the registry cache immediately.
+- **Affected areas:** `src/modules/plugintools/` (new: db model, inventory builder, REST routes), `src/routes.ts`, `src/mastra/tools/nativeTools.ts` (registry enforcement), `src/mastra/agentRuntime.ts` (models passed to registry), `src/connectionResolvers.ts` (model registration); shared lib `agent-tools` manifest now lists all tRPC procedures with an `agentUsable` flag and start-plugin mounts the endpoints unconditionally.
+- **Contracts changed:** `GET /agent-tools/manifest` now includes `agentUsable=false` tRPC inventory entries and `/agent-tools/call` rejects them; agent-tools endpoints are always mounted on every plugin; new plugin REST routes `GET /plugin-tools` and `POST /plugin-tools/curation` (no GraphQL surface for curation).
+
+### `2026-08-15` — Always-on approved tools (keyword scoping removed)
+
+- **Summary:** `selectTurnActiveTools` no longer regex-gates standalone builtins per turn (the gate hid `webSearch`/`fetchUrl` on phrasing like "research …", and the model then wrongly concluded it had no internet access); every permission-approved tool in the turn's toolset is now active and the model decides, while the erxes operation catalog stays model-searchable via `search_tools`.
+- **Affected areas:** `src/mastra/turnToolScope.ts` (simplified to always-on), `src/modules/agent/prepare.ts` (call site), `src/mastra/__tests__/turnToolScope.test.ts` (rewritten for always-on).
 - **Contracts changed:** None
 
-### `2026-08-13` — Library-native stream close
+### `2026-08-15` — Debug-mode locale strings removed
 
-- **Summary:** The chat stream now persists before writing `finish`, carries the reconciled message id in `finish` `messageMetadata`, sends the thread title before `finish`, and closes immediately — removing the post-finish reconcile tail (`data-message-id`) so the stock AI SDK transport/status lifecycle applies unchanged.
-- **Affected areas:** `src/mastra/streamTurn.ts`.
-- **Contracts changed:** `POST /chat/stream` no longer emits the transient `data-message-id` part; `finish` `messageMetadata.messageId` now holds the native assistant id (previously always null at finish time).
-
-### `2026-08-12` — Empty-result envelopes and guaranteed turn finalization
-
-- **Summary:** Empty operation results now reach the model as an explicit `resultCount: 0` envelope with pivot guidance, the prompt anchors the current date and empty-result pivot rules, progress-narration replies (English and Mongolian) are rejected for all providers, failed/interrupted streams still emit and persist a closing assistant message, and message persistence delegates to Mastra-native `savePerStep` incremental saves on both streamed and blocking turns.
-- **Affected areas:** `src/mastra/tools/emptyResult.ts` (new), `src/mastra/tools/erxesTools.ts`, `src/mastra/instructions/routing.ts`, `src/mastra/agentRuntime.ts`, `src/mastra/providerOutputGuard.ts`, `src/mastra/streamTurn.ts`, `src/modules/agent/run.ts`, `src/modules/agent/persist.ts`, `src/modules/session/nativeStore.ts`.
+- **Summary:** The UI's Debug mode setting was removed (the process line always opens the activity panel now), so the `general-settings-debug-*` strings were dropped from `src/locales/{en,mn}/erxes-agent.json`.
+- **Affected areas:** `src/locales/en/erxes-agent.json`, `src/locales/mn/erxes-agent.json`.
 - **Contracts changed:** None
 
-### `2026-08-11` — Subgraph SDL fallback for operation discovery
+### `2026-08-15` — Structured ask_user questions
 
-- **Summary:** When the gateway `/graphql` is blocked, hidden, or introspection-disabled, the operation registry rebuilds its operations and schema maps from each subgraph's federation SDL on internal addresses, keeping search/execute operation tools functional.
-- **Affected areas:** `src/mastra/tools/subgraphSchemaSource.ts` (new), `src/mastra/tools/erxesTools.ts`, `src/mastra/tools/operationRegistry.ts`, and tests.
-- **Contracts changed:** None
+- **Summary:** Agents can ask the user a clarifying question with structured choices: the new always-bound `ask_user` tool (Mastra built-in contract, non-suspending execution) ends the turn with an `awaitingUserAnswer` result, the system prompt gained an "Asking the User" block (act-first, one question per turn, never self-answer), and turn finalization never writes a closing note while a question is pending so the turn never closes over the card. Answers continue as ordinary next user messages.
+- **Affected areas:** `src/mastra/tools/metaTools.ts` (tool + `isAwaitingUserAnswer`), `src/mastra/agentRuntime.ts` (unconditional registration, ROUTING_VERSION 42), `src/mastra/instructions/routing.ts`, `src/mastra/streamTurn.ts` (no closing note for pending questions), `src/mastra/tools/__tests__/askUserTool.test.ts` (new).
+- **Contracts changed:** `POST /chat/stream` turns may now end with an `ask_user` tool part carrying `{ awaitingUserAnswer: true, question, options, selectionMode }` and no reply text; no other stream contract changes.
 
-### `2026-08-10` — Finish Kimi operation turns
+### `2026-08-14` — Signed agent-tools auth header
 
-- **Summary:** Guards immediate Kimi coding tool-work promises without forcing duplicate tools or changing plain future-tense answers, and makes streamed and blocking chats answer from completed, deduplicated operation results.
-- **Affected areas:** Agent runtime, provider-scoped completion guard, streamed and blocking turn finalization, GraphQL chat, and regression tests.
-- **Contracts changed:** None
+- **Summary:** Native capability discovery and execution now authenticate with the HMAC-signed `x-erxes-agent-auth` header (shared `JWT_TOKEN_SECRET`, short expiry) instead of the reversible `x-trpc-context` header, matching the hardened platform contract; the mutation correlation id moves from the header context into the reserved `__processId` input key.
+- **Affected areas:** `src/mastra/tools/nativeTools.ts` (`fetchPluginManifest`, `callNativeTool`).
+- **Contracts changed:** `GET /agent-tools/manifest` and `POST /agent-tools/call` requests must carry a valid `x-erxes-agent-auth` header; unsigned requests are rejected with 401 by the platform.
 
-### `2026-08-07` — Fix dynamic operation routing
+### `2026-08-14` — Remove the isolated terminal tool
 
-- **Summary:** Keeps permitted operation tools active for ToolSearchProcessor, adds compact live-name search terms, and tests direct subgraph execution with exact IDs.
-- **Affected areas:** Turn tool scope, operation tool descriptions, and authentication tests.
-- **Contracts changed:** None
+- **Summary:** Removed the `terminal` shell tool and its additional-tools toggle — code mode (`run-code`) is the sandbox execution path now; the sandbox workspace tools (`workspaceWrite`, `publishWebsite`) moved under the `runCode` gate, retired allowlist keys are dropped silently instead of failing agents saved with them, and the gateway locales now carry `runCode` labels (EN/MN) in place of the terminal ones.
+- **Affected areas:** deleted `src/mastra/tools/terminalTool.ts` (+ test); `src/mastra/tools/additionalTools.ts`, `src/mastra/agentRuntime.ts`, `src/mastra/turnToolScope.ts`, `src/modules/settings/@types/settings.ts`, `src/modules/agent/@types/agent.ts`, scope/capability tests; `backend/gateway/src/locales/{en,mn}/mastra.json`.
+- **Contracts changed:** `terminal` removed from the additional-tools catalog (`mastraAgentAdditionalTools`); agents storing it keep working (key ignored).
 
-### `2026-08-07` — Simplify agent setup and access
+### `2026-08-14` — Tool-budget hard stop and complete-only tool input streaming
 
-- **Summary:** Removed team and department audiences, per-agent memory/temperature/destructive choices, and duplicate settings/chat editors while keeping people sharing, permission groups, CRUD, and approval enforcement.
-- **Affected areas:** Agent schema, GraphQL, authorization, migration cleanup, runtime guardrails, setup form, routes, settings navigation, chat rail, locales, and stale docs/tests.
-- **Contracts changed:** Removed `audienceTeamIds`, `audienceDepartmentIds`, `destructiveOps`, `memoryEnabled`, and `temperature` from agent contracts; shared visibility now accepts people only.
+- **Summary:** The turn loop now hard-stops via `stopWhen: [turnToolBudgetExceeded]` once the 50-call budget is spent (previously the budget rejection was the sole breaker, so a retrying model could spin the turn indefinitely), with a plain-language closing note when the stop leaves no reply text; the chat stream no longer forwards partial `tool-input-start`/`tool-input-delta` chunks — tool input arrives only complete, eliminating the client-side argsText mismatch that flooded assistant-ui's tool tracker and froze the tab; and `ToolCallSignalFilter` now locates current-run frames structurally (after the last user message) instead of trusting the unreliably-populated `steps`, fixing models re-issuing identical successful tool calls forever because they never saw the results. Same change raised the default per-turn budget from 10 to 50 and fixed the `node:vm` cross-realm `SyntaxError` instanceof check that made every multi-statement `run-code` snippet fail to parse.
+- **Affected areas:** `src/mastra/agentRuntime.ts`, `src/mastra/streamTurn.ts`, `src/mastra/requestContext.ts`, `src/mastra/memory/toolCallSignalFilter.ts`, `src/mastra/codeMode/onServerRunner.ts`, `src/mastra/codeMode/runCode.ts`, `src/mastra/codeMode/isolatedRunner.ts`, `src/modules/agent/types.ts`.
+- **Contracts changed:** `POST /chat/stream` no longer emits `tool-input-start`/`tool-input-delta` chunks (clients see tool input only via complete `tool-input-available`).
 
-### `2026-08-07` — Simplify dynamic operation tools
+### `2026-08-14` — Code mode (`run-code`) with dual sandbox backends
 
-- **Summary:** Removed static operation hints, entity auto-resolution, custom response-field controls, operation preloading, and configuration-key discovery while retaining live introspection, exact tools, and safety gates.
-- **Affected areas:** `src/mastra/tools`, turn preparation and execution, routing instructions, and tool-scope tests.
-- **Contracts changed:** Removed the `list_config_keys` and `__responseFields` tool surfaces; operation descriptions and argument schemas now come from live GraphQL introspection.
+- **Summary:** Added an opt-in `run-code` builtin tool that executes LLM-written async JavaScript with an injected `erxes` SDK (`erxes.call(toolId, input)` / `erxes.list()`) bridging into the native capability layer as the agent account; the new tenant setting `sandboxMode` selects an in-process `node:vm` realm (`onserver`, zero-config default) or the OpenSandbox container (`isolated`, where a shim mediates capability calls by deterministic memoized replay over workspace files because the installed SDK has no stdin channel — zero egress preserved); output is a `{ result, logs, error? }` envelope capped at 64KB, executions audit as `agentCodeExecute`, and `runCode` joins the additional-tool allowlist and the serial side-effecting set.
+- **Affected areas:** `src/mastra/codeMode/runCode.ts`, `onServerRunner.ts`, `isolatedRunner.ts` (new), `src/mastra/tools/codeModeTool.ts` (new), `src/mastra/tools/additionalTools.ts`, `src/mastra/agentRuntime.ts`, `src/modules/settings/{@types,db,graphql}`.
+- **Contracts changed:** `MastraSettings` type and `MastraSettingsInput` gained `sandboxMode: String` (`"onserver"`/`"isolated"`; other values rejected with ExpectedError in the model layer).
 
-### `2026-08-06` — Remove end-user trace payloads
+### `2026-08-14` — Native capability tools replace GraphQL operations
 
-- **Summary:** Removed the agent debug setting, reasoning stream output, trace-only turn state, metadata, and session payload data while preserving tool execution, status, results, artifacts, approvals, and errors.
-- **Affected areas:** Agent schema and types, chat stream, activity tracking, turn accumulation and persistence, and native session hydration.
-- **Contracts changed:** Removed `debug` from `MastraAgent` and `MastraAgentInput`; session messages no longer expose reasoning parts or old trace metadata.
-
-### `2026-08-06` — Remove custom skills CMS
-
-- **Summary:** Removed custom skill persistence, CRUD, publishing, versioning, permissions, agent assignment, distillation, seeding, and API contracts while retaining Mastra-native file skills.
-- **Affected areas:** Runtime agent workspace, skill files, agent schema, GraphQL assembly, chat transport, permissions, and build assets.
-- **Contracts changed:** Removed all `mastraSkill*` operations, agent `skills` fields, skill permission actions, and slash-activation payload metadata.
+- **Summary:** Operation discovery and execution now run over each plugin's native agent-tools endpoints (`GET /agent-tools/manifest` + `POST /agent-tools/call`) instead of gateway/subgraph GraphQL introspection; the registry aggregates per-tenant manifests with a 60s cache, policy scoping derives from descriptor permissions (plugin + tolerant module + action match, any-action for permission-less tRPC tools), destructive native mutations keep the same approval flow, and the old introspection/SDL/arg-coercion machinery is deleted in a hard cutover.
+- **Affected areas:** `src/mastra/tools/nativeTools.ts` (new), `src/mastra/tools/scope.ts`, `actionsToAllowedTools.ts`, `agentGrantPolicy.ts`, `destructiveGuard.ts`, `metaTools.ts`, `src/mastra/agentRuntime.ts`, `src/mastra/instructions/routing.ts`; deleted `operationRegistry.ts`, `erxesTools.ts`, `operationTools.ts`, `schemaIntrospect.ts`, `subgraphSchemaSource.ts`, `argScrub.ts`, `serverErrorClassifier.ts`, `humanize.ts`, `securityGuard.ts` and their dedicated tests.
+- **Contracts changed:** None (this plugin's provided contracts are unchanged; it now consumes the shared `/agent-tools/*` endpoints instead of gateway GraphQL).

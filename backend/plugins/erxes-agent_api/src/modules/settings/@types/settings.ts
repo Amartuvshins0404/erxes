@@ -9,8 +9,11 @@ export interface IMastraSettings {
   // effective when that storage is actually configured.
   attachmentsEnabled?: boolean;
   backgroundRemovalEnabled?: boolean;
-  // OpenSandbox connection used by the optional per-agent terminal tool.
-  // The API key is write-only at the GraphQL boundary.
+  // run-code sandbox backend: 'onserver' (in-process node:vm) or 'isolated'
+  // (OpenSandbox container). Defaults to 'onserver'.
+  sandboxMode?: 'onserver' | 'isolated';
+  // OpenSandbox connection used by the isolated code-mode backend and the
+  // sandbox workspace tools. The API key is write-only at the GraphQL boundary.
   openSandboxApiUrl?: string;
   openSandboxApiKey?: string;
 }

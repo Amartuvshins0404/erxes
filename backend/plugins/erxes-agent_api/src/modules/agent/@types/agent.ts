@@ -12,7 +12,7 @@ export interface IMastraAgent {
   audienceUserIds?: string[];
   permissionMode?: MastraAgentPermissionMode;
   // Explicit allowlist for optional non-erxes capabilities (web, document,
-  // image, and isolated terminal tools). Empty means none.
+  // image, and code-mode tools). Empty means none.
   additionalTools?: string[];
 }
 

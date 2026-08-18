@@ -32,6 +32,7 @@ import {
 import { MermaidViewer } from '~/modules/chat/preview/MermaidViewer';
 import { ImageViewer } from '~/modules/chat/preview/ImageViewer';
 import { PresentMode } from '~/modules/chat/preview/PresentMode';
+import { ToolActivityPanel } from '~/modules/chat/preview/ToolActivityPanel';
 
 const canPresent = (a: Artifact): a is DocumentArtifact =>
   a.kind === 'document' && a.format === 'pptx' && !!a.slides?.length;
@@ -63,20 +64,25 @@ const artifactSubtitle = (a: Artifact, websiteFilesLabel?: string): string => {
     .join(' · ');
 };
 
-// The Claude-artifacts-style side panel. Two views — a per-thread file list
-// (persisted, survives reloads) and a single artifact (interactive chart or an
-// inline document) — and two layouts: docked beside the chat, or fullscreen
-// (whole window) with the file list pinned as a left sidebar. Reads
-// view/artifact/fullscreen from previewStore.
+// The Claude-artifacts-style side panel. Three views — a per-thread file list
+// (persisted, survives reloads), a single artifact (interactive chart or an
+// inline document), and the tool-activity detail for a turn — and two layouts:
+// docked beside the chat (sized by the Resizable split in ChatPage), or
+// fullscreen (whole window) with the file list pinned as a left sidebar for
+// artifact views. Reads view/artifact/activity/fullscreen from previewStore.
 export const PreviewPanel = ({ threadId }: { threadId?: string }) => {
   const view = previewStore((s) => s.view);
   const artifact = previewStore((s) => s.artifact);
+  const activity = previewStore((s) => s.activity);
   const fullscreen = previewStore((s) => s.fullscreen);
   const close = previewStore((s) => s.close);
 
-  const showList = view === 'list' || !artifact;
+  const activityView = view === 'activity' ? activity : null;
+  const showList = !activityView && (view !== 'item' || !artifact);
 
-  const body = showList ? (
+  const body = activityView ? (
+    <ToolActivityPanel activity={activityView} />
+  ) : showList || !artifact ? (
     <FileListView threadId={threadId} onClose={close} />
   ) : (
     <ItemView artifact={artifact} onClose={close} />
@@ -85,8 +91,9 @@ export const PreviewPanel = ({ threadId }: { threadId?: string }) => {
   if (fullscreen) {
     return (
       <div className="fixed inset-0 z-50 flex bg-background">
-        {/* Sidebar: the full file list, pinned, while an item is open. */}
-        {!showList && (
+        {/* Sidebar: the full file list, pinned, while an artifact item is open.
+            The activity view takes the whole width instead. */}
+        {!activityView && !showList && (
           <aside className="ea-preview-sidebar w-72 shrink-0 flex-col border-r">
             <SidebarFileList threadId={threadId} activeId={artifact?.id} />
           </aside>
@@ -96,11 +103,12 @@ export const PreviewPanel = ({ threadId }: { threadId?: string }) => {
     );
   }
 
-  // Docked layout (right-side column ≥lg, full-area overlay below) is defined in
-  // chat.css as .ea-preview-dock — the responsive/arbitrary width utilities it
-  // replaces get purged from the production host CSS, which made the panel take
-  // over the whole screen instead of docking.
-  return <div className="ea-preview-dock">{body}</div>;
+  // Docked: the panel fills the Resizable.Panel ChatPage places it in — sizing
+  // and the drag handle belong to the resizable shell now (the old
+  // .ea-preview-dock CSS-variable split is gone).
+  return (
+    <div className="flex min-h-0 flex-1 flex-col bg-background">{body}</div>
+  );
 };
 
 // ── A single file row (shared by the list view and the fullscreen sidebar) ────

@@ -23,6 +23,7 @@ import {
   shouldBufferProviderText,
 } from './providerOutputGuard';
 import { ensureWebsiteDeliveryReply } from '@/agent/websiteDelivery';
+import { isAwaitingUserAnswer } from './tools/metaTools';
 
 // Validated POST /chat/stream payload. All shape-checking for the untrusted
 // request body lives in routes.ts (parseChatStreamBody); this is the contract it
@@ -112,6 +113,18 @@ async function foldModelStream(params: {
         if (chunk.type === 'tool-input-available') {
           activity?.onToolCall(chunk.toolName, chunk.input);
         }
+        // Tool input reaches the client only when complete. Forwarding the
+        // partial start/delta chunks makes the client serialize incomplete
+        // argsText that later mismatches the complete form — assistant-ui's
+        // tool tracker then warns on every render for every such call and
+        // floods the console until the tab freezes. The AI SDK creates the
+        // tool part directly from `tool-input-available`, so nothing is lost.
+        if (
+          chunk.type === 'tool-input-start' ||
+          chunk.type === 'tool-input-delta'
+        ) {
+          continue;
+        }
         if (
           !bufferProviderText ||
           !['text-start', 'text-delta', 'text-end'].includes(chunk.type)
@@ -180,12 +193,24 @@ async function finalizeTurn(params: {
   }
 
   // The model owns the turn ending; its answer is never second-guessed or
-  // rewritten. Only a hard failure or interruption that left no text gets a
-  // plain-language note so the user isn't stranded on a blank bubble.
-  if (!reply && (interrupted || failed)) {
+  // rewritten. Only a hard failure, an interruption, or the tool-budget hard
+  // stop that left no text gets a plain-language note so the user isn't
+  // stranded on a blank bubble. A turn that ended on ask_user is waiting on
+  // the user's answer — the chat renders the question card, so it never gets
+  // a closing note either (the card IS the outcome).
+  const askedUser = acc.toolCalls.some(
+    (toolCall) =>
+      toolCall.toolName === 'ask_user' &&
+      isAwaitingUserAnswer(toolCall.result),
+  );
+  const budgetExhausted =
+    (authCtx.toolCallCount ?? 0) >= (authCtx.toolCallLimit ?? 50);
+  if (!reply && !askedUser && (interrupted || failed || budgetExhausted)) {
     reply = interrupted
       ? 'This response was interrupted before it finished. Please tap retry to continue.'
-      : 'Something went wrong while I was working on that. Please try again.';
+      : failed
+        ? 'Something went wrong while I was working on that. Please try again.'
+        : `I reached this turn's action limit (${authCtx.toolCallLimit ?? 50} calls) and stopped here. Ask me to continue and I will pick up from the results above.`;
     emitReply = true;
   }
 

@@ -4,22 +4,23 @@ import {
   useThread,
 } from '@assistant-ui/react';
 import { IconChevronDown } from '@tabler/icons-react';
+import { ThinkingOrb } from 'thinking-orbs';
 import { Badge, Skeleton } from 'erxes-ui';
 import { AgentMark } from '~/modules/chat/components/Avatars';
 import { AgentMessage } from '~/modules/chat/assistant/AgentMessage';
 import { focusAgentComposer } from '~/modules/chat/assistant/chatContexts';
 import type { IChatAgent } from '~/modules/chat/hooks/useChatAgents';
 
-// Dots row shown while the turn runs but no assistant message exists yet —
-// once the assistant message streams, its inline parts carry the status.
+// Thinking orb shown while the turn runs but no assistant message exists yet —
+// once the assistant message streams, its inline parts (reasoning, tool status
+// rows) carry the live status.
 const ThinkingRow = () => {
   const lastRole = useThread((s) => s.messages[s.messages.length - 1]?.role);
   if (lastRole === 'assistant') return null;
   return (
-    <div className="mx-auto flex w-full max-w-3xl items-center gap-1.5 py-2">
-      <span className="ea-typing-dot" />
-      <span className="ea-typing-dot" />
-      <span className="ea-typing-dot" />
+    <div className="mx-auto flex w-full max-w-3xl items-center gap-3 py-2">
+      <ThinkingOrb state="working" size={64} aria-label="Thinking" />
+      <span className="ea-shimmer-text text-sm font-medium">Thinking…</span>
     </div>
   );
 };

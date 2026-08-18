@@ -17,11 +17,15 @@ export interface MessageExtras {
 
 // Actions the message rows dispatch up to the page: regenerate the last reply,
 // delete a persisted prompt+reply pair, resend a past user message, and copy a
-// past user message into the composer for editing.
+// past user message into the composer for editing. The ask_user card replies
+// through onAnswerQuestion / onSkipQuestion (hidden sends quoting the
+// question, same replay pattern as approve/deny).
 export interface ChatMessageActions {
   onRegenerate: () => void;
   onDeleteMessage: (uiMessageId: string, persistedMessageId: string) => void;
   onResendMessage: (text: string, attachments: ChatAttachment[]) => void;
+  onAnswerQuestion: (question: string, answer: string) => void;
+  onSkipQuestion: (question: string) => void;
 }
 
 export const MessageExtrasContext = createContext<Map<string, MessageExtras>>(
@@ -32,6 +36,8 @@ export const ChatMessageActionsContext = createContext<ChatMessageActions>({
   onRegenerate: () => undefined,
   onDeleteMessage: () => undefined,
   onResendMessage: () => undefined,
+  onAnswerQuestion: () => undefined,
+  onSkipQuestion: () => undefined,
 });
 
 // The erxes-only metadata blob the AI SDK UIMessage carries; assistant-ui

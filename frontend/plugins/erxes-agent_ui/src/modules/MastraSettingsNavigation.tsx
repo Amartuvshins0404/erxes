@@ -19,11 +19,18 @@ export const MastraSettingsNavigation = () => {
             name="Providers & Models"
           />
           {isAdmin && (
-            <SettingsNavigationMenuLinkItem
-              pathPrefix="erxes-agent"
-              path="/general"
-              name="General Settings"
-            />
+            <>
+              <SettingsNavigationMenuLinkItem
+                pathPrefix="erxes-agent"
+                path="/general"
+                name="General Settings"
+              />
+              <SettingsNavigationMenuLinkItem
+                pathPrefix="erxes-agent"
+                path="/plugin-tools"
+                name="Plugin tools"
+              />
+            </>
           )}
         </Sidebar.Menu>
       </Sidebar.GroupContent>

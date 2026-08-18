@@ -1,30 +1,5 @@
 import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
-import { executeErxesOperation } from './erxesTools';
-import type { OperationMeta, OperationRegistry } from './operationRegistry';
-import { isOperationAllowed, type ToolPolicy } from './scope';
-import {
-  destructiveApprovalRequiredResult,
-  isApprovedOperation,
-  isDestructiveOperation,
-} from './destructiveGuard';
-import {
-  isSecurityBlockedOperation,
-  securityBlockedResult,
-} from './securityGuard';
-import { redactSecrets } from './secretRedaction';
-import {
-  getCurrentAuth,
-  runMutationSerially,
-  runToolOnce,
-} from '../requestContext';
-import { makeAgentProcessId, type AgentActionInput } from '../auditLog';
-
-function coerceArgs(value: unknown): Record<string, unknown> {
-  return value && typeof value === 'object' && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {};
-}
 
 const AUDIT_ERROR_MAX = 500;
 
@@ -42,94 +17,6 @@ export function auditErrorMessage(result: unknown): string {
   } catch {
     return '';
   }
-}
-
-export interface ExecutePolicyScopedOperationParams {
-  operation: OperationMeta;
-  args: Record<string, unknown>;
-  registry: OperationRegistry;
-  policy: ToolPolicy;
-  recordAction?: (entry: AgentActionInput) => void;
-}
-
-/**
- * Runs one already-discovered operation behind every erxes safety boundary.
- * Per-operation Mastra tools delegate here so typed schemas improve model calls
- * without duplicating policy, approval, audit, secret, or GraphQL behavior.
- */
-export async function executePolicyScopedOperation({
-  operation,
-  args,
-  registry,
-  policy,
-  recordAction,
-}: ExecutePolicyScopedOperationParams): Promise<unknown> {
-  const operationName = operation.operation;
-  const callArgs = coerceArgs(args);
-
-  // Check this before policy/registry detail so blocked operations leak nothing.
-  if (isSecurityBlockedOperation(operationName)) {
-    recordAction?.({
-      operation: operationName,
-      operationType: operation.operationType,
-      destructive: isDestructiveOperation(operation),
-      args: redactSecrets(callArgs),
-      status: 'blocked',
-      error: 'security-blocked',
-    });
-    return securityBlockedResult();
-  }
-
-  // Defense in depth: discovery filters policy, and execution re-checks it.
-  if (!isOperationAllowed(operation, policy)) {
-    return {
-      success: false,
-      error: `Operation "${operationName}" is not permitted for this agent.`,
-    };
-  }
-
-  const isMutation = operation.operationType === 'mutation';
-
-  if (isDestructiveOperation(operation)) {
-    const approvedOps = getCurrentAuth()?.approvedOps;
-    if (!isApprovedOperation(operationName, approvedOps)) {
-      recordAction?.({
-        operation: operationName,
-        operationType: operation.operationType,
-        destructive: true,
-        args: redactSecrets(callArgs),
-        status: 'blocked',
-        error: 'awaiting user approval',
-      });
-      return destructiveApprovalRequiredResult(operationName, callArgs);
-    }
-  }
-
-  const processId = isMutation ? makeAgentProcessId() : undefined;
-  const execute = () =>
-    executeErxesOperation(operation, callArgs, registry, processId);
-  const result = await runToolOnce(operationName, { args: callArgs }, () =>
-    isMutation ? runMutationSerially(execute) : execute(),
-  );
-
-  if (isMutation) {
-    const failed =
-      result !== null &&
-      typeof result === 'object' &&
-      'success' in result &&
-      result.success === false;
-    recordAction?.({
-      operation: operationName,
-      operationType: operation.operationType,
-      destructive: isDestructiveOperation(operation),
-      args: redactSecrets(callArgs),
-      status: failed ? 'failed' : 'success',
-      error: failed ? auditErrorMessage(result) : undefined,
-      processId,
-    });
-  }
-
-  return result;
 }
 
 /** Standalone erxes helpers that remain directly bound beside tool discovery. */
@@ -163,3 +50,62 @@ export function buildErxesSupportTools() {
   // Every destructive mutation asks for approval; the agent config cannot bypass this.
   return { request_approval: requestApproval };
 }
+
+/**
+ * ask_user — ask the user a structured question when a request is ambiguous in
+ * a way that changes the outcome. Same input contract as Mastra's built-in
+ * askUserTool (question + options + selectionMode), but instead of suspending
+ * the run (which needs Mastra snapshot storage this service does not run) it
+ * returns the question payload as a plain tool result and ends the turn — the
+ * chat UI renders an interactive question card and the user's answer arrives as
+ * their next message, exactly like the request_approval replay pattern.
+ */
+export const askUserTool = createTool({
+  id: 'ask_user',
+  description:
+    'Ask the user a question to clarify an ambiguous request when the missing answer changes what you would do. ' +
+    'Provide a short question and up to four concrete options (the user can also write their own answer or skip). ' +
+    'Omit options for a free-text answer. This asks and waits — it executes nothing. ' +
+    'After calling this tool, END your turn immediately: no summary, no narration, never answer your own question. ' +
+    "The user's next message answers it (or says it was skipped — then proceed with your best judgment).",
+  inputSchema: z.object({
+    question: z.string().min(1).describe('The short question shown to the user.'),
+    options: z
+      .array(
+        z.object({
+          label: z
+            .string()
+            .describe(
+              'Short display text; this value is the answer when selected.',
+            ),
+          description: z
+            .string()
+            .optional()
+            .describe('One line of extra context for this option.'),
+        }),
+      )
+      .max(6)
+      .optional()
+      .describe('Structured choices. Omit for a free-text answer.'),
+    selectionMode: z
+      .enum(['single_select', 'multi_select'])
+      .optional()
+      .describe(
+        'How many options the user may pick. Defaults to single_select when options are given.',
+      ),
+  }),
+  outputSchema: z.unknown(),
+  execute: async ({ question, options, selectionMode }) => ({
+    awaitingUserAnswer: true,
+    question,
+    options: options ?? [],
+    selectionMode:
+      selectionMode ?? (options?.length ? 'single_select' : undefined),
+  }),
+});
+
+/** True for a settled ask_user tool result — the turn is waiting on the user. */
+export const isAwaitingUserAnswer = (result: unknown): boolean =>
+  !!result &&
+  typeof result === 'object' &&
+  (result as { awaitingUserAnswer?: unknown }).awaitingUserAnswer === true;

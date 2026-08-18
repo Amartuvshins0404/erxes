@@ -1,4 +1,5 @@
 import { Model } from 'mongoose';
+import { ExpectedError } from 'erxes-api-shared/utils';
 import { IModels } from '~/connectionResolvers';
 import { settingsSchema } from '@/settings/db/definitions/settings';
 import {
@@ -37,6 +38,13 @@ interface PersistedSettings extends IMastraSettings {
 export const buildSettingsUpdate = (doc: IMastraSettings): IMastraSettings => {
   const { openSandboxApiKey, ...rest } = doc;
   const update: IMastraSettings = { ...rest };
+  if (
+    update.sandboxMode !== undefined &&
+    update.sandboxMode !== 'onserver' &&
+    update.sandboxMode !== 'isolated'
+  ) {
+    throw new ExpectedError("sandboxMode must be 'onserver' or 'isolated'.");
+  }
   if (typeof openSandboxApiKey === 'string' && openSandboxApiKey.trim()) {
     update.openSandboxApiKey = openSandboxApiKey.trim();
   }
@@ -85,6 +93,11 @@ export const loadSettingsClass = (_models: IModels) => {
         doc = cleaned ?? (await _models.MastraSettings.create({}));
       } else {
         doc = _models.MastraSettings.hydrate(persisted);
+      }
+
+      // Rows persisted before sandboxMode existed read back as 'onserver'.
+      if (doc.sandboxMode !== 'onserver' && doc.sandboxMode !== 'isolated') {
+        doc.sandboxMode = 'onserver';
       }
 
       _settingsCacheByTenant.set(key, {

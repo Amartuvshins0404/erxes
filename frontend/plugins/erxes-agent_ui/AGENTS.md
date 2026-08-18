@@ -6,7 +6,7 @@
 - **Project:** `erxes-agent_ui`
 - **Layer:** Frontend UI
 - **Path:** `frontend/plugins/erxes-agent_ui`
-- **Last synchronized:** `2026-08-13`
+- **Last synchronized:** `2026-08-15`
 
 ## Scope
 
@@ -25,8 +25,13 @@
 - Lists, creates, edits, and chats with permission-scoped AI team members from the main `/erxes-agent/agents` area.
 - Supports private, people-shared, and organization visibility, permission groups, additional-tool allowlists, provider/model settings, and active state.
 - Manages providers and tenant runtime settings; Settings opens Providers by default.
+- General settings include a Sandbox mode select (`onserver` built-in vs `isolated` OpenSandbox); OpenSandbox URL/API-key fields render only in isolated mode.
+- Admin-gated Plugin tools page (`/settings/erxes-agent/plugin-tools`) toggles per-plugin agent capability access (default off, `No endpoint` when unsupported) and per-tool disable switches; non-agent-callable tools show a muted badge instead of a switch.
 - Streams native agent chat parts, tool activity, attachments, artifacts, and session updates.
-- Renders the chat conversation on assistant-ui primitives (`ThreadPrimitive`, `MessagePrimitive`, `ComposerPrimitive`, streaming markdown) over the AI SDK chat runtime; tool calls display as inline per-call status lines with dedicated readable renderers for web-search and fetch-url results.
+- Renders the chat conversation on assistant-ui primitives (`ThreadPrimitive`, `MessagePrimitive`, `ComposerPrimitive`, streaming markdown) over the AI SDK chat runtime; a turn's reasoning bursts and tool calls group into ONE ChatGPT-style process line — while working it shows the current step's real, content-derived title (a reasoning step's title is distilled from its own text, a tool step shows its per-tool label), settled it shows the existing summary — and clicking it opens the right preview panel with the whole process as titled steps (status icon + bold title + content: full reasoning text for reasoning steps, params/result/sources per tool call, separators between steps). Reasoning never renders as rows in the message body and nothing expands inline. Tool args/results render structured (key-value rows, capped mini tables, web-search sources list) — never raw JSON.
+- Shows "thinking"/activity with `thinking-orbs` (`ThinkingOrb`): a size-64 orb while the turn spins up, size-20 per-step-state orbs (`searching`, `connecting`, `solving`, `composing`, `shaping`, `listening`) on the running process line and the panel's active step.
+- Renders the agent's `ask_user` clarifying questions as an interactive card (numbered options, free-text "Something else", Skip) docked after the message parts; answers replay as hidden user messages quoting the question.
+- The preview panel (file list, single artifact, tool-activity view) docks beside the chat in the second pane of an erxes-ui `Resizable` split (`autoSaveId`-persisted, min 20%) and can go fullscreen as a fixed overlay; tool-activity fullscreen skips the file-list sidebar.
 - Hosts a custom chat workspace sidebar: agents up top and the active agent's conversations below as an assistant-ui thread list (`ThreadListPrimitive` / `ThreadListItemPrimitive`) driven by a remote-thread-list runtime over the mastra session GraphQL contract, plus a permission-gated "Manage agents" footer link.
 - The plugin registers no core sub-module panel (`navigationGroup` carries only the rail label/icon), so entering the plugin shows only the plugin's own sidebar.
 
@@ -54,7 +59,7 @@
 
 ### Consumes
 
-- The `erxes-agent_api` GraphQL schema, chat SSE endpoint, and plugin file/artifact routes.
+- The `erxes-agent_api` GraphQL schema, chat SSE endpoint, plugin file/artifact routes, and the plugin-tools curation REST endpoints (`GET/POST /pl:erxes-agent/plugin-tools(/:curation)`).
 - Public `erxes-ui` and `ui-modules` components, Apollo Client, React Router, and React Hook Form with Zod.
 
 ## Data and State
@@ -63,6 +68,7 @@
 - Live chat turns are owned by AI SDK `Chat` instances (one per agent+thread) behind a small zustand registry; the stock `DefaultChatTransport` speaks to the SSE endpoint, whose `finish` chunk metadata supplies the native message id. Session/activity signals mirror into the registry only for background-thread badges.
 - Conversation selection is owned by an assistant-ui `unstable_useRemoteThreadListRuntime` per agent: a plugin adapter (`chat/runtime/mastraThreadListAdapter.ts`) maps the mastra session queries/mutations onto the remote-thread-list contract (thread ids are client-generated; `initialize` is an id passthrough, archiving is unsupported). `ChatRuntimeSync` keeps `?thread=`, the runtime main thread, and the store's per-agent active selection in two-way sync.
 - The conversation view runs on `@assistant-ui/react` primitives via per-thread `useAISDKRuntime(chatHelpers)` instances (one hook instance per alive thread, mounted by the remote list runtime); sends go through the store's pipeline (staged attachment uploads and per-send body extras), not the runtime composer send.
+- `ask_user` answers replay through `chatStore.sendMessage` as hidden user messages (`formatAskUserAnswer`/`formatAskUserSkip` in `chat/types.ts` — the quote anchors backend keyword tool-scoping); `AskUserCard` parses the convention back for the answered receipt, and `UserMessageRow` hides convention-matching messages via `parseAskUserAnswer` (the `hidden` metadata is in-memory only), so neither the bubble nor the receipt breaks after reloads.
 - Settings forms use React Hook Form values validated by Zod schemas in `src/pages/settings/validations.ts`.
 
 ## Local Invariants
@@ -84,62 +90,59 @@
 
 <!-- Newest first. Keep at most 10 entries. -->
 
+### `2026-08-15` — Plugin tools settings page (REST transport)
+
+- **Summary:** Added an admin-gated Plugin tools settings page (`/settings/erxes-agent/plugin-tools`) listing one collapsible card per plugin — header enable switch, `No endpoint` and `N unavailable` badges, module-grouped tool rows with kind/mutation/destructive badges, dimmed permission actions, and per-tool disable switches (non-agent-callable tools render a muted badge instead); every toggle saves the full `{plugin, enabled, disabledTools}` and refetches. The page uses a fetch-based `usePluginTools` hook against the plugin's REST endpoints instead of GraphQL.
+- **Affected areas:** `src/pages/settings/PluginToolsPage.tsx` (new), `src/pages/settings/hooks/usePluginTools.ts` (new fetch hook), `src/modules/MastraSettings.tsx` (route), `src/modules/MastraSettingsNavigation.tsx` (nav item).
+- **Contracts changed:** Consumes the backend REST endpoints `GET /pl:erxes-agent/plugin-tools` (full per-plugin inventory incl. `disabledTools` and `agentUsable=false` entries) and `POST /pl:erxes-agent/plugin-tools/curation` (upsert `{plugin, enabled, disabledTools}`); no GraphQL surface for curation.
+
+### `2026-08-15` — Debug mode removed; process line always opens the panel
+
+- **Summary:** Deleted the Debug mode setting entirely (settings switch, `chatDebugModeAtom`/`useChatDebugMode`, the `debugMode.ts` module, and its EN/MN locale strings) — the single process line now always opens the right activity panel on click, and the debug-only inline stepper in the message body is gone, so there is exactly one activity UX with no `debugMode` branches.
+- **Affected areas:** `src/modules/chat/assistant/ToolGroupBlock.tsx` (panel-open button only; `StepRow`/Collapsible path removed), `src/modules/chat/debugMode.ts` (deleted), `src/pages/settings/GeneralSettingsPage.tsx` (debug card removed), `backend/plugins/erxes-agent_api/src/locales/{en,mn}/erxes-agent.json` (debug strings removed).
+- **Contracts changed:** None
+
+### `2026-08-15` — Hidden ask_user replays and collapsible panel tool calls
+
+- **Summary:** Replayed ask_user answers never render as user bubbles anymore — `UserMessageRow` now hides any message matching the `formatAskUserAnswer`/`formatAskUserSkip` convention via `parseAskUserAnswer` (the `hidden` flag is in-memory only, so metadata-based hiding broke after reload); and in the activity panel, tool-call steps are individually collapsible (default collapsed, title row is the trigger with a rotating chevron) while thought/phase steps keep their always-visible title + text.
+- **Affected areas:** `src/modules/chat/assistant/AgentMessage.tsx` (convention-based hide), `src/modules/chat/preview/ToolActivityPanel.tsx` (`ToolStepSection` with erxes-ui `Collapsible`; `StepTitle`/`StepContent` extracted).
+- **Contracts changed:** None
+
+### `2026-08-15` — Composer height fix on preview panel toggle
+
+- **Summary:** The composer no longer balloons to its 160px cap when the preview panel opens/closes: react-textarea-autosize measured the empty input's placeholder at the split's mid-transition width and kept the bloated inline height until the next keystroke (the panel group's settled-layout re-render bails out on the composer subtree), so the input now passes `maxRows={8}` and ChatPage dispatches a window `resize` two frames after `previewStore.open` changes to force a settled-width re-measure.
+- **Affected areas:** `src/modules/chat/assistant/AgentComposer.tsx` (`maxRows`), `src/modules/chat/ChatPage.tsx` (settled re-measure effect), `src/modules/chat/chat.css` (`.ea-composer-input` comment corrected; the rule stays the visual clamp).
+- **Contracts changed:** None
+
+### `2026-08-15` — Single process line; titled activity steps in panel
+
+- **Summary:** A turn now shows exactly one process line — while working, the current step's content-derived title (reasoning steps distilled from their own text, tool steps their per-tool labels); settled, the existing summary — and clicking it opens the right preview panel rendering the whole process as titled steps (full reasoning text, per-call params/results/sources, separators between steps); reasoning never renders as message rows and inline expansion is debug-mode-only.
+- **Affected areas:** `src/modules/chat/assistant/turnSteps.ts` (ordered `TurnActivityItem` input with reasoning steps), `src/modules/chat/assistant/ToolGroupBlock.tsx` (line click opens the panel; debug mode keeps the inline stepper), `src/modules/chat/assistant/AgentMessage.tsx` (reasoning + tool parts merge into the single activity group; per-tool renderers removed), `src/modules/chat/preview/previewStore.ts` (`openActivity` takes `{steps, title?}`, new `PanelStep`), `src/modules/chat/preview/ToolActivityPanel.tsx` (step-centric sections), `src/modules/chat/assistant/toolValue.tsx` (gained `humanizeToolName`), `src/modules/chat/assistant/WebSearchTool.tsx` (trimmed to the sources exports), `src/modules/chat/assistant/QuietTools.tsx` (import update only); deleted `ReasoningBlock.tsx`, `FetchUrlTool.tsx`, `ToolFallback.tsx`.
+- **Contracts changed:** None
+
+### `2026-08-15` — Activity stepper and scoped tool-activity panel
+
+- **Summary:** The turn's single tool-activity line now expands inline into a process-step list (analyze → one step per tool call → compose) with descriptive labels and pending/active/done states, and each step opens the right preview panel scoped to that step (step label as title, note atop the body, separators between calls and between args/result sections).
+- **Affected areas:** `src/modules/chat/assistant/turnSteps.ts` (new step model), `src/modules/chat/assistant/ToolGroupBlock.tsx` (collapsible stepper replaces open-panel-on-click; `children` prop removed), `src/modules/chat/assistant/AgentMessage.tsx` (call site), `src/modules/chat/preview/previewStore.ts` (`openActivity` takes `{toolCalls, title?, note?}`), `src/modules/chat/preview/ToolActivityPanel.tsx` (scoped title/note, separators).
+- **Contracts changed:** None
+
+### `2026-08-15` — Tool activity line opens detail panel; resizable panel shell
+
+- **Summary:** Clicking a turn's single tool-activity line now opens the right preview panel with every call's full args/results (webSearch renders its sources list; all-webSearch turns read as "Sources · N") instead of expanding inline — inline expansion is debug-mode-only; the docked chat↔preview layout moved off the custom CSS-variable resizer onto the erxes-ui `Resizable` split (`defaultSize` 30, `minSize` 20, persisted via `autoSaveId`).
+- **Affected areas:** `src/modules/chat/preview/previewStore.ts` (`activity` view + `PanelToolCall`), `src/modules/chat/preview/ToolActivityPanel.tsx` (new), `src/modules/chat/preview/PreviewPanel.tsx`, `src/modules/chat/assistant/ToolGroupBlock.tsx`, `src/modules/chat/assistant/WebSearchTool.tsx` (exported `SourcesList`), `src/modules/chat/ChatPage.tsx`, `src/modules/chat/chat.css` (removed `.ea-preview-dock`); deleted `src/modules/chat/components/PreviewResizer.tsx`.
+- **Contracts changed:** None
+
+### `2026-08-15` — Tool activity redesign, thinking orbs, and ask_user cards
+
+- **Summary:** Rebuilt the tool-call surface on the official assistant-ui tool-fallback architecture (scroll-locked collapsibles, shimmer-while-running, per-call elapsed time) with structured args/results — key-value rows, capped mini tables for record lists, and notes for the empty/error envelopes — replacing every raw JSON dump; webSearch/fetchUrl render ChatGPT-style "Searching <query>" status lines and favicon source lists; `thinking-orbs` drives the turn-level Thinking orb and per-tool running states; the agent's `ask_user` questions render as an interactive option card (single/multi select, free-text, Skip) whose answer replays as a hidden user message; plumbing tools (calculator, approvals, tool search, artifact generators) are quiet one-liners.
+- **Affected areas:** `src/modules/chat/assistant/` (rewritten `ToolFallback`/`WebSearchTool`/`FetchUrlTool`/`ToolGroupBlock`; new `toolValue.tsx`, `QuietTools.tsx`, `AskUserTool.tsx`), `AgentThread.tsx` (orb ThinkingRow), `chat/types.ts` (ask_user contract), `chatContexts.ts`, `ChatPage.tsx` (answer/skip handlers), `chat.css` (`ea-kv`, `ea-tool-table`, `ea-clamp-2`, `ea-ask-*`; removed `ea-typing-dot`), root `package.json` (+`thinking-orbs`).
+- **Contracts changed:** Consumes the backend's new `ask_user` tool (args `{question, options, selectionMode}`, result `{awaitingUserAnswer: true, …}`); GraphQL contracts unchanged.
+
+### `2026-08-14` — Sandbox mode selector in general settings
+
 ### `2026-08-13` — Production-safe chat surface styles
 
 - **Summary:** Fixed the prod-test rendering (white user bubble, unstyled send button, invisible hover controls) by moving every plugin-unique Tailwind utility off the chat surface into self-contained `ea-*` classes in `chat.css` — the deployed host CSS is built without scanning this plugin, so arbitrary values, opacity modifiers, and group/data variants were all missing in production.
 - **Affected areas:** `src/modules/chat/chat.css`, chat assistant/components/preview/sidebar files, `src/pages/agents/components/AgentFormFields.tsx` (now imports chat.css for `ea-form-grid`).
 - **Contracts changed:** None
 
-### `2026-08-13` — Drop the core sub-module panel
-
-- **Summary:** The plugin no longer registers `navigationGroup.content`, so core renders no sub-module sidebar for it; agent/conversation browsing lives entirely in the plugin's own chat sidebar, which gained a permission-gated "Manage agents" footer link.
-- **Affected areas:** `src/config.tsx`, `src/modules/chat/sidebar/AgentChatSidebar.tsx`; removed `src/modules/navigation/AgentNavLinks.tsx`.
-- **Contracts changed:** None
-
-### `2026-08-13` — Fix session ping-pong in runtime sync
-
-- **Summary:** Selecting two sessions in a row no longer blink-loops between them: the URL→runtime effect now reads the runtime via `getState()` (no reactive dep) and the runtime→URL effect reads the param through a ref, so each direction fires only from its own source.
-- **Affected areas:** `src/modules/chat/runtime/ChatRuntimeSync.tsx`.
-- **Contracts changed:** None
-
-### `2026-08-13` — Custom chat sidebar on the assistant-ui remote thread list
-
-- **Summary:** Moved session browsing out of the core sidebar into a chat-workspace sidebar built on `ThreadListPrimitive`/`ThreadListItemPrimitive`, backed by a per-agent `unstable_useRemoteThreadListRuntime` whose adapter serves the mastra session GraphQL contract (list/fetch/initialize/rename/delete; title generation reads the backend-persisted title after the first turn). Core navigation is now flat Chat / Agents links; `?thread=` deep-links, browser Back, delete-with-confirm, and re-homing all sync through `ChatRuntimeSync`.
-- **Affected areas:** `src/modules/chat/runtime/` (new: adapter, provider, sync), `src/modules/chat/sidebar/AgentChatSidebar.tsx` (new), `src/modules/chat/ChatPage.tsx`, `src/modules/chat/store/chatStore.ts` (`setActiveThread`/`ensureThreadChat`/`hydrateThread` replace `newDraft`/`selectSession`), `src/modules/navigation/AgentNavLinks.tsx` (new), `src/config.tsx`; removed `AgentChatNavTree`, `useSessionBootstrap`, `useMastraThreads`, `useRemoveMastraThread`.
-- **Contracts changed:** None
-
-### `2026-08-13` — Sidebar session rows redesigned
-
-- **Summary:** Rebuilt the sidebar conversation rows on `Sidebar.SubItem` + `Sidebar.SubButton` with a left tree-guide border; the delete control is now a hover/focus-revealed icon button absolutely centered (`top-1/2 -translate-y-1/2`) over a solid `bg-sidebar` chip, replacing the misaligned `NavigationMenuLinkItem` + `Sidebar.MenuAction` pairing, and the agent row gained consistent action spacing.
-- **Affected areas:** `src/modules/navigation/AgentChatNavTree.tsx`.
-- **Contracts changed:** None
-
-### `2026-08-13` — Readable fetchUrl tool results
-
-- **Summary:** Added a dedicated `fetchUrl` tool renderer that shows the fetched page as a readable card (favicon, linked title, site name, plain-text content behind a "Read more" toggle) instead of dumping the raw JSON payload; unexpected result shapes still fall back to the capped JSON block.
-- **Affected areas:** `src/modules/chat/assistant/FetchUrlTool.tsx` (new), `src/modules/chat/assistant/AgentMessage.tsx`.
-- **Contracts changed:** None
-
-### `2026-08-13` — Sidebar session rows use sidebar primitives
-
-- **Summary:** Fixed the session delete button floating below its row by switching it to `Sidebar.MenuAction` (absolute, vertically centered, hover-revealed); sessions now indent under their agent via `Sidebar.Sub`, the agent row uses `Sidebar.MenuButton` for consistent hover/active states, and the new-conversation control is a real icon button.
-- **Affected areas:** `src/modules/navigation/AgentChatNavTree.tsx`.
-- **Contracts changed:** None
-
-### `2026-08-13` — assistant-ui chat surface and nested sidebar navigation
-
-- **Summary:** Rebuilt the conversation view on assistant-ui primitives (thread, message rows with streaming markdown and inline per-call tool status, composer) over the AI SDK chat runtime, replacing the custom message list/bubble/composer/waiting components and the summarized activity line; moved the agent/session browser into the main sidebar as a nested "Chat" tree with lazy session loading, deleting the in-page side panel.
-- **Affected areas:** `src/modules/chat/assistant` (new), `src/modules/chat/ChatPage.tsx`, `src/modules/navigation/AgentChatNavTree.tsx` (new), `src/config.tsx`, `src/modules/chat/hooks/useChatView.ts`; removed `MessageList`, `MessageBubble`, `Composer`, `WaitingIndicator`, `ChatMarkdown`, `ChatSidePanel`, `AgentRail`, `SessionList`, `MastraNavigation` and related hooks.
-- **Contracts changed:** None
-
-### `2026-08-13` — Stock AI SDK chat transport
-
-- **Summary:** Dropped the custom settling transport, settled flags, idle handoff, and message-id reconcile parts now that the backend closes the stream at `finish` with the native id in `messageMetadata`; the chat runs on the stock `DefaultChatTransport` and status lifecycle.
-- **Affected areas:** `src/modules/chat/lib/chatTransport.ts`, `src/modules/chat/store/chatStore.ts`, `src/modules/chat/hooks/useChatView.ts`, `src/modules/chat/types.ts`.
-- **Contracts changed:** Consumes `finish` `messageMetadata.messageId` instead of the removed transient `data-message-id` part.
-
-### `2026-08-07` — Enforce agent rail access
-
-- **Summary:** Hides agent settings links without edit access and refreshes the access-filtered chat agent list after saves.
-- **Affected areas:** Agent rail permissions, save mutation cache handling, and stale cache tests.
-- **Contracts changed:** None

@@ -83,6 +83,7 @@ export const MASTRA_SETTINGS_SAVE = gql`
       memoryEnabled
       attachmentsEnabled
       backgroundRemovalEnabled
+      sandboxMode
       openSandboxApiUrl
       hasOpenSandboxApiKey
       openSandboxApiKeyHint

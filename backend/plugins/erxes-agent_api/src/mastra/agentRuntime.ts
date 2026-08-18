@@ -1,17 +1,18 @@
 import { Agent } from '@mastra/core/agent';
 import type { ToolsInput } from '@mastra/core/agent';
+import type { Tool } from '@mastra/core/tools';
 import { ExpectedError } from 'erxes-api-shared/utils';
 import type { IModels } from '~/connectionResolvers';
 import type { IMastraAgentDocument } from '@/agent/@types/agent';
 import { BUILTIN_TOOLS } from './tools/builtins';
 import { buildModel, providerRuntimeFingerprint } from './providers';
 import { buildSystemPrompt, ToolInfo } from './instructions/routing';
-import { getOperationRegistry } from './tools/operationRegistry';
-import { buildErxesSupportTools } from './tools/metaTools';
 import {
-  buildErxesOperationTools,
-  type ErxesOperationTools,
-} from './tools/operationTools';
+  buildNativeOperationTools,
+  getNativeToolRegistry,
+  type NativeToolRegistry,
+} from './tools/nativeTools';
+import { askUserTool, buildErxesSupportTools } from './tools/metaTools';
 import {
   isBuiltinAllowed,
   hasAnyOperation,
@@ -24,16 +25,15 @@ import type { GroupPermission } from './tools/actionsToAllowedTools';
 import { writeAgentAction, AgentActionInput } from './auditLog';
 import { isWorkspaceMemoryEnabled } from './memory/config';
 import { getMastraMemory } from './memory/mastraMemory';
-import { withToolExecutionControl } from './requestContext';
+import { getCurrentAuth, withToolExecutionControl } from './requestContext';
 import { ToolCallSignalFilter } from './memory/toolCallSignalFilter';
 import { ErxesToolSearchProcessor } from './toolSearch';
 import { getRuntimeSkillsWorkspace } from './runtimeSkills';
-import { createTerminalTool } from './tools/terminalTool';
+import { createCodeModeTool } from './tools/codeModeTool';
 import {
   createPublishWebsiteTool,
   createWorkspaceWriteTool,
 } from './tools/workspaceTools';
-import type { OperationRegistry } from './tools/operationRegistry';
 import type { IMastraProviderDocument } from '@/provider/@types/provider';
 import type { IMastraSettingsDocument } from '@/settings/@types/settings';
 import {
@@ -42,6 +42,17 @@ import {
   getCoreUserById,
   type AgentAccount,
 } from './auth/servicePrincipal';
+
+// Hard stop for a turn whose tool budget is spent: once runToolOnce starts
+// rejecting calls, further steps can only produce failures, so the loop ends
+// instead of burning provider tokens on doomed retries. Runs inside the
+// turn's runWithAuth chain, so the per-turn counter is visible here.
+const turnToolBudgetExceeded = (): boolean => {
+  const auth = getCurrentAuth();
+  if (!auth?.turnId) return false;
+  const limit = auth.toolCallLimit ?? 50;
+  return (auth.toolCallCount ?? 0) >= limit;
+};
 
 // Cache agents by config ID + updatedAt + routing version.
 const agentCache = new Map<string, Agent>();
@@ -54,7 +65,7 @@ const promptContextCache = new Map<string, AgentPromptContext>();
 const SIDE_EFFECTING_STANDALONE_TOOLS: Record<string, true> = {
   publishWebsite: true,
   removeImageBackground: true,
-  terminal: true,
+  runCode: true,
   updateWorkingMemory: true,
   workspaceWrite: true,
 };
@@ -122,7 +133,7 @@ const enforceDelegatedPermissionCeiling = async ({
 };
 
 // Increment this whenever routing.ts, the meta-tools, or provider logic changes.
-const ROUTING_VERSION = 41;
+const ROUTING_VERSION = 42;
 
 export interface AgentPromptContext {
   agentInstructions: string;
@@ -208,13 +219,13 @@ function buildAgentCacheKey(params: {
 function assembleAgentTools(params: {
   agentConfig: IMastraAgentDocument;
   models: IModels;
-  registry: OperationRegistry;
+  registry: NativeToolRegistry;
   policy: ToolPolicy;
   hasErxes: boolean;
   settings: IMastraSettingsDocument;
 }): {
   tools: ToolsInput;
-  operationTools: ErxesOperationTools;
+  operationTools: Record<string, Tool>;
   builtinInfos: ToolInfo[];
 } {
   const { agentConfig, models, registry, policy, hasErxes, settings } = params;
@@ -232,16 +243,27 @@ function assembleAgentTools(params: {
     });
 
   const operationTools = hasErxes
-    ? buildErxesOperationTools({
+    ? buildNativeOperationTools({
         registry,
         policy,
         recordAction,
+        models,
       })
     : {};
 
   if (hasErxes) {
     Object.assign(tools, buildErxesSupportTools());
   }
+
+  // ask_user is a conversation capability, not a scoped capability: every
+  // agent can hit an ambiguous request, so it is always bound and always
+  // active (selectTurnActiveTools never filters it out).
+  tools.ask_user = askUserTool;
+  builtinInfos.push({
+    id: 'ask_user',
+    name: 'ask_user',
+    description: askUserTool.description,
+  });
 
   // Standalone builtin tools, filtered by policy.
   for (const [key, tool] of Object.entries(BUILTIN_TOOLS)) {
@@ -260,11 +282,9 @@ function assembleAgentTools(params: {
     });
   }
 
-  if (isBuiltinAllowed('terminal', policy)) {
-    const terminalTool = createTerminalTool({
-      models,
-      agentId: agentConfig._id,
-    });
+  // Sandbox workspace tools ride the code-mode gate: an agent that may run
+  // code in the sandbox may also write workspace files and publish sites.
+  if (isBuiltinAllowed('runCode', policy)) {
     const workspaceWriteTool = createWorkspaceWriteTool({
       models,
       agentId: agentConfig._id,
@@ -274,16 +294,10 @@ function assembleAgentTools(params: {
       agentId: agentConfig._id,
     });
     Object.assign(tools, {
-      terminal: terminalTool,
       workspaceWrite: workspaceWriteTool,
       publishWebsite: publishWebsiteTool,
     });
     builtinInfos.push(
-      {
-        id: 'terminal',
-        name: 'terminal',
-        description: terminalTool.description,
-      },
       {
         id: 'workspaceWrite',
         name: 'workspaceWrite',
@@ -295,6 +309,19 @@ function assembleAgentTools(params: {
         description: publishWebsiteTool.description,
       },
     );
+  }
+
+  if (isBuiltinAllowed('runCode', policy)) {
+    const codeModeTool = createCodeModeTool({
+      models,
+      agentId: agentConfig._id,
+    });
+    tools.runCode = codeModeTool;
+    builtinInfos.push({
+      id: 'runCode',
+      name: 'runCode',
+      description: codeModeTool.description,
+    });
   }
 
   // file_reader is bound regardless of policy: the agent must always be able to
@@ -346,7 +373,7 @@ export async function getOrCreateAgent(
     agentConfig,
     subdomain: subdomain || 'os',
   });
-  const registry = await getOperationRegistry(settings);
+  const registry = await getNativeToolRegistry(subdomain || 'os', { models });
   const allowedTools = await resolveAgentAllowedTools({
     subdomain: subdomain || 'os',
     permissionGroupIds: account.permissionGroupIds ?? [],
@@ -409,10 +436,10 @@ export async function getOrCreateAgent(
   const controlledTools = Object.fromEntries(
     Object.entries(tools).map(([name, tool]) => [
       name,
-      // fileReader and exact erxes operations already use runToolOnce at their
-      // execution boundary; wrapping them twice would recursively share the
-      // same in-flight promise. Standalone writes share the mutation queue so
-      // four-way read concurrency cannot race workspace state.
+      // fileReader and exact erxes capability tools already use runToolOnce at
+      // their execution boundary; wrapping them twice would recursively share
+      // the same in-flight promise. Standalone writes share the mutation queue
+      // so four-way read concurrency cannot race workspace state.
       name === 'fileReader'
         ? tool
         : withToolExecutionControl(name, tool, {
@@ -472,12 +499,12 @@ export async function getOrCreateAgent(
     ...(inputProcessors.length ? { inputProcessors } : {}),
     ...(runtimeSkillsWorkspace ? { workspace: runtimeSkillsWorkspace } : {}),
     defaultOptions: {
-      // No step ceiling: the loop ends when the model stops calling tools.
-      // Runaway tool execution is bounded by the per-turn invocation hard
-      // stop in runToolOnce, so an unbounded step count cannot run away.
-      stopWhen: [],
-      // Independent reads may execute together. Exact GraphQL mutations and
-      // state-changing standalone tools share the per-turn serial queue.
+      // No step ceiling: the loop ends when the model stops calling tools —
+      // or when the turn's tool budget is spent (the only hard stop), so a
+      // model that keeps retrying rejected calls cannot spin forever.
+      stopWhen: [turnToolBudgetExceeded],
+      // Independent reads may execute together. State-changing native tools
+      // and standalone tools share the per-turn serial queue.
       toolCallConcurrency: 4,
     },
   } as never);

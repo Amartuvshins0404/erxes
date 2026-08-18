@@ -9,7 +9,7 @@ import {
   IconPhoto,
   IconTerminal2,
 } from '@tabler/icons-react';
-import { Badge, Button, Card, Form, Input, Switch, toast } from 'erxes-ui';
+import { Badge, Button, Card, Form, Input, Select, Switch, toast } from 'erxes-ui';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useGeneralSettings } from './hooks/useGeneralSettings';
@@ -38,10 +38,13 @@ export const GeneralSettingsPage = () => {
       memoryEnabled: settings.memoryEnabled !== false,
       attachmentsEnabled: settings.attachmentsEnabled !== false,
       backgroundRemovalEnabled: settings.backgroundRemovalEnabled !== false,
+      sandboxMode: settings.sandboxMode === 'isolated' ? 'isolated' : 'onserver',
       openSandboxApiUrl: settings.openSandboxApiUrl || '',
       openSandboxApiKey: '',
     });
   }, [settings, form]);
+
+  const sandboxMode = form.watch('sandboxMode');
 
   const attachmentStorage = settings?.attachmentStorage;
   const storageConfigured = attachmentStorage?.configured === true;
@@ -128,78 +131,138 @@ export const GeneralSettingsPage = () => {
                         </p>
                       </div>
                     </div>
-                    <Badge
-                      aria-live="polite"
-                      variant={sandboxConfigured ? 'success' : 'secondary'}
-                    >
-                      {sandboxConfigured
-                        ? t('general-settings-sandbox-configured')
-                        : t('general-settings-sandbox-not-configured')}
-                    </Badge>
+                    {sandboxMode === 'isolated' && (
+                      <Badge
+                        aria-live="polite"
+                        variant={sandboxConfigured ? 'success' : 'secondary'}
+                      >
+                        {sandboxConfigured
+                          ? t('general-settings-sandbox-configured')
+                          : t('general-settings-sandbox-not-configured')}
+                      </Badge>
+                    )}
                   </div>
 
                   <Form.Field
                     control={form.control}
-                    name="openSandboxApiUrl"
+                    name="sandboxMode"
                     render={({ field }) => (
                       <Form.Item>
                         <Form.Label>
-                          {t('general-settings-sandbox-url-label')}
+                          {t('general-settings-sandbox-mode-label', {
+                            defaultValue: 'Sandbox mode',
+                          })}
                         </Form.Label>
-                        <Form.Control>
-                          <Input
-                            {...field}
-                            inputMode="url"
-                            placeholder={t(
-                              'general-settings-sandbox-url-placeholder',
-                            )}
-                          />
-                        </Form.Control>
+                        <Select
+                          value={field.value}
+                          onValueChange={(value) => {
+                            field.onChange(value);
+                            if (value === 'onserver') {
+                              form.setValue('openSandboxApiUrl', '');
+                              form.setValue('openSandboxApiKey', '');
+                            }
+                          }}
+                        >
+                          <Form.Control>
+                            <Select.Trigger className="w-full">
+                              <Select.Value />
+                            </Select.Trigger>
+                          </Form.Control>
+                          <Select.Content>
+                            <Select.Item value="onserver">
+                              {t('general-settings-sandbox-mode-onserver', {
+                                defaultValue: 'On-server (built-in)',
+                              })}
+                            </Select.Item>
+                            <Select.Item value="isolated">
+                              {t('general-settings-sandbox-mode-isolated', {
+                                defaultValue: 'Isolated (OpenSandbox)',
+                              })}
+                            </Select.Item>
+                          </Select.Content>
+                        </Select>
                         <Form.Description>
-                          {t('general-settings-sandbox-url-description')}
+                          {sandboxMode === 'isolated'
+                            ? t('general-settings-sandbox-mode-isolated-help', {
+                                defaultValue:
+                                  'Runs code in an isolated OpenSandbox container. Requires OpenSandbox connection below.',
+                              })
+                            : t('general-settings-sandbox-mode-onserver-help', {
+                                defaultValue:
+                                  'Runs code on this server in a restricted realm. No configuration needed.',
+                              })}
                         </Form.Description>
                         <Form.Message />
                       </Form.Item>
                     )}
                   />
 
-                  <Form.Field
-                    control={form.control}
-                    name="openSandboxApiKey"
-                    render={({ field }) => (
-                      <Form.Item>
-                        <Form.Label>
-                          {t('general-settings-sandbox-key-label')}
-                        </Form.Label>
-                        <Form.Control>
-                          <div className="relative">
-                            <IconKey
-                              aria-hidden
-                              className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
-                            />
-                            <Input
-                              {...field}
-                              type="password"
-                              autoComplete="new-password"
-                              className="pl-9"
-                              placeholder={
-                                sandboxKeyHint ||
-                                t('general-settings-sandbox-key-placeholder')
-                              }
-                            />
-                          </div>
-                        </Form.Control>
-                        <Form.Description>
-                          {settings?.hasOpenSandboxApiKey
-                            ? t(
-                                'general-settings-sandbox-key-preserve-description',
-                              )
-                            : t('general-settings-sandbox-key-description')}
-                        </Form.Description>
-                        <Form.Message />
-                      </Form.Item>
-                    )}
-                  />
+                  {sandboxMode === 'isolated' && (
+                    <>
+                      <Form.Field
+                        control={form.control}
+                        name="openSandboxApiUrl"
+                        render={({ field }) => (
+                          <Form.Item>
+                            <Form.Label>
+                              {t('general-settings-sandbox-url-label')}
+                            </Form.Label>
+                            <Form.Control>
+                              <Input
+                                {...field}
+                                inputMode="url"
+                                placeholder={t(
+                                  'general-settings-sandbox-url-placeholder',
+                                )}
+                              />
+                            </Form.Control>
+                            <Form.Description>
+                              {t('general-settings-sandbox-url-description')}
+                            </Form.Description>
+                            <Form.Message />
+                          </Form.Item>
+                        )}
+                      />
+
+                      <Form.Field
+                        control={form.control}
+                        name="openSandboxApiKey"
+                        render={({ field }) => (
+                          <Form.Item>
+                            <Form.Label>
+                              {t('general-settings-sandbox-key-label')}
+                            </Form.Label>
+                            <Form.Control>
+                              <div className="relative">
+                                <IconKey
+                                  aria-hidden
+                                  className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                                />
+                                <Input
+                                  {...field}
+                                  type="password"
+                                  autoComplete="new-password"
+                                  className="pl-9"
+                                  placeholder={
+                                    sandboxKeyHint ||
+                                    t('general-settings-sandbox-key-placeholder')
+                                  }
+                                />
+                              </div>
+                            </Form.Control>
+                            <Form.Description>
+                              {settings?.hasOpenSandboxApiKey
+                                ? t(
+                                    'general-settings-sandbox-key-preserve-description',
+                                  )
+                                : t('general-settings-sandbox-key-description')}
+                            </Form.Description>
+                            <Form.Message />
+                          </Form.Item>
+                        )}
+                      />
+                    </>
+                  )}
                 </div>
 
                 <Form.Field

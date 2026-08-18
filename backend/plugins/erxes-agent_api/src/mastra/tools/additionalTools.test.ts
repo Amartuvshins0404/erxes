@@ -9,19 +9,22 @@ describe('additional tool selection', () => {
       DEFAULT_ADDITIONAL_TOOL_KEYS,
     );
     expect(normalizeAdditionalToolKeys(undefined)).not.toContain('webSearch');
-    expect(normalizeAdditionalToolKeys(undefined)).not.toContain('terminal');
+    expect(normalizeAdditionalToolKeys(undefined)).not.toContain('runCode');
   });
 
   it('honors an explicit empty or selected allowlist', () => {
     expect(normalizeAdditionalToolKeys([], [])).toEqual([]);
     expect(
-      normalizeAdditionalToolKeys(['terminal', 'webSearch', 'terminal'], []),
-    ).toEqual(['webSearch', 'terminal']);
+      normalizeAdditionalToolKeys(['runCode', 'webSearch', 'runCode'], []),
+    ).toEqual(['webSearch', 'runCode']);
   });
 
-  it('rejects unknown tool names instead of granting or silently persisting them', () => {
-    expect(() =>
-      normalizeAdditionalToolKeys(['terminal', 'hostShell'], []),
-    ).toThrow('Unknown additional tool: hostShell');
+  it('drops retired or unknown tool names instead of granting them', () => {
+    expect(normalizeAdditionalToolKeys(['terminal', 'hostShell'], [])).toEqual(
+      [],
+    );
+    expect(
+      normalizeAdditionalToolKeys(['terminal', 'webSearch'], []),
+    ).toEqual(['webSearch']);
   });
 });

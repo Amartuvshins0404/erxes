@@ -1,13 +1,17 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useApolloClient } from '@apollo/client';
 import { useTranslation } from 'react-i18next';
-import { useToast } from 'erxes-ui';
+import { Resizable, useToast } from 'erxes-ui';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAssistantRuntime } from '@assistant-ui/react';
 import type {
   ChatAttachment,
   ApprovedOp,
   ReasoningEffort,
+} from '~/modules/chat/types';
+import {
+  formatAskUserAnswer,
+  formatAskUserSkip,
 } from '~/modules/chat/types';
 import type { IChatAgent } from '~/modules/chat/hooks/useChatAgents';
 import { chatStore } from '~/modules/chat/store/chatStore';
@@ -27,7 +31,6 @@ import {
   SelectAgentEmpty,
 } from '~/modules/chat/components/ChatNotices';
 import { ApprovalBar } from '~/modules/chat/components/ApprovalBar';
-import { PreviewResizer } from '~/modules/chat/components/PreviewResizer';
 import { PreviewPanel } from '~/modules/chat/preview/PreviewPanel';
 import { previewStore } from '~/modules/chat/preview/previewStore';
 import { pendingApproval } from '~/modules/chat/lib/uiParts';
@@ -94,20 +97,36 @@ const AgentChatWorkspace = ({
     useState<PendingMessagePairDelete | null>(null);
   const [messageDeleteLoading, setMessageDeleteLoading] = useState(false);
 
-  // The chat↔preview split row — PreviewResizer sets --ea-preview-w on it.
-  const splitRef = useRef<HTMLDivElement>(null);
-
   const attachments = useAttachments(attachmentsEnabled);
 
-  // Artifact Preview panel (charts / generated documents). Switching agent or
-  // thread clears any open preview — it belongs to the prior conversation.
+  // Artifact Preview panel (charts / generated documents / tool activity).
+  // Switching agent or thread clears any open preview — it belongs to the
+  // prior conversation.
   const previewOpen = previewStore((s) => s.open);
-  // The split handle only makes sense while the panel is docked beside the
-  // chat — in fullscreen the panel is a fixed overlay with nothing to resize.
-  const previewFullscreen = previewStore((s) => s.fullscreen);
   useEffect(() => {
     previewStore.getState().close();
   }, [agentId, activeThreadId]);
+
+  // The composer input (react-textarea-autosize via ComposerPrimitive.Input)
+  // measures its height against the computed width at render time. Mounting or
+  // unmounting the preview panel re-renders it in the same commit, but the
+  // Resizable split only applies the settled layout in a later layout effect
+  // (registerPanel → forceUpdate), which then bails out of re-rendering this
+  // subtree — so a mid-transition, bloated height would stick until the next
+  // keystroke. Force a re-measure once the split has settled (autosize
+  // re-measures on window resize; two frames puts us past the first paint).
+  useEffect(() => {
+    let cancelled = false;
+    const frame = requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        if (!cancelled) window.dispatchEvent(new Event('resize'));
+      }),
+    );
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(frame);
+    };
+  }, [previewOpen]);
 
   // Persisted artifacts for this thread — re-renders the inline chat cards on
   // reload (live tool parts don't survive). Apollo dedupes with the Files panel.
@@ -241,6 +260,25 @@ const AgentChatWorkspace = ({
     );
   };
 
+  // The ask_user card answers as a hidden send quoting the question — the
+  // quote anchors the backend's keyword tool-scoping to the original task, and
+  // the convention parses back into the card's answered receipt on reload.
+  const handleAnswerQuestion = useCallback(
+    (question: string, answer: string) => {
+      if (chatLoading || !answer.trim()) return;
+      sendMessage(formatAskUserAnswer(question, answer.trim()), [], undefined, true);
+    },
+    [chatLoading, sendMessage],
+  );
+
+  const handleSkipQuestion = useCallback(
+    (question: string) => {
+      if (chatLoading) return;
+      sendMessage(formatAskUserSkip(question), [], undefined, true);
+    },
+    [chatLoading, sendMessage],
+  );
+
   // The composer's send: upload staged files first, then fire the turn. On any
   // upload failure nothing is sent — the composer keeps its text and chips.
   const handleSend = useCallback(
@@ -285,8 +323,16 @@ const AgentChatWorkspace = ({
       onRegenerate: handleRegenerate,
       onDeleteMessage: handleDeleteMessage,
       onResendMessage: handleResendMessage,
+      onAnswerQuestion: handleAnswerQuestion,
+      onSkipQuestion: handleSkipQuestion,
     }),
-    [handleRegenerate, handleDeleteMessage, handleResendMessage],
+    [
+      handleRegenerate,
+      handleDeleteMessage,
+      handleResendMessage,
+      handleAnswerQuestion,
+      handleSkipQuestion,
+    ],
   );
 
   return (
@@ -302,63 +348,79 @@ const AgentChatWorkspace = ({
       <div className="flex flex-1 overflow-hidden relative">
         <AgentChatSidebar agents={agents} activeAgentId={agentId} />
 
-        <div ref={splitRef} className="flex flex-1 overflow-hidden relative">
-          {/* ── Chat area ── */}
-          <div
-            className="flex-1 flex flex-col overflow-hidden relative"
-            onDragEnter={attachments.onDragEnter}
-            onDragOver={attachments.onDragOver}
-            onDragLeave={attachments.onDragLeave}
-            onDrop={attachments.onDrop}
-          >
-            {attachments.isDragging && <DropOverlay />}
+        {/* Chat ↔ preview split on the resizable library: the chat column
+            (and its runtime machinery) stays mounted in the first panel; the
+            preview's panel mounts/unmounts with previewStore.open without
+            touching it. Fullscreen is a fixed overlay inside PreviewPanel. */}
+        <Resizable.PanelGroup
+          direction="horizontal"
+          autoSaveId="erxes-agent:preview-split"
+          className="min-w-0 flex-1"
+        >
+          <Resizable.Panel className="flex flex-col">
+            {/* ── Chat area ── */}
+            <div
+              className="flex h-full flex-col overflow-hidden relative"
+              onDragEnter={attachments.onDragEnter}
+              onDragOver={attachments.onDragOver}
+              onDragLeave={attachments.onDragLeave}
+              onDrop={attachments.onDrop}
+            >
+              {attachments.isDragging && <DropOverlay />}
 
-            {chatLoading && <AmbientBackdrop />}
+              {chatLoading && <AmbientBackdrop />}
 
-            <MessageExtrasContext.Provider value={messageExtras}>
-              <ChatMessageActionsContext.Provider value={messageActions}>
-                <AgentThread
-                  agent={agent}
-                  messagesLoading={messagesLoading}
-                  attachmentsEnabled={attachmentsEnabled}
+              <MessageExtrasContext.Provider value={messageExtras}>
+                <ChatMessageActionsContext.Provider value={messageActions}>
+                  <AgentThread
+                    agent={agent}
+                    messagesLoading={messagesLoading}
+                    attachmentsEnabled={attachmentsEnabled}
+                  />
+                </ChatMessageActionsContext.Provider>
+              </MessageExtrasContext.Provider>
+
+              {chatError && !chatLoading && (
+                <ChatErrorBanner
+                  message={chatError.message}
+                  onRetry={handleRetry}
                 />
-              </ChatMessageActionsContext.Provider>
-            </MessageExtrasContext.Provider>
+              )}
 
-            {chatError && !chatLoading && (
-              <ChatErrorBanner
-                message={chatError.message}
-                onRetry={handleRetry}
+              {approval && !chatLoading && (
+                <ApprovalBar
+                  prompt={approval.prompt}
+                  busy={chatLoading}
+                  onApprove={handleApprove}
+                  onDeny={handleDeny}
+                />
+              )}
+
+              <AgentComposer
+                onSend={handleSend}
+                onStop={handleStop}
+                chatLoading={chatLoading}
+                attachmentsEnabled={attachmentsEnabled}
+                attachments={attachments}
+                agentName={agent.accountName}
+                reasoningEffort={reasoningEffort}
+                onReasoningEffortChange={handleReasoningEffortChange}
               />
-            )}
-
-            {approval && !chatLoading && (
-              <ApprovalBar
-                prompt={approval.prompt}
-                busy={chatLoading}
-                onApprove={handleApprove}
-                onDeny={handleDeny}
-              />
-            )}
-
-            <AgentComposer
-              onSend={handleSend}
-              onStop={handleStop}
-              chatLoading={chatLoading}
-              attachmentsEnabled={attachmentsEnabled}
-              attachments={attachments}
-              agentName={agent.accountName}
-              reasoningEffort={reasoningEffort}
-              onReasoningEffortChange={handleReasoningEffortChange}
-            />
-          </div>
+            </div>
+          </Resizable.Panel>
 
           {/* ── Artifact Preview panel (charts / generated documents) ── */}
-          {previewOpen && !previewFullscreen && (
-            <PreviewResizer splitRef={splitRef} />
+          {previewOpen && <Resizable.Handle />}
+          {previewOpen && (
+            <Resizable.Panel
+              defaultSize={30}
+              minSize={20}
+              className="flex flex-col"
+            >
+              <PreviewPanel threadId={activeThreadId} />
+            </Resizable.Panel>
           )}
-          {previewOpen && <PreviewPanel threadId={activeThreadId} />}
-        </div>
+        </Resizable.PanelGroup>
       </div>
 
       <DeleteMessagePairDialog

@@ -59,12 +59,15 @@ export interface IAttachmentStorageStatusResponse {
   mastraAttachmentStorageStatus: IAttachmentStorage | null;
 }
 
+export type MastraSandboxMode = 'onserver' | 'isolated';
+
 export interface IMastraSettings {
   _id?: string;
   erxesApiUrl?: string | null;
   memoryEnabled?: boolean | null;
   attachmentsEnabled?: boolean | null;
   backgroundRemovalEnabled?: boolean | null;
+  sandboxMode?: MastraSandboxMode | null;
   openSandboxApiUrl?: string | null;
   hasOpenSandboxApiKey?: boolean | null;
   openSandboxApiKeyHint?: string | null;

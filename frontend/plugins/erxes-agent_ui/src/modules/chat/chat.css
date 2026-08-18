@@ -64,6 +64,17 @@
   background: #212121;
   box-shadow: inset 0 0 1px 0 rgba(255, 255, 255, 0.2);
 }
+/* Composer input cap — react-textarea-autosize stamps an inline
+   `height … !important` on every measure; `maxRows` caps that height
+   library-side and ChatPage forces a re-measure (window resize) once the
+   preview split settles, so the used box stays one line until real content
+   grows it. This rule remains the visual clamp and keeps the overflow
+   scrolling inside the textarea. Kept as an ea-* rule because max-h-40 may
+   not exist in the host CSS. */
+.ea-composer-input {
+  max-height: 10rem;
+  overflow-y: auto;
+}
 .ea-composer-input::placeholder {
   color: color-mix(in oklch, var(--muted-foreground) 70%, transparent);
 }
@@ -350,31 +361,132 @@
   animation: ea-shimmer 2.2s linear infinite;
 }
 
-/* Typing dots while waiting for the first event. */
-@keyframes ea-dot {
-  0%,
-  60%,
-  100% {
-    transform: translateY(0);
-    opacity: 0.35;
-  }
-  30% {
-    transform: translateY(-4px);
-    opacity: 1;
-  }
+/* ── Tool call surface ──────────────────────────────────────────────────────
+   Structured args/results inside the tool collapsible (toolValue.tsx). Kept
+   as self-contained classes — the host CSS purge strips plugin-unique
+   Tailwind utilities, so none of these may rely on the utility graph. */
+
+/* Key-value rows: quiet label column + value column. */
+.ea-kv {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin: 0;
 }
-.ea-typing-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 9999px;
-  background: var(--primary);
-  animation: ea-dot 1.2s ease-in-out infinite;
+.ea-kv-row {
+  display: grid;
+  grid-template-columns: minmax(5rem, 11rem) minmax(0, 1fr);
+  gap: 0.75rem;
+  align-items: baseline;
 }
-.ea-typing-dot:nth-child(2) {
-  animation-delay: 0.15s;
+.ea-kv-row > dt {
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: var(--muted-foreground);
 }
-.ea-typing-dot:nth-child(3) {
-  animation-delay: 0.3s;
+.ea-kv-row > dd {
+  margin: 0;
+  min-width: 0;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: color-mix(in oklch, var(--foreground) 90%, transparent);
+  overflow-wrap: break-word;
+}
+
+/* Two-line clamp for source titles/snippets (line-clamp utilities are not
+   guaranteed in the host build). */
+.ea-clamp-2 {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+/* Quiet mini table for record-list tool results. */
+.ea-tool-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+.ea-tool-table th {
+  text-align: left;
+  font-weight: 500;
+  color: var(--muted-foreground);
+  padding: 0.375rem 0.625rem;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.ea-tool-table td {
+  padding: 0.375rem 0.625rem;
+  border-bottom: 1px solid
+    color-mix(in oklch, var(--border) 50%, transparent);
+  color: color-mix(in oklch, var(--foreground) 90%, transparent);
+  max-width: 16rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ea-tool-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* ── ask_user question card ─────────────────────────────────────────────────
+   The structured clarifying question (AskUserTool.tsx). Self-contained rows:
+   selected/hover tints use token color-mix (plugin-only Tailwind variants
+   never survive the host CSS purge). */
+.ea-ask-card {
+  margin-top: 0.5rem;
+  max-width: 32rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: color-mix(in oklch, var(--muted) 40%, transparent);
+  padding: 0.875rem 1rem;
+}
+.ea-ask-card-done {
+  background: transparent;
+}
+.ea-ask-option {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.625rem;
+  padding: 0.5rem 0.5rem;
+  border-radius: calc(var(--radius) - 2px);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+.ea-ask-option:hover {
+  background: color-mix(in oklch, var(--accent) 60%, transparent);
+}
+.ea-ask-option-on {
+  border-color: color-mix(in oklch, var(--primary) 40%, transparent);
+  background: color-mix(in oklch, var(--primary) 10%, transparent);
+}
+.ea-ask-option-on:hover {
+  background: color-mix(in oklch, var(--primary) 14%, transparent);
+}
+.ea-ask-option-done {
+  cursor: default;
+}
+.ea-ask-option-done:hover {
+  background: transparent;
+}
+.ea-ask-num {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 1.375rem;
+  height: 1.375rem;
+  border-radius: 0.375rem;
+  font-size: 0.75rem;
+  line-height: 1;
+  color: var(--muted-foreground);
+  background: color-mix(in oklch, var(--muted) 70%, transparent);
+}
+.ea-ask-option-on .ea-ask-num {
+  color: var(--primary);
+  background: color-mix(in oklch, var(--primary) 14%, transparent);
 }
 
 /* Streaming caret at the end of live answer text. */
@@ -673,35 +785,10 @@
   pointer-events: none;
 }
 
-/* ── Artifact preview panel layout ────────────────────────────────────────
-   The docked preview is a right-side column beside the chat that collapses to
-   a full-area overlay on narrow screens. These layout rules MUST live here, not
-   as Tailwind utilities: the docking relied on plugin-unique responsive +
-   arbitrary-value utilities (lg:static, lg:w-[42%], lg:min-w-[360px], …) that
-   are purged from the production host CSS. There they vanished and the panel
-   fell back to its bare `absolute inset-0` overlay — rendering as a full-screen
-   takeover instead of docking to the side. Driven off design tokens so it
-   survives the purge (same rule as .ea-user-bubble above). */
-.ea-preview-dock {
-  position: absolute;
-  inset: 0;
-  z-index: 30;
-  display: flex;
-  flex-direction: column;
-  background: var(--background);
-  border-left: 1px solid var(--border);
-}
-@media (min-width: 1024px) {
-  .ea-preview-dock {
-    position: static;
-    z-index: auto;
-    /* Width is user-adjustable via the split handle (PreviewResizer sets the
-       variable on the split container in px); 42% is the untouched default. */
-    width: var(--ea-preview-w, 42%);
-    min-width: 320px;
-    max-width: 75%;
-  }
-}
+/* ── Artifact preview panel ─────────────────────────────────────────────────
+   The docked preview lives in the second pane of the chat page's Resizable
+   split (ChatPage) — the drag handle and sizing are the library's. Only the
+   fullscreen file-list sidebar rule below remains plugin-owned. */
 
 /* ── Chat ↔ Preview split handle ──────────────────────────────────────────
    The draggable divider between the chat column and the docked Preview panel

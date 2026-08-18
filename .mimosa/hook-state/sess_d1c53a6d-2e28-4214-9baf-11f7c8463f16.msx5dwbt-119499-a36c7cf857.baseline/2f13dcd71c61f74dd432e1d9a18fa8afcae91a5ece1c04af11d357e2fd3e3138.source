@@ -1,0 +1,1 @@
+export const KHANBANK_DEPOSIT_ACCOUNT = '5XXX-XXXX-XXXX (Khanbank)';

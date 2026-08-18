@@ -38,7 +38,12 @@ const manifestCache = new Map<
 const manifestCacheKey = (
   subdomain: string,
   options: AgentToolsOptions,
-): string => JSON.stringify([options.plugin, subdomain, options.exclude || []]);
+): string =>
+  JSON.stringify([
+    options.plugin,
+    subdomain,
+    options.exclude || [],
+  ]);
 
 const getManifest = async (
   subdomain: string,

@@ -10,6 +10,7 @@ overrides:
   '@mastra/core>zod': ^3.25.0
   '@mastra/memory>zod': ^3.25.0
   '@mastra/libsql>zod': ^3.25.0
+  shell-quote: 1.10.0
 
 importers:
 
@@ -869,210 +870,6 @@ importers:
         specifier: ^1.0.15
         version: 1.0.15
 
-  backend/core-api/dist:
-    dependencies:
-      '@apollo/server':
-        specifier: 4.11.3
-        version: 4.11.3(encoding@0.1.13)(graphql@16.10.0)
-      '@apollo/subgraph':
-        specifier: 2.10.0
-        version: 2.10.0(graphql@16.10.0)
-      '@azure/storage-blob':
-        specifier: 12.29.1
-        version: 12.29.1
-      '@babel/preset-env':
-        specifier: 7.26.9
-        version: 7.26.9(@babel/core@7.29.7)
-      '@blocknote/core':
-        specifier: ^0.35.0
-        version: 0.35.0(@types/hast@3.0.4)
-      '@elastic/elasticsearch':
-        specifier: 7.17.14
-        version: 7.17.14
-      '@faker-js/faker':
-        specifier: ^9.9.0
-        version: 9.9.0
-      '@google-cloud/storage':
-        specifier: 7.17.3
-        version: 7.17.3(encoding@0.1.13)
-      '@preconstruct/cli':
-        specifier: 2.8.12
-        version: 2.8.12
-      '@prettier/sync':
-        specifier: 0.5.5
-        version: 0.5.5(prettier@3.6.2)
-      '@sendgrid/mail':
-        specifier: ^8.1.5
-        version: 8.1.5
-      '@sentry/node':
-        specifier: ^10.55.0
-        version: 10.57.0(@opentelemetry/exporter-trace-otlp-http@0.218.0(@opentelemetry/api@1.9.1))
-      '@sniptt/guards':
-        specifier: 0.2.0
-        version: 0.2.0
-      '@trpc/client':
-        specifier: 11.0.4
-        version: 11.0.4(@trpc/server@11.0.4(typescript@5.8.3))(typescript@5.8.3)
-      '@trpc/server':
-        specifier: 11.0.4
-        version: 11.0.4(typescript@5.8.3)
-      '@types/babel__preset-env':
-        specifier: 7.10.0
-        version: 7.10.0
-      '@types/graphql':
-        specifier: 14.5.0
-        version: 14.5.0
-      '@types/ioredis':
-        specifier: 5.0.0
-        version: 5.0.0
-      '@types/lodash':
-        specifier: 4.17.21
-        version: 4.17.21
-      '@types/nodemailer':
-        specifier: 6.4.24
-        version: 6.4.24
-      '@workos-inc/node':
-        specifier: ^7.65.0
-        version: 7.65.0(express@4.21.2)(koa@2.15.3)
-      aws-sdk:
-        specifier: 2.1692.0
-        version: 2.1692.0
-      babel-plugin-module-resolver:
-        specifier: 5.0.2
-        version: 5.0.2
-      bcryptjs:
-        specifier: ^3.0.2
-        version: 3.0.2
-      bullmq:
-        specifier: 5.40.4
-        version: 5.40.4
-      bwip-js:
-        specifier: ^4.11.1
-        version: 4.11.1
-      cookie-parser:
-        specifier: 1.4.7
-        version: 1.4.7
-      cors:
-        specifier: 2.8.5
-        version: 2.8.5
-      csv-parse:
-        specifier: 6.2.1
-        version: 6.2.1
-      dataloader:
-        specifier: 2.2.3
-        version: 2.2.3
-      dayjs:
-        specifier: 1.11.13
-        version: 1.11.13
-      dotenv:
-        specifier: 16.4.7
-        version: 16.4.7
-      erxes-api-shared:
-        specifier: workspace:^
-        version: link:../../erxes-api-shared
-      exceljs:
-        specifier: 4.4.0
-        version: 4.4.0
-      express:
-        specifier: 4.21.2
-        version: 4.21.2
-      express-rate-limit:
-        specifier: 8.0.1
-        version: 8.0.1(express@4.21.2)
-      file-type:
-        specifier: 20.5.0
-        version: 20.5.0
-      firebase-admin:
-        specifier: ^13.6.0
-        version: 13.6.0(encoding@0.1.13)
-      form-data:
-        specifier: 4.0.2
-        version: 4.0.2
-      formidable:
-        specifier: ^3.5.4
-        version: 3.5.4
-      glob:
-        specifier: 11.0.1
-        version: 11.0.1
-      graphql:
-        specifier: 16.10.0
-        version: 16.10.0
-      graphql-redis-subscriptions:
-        specifier: 2.7.0
-        version: 2.7.0(graphql-subscriptions@3.0.0(graphql@16.10.0))
-      graphql-subscriptions:
-        specifier: 3.0.0
-        version: 3.0.0(graphql@16.10.0)
-      graphql-tag:
-        specifier: ^2.12.6
-        version: 2.12.6(graphql@16.10.0)
-      handlebars:
-        specifier: ^4.7.8
-        version: 4.7.8
-      helmet:
-        specifier: 8.1.0
-        version: 8.1.0
-      ioredis:
-        specifier: ^5.6.1
-        version: 5.6.1
-      jimp:
-        specifier: ^1.6.0
-        version: 1.6.0
-      jsonwebtoken:
-        specifier: ^9.0.2
-        version: 9.0.2
-      lodash:
-        specifier: 4.17.21
-        version: 4.17.21
-      moment:
-        specifier: 2.30.1
-        version: 2.30.1
-      mongodb:
-        specifier: ^6.18.0
-        version: 6.18.0(socks@2.8.7)
-      mongoose:
-        specifier: 8.13.2
-        version: 8.13.2(socks@2.8.7)
-      multer:
-        specifier: ^1.4.2
-        version: 1.4.4
-      nanoid:
-        specifier: 3.3.11
-        version: 3.3.11
-      node-fetch:
-        specifier: 2.7.0
-        version: 2.7.0(encoding@0.1.13)
-      nodemailer:
-        specifier: ^6.9.10
-        version: 6.9.10
-      sha256:
-        specifier: ^0.2.0
-        version: 0.2.0
-      strip-ansi:
-        specifier: 6.0.1
-        version: 6.0.1
-      telnyx:
-        specifier: ^1.7.2
-        version: 1.27.0
-      tmp:
-        specifier: ^0.2.3
-        version: 0.2.3
-      tslib:
-        specifier: 2.8.1
-        version: 2.8.1
-      underscore:
-        specifier: ^1.13.7
-        version: 1.13.7
-      validator:
-        specifier: ^13.15.0
-        version: 13.15.0
-      xss:
-        specifier: ^1.0.15
-        version: 1.0.15
-      zod:
-        specifier: 3.25.76
-        version: 3.25.76
-
   backend/erxes-api-shared:
     dependencies:
       '@apollo/server':
@@ -1186,7 +983,7 @@ importers:
     devDependencies:
       '@babel/preset-env':
         specifier: ^7.26.9
-        version: 7.26.9(@babel/core@8.0.1)
+        version: 7.26.9(@babel/core@7.29.7)
       '@preconstruct/cli':
         specifier: ^2.8.12
         version: 2.8.12
@@ -20114,10 +19911,6 @@ packages:
 
   shell-quote@1.10.0:
     resolution: {integrity: sha512-w1aiOKwKuRgtwAReIIj89puqg+I7GvX4IbLrvmhXbzQsj1+Zwi4VO3+fa6ZF91TWSjIxoEkKnMeHcLEODK5ZXA==}
-    engines: {node: '>= 0.4'}
-
-  shell-quote@1.8.2:
-    resolution: {integrity: sha512-AzqKpGKjrj7EM6rKVQEPpB288oCfnrEIuyoT9cyF4nmGa7V8Zk6f7RRqYisX8X9m+Q7bd632aZW4ky7EhbQztA==}
     engines: {node: '>= 0.4'}
 
   shelljs@0.8.5:
@@ -41548,7 +41341,7 @@ snapshots:
   launch-editor@2.10.0:
     dependencies:
       picocolors: 1.1.1
-      shell-quote: 1.8.2
+      shell-quote: 1.10.0
 
   layout-base@1.0.2: {}
 
@@ -45808,8 +45601,6 @@ snapshots:
   shebang-regex@3.0.0: {}
 
   shell-quote@1.10.0: {}
-
-  shell-quote@1.8.2: {}
 
   shelljs@0.8.5:
     dependencies:

@@ -147,6 +147,18 @@ describe('migrateTenantAgentAccounts', () => {
     expect(adoptLegacyAgentAccount).toHaveBeenCalledTimes(1);
   });
 
+  it('still drops the legacy index when the autoIndex build wait fails', async () => {
+    const { models, dropIndex } = makeModels();
+    (models.MastraAgent.init as unknown as jest.Mock).mockRejectedValue(
+      new Error('index build failed'),
+    );
+
+    await migrateTenantAgentAccounts(models, 'os');
+
+    expect(dropIndex).toHaveBeenCalledTimes(1);
+    expect(adoptLegacyAgentAccount).toHaveBeenCalledTimes(1);
+  });
+
   it('keeps legacy fields intact when account creation fails so startup can retry', async () => {
     const { models, updateOne } = makeModels();
     findCoreUsers.mockResolvedValue([]);

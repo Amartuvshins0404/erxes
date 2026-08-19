@@ -65,8 +65,17 @@ const agentCollection = (models: IModels): Collection<LegacyAgentProfile> =>
 const dropLegacyAgentIdIndex = async (models: IModels): Promise<void> => {
   // generateModels() just compiled this model; with Mongoose autoIndex its
   // schema indexes build in the background. Await them so the drop below does
-  // not race the build and fail with error 12586.
-  await models.MastraAgent.init();
+  // not race the build and fail with error 12586. A failed build is no longer
+  // "in progress", so log and proceed — the drop can still succeed.
+  try {
+    await models.MastraAgent.init();
+  } catch (error) {
+    console.error(
+      `[erxes-agent:accounts] index build wait failed, attempting drop anyway: ${
+        (error as Error).message
+      }`,
+    );
+  }
 
   const collection = agentCollection(models);
   for (let attempt = 1; ; attempt++) {

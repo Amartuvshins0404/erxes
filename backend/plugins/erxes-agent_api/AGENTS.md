@@ -101,7 +101,7 @@
 
 ### `2026-08-19` — Legacy index drop waits out background index builds
 
-- **Summary:** The startup account migration no longer aborts tenants with MongoDB error 12586 (`BackgroundOperationInProgressForNamespace`): it awaits the model's autoIndex builds (`MastraAgent.init()`) before dropping the legacy `agentId_1` index and retries the drop with backoff while any background build drains.
+- **Summary:** The startup account migration no longer aborts tenants with MongoDB error 12586 (`BackgroundOperationInProgressForNamespace`): it awaits the model's autoIndex builds (`MastraAgent.init()`) before dropping the legacy `agentId_1` index — proceeding with the drop even if that wait fails, since a failed build is no longer in progress — and retries the drop with backoff while any background build drains.
 - **Affected areas:** `src/migrations/migrateAgentAccounts.ts` (+ test).
 - **Contracts changed:** None
 

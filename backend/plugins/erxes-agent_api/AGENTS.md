@@ -6,7 +6,7 @@
 - **Project:** `erxes-agent_api`
 - **Layer:** Backend API
 - **Path:** `backend/plugins/erxes-agent_api`
-- **Last synchronized:** `2026-08-17`
+- **Last synchronized:** `2026-08-19`
 
 ## Scope
 
@@ -99,6 +99,12 @@
 
 <!-- Newest first. Keep at most 10 entries. -->
 
+### `2026-08-19` — Legacy index drop waits out background index builds
+
+- **Summary:** The startup account migration no longer aborts tenants with MongoDB error 12586 (`BackgroundOperationInProgressForNamespace`): it awaits the model's autoIndex builds (`MastraAgent.init()`) before dropping the legacy `agentId_1` index and retries the drop with backoff while any background build drains.
+- **Affected areas:** `src/migrations/migrateAgentAccounts.ts` (+ test).
+- **Contracts changed:** None
+
 ### `2026-08-17` — Strict tRPC-only agent tool curation
 
 - **Summary:** Aligned native capability discovery with the strict admit-only tRPC platform: only procedures declaring `.meta({ agent: { description, permission } })` are exposed or executable, permission-less fallbacks and model CRUD checks are removed, and tests are updated to enforce declared permissions.
@@ -152,9 +158,3 @@
 - **Summary:** Added an opt-in `run-code` builtin tool that executes LLM-written async JavaScript with an injected `erxes` SDK (`erxes.call(toolId, input)` / `erxes.list()`) bridging into the native capability layer as the agent account; the new tenant setting `sandboxMode` selects an in-process `node:vm` realm (`onserver`, zero-config default) or the OpenSandbox container (`isolated`, where a shim mediates capability calls by deterministic memoized replay over workspace files because the installed SDK has no stdin channel — zero egress preserved); output is a `{ result, logs, error? }` envelope capped at 64KB, executions audit as `agentCodeExecute`, and `runCode` joins the additional-tool allowlist and the serial side-effecting set.
 - **Affected areas:** `src/mastra/codeMode/runCode.ts`, `onServerRunner.ts`, `isolatedRunner.ts` (new), `src/mastra/tools/codeModeTool.ts` (new), `src/mastra/tools/additionalTools.ts`, `src/mastra/agentRuntime.ts`, `src/modules/settings/{@types,db,graphql}`.
 - **Contracts changed:** `MastraSettings` type and `MastraSettingsInput` gained `sandboxMode: String` (`"onserver"`/`"isolated"`; other values rejected with ExpectedError in the model layer).
-
-### `2026-08-14` — Native capability tools replace GraphQL operations
-
-- **Summary:** Operation discovery and execution now run over each plugin's native agent-tools endpoints (`GET /agent-tools/manifest` + `POST /agent-tools/call`) instead of gateway/subgraph GraphQL introspection; the registry aggregates per-tenant manifests with a 60s cache, policy scoping derives from descriptor permissions (plugin + tolerant module + action match, any-action for permission-less tRPC tools), destructive native mutations keep the same approval flow, and the old introspection/SDL/arg-coercion machinery is deleted in a hard cutover.
-- **Affected areas:** `src/mastra/tools/nativeTools.ts` (new), `src/mastra/tools/scope.ts`, `actionsToAllowedTools.ts`, `agentGrantPolicy.ts`, `destructiveGuard.ts`, `metaTools.ts`, `src/mastra/agentRuntime.ts`, `src/mastra/instructions/routing.ts`; deleted `operationRegistry.ts`, `erxesTools.ts`, `operationTools.ts`, `schemaIntrospect.ts`, `subgraphSchemaSource.ts`, `argScrub.ts`, `serverErrorClassifier.ts`, `humanize.ts`, `securityGuard.ts` and their dedicated tests.
-- **Contracts changed:** None (this plugin's provided contracts are unchanged; it now consumes the shared `/agent-tools/*` endpoints instead of gateway GraphQL).

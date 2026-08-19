@@ -31,6 +31,7 @@ jest.mock('~/mastra/auth/servicePrincipal', () => ({
 }));
 
 import type { IModels } from '~/connectionResolvers';
+import { MongoServerError } from 'mongodb';
 import { migrateTenantAgentAccounts } from './migrateAgentAccounts';
 
 const legacyProfile: Record<string, unknown> = {
@@ -64,6 +65,7 @@ const makeModels = () => {
   });
   const models = {
     MastraAgent: {
+      init: jest.fn(async () => ({})),
       collection: { find, updateOne, indexExists, dropIndex },
     },
   } as unknown as IModels;
@@ -125,6 +127,24 @@ describe('migrateTenantAgentAccounts', () => {
     expect(dropIndex.mock.invocationCallOrder[0]).toBeLessThan(
       updateOne.mock.invocationCallOrder[0],
     );
+  });
+
+  it('retries the legacy index drop while a background index build drains', async () => {
+    const { models, dropIndex } = makeModels();
+    dropIndex
+      .mockRejectedValueOnce(
+        new MongoServerError({
+          message:
+            'cannot perform operation: a background operation is currently running',
+          code: 12586,
+        }),
+      )
+      .mockResolvedValue({ ok: 1 });
+
+    await migrateTenantAgentAccounts(models, 'os');
+
+    expect(dropIndex).toHaveBeenCalledTimes(2);
+    expect(adoptLegacyAgentAccount).toHaveBeenCalledTimes(1);
   });
 
   it('keeps legacy fields intact when account creation fails so startup can retry', async () => {

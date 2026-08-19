@@ -54,16 +54,47 @@ const LEGACY_FIELDS = {
 
 const LEGACY_AGENT_ID_INDEX = 'agentId_1';
 
+// MongoDB rejects dropIndexes while any index build is in progress on the
+// collection (BackgroundOperationInProgressForNamespace).
+const BACKGROUND_BUILD_IN_PROGRESS = 12586;
+const DROP_INDEX_MAX_ATTEMPTS = 5;
+
 const agentCollection = (models: IModels): Collection<LegacyAgentProfile> =>
   models.MastraAgent.collection as unknown as Collection<LegacyAgentProfile>;
 
 const dropLegacyAgentIdIndex = async (models: IModels): Promise<void> => {
-  const collection = agentCollection(models);
-  if (!(await collection.indexExists(LEGACY_AGENT_ID_INDEX))) return;
+  // generateModels() just compiled this model; with Mongoose autoIndex its
+  // schema indexes build in the background. Await them so the drop below does
+  // not race the build and fail with error 12586. A failed build is no longer
+  // "in progress", so log and proceed — the drop can still succeed.
   try {
-    await collection.dropIndex(LEGACY_AGENT_ID_INDEX);
+    await models.MastraAgent.init();
   } catch (error) {
-    if (!(error instanceof MongoServerError) || error.code !== 27) throw error;
+    console.error(
+      `[erxes-agent:accounts] index build wait failed, attempting drop anyway: ${
+        (error as Error).message
+      }`,
+    );
+  }
+
+  const collection = agentCollection(models);
+  for (let attempt = 1; ; attempt++) {
+    try {
+      if (!(await collection.indexExists(LEGACY_AGENT_ID_INDEX))) return;
+      await collection.dropIndex(LEGACY_AGENT_ID_INDEX);
+      return;
+    } catch (error) {
+      if (!(error instanceof MongoServerError)) throw error;
+      if (error.code === 27) return; // IndexNotFound: already dropped
+      if (
+        error.code !== BACKGROUND_BUILD_IN_PROGRESS ||
+        attempt >= DROP_INDEX_MAX_ATTEMPTS
+      ) {
+        throw error;
+      }
+      // Another build (e.g. from a concurrent deploy) is still draining.
+      await new Promise((resolve) => setTimeout(resolve, attempt * 1000));
+    }
   }
 };
 

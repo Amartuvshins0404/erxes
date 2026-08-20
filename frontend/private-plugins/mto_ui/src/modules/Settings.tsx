@@ -1,10 +1,37 @@
 import { useState, useEffect } from 'react';
 import { useAtomValue } from 'jotai';
-import { currentOrganizationState } from 'ui-modules';
+import { IconActivity } from '@tabler/icons-react';
+import { Button, Input, PageContainer, Sidebar } from 'erxes-ui';
+import { Link, useLocation } from 'react-router-dom';
+import {
+  currentOrganizationState,
+  SettingsHeader,
+} from 'ui-modules';
 import { PaymentSelection } from '@/config/components/PaymentSelection';
 import { useInstanceIdConfig } from '@/config/hooks/useInstanceIdConfig';
 import { useMtoSuggestedInstanceId } from '@/config/hooks/useMtoSuggestedInstanceId';
-import { Button, Input } from 'erxes-ui';
+
+const MtoSettingsSidebar = () => {
+  const { pathname } = useLocation();
+  return (
+    <Sidebar collapsible="none" className="border-r flex-none">
+      <Sidebar.Group>
+        <Sidebar.GroupContent>
+          <Sidebar.Menu>
+            <Sidebar.MenuItem>
+              <Sidebar.MenuButton
+                isActive={pathname === '/settings/mto'}
+                asChild
+              >
+                <Link to="/settings/mto">General</Link>
+              </Sidebar.MenuButton>
+            </Sidebar.MenuItem>
+          </Sidebar.Menu>
+        </Sidebar.GroupContent>
+      </Sidebar.Group>
+    </Sidebar>
+  );
+};
 
 const MtoSettings = () => {
   const organization = useAtomValue(currentOrganizationState);
@@ -36,37 +63,46 @@ const MtoSettings = () => {
   const saasReadOnly = isSaas;
 
   return (
-    <div className="container mx-auto py-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold">Mto Settings</h1>
-        <p className="text-sm text-gray-600 mt-1">
-          Configure Mto system settings
-        </p>
-      </div>
-
-      <div className="space-y-4">
-        <div className="bg-white rounded-lg border shadow-sm p-6">
-          <h2 className="text-lg font-semibold mb-2">Instance ID</h2>
-          <p className="text-sm text-gray-600 mb-4">
-            This value identifies the current Mto instance. Save it here to use
-            it as the instance ID for this deployment (e.g. in slave mode).
-          </p>
-
-          {configLoading ? (
-            <div className="text-sm text-gray-500">Loading instance ID...</div>
-          ) : configError ? (
-            <div className="text-sm text-red-500">
-              Failed to load instance ID
+    <PageContainer>
+      <SettingsHeader
+        breadcrumbs={
+          <Button variant="ghost" className="font-semibold" asChild>
+            <Link to="/settings/mto">
+              <IconActivity className="text-accent-foreground" />
+              Mto
+            </Link>
+          </Button>
+        }
+      />
+      <div className="flex flex-auto overflow-hidden">
+        <MtoSettingsSidebar />
+        <div className="flex flex-col h-full overflow-auto flex-1 p-6 gap-6">
+          <div className="rounded-lg border p-6 space-y-4">
+            <div>
+              <h2 className="text-lg font-semibold mb-1">Instance ID</h2>
+              <p className="text-sm text-muted-foreground">
+                This value identifies the current Mto instance. Save it here to
+                use it as the instance ID for this deployment (e.g. in slave
+                mode).
+              </p>
             </div>
-          ) : (
-            <div className="space-y-3">
-              {isSaas && (
-                <p className="text-sm text-muted-foreground">
-                  In SAAS mode, the Instance ID is your organization ID and
-                  cannot be changed.
-                </p>
-              )}
-              <div className="flex gap-2">
+
+            {configLoading ? (
+              <div className="text-sm text-muted-foreground">
+                Loading instance ID...
+              </div>
+            ) : configError ? (
+              <div className="text-sm text-destructive">
+                Failed to load instance ID
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {isSaas && (
+                  <p className="text-sm text-muted-foreground">
+                    In SAAS mode, the Instance ID is your organization ID and
+                    cannot be changed.
+                  </p>
+                )}
                 <Input
                   type="text"
                   value={inputValue}
@@ -82,29 +118,28 @@ const MtoSettings = () => {
                   readOnly={saasReadOnly}
                   disabled={saasReadOnly}
                 />
+                <div className="flex justify-end">
+                  <Button
+                    onClick={handleSave}
+                    disabled={
+                      updateLoading ||
+                      !hasChange ||
+                      (isSaas && (suggestedLoading || !suggestedInstanceId))
+                    }
+                  >
+                    {updateLoading ? 'Saving...' : 'Save'}
+                  </Button>
+                </div>
               </div>
-              <div className="flex justify-end">
-                <Button
-                  onClick={handleSave}
-                  disabled={
-                    updateLoading ||
-                    !hasChange ||
-                    (isSaas && (suggestedLoading || !suggestedInstanceId))
-                  }
-                  variant="default"
-                >
-                  {updateLoading ? 'Saving...' : 'Save'}
-                </Button>
-              </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
 
-        <div className="bg-white rounded-lg border shadow-sm">
-          <PaymentSelection />
+          <div className="rounded-lg border">
+            <PaymentSelection />
+          </div>
         </div>
       </div>
-    </div>
+    </PageContainer>
   );
 };
 

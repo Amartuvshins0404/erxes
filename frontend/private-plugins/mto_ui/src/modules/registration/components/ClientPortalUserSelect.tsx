@@ -27,7 +27,7 @@ export interface IClientPortalUserRow {
   username?: string | null;
 }
 
-function formatCpUserLabel(u: IClientPortalUserRow): string {
+export function formatCpUserLabel(u: IClientPortalUserRow): string {
   const name = [u.firstName, u.lastName].filter(Boolean).join(' ').trim();
   if (name) return name;
   if (u.email) return u.email;

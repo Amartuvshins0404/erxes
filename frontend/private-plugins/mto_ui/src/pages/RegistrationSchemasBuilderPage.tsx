@@ -1,20 +1,25 @@
 import { useMutation, useQuery } from '@apollo/client';
+import { IconForms } from '@tabler/icons-react';
 import {
   Badge,
+  Breadcrumb,
   Button,
   Checkbox,
   Collapsible,
   Input,
   Label,
+  PageContainer,
   ScrollArea,
   Select,
+  Separator,
   Sheet,
   Spinner,
   Textarea,
   toast,
 } from 'erxes-ui';
 import { useMemo, useState } from 'react';
-import { MtoPageLayout } from '~/components/MtoPageLayout';
+import { Link } from 'react-router-dom';
+import { PageHeader } from 'ui-modules';
 import {
   MTO_REGISTRATION_FORM_SCHEMA_CREATE,
   MTO_REGISTRATION_FORM_SCHEMA_REMOVE,
@@ -329,14 +334,34 @@ export function RegistrationSchemasBuilderPage() {
   }
 
   return (
-    <MtoPageLayout pageName="Registration Schemas">
+    <PageContainer>
+      <PageHeader>
+        <PageHeader.Start>
+          <Breadcrumb>
+            <Breadcrumb.List className="gap-1">
+              <Breadcrumb.Item>
+                <Button variant="ghost" asChild>
+                  <Link to="/mto/fillform">
+                    <IconForms />
+                    Registration Schemas
+                  </Link>
+                </Button>
+              </Breadcrumb.Item>
+            </Breadcrumb.List>
+          </Breadcrumb>
+          <Separator.Inline />
+          <PageHeader.FavoriteToggleButton />
+        </PageHeader.Start>
+        <PageHeader.End>
+          <Button type="button" onClick={openCreateSheet}>
+            New schema
+          </Button>
+        </PageHeader.End>
+      </PageHeader>
       <div className="flex flex-auto overflow-hidden flex-col">
         <div className="shrink-0 p-6 pb-4">
           <div className="mb-4 flex items-center justify-between">
             <h3 className="font-semibold">Schemas</h3>
-            <Button type="button" onClick={openCreateSheet}>
-              New schema
-            </Button>
           </div>
 
           {loading ? <Spinner /> : null}
@@ -1046,6 +1071,6 @@ export function RegistrationSchemasBuilderPage() {
           </Sheet.Footer>
         </Sheet.View>
       </Sheet>
-    </MtoPageLayout>
+    </PageContainer>
   );
 }

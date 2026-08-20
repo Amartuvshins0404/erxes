@@ -163,7 +163,6 @@ const MtoUploadPreview = ({
 
   const { url, handleTriggerClick, setCallbacks } = uploadContext;
 
-  // Register callbacks with Root so they can be called during upload
   useEffect(() => {
     setCallbacks({
       onUploadStart,

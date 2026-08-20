@@ -34,7 +34,7 @@
 - Derives chat titles from the first meaningful request without a provider call.
 - Wraps empty operation results (`{}`/`[]`/`null`) in an explicit `resultCount: 0` envelope with filter-check/pivot guidance instead of forwarding an anonymous empty payload.
 - Anchors the system prompt to the current date and lets the native Mastra loop own turn lifecycle: a turn ends only when the model itself answers — no tool budget, no step ceiling, no completion guard. When the sandbox workspace tools are active, the prompt also carries the workspace doctrine (batch writes, idempotent full-file content, `workspaceReused: false` means the workspace was recreated empty — rewrite from plan, never probe; publish once after all writes).
-- Streams the model's reply as-is: mid-stream provider failures append a plain-language failure note, and error/abort finishes with no text create the assistant row Mastra never saved. A completed turn's text is never rewritten, synthesized, or replaced.
+- Streams the model's reply as-is: mid-stream provider failures append a plain-language failure note, error/abort finishes with no text create the assistant row Mastra never saved, and a turn that goes silent after tool work (no answer, no artifact) closes with a persisted plain-language note. A completed turn's text is never rewritten, synthesized, or replaced.
 
 ## Architecture
 
@@ -83,7 +83,7 @@
 - Sandboxed `erxes.call` invocations (run-code) execute as the agent account serialized through a promise chain: each bridged call goes through `runToolOnce` (exact-call dedupe) and mutations join the turn-wide `runMutationSerially` queue — code mode cannot fan out past the turn's serial controls. The serving plugin's permission checks remain authoritative, and agent-side destructive approval does not wrap calls made from inside code mode (v1, documented in the tool description). Isolated mode keeps the zero-egress invariant: the in-container shim mediates calls by deterministic memoized replay over workspace files, never by network or stdin.
 - The agentic loop has no step ceiling, no tool-call budget, and no answer budget; a turn ends only when the model itself stops calling tools and answers. No completion guards or forced text-only steps — the only processors are tool search and the memory replay filter. A hard failure or abort with no text still produces a plain-language closing note.
 - Provider-specific code is limited to compatibility (Kimi reasoning-separator sanitization/buffering), never turn-lifecycle control.
-- The model's answer is never inspected or rewritten: no synthesis-from-results, no fallback text, no completeness checks. Only a hard failure or abort with no text produces a plain-language closing note (creating the native assistant row directly when the run finished before any step completed; later steps are already persisted natively via `savePerStep`).
+- The model's answer is never inspected or rewritten: no synthesis-from-results, no fallback text, no completeness checks. A plain-language closing note (`src/mastra/closingNote.ts`) appears only when a turn leaves the user with nothing — a hard failure, an abort, or a silent finish after tool work (tool calls ran, but the model composed no answer and delivered no artifact); the silent-finish note is written into the existing native row so it survives reloads, while error/abort finishes create the assistant row Mastra never saved.
 - Thread titles and activity labels must not trigger auxiliary model requests.
 - Agent execution must start from an authenticated user request; the plugin must not subscribe to notifications, register automation actions, or run a scheduler.
 - Plugin source must not import another plugin or require private changes to core/shared code.
@@ -98,6 +98,12 @@
 ## Recent Changes
 
 <!-- Newest first. Keep at most 10 entries. -->
+
+### `2026-08-20` — Closing note for silent-after-work turns
+
+- **Summary:** A turn that called tools and then ended without composing any answer (observed: five run-code calls, then an empty assistant message and the UI's "No response was generated" fallback) now closes with a plain-language note — "I completed the actions but could not put together a reply. Please try again." — streamed and written into the existing native row so it survives reloads; the note fires only when nothing else was delivered (no text, no ask_user card, no artifact), and interrupted/failed notes keep their existing wording and persistence paths.
+- **Affected areas:** `src/mastra/closingNote.ts` (new), `src/mastra/streamTurn.ts`, `src/mastra/__tests__/closingNote.test.ts` (new).
+- **Contracts changed:** None
 
 ### `2026-08-20` — Tool-call budget removed (model-owned turn ending)
 

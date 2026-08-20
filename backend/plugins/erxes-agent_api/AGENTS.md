@@ -29,11 +29,11 @@
 - Creates documents, charts, diagrams, and websites when those tools are enabled for the selected agent.
 - Runs LLM-written JavaScript through the opt-in `run-code` builtin with an injected `erxes` SDK (`erxes.call`/`erxes.list`) bridging into the native capability layer; the tenant `sandboxMode` setting selects an in-process `node:vm` realm (`onserver`, default) or the OpenSandbox container (`isolated`, deterministic memoized replay over workspace files — zero egress).
 - Loads plugin-owned `SKILL.md` files through Mastra `Workspace` and `LocalSkillSource`; Mastra provides skill discovery and read tools at runtime.
-- Bounds unique tool executions and state-changing tool concurrency per turn; every tool invocation (first or exact repeat) spends from the same 50-call hard stop so a repeat loop cannot spin forever.
+- Deduplicates exact tool calls per turn (identical calls, including failures, share one promise) and serializes state-changing calls; there is no numeric tool budget — a turn ends only when the model itself answers.
 - Asks structured clarifying questions through `ask_user` (`src/mastra/tools/metaTools.ts`): same input contract as Mastra's built-in `askUserTool` (question/options/selectionMode), but returns the payload as a plain tool result (`awaitingUserAnswer: true`) and ends the turn instead of suspending the run — the UI renders the question card and the answer arrives as the next user message (the `request_approval` replay pattern; no Mastra snapshot storage required).
 - Derives chat titles from the first meaningful request without a provider call.
 - Wraps empty operation results (`{}`/`[]`/`null`) in an explicit `resultCount: 0` envelope with filter-check/pivot guidance instead of forwarding an anonymous empty payload.
-- Anchors the system prompt to the current date and lets the native Mastra loop own turn lifecycle: a turn ends when the model itself answers or when the 50-call tool budget is spent (the only hard stop), with no other step ceiling or completion guard. When the sandbox workspace tools are active, the prompt also carries the workspace doctrine (batch writes, idempotent full-file content, `workspaceReused: false` means the workspace was recreated empty — rewrite from plan, never probe; publish once after all writes).
+- Anchors the system prompt to the current date and lets the native Mastra loop own turn lifecycle: a turn ends only when the model itself answers — no tool budget, no step ceiling, no completion guard. When the sandbox workspace tools are active, the prompt also carries the workspace doctrine (batch writes, idempotent full-file content, `workspaceReused: false` means the workspace was recreated empty — rewrite from plan, never probe; publish once after all writes).
 - Streams the model's reply as-is: mid-stream provider failures append a plain-language failure note, and error/abort finishes with no text create the assistant row Mastra never saved. A completed turn's text is never rewritten, synthesized, or replaced.
 
 ## Architecture
@@ -69,7 +69,7 @@
 - Plugin configuration and domain records use tenant-scoped Mongoose models from `src/modules/*/db`.
 - Native chat threads, messages, resources, and working memory live in the configured Mastra memory database.
 - Runtime skills are read-only files copied into `dist/skills` during the backend build.
-- Per-turn execution state uses `AsyncLocalStorage`; exact-call caches, repetition tracking, call budgets, and state-changing tool queues never cross turn boundaries.
+- Per-turn execution state uses `AsyncLocalStorage`; exact-call caches and state-changing tool queues never cross turn boundaries.
 
 ## Local Invariants
 
@@ -79,9 +79,9 @@
 - Mastra searches only the live, policy-scoped native capability tools; tool arguments follow the manifest's flat input fields and never trigger entity name-to-ID resolution.
 - Capability discovery is best-effort per plugin: a failed or unreachable `/agent-tools/manifest` skips that plugin (fail-closed), and the agent's own plugin is excluded from discovery to avoid recursion.
 - Plugins' agent-tool surface is default-deny until enabled in settings; `agentUsable=false` tools are never executable.
-- Direct operation, file, and standalone execution admits at most ten invocations per turn; identical calls share one promise and state-changing calls execute serially.
-- Sandboxed `erxes.call` invocations (run-code) execute as the agent account serialized through a promise chain and spend from the SAME per-turn budget as any tool: each bridged call goes through `runToolOnce` (50-call hard stop + exact-call dedupe) and mutations join the turn-wide `runMutationSerially` queue — code mode cannot fan out past the turn limit. The serving plugin's permission checks remain authoritative, and agent-side destructive approval does not wrap calls made from inside code mode (v1, documented in the tool description). Isolated mode keeps the zero-egress invariant: the in-container shim mediates calls by deterministic memoized replay over workspace files, never by network or stdin.
-- The agentic loop has no step ceiling beyond the tool budget (`stopWhen: [turnToolBudgetExceeded]`) and no answer budget; a turn ends when the model itself answers or when the 50-call budget is spent, which also emits a plain-language closing note when no reply text exists. No other completion guards or forced text-only steps — the only processors are tool search and the memory replay filter.
+- Direct operation, file, and standalone execution has no per-turn invocation cap; identical calls share one promise and state-changing calls execute serially.
+- Sandboxed `erxes.call` invocations (run-code) execute as the agent account serialized through a promise chain: each bridged call goes through `runToolOnce` (exact-call dedupe) and mutations join the turn-wide `runMutationSerially` queue — code mode cannot fan out past the turn's serial controls. The serving plugin's permission checks remain authoritative, and agent-side destructive approval does not wrap calls made from inside code mode (v1, documented in the tool description). Isolated mode keeps the zero-egress invariant: the in-container shim mediates calls by deterministic memoized replay over workspace files, never by network or stdin.
+- The agentic loop has no step ceiling, no tool-call budget, and no answer budget; a turn ends only when the model itself stops calling tools and answers. No completion guards or forced text-only steps — the only processors are tool search and the memory replay filter. A hard failure or abort with no text still produces a plain-language closing note.
 - Provider-specific code is limited to compatibility (Kimi reasoning-separator sanitization/buffering), never turn-lifecycle control.
 - The model's answer is never inspected or rewritten: no synthesis-from-results, no fallback text, no completeness checks. Only a hard failure or abort with no text produces a plain-language closing note (creating the native assistant row directly when the run finished before any step completed; later steps are already persisted natively via `savePerStep`).
 - Thread titles and activity labels must not trigger auxiliary model requests.
@@ -98,6 +98,12 @@
 ## Recent Changes
 
 <!-- Newest first. Keep at most 10 entries. -->
+
+### `2026-08-20` — Tool-call budget removed (model-owned turn ending)
+
+- **Summary:** Per product decision, the 50-call per-turn tool budget is gone entirely: `runToolOnce` no longer counts or rejects invocations, the `stopWhen: [turnToolBudgetExceeded]` hard stop is removed from agent defaults, and the "action limit reached" closing-note branch is dropped — a turn now ends only when the model itself stops calling tools and answers (hard failure/abort with no text still produces the plain-language note). Exact-call dedupe (identical calls share one promise, failures included) and the serial mutation queue remain as the only execution controls.
+- **Affected areas:** `src/mastra/requestContext.ts`, `src/mastra/agentRuntime.ts`, `src/mastra/streamTurn.ts`, `src/modules/agent/types.ts`, `src/mastra/codeMode/runCode.ts` (comment).
+- **Contracts changed:** None
 
 ### `2026-08-20` — Workspace tool contract hardening
 

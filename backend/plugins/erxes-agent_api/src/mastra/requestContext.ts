@@ -48,10 +48,6 @@ interface RequestAuth {
   /** Per-turn exact-call cache. Repeated model calls share the first promise,
    *  including failures, so one broken dependency cannot create a retry storm. */
   toolCallCache?: Map<string, Promise<unknown>>;
-  /** Number of tool invocations admitted during this turn. */
-  toolCallCount?: number;
-  /** Hard stop for tool invocations; defaults to fifty. */
-  toolCallLimit?: number;
   /** Serial tail for state-changing tools while reads run concurrently. */
   mutationTail?: Promise<void>;
 }
@@ -89,6 +85,8 @@ export function getCurrentAuth(): RequestAuth | undefined {
  * Execute an exact tool call at most once in the active turn. Concurrent
  * duplicates share the same promise; rejected calls remain cached for the turn
  * so a non-repairable failure cannot consume the provider/tool quota repeatedly.
+ * There is no numeric tool budget: the turn ends only when the model itself
+ * stops calling tools.
  */
 export async function runToolOnce<T>(
   toolName: string,
@@ -100,18 +98,6 @@ export async function runToolOnce<T>(
 
   const key = exactToolCallKey(toolName, args);
   auth.toolCallCache ??= new Map<string, Promise<unknown>>();
-
-  // Every invocation — first or exact repeat — spends from the same budget,
-  // so a stuck model repeating one cached call still hits the hard stop
-  // instead of looping forever at zero cost.
-  const limit = auth.toolCallLimit ?? 50;
-  const count = auth.toolCallCount ?? 0;
-  if (count >= limit) {
-    throw new Error(
-      `This turn reached its ${limit}-tool execution limit. Summarize the results already available.`,
-    );
-  }
-  auth.toolCallCount = count + 1;
 
   const existing = auth.toolCallCache.get(key);
   if (existing) {
@@ -140,9 +126,8 @@ export interface ToolExecutionControlOptions {
 }
 
 /**
- * Apply the turn-wide exact-call cache and execution budget to a Mastra tool.
- * The wrapper keeps the original tool metadata/schema and only intercepts its
- * execute function.
+ * Apply the turn-wide exact-call cache to a Mastra tool. The wrapper keeps
+ * the original tool metadata/schema and only intercepts its execute function.
  */
 export function withToolExecutionControl<T extends object>(
   toolName: string,

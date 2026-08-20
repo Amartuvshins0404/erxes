@@ -78,9 +78,8 @@ const capCodeOutput = (output: CodeExecutionResult): CodeExecutionResult => {
 
 /**
  * Execute one sandboxed `erxes.call` through the same per-turn controls as
- * any standalone tool: every invocation spends from the turn's tool-call
- * budget, exact repeats share the first promise, and mutations join the
- * turn-wide serial queue.
+ * any standalone tool: exact repeats share the first promise and mutations
+ * join the turn-wide serial queue.
  */
 export const executeCodeModeCall = async (opts: {
   auth: CodeExecutionAuth;

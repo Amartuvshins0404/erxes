@@ -43,10 +43,6 @@ export interface TurnAuthCtx {
   /** Persisted website artifacts produced during this turn. */
   websiteArtifactCount?: number;
   resourceId?: string;
-  /** Tool invocations admitted so far this turn (mutated by runToolOnce). */
-  toolCallCount?: number;
-  /** Hard stop for tool invocations; defaults to fifty. */
-  toolCallLimit?: number;
 }
 
 // One message of the assembled LLM conversation. `content` widens beyond a

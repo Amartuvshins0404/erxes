@@ -25,7 +25,7 @@ import type { GroupPermission } from './tools/actionsToAllowedTools';
 import { writeAgentAction, AgentActionInput } from './auditLog';
 import { isWorkspaceMemoryEnabled } from './memory/config';
 import { getMastraMemory } from './memory/mastraMemory';
-import { getCurrentAuth, withToolExecutionControl } from './requestContext';
+import { withToolExecutionControl } from './requestContext';
 import { ToolCallSignalFilter } from './memory/toolCallSignalFilter';
 import { ErxesToolSearchProcessor } from './toolSearch';
 import { getRuntimeSkillsWorkspace } from './runtimeSkills';
@@ -42,17 +42,6 @@ import {
   getCoreUserById,
   type AgentAccount,
 } from './auth/servicePrincipal';
-
-// Hard stop for a turn whose tool budget is spent: once runToolOnce starts
-// rejecting calls, further steps can only produce failures, so the loop ends
-// instead of burning provider tokens on doomed retries. Runs inside the
-// turn's runWithAuth chain, so the per-turn counter is visible here.
-const turnToolBudgetExceeded = (): boolean => {
-  const auth = getCurrentAuth();
-  if (!auth?.turnId) return false;
-  const limit = auth.toolCallLimit ?? 50;
-  return (auth.toolCallCount ?? 0) >= limit;
-};
 
 // Cache agents by config ID + updatedAt + routing version.
 const agentCache = new Map<string, Agent>();
@@ -499,10 +488,8 @@ export async function getOrCreateAgent(
     ...(inputProcessors.length ? { inputProcessors } : {}),
     ...(runtimeSkillsWorkspace ? { workspace: runtimeSkillsWorkspace } : {}),
     defaultOptions: {
-      // No step ceiling: the loop ends when the model stops calling tools —
-      // or when the turn's tool budget is spent (the only hard stop), so a
-      // model that keeps retrying rejected calls cannot spin forever.
-      stopWhen: [turnToolBudgetExceeded],
+      // No step ceiling and no tool budget: the loop ends only when the
+      // model itself stops calling tools and answers.
       // Independent reads may execute together. State-changing native tools
       // and standalone tools share the per-turn serial queue.
       toolCallConcurrency: 4,

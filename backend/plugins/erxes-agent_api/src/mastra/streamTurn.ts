@@ -193,24 +193,20 @@ async function finalizeTurn(params: {
   }
 
   // The model owns the turn ending; its answer is never second-guessed or
-  // rewritten. Only a hard failure, an interruption, or the tool-budget hard
-  // stop that left no text gets a plain-language note so the user isn't
-  // stranded on a blank bubble. A turn that ended on ask_user is waiting on
-  // the user's answer — the chat renders the question card, so it never gets
-  // a closing note either (the card IS the outcome).
+  // rewritten. Only a hard failure or an interruption that left no text gets
+  // a plain-language note so the user isn't stranded on a blank bubble. A
+  // turn that ended on ask_user is waiting on the user's answer — the chat
+  // renders the question card, so it never gets a closing note either (the
+  // card IS the outcome).
   const askedUser = acc.toolCalls.some(
     (toolCall) =>
       toolCall.toolName === 'ask_user' &&
       isAwaitingUserAnswer(toolCall.result),
   );
-  const budgetExhausted =
-    (authCtx.toolCallCount ?? 0) >= (authCtx.toolCallLimit ?? 50);
-  if (!reply && !askedUser && (interrupted || failed || budgetExhausted)) {
+  if (!reply && !askedUser && (interrupted || failed)) {
     reply = interrupted
       ? 'This response was interrupted before it finished. Please tap retry to continue.'
-      : failed
-        ? 'Something went wrong while I was working on that. Please try again.'
-        : `I reached this turn's action limit (${authCtx.toolCallLimit ?? 50} calls) and stopped here. Ask me to continue and I will pick up from the results above.`;
+      : 'Something went wrong while I was working on that. Please try again.';
     emitReply = true;
   }
 

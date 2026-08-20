@@ -81,7 +81,7 @@
 - Plugins' agent-tool surface is default-deny until enabled in settings; `agentUsable=false` tools are never executable.
 - Direct operation, file, and standalone execution has no per-turn invocation cap; identical calls share one promise and state-changing calls execute serially.
 - Sandboxed `erxes.call` invocations (run-code) execute as the agent account serialized through a promise chain: each bridged call goes through `runToolOnce` (exact-call dedupe) and mutations join the turn-wide `runMutationSerially` queue — code mode cannot fan out past the turn's serial controls. The serving plugin's permission checks remain authoritative, and agent-side destructive approval does not wrap calls made from inside code mode (v1, documented in the tool description). Isolated mode keeps the zero-egress invariant: the in-container shim mediates calls by deterministic memoized replay over workspace files, never by network or stdin.
-- The agentic loop has no step ceiling, no tool-call budget, and no answer budget; a turn ends only when the model itself stops calling tools and answers. No completion guards or forced text-only steps — the only processors are tool search and the memory replay filter. A hard failure or abort with no text still produces a plain-language closing note.
+- The agentic loop has no step ceiling, no tool-call budget, and no answer budget; a turn ends only when the model itself stops calling tools and answers. `defaultOptions.stopWhen` must ALWAYS carry an explicit never-true condition — omitting `stopWhen` silently activates Mastra's built-in `stepCountIs(5)` default and caps every turn at five steps. No completion guards or forced text-only steps — the only processors are tool search and the memory replay filter. A hard failure or abort with no text still produces a plain-language closing note.
 - Provider-specific code is limited to compatibility (Kimi reasoning-separator sanitization/buffering), never turn-lifecycle control.
 - The model's answer is never inspected or rewritten: no synthesis-from-results, no fallback text, no completeness checks. A plain-language closing note (`src/mastra/closingNote.ts`) appears only when a turn leaves the user with nothing — a hard failure, an abort, or a silent finish after tool work (tool calls ran, but the model composed no answer and delivered no artifact); the silent-finish note is written into the existing native row so it survives reloads, while error/abort finishes create the assistant row Mastra never saved.
 - Thread titles and activity labels must not trigger auxiliary model requests.
@@ -98,6 +98,12 @@
 ## Recent Changes
 
 <!-- Newest first. Keep at most 10 entries. -->
+
+### `2026-08-20` — Turn loop step ceiling restored
+
+- **Summary:** Removing the tool budget (#396's predecessor commit) also removed the only explicit `stopWhen`, and Mastra silently applies `stepCountIs(5)` when none is given — every turn then hard-stopped after five tool rounds mid-task (observed twice: a run ending on "please wait" after five run-code calls, and one ending with no text at all). Agent defaults now carry an explicit never-true stop condition, so the loop again ends only when the model itself stops calling tools.
+- **Affected areas:** `src/mastra/agentRuntime.ts`.
+- **Contracts changed:** None
 
 ### `2026-08-20` — Closing note for silent-after-work turns
 

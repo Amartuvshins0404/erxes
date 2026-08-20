@@ -6,7 +6,7 @@
 - **Project:** `erxes-agent_api`
 - **Layer:** Backend API
 - **Path:** `backend/plugins/erxes-agent_api`
-- **Last synchronized:** `2026-08-20`
+- **Last synchronized:** `2026-08-21`
 
 ## Scope
 
@@ -99,6 +99,12 @@
 
 <!-- Newest first. Keep at most 10 entries. -->
 
+### `2026-08-21` — Startup account migration removed
+
+- **Summary:** The legacy agent/service-user cutover migration is gone: startup no longer canonicalizes legacy profiles, drops the legacy `agentId_1` index, or backfills agent accounts — `onServerInit` is removed entirely, so the permission-action cache flush (`user_actions_*` SCAN/DEL on permissions-definition change) it hosted is gone too. The adoption helpers (`adoptLegacyAgentAccount`/`isAdoptableAgentAccount`) remain available in `src/mastra/auth/servicePrincipal.ts`.
+- **Affected areas:** `src/main.ts` (`onServerInit` removed); deleted `src/migrations/migrateAgentAccounts.ts` (+ test) and the now-empty `src/migrations/` directory.
+- **Contracts changed:** None
+
 ### `2026-08-20` — Turn loop step ceiling restored
 
 - **Summary:** Removing the tool budget (#396's predecessor commit) also removed the only explicit `stopWhen`, and Mastra silently applies `stepCountIs(5)` when none is given — every turn then hard-stopped after five tool rounds mid-task (observed twice: a run ending on "please wait" after five run-code calls, and one ending with no text at all). Agent defaults now carry an explicit never-true stop condition, so the loop again ends only when the model itself stops calling tools.
@@ -152,33 +158,3 @@
 - **Summary:** The UI's Debug mode setting was removed (the process line always opens the activity panel now), so the `general-settings-debug-*` strings were dropped from `src/locales/{en,mn}/erxes-agent.json`.
 - **Affected areas:** `src/locales/en/erxes-agent.json`, `src/locales/mn/erxes-agent.json`.
 - **Contracts changed:** None
-
-### `2026-08-15` — Structured ask_user questions
-
-- **Summary:** Agents can ask the user a clarifying question with structured choices: the new always-bound `ask_user` tool (Mastra built-in contract, non-suspending execution) ends the turn with an `awaitingUserAnswer` result, the system prompt gained an "Asking the User" block (act-first, one question per turn, never self-answer), and turn finalization never writes a closing note while a question is pending so the turn never closes over the card. Answers continue as ordinary next user messages.
-- **Affected areas:** `src/mastra/tools/metaTools.ts` (tool + `isAwaitingUserAnswer`), `src/mastra/agentRuntime.ts` (unconditional registration, ROUTING_VERSION 42), `src/mastra/instructions/routing.ts`, `src/mastra/streamTurn.ts` (no closing note for pending questions), `src/mastra/tools/__tests__/askUserTool.test.ts` (new).
-- **Contracts changed:** `POST /chat/stream` turns may now end with an `ask_user` tool part carrying `{ awaitingUserAnswer: true, question, options, selectionMode }` and no reply text; no other stream contract changes.
-
-### `2026-08-14` — Signed agent-tools auth header
-
-- **Summary:** Native capability discovery and execution now authenticate with the HMAC-signed `x-erxes-agent-auth` header (shared `JWT_TOKEN_SECRET`, short expiry) instead of the reversible `x-trpc-context` header, matching the hardened platform contract; the mutation correlation id moves from the header context into the reserved `__processId` input key.
-- **Affected areas:** `src/mastra/tools/nativeTools.ts` (`fetchPluginManifest`, `callNativeTool`).
-- **Contracts changed:** `GET /agent-tools/manifest` and `POST /agent-tools/call` requests must carry a valid `x-erxes-agent-auth` header; unsigned requests are rejected with 401 by the platform.
-
-### `2026-08-14` — Remove the isolated terminal tool
-
-- **Summary:** Removed the `terminal` shell tool and its additional-tools toggle — code mode (`run-code`) is the sandbox execution path now; the sandbox workspace tools (`workspaceWrite`, `publishWebsite`) moved under the `runCode` gate, retired allowlist keys are dropped silently instead of failing agents saved with them, and the gateway locales now carry `runCode` labels (EN/MN) in place of the terminal ones.
-- **Affected areas:** deleted `src/mastra/tools/terminalTool.ts` (+ test); `src/mastra/tools/additionalTools.ts`, `src/mastra/agentRuntime.ts`, `src/mastra/turnToolScope.ts`, `src/modules/settings/@types/settings.ts`, `src/modules/agent/@types/agent.ts`, scope/capability tests; `backend/gateway/src/locales/{en,mn}/mastra.json`.
-- **Contracts changed:** `terminal` removed from the additional-tools catalog (`mastraAgentAdditionalTools`); agents storing it keep working (key ignored).
-
-### `2026-08-14` — Tool-budget hard stop and complete-only tool input streaming
-
-- **Summary:** The turn loop now hard-stops via `stopWhen: [turnToolBudgetExceeded]` once the 50-call budget is spent (previously the budget rejection was the sole breaker, so a retrying model could spin the turn indefinitely), with a plain-language closing note when the stop leaves no reply text; the chat stream no longer forwards partial `tool-input-start`/`tool-input-delta` chunks — tool input arrives only complete, eliminating the client-side argsText mismatch that flooded assistant-ui's tool tracker and froze the tab; and `ToolCallSignalFilter` now locates current-run frames structurally (after the last user message) instead of trusting the unreliably-populated `steps`, fixing models re-issuing identical successful tool calls forever because they never saw the results. Same change raised the default per-turn budget from 10 to 50 and fixed the `node:vm` cross-realm `SyntaxError` instanceof check that made every multi-statement `run-code` snippet fail to parse.
-- **Affected areas:** `src/mastra/agentRuntime.ts`, `src/mastra/streamTurn.ts`, `src/mastra/requestContext.ts`, `src/mastra/memory/toolCallSignalFilter.ts`, `src/mastra/codeMode/onServerRunner.ts`, `src/mastra/codeMode/runCode.ts`, `src/mastra/codeMode/isolatedRunner.ts`, `src/modules/agent/types.ts`.
-- **Contracts changed:** `POST /chat/stream` no longer emits `tool-input-start`/`tool-input-delta` chunks (clients see tool input only via complete `tool-input-available`).
-
-### `2026-08-14` — Code mode (`run-code`) with dual sandbox backends
-
-- **Summary:** Added an opt-in `run-code` builtin tool that executes LLM-written async JavaScript with an injected `erxes` SDK (`erxes.call(toolId, input)` / `erxes.list()`) bridging into the native capability layer as the agent account; the new tenant setting `sandboxMode` selects an in-process `node:vm` realm (`onserver`, zero-config default) or the OpenSandbox container (`isolated`, where a shim mediates capability calls by deterministic memoized replay over workspace files because the installed SDK has no stdin channel — zero egress preserved); output is a `{ result, logs, error? }` envelope capped at 64KB, executions audit as `agentCodeExecute`, and `runCode` joins the additional-tool allowlist and the serial side-effecting set.
-- **Affected areas:** `src/mastra/codeMode/runCode.ts`, `onServerRunner.ts`, `isolatedRunner.ts` (new), `src/mastra/tools/codeModeTool.ts` (new), `src/mastra/tools/additionalTools.ts`, `src/mastra/agentRuntime.ts`, `src/modules/settings/{@types,db,graphql}`.
-- **Contracts changed:** `MastraSettings` type and `MastraSettingsInput` gained `sandboxMode: String` (`"onserver"`/`"isolated"`; other values rejected with ExpectedError in the model layer).

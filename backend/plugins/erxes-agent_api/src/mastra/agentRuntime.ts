@@ -489,7 +489,10 @@ export async function getOrCreateAgent(
     ...(runtimeSkillsWorkspace ? { workspace: runtimeSkillsWorkspace } : {}),
     defaultOptions: {
       // No step ceiling and no tool budget: the loop ends only when the
-      // model itself stops calling tools and answers.
+      // model itself stops calling tools and answers. stopWhen must carry an
+      // explicit never-true condition — omitting it makes Mastra apply its
+      // built-in stepCountIs(5) default, which silently cut turns mid-task.
+      stopWhen: [() => false],
       // Independent reads may execute together. State-changing native tools
       // and standalone tools share the per-turn serial queue.
       toolCallConcurrency: 4,

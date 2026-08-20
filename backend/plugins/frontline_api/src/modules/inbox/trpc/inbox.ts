@@ -436,10 +436,19 @@ export const conversationsRouter = t.router({
         const { query = {}, options } = input;
         const { models } = ctx;
 
-        const count = await models.Conversations.find(query)
-          .skip(options?.skip || 0)
-          .limit(options?.limit || 0) // 0 means no limit
-          .countDocuments();
+        // countDocuments builds an aggregation pipeline, where $limit must be
+        // positive: applying `.limit(0)` (find's "no limit" sentinel) throws
+        // "the limit must be positive". Apply skip/limit only when present.
+        let cursor = models.Conversations.find(query);
+        const skip = Number(options?.skip);
+        if (Number.isInteger(skip) && skip > 0) {
+          cursor = cursor.skip(skip);
+        }
+        const limit = Number(options?.limit);
+        if (Number.isInteger(limit) && limit > 0) {
+          cursor = cursor.limit(limit);
+        }
+        const count = await cursor.countDocuments();
 
         return {
           status: 'success',

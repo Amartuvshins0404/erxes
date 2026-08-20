@@ -297,7 +297,69 @@ function buildInputSchema(
   if (!fields) return z.record(z.unknown());
   const shape: Record<string, z.ZodTypeAny> = {};
   for (const field of fields) shape[field.name] = fieldToZod(field);
-  return z.object(shape);
+  // Passthrough, NOT strip (the z.object default): unknown keys must survive
+  // Mastra's schema validation so validateNativeToolInput can see — and
+  // correctively reject — the model's invented wrapper keys (e.g. "arg")
+  // instead of having them silently stripped to a valid-looking {}.
+  return z.object(shape).passthrough();
+}
+
+// Corrective instruction for input the guard rejected. Deliberately different
+// from the transport-failure wording: this is a model-fixable mistake, so it
+// must invite an immediate corrected retry — never "internal system problem".
+const INVALID_INPUT_INSTRUCTION =
+  'This call was rejected before reaching the service because its input was invalid. This is a fixable input mistake, not a system problem: correct the call to use only the listed fields and try again with the same intent.';
+
+/**
+ * Validate model-supplied input against the manifest's declared fields BEFORE
+ * any network call. Unknown top-level keys (invented wrappers like "arg",
+ * which a plugin would silently treat as a document filter and match nothing)
+ * and missing required fields become a corrective failure — the owning plugin
+ * is never called with input it would silently misinterpret. Free-form tools
+ * (inputFields: null) skip key validation; their input rules are enforced by
+ * the owning plugin server-side.
+ */
+function validateNativeToolInput(
+  descriptor: AgentToolDescriptor,
+  input: Record<string, unknown>,
+): { ok: true } | { ok: false; result: { success: false; error: string; instruction: string } } {
+  const fields = descriptor.inputFields;
+  if (!fields) return { ok: true };
+
+  const validNames = fields.map((field) => field.name);
+  const unknownKeys = Object.keys(input).filter(
+    (key) => !validNames.includes(key),
+  );
+  if (unknownKeys.length) {
+    return {
+      ok: false,
+      result: {
+        success: false,
+        error: `Invalid input for "${descriptor.id}": unknown field(s) ${unknownKeys
+          .map((key) => `"${key}"`)
+          .join(', ')}. Valid fields: ${validNames.join(', ')}.`,
+        instruction: INVALID_INPUT_INSTRUCTION,
+      },
+    };
+  }
+
+  const missing = fields
+    .filter((field) => field.required && input[field.name] === undefined)
+    .map((field) => field.name);
+  if (missing.length) {
+    return {
+      ok: false,
+      result: {
+        success: false,
+        error: `Invalid input for "${descriptor.id}": missing required field(s) ${missing
+          .map((key) => `"${key}"`)
+          .join(', ')}. Valid fields: ${validNames.join(', ')}.`,
+        instruction: INVALID_INPUT_INSTRUCTION,
+      },
+    };
+  }
+
+  return { ok: true };
 }
 
 function nativeToolDescription(descriptor: AgentToolDescriptor): string {
@@ -367,6 +429,14 @@ export function buildNativeOperationTools(params: {
 
         const isMutation = descriptor.method === 'mutation';
         const destructive = isDestructiveTool(descriptor);
+
+        // Input shape is validated against the manifest BEFORE the approval
+        // gate and any network call — a malformed call is corrected by the
+        // model, never approved by the user or misread by the plugin.
+        const inputCheck = validateNativeToolInput(descriptor, callArgs);
+        if (!inputCheck.ok) {
+          return inputCheck.result;
+        }
 
         // Every destructive capability asks for approval; the agent config
         // cannot bypass this. Matched on the name the model sees (the Mastra

@@ -77,6 +77,7 @@
 - Destructive mutations always require explicit user approval; agent configuration cannot bypass that check.
 - Tool permissions remain authoritative; every approved tool (builtins included) is active on every turn and the model decides what to call — no keyword scoping. Only the erxes operation catalog stays search-gated via `search_tools`.
 - Mastra searches only the live, policy-scoped native capability tools; tool arguments follow the manifest's flat input fields and never trigger entity name-to-ID resolution.
+- Capability tool input is validated against the manifest's declared fields before any network call: unknown top-level keys and missing required fields return a corrective, model-fixable failure (never the transport-failure wording) and the owning plugin is not called. Tool input schemas stay `.passthrough()` so Mastra's validation cannot silently strip bad keys before the guard sees them; free-form tools (`inputFields: null`) are not key-validated — their input safety is the owning plugin's server-side enforcement.
 - Capability discovery is best-effort per plugin: a failed or unreachable `/agent-tools/manifest` skips that plugin (fail-closed), and the agent's own plugin is excluded from discovery to avoid recursion.
 - Plugins' agent-tool surface is default-deny until enabled in settings; `agentUsable=false` tools are never executable.
 - Direct operation, file, and standalone execution has no per-turn invocation cap; identical calls share one promise and state-changing calls execute serially.
@@ -98,6 +99,12 @@
 ## Recent Changes
 
 <!-- Newest first. Keep at most 10 entries. -->
+
+### `2026-08-21` — Native tool input guard (pre-transport validation)
+
+- **Summary:** Model-supplied capability input is validated against the manifest's declared `inputFields` before the approval gate and any network call: unknown top-level keys (an invented `arg` wrapper was silently treated as a document filter by the plugin, matched nothing, and the model reported "no data" as fact — observed 2026-08-20 on the test tenant) and missing required fields return a corrective `success: false` result naming the offending keys, listing the valid fields, and instructing the model to fix and retry — deliberately never the "internal system problem" wording that forbids retry. Tool input schemas are built `.passthrough()` so Mastra's zod validation no longer strips unknown keys before the guard can see them. Free-form tools (`inputFields: null`) pass through unchanged; their input safety is the owning plugin's server-side enforcement (see sales_api's bounded `deal.find`).
+- **Affected areas:** `src/mastra/tools/nativeTools.ts` (`validateNativeToolInput`, passthrough `buildInputSchema`).
+- **Contracts changed:** None
 
 ### `2026-08-21` — Startup account migration removed
 
@@ -151,10 +158,4 @@
 
 - **Summary:** `selectTurnActiveTools` no longer regex-gates standalone builtins per turn (the gate hid `webSearch`/`fetchUrl` on phrasing like "research …", and the model then wrongly concluded it had no internet access); every permission-approved tool in the turn's toolset is now active and the model decides, while the erxes operation catalog stays model-searchable via `search_tools`.
 - **Affected areas:** `src/mastra/turnToolScope.ts` (simplified to always-on), `src/modules/agent/prepare.ts` (call site), `src/mastra/__tests__/turnToolScope.test.ts` (rewritten for always-on).
-- **Contracts changed:** None
-
-### `2026-08-15` — Debug-mode locale strings removed
-
-- **Summary:** The UI's Debug mode setting was removed (the process line always opens the activity panel now), so the `general-settings-debug-*` strings were dropped from `src/locales/{en,mn}/erxes-agent.json`.
-- **Affected areas:** `src/locales/en/erxes-agent.json`, `src/locales/mn/erxes-agent.json`.
 - **Contracts changed:** None

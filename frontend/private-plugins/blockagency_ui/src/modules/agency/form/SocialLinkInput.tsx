@@ -9,6 +9,7 @@ import {
   IconLink,
 } from '@tabler/icons-react';
 import { cn, Input } from 'erxes-ui';
+import { forwardRef } from 'react';
 
 const getSocialIcon = (url: string) => {
   if (!url) return <IconLink size={16} className="text-muted-foreground" />;
@@ -31,29 +32,32 @@ const getSocialIcon = (url: string) => {
   return <IconLink size={16} className="text-muted-foreground" />;
 };
 
-interface SocialLinkInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
-  value?: string;
+interface SocialLinkInputProps
+  extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'value'> {
+  value?: string | null;
 }
 
-export function SocialLinkInput({
-  value = '',
-  className,
-  ...props
-}: SocialLinkInputProps) {
+export const SocialLinkInput = forwardRef<
+  HTMLInputElement,
+  SocialLinkInputProps
+>(({ value, className, ...props }, ref) => {
+  const url = value ?? '';
+
   return (
     <div className="relative flex items-center w-full">
       <div className="absolute left-3 flex items-center pointer-events-none">
-        {getSocialIcon(value)}
+        {getSocialIcon(url)}
       </div>
       <Input
-        value={value}
+        ref={ref}
+        value={url}
         className={cn('pl-9', className)}
         placeholder="https://"
         {...props}
       />
       <div className="absolute right-3 flex items-center pointer-events-none">
         <a
-          href={value}
+          href={url}
           target="_blank"
           className="cursor-pointer pointer-events-auto"
         >
@@ -62,4 +66,6 @@ export function SocialLinkInput({
       </div>
     </div>
   );
-}
+});
+
+SocialLinkInput.displayName = 'SocialLinkInput';

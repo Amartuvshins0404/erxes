@@ -6,13 +6,13 @@
 - **Project:** `blockadmin_ui`
 - **Layer:** `Frontend UI`
 - **Path:** `frontend/private-plugins/blockadmin_ui`
-- **Last synchronized:** `2026-08-10`
+- **Last synchronized:** `2026-08-21`
 
 ## Scope
 
 ### Owns
 
-- Blockadmin admin routes, navigation, supplier review screens, supplier product review screens, membership UI, pricing UI, and blockadmin detail sheets.
+- Blockadmin admin routes, navigation, supplier review screens, supplier product review screens, agency review screens, membership UI, pricing UI, and blockadmin detail sheets.
 
 ### Does not own
 
@@ -25,6 +25,7 @@
 - Provides module federation entry points for blockadmin routes and settings.
 - Shows admin supplier lists, supplier profile detail sheets, verification actions, and supplier product review screens with editable product categories.
 - Displays supplier profile fields synced from supplier tenants, including industry.
+- Reviews agencies through a read-only detail screen (profile, sidebar tabs, general/activity/operation area/contact/documents/social links panels, plus Agents and Integrations under internal settings) with verify and reject actions.
 - Uses `erxes-ui` and `ui-modules` components for tables, sheets, filters, navigation, and feedback.
 
 ## Architecture
@@ -36,6 +37,7 @@
 | Main routes       | `frontend/private-plugins/blockadmin_ui/src/modules/Main.tsx`          | Defines blockadmin page routing                                                       |
 | Supplier profile  | `frontend/private-plugins/blockadmin_ui/src/modules/supplier/profile/` | Supplier list, filters, detail sheet, GraphQL documents, and verification actions     |
 | Supplier products | `frontend/private-plugins/blockadmin_ui/src/modules/supplier/product/` | Supplier product list, filters, detail sheet, status actions, and category assignment |
+| Agencies          | `frontend/private-plugins/blockadmin_ui/src/modules/agencies/`         | Agency grid/list, read-only agency detail tabs (including the synced agents list), verify/reject actions, listing review  |
 
 ## Contracts
 
@@ -49,6 +51,7 @@
 - `baSuppliers`, `baSupplierDetail`, `baUpdateSupplierVerificationStatus`, and `baUpdateSupplierTier` GraphQL operations from `blockadmin_api`.
 - Supplier detail consumes nullable `BaSupplier.industry`.
 - Supplier product `ba*` GraphQL operations from `blockadmin_api`, plus core `productCategories` lookup for category assignment.
+- `GetAgencies`, `GetAgencyInfo`, `BlockAdminAgencyAgents`, `BlockAdminAgencyVerify`, and `BlockAdminAgencyReject` GraphQL operations from `blockadmin_api`; `blockadmin_api` exposes no agency update mutation and no agent mutation — agents are owned by the agency tenant.
 - Public components and hooks from `erxes-ui` and `ui-modules`.
 
 ## Data and State
@@ -61,19 +64,57 @@
 ## Local Invariants
 
 - Supplier profile UI displays supplier-owned synced values for admin review.
+- Agency `logo`, `coverImage`, and `documents` are `Attachment` objects typed as `AgencyAttachment` in `src/modules/agencies/types/agencyTypes.ts`; only `url` and `name` are guaranteed. Read images through `attachment.url`, never by passing the attachment itself to `readImage`, and derive icons/labels through `src/modules/agencies/utils/attachment.ts` plus `components/attachment-type.tsx`.
+- Agency `brief` and `description` hold the block editor's serialized JSON, written by `blockagency_ui`; records predating that editor hold plain strings. Render them with `BlockEditorReadOnly` (it accepts both), and use `getBlockPlainText` (`src/modules/agencies/utils/blockText.ts`) anywhere the value must be plain text, such as the card and list-row summaries — printing the raw value there leaks serialized blocks into the UI.
+- The agency detail screen is a read-only review surface: `blockadmin_api` exposes no agency update mutation, so agency fields must never be rendered as editable inputs. The only agency write paths are `blockAdminAgencyVerify` and `blockAdminAgencyReject`.
+- Agency detail follows the `ProjectDetail` composition: `AgencyDetailPage` owns the page shell, `AgencyDetail` owns profile + sidebar + tab body, and every `AgencyDetail*` tab panel reads the shared `useAgencyDetail()` Apollo cache entry instead of receiving props.
+- `useAgencyDetail()` defaults to the `:id` route param; pass `variables.id` (with `skip`) to read another agency from a non-agency route. `useAgencyAgents()` follows the same rule with `variables.agencyId`.
+- Agents are mirrored into block admin from the agency's own workspace, so the Agents tab is read-only and renders only the denormalized `user` summary the sync provides — never assume a federated core `User` is resolvable for an agent.
 - Keep GraphQL documents near the supplier feature and preserve unique `ba*` operation names.
 - Use `erxes-ui` / `ui-modules` components instead of direct Radix imports or custom UI primitives.
 - Detail sheets must include loading and not-found states.
 
 ## Validation
 
+- `pnpm nx lint blockadmin_ui`
 - `pnpm nx build blockadmin_ui`
+- Agency detail smoke scenario: open an agency from the agency grid, switch through the sidebar tabs (the `tab` query param must persist the selection), and confirm the profile badge flips after Verify without a manual refresh.
 - Supplier profile smoke scenario: open a supplier detail sheet and confirm synced Industry renders in the General section.
 - Supplier product smoke scenario: open the product table/detail, assign and clear a category, and confirm the selected category changes without refresh.
 
 ## Recent Changes
 
 <!-- Newest first. Keep at most 10 entries. -->
+
+### `2026-08-21` — Favorite toggles in the agencies module carry a breadcrumb
+
+- **Summary:** The agencies, agency listing, and admin listing detail pages pass the now-required `breadcrumb` (built with `createFavoriteBreadcrumb`) plus an `icon` to `PageHeader.FavoriteToggleButton`, so favoriting those screens stores a readable label.
+- **Affected areas:** `src/pages/AgenciesPage.tsx`, `src/pages/AgencyListingPage.tsx`, `src/pages/AdminListingDetailPage.tsx`
+- **Contracts changed:** None.
+
+### `2026-08-21` — Introduction rendered as editor content
+
+- **Summary:** The agency detail Introduction card renders `brief` and `description` with `BlockEditorReadOnly` now that agencies write them in the block editor, and the agency card/list row render the extracted plain text so serialized blocks never reach those summaries.
+- **Affected areas:** `src/modules/agencies/components/AgencyDetailGeneral.tsx`, `src/modules/agencies/components/AgencyCard.tsx`, `src/modules/agencies/components/AgencyListItem.tsx`, `src/modules/agencies/utils/blockText.ts`
+- **Contracts changed:** None.
+
+### `2026-08-21` — Agents tab on the agency detail screen
+
+- **Summary:** Internal settings gained an Agents tab listing the agency members synced into block admin, with avatar, name, role, email, and location plus loading, empty, and error states.
+- **Affected areas:** `src/modules/agencies/components/AgencyDetailAgents.tsx`, `src/modules/agencies/components/AgencyDetailTabs.tsx`, `src/modules/agencies/constants/agency-detail.ts`, `src/modules/agencies/hooks/useAgencyAgents.ts`, `src/modules/agencies/graphql/queries.ts`, `src/modules/agencies/types/agencyTypes.ts`
+- **Contracts changed:** Consumes the new `getBlockAdminAgents` query as `BlockAdminAgencyAgents`.
+
+### `2026-08-21` — Agency detail rebuilt on the `ProjectDetail` composition
+
+- **Summary:** The agency detail screen is now a read-only review surface — profile header with verification badge and verify/reject actions, sidebar tab navigation, and lazy-loaded `InfoCard` tab panels for general, activity, operation area, contact, documents, social links, and integrations — replacing the non-submitting agency form.
+- **Affected areas:** `src/pages/AgencyDetailPage.tsx`, `src/modules/agencies/components/AgencyDetail*.tsx`, `src/modules/agencies/components/attachment-type.tsx`, `src/modules/agencies/constants/agency-detail.ts`, `src/modules/agencies/hooks/useAgencyDetail.ts`, `src/modules/agencies/utils/attachment.ts`, `src/modules/agencies/graphql/queries.ts`, `src/modules/agencies/types/agencyTypes.ts`; removed `AgencyInfoForm`, `AgencyActionBar`, `AgencyEmails`, `AgencyPhones`, `MultipleDocumentUpload`, `SocialLinkInput`, `useAgencyForm`, `useRemoteComponent`, and the zod-only `schema.ts`.
+- **Contracts changed:** `GetAgencyInfo` additionally selects `entityId`, `verificationStatus`, `rejectionReasons`, and `rejectionNotes`.
+
+### `2026-08-20` — Agency attachments in the admin agency screens
+
+- **Summary:** Agency `logo`, `coverImage`, and `documents` are read as `Attachment` objects: the queries and mutations select the attachment subfields, the form schema and `IAgency` describe them, and the cards, list rows, and document list render `url`/`name`.
+- **Affected areas:** `src/modules/agencies/graphql/queries.ts`, `src/modules/agencies/graphql/mutations.ts`, `src/modules/agencies/schema.ts`, `src/modules/agencies/types/agencyTypes.ts`, `src/modules/agencies/components/AgencyCard.tsx`, `src/modules/agencies/components/AgencyListItem.tsx`, `src/modules/agencies/components/AgencyInfoForm.tsx`, `src/modules/agencies/components/MultipleDocumentUpload.tsx`
+- **Contracts changed:** Consumes `BlockAdminAgency.logo`/`coverImage` as `Attachment` and `documents` as `[Attachment]`.
 
 ### `2026-08-10` — `Supplier product category editing`
 

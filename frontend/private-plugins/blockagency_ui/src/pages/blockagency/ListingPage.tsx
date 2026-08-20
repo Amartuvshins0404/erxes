@@ -1,10 +1,12 @@
 import { Breadcrumb, Button, Separator } from 'erxes-ui';
-import { PageHeader } from 'ui-modules';
+import { PageHeader, createFavoriteBreadcrumb } from 'ui-modules';
 import { IconHomeSearch } from '@tabler/icons-react';
 import { Outlet } from 'react-router';
 import { CreateListing } from '~/modules/listing/components/CreateListing';
 
 export const ListingPage = () => {
+  const favoriteBreadcrumb = createFavoriteBreadcrumb('Listing');
+
   return (
     <div className="flex flex-col h-full">
       <PageHeader>
@@ -20,7 +22,10 @@ export const ListingPage = () => {
             </Breadcrumb.List>
           </Breadcrumb>
           <Separator.Inline />
-          <PageHeader.FavoriteToggleButton />
+          <PageHeader.FavoriteToggleButton
+            breadcrumb={favoriteBreadcrumb}
+            icon="IconHomeSearch"
+          />
         </PageHeader.Start>
         <PageHeader.End>
           <CreateListing />

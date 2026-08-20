@@ -1,9 +1,11 @@
 import { IconUserHexagon } from '@tabler/icons-react';
 import { Breadcrumb, Button, PageContainer, Separator } from 'erxes-ui';
-import { PageHeader } from 'ui-modules';
+import { PageHeader, createFavoriteBreadcrumb } from 'ui-modules';
 import { MemberProfile } from '~/modules/member/components/MemberProfile';
 
 export const MemberIndexPage = () => {
+  const favoriteBreadcrumb = createFavoriteBreadcrumb('Profile');
+
   return (
     <PageContainer>
       <PageHeader>
@@ -19,10 +21,13 @@ export const MemberIndexPage = () => {
             </Breadcrumb.List>
           </Breadcrumb>
           <Separator.Inline />
-          <PageHeader.FavoriteToggleButton />
+          <PageHeader.FavoriteToggleButton
+            breadcrumb={favoriteBreadcrumb}
+            icon="IconUserHexagon"
+          />
         </PageHeader.Start>
       </PageHeader>
-      <div className="flex flex-auto overflow-hidden">
+      <div className="flex flex-1 overflow-hidden">
         <MemberProfile />
       </div>
     </PageContainer>

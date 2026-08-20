@@ -1,10 +1,24 @@
-import { date, z } from 'zod';
+import { z } from 'zod';
 import { socialPlatforms } from '../constants/social-platforms';
+import { getBlockPlainText } from '../utils/blockText';
+
+export const BRIEF_MAX_LENGTH = 300;
+
+// Uploaded file, matches the `Attachment` graphql type. Only `url` and `name`
+// are guaranteed, the rest is missing on files uploaded before the migration
+// from plain url strings.
+export const agencyAttachmentSchema = z.object({
+  url: z.string(),
+  name: z.string(),
+  type: z.string().nullish(),
+  size: z.number().nullish(),
+  duration: z.number().nullish(),
+});
 
 // Agency profile
 export const agencyIdentitySchema = z.object({
-  logo: z.string().optional(),
-  coverImage: z.string().optional(),
+  logo: agencyAttachmentSchema.nullish(),
+  coverImage: agencyAttachmentSchema.nullish(),
 });
 
 export const agencyGeneralInfoSchema = z.object({
@@ -27,12 +41,19 @@ export const agencyContactInfoSchema = z.object({
 });
 
 export const agencyIntroductionSchema = z.object({
-  brief: z.string().max(300, 'Brief must be at most 300 characters'),
+  // `brief` holds serialized editor blocks, so the limit is measured on the
+  // text the agency actually wrote, not on the serialized payload.
+  brief: z
+    .string()
+    .refine(
+      (value) => getBlockPlainText(value).length <= BRIEF_MAX_LENGTH,
+      `Brief must be at most ${BRIEF_MAX_LENGTH} characters`,
+    ),
   description: z.string(),
 });
 
 export const agencyDocuments = z.object({
-  documents: z.array(z.string()).optional(),
+  documents: z.array(agencyAttachmentSchema).optional(),
 });
 
 export const agencyFieldsOfExpertiseItemSchema = z.object({

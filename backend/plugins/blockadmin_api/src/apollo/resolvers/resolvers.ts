@@ -1,7 +1,9 @@
+import { BlockAdminAgency } from '@/agency/graphql/resolvers/customResolvers/agency';
 import cpCustomResolvers from '@/clientportal/graphql/resolvers/customResolvers';
 import developerCustomResolvers from '@/developer/graphql/resolvers/customResolvers';
 import formCustomResolvers from '@/form/graphql/customResolver';
 import listingCustomResolvers from '@/listing/graphql/resolvers/customResolvers';
+import { BlockAdminAgent } from '@/member/graphql/resolvers/customResolvers/member';
 import projectCustomResolvers from '@/project/graphql/resolvers/customResolvers';
 import unitCustomResolvers from '@/unit/graphql/resolvers/customResolvers';
 import { BaSupplier } from '@/supplier/profile/graphql/resolvers/customResolvers/supplier';
@@ -10,6 +12,9 @@ import { membershipTypeResolvers } from '@/membership/graphql/resolvers/queries/
 import CPUser from '@/membership/graphql/resolvers/customResolvers/cpUser';
 
 export const customResolvers = {
+  BlockAdminAgency,
+  BlockAdminAgent,
+
   ...unitCustomResolvers,
   ...projectCustomResolvers,
   ...formCustomResolvers,

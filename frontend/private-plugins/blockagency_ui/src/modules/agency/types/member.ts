@@ -1,4 +1,5 @@
 import { IUser } from 'ui-modules';
+import { AgencyAttachment } from './form';
 
 export interface IAgencyMember {
   _id: string;
@@ -12,7 +13,7 @@ export interface IAgencyMember {
   description?: string;
   country?: string;
   city?: string;
-  certificatePhotos?: string[];
+  certificatePhotos?: AgencyAttachment[];
   createdAt: string;
   updatedAt: string;
   member?: IUser;

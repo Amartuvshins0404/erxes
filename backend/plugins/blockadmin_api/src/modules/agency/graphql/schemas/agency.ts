@@ -38,9 +38,9 @@ export const types = `
     phones: [String]
     primaryPhone: String
     dateFounded: String
-    logo: String
-    coverImage: String
-    documents: [String]
+    logo: Attachment
+    coverImage: Attachment
+    documents: [Attachment]
     socialLinks: JSON
     operationArea: BlockAdminAgencyOperationArea
     fieldsOfExpertise: BlockAdminAgencyFieldOfExpertise

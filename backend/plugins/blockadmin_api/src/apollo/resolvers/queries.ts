@@ -16,6 +16,7 @@ import { unitLeadQueries } from '@/unit/graphql/resolvers/queries/unitLead';
 import { cpBlockQueries } from '~/modules/clientportal/graphql/resolvers/queries';
 import { formQueries } from '~/modules/form/graphql/queries';
 import { listingQueries } from '@/listing/graphql/resolvers/queries/listing';
+import { agentQueries } from '@/member/graphql/resolvers/queries/member';
 import { supplierQueries } from '@/supplier/profile/graphql/resolvers/queries/supplier';
 import { productQueries } from '@/supplier/product/graphql/resolvers/queries/product';
 import { membershipQueries } from '@/membership/graphql/resolvers/queries/membership';
@@ -39,6 +40,7 @@ export const queries = {
   ...invoiceQueries,
   ...formQueries,
   ...listingQueries,
+  ...agentQueries,
   ...supplierQueries,
   ...productQueries,
   ...membershipQueries,

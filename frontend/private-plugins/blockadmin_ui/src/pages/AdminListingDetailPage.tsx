@@ -7,7 +7,7 @@ import {
 } from 'erxes-ui';
 import { Link } from 'react-router-dom';
 import { IconListDetails } from '@tabler/icons-react';
-import { PageHeader } from 'ui-modules';
+import { PageHeader, createFavoriteBreadcrumb } from 'ui-modules';
 import { AdminListingDetailProfile } from '@/agencies/listing/components/AdminListingDetailProfile';
 import { AdminListingDetailSidebar } from '@/agencies/listing/components/AdminListingDetailSidebar';
 import { AdminListingDetailTabs } from '@/agencies/listing/components/AdminListingDetailTabs';
@@ -40,13 +40,23 @@ const ListingDetailBreadcrumb = () => {
 };
 
 export const AdminListingDetailPage = () => {
+  const { listing } = useAdminListingDetail();
+  const favoriteBreadcrumb = createFavoriteBreadcrumb(
+    'Agencies',
+    'Listing',
+    listing?.title,
+  );
+
   return (
     <PageContainer>
       <PageHeader>
         <PageHeader.Start>
           <ListingDetailBreadcrumb />
           <Separator.Inline />
-          <PageHeader.FavoriteToggleButton />
+          <PageHeader.FavoriteToggleButton
+            breadcrumb={favoriteBreadcrumb}
+            icon="IconListDetails"
+          />
         </PageHeader.Start>
       </PageHeader>
       <div className="flex flex-col flex-auto overflow-hidden">

@@ -1,3 +1,4 @@
+import { attachmentSchema } from 'erxes-api-shared/core-modules';
 import { Schema } from 'mongoose';
 import { IBlockAgencyMemberDocument } from '~/modules/member/@types/member';
 
@@ -12,7 +13,7 @@ export const blockAgencyMemberSchema = new Schema<IBlockAgencyMemberDocument>(
     facebookUrl: { type: String, label: 'Facebook URL' },
     instagramUrl: { type: String, label: 'Instagram URL' },
     linkedUrl: { type: String, label: 'LinkedIn URL' },
-    certificatePhotos: [{ type: String }],
+    certificatePhotos: [{ type: attachmentSchema }],
     role: {
       type: String,
       enum: ['admin', 'lead', 'member'],

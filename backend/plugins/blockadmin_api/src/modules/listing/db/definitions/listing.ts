@@ -6,6 +6,7 @@ export const listingSchema = schemaWrapper(
   new Schema<IBlockAdminListingDocument>(
     {
       title: { type: String },
+      agencyMemberId: { type: String, index: true },
       type: { type: String, enum: ['sale', 'rent', 'lease'], default: 'sale' },
       propertyType: { type: String },
       status: {

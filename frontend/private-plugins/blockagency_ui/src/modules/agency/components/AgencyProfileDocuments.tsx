@@ -6,6 +6,7 @@ import { useAgencyInfo } from '../hooks/useAgencyInfo';
 import { AgencyDocumentsValues } from '../types/form';
 import { agencyDocuments } from '../schema/form';
 import { useUpdateAgency } from '../hooks/useUpdateAgency';
+import { toAttachmentInputs } from '../utils/attachment';
 
 export const AgencyProfileDocuments = () => {
   const { loading } = useAgencyInfo();
@@ -29,13 +30,16 @@ export const AgencyDocumentInfo = () => {
     mode: 'onBlur',
     resolver: zodResolver(agencyDocuments),
     defaultValues: {
-      documents: agencyInfo?.documents || [],
+      documents: toAttachmentInputs(agencyInfo?.documents),
     },
   });
   const { updateAgency } = useUpdateAgency();
   const handleSave = (patch: Partial<AgencyDocumentsValues>) => {
-    const values = { ...form.getValues(), ...patch };
-    updateAgency({ variables: { input: values } });
+    const { documents } = { ...form.getValues(), ...patch };
+
+    updateAgency({
+      variables: { input: { documents: toAttachmentInputs(documents) } },
+    });
   };
   return (
     <Form {...form}>
@@ -48,7 +52,7 @@ export const AgencyDocumentInfo = () => {
               <Form.Label>Documents</Form.Label>
               <Form.Control>
                 <MultipleDocumentUpload
-                  value={field.value as string[]}
+                  value={field.value ?? []}
                   onChange={(values) => {
                     field.onChange(values);
                     handleSave({ documents: values });

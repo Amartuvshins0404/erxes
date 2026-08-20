@@ -1,18 +1,28 @@
 import { IBlockAdminListingDocument } from '@/listing/@types/listing';
-import { generateFilter } from '@/listing/utils';
+import {
+  buildListingStats,
+  EMPTY_LISTING_STATS,
+  generateFilter,
+} from '@/listing/utils';
+import { resolveAgencyKeys, resolveAgentKeys } from '@/member/utils';
 import { IOffsetPaginateParams } from 'erxes-api-shared/core-types';
 import { markResolvers, paginate } from 'erxes-api-shared/utils';
 import { FilterQuery } from 'mongoose';
 import { IContext, IModels } from '~/connectionResolvers';
 
 /**
- * The client portal only ever sees published listings; drafts, inactive and
- * sold records stay admin-side.
+ * The client portal only ever sees published listings; drafts and inactive
+ * records stay admin-side. Sold listings stay visible so agent profiles can
+ * show their track record.
  */
 const PUBLIC_LISTING_STATUS = 'active';
+const PUBLIC_LISTING_STATUSES = ['active', 'sold'];
 
 export interface CpListingQueryParams {
   agencyId?: string;
+  /** Block admin `CpBlockAdminAgent._id` of the owning agent. */
+  agencyMemberId?: string;
+  status?: string;
   type?: string;
   propertyType?: string;
   searchValue?: string;
@@ -21,39 +31,66 @@ export interface CpListingQueryParams {
 }
 
 /**
- * Listings are keyed to their agency by `subdomain`, so a client-portal
- * `agencyId` has to be resolved to one first. Returns `undefined` when the
- * agency does not exist, which callers must treat as "no listings" rather than
- * as "no filter".
+ * Listings are keyed to their agency by `subdomain` and to their agent by the
+ * agency-side member id, so client-portal ids have to be resolved first.
+ * Returns `null` when the agency or agent does not exist, which callers must
+ * treat as "no listings" rather than as "no filter".
  */
-const resolveAgencySubdomain = async (models: IModels, agencyId: string) => {
-  const agency = await models.Agency.findOne({ _id: agencyId })
-    .select('subdomain')
-    .lean();
+const resolveScope = async (
+  models: IModels,
+  { agencyId, agencyMemberId }: CpListingQueryParams,
+): Promise<{ subdomain?: string; memberEntityId?: string } | null> => {
+  const scope: { subdomain?: string; memberEntityId?: string } = {};
 
-  return agency?.subdomain;
+  if (agencyId) {
+    const keys = await resolveAgencyKeys(models, agencyId);
+
+    if (!keys) {
+      return null;
+    }
+
+    scope.subdomain = keys.subdomain;
+  }
+
+  if (agencyMemberId) {
+    const keys = await resolveAgentKeys(models, agencyMemberId);
+
+    if (!keys || (scope.subdomain && scope.subdomain !== keys.subdomain)) {
+      return null;
+    }
+
+    scope.subdomain = keys.subdomain;
+    scope.memberEntityId = keys.entityId;
+  }
+
+  return scope;
 };
 
 const buildPublicFilter = async (
   models: IModels,
-  { agencyId, type, propertyType, searchValue, city, district }: CpListingQueryParams,
+  params: CpListingQueryParams,
 ): Promise<FilterQuery<IBlockAdminListingDocument> | null> => {
-  let subdomain: string | undefined;
+  const { status, type, propertyType, searchValue, city, district } = params;
 
-  if (agencyId) {
-    subdomain = await resolveAgencySubdomain(models, agencyId);
+  const scope = await resolveScope(models, params);
 
-    if (!subdomain) {
-      return null;
-    }
+  if (!scope) {
+    return null;
+  }
+
+  // A requested status is honored only when it is publicly visible, so the
+  // portal can never reach drafts or deactivated listings.
+  if (status && !PUBLIC_LISTING_STATUSES.includes(status)) {
+    return null;
   }
 
   const filter = generateFilter({
-    subdomain,
+    subdomain: scope.subdomain,
+    agencyMemberId: scope.memberEntityId,
     searchValue,
     city,
     district,
-    status: PUBLIC_LISTING_STATUS,
+    status: status || PUBLIC_LISTING_STATUS,
   });
 
   if (type) {
@@ -75,7 +112,7 @@ export const cpListingQueries = {
   ) => {
     const listing = await models.Listing.findOne({
       _id,
-      status: PUBLIC_LISTING_STATUS,
+      status: { $in: PUBLIC_LISTING_STATUSES },
     }).lean();
 
     if (!listing) {
@@ -113,37 +150,21 @@ export const cpListingQueries = {
 
   cpGetBlockAdminListingStats: async (
     _root: undefined,
-    { agencyId }: { agencyId?: string },
+    params: Pick<CpListingQueryParams, 'agencyId' | 'agencyMemberId'>,
     { models }: IContext,
   ) => {
-    const baseFilter: FilterQuery<IBlockAdminListingDocument> = {};
+    const scope = await resolveScope(models, params);
 
-    if (agencyId) {
-      const subdomain = await resolveAgencySubdomain(models, agencyId);
-
-      if (!subdomain) {
-        return { total: 0, active: 0, draft: 0, totalViews: 0 };
-      }
-
-      baseFilter.subdomain = subdomain;
+    if (!scope) {
+      return EMPTY_LISTING_STATS;
     }
 
-    const [total, active, draft, viewsAgg] = await Promise.all([
-      models.Listing.countDocuments(baseFilter),
-      models.Listing.countDocuments({ ...baseFilter, status: 'active' }),
-      models.Listing.countDocuments({ ...baseFilter, status: 'draft' }),
-      models.Listing.aggregate<{ totalViews: number }>([
-        { $match: baseFilter },
-        { $group: { _id: null, totalViews: { $sum: '$viewCount' } } },
-      ]),
-    ]);
+    const baseFilter = generateFilter({
+      subdomain: scope.subdomain,
+      agencyMemberId: scope.memberEntityId,
+    });
 
-    return {
-      total,
-      active,
-      draft,
-      totalViews: viewsAgg[0]?.totalViews ?? 0,
-    };
+    return await buildListingStats(models.Listing, baseFilter);
   },
 };
 

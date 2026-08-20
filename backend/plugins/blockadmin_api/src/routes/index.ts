@@ -7,6 +7,7 @@ import { router as developerRoutes } from '@/developer/routes';
 import { router as documentRoutes } from '@/document/routes';
 import { router as invoiceRoutes } from '@/invoice/routes';
 import { router as listingRoutes } from '@/listing/routes';
+import { router as memberRoutes } from '@/member/routes';
 import { router as projectRoutes } from '@/project/routes';
 import { router as unitRoutes } from '@/unit/routes';
 import { router as supplierRoutes } from '@/supplier/profile/routes/webhook';
@@ -31,6 +32,7 @@ router.use(
     documentRoutes,
     invoiceRoutes,
     listingRoutes,
+    memberRoutes,
     projectRoutes,
     unitRoutes,
     supplierRoutes,

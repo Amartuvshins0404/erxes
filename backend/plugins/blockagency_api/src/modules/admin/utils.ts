@@ -54,7 +54,16 @@ const buildPayload = (
   return payload;
 };
 
-const sendMessage = ({ subdomain, path, payload }: SendMessagePayload) => {
+/**
+ * Mirrors one change to block-admin over the signed webhook. Mutations get this
+ * for free through `wrapMutationResolver`; anything that writes outside a
+ * mutation must call it directly.
+ */
+export const sendBlockAdminMessage = ({
+  subdomain,
+  path,
+  payload,
+}: SendMessagePayload) => {
   const API_ENDPOINT = `${BLOCK_ADMIN_API_URL}/webhook/${path}`;
 
   if (!BLOCK_ADMIN_API_URL || !BLOCK_ADMIN_SECRET) {
@@ -87,7 +96,7 @@ export const wrapMutationResolver = (mutations: Record<string, Resolver>) => {
       const entity = await resolver(root, args, context, info);
 
       if (entity) {
-        sendMessage({
+        sendBlockAdminMessage({
           subdomain: context.subdomain,
           path,
           payload: buildPayload(

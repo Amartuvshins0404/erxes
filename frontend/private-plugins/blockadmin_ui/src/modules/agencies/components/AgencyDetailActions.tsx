@@ -3,6 +3,7 @@ import {
   IconCircleDashedX,
   IconDotsVertical,
 } from '@tabler/icons-react';
+import { Block } from '@blocknote/core';
 import {
   BlockEditor,
   Button,
@@ -14,84 +15,62 @@ import {
   useBlockEditor,
 } from 'erxes-ui';
 import { useState } from 'react';
-import { useAgencyVerify } from '../hooks/useAgencyVerify';
-import { useParams } from 'react-router-dom';
+import { useAgencyDetail } from '../hooks/useAgencyDetail';
 import { useAgencyReject } from '../hooks/useAgencyReject';
+import { useAgencyVerify } from '../hooks/useAgencyVerify';
 import { AgencyRejectionReasons } from '../types/agencyTypes';
-import { Block } from '@blocknote/core';
 
-export const AgencyActionBar = () => {
-  const [open, setOpen] = useState<boolean>(false);
-  return (
-    <div className="ba:flex ba:justify-end ba:items-center">
-      <DropdownMenu open={open} onOpenChange={setOpen}>
-        <ActionBarTrigger />
-        <ActionBarMenu />
-      </DropdownMenu>
-    </div>
-  );
-};
+export const AgencyDetailActions = () => {
+  const { agency } = useAgencyDetail();
+  const [rejectOpen, setRejectOpen] = useState(false);
+  const { handleVerify, loading: verifying } = useAgencyVerify();
+  const isVerified = agency?.verificationStatus === 'verified';
+  const isRejected = agency?.verificationStatus === 'unverified';
 
-export const ActionBarTrigger = () => {
-  return (
-    <DropdownMenu.Trigger asChild>
-      <Button variant={'secondary'}>
-        <IconDotsVertical />
-        Actions
-      </Button>
-    </DropdownMenu.Trigger>
-  );
-};
+  if (!agency) return null;
 
-export const ActionBarMenu = () => {
-  return (
-    <DropdownMenu.Content align="end">
-      <ActionVerifyStatus />
-      <ActionRejectSubmission />
-    </DropdownMenu.Content>
-  );
-};
-
-export const ActionVerifyStatus = () => {
-  const { handleVerify, loading } = useAgencyVerify();
-  const { id } = useParams();
-  return (
-    <DropdownMenu.Item
-      className="text-success"
-      disabled={loading}
-      onSelect={() => handleVerify(id as string)}
-    >
-      {loading ? <Spinner /> : <IconCircleDashedCheck />}
-      Verify
-    </DropdownMenu.Item>
-  );
-};
-
-export const ActionRejectSubmission = () => {
-  const [open, setOpen] = useState<boolean>(false);
-  const { id } = useParams();
   return (
     <>
-      <DropdownMenu.Item
-        className="text-destructive"
-        onSelect={(e) => {
-          e.preventDefault();
-          setOpen(true);
-        }}
-      >
-        <IconCircleDashedX />
-        Reject
-      </DropdownMenu.Item>
-      <ActionRejectionDialog
-        open={open}
-        onOpenChange={setOpen}
-        agencyId={id as string}
+      <DropdownMenu>
+        <DropdownMenu.Trigger asChild>
+          <Button variant="outline">
+            <IconDotsVertical />
+            Actions
+          </Button>
+        </DropdownMenu.Trigger>
+        <DropdownMenu.Content className="min-w-48" align="end">
+          <DropdownMenu.Item
+            className="text-success focus:text-success"
+            disabled={verifying || isVerified}
+            onSelect={() => handleVerify(agency._id)}
+          >
+            {verifying ? <Spinner /> : <IconCircleDashedCheck />}
+            {isVerified ? 'Already verified' : 'Verify agency'}
+          </DropdownMenu.Item>
+          <DropdownMenu.Separator />
+          <DropdownMenu.Item
+            className="text-destructive focus:text-destructive"
+            disabled={isRejected}
+            onSelect={(e) => {
+              e.preventDefault();
+              setRejectOpen(true);
+            }}
+          >
+            <IconCircleDashedX />
+            {isRejected ? 'Already rejected' : 'Reject submission'}
+          </DropdownMenu.Item>
+        </DropdownMenu.Content>
+      </DropdownMenu>
+      <AgencyRejectDialog
+        open={rejectOpen}
+        onOpenChange={setRejectOpen}
+        agencyId={agency._id}
       />
     </>
   );
 };
 
-export const ActionRejectionDialog = ({
+export const AgencyRejectDialog = ({
   open,
   onOpenChange,
   agencyId,

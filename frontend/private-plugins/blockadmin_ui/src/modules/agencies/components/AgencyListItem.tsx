@@ -12,6 +12,7 @@ import { Avatar, Badge, Button } from 'erxes-ui';
 import { AgencyVerificationStatus } from './AgencyCard';
 import { PropertyTypeKey } from './SelectPropertyType';
 import { PROPERTY_TYPE_LABELS } from '../constants';
+import { getBlockPlainText } from '../utils/blockText';
 
 const getInitials = (value?: string) =>
   (value || '')
@@ -40,7 +41,7 @@ export const AgencyListItem = ({
       <Avatar size="xl" className="ba:size-14 ba:rounded-lg flex-none">
         {logo && (
           <Avatar.Image
-            src={readImage(logo)}
+            src={readImage(logo.url)}
             alt={name}
             className="ba:rounded-lg"
           />
@@ -63,9 +64,9 @@ export const AgencyListItem = ({
           )}
           <AgencyVerificationStatus verificationStatus={verificationStatus} />
         </div>
-        {brief && (
+        {!!getBlockPlainText(brief) && (
           <p className="text-xs text-muted-foreground ba:line-clamp-1">
-            {brief}
+            {getBlockPlainText(brief)}
           </p>
         )}
         <div className="flex items-center gap-4 flex-wrap text-accent-foreground">

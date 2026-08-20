@@ -1,37 +1,13 @@
 import { gql } from '@apollo/client';
+import { AGENCY_INFO_FIELDS } from './fragments';
 
 export const GET_AGENCY_INFO = gql`
   query GetAgencyInfo {
     getAgencyInfo {
-      _id
-      name
-      brandName
-      type
-      description
-      brief
-      logo
-      coverImage
-      documents
-      website
-      emails
-      primaryEmail
-      phones
-      primaryPhone
-      socialLinks
-      dateFounded
-      operationArea {
-        city
-        district
-      }
-      fieldsOfExpertise {
-        propertyTypes
-        services
-        clientTypes
-      }
-      messengerIntegrationId
-      widgetBundleUrl
+      ...BlockAgencyInfoFields
     }
   }
+  ${AGENCY_INFO_FIELDS}
 `;
 
 export const GET_AGENCY_MEMBERS = gql`
@@ -49,7 +25,12 @@ export const GET_AGENCY_MEMBERS = gql`
       createdAt
       country
       city
-      certificatePhotos
+      certificatePhotos {
+        url
+        name
+        type
+        size
+      }
       agencyId
       member {
         _id

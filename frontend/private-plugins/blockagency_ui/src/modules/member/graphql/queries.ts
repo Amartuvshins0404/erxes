@@ -13,7 +13,12 @@ export const GET_MEMBER_PROFILE = gql`
       facebookUrl
       instagramUrl
       linkedUrl
-      certificatePhotos
+      certificatePhotos {
+        url
+        name
+        type
+        size
+      }
       role
       createdAt
       updatedAt

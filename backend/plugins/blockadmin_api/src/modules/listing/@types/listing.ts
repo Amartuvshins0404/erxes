@@ -35,6 +35,8 @@ export interface IBlockAdminListingAgent {
 
 export interface IBlockAdminListing extends IBlock {
   title: string;
+  /** Agency-side member id of the listing owner, i.e. `BlockAdminAgent.entityId`. */
+  agencyMemberId?: string;
   type: 'sale' | 'rent' | 'lease';
   propertyType: string;
   status: 'active' | 'inactive' | 'sold' | 'draft';

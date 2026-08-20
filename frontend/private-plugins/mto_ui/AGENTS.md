@@ -12,7 +12,7 @@
 
 ### Owns
 
-- MTO admin UI: categories, events, registration applications (list/detail/create), FillForm schema builder, slave-mode onboarding, settings (instance ID + payment selection), and the `mtocustomer` relation-widget expose (currently a stub).
+- MTO admin UI: categories, travel associations, events, registration applications (list/detail/create), FillForm schema builder, slave-mode onboarding, settings (instance ID + payment selection), and the `mtocustomer` relation-widget expose (currently a stub).
 - Plugin GraphQL documents, hooks, Jotai sheet/count state, and Module Federation entry points under `src/`.
 
 ### Does not own
@@ -24,9 +24,9 @@
 ## Current Capabilities
 
 - Dev port **3008**. Registers with `core-ui` as module `mto`, with navigation group (including registration-type `subGroup`), settings navigation, and relation-widget module `mtocustomer`.
-- List pages for categories, events, and registrations use `PageContainer` + `PageHeader` + `PageSubHeader` with URL-driven `Filter` bars and `RecordTable` (cursor pagination on registrations).
+- List pages for categories, travel associations, events, and registrations use `PageContainer` + `PageHeader` + `PageSubHeader` with URL-driven `Filter` bars and `RecordTable` (cursor pagination on registrations).
 - Navigation `subGroup` lists FillForm membership types and filters `/mto/registrations?membershipTypeId=...`.
-- Category/event create and edit via side `Sheet` forms validated with React Hook Form + Zod.
+- Category/travel-association/event create and edit via side `Sheet` forms validated with React Hook Form + Zod.
 - Registration detail opens as a `FocusSheet` driven by Jotai (`registrationDetailSheetState`); create uses membership-type Dialog chooser then `RegistrationFormSheet`.
 - `/mto` and `/mto/registration` redirect to `/mto/registrations`.
 - Slave mode without instance ID gates routes behind onboarding and settings.
@@ -39,6 +39,7 @@
 | Main routes | `src/modules/Main.tsx` | Route table + slave onboarding gate |
 | Navigation | `src/modules/MtoNavigation*.tsx`, `src/modules/MtoRegistrationsNavigation.tsx` | Sidebar links, setup guard, registration-type subGroup |
 | Category | `src/modules/category` | Category filters, table, form sheet, hooks |
+| Travel association | `src/modules/travelAssociation` | Travel association filters, table, form sheet, hooks |
 | Event | `src/modules/event` | Event filters, table, form sheet, hooks |
 | Registration | `src/modules/registration` | Filters, cursor table, detail/create sheets, schema builder utils |
 | Config/settings | `src/modules/config`, `src/modules/Settings.tsx` | Instance ID, payments, upload config |
@@ -53,31 +54,37 @@
 
 ### Consumes
 
-- `mto_api` GraphQL operations prefixed `mto*` / `cpMto*` (categories, events, registration applications/schemas, config).
+- `mto_api` GraphQL operations prefixed `mto*` / `cpMto*` (categories, travel associations, events, registration applications/schemas, config).
 - Public `erxes-ui` and `ui-modules` UI/hooks only; no direct `@radix-ui/*` imports.
 
 ## Data and State
 
 - Apollo Client for server state; list filters live in URL query params (`useMultiQueryState` / `useNonNullMultiQueryState`).
 - Jotai for registration detail sheet open id and registrations total count chip.
-- React Hook Form + Zod for category/event sheets; registration answer forms use RHF without Zod schemas.
+- React Hook Form + Zod for category/travel-association/event sheets; registration answer forms use RHF without Zod schemas.
 
 ## Local Invariants
 
 - Plugin changes stay inside `frontend/private-plugins/mto_ui/**`.
 - List filters must stay URL-driven and share `REGISTRATIONS_CURSOR_SESSION_KEY` with registrations cursor pagination.
 - Do not reintroduce `MtoPageLayout` / `MtoListPageLayout` / `MtoFilterBase`; compose `PageContainer` + `PageHeader` + `Filter` like Block Offers/Payments.
-- Slave-mode routes must continue to hide events/categories/fillform and require instance ID.
+- Slave-mode routes must continue to hide events/categories/travel-associations/fillform and require instance ID.
 - Relation widget `mtocustomer` remains a stub unless explicitly implemented; do not add relation-widget side tabs without a real widget.
 
 ## Validation
 
 - `pnpm nx build mto_ui`
-- Smoke: categories / events / registrations list → filter via URL → create/edit sheet → empty list → settings save → slave-mode onboarding still gates routes
+- Smoke: categories / travel associations / events / registrations list → filter via URL → create/edit sheet → empty list → settings save → slave-mode onboarding still gates routes
 
 ## Recent Changes
 
 <!-- Newest first. Keep at most 10 entries. -->
+
+### `2026-08-20` — Travel Association admin
+
+- **Summary:** Added a master-only travel associations list with URL filters, RecordTable, and a Zod-validated create/edit sheet for logo, cover, bilingual title/description, and found date.
+- **Affected areas:** `src/modules/travelAssociation`, `src/pages/TravelAssociationsPage.tsx`, `src/modules/Main.tsx`, `src/modules/MtoNavigation.tsx`
+- **Contracts changed:** Consumes new `mtoTravelAssociation*` GraphQL operations
 
 ### `2026-08-20` — Registration type nav submenus
 

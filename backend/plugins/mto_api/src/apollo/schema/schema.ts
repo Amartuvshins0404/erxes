@@ -28,6 +28,12 @@ import {
   queries as EventQueries,
   mutations as EventMutations,
 } from '@/event/graphql/schemas/event';
+
+import {
+  types as TravelAssociationTypes,
+  queries as TravelAssociationQueries,
+  mutations as TravelAssociationMutations,
+} from '@/travelAssociation/graphql/schemas/travelAssociation';
 import { TypeExtensions } from './extensions';
 
 export const types = `
@@ -36,6 +42,7 @@ export const types = `
   ${CategoryTypes}
   ${ConfigTypes}
   ${EventTypes}
+  ${TravelAssociationTypes}
   ${RegistrationTypes}
 `;
 
@@ -44,6 +51,7 @@ export const queries = `
   ${CategoryQueries}
   ${ConfigQueries}
   ${EventQueries}
+  ${TravelAssociationQueries}
   ${RegistrationQueries}
 `;
 
@@ -52,6 +60,7 @@ export const mutations = `
   ${CategoryMutations}
   ${ConfigMutations}
   ${EventMutations}
+  ${TravelAssociationMutations}
   ${RegistrationMutations}
 `;
 

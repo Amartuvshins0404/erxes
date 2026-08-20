@@ -24,6 +24,7 @@ import {
 } from './providerOutputGuard';
 import { ensureWebsiteDeliveryReply } from '@/agent/websiteDelivery';
 import { isAwaitingUserAnswer } from './tools/metaTools';
+import { closingNoteFor } from './closingNote';
 
 // Validated POST /chat/stream payload. All shape-checking for the untrusted
 // request body lives in routes.ts (parseChatStreamBody); this is the contract it
@@ -193,9 +194,11 @@ async function finalizeTurn(params: {
   }
 
   // The model owns the turn ending; its answer is never second-guessed or
-  // rewritten. Only a hard failure or an interruption that left no text gets
-  // a plain-language note so the user isn't stranded on a blank bubble. A
-  // turn that ended on ask_user is waiting on the user's answer — the chat
+  // rewritten. But a turn that leaves the user with nothing — no text, no
+  // question card, no artifact — gets a plain-language closing note instead
+  // of a blank bubble: a hard failure, an interruption, or a silent finish
+  // after tool work (the model ended without composing an answer). A turn
+  // that ended on ask_user is waiting on the user's answer — the chat
   // renders the question card, so it never gets a closing note either (the
   // card IS the outcome).
   const askedUser = acc.toolCalls.some(
@@ -203,10 +206,19 @@ async function finalizeTurn(params: {
       toolCall.toolName === 'ask_user' &&
       isAwaitingUserAnswer(toolCall.result),
   );
-  if (!reply && !askedUser && (interrupted || failed)) {
-    reply = interrupted
-      ? 'This response was interrupted before it finished. Please tap retry to continue.'
-      : 'Something went wrong while I was working on that. Please try again.';
+  // Silent finish: work happened (tool calls) but the model composed no
+  // answer and no artifact was delivered — nothing visible remains.
+  const silentAfterWork =
+    !interrupted &&
+    !failed &&
+    acc.toolCalls.length > 0 &&
+    (authCtx.artifactCount ?? 0) === 0;
+  const closingNote =
+    !reply && !askedUser
+      ? closingNoteFor({ interrupted, failed, silentAfterWork })
+      : null;
+  if (closingNote) {
+    reply = closingNote;
     emitReply = true;
   }
 
@@ -246,7 +258,13 @@ async function finalizeTurn(params: {
       // Mastra's assigned id for this turn's assistant row, captured off the
       // stream's `start` chunk — the id the client rates without a reload.
       assistantMessageId: acc.messageId,
-      replaceNativeText: bufferProviderText || deliveryCorrected,
+      // A silent-after-work closing note must REPLACE the (empty) native text
+      // so the note survives reloads; interrupted/failed notes keep their
+      // existing persistence path (partial text + create-when-missing).
+      replaceNativeText:
+        bufferProviderText ||
+        deliveryCorrected ||
+        (closingNote !== null && silentAfterWork),
       interrupted,
       failed,
       hasArtifacts: (prepared.authCtx.artifactCount ?? 0) > 0,

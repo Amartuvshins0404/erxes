@@ -808,6 +808,12 @@ customerIds, tagIds, propertiesData: JSON)` — the public messenger ticket
 
 <!-- Newest first. Keep at most 10 entries. -->
 
+### `2026-08-20` — `conversations.count` no longer fails without a limit
+
+- **Summary:** The agent-callable `inbox.conversations.count` applied `.skip(0).limit(0)` unconditionally, and `countDocuments` builds an aggregation pipeline where `$limit: 0` is rejected ("the limit must be positive") — so every count call without an explicit positive `options.limit` returned an error envelope, and callers who passed `limit: 1` to work around it got counts truncated to 1. Skip/limit are now applied only when a positive integer is supplied.
+- **Affected areas:** `src/modules/inbox/trpc/inbox.ts`.
+- **Contracts changed:** None — same input shape; `options.skip`/`options.limit` now behave as documented instead of erroring when omitted.
+
 ### `2026-08-20` — Agent-callable tRPC tools
 
 - **Summary:** Read-only inbox conversation/message, integration, and form

@@ -1,11 +1,13 @@
 import { gql } from '@apollo/client';
+import { AGENCY_INFO_FIELDS } from './fragments';
 
 export const UPDATE_AGENCY = gql`
   mutation UpdateAgencyInfo($input: AgencyInput!) {
     updateAgencyInfo(input: $input) {
-      _id
+      ...BlockAgencyInfoFields
     }
   }
+  ${AGENCY_INFO_FIELDS}
 `;
 
 export const CREATE_AGENCY_MEMBER = gql`
@@ -21,7 +23,12 @@ export const CREATE_AGENCY_MEMBER = gql`
       facebookUrl
       instagramUrl
       linkedUrl
-      certificatePhotos
+      certificatePhotos {
+        url
+        name
+        type
+        size
+      }
       role
       createdAt
       updatedAt
@@ -48,7 +55,12 @@ export const UPDATE_AGENCY_MEMBER = gql`
       facebookUrl
       instagramUrl
       linkedUrl
-      certificatePhotos
+      certificatePhotos {
+        url
+        name
+        type
+        size
+      }
       role
       createdAt
       updatedAt

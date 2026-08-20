@@ -89,6 +89,11 @@ import {
 } from '@/listing/graphql/schemas/listing';
 
 import {
+  queries as AgentQueries,
+  types as AgentTypes,
+} from '@/member/graphql/schemas/member';
+
+import {
   queries as ClientPortalBlockQueries,
   types as ClientPortalBlockTypes,
 } from '~/modules/clientportal/graphql/schemas';
@@ -138,6 +143,7 @@ export const types = `
   ${OfferTypes}
   ${SubmissionTypes}
   ${ListingTypes}
+  ${AgentTypes}
 
   ${SupplierTypes}
   ${ProductTypes}
@@ -165,6 +171,7 @@ export const queries = `
   ${OfferQueries}
   ${FormQueries}
   ${ListingQueries}
+  ${AgentQueries}
 
   ${SupplierQueries}
   ${ProductQueries}

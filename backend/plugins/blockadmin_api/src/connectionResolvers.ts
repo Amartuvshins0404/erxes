@@ -8,6 +8,11 @@ import {
   IBlockAdminListingModel,
   loadBlockAdminListingClass,
 } from '@/listing/db/models/Listing';
+import { IBlockAdminAgentDocument } from '@/member/@types/member';
+import {
+  IBlockAdminAgentModel,
+  loadBlockAdminAgentClass,
+} from '@/member/db/models/Member';
 import { IBlockAttachmentDocument } from '@/attachment/@types/attachment';
 import {
   IBlockAttachmentModel,
@@ -90,6 +95,7 @@ import {
 
 export interface IModels extends ISupplierModels, IMembershipModels {
   Agency: IBlockAgencyModel;
+  AgencyMember: IBlockAdminAgentModel;
   Listing: IBlockAdminListingModel;
   Project: IProjectModel;
   ProjectPaymentPlan: IProjectPaymentPlanModel;
@@ -122,6 +128,11 @@ export const loadClasses = (db: mongoose.Connection): IModels => {
     'block_admin_agencies',
     loadBlockAgencyClass(models),
   );
+
+  models.AgencyMember = db.model<
+    IBlockAdminAgentDocument,
+    IBlockAdminAgentModel
+  >('block_admin_members', loadBlockAdminAgentClass(models));
 
   models.Listing = db.model<
     IBlockAdminListingDocument,

@@ -1,3 +1,4 @@
+import { attachmentSchema } from 'erxes-api-shared/core-modules';
 import { Schema } from 'mongoose';
 
 import { BLOCKAGENCY_VERIFICATION_STATUS } from '~/constants';
@@ -16,9 +17,9 @@ export const blockAgencySchema = new Schema<IBlockAgencyDocument>(
     primaryEmail: { type: String },
     phones: [{ type: String }],
     primaryPhone: { type: String },
-    logo: { type: String },
-    coverImage: { type: String },
-    documents: [{ type: String }],
+    logo: { type: attachmentSchema },
+    coverImage: { type: attachmentSchema },
+    documents: [{ type: attachmentSchema }],
     socialLinks: { type: Map, of: String, default: {} },
     operationArea: {
       city: { type: String, label: 'City' },

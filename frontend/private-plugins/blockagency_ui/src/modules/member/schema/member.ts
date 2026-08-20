@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { agencyAttachmentSchema } from '~/modules/agency/schema/form';
 
 export const agentFormSchema = z.object({
   city: z.string().optional(),
@@ -7,8 +8,8 @@ export const agentFormSchema = z.object({
     .string()
     .max(300, 'Description must be at most 300 characters')
     .optional(),
-  facebookUrl: z.string().optional(),
-  instagramUrl: z.string().optional(),
-  linkedUrl: z.string().optional(),
-  certificatePhotos: z.array(z.string()).optional(),
+  facebookUrl: z.string().optional().nullable(),
+  instagramUrl: z.string().optional().nullable(),
+  linkedUrl: z.string().optional().nullable(),
+  certificatePhotos: z.array(agencyAttachmentSchema).optional(),
 });

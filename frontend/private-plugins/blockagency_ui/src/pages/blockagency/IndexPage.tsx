@@ -6,12 +6,14 @@ import {
   ScrollArea,
   Separator,
 } from 'erxes-ui';
-import { PageHeader } from 'ui-modules';
+import { PageHeader, createFavoriteBreadcrumb } from 'ui-modules';
 import { AgencyProfileSidebar } from '~/modules/agency/components/AgencyProfileSidebar';
 import { AgencyProfileTabs } from '~/modules/agency/components/AgencyProfileTabs';
 import { AgencyProfileDetailHeader } from '~/modules/agency/components/AgencyProfileDetailHeader';
 
 export const IndexPage = () => {
+  const favoriteBreadcrumb = createFavoriteBreadcrumb('Agency Profile');
+
   return (
     <PageContainer>
       <PageHeader>
@@ -27,7 +29,10 @@ export const IndexPage = () => {
             </Breadcrumb.List>
           </Breadcrumb>
           <Separator.Inline />
-          <PageHeader.FavoriteToggleButton />
+          <PageHeader.FavoriteToggleButton
+            breadcrumb={favoriteBreadcrumb}
+            icon="IconId"
+          />
         </PageHeader.Start>
       </PageHeader>
       <div className="flex flex-auto overflow-hidden">

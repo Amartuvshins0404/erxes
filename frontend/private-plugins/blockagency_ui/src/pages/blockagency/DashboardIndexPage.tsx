@@ -1,9 +1,11 @@
 import { IconChartArcs } from '@tabler/icons-react';
 import { Breadcrumb, Button, PageContainer, Separator } from 'erxes-ui';
-import { PageHeader } from 'ui-modules';
+import { PageHeader, createFavoriteBreadcrumb } from 'ui-modules';
 import { AgencyDashboardWindow } from '~/modules/dashboard/components/AgencyDashboardWindow';
 
 export const DashboardIndexPage = () => {
+  const favoriteBreadcrumb = createFavoriteBreadcrumb('Dashboard');
+
   return (
     <PageContainer>
       <PageHeader>
@@ -19,7 +21,10 @@ export const DashboardIndexPage = () => {
             </Breadcrumb.List>
           </Breadcrumb>
           <Separator.Inline />
-          <PageHeader.FavoriteToggleButton />
+          <PageHeader.FavoriteToggleButton
+            breadcrumb={favoriteBreadcrumb}
+            icon="IconChartArcs"
+          />
         </PageHeader.Start>
       </PageHeader>
 

@@ -1,4 +1,5 @@
 import { MutationHookOptions, useMutation } from '@apollo/client';
+import { toAttachmentInputs } from '~/modules/agency/utils/attachment';
 import { UPDATE_MEMBER_PROFILE, GET_MEMBER_PROFILE } from '../graphql';
 import { IBlockAgencyMember, TAgentForm } from '../types/member';
 
@@ -14,7 +15,16 @@ export const useUpdateMemberProfile = (options?: MutationHookOptions) => {
     });
 
   const onSubmit = (input: TAgentForm) => {
-    return updateMemberProfile({ variables: { input } });
+    // The form is seeded from `blockAgentGetMemberProfile`, so its attachments
+    // carry `__typename`, which `AttachmentInput` rejects.
+    return updateMemberProfile({
+      variables: {
+        input: {
+          ...input,
+          certificatePhotos: toAttachmentInputs(input.certificatePhotos),
+        },
+      },
+    });
   };
 
   return {

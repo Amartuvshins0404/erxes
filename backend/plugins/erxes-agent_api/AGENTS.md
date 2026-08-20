@@ -6,7 +6,7 @@
 - **Project:** `erxes-agent_api`
 - **Layer:** Backend API
 - **Path:** `backend/plugins/erxes-agent_api`
-- **Last synchronized:** `2026-08-19`
+- **Last synchronized:** `2026-08-20`
 
 ## Scope
 
@@ -33,7 +33,7 @@
 - Asks structured clarifying questions through `ask_user` (`src/mastra/tools/metaTools.ts`): same input contract as Mastra's built-in `askUserTool` (question/options/selectionMode), but returns the payload as a plain tool result (`awaitingUserAnswer: true`) and ends the turn instead of suspending the run — the UI renders the question card and the answer arrives as the next user message (the `request_approval` replay pattern; no Mastra snapshot storage required).
 - Derives chat titles from the first meaningful request without a provider call.
 - Wraps empty operation results (`{}`/`[]`/`null`) in an explicit `resultCount: 0` envelope with filter-check/pivot guidance instead of forwarding an anonymous empty payload.
-- Anchors the system prompt to the current date and lets the native Mastra loop own turn lifecycle: a turn ends when the model itself answers or when the 50-call tool budget is spent (the only hard stop), with no other step ceiling or completion guard.
+- Anchors the system prompt to the current date and lets the native Mastra loop own turn lifecycle: a turn ends when the model itself answers or when the 50-call tool budget is spent (the only hard stop), with no other step ceiling or completion guard. When the sandbox workspace tools are active, the prompt also carries the workspace doctrine (batch writes, idempotent full-file content, `workspaceReused: false` means the workspace was recreated empty — rewrite from plan, never probe; publish once after all writes).
 - Streams the model's reply as-is: mid-stream provider failures append a plain-language failure note, and error/abort finishes with no text create the assistant row Mastra never saved. A completed turn's text is never rewritten, synthesized, or replaced.
 
 ## Architecture
@@ -98,6 +98,12 @@
 ## Recent Changes
 
 <!-- Newest first. Keep at most 10 entries. -->
+
+### `2026-08-20` — Workspace tool contract hardening
+
+- **Summary:** Closed the remaining gaps behind a recorded turn failure (agent looped on a wiped workspace and oversized heredoc writes): the system prompt now carries a workspace doctrine when `workspaceWrite` is active (batch up to 32 files in one call, always full-file idempotent content, `workspaceReused: false` means the sandbox was recreated empty so rewrite from plan instead of probing, publish once after writes), the `workspaceWrite`/`publishWebsite` descriptions state the same semantics in plain language, and workspace lease acquisition polls briefly (4 attempts × 500ms) on a cross-replica duplicate-key race before surfacing the "workspace is busy" error.
+- **Affected areas:** `src/mastra/instructions/routing.ts`, `src/mastra/tools/workspaceTools.ts`, `src/mastra/sandbox/commandService.ts` (+ tests).
+- **Contracts changed:** None
 
 ### `2026-08-19` — Legacy index drop waits out background index builds
 

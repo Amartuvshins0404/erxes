@@ -548,4 +548,44 @@ describe('OpenSandbox terminal execution', () => {
     await Promise.all([first, second]);
     expect(writeFiles).toHaveBeenCalledTimes(2);
   });
+
+  it('retries lease acquisition when another replica holds the workspace', async () => {
+    sessionModel.findOneAndUpdate.mockImplementationOnce(() => {
+      const error = new Error('duplicate key') as Error & { code: number };
+      error.code = 11000;
+      throw error;
+    });
+    commandRun.mockResolvedValue({ exitCode: 0 });
+
+    const result = await writeSandboxWorkspaceFiles(
+      models,
+      { agentId: 'agent-1', threadId: 'thread-1', subdomain: 'tenant' },
+      { files: [{ path: 'retry.txt', content: 'ok' }] },
+    );
+
+    expect(sessionModel.findOneAndUpdate).toHaveBeenCalledTimes(2);
+    expect(result.files).toEqual([{ path: 'retry.txt', size: 2 }]);
+    expect(writeFiles).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails with the busy message when the lease never frees up', async () => {
+    sessionModel.findOneAndUpdate.mockImplementation(() => {
+      const error = new Error('duplicate key') as Error & { code: number };
+      error.code = 11000;
+      throw error;
+    });
+
+    await expect(
+      writeSandboxWorkspaceFiles(
+        models,
+        { agentId: 'agent-1', threadId: 'thread-1', subdomain: 'tenant' },
+        { files: [{ path: 'never.txt', content: 'no' }] },
+      ),
+    ).rejects.toThrow('This agent workspace is busy');
+
+    expect(sessionModel.findOneAndUpdate).toHaveBeenCalledTimes(4);
+    expect(createSandbox).not.toHaveBeenCalled();
+    expect(connectSandbox).not.toHaveBeenCalled();
+    expect(writeFiles).not.toHaveBeenCalled();
+  }, 15_000);
 });

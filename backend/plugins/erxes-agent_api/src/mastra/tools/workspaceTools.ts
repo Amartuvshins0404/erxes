@@ -71,7 +71,9 @@ export const createWorkspaceWriteTool = ({
     description:
       'Write complete UTF-8 source files into this AI team member’s isolated persistent workspace. ' +
       'Use this instead of shell heredocs, base64, printf, or oversized terminal commands. ' +
-      'Parent directories are created automatically.',
+      'Parent directories are created automatically. ' +
+      'Batch up to 32 files in one call (1MB each) and always pass each file’s full content — writes are idempotent. ' +
+      'When a result reports workspaceReused: false, the workspace was recreated empty and earlier files are gone: rewrite every needed file in one call instead of probing.',
     inputSchema: z.object({
       cwd: cwdSchema,
       files: z
@@ -144,6 +146,7 @@ export const createPublishWebsiteTool = ({
     id: 'publish-website',
     description:
       'Publish one completed static website directory from the persistent workspace as one immutable chat artifact. ' +
+      'Call it once, only after every website file has been written. ' +
       'Run the build first when needed. The directory must contain every HTML, CSS, JavaScript, image, and font asset; never start a server or use localhost URLs.',
     inputSchema: z.object({
       cwd: cwdSchema,

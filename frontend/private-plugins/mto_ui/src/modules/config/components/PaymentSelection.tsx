@@ -10,7 +10,6 @@ interface Payment {
   name: string;
   kind: string;
   status: string;
-  config?: any;
   createdAt?: string;
 }
 
@@ -53,7 +52,7 @@ export function PaymentSelection() {
   if (isLoading) {
     return (
       <div className="p-6">
-        <div className="text-sm text-gray-500">Loading payments...</div>
+        <div className="text-sm text-muted-foreground">Loading payments...</div>
       </div>
     );
   }
@@ -62,20 +61,20 @@ export function PaymentSelection() {
     <div className="p-6 space-y-4">
       <div>
         <h2 className="text-lg font-semibold mb-2">Select Payments</h2>
-        <p className="text-sm text-gray-600 mb-4">
+        <p className="text-sm text-muted-foreground mb-4">
           Choose which payment methods should be available in the system.
         </p>
       </div>
 
       {payments.length === 0 ? (
-        <div className="text-sm text-gray-500">No payments available</div>
+        <div className="text-sm text-muted-foreground">No payments available</div>
       ) : (
         <>
           <div className="border rounded-lg divide-y">
             {payments.map((payment) => (
               <div
                 key={payment._id}
-                className="flex items-center justify-between p-4 hover:bg-gray-50"
+                className="flex items-center justify-between p-4 hover:bg-muted/50"
               >
                 <div className="flex items-center gap-3 flex-1">
                   <Checkbox
@@ -83,14 +82,12 @@ export function PaymentSelection() {
                     onCheckedChange={() => handleTogglePayment(payment._id)}
                   />
                   <div className="flex-1">
-                    <div className="font-medium text-gray-900">
-                      {payment.name}
-                    </div>
-                    <div className="text-sm text-gray-500 capitalize">
+                    <div className="font-medium">{payment.name}</div>
+                    <div className="text-sm text-muted-foreground capitalize">
                       {payment.kind}
                     </div>
                   </div>
-                  <div className="text-xs text-gray-400 capitalize">
+                  <div className="text-xs text-muted-foreground capitalize">
                     {payment.status}
                   </div>
                 </div>
@@ -99,11 +96,7 @@ export function PaymentSelection() {
           </div>
 
           <div className="flex justify-end gap-2 pt-4">
-            <Button
-              onClick={handleSave}
-              disabled={updateLoading}
-              variant="default"
-            >
+            <Button onClick={handleSave} disabled={updateLoading}>
               {updateLoading ? 'Saving...' : 'Save'}
             </Button>
           </div>

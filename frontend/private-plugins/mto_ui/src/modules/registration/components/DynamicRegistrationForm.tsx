@@ -13,7 +13,7 @@ import { useForm } from 'react-hook-form';
 import { useEffect, useMemo } from 'react';
 import { useMutation } from '@apollo/client';
 import { toast } from 'erxes-ui';
-import { MtoUpload } from '~/components/onefit-upload';
+import { MtoUpload } from '~/components/MtoUpload';
 import { useUploadConfig } from '@/config/hooks/useUploadConfig';
 import {
   MTO_REGISTRATION_APPLICATION_UPDATE,

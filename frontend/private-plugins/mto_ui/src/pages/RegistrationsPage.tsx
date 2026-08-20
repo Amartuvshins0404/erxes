@@ -10,8 +10,9 @@ import {
   Separator,
   Spinner,
   toast,
+  useQueryState,
 } from 'erxes-ui';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PageHeader } from 'ui-modules';
 import { RegistrationFilters } from '@/registration/components/RegistrationFilters';
@@ -44,6 +45,7 @@ interface MembershipSummary {
 
 export function RegistrationsPage() {
   const filters = useRegistrationsFilterVariables();
+  const [membershipTypeId] = useQueryState<string>('membershipTypeId');
   const { refetch } = useRegistrations();
   const { data, loading } = useQuery(MTO_REGISTRATION_MEMBERSHIP_SUMMARIES);
   const [chooserOpen, setChooserOpen] = useState(false);
@@ -54,9 +56,18 @@ export function RegistrationsPage() {
     MTO_REGISTRATION_APPLICATIONS_EXPORT,
   );
 
-  const fillFormTypes = (
-    (data?.mtoRegistrationMembershipSummaries ?? []) as MembershipSummary[]
-  ).slice(0, 6);
+  const summaries = (data?.mtoRegistrationMembershipSummaries ??
+    []) as MembershipSummary[];
+
+  const fillFormTypes = summaries.slice(0, 6);
+
+  const activeTypeTitle = useMemo(() => {
+    if (!membershipTypeId) return null;
+    return (
+      summaries.find((row) => row.membershipTypeId === membershipTypeId)
+        ?.title ?? membershipTypeId
+    );
+  }, [membershipTypeId, summaries]);
 
   function openSheet(row: MembershipSummary) {
     setSelectedTypeId(row.membershipTypeId);
@@ -106,6 +117,16 @@ export function RegistrationsPage() {
                   </Link>
                 </Button>
               </Breadcrumb.Item>
+              {activeTypeTitle ? (
+                <>
+                  <Breadcrumb.Separator />
+                  <Breadcrumb.Item>
+                    <Button variant="ghost" disabled>
+                      {activeTypeTitle}
+                    </Button>
+                  </Breadcrumb.Item>
+                </>
+              ) : null}
             </Breadcrumb.List>
           </Breadcrumb>
           <Separator.Inline />

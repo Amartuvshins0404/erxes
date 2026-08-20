@@ -23,8 +23,9 @@
 
 ## Current Capabilities
 
-- Dev port **3008**. Registers with `core-ui` as module `mto`, with navigation group, settings navigation, and relation-widget module `mtocustomer`.
+- Dev port **3008**. Registers with `core-ui` as module `mto`, with navigation group (including registration-type `subGroup`), settings navigation, and relation-widget module `mtocustomer`.
 - List pages for categories, events, and registrations use `PageContainer` + `PageHeader` + `PageSubHeader` with URL-driven `Filter` bars and `RecordTable` (cursor pagination on registrations).
+- Navigation `subGroup` lists FillForm membership types and filters `/mto/registrations?membershipTypeId=...`.
 - Category/event create and edit via side `Sheet` forms validated with React Hook Form + Zod.
 - Registration detail opens as a `FocusSheet` driven by Jotai (`registrationDetailSheetState`); create uses membership-type Dialog chooser then `RegistrationFormSheet`.
 - `/mto` and `/mto/registration` redirect to `/mto/registrations`.
@@ -36,7 +37,7 @@
 | -------- | ---------------------------- | -------------------------- |
 | Config | `src/config.tsx` | Module registration, navigation, widgets |
 | Main routes | `src/modules/Main.tsx` | Route table + slave onboarding gate |
-| Navigation | `src/modules/MtoNavigation*.tsx` | Sidebar links and setup guard |
+| Navigation | `src/modules/MtoNavigation*.tsx`, `src/modules/MtoRegistrationsNavigation.tsx` | Sidebar links, setup guard, registration-type subGroup |
 | Category | `src/modules/category` | Category filters, table, form sheet, hooks |
 | Event | `src/modules/event` | Event filters, table, form sheet, hooks |
 | Registration | `src/modules/registration` | Filters, cursor table, detail/create sheets, schema builder utils |
@@ -77,6 +78,12 @@
 ## Recent Changes
 
 <!-- Newest first. Keep at most 10 entries. -->
+
+### `2026-08-20` — Registration type nav submenus
+
+- **Summary:** Added Block-style `navigationGroup.subGroup` listing FillForm membership types; each link opens registrations filtered by `membershipTypeId`, with matching breadcrumb.
+- **Affected areas:** `src/config.tsx`, `src/modules/MtoRegistrationsNavigation.tsx`, `src/pages/RegistrationsPage.tsx`
+- **Contracts changed:** None
 
 ### `2026-08-20` — Tighter RecordTable columns
 

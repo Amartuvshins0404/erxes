@@ -134,6 +134,19 @@ contain spaces or punctuation. Call renderDiagram only when the user explicitly
 wants a downloadable file.
 `.trim();
 
+// Workspace doctrine: the model cannot see the sandbox lifecycle, so state it
+// explicitly. Without this it re-probes a wiped workspace file by file and
+// burns the turn (observed failure: rebuilt one site three times in one turn).
+const WORKSPACE_HINT = `
+**Workspace & websites:** workspaceWrite writes complete files into your
+persistent per-chat workspace. Batch every file of one change into a single
+workspaceWrite call (up to 32 files); always pass each file's full content,
+never a partial patch. Each result reports workspaceReused: when it is false,
+the workspace was recreated empty and earlier files are gone — rewrite
+everything your plan needs in one call instead of probing what survived.
+Publish with publishWebsite once, after every file is written.
+`.trim();
+
 /** Prompt section listing the agent's standalone builtin tools. */
 const BUILTIN_BLOCK = (tools: ToolInfo[]) => {
   const names = tools.map((tool) => tool.name || tool.id);
@@ -144,6 +157,7 @@ Use only the tools active for this turn; their input schemas are authoritative.
 Configured capabilities: ${names.join(', ')}.
 ${names.includes('renderChart') ? `\n${RENDER_CHART_HINT}` : ''}
 ${names.includes('renderDiagram') ? `\n${RENDER_DIAGRAM_HINT}` : ''}
+${names.includes('workspaceWrite') ? `\n${WORKSPACE_HINT}` : ''}
 `.trim();
 };
 

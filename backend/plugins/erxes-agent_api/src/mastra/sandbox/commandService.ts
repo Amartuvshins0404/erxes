@@ -127,44 +127,59 @@ const isDuplicateKeyError = (error: unknown): boolean => {
   return error.code === 11000;
 };
 
+const WORKSPACE_BUSY_RETRY_DELAY_MS = 500;
+const WORKSPACE_BUSY_MAX_ATTEMPTS = 4;
+
+const delay = (ms: number): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, ms));
+
+// The in-process queue serializes same-replica workspace calls, so a duplicate
+// key here means another replica holds the lease. Poll briefly — short
+// operations on the other replica release it — before failing the tool call.
 const acquireSession = async (
   models: IModels,
   identity: SandboxSessionIdentity,
 ): Promise<{ session: IMastraSandboxSessionDocument; leaseId: string }> => {
-  const now = new Date();
-  const leaseId = randomUUID();
-  const leaseExpiresAt = new Date(now.getTime() + LEASE_MILLISECONDS);
-  try {
-    const session = await models.MastraSandboxSession.findOneAndUpdate(
-      {
-        agentId: identity.agentId,
-        threadId: identity.threadId,
-        $or: [
-          { leaseId: { $exists: false } },
-          { leaseId: null },
-          { leaseExpiresAt: { $lte: now } },
-        ],
-      },
-      {
-        $set: { leaseId, leaseExpiresAt },
-        $setOnInsert: {
+  for (let attempt = 1; attempt <= WORKSPACE_BUSY_MAX_ATTEMPTS; attempt += 1) {
+    const now = new Date();
+    const leaseId = randomUUID();
+    const leaseExpiresAt = new Date(now.getTime() + LEASE_MILLISECONDS);
+    try {
+      const session = await models.MastraSandboxSession.findOneAndUpdate(
+        {
           agentId: identity.agentId,
           threadId: identity.threadId,
-          expiresAt: leaseExpiresAt,
+          $or: [
+            { leaseId: { $exists: false } },
+            { leaseId: null },
+            { leaseExpiresAt: { $lte: now } },
+          ],
         },
-      },
-      { upsert: true, new: true },
-    );
-    if (!session) throw new Error('Workspace lease was not acquired');
-    return { session, leaseId };
-  } catch (error) {
-    if (isDuplicateKeyError(error)) {
-      throw new ExpectedError(
-        'This agent workspace is busy. Wait for its current command to finish.',
+        {
+          $set: { leaseId, leaseExpiresAt },
+          $setOnInsert: {
+            agentId: identity.agentId,
+            threadId: identity.threadId,
+            expiresAt: leaseExpiresAt,
+          },
+        },
+        { upsert: true, new: true },
       );
+      if (!session) throw new Error('Workspace lease was not acquired');
+      return { session, leaseId };
+    } catch (error) {
+      if (!isDuplicateKeyError(error)) throw error;
+      if (attempt === WORKSPACE_BUSY_MAX_ATTEMPTS) {
+        throw new ExpectedError(
+          'This agent workspace is busy. Wait for its current command to finish.',
+        );
+      }
+      await delay(WORKSPACE_BUSY_RETRY_DELAY_MS);
     }
-    throw error;
   }
+  throw new ExpectedError(
+    'This agent workspace is busy. Wait for its current command to finish.',
+  );
 };
 
 const releaseSession = async (

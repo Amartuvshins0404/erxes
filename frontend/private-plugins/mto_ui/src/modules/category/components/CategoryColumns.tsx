@@ -1,14 +1,24 @@
-import { IconEdit, IconTrash } from '@tabler/icons-react';
+/* eslint-disable react-hooks/rules-of-hooks */
+import {
+  IconCalendar,
+  IconDots,
+  IconEdit,
+  IconLayersSubtract,
+  IconProgress,
+  IconTag,
+  IconTrash,
+} from '@tabler/icons-react';
 import { ColumnDef } from '@tanstack/table-core';
 import {
   Badge,
   Button,
+  DropdownMenu,
   RecordTable,
   RecordTableInlineCell,
   RelativeDateDisplay,
 } from 'erxes-ui';
-import { MtoCategory } from '@/category/types/category';
 import { isMainCategory } from '@/category/hooks/useCategoryOptions';
+import { MtoCategory } from '@/category/types/category';
 
 export const categoryColumns = ({
   onEdit,
@@ -18,38 +28,33 @@ export const categoryColumns = ({
   onRemove: (id: string) => void;
 }): ColumnDef<MtoCategory>[] => [
   {
+    id: 'name',
     accessorKey: 'name',
-    header: () => <RecordTable.InlineHead label="Name (EN)" />,
+    header: () => <RecordTable.InlineHead label="Name" icon={IconTag} />,
     cell: ({ cell }) => {
       const name = cell.getValue() as MtoCategory['name'];
-
       return (
-        <RecordTableInlineCell className="font-medium max-w-[200px]">
-          {name?.en || '—'}
+        <RecordTableInlineCell className="min-w-0">
+          <div className="flex flex-col gap-0.5 min-w-0">
+            <span className="font-medium truncate">{name?.en || '—'}</span>
+            {name?.mn ? (
+              <span className="text-xs text-muted-foreground truncate">
+                {name.mn}
+              </span>
+            ) : null}
+          </div>
         </RecordTableInlineCell>
       );
     },
-  },
-  {
-    id: 'nameMn',
-    accessorKey: 'name',
-    header: () => <RecordTable.InlineHead label="Name (MN)" />,
-    cell: ({ cell }) => {
-      const name = cell.getValue() as MtoCategory['name'];
-
-      return (
-        <RecordTableInlineCell className="max-w-[200px]">
-          {name?.mn || '—'}
-        </RecordTableInlineCell>
-      );
-    },
+    size: 280,
   },
   {
     id: 'level',
-    header: () => <RecordTable.InlineHead label="Level" />,
+    header: () => (
+      <RecordTable.InlineHead label="Level" icon={IconLayersSubtract} />
+    ),
     cell: ({ row }) => {
       const main = isMainCategory(row.original);
-
       return (
         <RecordTableInlineCell>
           <Badge variant={main ? 'default' : 'secondary'}>
@@ -58,13 +63,16 @@ export const categoryColumns = ({
         </RecordTableInlineCell>
       );
     },
+    size: 100,
   },
   {
+    id: 'isActive',
     accessorKey: 'isActive',
-    header: () => <RecordTable.InlineHead label="Status" />,
+    header: () => (
+      <RecordTable.InlineHead label="Status" icon={IconProgress} />
+    ),
     cell: ({ cell }) => {
       const active = cell.getValue() as boolean;
-
       return (
         <RecordTableInlineCell>
           <Badge variant={active ? 'success' : 'secondary'}>
@@ -73,40 +81,60 @@ export const categoryColumns = ({
         </RecordTableInlineCell>
       );
     },
+    size: 110,
   },
   {
+    id: 'createdAt',
     accessorKey: 'createdAt',
-    header: () => <RecordTable.InlineHead label="Created" />,
-    cell: ({ cell }) => (
-      <RecordTableInlineCell className="text-xs">
-        <RelativeDateDisplay value={cell.getValue() as string} asChild>
-          <RelativeDateDisplay.Value value={cell.getValue() as string} />
-        </RelativeDateDisplay>
-      </RecordTableInlineCell>
+    header: () => (
+      <RecordTable.InlineHead label="Created" icon={IconCalendar} />
     ),
+    cell: ({ cell }) => {
+      const value = cell.getValue() as string | undefined;
+      return (
+        <RecordTableInlineCell>
+          {value ? (
+            <RelativeDateDisplay value={value} asChild>
+              <RelativeDateDisplay.Value value={value} />
+            </RelativeDateDisplay>
+          ) : (
+            <span className="text-muted-foreground">—</span>
+          )}
+        </RecordTableInlineCell>
+      );
+    },
+    size: 140,
   },
   {
     id: 'actions',
-    header: '',
+    header: () => <span />,
     cell: ({ row }) => (
-      <RecordTableInlineCell className="flex justify-end items-center gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          size="icon"
-          onClick={() => onEdit(row.original._id)}
-        >
-          <IconEdit size={16} />
-        </Button>
-        <Button
-          type="button"
-          variant="destructive"
-          size="icon"
-          onClick={() => onRemove(row.original._id)}
-        >
-          <IconTrash size={16} />
-        </Button>
+      <RecordTableInlineCell>
+        <DropdownMenu>
+          <DropdownMenu.Trigger asChild>
+            <Button variant="ghost" size="icon" className="h-7 w-7">
+              <IconDots className="size-4" />
+            </Button>
+          </DropdownMenu.Trigger>
+          <DropdownMenu.Content className="mto:min-w-36" align="end">
+            <DropdownMenu.Item
+              className="cursor-pointer"
+              onClick={() => onEdit(row.original._id)}
+            >
+              <IconEdit className="size-4" />
+              <span>Edit</span>
+            </DropdownMenu.Item>
+            <DropdownMenu.Item
+              className="cursor-pointer text-destructive focus:text-destructive"
+              onClick={() => onRemove(row.original._id)}
+            >
+              <IconTrash className="size-4" />
+              <span>Delete</span>
+            </DropdownMenu.Item>
+          </DropdownMenu.Content>
+        </DropdownMenu>
       </RecordTableInlineCell>
     ),
+    size: 50,
   },
 ];

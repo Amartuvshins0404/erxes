@@ -41,26 +41,29 @@ export function CategoriesRecordTable() {
 
   return (
     <>
-      <RecordTable.Provider
-        columns={categoryColumns({
-          onEdit: (id) => {
-            setEditId(id);
-            setSheetOpen(true);
-          },
-          onRemove: handleRemove,
-        })}
-        data={categories}
-        className="m-3"
-        tableId="categories_record_table"
-      >
-        <RecordTable>
-          <RecordTable.Header />
-          <RecordTable.Body>
-            {loading && <RecordTable.RowSkeleton rows={10} />}
-            <RecordTable.RowList />
-          </RecordTable.Body>
-        </RecordTable>
-      </RecordTable.Provider>
+      <div className="flex flex-col overflow-hidden h-full">
+        <RecordTable.Provider
+          columns={categoryColumns({
+            onEdit: (id) => {
+              setEditId(id);
+              setSheetOpen(true);
+            },
+            onRemove: handleRemove,
+          })}
+          data={categories}
+          className="m-3 h-full"
+          stickyColumns={['name']}
+          tableId="categories_record_table"
+        >
+          <RecordTable>
+            <RecordTable.Header />
+            <RecordTable.Body>
+              {loading && <RecordTable.RowSkeleton rows={10} />}
+              <RecordTable.RowList />
+            </RecordTable.Body>
+          </RecordTable>
+        </RecordTable.Provider>
+      </div>
 
       <CategoryFormSheet
         open={sheetOpen}

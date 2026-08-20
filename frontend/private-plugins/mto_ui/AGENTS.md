@@ -78,6 +78,12 @@
 
 <!-- Newest first. Keep at most 10 entries. -->
 
+### `2026-08-20` — Tighter RecordTable columns
+
+- **Summary:** Reorganized category/event/registration tables: icon headers, fixed sizes, sticky primary columns, bilingual name/title stacked cells, schedule/status consolidation, and kebab action menus.
+- **Affected areas:** `CategoryColumns.tsx`, `EventColumns.tsx`, `RegistrationColumns.tsx`, `*RecordTable.tsx`
+- **Contracts changed:** None
+
 ### `2026-08-20` — Align UI with Block Offers patterns
 
 - **Summary:** Replaced custom MTO page/filter chrome with Block-style `PageContainer`/`PageHeader`/`Filter`/URL state, split RecordTables, RHF+Zod category/event sheets, FocusSheet registration detail, settings restyle, and landing redirects.

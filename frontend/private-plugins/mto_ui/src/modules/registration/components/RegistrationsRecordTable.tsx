@@ -63,6 +63,7 @@ export function RegistrationsRecordTable() {
           })}
           data={registrations || (loading ? [{} as never] : [])}
           className="m-3 h-full"
+          stickyColumns={['isRead', 'membershipTypeTitle']}
           tableId="registrations_record_table"
         >
           <RecordTable.CursorProvider

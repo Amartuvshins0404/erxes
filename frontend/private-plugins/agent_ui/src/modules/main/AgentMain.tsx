@@ -2,7 +2,6 @@ import { AgentDeployScreen } from '../deploy/components/AgentDeployScreen';
 import { AgentTransferCredentialsDialog } from '../deploy/components/AgentTransferCredentialsDialog';
 import { useAgent } from './hooks/useAgent';
 import { useFixAndRestart } from '../detail/hooks/useFixAndRestart';
-import { useKimiKeyStatus } from '../detail/hooks/useKimiKey';
 import { Button, Card, Spinner } from 'erxes-ui';
 import {
   IconKey,
@@ -43,17 +42,12 @@ export const AgentMain = () => {
   const runtimeUrl = agent?.url?.trim().replace(/\/+$/, '');
   const isApproved =
     !!agent && agent.status === SERVER_STATUSES.APPROVED && !!runtimeUrl;
-  const shouldCheckKimiKey =
-    isApproved && (!agent?.provider || agent.provider === 'kimi');
-  const { hasKey, refetch: refetchKimiKey } = useKimiKeyStatus(
-    !shouldCheckKimiKey,
-  );
-  const [llmConnectionManualOpen, setLlmConnectionManualOpen] = useState(false);
-  const llmConnectionForced =
-    (shouldCheckKimiKey && hasKey === false) ||
-    (agent?.credentialMode === 'subscription' &&
-      agent?.credentialStatus !== 'connected');
-  const llmConnectionOpen = llmConnectionForced || llmConnectionManualOpen;
+  // The connection dialog only opens when the user asks for it (key button).
+  // It used to force itself open whenever the provider probe failed, but that
+  // probe returns false for a quota-exhausted or rate-limited key as well as a
+  // dead one -- locking the user out of their own assistant over a key that was
+  // fine, with no way to dismiss and nothing to fix.
+  const [llmConnectionOpen, setLlmConnectionOpen] = useState(false);
 
   if (loading) {
     return <Spinner />;
@@ -121,7 +115,7 @@ export const AgentMain = () => {
             type="button"
             variant="ghost"
             size="icon"
-            onClick={() => setLlmConnectionManualOpen(true)}
+            onClick={() => setLlmConnectionOpen(true)}
             aria-label="Change API key or provider subscription"
             title="Change API key or provider subscription"
           >
@@ -194,18 +188,11 @@ export const AgentMain = () => {
         currentModel={agent.model}
         currentCredentialMode={agent.credentialMode}
         managed={isManagedAssistantAgent(agent)}
-        onSuccess={(provider) => {
-          setLlmConnectionManualOpen(false);
-          if (provider === 'kimi') {
-            refetchKimiKey();
-          }
+        onSuccess={() => {
+          setLlmConnectionOpen(false);
           refreshIframe();
         }}
-        onCancel={
-          llmConnectionForced
-            ? undefined
-            : () => setLlmConnectionManualOpen(false)
-        }
+        onCancel={() => setLlmConnectionOpen(false)}
       />
     </div>
   );

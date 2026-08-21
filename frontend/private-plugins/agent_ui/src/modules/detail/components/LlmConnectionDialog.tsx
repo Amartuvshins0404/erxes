@@ -272,7 +272,14 @@ export const LlmConnectionDialog = ({
   };
 
   return (
-    <AlertDialog open={open}>
+    <AlertDialog
+      open={open}
+      onOpenChange={(next) => {
+        // Without this, Escape had nothing to call and the dialog was a trap.
+        // Never dismiss mid-apply: the key is already being written.
+        if (!next && !busy) onCancel?.();
+      }}
+    >
       <AlertDialog.Content className="sm:max-w-2xl">
         <AlertDialog.Header className="flex flex-row gap-3 sm:flex-row">
           <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/10">

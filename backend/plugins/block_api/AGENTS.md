@@ -6,7 +6,7 @@
 - **Project:** `block_api`
 - **Layer:** `Backend API`
 - **Path:** `backend/plugins/block_api`
-- **Last synchronized:** `2026-08-11`
+- **Last synchronized:** `2026-08-21`
 
 ## Scope
 
@@ -30,6 +30,7 @@
 - On-demand manual re-sync of a single signed contract (`blockManualSyncContract`) — same pipeline as the automatic signed-path sync, triggered by a widget instead of a status transition.
 - Offer mirroring to block-admin, mirroring Contract's design: `Offer.updateOffer` throws `'Sent offers cannot be edited'` once `status === 'sent'` (5-minute revert window, same pattern as Contract), and `blockCreateOffer`/`blockUpdateOffer`/`blockSendOfferEmail` all auto-mirror via `wrapMutationResolver` — block-admin only actually syncs the offer once its status is `sent`. On-demand manual re-sync of a single sent offer (`blockManualSyncOffer`) mirrors `blockManualSyncContract`'s design.
 - Every mutation in `resolvers.Mutation` is globally wrapped by `wrapMutationResolver` (`src/main.ts`), which fires a best-effort webhook to `${BLOCK_ADMIN_API_URL}/webhook/{mutationName}` after any mutation that returns a truthy entity — most of these paths have no matching route in `blockadmin_api` and are ignored there; only the explicitly-built webhook paths below are consumed.
+- Agent-callable tRPC read tools: `unit.findOne`/`unit.find`/`unit.count` (permission `unit.showUnits`) and `project.findOne`/`project.find` (permission `project.showProjects`) are exposed via `.meta({ agent: ... })`, discovered through the platform's auto-mounted `/agent-tools/manifest`. Sellable units are `status: 'available'` with `locked: false`.
 
 ## Architecture
 
@@ -37,9 +38,9 @@
 | ------------------ | ----------------------------------------- | -------------------------------------------------------------------------------- |
 | Admin/sync         | `src/modules/admin`                       | `CustomerSync` link record, `sendMessage`/`sendMessageAwait` webhook client, `syncCustomerToBlockAdmin`, global `wrapMutationResolver` |
 | Contract           | `src/modules/contract`                    | Contract CRUD, `ContractStatus`, `ContractPayment`/`ContractPaymentTransaction`, offers, block-admin mirror utils (`utils/mirror.ts`, `utils/paymentsSync.ts`, `utils/signedStatus.ts`) |
-| Project            | `src/modules/project`                     | Project, payment plan templates, project members                               |
+| Project            | `src/modules/project`                     | Project, payment plan templates, project members, agent-facing project tRPC tools (`trpc/project.ts`) |
 | Building           | `src/modules/building`                    | Buildings, zonings                                                              |
-| Unit               | `src/modules/unit`                        | Units, unit types                                                               |
+| Unit               | `src/modules/unit`                        | Units, unit types, agent-facing unit tRPC tools (`trpc/unit.ts`)                |
 | Oppty              | `src/modules/oppty`                       | Opportunity pipeline, oppty statuses, convert-to-contract                       |
 | Developer          | `src/modules/developer`                   | Developer org profile                                                           |
 | Document/Note/Attachment | `src/modules/document`, `note`, `attachment` | Generic file/note/attachment CRUD scoped to block entities                   |
@@ -50,6 +51,7 @@
 ### Provides
 
 - GraphQL (all operations prefixed `block`/`getBlock`/`createBlock` etc., unique repo-wide): contract (`blockCreateContract`, `blockUpdateContract`, `blockUpdateContractStatus`, `blockManualSyncContract`, `blockGetContract(s)`, `blockGetContractsList`, `blockGetUnitContractOverview`), contract payments/transactions (`blockGetContractPayments`, `blockAddPaymentTransaction`, `blockUpdatePaymentTransaction`, `blockRemovePaymentTransaction`, ...), contract statuses (`*BlockContractStatus*`), projects/buildings/units/oppty/offers/invoices/documents/notes/attachments (see `src/modules/*/graphql/schemas`), customer sync (`blockSyncCustomer`, `blockGetCustomerSync`).
+- tRPC agent tools (auto-mounted `/agent-tools/manifest` + `/agent-tools/call` via `trpcAppRouter` in `src/main.ts`): `unit.findOne`, `unit.find`, `unit.count` (`unit.showUnits` permission), `project.findOne`, `project.find` (`project.showProjects` permission). Read-only; find/count inputs are strict and results bounded.
 - Webhook calls to `blockadmin_api` at `${BLOCK_ADMIN_API_URL}/webhook/{path}` (HMAC-signed with `BLOCK_ADMIN_SECRET`): `customerSync`, `blockCreateContract`, `blockUpdateContract`, `blockUpdateContractStatus`, `contractSigned`, `blockSyncContractPayments`. Every other mutation name is also fired generically by `wrapMutationResolver` but has no consuming route on the other side.
 
 ### Consumes
@@ -76,6 +78,7 @@
 - Offer's `status` (`draft|sent`) is a plain enum stored directly on the document — unlike Contract's status (an ObjectId reference into a per-org `ContractStatus` collection), there is no lookup/resolve-to-semantic-type step needed before mirroring an offer.
 - `blockSendOfferEmail`'s own GraphQL args (`{_id}`) carry no offer fields, so — like `blockUpdateContractStatus` does for Contract — it must mutate `args.input` in place after computing the updated offer, or `wrapMutationResolver`'s auto-forwarded webhook payload has nothing for block-admin's route to mirror. `contract/utils/offerMirror.ts#buildOfferMirrorInput` is the one place that builds this shape; `blockSendOfferEmail`, `blockUpdateOffer`, and `blockManualSyncOffer` all use it — keep it as the single source rather than reconstructing the field list at each call site.
 - `blockUpdateOffer` must always reshape `args.input` to the full DB record via `buildOfferMirrorInput(updated)` after the write, even though its GraphQL arg is a full `BlockOfferInput!` — the frontend's status-only Select (`OfferDetailSheet.handleStatusChange`) calls this same mutation with a deliberately partial input (no `customerId`, `paymentPlan`, etc.), so forwarding the caller's raw `input` as-is silently drops fields block-admin's `syncIfSent` needs (this was the root cause of the "offer sent" notification not firing — fixed 2026-08-11). Contract avoids this class of bug entirely by routing status-only changes through a dedicated `blockUpdateContractStatus` mutation instead of overloading `blockUpdateContract`; Offer instead fixes it by making the shared update path always mirror complete data regardless of what was sent.
+- Agent-facing tRPC reads must stay bounded and strict: every `.meta({ agent })` find-style procedure caps `limit` (default 20, max 100), rejects unknown top-level input keys via `.strict()` Zod schemas, and only safe read procedures get annotated. Never annotate raw-mongo or mutation helpers.
 
 ## Validation
 
@@ -87,6 +90,12 @@
 ## Recent Changes
 
 <!-- Newest first. Keep at most 10 entries. -->
+
+### `2026-08-21` — Agent-callable tRPC read tools for units and projects
+
+- **Summary:** Wired `trpcAppRouter` into `startPlugin` and exposed read-only agent tools — `unit.findOne`/`unit.find`/`unit.count` and `project.findOne`/`project.find` — via `.meta({ agent })`, so AI agents can answer real-estate availability questions (sellable = `status: 'available'`, `locked: false`) through the platform's `/agent-tools` protocol. Added the plugin's first permissions config (`unit.showUnits`, `project.showProjects`, both `always: true`) and a local `agentMeta` helper.
+- **Affected areas:** `src/trpc/agentMeta.ts` (new), `src/trpc/init-trpc.ts`, `src/meta/permissions.ts` (new), `src/modules/unit/trpc/unit.ts` (new), `src/modules/project/trpc/project.ts` (new), `src/main.ts`.
+- **Contracts changed:** Added tRPC agent tools (`unit.*`, `project.*` reads) on the auto-mounted `/agent-tools/manifest`; registered permissions modules `unit` and `project`. No GraphQL changes.
 
 ### `2026-08-11` — Fixed offer-sent notification not firing
 

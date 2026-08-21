@@ -1,10 +1,12 @@
 import * as path from 'path';
 import { startPlugin } from 'erxes-api-shared/utils';
 import { typeDefs } from '~/apollo/typeDefs';
+import { permissions } from '~/meta/permissions';
 import { wrapMutationResolver } from '~/modules/admin/utils';
 import resolvers from './apollo/resolvers';
 import { generateModels } from './connectionResolvers';
 import { router } from './routes';
+import { appRouter } from './trpc/init-trpc';
 
 startPlugin({
   name: 'block',
@@ -24,6 +26,7 @@ startPlugin({
     process.env.NODE_ENV === 'production' ? 'subscription.js' : 'subscription.ts',
   ),
   meta: {
+    permissions,
     properties: {
       types: [
         {
@@ -39,5 +42,15 @@ startPlugin({
     context.models = models;
 
     return context;
+  },
+  trpcAppRouter: {
+    router: appRouter,
+    createContext: async (subdomain, context) => {
+      const models = await generateModels(subdomain);
+
+      context.models = models;
+
+      return context;
+    },
   },
 });

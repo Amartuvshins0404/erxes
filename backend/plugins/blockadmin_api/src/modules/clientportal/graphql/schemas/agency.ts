@@ -14,8 +14,8 @@ export const types = `
     phones: [String]
     primaryPhone: String
     dateFounded: String
-    logo: String
-    coverImage: String
+    logo: Attachment
+    coverImage: Attachment
     socialLinks: JSON
     operationArea: BlockAdminAgencyOperationArea
     fieldsOfExpertise: BlockAdminAgencyFieldOfExpertise
@@ -47,6 +47,7 @@ export const types = `
     linkedUrl: String
     certificatePhotos: [Attachment]
     user: CpBlockAdminAgentUser
+    agency: CpBlockAdminAgency
     createdAt: Date
     updatedAt: Date
   }

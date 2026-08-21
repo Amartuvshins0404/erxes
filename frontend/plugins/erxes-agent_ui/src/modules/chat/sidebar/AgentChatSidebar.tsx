@@ -162,10 +162,20 @@ export const AgentChatSidebar = ({
     try {
       const wasMain =
         runtime.threads.getState().mainThreadId === pendingDelete;
-      await runtime.threads.getItemById(pendingDelete).delete();
+      const item = runtime.threads.getItemById(pendingDelete);
+      // assistant-ui 0.11's remote-thread-list delete() drops the thread from
+      // the list lookup but never stops its mounted per-thread provider (only
+      // detach() does), so the provider's next state read throws
+      // "tapLookupResources: Resource not found" and the plugin error
+      // boundary fires. Detach first — this also re-homes main onto a fresh
+      // draft — then give React a macrotask to commit the unmount before the
+      // thread leaves the lookup (detach's promise is not publicly returned).
+      item.detach();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      await item.delete();
       setPendingDelete(null);
       // Deleting the open conversation re-homes to the most recent one (the
-      // runtime parks main on a fresh draft during delete).
+      // detach above already parked main on a fresh draft).
       const remaining = runtime.threads.getState().threads;
       if (wasMain && remaining.length > 0) {
         void runtime.threads.switchToThread(remaining[0]);

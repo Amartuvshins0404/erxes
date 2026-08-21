@@ -6,7 +6,7 @@
 - **Project:** `erxes-agent_ui`
 - **Layer:** Frontend UI
 - **Path:** `frontend/plugins/erxes-agent_ui`
-- **Last synchronized:** `2026-08-15`
+- **Last synchronized:** `2026-08-21`
 
 ## Scope
 
@@ -28,7 +28,7 @@
 - General settings include a Sandbox mode select (`onserver` built-in vs `isolated` OpenSandbox); OpenSandbox URL/API-key fields render only in isolated mode.
 - Admin-gated Plugin tools page (`/settings/erxes-agent/plugin-tools`) toggles per-plugin agent capability access (default off, `No endpoint` when unsupported) and per-tool disable switches; non-agent-callable tools show a muted badge instead of a switch.
 - Streams native agent chat parts, tool activity, attachments, artifacts, and session updates.
-- Renders the chat conversation on assistant-ui primitives (`ThreadPrimitive`, `MessagePrimitive`, `ComposerPrimitive`, streaming markdown) over the AI SDK chat runtime; a turn's reasoning bursts and tool calls group into ONE ChatGPT-style process line — while working it shows the current step's real, content-derived title (a reasoning step's title is distilled from its own text, a tool step shows its per-tool label), settled it shows the existing summary — and clicking it opens the right preview panel with the whole process as titled steps (status icon + bold title + content: full reasoning text for reasoning steps, params/result/sources per tool call, separators between steps). Reasoning never renders as rows in the message body and nothing expands inline. Tool args/results render structured (key-value rows, capped mini tables, web-search sources list) — never raw JSON.
+- Renders the chat conversation on assistant-ui primitives (`ThreadPrimitive`, `MessagePrimitive`, `ComposerPrimitive`, streaming markdown) over the AI SDK chat runtime; a turn's reasoning bursts and tool calls group into ONE ChatGPT-style process line — while working it shows the current step's real, content-derived title (a reasoning step's title is distilled from its own text, a tool step shows its per-tool label), settled it shows the existing summary — and clicking it opens the right preview panel with the whole process as titled steps (status icon + bold title + content: full reasoning text for reasoning steps, params/result/sources per tool call, separators between steps) — the panel binds to the turn's message id and live-updates as the turn streams, no re-click needed. Reasoning never renders as rows in the message body and nothing expands inline. Tool args/results render structured (key-value rows, capped mini tables, web-search sources list) — never raw JSON.
 - Shows "thinking"/activity with `thinking-orbs` (`ThinkingOrb`): a size-64 orb while the turn spins up, size-20 per-step-state orbs (`searching`, `connecting`, `solving`, `composing`, `shaping`, `listening`) on the running process line and the panel's active step.
 - Renders the agent's `ask_user` clarifying questions as an interactive card (numbered options, free-text "Something else", Skip) docked after the message parts; answers replay as hidden user messages quoting the question.
 - The preview panel (file list, single artifact, tool-activity view) docks beside the chat in the second pane of an erxes-ui `Resizable` split (`autoSaveId`-persisted, min 20%) and can go fullscreen as a fixed overlay; tool-activity fullscreen skips the file-list sidebar.
@@ -69,6 +69,7 @@
 - Conversation selection is owned by an assistant-ui `unstable_useRemoteThreadListRuntime` per agent: a plugin adapter (`chat/runtime/mastraThreadListAdapter.ts`) maps the mastra session queries/mutations onto the remote-thread-list contract (thread ids are client-generated; `initialize` is an id passthrough, archiving is unsupported). `ChatRuntimeSync` keeps `?thread=`, the runtime main thread, and the store's per-agent active selection in two-way sync.
 - The conversation view runs on `@assistant-ui/react` primitives via per-thread `useAISDKRuntime(chatHelpers)` instances (one hook instance per alive thread, mounted by the remote list runtime); sends go through the store's pipeline (staged attachment uploads and per-send body extras), not the runtime composer send.
 - `ask_user` answers replay through `chatStore.sendMessage` as hidden user messages (`formatAskUserAnswer`/`formatAskUserSkip` in `chat/types.ts` — the quote anchors backend keyword tool-scoping); `AskUserCard` parses the convention back for the answered receipt, and `UserMessageRow` hides convention-matching messages via `parseAskUserAnswer` (the `hidden` metadata is in-memory only), so neither the bubble nor the receipt breaks after reloads.
+- The activity preview view is bound to a turn's message id (`previewStore.activity.messageId`): the bound message's `ToolGroupBlock` re-renders on every streamed part and pushes fresh steps through `previewStore.syncActivity` (no-op unless the panel is open on that message; serialized compare skips unchanged payloads), so the open panel tracks the turn in real time.
 - Settings forms use React Hook Form values validated by Zod schemas in `src/pages/settings/validations.ts`.
 
 ## Local Invariants
@@ -77,6 +78,7 @@
 - Every mutation provides error feedback and updates or refetches the affected Apollo data.
 - Routes and federation exposes stay lazy-loaded and aligned with `src/config.tsx`.
 - Thread ids are generated by the assistant-ui remote list runtime (`__LOCALID_*` for drafts) and passed through to the backend unchanged; never remap them in the adapter.
+- Session delete must `item.detach()` first, wait a macrotask for the provider unmount to commit, then `item.delete()` — assistant-ui 0.11's remote-list `delete()` removes the thread from the list lookup but never stops its mounted per-thread provider, so deleting without detaching throws `tapLookupResources: Resource not found` and trips the plugin error boundary.
 - UI primitives come from `erxes-ui`; plugin code never imports another plugin.
 - Runtime settings expose only behavior the backend currently executes.
 - The host global CSS is built without this plugin's source, so plugin-unique Tailwind utilities (arbitrary values, `/<pct>` opacity modifiers, named group/data variants) never reach production. Any style not guaranteed by the host must be an `ea-*` class in `src/modules/chat/chat.css` (import it directly in pages outside the chat chunk graph).
@@ -89,6 +91,18 @@
 ## Recent Changes
 
 <!-- Newest first. Keep at most 10 entries. -->
+
+### `2026-08-21` — Session delete no longer crashes the runtime
+
+- **Summary:** Deleting a conversation threw `tapLookupResources: Resource not found` and tripped the plugin error boundary: assistant-ui 0.11's remote-list `delete()` removes the thread from the list lookup but never stops its mounted per-thread provider (only `detach()` calls `stopThreadRuntime`), so the dead thread's provider kept reading its list-item snapshot. `confirmDelete` now detaches first (also re-homes main onto a fresh draft), waits a macrotask for the unmount to commit, then deletes; the re-home-to-most-recent step is unchanged.
+- **Affected areas:** `src/modules/chat/sidebar/AgentChatSidebar.tsx` (`confirmDelete`).
+- **Contracts changed:** None
+
+### `2026-08-21` — Real-time activity panel
+
+- **Summary:** The tool-activity panel no longer renders a click-time snapshot: `openActivity` binds the view to the turn's message id, and the bound message's `ToolGroupBlock` pushes every streamed step change into the store via the new `syncActivity` action (binding check + serialized-compare guard), so the open panel live-updates as reasoning bursts, tool calls, and results arrive — no close/re-click to refresh.
+- **Affected areas:** `src/modules/chat/preview/previewStore.ts` (`activity.messageId` binding, `syncActivity`), `src/modules/chat/assistant/ToolGroupBlock.tsx` (message-id binding, sync effect, shared `panelTitle`), `src/modules/chat/preview/ToolActivityPanel.tsx` (stale snapshot comments removed).
+- **Contracts changed:** None
 
 ### `2026-08-15` — Plugin tools settings page (REST transport)
 
@@ -138,11 +152,4 @@
 - **Affected areas:** `src/modules/chat/assistant/` (rewritten `ToolFallback`/`WebSearchTool`/`FetchUrlTool`/`ToolGroupBlock`; new `toolValue.tsx`, `QuietTools.tsx`, `AskUserTool.tsx`), `AgentThread.tsx` (orb ThinkingRow), `chat/types.ts` (ask_user contract), `chatContexts.ts`, `ChatPage.tsx` (answer/skip handlers), `chat.css` (`ea-kv`, `ea-tool-table`, `ea-clamp-2`, `ea-ask-*`; removed `ea-typing-dot`), root `package.json` (+`thinking-orbs`).
 - **Contracts changed:** Consumes the backend's new `ask_user` tool (args `{question, options, selectionMode}`, result `{awaitingUserAnswer: true, …}`); GraphQL contracts unchanged.
 
-### `2026-08-14` — Sandbox mode selector in general settings
-
-### `2026-08-13` — Production-safe chat surface styles
-
-- **Summary:** Fixed the prod-test rendering (white user bubble, unstyled send button, invisible hover controls) by moving every plugin-unique Tailwind utility off the chat surface into self-contained `ea-*` classes in `chat.css` — the deployed host CSS is built without scanning this plugin, so arbitrary values, opacity modifiers, and group/data variants were all missing in production.
-- **Affected areas:** `src/modules/chat/chat.css`, chat assistant/components/preview/sidebar files, `src/pages/agents/components/AgentFormFields.tsx` (now imports chat.css for `ea-form-grid`).
-- **Contracts changed:** None
 

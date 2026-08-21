@@ -1,5 +1,6 @@
-import { type ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import {
+  useMessage,
   useMessageRuntime,
   type TextMessagePart,
   type ToolCallMessagePart,
@@ -77,6 +78,7 @@ const settledTitle = (parts: ToolCallMessagePart[]): string => {
 // message into this single group — see groupTurnActivity in AgentMessage.
 export const ToolGroupBlock = ({ indices }: { indices: number[] }) => {
   const runtime = useMessageRuntime();
+  const messageId = useMessage((s) => s.id);
 
   const state = runtime.getState();
   const parts: ToolCallMessagePart[] = [];
@@ -102,7 +104,6 @@ export const ToolGroupBlock = ({ indices }: { indices: number[] }) => {
       });
     }
   });
-  if (!activities.length) return null;
 
   const streaming =
     state.status?.type === 'running' ||
@@ -128,6 +129,24 @@ export const ToolGroupBlock = ({ indices }: { indices: number[] }) => {
   const activeStep = steps.find((step) => step.status === 'active');
   const working = !!activeStep;
 
+  const panelTitle = working
+    ? 'Working…'
+    : parts.length > 0
+      ? settledTitle(parts)
+      : 'Thought process';
+
+  // Keep the open activity panel in lockstep with this turn: every streamed
+  // part re-renders this block (via Unstable_PartsGrouped's content
+  // subscription), and syncActivity pushes the fresh steps when the panel is
+  // bound to this message — it no-ops for every other message/closed panel.
+  useEffect(() => {
+    previewStore
+      .getState()
+      .syncActivity({ messageId, steps, title: panelTitle });
+  });
+
+  if (!activities.length) return null;
+
   const statusIcon = working ? (
     <ThinkingOrb state={activeStep.runningState ?? 'working'} size={20} />
   ) : failed ? (
@@ -151,19 +170,17 @@ export const ToolGroupBlock = ({ indices }: { indices: number[] }) => {
   const lineClass =
     'flex w-fit max-w-full items-center gap-2 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground';
 
-  // The line opens the right activity panel with the full process.
+  // The line opens the right activity panel with the full process; the panel
+  // binds to this message and live-updates via the sync effect above.
   return (
     <button
       type="button"
       className={lineClass}
       onClick={() =>
         previewStore.getState().openActivity({
+          messageId,
           steps,
-          title: working
-            ? 'Working…'
-            : parts.length > 0
-              ? settledTitle(parts)
-              : 'Thought process',
+          title: panelTitle,
         })
       }
     >

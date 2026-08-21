@@ -49,9 +49,9 @@ const callHint = (call: PanelToolCall): string => {
   return '';
 };
 
-// One snapshotted call: status row, parameters, and the full result (sources
-// list for webSearch, the structured result view for everything else), with a
-// mini separator between the sections that render. A call still in flight (no
+// One call: status row, parameters, and the full result (sources list for
+// webSearch, the structured result view for everything else), with a mini
+// separator between the sections that render. A call still in flight (no
 // result yet) renders nothing below the status row.
 const ToolCallBlock = ({ call }: { call: PanelToolCall }) => {
   const running = call.result === undefined;
@@ -143,8 +143,8 @@ const StepContent = ({ step }: { step: PanelStep }) => (
 
 // A tool step: the title row is the collapsible trigger (chevron rotated while
 // collapsed) and the per-call blocks stay hidden until expanded. Starts
-// collapsed even while the call is still running — the panel is a click-time
-// snapshot, so nothing re-opens on its own.
+// collapsed and keeps the user's choice across live updates — steps reconcile
+// by id, so streaming updates never re-open or re-close a section on their own.
 const ToolStepSection = ({ step }: { step: PanelStep }) => {
   const [open, setOpen] = useState(false);
   return (
@@ -186,9 +186,9 @@ const StepSection = ({ step }: { step: PanelStep }) => {
 
 // The preview panel's tool-activity view: the turn's whole process as titled
 // steps (reasoning notes, tool calls with full args/result detail), opened by
-// clicking the chat's single process line — or scoped to one step from the
-// debug-mode stepper. The data is a snapshot from click time — the panel does
-// not live-update as the turn continues.
+// clicking the chat's single process line. The view is bound to the turn's
+// message id and live-updates as the turn streams — the bound message's
+// ToolGroupBlock pushes every step change through previewStore.syncActivity.
 export const ToolActivityPanel = ({
   activity,
 }: {

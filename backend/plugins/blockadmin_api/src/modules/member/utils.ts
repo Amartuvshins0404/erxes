@@ -1,3 +1,4 @@
+import { IBlockAgencyDocument } from '@/agency/@types/agency';
 import {
   AgentQueryParams,
   IBlockAdminAgentDocument,
@@ -42,6 +43,33 @@ export const resolveAgentKeys = async (
   }
 
   return { subdomain: agent.subdomain, entityId: String(agent.entityId) };
+};
+
+/**
+ * Reverse of `resolveAgencyKeys`: an agent only carries the agency-side keys
+ * (`subdomain` + `agencyId`, i.e. `Agency.entityId`), so its block admin agency
+ * has to be looked up by that pair. Agencies synced before `entityId` was
+ * recorded are still reachable through `subdomain` alone, which is unique per
+ * mirrored agency tenant.
+ */
+export const findAgentAgency = async (
+  models: IModels,
+  { subdomain, agencyId }: { subdomain?: string; agencyId?: string },
+) => {
+  if (!subdomain) {
+    return null;
+  }
+
+  const filter: FilterQuery<IBlockAgencyDocument> = { subdomain };
+
+  if (agencyId) {
+    filter.entityId = agencyId;
+  }
+
+  return (
+    (await models.Agency.findOne(filter).lean()) ||
+    (agencyId ? await models.Agency.findOne({ subdomain }).lean() : null)
+  );
 };
 
 export const generateFilter = (

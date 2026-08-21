@@ -6,8 +6,8 @@ import type { Artifact } from '~/modules/chat/lib/artifacts';
 // whether the panel is visible. Kept separate from chatStore so opening a
 // preview never re-renders the chat transport machinery.
 
-// A tool call snapshotted for the panel's activity view (captured when the
-// chat activity line is clicked — the panel does not live-update).
+// A tool call rendered in the panel's activity view (the serializable subset
+// of a message's tool-call part).
 export interface PanelToolCall {
   toolCallId: string;
   toolName: string;
@@ -17,9 +17,9 @@ export interface PanelToolCall {
   isError?: boolean;
 }
 
-// One process step snapshotted for the panel's activity view — the
-// serializable subset of the chat's TurnStep (see assistant/turnSteps.ts);
-// runningState stays an opaque string so a TurnStep is trivially assignable.
+// One process step rendered in the panel's activity view — the serializable
+// subset of the chat's TurnStep (see assistant/turnSteps.ts); runningState
+// stays an opaque string so a TurnStep is trivially assignable.
 export interface PanelStep {
   id: string;
   status: 'done' | 'active' | 'pending';
@@ -36,9 +36,13 @@ interface PreviewState {
   open: boolean;
   view: PreviewView;
   artifact: Artifact | null;
-  // The tool-activity snapshot shown when view === 'activity': the turn's full
-  // process as titled steps, plus the line's summary as the panel title.
+  // The tool-activity view shown when view === 'activity': the turn's full
+  // process as titled steps, plus the line's summary as the panel title. Bound
+  // to the turn's message id — while the panel stays open, the bound turn's
+  // ToolGroupBlock pushes every step change through syncActivity, so the view
+  // live-updates as the turn streams instead of going stale from click time.
   activity: {
+    messageId: string;
     steps: PanelStep[];
     title?: string;
   } | null;
@@ -56,8 +60,22 @@ interface PreviewState {
   // Back to the file list from a single item.
   showList: () => void;
   // Open the panel showing a turn's process as titled steps (reasoning notes,
-  // tool calls with full responses), titled by the line's summary.
-  openActivity: (input: { steps: PanelStep[]; title?: string }) => void;
+  // tool calls with full responses), titled by the line's summary and bound to
+  // the turn's message id so syncActivity keeps it live while the turn runs.
+  openActivity: (input: {
+    messageId: string;
+    steps: PanelStep[];
+    title?: string;
+  }) => void;
+  // Live-update the open activity view from the bound turn's ToolGroupBlock.
+  // No-ops unless the panel is open on the activity view for the SAME message,
+  // and skips the set when the payload is unchanged (serialized compare — the
+  // caller rebuilds step objects every render, so identity alone won't do).
+  syncActivity: (input: {
+    messageId: string;
+    steps: PanelStep[];
+    title?: string;
+  }) => void;
   setFullscreen: (value: boolean) => void;
   toggleFullscreen: () => void;
   close: () => void;
@@ -83,6 +101,17 @@ export const previewStore = create<PreviewState>((set, get) => ({
   showList: () => set({ view: 'list', activity: null }),
   openActivity: (input) =>
     set({ open: true, view: 'activity', activity: input }),
+  syncActivity: (input) => {
+    const { open, view, activity } = get();
+    if (!open || view !== 'activity' || activity?.messageId !== input.messageId) {
+      return;
+    }
+    const unchanged =
+      JSON.stringify({ steps: activity.steps, title: activity.title }) ===
+      JSON.stringify({ steps: input.steps, title: input.title });
+    if (unchanged) return;
+    set({ activity: input });
+  },
   setFullscreen: (value) => set({ fullscreen: value }),
   toggleFullscreen: () => set({ fullscreen: !get().fullscreen }),
   // Closing always drops fullscreen so the next open starts docked.

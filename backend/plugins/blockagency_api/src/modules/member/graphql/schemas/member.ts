@@ -3,6 +3,7 @@ export const types = `
     _id: String
     agencyId: String
     memberId: String
+    member: User @provides(fields: "_id")
     description: String
     country: String
     city: String
@@ -10,7 +11,7 @@ export const types = `
     facebookUrl: String
     instagramUrl: String
     linkedUrl: String
-    certificatePhotos: [String]
+    certificatePhotos: [Attachment]
     role: String
 
     createdAt: Date
@@ -27,7 +28,7 @@ export const types = `
     facebookUrl: String
     instagramUrl: String
     linkedUrl: String
-    certificatePhotos: [String]
+    certificatePhotos: [AttachmentInput]
     role: String
   }
 `;

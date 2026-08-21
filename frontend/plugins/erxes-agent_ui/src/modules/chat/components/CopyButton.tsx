@@ -25,7 +25,7 @@ export const CopyButton = ({ text }: { text: string }) => {
             type="button"
             aria-label={copied ? 'Copied!' : 'Copy'}
             onClick={handleCopy}
-            className="size-6 flex items-center justify-center rounded hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-muted-foreground hover:text-foreground"
+            className="size-6 flex items-center justify-center rounded ea-quiet-btn  transition-colors text-muted-foreground hover:text-foreground"
           >
             {copied ? (
               <IconCheck className="size-3.5 text-green-600" />

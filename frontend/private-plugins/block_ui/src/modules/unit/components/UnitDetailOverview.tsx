@@ -48,10 +48,7 @@ export const UnitDetailOverview = () => {
       <Separator />
       <div className="p-5 flex flex-col gap-4">
         {unit?.activeContract?.statusType === 'signed' && (
-          <UnitPartyDetail
-            partyId={unit.activeContract.partyId}
-            partyType={unit.activeContract.partyType}
-          />
+          <UnitPartyDetail customerId={unit.activeContract.customerId} />
         )}
         <UnitTypeSummary unitType={unitType} />
       </div>

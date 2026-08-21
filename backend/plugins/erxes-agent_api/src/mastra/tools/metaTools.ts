@@ -1,46 +1,5 @@
 import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
-import { sendTRPCMessage } from 'erxes-api-shared/utils';
-import { executeErxesOperation } from './erxesTools';
-import { parseJsonPreprocess } from './schemaIntrospect';
-import type { OperationMeta, OperationRegistry } from './operationRegistry';
-import { isOperationAllowed, type ToolPolicy } from './scope';
-import {
-  destructiveApprovalRequiredResult,
-  destructiveOpsPreapproved,
-  isApprovedOperation,
-  isDestructiveOperation,
-  type DestructiveOpsPolicy,
-} from './destructiveGuard';
-import {
-  isSecurityBlockedOperation,
-  securityBlockedResult,
-} from './securityGuard';
-import { redactSecrets } from './secretRedaction';
-import { getCurrentAuth } from '../requestContext';
-import { makeAgentProcessId, type AgentActionInput } from '../auditLog';
-
-/** Model-readable metadata used by the static operation-hint census. */
-export interface ArgFieldSpec {
-  name: string;
-  type: string;
-  required: boolean;
-  enumValues?: string[];
-  requiredNote?: string;
-}
-
-/** One operation argument plus its optional nested input-object shape. */
-export interface ArgSpec extends ArgFieldSpec {
-  description?: string;
-  fields?: Array<ArgFieldSpec | string>;
-}
-
-function coerceArgs(value: unknown): Record<string, unknown> {
-  const parsed = typeof value === 'string' ? parseJsonPreprocess(value) : value;
-  return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-    ? (parsed as Record<string, unknown>)
-    : {};
-}
 
 const AUDIT_ERROR_MAX = 500;
 
@@ -60,112 +19,8 @@ export function auditErrorMessage(result: unknown): string {
   }
 }
 
-export interface ExecutePolicyScopedOperationParams {
-  operation: OperationMeta;
-  args: Record<string, unknown>;
-  responseFields?: string[];
-  registry: OperationRegistry;
-  policy: ToolPolicy;
-  destructiveOps: DestructiveOpsPolicy;
-  recordAction?: (entry: AgentActionInput) => void;
-}
-
-/**
- * Runs one already-discovered operation behind every erxes safety boundary.
- * Per-operation Mastra tools delegate here so typed schemas improve model calls
- * without duplicating policy, approval, audit, secret, or GraphQL behavior.
- */
-export async function executePolicyScopedOperation({
-  operation,
-  args,
-  responseFields,
-  registry,
-  policy,
-  destructiveOps,
-  recordAction,
-}: ExecutePolicyScopedOperationParams): Promise<unknown> {
-  const operationName = operation.operation;
-  const callArgs = coerceArgs(args);
-
-  // Check this before policy/registry detail so blocked operations leak nothing.
-  if (isSecurityBlockedOperation(operationName)) {
-    recordAction?.({
-      operation: operationName,
-      operationType: operation.operationType,
-      destructive: isDestructiveOperation(operation),
-      args: redactSecrets(callArgs),
-      status: 'blocked',
-      error: 'security-blocked',
-    });
-    return securityBlockedResult();
-  }
-
-  // Defense in depth: discovery filters policy, and execution re-checks it.
-  if (!isOperationAllowed(operation, policy)) {
-    return {
-      success: false,
-      error: `Operation "${operationName}" is not permitted for this agent.`,
-    };
-  }
-
-  const isMutation = operation.operationType === 'mutation';
-  const background = getCurrentAuth()?.background === true;
-  const destructiveAllowed = destructiveOpsPreapproved(
-    destructiveOps,
-    background,
-  );
-
-  if (!destructiveAllowed && isDestructiveOperation(operation)) {
-    const approvedOps = getCurrentAuth()?.approvedOps;
-    if (!isApprovedOperation(operationName, approvedOps)) {
-      recordAction?.({
-        operation: operationName,
-        operationType: operation.operationType,
-        destructive: true,
-        args: redactSecrets(callArgs),
-        status: 'blocked',
-        error: 'awaiting user approval',
-      });
-      return destructiveApprovalRequiredResult(operationName, callArgs);
-    }
-  }
-
-  const processId = isMutation ? makeAgentProcessId() : undefined;
-  const result = await executeErxesOperation(
-    operation,
-    callArgs,
-    registry,
-    processId,
-    responseFields?.length ? responseFields : undefined,
-  );
-
-  if (isMutation) {
-    const failed =
-      result !== null &&
-      typeof result === 'object' &&
-      'success' in result &&
-      result.success === false;
-    recordAction?.({
-      operation: operationName,
-      operationType: operation.operationType,
-      destructive: isDestructiveOperation(operation),
-      args: redactSecrets(callArgs),
-      status: failed ? 'failed' : 'success',
-      error: failed ? auditErrorMessage(result) : undefined,
-      processId,
-    });
-  }
-
-  return result;
-}
-
 /** Standalone erxes helpers that remain directly bound beside tool discovery. */
-export function buildErxesSupportTools(params: {
-  policy: ToolPolicy;
-  destructiveOps: DestructiveOpsPolicy;
-}) {
-  const { policy, destructiveOps } = params;
-
+export function buildErxesSupportTools() {
   const requestApproval = createTool({
     id: 'request_approval',
     description:
@@ -192,55 +47,65 @@ export function buildErxesSupportTools(params: {
     }),
   });
 
-  const listConfigKeys = createTool({
-    id: 'list_config_keys',
-    description:
-      'List which erxes configuration codes are currently SET (names only; values are never returned).',
-    inputSchema: z.object({}),
-    outputSchema: z.unknown(),
-    execute: async () => {
-      const subdomain = getCurrentAuth()?.subdomain || '';
-      try {
-        const codes = await sendTRPCMessage({
-          subdomain,
-          pluginName: 'core',
-          module: 'configs',
-          action: 'getCodes',
-          method: 'query',
-          input: {},
-          defaultValue: null,
-        });
-        if (codes == null) {
-          return {
-            success: false,
-            error: 'Could not reach the configuration service.',
-            instruction:
-              'Tell the user the configuration list is temporarily unavailable; do not guess what is configured.',
-          };
-        }
-        const list = Array.isArray(codes) ? codes.map(String) : [];
-        return {
-          total: list.length,
-          codes: list,
-          note: list.length
-            ? 'These configuration codes are set. Values are hidden and cannot be read. To change a config that holds a secret, send only the fields being changed.'
-            : 'No configuration codes are set on this instance.',
-        };
-      } catch {
-        return {
-          success: false,
-          error: 'Could not reach the configuration service.',
-          instruction:
-            'Tell the user the configuration list is temporarily unavailable; do not guess what is configured.',
-        };
-      }
-    },
-  });
-
-  return {
-    ...(policy.mode === 'all' ? { list_config_keys: listConfigKeys } : {}),
-    ...(destructiveOps !== 'allow'
-      ? { request_approval: requestApproval }
-      : {}),
-  };
+  // Every destructive mutation asks for approval; the agent config cannot bypass this.
+  return { request_approval: requestApproval };
 }
+
+/**
+ * ask_user — ask the user a structured question when a request is ambiguous in
+ * a way that changes the outcome. Same input contract as Mastra's built-in
+ * askUserTool (question + options + selectionMode), but instead of suspending
+ * the run (which needs Mastra snapshot storage this service does not run) it
+ * returns the question payload as a plain tool result and ends the turn — the
+ * chat UI renders an interactive question card and the user's answer arrives as
+ * their next message, exactly like the request_approval replay pattern.
+ */
+export const askUserTool = createTool({
+  id: 'ask_user',
+  description:
+    'Ask the user a question to clarify an ambiguous request when the missing answer changes what you would do. ' +
+    'Provide a short question and up to four concrete options (the user can also write their own answer or skip). ' +
+    'Omit options for a free-text answer. This asks and waits — it executes nothing. ' +
+    'After calling this tool, END your turn immediately: no summary, no narration, never answer your own question. ' +
+    "The user's next message answers it (or says it was skipped — then proceed with your best judgment).",
+  inputSchema: z.object({
+    question: z.string().min(1).describe('The short question shown to the user.'),
+    options: z
+      .array(
+        z.object({
+          label: z
+            .string()
+            .describe(
+              'Short display text; this value is the answer when selected.',
+            ),
+          description: z
+            .string()
+            .optional()
+            .describe('One line of extra context for this option.'),
+        }),
+      )
+      .max(6)
+      .optional()
+      .describe('Structured choices. Omit for a free-text answer.'),
+    selectionMode: z
+      .enum(['single_select', 'multi_select'])
+      .optional()
+      .describe(
+        'How many options the user may pick. Defaults to single_select when options are given.',
+      ),
+  }),
+  outputSchema: z.unknown(),
+  execute: async ({ question, options, selectionMode }) => ({
+    awaitingUserAnswer: true,
+    question,
+    options: options ?? [],
+    selectionMode:
+      selectionMode ?? (options?.length ? 'single_select' : undefined),
+  }),
+});
+
+/** True for a settled ask_user tool result — the turn is waiting on the user. */
+export const isAwaitingUserAnswer = (result: unknown): boolean =>
+  !!result &&
+  typeof result === 'object' &&
+  (result as { awaitingUserAnswer?: unknown }).awaitingUserAnswer === true;

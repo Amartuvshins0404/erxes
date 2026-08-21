@@ -3,10 +3,7 @@ import { useParams } from 'react-router-dom';
 import { useUnit } from '@/unit/hooks/useUnit';
 import { useBuilding, useZoning } from '@/building/hooks/useBuildings';
 import { useCustomerDetail, MembersInline } from 'ui-modules';
-import {
-  IContract,
-  ContractPartyType,
-} from '@/contract/types/contractTypes';
+import { IContract } from '@/contract/types/contractTypes';
 import { useBlockContractStatusesByType } from '@/contract-status/hooks/useGetBlockContractStatuses';
 import {
   STATUS_TYPE_VARIANT,
@@ -34,17 +31,14 @@ export const ContractOverviewBody = ({
     ? statuses.find((s) => s._id === contract.status)
     : undefined;
 
-  const partyId = contract.party?.id;
-  const isCustomer = contract.party?.type === ContractPartyType.CUSTOMER;
-
   const { customerDetail } = useCustomerDetail(
-    { variables: { _id: partyId }, skip: !partyId || !isCustomer },
+    { variables: { _id: contract.customerId }, skip: !contract.customerId },
     true,
   );
 
-  const partyLabel = (() => {
-    if (!contract.party) return null;
-    if (isCustomer && customerDetail) {
+  const customerLabel = (() => {
+    if (!contract.customerId) return null;
+    if (customerDetail) {
       const name =
         [customerDetail.firstName, customerDetail.lastName]
           .filter(Boolean)
@@ -54,7 +48,7 @@ export const ContractOverviewBody = ({
         'Unnamed customer';
       return `Customer · ${name}`;
     }
-    return `${contract.party.type} · ${contract.party.id}`;
+    return `Customer · ${contract.customerId}`;
   })();
 
   const unitLabel = (() => {
@@ -102,7 +96,7 @@ export const ContractOverviewBody = ({
               )}
               {renderRow('Currency', contract.currency)}
               {renderRow('Contract Date', formatDate(contract.date))}
-              {renderRow('Party', partyLabel)}
+              {renderRow('Customer', customerLabel)}
               {renderRow(
                 'Assigned User',
                 contract.user ? (

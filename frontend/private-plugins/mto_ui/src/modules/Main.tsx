@@ -23,6 +23,12 @@ const CategoriesPage = lazy(() =>
   })),
 );
 
+const TravelAssociationsPage = lazy(() =>
+  import('~/pages/TravelAssociationsPage').then((module) => ({
+    default: module.TravelAssociationsPage,
+  })),
+);
+
 const RegistrationIndexPage = lazy(() =>
   import('~/pages/RegistrationIndexPage').then((module) => ({
     default: module.RegistrationIndexPage,
@@ -68,6 +74,12 @@ const MtoMain = () => {
         {!isSlaveMode && <Route path="/events" element={<EventsPage />} />}
         {!isSlaveMode && (
           <Route path="/categories" element={<CategoriesPage />} />
+        )}
+        {!isSlaveMode && (
+          <Route
+            path="/travel-associations"
+            element={<TravelAssociationsPage />}
+          />
         )}
         <Route path="/registration" element={<RegistrationIndexPage />} />
         <Route path="/registrations" element={<RegistrationsPage />} />

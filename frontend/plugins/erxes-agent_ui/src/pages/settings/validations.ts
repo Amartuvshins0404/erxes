@@ -29,26 +29,36 @@ export const PROVIDER_FORM_DEFAULTS: ProviderFormValues = {
   isEnabled: true,
 };
 
-export const generalSettingsSchema = z.object({
-  erxesApiUrl: z.string(),
-  memoryEnabled: z.boolean(),
-  attachmentsEnabled: z.boolean(),
-  learningEnabled: z.boolean(),
-  learningAutoPromoteMinSources: z.number().int().min(1).max(20),
-  learningAutoPromoteMinConfidence: z.number().min(0).max(1),
-  learningDigestMaxChars: z.number().int().min(500).max(10000),
-  learningDigestMaxEntries: z.number().int().min(1).max(100),
-  learningIdleMinutes: z.number().int().min(1).max(10080),
-  learningDecayDays: z.number().int().min(1).max(3650),
-  learningDecayFactor: z.number().min(0).max(1),
-  learningArchiveBelowConfidence: z.number().min(0).max(1),
-  evaluationEnabled: z.boolean(),
-  evaluationDsn: z.string(),
-  clearEvaluationDsn: z.boolean(),
-  backgroundRemovalEnabled: z.boolean(),
-  summarizerProvider: z.string(),
-  summarizerModel: z.string(),
-});
+export const generalSettingsSchema = z
+  .object({
+    erxesApiUrl: z.string(),
+    memoryEnabled: z.boolean(),
+    attachmentsEnabled: z.boolean(),
+    backgroundRemovalEnabled: z.boolean(),
+    sandboxMode: z.enum(['onserver', 'isolated']),
+    openSandboxApiUrl: z.string().max(2048),
+    openSandboxApiKey: z.string().max(512),
+  })
+  .superRefine((values, ctx) => {
+    // The URL format rule only applies in isolated mode; in onserver mode the
+    // fields are hidden and stripped by the transform below.
+    if (
+      values.sandboxMode === 'isolated' &&
+      values.openSandboxApiUrl &&
+      !/^https?:\/\//i.test(values.openSandboxApiUrl)
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['openSandboxApiUrl'],
+        message: 'OpenSandbox API URL must start with http:// or https://',
+      });
+    }
+  })
+  .transform((values) =>
+    values.sandboxMode === 'onserver'
+      ? { ...values, openSandboxApiUrl: '', openSandboxApiKey: '' }
+      : values,
+  );
 
 export type GeneralSettingsValues = z.infer<typeof generalSettingsSchema>;
 
@@ -56,19 +66,8 @@ export const GENERAL_SETTINGS_DEFAULTS: GeneralSettingsValues = {
   erxesApiUrl: 'http://localhost:4000',
   memoryEnabled: true,
   attachmentsEnabled: true,
-  learningEnabled: false,
-  learningAutoPromoteMinSources: 3,
-  learningAutoPromoteMinConfidence: 0.75,
-  learningDigestMaxChars: 2400,
-  learningDigestMaxEntries: 12,
-  learningIdleMinutes: 30,
-  learningDecayDays: 30,
-  learningDecayFactor: 0.9,
-  learningArchiveBelowConfidence: 0.2,
-  evaluationEnabled: false,
-  evaluationDsn: '',
-  clearEvaluationDsn: false,
   backgroundRemovalEnabled: true,
-  summarizerProvider: '',
-  summarizerModel: '',
+  sandboxMode: 'onserver',
+  openSandboxApiUrl: '',
+  openSandboxApiKey: '',
 };

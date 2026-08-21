@@ -26,8 +26,17 @@ export interface IBlockAdminListingSpecs {
   builtYear?: string;
 }
 
+export interface IBlockAdminListingAgent {
+  _id?: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  email?: string | null;
+}
+
 export interface IBlockAdminListing extends IBlock {
   title: string;
+  /** Agency-side member id of the listing owner, i.e. `BlockAdminAgent.entityId`. */
+  agencyMemberId?: string;
   type: 'sale' | 'rent' | 'lease';
   propertyType: string;
   status: 'active' | 'inactive' | 'sold' | 'draft';
@@ -39,6 +48,7 @@ export interface IBlockAdminListing extends IBlock {
   featuredImg?: string;
   viewCount?: number;
   isFeatured?: boolean;
+  agent?: IBlockAdminListingAgent | null;
 }
 
 export interface IBlockAdminListingDocument

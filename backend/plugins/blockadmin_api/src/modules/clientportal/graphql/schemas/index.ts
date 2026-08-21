@@ -15,11 +15,28 @@ import {
 
 import { queries as cpUnitQueries, types as cpUnitTypes } from './unit';
 
+import {
+  queries as cpContractQueries,
+  types as cpContractTypes,
+} from './contract';
+
+import { queries as cpAgencyQueries, types as cpAgencyTypes } from './agency';
+
+import {
+  queries as cpListingQueries,
+  types as cpListingTypes,
+} from './listing';
+import { queries as cpOfferQueries, types as cpOfferTypes } from './offer';
+
 export const types = `
     ${cpProjectTypes}
     ${cpDeveloperTypes}
     ${cpBuildingTypes}
     ${cpUnitTypes}
+    ${cpContractTypes}
+    ${cpAgencyTypes}
+    ${cpListingTypes}
+    ${cpOfferTypes}
 `;
 
 export const queries = `
@@ -27,4 +44,8 @@ export const queries = `
     ${cpDeveloperQueries}
     ${cpBuildingQueries}
     ${cpUnitQueries}
+    ${cpContractQueries}
+    ${cpAgencyQueries}
+    ${cpListingQueries}
+    ${cpOfferQueries}
 `;

@@ -7,24 +7,32 @@ import {
   IconMinimize,
   IconPresentation,
   IconX,
+  IconWorldWww,
 } from '@tabler/icons-react';
 import { Button, cn, Empty } from 'erxes-ui';
+import { useTranslation } from 'react-i18next';
 import { type EChartHandle } from '~/modules/chat/charts';
 import { ChartArtifactView } from '~/modules/chat/components/ChartArtifactView';
 import {
   artifactIcon,
-  Artifact,
-  DocumentArtifact,
-  ImageArtifact,
+  type Artifact,
+  type DocumentArtifact,
+  type ImageArtifact,
+  type WebsiteArtifact,
   documentUrl,
+  websiteUrl,
 } from '~/modules/chat/lib/artifacts';
-import { MermaidViewer } from '~/modules/chat/preview/MermaidViewer';
 import { formatFileSize } from '~/modules/chat/lib/attachments';
+import { useThreadArtifacts } from '~/modules/chat/hooks/useThreadArtifacts';
 import { previewStore } from '~/modules/chat/preview/previewStore';
-import { DocumentViewer } from '~/modules/chat/preview/DocumentViewer';
+import {
+  DocumentViewer,
+  WebsiteViewer,
+} from '~/modules/chat/preview/DocumentViewer';
+import { MermaidViewer } from '~/modules/chat/preview/MermaidViewer';
 import { ImageViewer } from '~/modules/chat/preview/ImageViewer';
 import { PresentMode } from '~/modules/chat/preview/PresentMode';
-import { useThreadArtifacts } from '~/modules/chat/hooks/useThreadArtifacts';
+import { ToolActivityPanel } from '~/modules/chat/preview/ToolActivityPanel';
 
 const canPresent = (a: Artifact): a is DocumentArtifact =>
   a.kind === 'document' && a.format === 'pptx' && !!a.slides?.length;
@@ -34,9 +42,14 @@ const slideLabel = (a: DocumentArtifact): string => {
   return n ? `${n} slide${n === 1 ? '' : 's'}` : '';
 };
 
-const artifactSubtitle = (a: Artifact): string => {
+const artifactSubtitle = (a: Artifact, websiteFilesLabel?: string): string => {
   if (a.kind === 'chart') return 'Interactive chart';
   if (a.kind === 'diagram') return 'Mermaid diagram';
+  if (a.kind === 'website') {
+    return [websiteFilesLabel, formatFileSize(a.size)]
+      .filter(Boolean)
+      .join(' · ');
+  }
   if (a.kind === 'image') {
     return [
       'Transparent PNG',
@@ -51,20 +64,25 @@ const artifactSubtitle = (a: Artifact): string => {
     .join(' · ');
 };
 
-// The Claude-artifacts-style side panel. Two views — a per-thread file list
-// (persisted, survives reloads) and a single artifact (interactive chart or an
-// inline document) — and two layouts: docked beside the chat, or fullscreen
-// (whole window) with the file list pinned as a left sidebar. Reads
-// view/artifact/fullscreen from previewStore.
+// The Claude-artifacts-style side panel. Three views — a per-thread file list
+// (persisted, survives reloads), a single artifact (interactive chart or an
+// inline document), and the tool-activity detail for a turn — and two layouts:
+// docked beside the chat (sized by the Resizable split in ChatPage), or
+// fullscreen (whole window) with the file list pinned as a left sidebar for
+// artifact views. Reads view/artifact/activity/fullscreen from previewStore.
 export const PreviewPanel = ({ threadId }: { threadId?: string }) => {
   const view = previewStore((s) => s.view);
   const artifact = previewStore((s) => s.artifact);
+  const activity = previewStore((s) => s.activity);
   const fullscreen = previewStore((s) => s.fullscreen);
   const close = previewStore((s) => s.close);
 
-  const showList = view === 'list' || !artifact;
+  const activityView = view === 'activity' ? activity : null;
+  const showList = !activityView && (view !== 'item' || !artifact);
 
-  const body = showList ? (
+  const body = activityView ? (
+    <ToolActivityPanel activity={activityView} />
+  ) : showList || !artifact ? (
     <FileListView threadId={threadId} onClose={close} />
   ) : (
     <ItemView artifact={artifact} onClose={close} />
@@ -73,8 +91,9 @@ export const PreviewPanel = ({ threadId }: { threadId?: string }) => {
   if (fullscreen) {
     return (
       <div className="fixed inset-0 z-50 flex bg-background">
-        {/* Sidebar: the full file list, pinned, while an item is open. */}
-        {!showList && (
+        {/* Sidebar: the full file list, pinned, while an artifact item is open.
+            The activity view takes the whole width instead. */}
+        {!activityView && !showList && (
           <aside className="ea-preview-sidebar w-72 shrink-0 flex-col border-r">
             <SidebarFileList threadId={threadId} activeId={artifact?.id} />
           </aside>
@@ -84,11 +103,12 @@ export const PreviewPanel = ({ threadId }: { threadId?: string }) => {
     );
   }
 
-  // Docked layout (right-side column ≥lg, full-area overlay below) is defined in
-  // chat.css as .ea-preview-dock — the responsive/arbitrary width utilities it
-  // replaces get purged from the production host CSS, which made the panel take
-  // over the whole screen instead of docking.
-  return <div className="ea-preview-dock">{body}</div>;
+  // Docked: the panel fills the Resizable.Panel ChatPage places it in — sizing
+  // and the drag handle belong to the resizable shell now (the old
+  // .ea-preview-dock CSS-variable split is gone).
+  return (
+    <div className="flex min-h-0 flex-1 flex-col bg-background">{body}</div>
+  );
 };
 
 // ── A single file row (shared by the list view and the fullscreen sidebar) ────
@@ -101,6 +121,7 @@ const FileRow = ({
   active?: boolean;
   onClick: () => void;
 }) => {
+  const { t } = useTranslation('erxes-agent');
   const Icon = artifactIcon(artifact);
   return (
     <button
@@ -109,17 +130,24 @@ const FileRow = ({
       className={cn(
         'flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors',
         active
-          ? 'border-primary/40 bg-primary/5'
-          : 'border-border/70 bg-background/60 hover:border-border hover:bg-accent/40',
+          ? 'ea-border-primary-40 ea-bg-primary-5'
+          : 'ea-border-70 ea-bg-60 hover:border-border ea-hover-accent-40',
       )}
     >
-      <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+      <div className="flex size-9 shrink-0 items-center justify-center rounded-lg ea-bg-primary-10 text-primary">
         <Icon className="size-5" />
       </div>
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium">{artifact.title}</p>
         <p className="truncate text-xs text-muted-foreground">
-          {artifactSubtitle(artifact)}
+          {artifactSubtitle(
+            artifact,
+            artifact.kind === 'website'
+              ? t('artifact-website-file-count', {
+                  count: artifact.fileCount,
+                })
+              : undefined,
+          )}
         </p>
       </div>
     </button>
@@ -141,7 +169,7 @@ const GroupedFiles = ({
     <div className="space-y-4">
       {groups.map((group, gi) => (
         <div key={group.turnId} className="space-y-1.5">
-          <p className="truncate px-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          <p className="ea-text-11 truncate px-1 font-semibold uppercase tracking-wider text-muted-foreground">
             {group.prompt || `Conversation ${gi + 1}`}
           </p>
           <ul className="space-y-1.5">
@@ -214,7 +242,12 @@ const FileListView = ({
             <IconMaximize className="size-4" />
           )}
         </Button>
-        <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onClose}
+          aria-label="Close"
+        >
           <IconX className="size-4" />
         </Button>
       </div>
@@ -256,14 +289,17 @@ const ItemView = ({
   const toggleFullscreen = previewStore((s) => s.toggleFullscreen);
   const chartRef = useRef<EChartHandle>(null);
   const [presenting, setPresenting] = useState(false);
+  const { t } = useTranslation('erxes-agent');
   const typeLabel =
     artifact.kind === 'chart'
       ? 'Chart'
       : artifact.kind === 'diagram'
-        ? 'Diagram'
-        : artifact.kind === 'image'
-          ? 'Image'
-          : artifact.format.toUpperCase();
+      ? 'Diagram'
+      : artifact.kind === 'image'
+      ? 'Image'
+      : artifact.kind === 'website'
+      ? t('artifact-website-type')
+      : artifact.format.toUpperCase();
 
   return (
     <>
@@ -276,7 +312,7 @@ const ItemView = ({
         >
           <IconArrowLeft className="size-4" />
         </Button>
-        <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+        <span className="ea-text-10 rounded bg-muted px-1.5 py-0.5 font-semibold uppercase tracking-wider text-muted-foreground">
           {typeLabel}
         </span>
         <div className="min-w-0 flex-1">
@@ -313,6 +349,7 @@ const ItemView = ({
         {(artifact.kind === 'document' || artifact.kind === 'image') && (
           <DocumentActions artifact={artifact} />
         )}
+        {artifact.kind === 'website' && <WebsiteActions artifact={artifact} />}
         <Button
           variant="ghost"
           size="icon"
@@ -325,7 +362,12 @@ const ItemView = ({
             <IconMaximize className="size-4" />
           )}
         </Button>
-        <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onClose}
+          aria-label="Close"
+        >
           <IconX className="size-4" />
         </Button>
       </div>
@@ -341,16 +383,15 @@ const ItemView = ({
           <MermaidViewer definition={artifact.definition} />
         ) : artifact.kind === 'image' ? (
           <ImageViewer artifact={artifact} />
+        ) : artifact.kind === 'website' ? (
+          <WebsiteViewer artifact={artifact} />
         ) : (
           <DocumentViewer artifact={artifact} />
         )}
       </div>
 
       {presenting && canPresent(artifact) && (
-        <PresentMode
-          artifact={artifact}
-          onExit={() => setPresenting(false)}
-        />
+        <PresentMode artifact={artifact} onExit={() => setPresenting(false)} />
       )}
     </>
   );
@@ -373,3 +414,16 @@ const DocumentActions = ({
     </a>
   </Button>
 );
+
+const WebsiteActions = ({ artifact }: { artifact: WebsiteArtifact }) => {
+  const { t } = useTranslation('erxes-agent');
+
+  return (
+    <Button asChild variant="secondary" size="sm">
+      <a href={websiteUrl(artifact)} target="_blank" rel="noreferrer">
+        <IconWorldWww className="size-3.5" />
+        {t('artifact-website-open-browser')}
+      </a>
+    </Button>
+  );
+};

@@ -12,22 +12,14 @@ export const types = `
     createdBy: String
     visibility: MastraAgentVisibility!
     audienceUserIds: [String!]!
-    audienceTeamIds: [String!]!
-    audienceDepartmentIds: [String!]!
     instructions: String
     provider: String
     model: String
-    skills: [String]
-    destructiveOps: String
-    memoryEnabled: Boolean
-    debug: Boolean
-    maxSteps: Int
-    temperature: Float
+    additionalTools: [String!]!
     permissionGroupIds: [String!]!
     isActive: Boolean!
     createdAt: Date
     updatedAt: Date
-    workflowsCount: Int
   }
 
   input MastraAgentInput {
@@ -35,17 +27,10 @@ export const types = `
     description: String
     visibility: MastraAgentVisibility
     audienceUserIds: [String!]
-    audienceTeamIds: [String!]
-    audienceDepartmentIds: [String!]
     instructions: String
     provider: String
     model: String
-    skills: [String]
-    destructiveOps: String
-    memoryEnabled: Boolean
-    debug: Boolean
-    maxSteps: Int
-    temperature: Float
+    additionalTools: [String!]
     permissionGroupIds: [String!]
     isActive: Boolean
   }
@@ -61,6 +46,7 @@ export const types = `
 export const queries = `
   mastraAgents: [MastraAgent]
   mastraAgentsMain(page: Int, perPage: Int, searchValue: String): MastraAgentListResponse
+  mastraAgentAdditionalTools: [String!]!
   mastraAgent(_id: String!): MastraAgent
   mastraAgentChat(agentId: String!, message: String!, threadId: String): String
 `;

@@ -10,20 +10,10 @@ export interface IMastraAgent {
   createdBy?: string;
   visibility?: MastraAgentVisibility;
   audienceUserIds?: string[];
-  audienceTeamIds?: string[];
-  audienceDepartmentIds?: string[];
   permissionMode?: MastraAgentPermissionMode;
-  // Skill allowlist: glob patterns matched against global skills' name (or
-  // `category/name`), e.g. ['erxes-*', 'sales/*']. Empty/unset → no skills.
-  skills?: string[];
-  // Consent for irreversible deletes/merges. 'ask' (default) prompts the user;
-  // 'allow' runs without asking. ('block' is a tolerated legacy value → 'ask'.)
-  destructiveOps?: 'allow' | 'ask' | 'block';
-  memoryEnabled?: boolean;
-  // Debug view: surface the full tool-call trace in chat (default off).
-  debug?: boolean;
-  maxSteps?: number;
-  temperature?: number;
+  // Explicit allowlist for optional non-erxes capabilities (web, document,
+  // image, and code-mode tools). Empty means none.
+  additionalTools?: string[];
 }
 
 // Account fields accepted by the AI-team-member create/update API. They are

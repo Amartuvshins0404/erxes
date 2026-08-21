@@ -81,6 +81,11 @@ export const registrationApplicationSchema = new Schema(
       type: Number,
       label: 'Membership fee amount',
     },
+    archivedAt: {
+      type: Date,
+      label: 'Archived at',
+      index: true,
+    },
   },
   {
     timestamps: true,
@@ -90,3 +95,4 @@ export const registrationApplicationSchema = new Schema(
 registrationApplicationSchema.index({ subdomain: 1, membershipTypeId: 1 });
 registrationApplicationSchema.index({ subdomain: 1, createdAt: -1 });
 registrationApplicationSchema.index({ subdomain: 1, cpUserId: 1 });
+registrationApplicationSchema.index({ subdomain: 1, archivedAt: 1 });

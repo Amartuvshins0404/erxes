@@ -29,6 +29,10 @@ export interface IRegistrationApplicationModel extends Model<IRegistrationApplic
     subdomain: string,
     isRead: boolean,
   ): Promise<IRegistrationApplicationDocument | null>;
+  removeApplicationById(
+    _id: string,
+    subdomain: string,
+  ): Promise<IRegistrationApplicationDocument | null>;
 }
 
 export const loadRegistrationApplicationClass = (models: IModels) => {
@@ -114,6 +118,14 @@ export const loadRegistrationApplicationClass = (models: IModels) => {
       return models.RegistrationApplication.findOneAndUpdate(
         { _id, subdomain },
         { $set: { isRead, modifiedAt: new Date() } },
+        { new: true },
+      );
+    }
+
+    public static async removeApplicationById(_id: string, subdomain: string) {
+      return models.RegistrationApplication.findOneAndUpdate(
+        { _id, subdomain },
+        { $set: { archivedAt: new Date(), modifiedAt: new Date() } },
         { new: true },
       );
     }

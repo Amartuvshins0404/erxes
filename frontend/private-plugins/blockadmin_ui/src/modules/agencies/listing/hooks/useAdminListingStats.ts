@@ -1,5 +1,5 @@
 import { useQuery } from '@apollo/client';
-import { IAdminListingStats } from '../types';
+import { IAdminListingStats } from '../types/listingTypes';
 import { GET_ADMIN_LISTING_STATS } from '../graphql';
 
 type GetAdminListingStatsResponse = {

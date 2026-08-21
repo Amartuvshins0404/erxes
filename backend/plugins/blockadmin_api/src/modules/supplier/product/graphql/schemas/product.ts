@@ -1,4 +1,4 @@
-import { GQL_CURSOR_PARAM_DEFS } from 'erxes-api-shared/utils';
+import { GQL_CURSOR_PARAM_DEFS, GQL_OFFSET_PARAM_DEFS } from 'erxes-api-shared/utils';
 
 export const types = `
   type BaProductCategory {
@@ -57,6 +57,9 @@ const productQueryParams = `
 export const queries = `
   baProducts(${productQueryParams}${GQL_CURSOR_PARAM_DEFS}): BaProductListResponse
   baProductDetail(_id: String!): BaProduct
+
+  cpBaProducts(${productQueryParams}${GQL_OFFSET_PARAM_DEFS}): [BaProduct]
+  cpBaProductDetail(_id: String!): BaProduct
 `;
 
 export const mutations = `

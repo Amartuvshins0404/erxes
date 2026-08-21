@@ -59,25 +59,18 @@ export interface IAttachmentStorageStatusResponse {
   mastraAttachmentStorageStatus: IAttachmentStorage | null;
 }
 
+export type MastraSandboxMode = 'onserver' | 'isolated';
+
 export interface IMastraSettings {
   _id?: string;
   erxesApiUrl?: string | null;
   memoryEnabled?: boolean | null;
   attachmentsEnabled?: boolean | null;
-  learningEnabled?: boolean | null;
-  learningAutoPromoteMinSources?: number | null;
-  learningAutoPromoteMinConfidence?: number | null;
-  learningDigestMaxChars?: number | null;
-  learningDigestMaxEntries?: number | null;
-  learningIdleMinutes?: number | null;
-  learningDecayDays?: number | null;
-  learningDecayFactor?: number | null;
-  learningArchiveBelowConfidence?: number | null;
-  evaluationEnabled?: boolean | null;
-  evaluationDsnConfigured?: boolean | null;
   backgroundRemovalEnabled?: boolean | null;
-  summarizerProvider?: string | null;
-  summarizerModel?: string | null;
+  sandboxMode?: MastraSandboxMode | null;
+  openSandboxApiUrl?: string | null;
+  hasOpenSandboxApiKey?: boolean | null;
+  openSandboxApiKeyHint?: string | null;
   attachmentStorage?: Pick<
     IAttachmentStorage,
     'configured' | 'serviceType'

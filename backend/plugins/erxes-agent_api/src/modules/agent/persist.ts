@@ -4,6 +4,7 @@ import {
   getNativeMemory,
   ensureThreadRegistered,
   patchNativeMessages,
+  createNativeAssistantMessage,
 } from '@/session/nativeStore';
 import { IMastraChatAttachment } from '@/session/@types/session';
 import { MemoryBinding, PreparedTurn } from '@/agent/types';
@@ -12,14 +13,14 @@ export async function persistTurn(params: {
   models: IModels;
   prepared: PreparedTurn;
   reply: string | null;
-  // Per-reasoning-step short summaries, index-aligned to the assistant turn's
-  // reasoning parts (holes are null). Stamped onto the assistant message's erxes
-  // meta so the chat re-renders the short thoughts on reload.
-  reasoningSummaries?: (string | null)[];
-  // One-line "what this turn accomplished" headline for the collapsed trace.
-  turnSummary?: string;
   assistantMessageId?: string;
+  // Replace native intermediate text blocks with the guarded final reply.
+  replaceNativeText?: boolean;
   interrupted?: boolean;
+  // The model stream failed outright — native persistence definitely skipped
+  // this turn, so a reply row must be created, not just patched.
+  failed?: boolean;
+  hasArtifacts?: boolean;
 }): Promise<{
   titlePromise: Promise<string | null>;
   assistantMessageId: string | null;
@@ -28,9 +29,10 @@ export async function persistTurn(params: {
     prepared,
     reply,
     assistantMessageId,
-    reasoningSummaries,
-    turnSummary,
     interrupted,
+    failed,
+    hasArtifacts,
+    replaceNativeText,
   } = params;
   const { useMemory, memCtx, agentConfig, attachments } = prepared;
 
@@ -52,11 +54,11 @@ export async function persistTurn(params: {
         agentId: agentConfig._id,
         reply,
         attachments,
-        reasoningSummaries,
-        turnSummary,
         assistantMessageId,
         turnStartedAt: prepared.authCtx?.turnStartedAt,
         interrupted,
+        failed,
+        replaceNativeText,
       });
     } catch (e) {
       console.warn(
@@ -67,28 +69,26 @@ export async function persistTurn(params: {
     }
   }
 
-  // Link this turn's generated artifacts to the assistant message so the chat
-  // can re-render their inline cards on reload (the dedicated store survives,
-  // unlike the native-store message meta). Best-effort.
+  // Link only turns that actually persisted artifacts. Ordinary chat turns
+  // otherwise issued an unproductive updateMany against the artifact store.
   const turnId = prepared.authCtx?.turnId;
-  if (nativeAssistantId && turnId) {
-    await params.models.MastraArtifact.linkTurnToMessage(
-      turnId,
-      nativeAssistantId,
-    ).catch((e) =>
+  if (hasArtifacts) {
+    if (nativeAssistantId && turnId) {
+      await params.models.MastraArtifact.linkTurnToMessage(
+        turnId,
+        nativeAssistantId,
+      ).catch((e) =>
+        console.warn(
+          `[artifact-store] turn→message link skipped: ${
+            (e as Error)?.message || e
+          }`,
+        ),
+      );
+    } else if (turnId) {
       console.warn(
-        `[artifact-store] turn→message link skipped: ${
-          (e as Error)?.message || e
-        }`,
-      ),
-    );
-  } else if (turnId) {
-    // The turn produced artifacts (turnId stamped) but we never recovered the
-    // assistant message id, so their inline cards can't be re-attached on reload.
-    // Surface it — this is the one thing that silently breaks the card rehydration.
-    console.warn(
-      '[artifact-store] turn→message link skipped: no assistant message id recovered',
-    );
+        '[artifact-store] turn→message link skipped: no assistant message id recovered',
+      );
+    }
   }
 
   return { titlePromise, assistantMessageId: nativeAssistantId };
@@ -121,6 +121,27 @@ const isFromTurn = (m: NativeChatMessage, turnStartedAt?: Date): boolean => {
   );
 };
 
+function replaceNativeAssistantText(
+  content: NativeChatMessage['content'],
+  reply: string,
+): Record<string, unknown> {
+  const base = (content ?? {}) as Record<string, unknown>;
+  const parts = Array.isArray(base.parts) ? base.parts : [];
+  return {
+    ...base,
+    content: reply,
+    parts: [
+      ...parts.filter(
+        (part) =>
+          !part ||
+          typeof part !== 'object' ||
+          (part as { type?: unknown }).type !== 'text',
+      ),
+      { type: 'text', text: reply },
+    ],
+  };
+}
+
 function mergeErxesMeta(
   content: NativeChatMessage['content'],
   erxes: Record<string, unknown>,
@@ -140,25 +161,19 @@ export async function patchNativeTurn(params: {
   agentId: string;
   reply: string | null;
   attachments?: IMastraChatAttachment[];
-  reasoningSummaries?: (string | null)[];
-  turnSummary?: string;
   assistantMessageId?: string;
   turnStartedAt?: Date;
   interrupted?: boolean;
+  failed?: boolean;
+  replaceNativeText?: boolean;
 }): Promise<string | null> {
   const { subdomain, binding, agentId, reply, attachments } = params;
-  const { reasoningSummaries, turnSummary, assistantMessageId, interrupted } =
-    params;
+  const { assistantMessageId, interrupted, failed, replaceNativeText } = params;
   const { turnStartedAt } = params;
 
-  // The erxes-meta fields to stamp onto the assistant message (only the present
-  // ones), so a reload re-renders the short thoughts + turn headline. A stopped
-  // turn also stamps `interrupted` so a reload shows the "stopped" badge instead
-  // of the partial reply as complete.
+  // A stopped turn keeps its state so a reload shows the "stopped" badge
+  // instead of treating the partial reply as complete.
   const assistantMeta: Record<string, unknown> = {};
-  if (reasoningSummaries?.length)
-    assistantMeta.reasoningSummaries = reasoningSummaries;
-  if (turnSummary) assistantMeta.turnSummary = turnSummary;
   if (interrupted) assistantMeta.interrupted = true;
 
   await ensureThreadRegistered(
@@ -169,7 +184,9 @@ export async function patchNativeTurn(params: {
   );
 
   const wantUser = Boolean(attachments?.length);
-  const wantAssistant = Object.keys(assistantMeta).length > 0;
+  const wantAssistant =
+    Object.keys(assistantMeta).length > 0 ||
+    Boolean(replaceNativeText && reply);
 
   if (!wantUser && !wantAssistant && (assistantMessageId || !reply)) {
     return assistantMessageId ?? null;
@@ -228,11 +245,31 @@ export async function patchNativeTurn(params: {
     }
   }
 
+  // Error/abort finishes skip Mastra's native save entirely — no assistant row
+  // will ever appear no matter how long we wait. When finalization still
+  // produced a user-facing reply, create the row directly so the thread shows
+  // the outcome instead of a bare question. (Successful turns always have the
+  // native row; creating there would double-persist.)
+  if (!assistantMsg && reply && (interrupted || failed)) {
+    const createdId = await createNativeAssistantMessage({
+      subdomain,
+      threadId: binding.thread,
+      resourceId: binding.resource,
+      reply,
+      metadata: assistantMeta,
+    });
+    return assistantMessageId ?? createdId;
+  }
+
   if (wantAssistant && assistantMsg) {
+    const content =
+      replaceNativeText && reply
+        ? replaceNativeAssistantText(assistantMsg.content, reply)
+        : assistantMsg.content;
     await patchNativeMessages(subdomain, [
       {
         id: assistantMsg.id,
-        content: mergeErxesMeta(assistantMsg.content, assistantMeta),
+        content: mergeErxesMeta(content, assistantMeta),
       },
     ]);
   }

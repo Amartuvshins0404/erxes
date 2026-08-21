@@ -62,6 +62,7 @@ export const SupplierProfileForm = () => {
       urls: supplier?.urls || [],
       website: supplier?.website || '',
       registrationNumber: supplier?.registrationNumber || '',
+      industry: supplier?.industry || '',
       primaryEmail: supplier?.primaryEmail || '',
       primaryPhone: supplier?.primaryPhone || '',
       phones: supplier?.phones || [],
@@ -263,6 +264,19 @@ export const SupplierProfileForm = () => {
                   render={({ field }) => (
                     <Form.Item>
                       <Form.Label>Registration Number</Form.Label>
+                      <Form.Control>
+                        <Input {...field} />
+                      </Form.Control>
+                      <Form.Message />
+                    </Form.Item>
+                  )}
+                />
+                <Form.Field
+                  name="industry"
+                  control={form.control}
+                  render={({ field }) => (
+                    <Form.Item>
+                      <Form.Label>Industry</Form.Label>
                       <Form.Control>
                         <Input {...field} />
                       </Form.Control>

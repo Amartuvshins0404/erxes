@@ -12,21 +12,8 @@ export interface IChatAgent {
   createdBy?: string | null;
   visibility?: 'private' | 'shared' | 'organization';
   audienceUserIds: string[];
-  audienceTeamIds: string[];
-  audienceDepartmentIds: string[];
   model?: string;
   provider?: string;
-  // Full settings — present on the MASTRA_AGENTS payload, used by the in-chat
-  // "Edit agent" modal so it can populate without a second fetch.
-  instructions?: string;
-  permissionGroupIds: string[];
-  destructiveOps?: 'allow' | 'ask';
-  memoryEnabled?: boolean;
-  // When on, the chat shows this agent's full tool-call trace; off (default)
-  // shows only the turn summary that expands to the short thoughts.
-  debug?: boolean;
-  maxSteps?: number;
-  temperature?: number | null;
   isActive: boolean;
 }
 

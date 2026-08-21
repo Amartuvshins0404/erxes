@@ -56,6 +56,7 @@ const SupplierInfo = ({ supplier }: { supplier: ISupplier }) => {
     logo,
     coverImage,
     registrationNumber,
+    industry,
     dateFounded,
     website,
     primaryEmail,
@@ -110,6 +111,7 @@ const SupplierInfo = ({ supplier }: { supplier: ISupplier }) => {
               <Row label={t('Name')} value={name} />
               <Row label={t('Code')} value={code} />
               <Row label={t('Registration #')} value={registrationNumber} />
+              <Row label={t('Industry')} value={industry} />
               <Row label={t('Founded')} value={dateFounded} />
               <Row label={t('Website')} value={website} />
               <Row label={t('Primary Email')} value={primaryEmail} />

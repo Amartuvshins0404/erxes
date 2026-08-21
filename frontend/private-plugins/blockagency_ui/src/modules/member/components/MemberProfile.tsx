@@ -14,7 +14,7 @@ export const MemberProfile = () => {
 
   return (
     <InfoCard title="Profile" className="max-w-4xl mx-auto w-full my-4">
-      <InfoCard.Content>
+      <InfoCard.Content className="flex-1 flex flex-col overflow-hidden">
         <div>
           <Upload.Root
             value={currentUser?.details?.avatar as string}

@@ -1,3 +1,4 @@
+import { IAttachment } from 'erxes-api-shared/core-types';
 import { Document } from 'mongoose';
 import { SOCIAL_PLATFORMS } from '~/constants';
 
@@ -26,12 +27,14 @@ export interface IBlockAgency {
   primaryEmail: string;
   phones: string[];
   primaryPhone: string;
-  logo: string;
-  coverImage: string;
-  documents: string[];
+  logo: IAttachment;
+  coverImage: IAttachment;
+  documents: IAttachment[];
   socialLinks: Partial<Record<ISocialPlatform, string>>;
   operationArea: IBlockAgencyOperationArea;
   fieldsOfExpertise: IBlockAgencyFieldOfExpertise;
+  messengerIntegrationId: string;
+  widgetBundleUrl: string;
   verificationStatus: string;
   rejectionReasons?: string[];
   rejectionNotes?: string;

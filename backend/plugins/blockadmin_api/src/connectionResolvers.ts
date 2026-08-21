@@ -8,6 +8,11 @@ import {
   IBlockAdminListingModel,
   loadBlockAdminListingClass,
 } from '@/listing/db/models/Listing';
+import { IBlockAdminAgentDocument } from '@/member/@types/member';
+import {
+  IBlockAdminAgentModel,
+  loadBlockAdminAgentClass,
+} from '@/member/db/models/Member';
 import { IBlockAttachmentDocument } from '@/attachment/@types/attachment';
 import {
   IBlockAttachmentModel,
@@ -27,6 +32,16 @@ import {
   loadContractClass,
 } from '@/contract/db/models/Contract';
 import { IOfferModel, loadOfferClass } from '@/contract/db/models/Offer';
+import { IContractPaymentDocument } from '@/contract/@types/payment';
+import {
+  IContractPaymentModel,
+  loadContractPaymentClass,
+} from '@/contract/db/models/Payment';
+import { IBlockCustomerDocument } from '@/blockCustomer/@types/blockCustomer';
+import {
+  IBlockCustomerModel,
+  loadBlockCustomerClass,
+} from '@/blockCustomer/db/models/BlockCustomer';
 import { IBlockDeveloperDocument } from '@/developer/db/@types/developer';
 import {
   IBlockDeveloperModel,
@@ -80,6 +95,7 @@ import {
 
 export interface IModels extends ISupplierModels, IMembershipModels {
   Agency: IBlockAgencyModel;
+  AgencyMember: IBlockAdminAgentModel;
   Listing: IBlockAdminListingModel;
   Project: IProjectModel;
   ProjectPaymentPlan: IProjectPaymentPlanModel;
@@ -92,6 +108,8 @@ export interface IModels extends ISupplierModels, IMembershipModels {
   BlockAttachment: IBlockAttachmentModel;
   Developer: IBlockDeveloperModel;
   Contract: IContractModel;
+  ContractPayment: IContractPaymentModel;
+  BlockCustomer: IBlockCustomerModel;
   ProjectMember: IProjectMemberModel;
   Offer: IOfferModel;
   Invoice: IInvoiceModel;
@@ -110,6 +128,11 @@ export const loadClasses = (db: mongoose.Connection): IModels => {
     'block_admin_agencies',
     loadBlockAgencyClass(models),
   );
+
+  models.AgencyMember = db.model<
+    IBlockAdminAgentDocument,
+    IBlockAdminAgentModel
+  >('block_admin_members', loadBlockAdminAgentClass(models));
 
   models.Listing = db.model<
     IBlockAdminListingDocument,
@@ -165,6 +188,16 @@ export const loadClasses = (db: mongoose.Connection): IModels => {
     'block_admin_contracts',
     loadContractClass(models),
   );
+
+  models.ContractPayment = db.model<
+    IContractPaymentDocument,
+    IContractPaymentModel
+  >('block_admin_contract_payments', loadContractPaymentClass(models));
+
+  models.BlockCustomer = db.model<
+    IBlockCustomerDocument,
+    IBlockCustomerModel
+  >('block_admin_customers', loadBlockCustomerClass(models));
 
   models.ProjectMember = db.model<IProjectMemberDocument, IProjectMemberModel>(
     'block_admin_project_members',

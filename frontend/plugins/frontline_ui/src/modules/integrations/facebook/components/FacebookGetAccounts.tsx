@@ -24,7 +24,6 @@ import { useFacebookPages } from '../hooks/useFacebookPages';
 import { useFbAuthPopup } from '../hooks/useFbAuthPopup';
 import { useFbIntegrationContext } from '../contexts/FbIntegrationContext';
 
-
 const FacebookAccountRow = ({
   account,
   selectedAccount,
@@ -34,7 +33,9 @@ const FacebookAccountRow = ({
   selectedAccount: string | undefined;
   onSelect: (id: string) => void;
 }) => {
-  const { facebookGetPages, loading: pagesLoading } = useFacebookPages(account._id);
+  const { facebookGetPages, loading: pagesLoading } = useFacebookPages(
+    account._id,
+  );
   return (
     <Command.Item
       key={account._id}
@@ -66,8 +67,6 @@ const FacebookAccountRow = ({
 export const FacebookGetAccounts = () => {
   const { t } = useTranslation('frontline');
   const { isPost } = useFbIntegrationContext();
-  // Page posting may run on a separate Meta app; the connect flow has to name
-  // the kind so the right app authorizes and the right accounts are listed.
   const integrationKind = isPost ? 'facebook-post' : 'facebook-messenger';
   const { facebookGetAccounts, loading, refetch } =
     useFacebookAccounts(integrationKind);

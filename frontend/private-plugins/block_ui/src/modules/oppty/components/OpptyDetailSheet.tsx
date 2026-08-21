@@ -138,7 +138,7 @@ export const OpptyDetailSheet = () => {
             access={{ customer: 'read' }}
             hookOptions={{
               hiddenPlugins: ['sales', 'operation'],
-              hiddenModules: ['oppty', 'company', 'ticket'],
+              hiddenModules: ['oppty', 'company', 'ticket', 'customerSync'],
             }}
           />
         </FocusSheet.Content>

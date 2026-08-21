@@ -1,6 +1,7 @@
 import { Document } from 'mongoose';
 import { IBlock } from '~/types';
 import { SOCIAL_PLATFORMS } from '~/constants';
+import { IAttachment } from 'erxes-api-shared/core-types';
 
 export type ISocialPlatform = (typeof SOCIAL_PLATFORMS)[number];
 
@@ -27,12 +28,14 @@ export interface IBlockAgency extends IBlock {
   phones: string[];
   primaryPhone: string;
   dateFounded: string;
-  logo: string;
-  coverImage: string;
-  documents: string[];
+  logo: IAttachment;
+  coverImage: IAttachment;
+  documents: IAttachment[];
   socialLinks: Partial<Record<ISocialPlatform, string>>;
   operationArea: IBlockAgencyOperationArea;
   fieldsOfExpertise: IBlockAgencyFieldOfExpertise;
+  messengerIntegrationId: string;
+  widgetBundleUrl: string;
   verificationStatus: string;
   rejectionReasons?: string[];
   rejectionNotes?: string;

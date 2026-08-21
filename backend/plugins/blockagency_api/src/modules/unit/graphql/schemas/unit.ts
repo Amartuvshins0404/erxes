@@ -1,9 +1,14 @@
 export const types = `
   enum BlockUnitStatus {
-    available
+    vacant
     reserved
-    sold
     leased
+    leaseExpireSoon
+    leaseRenewal
+    underFitout
+    cancelled
+    internalUse
+    onHold
   }
 
   type BlockAgencyUnitAgency {
@@ -27,6 +32,7 @@ export const types = `
     unitNumber: String
     projectId: String
     memberId: String
+    member: User @provides(fields: "_id")
     status: BlockUnitStatus
     assignedAt: Date
     createdAt: Date

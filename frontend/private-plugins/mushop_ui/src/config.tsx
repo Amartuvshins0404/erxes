@@ -1,4 +1,4 @@
-import { IconBuildingStore, IconCreditCard, IconCurrencyYuan, IconFileDescription, IconPackage, IconUsers } from '@tabler/icons-react';
+import { IconBuildingStore, IconCurrencyYuan, IconFileDescription } from '@tabler/icons-react';
 import { lazy, Suspense } from 'react';
 import { IUIConfig } from 'erxes-ui';
 
@@ -24,24 +24,9 @@ export const CONFIG: IUIConfig = {
 
   modules: [
     {
-      name: 'Supplier',
-      icon: IconUsers,
-      path: 'suppliers',
-    },
-    {
-      name: 'Products',
-      icon: IconPackage,
-      path: 'products',
-    },
-    {
-      name: 'Members',
-      icon: IconCreditCard,
-      path: 'members',
-    },
-    {
-      name: 'Collectives',
+      name: 'mushop',
       icon: IconBuildingStore,
-      path: 'collectives',
+      path: 'mushop',
     },
   ],
 

@@ -19,6 +19,7 @@ export const supplierProfileSchema = z.object({
   about: z.string().optional(),
   website: domainOrEmpty.optional(),
   registrationNumber: z.string().optional(),
+  industry: z.string().optional(),
   address: z.object({
     details: z.object({
       countryCode: z.string().min(1).optional(),

@@ -1,48 +1,58 @@
-import { useApolloClient } from '@apollo/client';
+import { IconCalendarEvent, IconPlus } from '@tabler/icons-react';
+import {
+  Breadcrumb,
+  Button,
+  PageContainer,
+  PageSubHeader,
+  Separator,
+} from 'erxes-ui';
 import { useState } from 'react';
-import { Button } from 'erxes-ui';
-import { IconCalendarEvent } from '@tabler/icons-react';
-import { MtoListPageLayout } from '~/components/MtoListPageLayout';
+import { Link } from 'react-router-dom';
+import { PageHeader } from 'ui-modules';
 import { EventFilters } from '@/event/components/EventFilters';
-import { EventsList } from '@/event/components/EventsList';
-import { EventFilters as EventFiltersType } from '@/event/types/eventFilters';
 import { EventFormSheet } from '@/event/components/EventFormSheet';
-import { MTO_EVENTS } from '@/event/graphql/eventQueries';
+import { EventsRecordTable } from '@/event/components/EventsRecordTable';
+import { useEvents } from '@/event/hooks/useEvents';
 
 export function EventsPage() {
-  const client = useApolloClient();
-  const [filters, setFilters] = useState<EventFiltersType>({});
   const [createOpen, setCreateOpen] = useState(false);
+  const { refetch } = useEvents();
 
   return (
-    <>
-      <MtoListPageLayout
-        pageName="Events"
-        pageIcon={<IconCalendarEvent />}
-        filters={filters}
-        onFiltersChange={setFilters}
-        filtersComponent={EventFilters}
-        listComponent={EventsList}
-        createDialog={
-          <Button
-            variant="outline"
-            size="sm"
-            type="button"
-            onClick={() => setCreateOpen(true)}
-          >
+    <PageContainer>
+      <PageHeader>
+        <PageHeader.Start>
+          <Breadcrumb>
+            <Breadcrumb.List className="gap-1">
+              <Breadcrumb.Item>
+                <Button variant="ghost" asChild>
+                  <Link to="/mto/events">
+                    <IconCalendarEvent />
+                    Events
+                  </Link>
+                </Button>
+              </Breadcrumb.Item>
+            </Breadcrumb.List>
+          </Breadcrumb>
+          <Separator.Inline />
+          <PageHeader.FavoriteToggleButton />
+        </PageHeader.Start>
+        <PageHeader.End>
+          <Button onClick={() => setCreateOpen(true)}>
+            <IconPlus />
             Add Event
           </Button>
-        }
-        createDialogInHeader
-      />
-
+        </PageHeader.End>
+      </PageHeader>
+      <PageSubHeader>
+        <EventFilters />
+      </PageSubHeader>
+      <EventsRecordTable />
       <EventFormSheet
         open={createOpen}
         onOpenChange={setCreateOpen}
-        onSaved={() => {
-          void client.refetchQueries({ include: [MTO_EVENTS] });
-        }}
+        onSaved={() => void refetch()}
       />
-    </>
+    </PageContainer>
   );
 }

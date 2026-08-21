@@ -6,6 +6,11 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { AgencyIdentityValues } from '../types/form';
 import { UploadImage } from '../form/upload';
+import {
+  formatFileSize,
+  getAttachmentType,
+  toAttachmentInput,
+} from '../utils/attachment';
 
 export const AgencyProfileIdentity = () => {
   const { loading } = useAgencyInfo();
@@ -25,15 +30,23 @@ export const AgencyIdentity = () => {
     resolver: zodResolver(agencyIdentitySchema),
     mode: 'onBlur',
     defaultValues: {
-      logo: agencyInfo?.logo || '',
-      coverImage: agencyInfo?.coverImage || '',
+      logo: toAttachmentInput(agencyInfo?.logo),
+      coverImage: toAttachmentInput(agencyInfo?.coverImage),
     },
   });
   const { updateAgency } = useUpdateAgency();
 
   const handleSave = (patch: Partial<AgencyIdentityValues>) => {
-    const values = { ...form.getValues(), ...patch };
-    updateAgency({ variables: { input: values } });
+    const { logo, coverImage } = { ...form.getValues(), ...patch };
+
+    updateAgency({
+      variables: {
+        input: {
+          logo: toAttachmentInput(logo),
+          coverImage: toAttachmentInput(coverImage),
+        },
+      },
+    });
   };
 
   return (
@@ -56,6 +69,14 @@ export const AgencyIdentity = () => {
                     uploaderClassName="w-full"
                     className="w-full aspect-video"
                   />
+                  <Form.Description>
+                    {getAttachmentType(
+                      field.value?.type as string,
+                      field.value?.name,
+                    )}
+                    {' · '}
+                    {formatFileSize(field.value?.size || 0)}
+                  </Form.Description>
                   <Form.Message />
                 </Form.Item>
               )}
@@ -79,6 +100,14 @@ export const AgencyIdentity = () => {
                     uploaderClassName="w-full"
                     className="w-full aspect-video"
                   />
+                  <Form.Description>
+                    {getAttachmentType(
+                      field.value?.type as string,
+                      field.value?.name,
+                    )}
+                    {' · '}
+                    {formatFileSize(field.value?.size || 0)}
+                  </Form.Description>
                   <Form.Message />
                 </Form.Item>
               )}

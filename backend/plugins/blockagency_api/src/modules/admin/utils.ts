@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import { Resolver } from 'erxes-api-shared/core-types';
 import fetch from 'node-fetch';
 
-const { BLOCKAGENT_API_URL, BLOCK_ADMIN_SECRET } = process.env;
+const { BLOCK_ADMIN_API_URL, BLOCK_ADMIN_SECRET } = process.env;
 
 interface IData {
   [key: string]: any;
@@ -54,11 +54,20 @@ const buildPayload = (
   return payload;
 };
 
-const sendMessage = ({ subdomain, path, payload }: SendMessagePayload) => {
-  const API_ENDPOINT = `${BLOCKAGENT_API_URL}/webhook/${path}`;
+/**
+ * Mirrors one change to block-admin over the signed webhook. Mutations get this
+ * for free through `wrapMutationResolver`; anything that writes outside a
+ * mutation must call it directly.
+ */
+export const sendBlockAdminMessage = ({
+  subdomain,
+  path,
+  payload,
+}: SendMessagePayload) => {
+  const API_ENDPOINT = `${BLOCK_ADMIN_API_URL}/webhook/${path}`;
 
-  if (!BLOCKAGENT_API_URL || !BLOCK_ADMIN_SECRET) {
-    return console.error('BLOCKAGENT_API_URL or BLOCK_ADMIN_SECRET is not set');
+  if (!BLOCK_ADMIN_API_URL || !BLOCK_ADMIN_SECRET) {
+    return console.error('BLOCK_ADMIN_API_URL or BLOCK_ADMIN_SECRET is not set');
   }
 
   try {
@@ -87,7 +96,7 @@ export const wrapMutationResolver = (mutations: Record<string, Resolver>) => {
       const entity = await resolver(root, args, context, info);
 
       if (entity) {
-        sendMessage({
+        sendBlockAdminMessage({
           subdomain: context.subdomain,
           path,
           payload: buildPayload(

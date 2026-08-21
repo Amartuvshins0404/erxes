@@ -22,7 +22,7 @@ router.post(
         input.building,
       );
 
-      models.Zoning.createZoning({
+      await models.Zoning.createZoning({
         ...input,
         subdomain,
         entityId,
@@ -57,7 +57,7 @@ router.post(
         entityId,
       );
 
-      models.Zoning.updateZoning(subdomain, entityId, {
+      await models.Zoning.updateZoning(subdomain, entityId, {
         ...input,
         building: zoning.building,
       });
@@ -83,7 +83,7 @@ router.post(
 
       const { entityId } = payload || {};
 
-      models.Zoning.deleteZoning(subdomain, entityId);
+      await models.Zoning.deleteZoning(subdomain, entityId);
 
       return res.status(200).json({
         success: true,
@@ -115,7 +115,7 @@ router.post(
 
       const { _id, ...rest } = zoning;
 
-      models.Zoning.createZoning({
+      await models.Zoning.createZoning({
         ...rest,
         floor: rest.floor > 0 ? rest.floor + 1 : rest.floor - 1,
         subdomain,

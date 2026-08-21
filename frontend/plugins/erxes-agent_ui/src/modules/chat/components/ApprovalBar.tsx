@@ -15,7 +15,7 @@ export const ApprovalBar = ({
   onApprove: () => void;
   onDeny: () => void;
 }) => (
-  <div className="ea-pop mx-auto mb-2 w-full max-w-3xl rounded-lg border bg-muted/40 px-4 py-3">
+  <div className="ea-pop mx-auto mb-2 w-full max-w-3xl rounded-lg border ea-bg-muted-40 px-4 py-3">
     <p className="text-sm leading-relaxed text-foreground">{prompt}</p>
     <div className="mt-2.5 flex items-center justify-end gap-2">
       <Button variant="outline" onClick={onDeny} disabled={busy}>

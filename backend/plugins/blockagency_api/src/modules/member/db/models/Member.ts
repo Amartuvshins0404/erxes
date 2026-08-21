@@ -11,7 +11,7 @@ export interface IBlockAgencyMemberModel extends Model<IBlockAgencyMemberDocumen
   getMember(_id: string): Promise<IBlockAgencyMemberDocument | null>;
   createMember(
     members: IBlockAgencyAddMembersInput[],
-  ): Promise<IBlockAgencyMemberDocument>;
+  ): Promise<IBlockAgencyMemberDocument[]>;
   updateMember(
     _id: string,
     input: Partial<IBlockAgencyMember>,

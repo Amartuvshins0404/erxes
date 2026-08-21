@@ -15,7 +15,7 @@ router.post(
 
       const { entityId, data } = payload || {};
 
-      models.Project.createProject({ subdomain, entityId, ...data });
+      await models.Project.createProject({ subdomain, entityId, ...data });
 
       return res.status(200).json({
         success: true,
@@ -40,7 +40,7 @@ router.post(
 
       const { input } = data || {};
 
-      models.Project.updateProject(subdomain, entityId, input);
+      await models.Project.updateProject(subdomain, entityId, input);
 
       return res.status(200).json({
         success: true,
@@ -63,7 +63,7 @@ router.post(
 
       const { entityId } = payload || {};
 
-      models.Project.updateProject(subdomain, entityId, {
+      await models.Project.updateProject(subdomain, entityId, {
         isPublished: true,
       } as IProject);
 
@@ -88,7 +88,7 @@ router.post(
 
       const { entityId } = payload || {};
 
-      models.Project.removeProject(subdomain, entityId);
+      await models.Project.removeProject(subdomain, entityId);
 
       return res.status(200).json({
         success: true,

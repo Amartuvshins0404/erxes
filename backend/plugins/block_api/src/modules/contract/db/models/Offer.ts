@@ -1,5 +1,5 @@
 import { Model } from 'mongoose';
-import { IOfferDocument } from '@/contract/@types/offer';
+import { IOfferDocument, OfferStatus } from '@/contract/@types/offer';
 
 import { IOffer } from '@/contract/@types/offer';
 import { IModels } from '~/connectionResolvers';
@@ -20,6 +20,20 @@ export const loadOfferClass = (models: IModels) => {
     }
 
     public static async updateOffer(_id: string, input: IOffer) {
+      const prev = await models.Offer.findOne({ _id });
+
+      if (!prev) {
+        throw new Error('Offer not found');
+      }
+
+      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+      const withinRevertWindow =
+        prev.updatedAt && prev.updatedAt > fiveMinutesAgo;
+
+      if (prev.status === OfferStatus.SENT && !withinRevertWindow) {
+        throw new Error('Sent offers cannot be edited');
+      }
+
       return models.Offer.findOneAndUpdate({ _id }, input, {
         new: true,
       });

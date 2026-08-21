@@ -1,6 +1,5 @@
 import { getPlugin, getPlugins, sendTRPCMessage } from 'erxes-api-shared/utils';
-import { ERXES_AGENT_ACTIONS } from '~/meta/permissionActions';
-import { BUILTIN_TOOLS } from './builtins';
+import { normalizeAdditionalToolKeys } from './additionalTools';
 import {
   actionsToAllowedTools,
   assertAllowedToolsInvariant,
@@ -20,58 +19,8 @@ interface DefaultPermissionGroup {
   plugin?: string;
 }
 
-const WORKFLOW_TOOL_KEYS = new Set([
-  'workflowGuide',
-  'workflowValidate',
-  'workflowSimulate',
-  'workflowSave',
-  'workflowUpdate',
-  'workflowList',
-  'workflowRuns',
-  'workflowRunNow',
-]);
-
-const safeBuiltinEntries = (): string[] =>
-  Object.keys(BUILTIN_TOOLS)
-    .filter(
-      (key) =>
-        key !== 'webSearch' &&
-        key !== 'fetchUrl' &&
-        !WORKFLOW_TOOL_KEYS.has(key),
-    )
-    .map((key) => `builtin:${key}`);
-
-const permissionActions = (permissions: GroupPermission[]): Set<string> =>
-  new Set(permissions.flatMap((permission) => permission.actions ?? []));
-
-const permissionBuiltinEntries = (permissions: GroupPermission[]): string[] => {
-  const actions = permissionActions(permissions);
-  const entries: string[] = [];
-  if (actions.has(ERXES_AGENT_ACTIONS.workflow.read)) {
-    entries.push(
-      'builtin:workflowGuide',
-      'builtin:workflowValidate',
-      'builtin:workflowSimulate',
-      'builtin:workflowList',
-    );
-  }
-  if (actions.has(ERXES_AGENT_ACTIONS.workflow.runsRead)) {
-    entries.push('builtin:workflowRuns');
-  }
-  if (actions.has(ERXES_AGENT_ACTIONS.workflow.createDraft)) {
-    entries.push('builtin:workflowSave');
-  }
-  if (actions.has(ERXES_AGENT_ACTIONS.workflow.updateDraft)) {
-    entries.push('builtin:workflowUpdate');
-  }
-  if (actions.has(ERXES_AGENT_ACTIONS.workflow.run)) {
-    entries.push('builtin:workflowRunNow');
-  }
-  if (actions.has(ERXES_AGENT_ACTIONS.skills.create)) {
-    entries.push('builtin:make_skill');
-  }
-  return entries;
-};
+const additionalBuiltinEntries = (additionalTools?: string[]): string[] =>
+  normalizeAdditionalToolKeys(additionalTools).map((key) => `builtin:${key}`);
 
 const getDefaultPermissionGroups = async (): Promise<
   DefaultPermissionGroup[]
@@ -173,14 +122,14 @@ export async function resolveAgentPermissions(opts: {
 export function deriveAgentAllowedTools(
   permissions: GroupPermission[],
   registry: RegistryView,
+  additionalTools?: string[],
 ): string[] {
   const erxesTools = actionsToAllowedTools(permissions, registry);
   assertAllowedToolsInvariant(erxesTools, permissions, registry);
   return [
     ...new Set([
       ...erxesTools,
-      ...safeBuiltinEntries(),
-      ...permissionBuiltinEntries(permissions),
+      ...additionalBuiltinEntries(additionalTools),
     ]),
   ].sort((a, b) => a.localeCompare(b));
 }
@@ -189,8 +138,13 @@ export async function resolveAgentAllowedTools(opts: {
   subdomain: string;
   permissionGroupIds: string[];
   customPermissions?: GroupPermission[];
+  additionalTools?: string[];
   registry: RegistryView;
 }): Promise<string[]> {
   const { permissions } = await resolveAgentPermissions(opts);
-  return deriveAgentAllowedTools(permissions, opts.registry);
+  return deriveAgentAllowedTools(
+    permissions,
+    opts.registry,
+    opts.additionalTools,
+  );
 }

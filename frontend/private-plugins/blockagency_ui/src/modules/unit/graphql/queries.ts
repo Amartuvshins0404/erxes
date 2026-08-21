@@ -24,6 +24,13 @@ export const GET_AGENCY_UNITS = gql`
         name
       }
       memberId
+      member {
+        _id
+        details {
+          avatar
+          fullName
+        }
+      }
       status
       assignedAt
       createdAt

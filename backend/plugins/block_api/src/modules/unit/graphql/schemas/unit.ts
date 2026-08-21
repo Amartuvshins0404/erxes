@@ -11,8 +11,7 @@ export const types = `
     statusType: String
     statusLabel: String
     statusColor: String
-    partyId: String
-    partyType: String
+    customerId: String
   }
 
   type BlockUnit {

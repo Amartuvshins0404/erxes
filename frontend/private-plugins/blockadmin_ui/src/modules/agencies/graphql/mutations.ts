@@ -19,9 +19,24 @@ export const ADMIN_REJECT_AGENCY = gql`
       phones
       primaryPhone
       dateFounded
-      logo
-      coverImage
-      documents
+      logo {
+        url
+        name
+        type
+        size
+      }
+      coverImage {
+        url
+        name
+        type
+        size
+      }
+      documents {
+        url
+        name
+        type
+        size
+      }
       socialLinks
       operationArea {
         city
@@ -55,9 +70,24 @@ export const ADMIN_VERIFY_AGENCY = gql`
       phones
       primaryPhone
       dateFounded
-      logo
-      coverImage
-      documents
+      logo {
+        url
+        name
+        type
+        size
+      }
+      coverImage {
+        url
+        name
+        type
+        size
+      }
+      documents {
+        url
+        name
+        type
+        size
+      }
       socialLinks
       operationArea {
         city

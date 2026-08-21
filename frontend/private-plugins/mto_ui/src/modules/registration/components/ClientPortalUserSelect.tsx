@@ -27,13 +27,17 @@ export interface IClientPortalUserRow {
   username?: string | null;
 }
 
-function formatCpUserLabel(u: IClientPortalUserRow): string {
+export function formatCpUserLabel(u: IClientPortalUserRow): string {
   const name = [u.firstName, u.lastName].filter(Boolean).join(' ').trim();
   if (name) return name;
   if (u.email) return u.email;
   if (u.phone) return u.phone;
   if (u.username) return u.username;
-  return u._id;
+  return 'CP хэрэглэгч';
+}
+
+function formatCpUserMeta(u: IClientPortalUserRow): string {
+  return [u.phone, u.email].filter(Boolean).join(' · ');
 }
 
 interface ClientPortalUserSelectProps {
@@ -93,9 +97,11 @@ export function ClientPortalUserSelect({
   const displayLabel = useMemo(() => {
     if (!value) return '';
     if (selectedUser && selectedUser._id === value) {
-      return formatCpUserLabel(selectedUser);
+      const meta = formatCpUserMeta(selectedUser);
+      const name = formatCpUserLabel(selectedUser);
+      return meta ? `${name} · ${meta}` : name;
     }
-    return value;
+    return '';
   }, [value, selectedUser]);
 
   const handleFetchMore = useCallback(() => {
@@ -179,9 +185,11 @@ export function ClientPortalUserSelect({
                     <span className="font-medium">
                       {formatCpUserLabel(selectedUser)}
                     </span>
-                    <span className="text-xs text-muted-foreground font-mono">
-                      {selectedUser._id}
-                    </span>
+                    {formatCpUserMeta(selectedUser) ? (
+                      <span className="text-xs text-muted-foreground">
+                        {formatCpUserMeta(selectedUser)}
+                      </span>
+                    ) : null}
                   </div>
                   <Combobox.Check checked />
                 </Command.Item>
@@ -202,9 +210,11 @@ export function ClientPortalUserSelect({
                       <span className="font-medium">
                         {formatCpUserLabel(u)}
                       </span>
-                      <span className="text-xs text-muted-foreground font-mono">
-                        {u._id}
-                      </span>
+                      {formatCpUserMeta(u) ? (
+                        <span className="text-xs text-muted-foreground">
+                          {formatCpUserMeta(u)}
+                        </span>
+                      ) : null}
                     </div>
                     <Combobox.Check checked={value === u._id} />
                   </Command.Item>

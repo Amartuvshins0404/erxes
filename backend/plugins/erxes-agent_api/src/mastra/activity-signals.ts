@@ -61,10 +61,6 @@ export function toolStatusLine(
         query ? `for ${query}` : undefined,
       );
     }
-    case 'agentknowledge': {
-      const query = pick(args, ['query']);
-      return phrase('Recalling learnings', query ? `about ${query}` : undefined);
-    }
     case 'websearch': {
       const query = pick(args, ['query', 'q', 'search']);
       return phrase('Searching the web', query ? `for ${query}` : undefined);

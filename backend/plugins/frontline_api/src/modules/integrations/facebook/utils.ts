@@ -40,8 +40,6 @@ export const graphRequest = {
   },
 };
 
-// Note: returns undefined when the page has no stored token — callers must
-// check the result rather than rely on a throw. Defined before its callers.
 export const getPageAccessTokenFromMap = (
   pageId: string,
   pageTokens: { [key: string]: string },
@@ -76,27 +74,8 @@ export const getPostDetails = async (
   }
 };
 
-/**
- * Uploads a photo to the page WITHOUT publishing it, returning its media id.
- * Used to build multi-image (carousel) feed posts: each image is staged here,
- * then referenced from the feed post via attached_media. The image must be a
- * publicly reachable URL — Facebook fetches it server-side.
- */
-export const MAX_POST_IMAGE_BYTES = 4 * 1024 * 1024;
+const MAX_POST_IMAGE_BYTES = 4 * 1024 * 1024;
 
-/**
- * Reads an image the user uploaded to this organization's own file storage and
- * hands the BYTES to Facebook, rather than giving Facebook a URL to fetch.
- *
- * The key is resolved through generateAttachmentUrl, so the host is always our
- * own DOMAIN — a caller cannot steer this at an arbitrary address. That is the
- * whole reason this takes a storage key instead of a URL: fetching a
- * user-supplied URL server-side would be an SSRF hole, and the existing
- * validateMediaUrl allowlist only covers Facebook's CDN, not our storage.
- *
- * It also means image posting works where Facebook cannot reach the file at
- * all — local development, or any deployment whose storage is not public.
- */
 export const uploadUnpublishedPhotoFromKey = async (
   subdomain: string,
   pageId: string,
@@ -109,15 +88,10 @@ export const uploadUnpublishedPhotoFromKey = async (
     throw new Error('Page access token not found');
   }
 
-  // Reject traversal and absolute forms before they reach the storage URL.
   if (!fileKey || /^[a-zA-Z]+:\/\//.test(fileKey) || fileKey.includes('..')) {
     throw new Error('Invalid image reference');
   }
 
-  // generateAttachmentUrl interpolates the key straight into the query string,
-  // so an uploaded name containing a space or "#" produces an invalid URL and
-  // fetch throws "fetch failed". Uploads keep the original filename, so this is
-  // routine, not an edge case.
   const sourceUrl = generateAttachmentUrl(
     subdomain,
     encodeURIComponent(fileKey),
@@ -138,8 +112,6 @@ export const uploadUnpublishedPhotoFromKey = async (
     throw new Error('Could not read the uploaded image');
   }
 
-  // Facebook rejects anything larger, and buffering more would put the API at
-  // the mercy of whatever a caller decides to upload.
   if (bytes.byteLength > MAX_POST_IMAGE_BYTES) {
     throw new Error('Each image must be 4 MB or smaller');
   }
@@ -171,37 +143,6 @@ export const uploadUnpublishedPhotoFromKey = async (
   }
 };
 
-export const uploadUnpublishedPhoto = async (
-  pageId: string,
-  pageTokens: { [key: string]: string },
-  imageUrl: string,
-): Promise<{ id: string }> => {
-  // getPageAccessTokenFromMap returns undefined rather than throwing — check
-  // explicitly so the caller gets a clear error instead of a confusing
-  // Facebook OAuth failure.
-  const pageAccessToken = getPageAccessTokenFromMap(pageId, pageTokens);
-
-  if (!pageAccessToken) {
-    throw new Error('Page access token not found');
-  }
-
-  try {
-    const response = (await graphRequest.post(
-      `${pageId}/photos`,
-      pageAccessToken,
-      {
-        url: imageUrl,
-        published: false,
-      },
-    )) as { id: string };
-
-    return response;
-  } catch (e) {
-    debugError(`Error occurred while uploading facebook photo: ${e.message}`);
-    throw new Error(e.message);
-  }
-};
-
 export const createPagePost = async (
   pageId: string,
   pageTokens: { [key: string]: string },
@@ -209,7 +150,6 @@ export const createPagePost = async (
   link?: string,
   attachedMediaIds?: string[],
 ): Promise<{ id: string }> => {
-  // Explicit check — getPageAccessTokenFromMap returns undefined, not a throw.
   const pageAccessToken = getPageAccessTokenFromMap(pageId, pageTokens);
 
   if (!pageAccessToken) {
@@ -222,9 +162,6 @@ export const createPagePost = async (
     doc.link = link;
   }
 
-  // Multi-image (carousel) post: reference photos staged by
-  // uploadUnpublishedPhoto. Facebook expects one attached_media[i] form field
-  // per image, each a JSON object naming the media id.
   for (let i = 0; i < (attachedMediaIds || []).length; i++) {
     doc[`attached_media[${i}]`] = JSON.stringify({
       media_fbid: (attachedMediaIds as string[])[i],
@@ -630,12 +567,23 @@ export const sendReply = async (
     debugFacebook(`Successfully sent data to facebook ${JSON.stringify(data)}`);
     return response;
   } catch (e) {
+    const targetRecipient = data?.recipient?.id || data?.recipient?.comment_id;
+
     debugError(
-      `Error ocurred while trying to send post request to facebook ${
-        e.message
-      } data: ${JSON.stringify(data)}`,
+      `Facebook Graph request failed ${JSON.stringify({
+        path: url,
+        pageId: recipientId,
+        targetRecipient,
+        requestType: data?.sender_action ? 'sender_action' : 'message',
+        code: e.code,
+        errorSubcode: e.error_subcode,
+        fbtraceId: e.fbtrace_id,
+        message: e.message,
+      })}`,
     );
-    const messageLevelErrorCodes = [10, 10900];
+    // request-level failures (unknown error, invalid parameter, messaging
+    // window, already replied) say nothing about the token's health
+    const messageLevelErrorCodes = [1, 10, 100, 10900];
     if (e.message.includes('access token')) {
       await models.FacebookIntegrations.updateOne(
         { _id: integration._id },

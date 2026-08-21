@@ -21,28 +21,4 @@ export const ERXES_AGENT_ACTIONS = {
     manage: 'erxesAgentSettingsManage',
     quotasManage: 'erxesAgentQuotasManage',
   },
-  workflow: {
-    read: 'erxesAgentWorkflowsRead',
-    createDraft: 'erxesAgentWorkflowsCreateDraft',
-    updateDraft: 'erxesAgentWorkflowsUpdateDraft',
-    remove: 'erxesAgentWorkflowsRemove',
-    run: 'erxesAgentWorkflowsRun',
-    approve: 'erxesAgentWorkflowsApprove',
-    schedule: 'erxesAgentWorkflowsSchedule',
-    runsRead: 'erxesAgentWorkflowRunsRead',
-  },
-  learning: {
-    read: 'erxesAgentLearningRead',
-    curate: 'erxesAgentLearningCurate',
-    remove: 'erxesAgentLearningRemove',
-  },
-  skills: {
-    read: 'erxesAgentSkillsRead',
-    create: 'erxesAgentSkillsCreate',
-    update: 'erxesAgentSkillsUpdate',
-    publish: 'erxesAgentSkillsPublish',
-    remove: 'erxesAgentSkillsRemove',
-    promote: 'erxesAgentSkillsPromote',
-    moderate: 'erxesAgentSkillsModerate',
-  },
 } as const;

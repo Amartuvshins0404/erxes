@@ -251,7 +251,7 @@ const getHistoryAssistantLimit = (
   return getFallbackBundleAssistantLimit(history);
 };
 
-const computeActivePlanLimit = (
+export const computeActivePlanLimit = (
   histories: ISaasOrganizationPlanHistory[],
 ): number => {
   const activeHistories = histories.filter(
@@ -260,9 +260,35 @@ const computeActivePlanLimit = (
       isHistoryCurrent(history),
   );
 
-  return activeHistories.reduce(
-    (sum, history) => sum + getHistoryAssistantLimit(history),
-    0,
+  const subscriptionLimits = new Map<string, number>();
+  let standaloneLimit = 0;
+
+  for (const history of activeHistories) {
+    const historyLimit = getHistoryAssistantLimit(history);
+    const subscriptionId = history.stripeSubscriptionId
+      ? String(history.stripeSubscriptionId)
+      : '';
+
+    if (!subscriptionId) {
+      standaloneLimit += historyLimit;
+      continue;
+    }
+
+    // Stripe onboarding and invoice webhooks can leave both `onboarding` and
+    // `manual` histories for one subscription. They describe the same paid
+    // coverage, so count the strongest snapshot once instead of summing it.
+    subscriptionLimits.set(
+      subscriptionId,
+      Math.max(subscriptionLimits.get(subscriptionId) || 0, historyLimit),
+    );
+  }
+
+  return (
+    standaloneLimit +
+    Array.from(subscriptionLimits.values()).reduce(
+      (sum, limit) => sum + limit,
+      0,
+    )
   );
 };
 

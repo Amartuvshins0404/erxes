@@ -1,18 +1,17 @@
 import { IContext } from '~/connectionResolvers';
 import { IBlockAgency } from '~/modules/agency/@types/agency';
+import { ensureTenantAgency } from '~/modules/agency/utils';
 
 export const blockAgencyMutations = {
   updateAgencyInfo: async (
     _root: undefined,
     { input }: { input: IBlockAgency },
-    { models }: IContext,
+    { models, subdomain }: IContext,
   ) => {
-    const existingAgency = await models.BlockAgency.findOne({});
+    // Creating the agency here also seeds the tenant's owners as its admins,
+    // so every creation path goes through `ensureTenantAgency`.
+    const agency = await ensureTenantAgency(models, subdomain);
 
-    if (!existingAgency) {
-      return models.BlockAgency.createAgency(input);
-    }
-
-    return models.BlockAgency.updateAgency(existingAgency._id, input);
+    return models.BlockAgency.updateAgency(String(agency._id), input);
   },
 };

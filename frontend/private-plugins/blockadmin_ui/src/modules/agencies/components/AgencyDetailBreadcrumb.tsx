@@ -1,16 +1,21 @@
-import { Breadcrumb, Separator } from 'erxes-ui';
-import { useParams } from 'react-router-dom';
+import { Breadcrumb, Button, Separator, Skeleton } from 'erxes-ui';
 import { useAgencyDetail } from '../hooks/useAgencyDetail';
 
 export const AgencyDetailBreadcrumb = () => {
-  const { id } = useParams();
-  const { agency } = useAgencyDetail({
-    variables: { id: id },
-  });
+  const { agency, loading } = useAgencyDetail();
+
   return (
     <>
       <Separator.Inline />
-      <Breadcrumb.Item>{agency?.name || 'Agency Detail'}</Breadcrumb.Item>
+      <Breadcrumb.Item>
+        {loading ? (
+          <Skeleton className="w-32 h-4" />
+        ) : (
+          <Button variant="ghost">
+            <Breadcrumb.Page>{agency?.name || 'Agency detail'}</Breadcrumb.Page>
+          </Button>
+        )}
+      </Breadcrumb.Item>
     </>
   );
 };

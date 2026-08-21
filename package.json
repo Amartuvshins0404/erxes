@@ -1,6 +1,6 @@
 {
   "name": "erxes-next",
-  "version": "3.0.61",
+  "version": "3.0.89",
   "license": "MIT",
   "scripts": {
     "dev:core-api": "npx nx run-many -t serve -p core-api gateway",
@@ -21,6 +21,9 @@
     "@apollo/client": "^3.11.8",
     "@apollo/server": "^4.11.3",
     "@apollo/subgraph": "^2.9.3",
+    "@assistant-ui/react": "0.11.58",
+    "@assistant-ui/react-ai-sdk": "1.1.21",
+    "@assistant-ui/react-markdown": "0.11.10",
     "@aws-sdk/client-s3": "^3.913.0",
     "@azure/storage-blob": "^12.29.1",
     "@blocknote/core": "^0.35.0",
@@ -50,6 +53,8 @@
     "@internationalized/date": "^3.8.2",
     "@js-preview/excel": "^1.7.14",
     "@module-federation/sdk": "^0.8.9",
+    "@open-file-viewer/core": "0.1.32",
+    "@open-file-viewer/react": "0.1.32",
     "@react-pdf/renderer": "3.1.14",
     "@sendgrid/mail": "^8.1.5",
     "@sentry/node": "^10.55.0",
@@ -87,7 +92,6 @@
     "dompurify": "^3.2.4",
     "dotenv": "^16.4.7",
     "echarts": "^5.5.1",
-    "mermaid": "^11.15.0",
     "echarts-for-react": "^3.0.2",
     "emblor": "^1.4.8",
     "erxes-telemetry": "^1.0.4",
@@ -125,6 +129,7 @@
     "jssip": "^3.10.1",
     "libphonenumber-js": "^1.11.20",
     "lodash": "^4.17.21",
+    "mermaid": "^11.15.0",
     "moment": "^2.30.1",
     "moment-timezone": "^0.5.48",
     "mongodb": "^6.18.0",
@@ -133,6 +138,8 @@
     "nanoid": "^3.3.6",
     "node-fetch": "^2.6.7",
     "nodemailer": "^6.9.10",
+    "pdfjs-dist": "5.7.284",
+    "qz-tray": "^2.2.6",
     "radix-ui": "^1.4.3",
     "react": "18.3.1",
     "react-aria-components": "^1.10.1",
@@ -164,6 +171,7 @@
     "tailwind-merge": "^2.5.4",
     "tailwindcss-animate": "^1.0.7",
     "telnyx": "^1.7.2",
+    "thinking-orbs": "^0.3.1",
     "ts-key-enum": "^3.0.13",
     "tslib": "^2.8.1",
     "ua-parser-js": "^2.0.3",
@@ -278,7 +286,8 @@
       "ioredis": "^5.6.1",
       "@mastra/core>zod": "^3.25.0",
       "@mastra/memory>zod": "^3.25.0",
-      "@mastra/libsql>zod": "^3.25.0"
+      "@mastra/libsql>zod": "^3.25.0",
+      "shell-quote": "1.10.0"
     }
   }
 }

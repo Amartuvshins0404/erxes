@@ -1,30 +1,36 @@
 import { useState } from 'react';
-import { AgenciesBreadcrumb } from '@/agencies/components/AgenciesBreadcrumb';
 import { AgenciesSubNav } from '@/agencies/components/AgenciesSubNav';
 import { AdminListingFilterBar } from '@/agencies/listing/components/AdminListingFilter';
-import { AdminListingGrid } from '@/agencies/listing/components/AdminListingGrid';
-import { AdminListingFilter } from '@/agencies/listing/types';
+import { AdminListingFilter } from '@/agencies/listing/types/listingTypes';
 import { PageContainer, PageSubHeader, ScrollArea, Separator } from 'erxes-ui';
-import { PageHeader } from 'ui-modules';
+import { PageHeader, createFavoriteBreadcrumb } from 'ui-modules';
+import {
+  AdminListingsViewControl,
+  AdminListingView,
+} from '@/agencies/listing/components/AdminListingsView';
 
 export const AgencyListingPage = () => {
   const [filter, setFilter] = useState<AdminListingFilter>({});
+  const favoriteBreadcrumb = createFavoriteBreadcrumb('Agencies', 'Listing');
 
   return (
     <PageContainer>
       <PageHeader>
         <PageHeader.Start>
-          <AgenciesBreadcrumb />
+          <AgenciesSubNav />
           <Separator.Inline />
-          <PageHeader.FavoriteToggleButton />
+          <PageHeader.FavoriteToggleButton
+            breadcrumb={favoriteBreadcrumb}
+            icon="IconBriefcase"
+          />
         </PageHeader.Start>
       </PageHeader>
-      <AgenciesSubNav />
       <PageSubHeader>
-        <AdminListingFilterBar filter={filter} onFilterChange={setFilter} />
+        <AdminListingFilterBar />
+        <AdminListingsViewControl />
       </PageSubHeader>
       <ScrollArea className="flex-auto">
-        <AdminListingGrid filter={filter} />
+        <AdminListingView />
       </ScrollArea>
     </PageContainer>
   );

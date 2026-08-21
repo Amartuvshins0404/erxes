@@ -8,6 +8,12 @@ const Oppty = lazy(() =>
   })),
 );
 
+const CustomerSync = lazy(() =>
+  import('./modules/CustomerSync').then((module) => ({
+    default: module.CustomerSync,
+  })),
+);
+
 export const RelationWidgets = ({
   module,
   contentId,
@@ -24,6 +30,13 @@ export const RelationWidgets = ({
           contentType={contentType}
           customerId={customerId}
           companyId={companyId}
+          access={access}
+        />
+      ) : module === 'customerSync' ? (
+        <CustomerSync
+          contentId={contentId}
+          contentType={contentType}
+          customerId={customerId}
           access={access}
         />
       ) : null}

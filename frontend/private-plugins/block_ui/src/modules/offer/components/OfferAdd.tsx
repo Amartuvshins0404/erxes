@@ -19,7 +19,6 @@ import { OfferFormData, offerSchema } from '@/offer/constants/offerSchema';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
   SelectCustomer,
-  SelectCompany,
   SelectMember,
   currentUserState,
 } from 'ui-modules';
@@ -82,8 +81,7 @@ export const OfferAddForm = ({
       paymentPlanId: '',
       date: new Date().toISOString(),
       endDate: addDays(new Date(), 7),
-      partyType: 'customer',
-      partyId: '',
+      customerId: '',
       user: currentUser?._id,
       priceId: 'mainPrice',
       price: { currency: CurrencyCode.MNT, price: 0 },
@@ -111,7 +109,7 @@ export const OfferAddForm = ({
           currency: data.price?.currency,
           date: data.date || new Date().toISOString(),
           endDate: data.endDate?.toISOString(),
-          party: data.partyType ? { type: data.partyType, id: data.partyId } : undefined,
+          customerId: data.customerId || undefined,
           paymentPlan: data.paymentPlan,
           user: data.user,
           unit: resolvedUnitId,
@@ -202,32 +200,6 @@ export const OfferAddForm = ({
                   </Form.Item>
                 )}
               />
-              <Form.Field
-                name="partyType"
-                render={({ field }) => (
-                  <Form.Item>
-                    <Form.Label>Lead Type</Form.Label>
-                    <Select
-                      onValueChange={(value) => {
-                        field.onChange(value);
-                        form.resetField('partyId');
-                      }}
-                      value={field.value}
-                    >
-                      <Form.Control>
-                        <Select.Trigger className="h-8">
-                          <Select.Value placeholder="Select party type" />
-                        </Select.Trigger>
-                      </Form.Control>
-                      <Select.Content>
-                        <Select.Item value="customer">Customer</Select.Item>
-                        <Select.Item value="company">Company</Select.Item>
-                      </Select.Content>
-                    </Select>
-                    <Form.Message />
-                  </Form.Item>
-                )}
-              />
               <SelectLead form={form} />
               <Form.Field
                 name="price.currency"
@@ -304,18 +276,15 @@ export const SelectLead = ({
 }: {
   form: UseFormReturn<OfferFormData>;
 }) => {
-  const leadType = form.watch('partyType');
-  const SelectLeadComponent =
-    leadType === 'customer' ? SelectCustomer.FormItem : SelectCompany;
   return (
     <Form.Field
       control={form.control}
-      name="partyId"
+      name="customerId"
       render={({ field }) => (
         <Form.Item>
-          <Form.Label>Lead</Form.Label>
-          <SelectLeadComponent
-            value={field.value}
+          <Form.Label>Customer</Form.Label>
+          <SelectCustomer.FormItem
+            value={field.value || ''}
             onValueChange={field.onChange}
             mode="single"
           />
@@ -383,9 +352,17 @@ const OfferUnitSelector = ({
                 <Select.Trigger className="h-8"><Select.Value placeholder="Select unit" /></Select.Trigger>
               </Form.Control>
               <Select.Content>
-                {units.map((u) => (
-                  <Select.Item key={u._id} value={u._id}>Unit {u.number}</Select.Item>
-                ))}
+                {units.map((u) => {
+                  const isSigned = u.activeContract?.statusType === 'signed';
+                  return (
+                    <Select.Item key={u._id} value={u._id} disabled={isSigned}>
+                      Unit {u.number}
+                      {isSigned && (
+                        <span className="ml-2 text-xs text-muted-foreground">(Signed)</span>
+                      )}
+                    </Select.Item>
+                  );
+                })}
               </Select.Content>
             </Select>
             <Form.Message />

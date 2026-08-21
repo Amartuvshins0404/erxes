@@ -1,4 +1,5 @@
 import { Model } from 'mongoose';
+import { ExpectedError } from 'erxes-api-shared/utils';
 import { IModels } from '~/connectionResolvers';
 import { settingsSchema } from '@/settings/db/definitions/settings';
 import {
@@ -33,6 +34,28 @@ interface PersistedSettings extends IMastraSettings {
   defaultAgentId?: unknown;
 }
 
+/** Keep the OpenSandbox key write-only and preserve it when the UI sends blank. */
+export const buildSettingsUpdate = (doc: IMastraSettings): IMastraSettings => {
+  const { openSandboxApiKey, ...rest } = doc;
+  const update: IMastraSettings = { ...rest };
+  if (
+    update.sandboxMode !== undefined &&
+    update.sandboxMode !== 'onserver' &&
+    update.sandboxMode !== 'isolated'
+  ) {
+    throw new ExpectedError("sandboxMode must be 'onserver' or 'isolated'.");
+  }
+  if (typeof openSandboxApiKey === 'string' && openSandboxApiKey.trim()) {
+    update.openSandboxApiKey = openSandboxApiKey.trim();
+  }
+  if (typeof update.openSandboxApiUrl === 'string') {
+    update.openSandboxApiUrl = update.openSandboxApiUrl
+      .trim()
+      .replace(/\/+$/, '');
+  }
+  return update;
+};
+
 export const loadSettingsClass = (_models: IModels) => {
   // Resolved lazily inside the static methods: the model isn't assigned onto
   // `_models` until after loadSettingsClass returns, but by request time it is.
@@ -47,9 +70,9 @@ export const loadSettingsClass = (_models: IModels) => {
         return cached.doc;
       }
 
-      const persisted = (await _models.MastraSettings.findOne({})
-        .select('+evaluationDsn')
-        .lean()) as PersistedSettings | null;
+      const persisted = (await _models.MastraSettings.findOne(
+        {},
+      ).lean()) as PersistedSettings | null;
       let doc: IMastraSettingsDocument;
       if (!persisted) {
         doc = await _models.MastraSettings.create({});
@@ -72,6 +95,11 @@ export const loadSettingsClass = (_models: IModels) => {
         doc = _models.MastraSettings.hydrate(persisted);
       }
 
+      // Rows persisted before sandboxMode existed read back as 'onserver'.
+      if (doc.sandboxMode !== 'onserver' && doc.sandboxMode !== 'isolated') {
+        doc.sandboxMode = 'onserver';
+      }
+
       _settingsCacheByTenant.set(key, {
         doc,
         expiresAt: now + SETTINGS_CACHE_TTL,
@@ -80,22 +108,32 @@ export const loadSettingsClass = (_models: IModels) => {
     }
 
     public static async saveSettings(doc: IMastraSettings) {
-      _settingsCacheByTenant.delete(tenantKey()); // bust this tenant's cache on save so edits take effect immediately
-      const existing = await _models.MastraSettings.exists({});
-      if (existing) {
-        return _models.MastraSettings.findOneAndUpdate(
-          { _id: existing._id },
-          {
-            $set: doc,
-            $unset: {
-              erxesApiToken: 1,
-              defaultAgentId: 1,
-            },
+      const update = buildSettingsUpdate(doc);
+      const key = tenantKey();
+      _settingsCacheByTenant.delete(key);
+      const saved = await _models.MastraSettings.findOneAndUpdate(
+        {},
+        {
+          $set: update,
+          $unset: {
+            erxesApiToken: 1,
+            defaultAgentId: 1,
           },
-          { new: true, strict: false, runValidators: true },
-        );
-      }
-      return _models.MastraSettings.create(doc);
+        },
+        {
+          new: true,
+          upsert: true,
+          strict: false,
+          runValidators: true,
+          setDefaultsOnInsert: true,
+        },
+      );
+      if (!saved) throw new Error('Mastra settings could not be saved');
+      _settingsCacheByTenant.set(key, {
+        doc: saved,
+        expiresAt: Date.now() + SETTINGS_CACHE_TTL,
+      });
+      return saved;
     }
   }
 

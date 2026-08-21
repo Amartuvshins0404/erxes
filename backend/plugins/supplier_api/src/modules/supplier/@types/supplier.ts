@@ -45,6 +45,7 @@ export interface ISupplier {
   attachments?: string[];
   urls?: string[];
   registrationNumber?: string;
+  industry?: string;
   address?: ISupplierAddress;
   primaryEmail?: string;
   primaryPhone?: string;

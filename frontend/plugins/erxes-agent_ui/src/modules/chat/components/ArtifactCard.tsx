@@ -6,8 +6,10 @@ import {
   IconLayoutSidebarRightExpand,
   IconMaximize,
   IconPhoto,
+  IconWorldWww,
 } from '@tabler/icons-react';
 import { Button } from 'erxes-ui';
+import { useTranslation } from 'react-i18next';
 import {
   ChartArtifactView,
   ChartExpandDialog,
@@ -19,7 +21,9 @@ import {
   type DiagramArtifact,
   type DocumentArtifact,
   type ImageArtifact,
+  type WebsiteArtifact,
   documentUrl,
+  websiteUrl,
 } from '~/modules/chat/lib/artifacts';
 import { formatFileSize } from '~/modules/chat/lib/attachments';
 import { previewStore } from '~/modules/chat/preview/previewStore';
@@ -55,7 +59,9 @@ const ChartPreview = ({ artifact }: { artifact: ChartArtifact }) => {
       {/* Heading row */}
       <div className="flex items-start gap-2">
         <div className="min-w-0 flex-1">
-          <h3 className="text-2xl font-medium tracking-tight">{artifact.title}</h3>
+          <h3 className="text-2xl font-medium tracking-tight">
+            {artifact.title}
+          </h3>
           {artifact.spec.description && (
             <p className="mt-1 text-sm text-muted-foreground">
               {artifact.spec.description}
@@ -84,24 +90,44 @@ const ChartPreview = ({ artifact }: { artifact: ChartArtifact }) => {
         </div>
       </div>
       {/* Chart + totals + local filter sliders */}
-      <ChartArtifactView artifact={artifact} chartHeight={400} className="mt-2" />
-      <ChartExpandDialog artifact={artifact} open={expanded} onOpenChange={setExpanded} />
+      <ChartArtifactView
+        artifact={artifact}
+        chartHeight={400}
+        className="mt-2"
+      />
+      <ChartExpandDialog
+        artifact={artifact}
+        open={expanded}
+        onOpenChange={setExpanded}
+      />
     </div>
   );
 };
 
 // ── Diagram card (inline Mermaid + open in preview) ───────────────────────────
-const DiagramPreview = ({ artifact, live }: { artifact: DiagramArtifact; live?: boolean }) => {
+const DiagramPreview = ({
+  artifact,
+  live,
+}: {
+  artifact: DiagramArtifact;
+  live?: boolean;
+}) => {
   const openArtifact = previewStore((s) => s.openArtifact);
   usePresentIfLive(artifact, live);
 
   return (
-    <div className="ea-pop my-2 overflow-hidden rounded-xl border border-border/70 bg-background">
+    <div className="ea-pop my-2 overflow-hidden rounded-xl border ea-border-70 bg-background">
       {/* Card header */}
-      <div className="flex items-center gap-2 px-3 py-2 bg-muted/30 border-b border-border/50">
+      <div className="flex items-center gap-2 px-3 py-2 ea-bg-muted-30 border-b ea-border-50">
         <IconHierarchy className="size-4 text-primary shrink-0" />
-        <p className="flex-1 min-w-0 truncate text-sm font-medium">{artifact.title}</p>
-        <Button variant="ghost" size="sm" onClick={() => openArtifact(artifact)}>
+        <p className="flex-1 min-w-0 truncate text-sm font-medium">
+          {artifact.title}
+        </p>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => openArtifact(artifact)}
+        >
           <IconLayoutSidebarRightExpand className="size-3.5" />
           Open
         </Button>
@@ -114,18 +140,27 @@ const DiagramPreview = ({ artifact, live }: { artifact: DiagramArtifact; live?: 
 };
 
 // ── Document card (no inline rendering — PDF/DOCX/XLSX aren't embeddable) ─────
-const DocumentCard = ({ artifact, live }: { artifact: DocumentArtifact; live?: boolean }) => {
+const DocumentCard = ({
+  artifact,
+  live,
+}: {
+  artifact: DocumentArtifact;
+  live?: boolean;
+}) => {
   const openArtifact = previewStore((s) => s.openArtifact);
   usePresentIfLive(artifact, live);
 
   const Icon = artifactIcon(artifact);
-  const subtitle = [artifact.format.toUpperCase(), formatFileSize(artifact.size)]
+  const subtitle = [
+    artifact.format.toUpperCase(),
+    formatFileSize(artifact.size),
+  ]
     .filter(Boolean)
     .join(' · ');
 
   return (
-    <div className="ea-pop my-2 flex items-center gap-3 rounded-xl border border-border/70 bg-background/60 px-3 py-2.5 hover:border-border transition-colors">
-      <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+    <div className="ea-pop my-2 flex items-center gap-3 rounded-xl border ea-border-70 ea-bg-60 px-3 py-2.5 hover:border-border transition-colors">
+      <div className="flex size-9 shrink-0 items-center justify-center rounded-lg ea-bg-primary-10 text-primary">
         <Icon className="size-5" />
       </div>
       <div className="min-w-0 flex-1">
@@ -133,12 +168,21 @@ const DocumentCard = ({ artifact, live }: { artifact: DocumentArtifact; live?: b
         <p className="truncate text-xs text-muted-foreground">{subtitle}</p>
       </div>
       <div className="flex shrink-0 items-center gap-1">
-        <Button variant="secondary" size="sm" onClick={() => openArtifact(artifact)}>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => openArtifact(artifact)}
+        >
           <IconMaximize className="size-3.5" />
           Open
         </Button>
         <Button asChild variant="ghost" size="sm">
-          <a href={documentUrl(artifact)} download={artifact.fileName} target="_blank" rel="noreferrer">
+          <a
+            href={documentUrl(artifact)}
+            download={artifact.fileName}
+            target="_blank"
+            rel="noreferrer"
+          >
             <IconDownload className="size-3.5" />
           </a>
         </Button>
@@ -147,28 +191,94 @@ const DocumentCard = ({ artifact, live }: { artifact: DocumentArtifact; live?: b
   );
 };
 
+// ── Website card (one organized artifact, regardless of member file count) ──
+const WebsiteCard = ({
+  artifact,
+  live,
+}: {
+  artifact: WebsiteArtifact;
+  live?: boolean;
+}) => {
+  const { t } = useTranslation('erxes-agent');
+  const openArtifact = previewStore((state) => state.openArtifact);
+  usePresentIfLive(artifact, live);
+  const url = websiteUrl(artifact);
+  const subtitle = [
+    t('artifact-website-file-count', { count: artifact.fileCount }),
+    formatFileSize(artifact.size),
+  ]
+    .filter(Boolean)
+    .join(' · ');
+
+  return (
+    <div className="ea-pop my-2 overflow-hidden rounded-xl border ea-border-70 bg-background">
+      <div className="flex items-center gap-2 ea-bg-muted-30 px-3 py-2.5">
+        <IconWorldWww className="size-4 shrink-0 text-primary" />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium">{artifact.title}</p>
+          <p className="truncate text-xs text-muted-foreground">{subtitle}</p>
+        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => openArtifact(artifact)}
+        >
+          <IconLayoutSidebarRightExpand className="size-3.5" />
+          {t('artifact-website-open-preview')}
+        </Button>
+        <Button asChild variant="ghost" size="sm">
+          <a href={url} target="_blank" rel="noreferrer">
+            <IconWorldWww className="size-3.5" />
+            {t('artifact-website-open-browser')}
+          </a>
+        </Button>
+      </div>
+    </div>
+  );
+};
+
 // ── Image card (inline transparent-PNG preview + open in preview) ─────────────
-const ImageCard = ({ artifact, live }: { artifact: ImageArtifact; live?: boolean }) => {
+const ImageCard = ({
+  artifact,
+  live,
+}: {
+  artifact: ImageArtifact;
+  live?: boolean;
+}) => {
   const openArtifact = previewStore((s) => s.openArtifact);
   usePresentIfLive(artifact, live);
 
   return (
-    <div className="ea-pop my-2 overflow-hidden rounded-xl border border-border/70 bg-background">
+    <div className="ea-pop my-2 overflow-hidden rounded-xl border ea-border-70 bg-background">
       {/* Card header */}
-      <div className="flex items-center gap-2 px-3 py-2 bg-muted/30 border-b border-border/50">
+      <div className="flex items-center gap-2 px-3 py-2 ea-bg-muted-30 border-b ea-border-50">
         <IconPhoto className="size-4 text-primary shrink-0" />
-        <p className="flex-1 min-w-0 truncate text-sm font-medium">{artifact.title}</p>
-        <Button variant="ghost" size="sm" onClick={() => openArtifact(artifact)}>
+        <p className="flex-1 min-w-0 truncate text-sm font-medium">
+          {artifact.title}
+        </p>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => openArtifact(artifact)}
+        >
           <IconLayoutSidebarRightExpand className="size-3.5" />
           Open
         </Button>
         <Button asChild variant="ghost" size="sm">
-          <a href={documentUrl(artifact)} download={artifact.fileName} target="_blank" rel="noreferrer">
+          <a
+            href={documentUrl(artifact)}
+            download={artifact.fileName}
+            target="_blank"
+            rel="noreferrer"
+          >
             <IconDownload className="size-3.5" />
           </a>
         </Button>
       </div>
-      <div className="flex items-center justify-center p-2" style={CHECKERBOARD_STYLE}>
+      <div
+        className="flex items-center justify-center p-2"
+        style={CHECKERBOARD_STYLE}
+      >
         {/* Height cap as an inline style, not max-h-64 — that utility is used
             by no host/core code, so the prod CSS purge could drop it. */}
         <img
@@ -183,9 +293,9 @@ const ImageCard = ({ artifact, live }: { artifact: ImageArtifact; live?: boolean
 };
 
 // ── Failed artifact tool (visible fallback) ───────────────────────────────────
-// Artifact tools are hidden from the run trace because they normally surface as
-// a card — so when one errors (or its output yields no valid artifact) the turn
-// would show NOTHING. This card makes that failure visible where the chart or
+// Artifact tools normally surface as a card, so when one errors (or its output
+// yields no valid artifact) the turn would show nothing. This card makes that
+// failure visible where the chart or
 // document would have appeared.
 const FAILURE_NOUNS: Record<string, string> = {
   renderchart: 'chart',
@@ -202,8 +312,8 @@ export const ArtifactFailureCard = ({
   const noun =
     FAILURE_NOUNS[toolName.toLowerCase().replace(/[-_\s]/g, '')] ?? 'document';
   return (
-    <div className="ea-pop my-2 flex items-center gap-3 rounded-xl border border-border/70 bg-background/60 px-3 py-2.5">
-      <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-destructive/10 text-destructive">
+    <div className="ea-pop my-2 flex items-center gap-3 rounded-xl border ea-border-70 ea-bg-60 px-3 py-2.5">
+      <div className="flex size-9 shrink-0 items-center justify-center rounded-lg ea-bg-destructive-10 text-destructive">
         <IconAlertTriangle className="size-5" />
       </div>
       <div className="min-w-0 flex-1">
@@ -232,10 +342,20 @@ const artifactsEqual = (a: Artifact, b: Artifact): boolean =>
 // of propagating into EChart/Mermaid and remounting the visualization. EChart is
 // itself reference-churn-resilient; this just spares it the wasted renders.
 export const ArtifactCard = memo(
-  function ArtifactCard({ artifact, live }: { artifact: Artifact; live?: boolean }) {
+  function ArtifactCard({
+    artifact,
+    live,
+  }: {
+    artifact: Artifact;
+    live?: boolean;
+  }) {
     if (artifact.kind === 'chart') return <ChartPreview artifact={artifact} />;
-    if (artifact.kind === 'diagram') return <DiagramPreview artifact={artifact} live={live} />;
-    if (artifact.kind === 'image') return <ImageCard artifact={artifact} live={live} />;
+    if (artifact.kind === 'diagram')
+      return <DiagramPreview artifact={artifact} live={live} />;
+    if (artifact.kind === 'image')
+      return <ImageCard artifact={artifact} live={live} />;
+    if (artifact.kind === 'website')
+      return <WebsiteCard artifact={artifact} live={live} />;
     return <DocumentCard artifact={artifact} live={live} />;
   },
   (prev, next) =>

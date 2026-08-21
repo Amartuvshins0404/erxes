@@ -13,7 +13,10 @@ import {
 } from '@/integrations/facebook/@types/utils';
 import { IFacebookConversationMessageDocument } from '@/integrations/facebook/@types/conversationMessages';
 import { INTEGRATION_KINDS } from '@/integrations/facebook/constants';
-import { resolveFacebookApp } from '@/integrations/facebook/commonUtils';
+import {
+  facebookAppSelector,
+  resolveFacebookApp,
+} from '@/integrations/facebook/commonUtils';
 
 const buildSelector = async (conversationId: string, model: any) => {
   const query = { conversationId: '' };
@@ -99,7 +102,13 @@ const appendRelatedMessengerMessages = async (
 };
 
 export const facebookQueries = {
-  async facebookGetConfigs(_root, _args, { models }: IContext) {
+  async facebookGetConfigs(
+    _root,
+    _args,
+    { models, checkPermission }: IContext,
+  ) {
+    await checkPermission('integrationsEdit');
+
     return await models.FacebookConfigs.find({});
   },
   async facebookGetAccounts(
@@ -107,34 +116,15 @@ export const facebookQueries = {
     { kind, integrationKind }: IKind & { integrationKind?: string },
     { models }: IContext,
   ) {
-    // Accounts are per Meta app once page posting runs on its own app. Offering
-    // a Messenger-app account for a posting connect would mint page tokens from
-    // the wrong app and fail confusingly at publish time.
     const app = await resolveFacebookApp(models, integrationKind);
 
-    const selector: Record<string, unknown> = { kind };
-
-    if (app.isSeparate) {
-      selector.appId = app.appId;
-    } else {
-      // Pre-split accounts carry no appId; treat them as the main app's.
-      selector.$or = [
-        { appId: { $exists: false } },
-        { appId: null },
-        { appId: '' },
-        { appId: app.appId },
-      ];
-    }
-
-    // These resolvers return the raw document as JSON, so credentials must be
-    // projected out explicitly. `token` is a Facebook *user* access token — it
-    // can enumerate the user's pages and mint page tokens — and nothing in the
-    // UI needs it.
-    return models.FacebookAccounts.find(selector, { token: 0, tokenSecret: 0 });
+    return models.FacebookAccounts.find(
+      { kind, ...facebookAppSelector(app) },
+      { token: 0, tokenSecret: 0 },
+    );
   },
 
   facebookGetIntegrations(_root, { kind }: IKind, { models }: IContext) {
-    // facebookPageTokensMap holds page access tokens; never expose it.
     return models.FacebookIntegrations.find(
       { kind },
       { facebookPageTokensMap: 0 },

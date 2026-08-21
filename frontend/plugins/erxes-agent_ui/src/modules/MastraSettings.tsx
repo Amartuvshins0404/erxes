@@ -1,7 +1,9 @@
 import { lazy, type ReactElement } from 'react';
 import { Navigate, Route } from 'react-router';
 import { PluginRoutesShell } from '~/components/PluginRoutesShell';
+import { ERXES_AGENT_ACTIONS } from '~/permissions';
 import { useAgentAccess } from '~/pages/agents/hooks/useAgentAccess';
+import { usePermissionCheck } from 'ui-modules';
 
 const ProvidersPage = lazy(() =>
   import('~/pages/settings/ProvidersPage').then((m) => ({
@@ -12,6 +14,12 @@ const ProvidersPage = lazy(() =>
 const GeneralSettingsPage = lazy(() =>
   import('~/pages/settings/GeneralSettingsPage').then((m) => ({
     default: m.GeneralSettingsPage,
+  })),
+);
+
+const PluginToolsPage = lazy(() =>
+  import('~/pages/settings/PluginToolsPage').then((m) => ({
+    default: m.PluginToolsPage,
   })),
 );
 
@@ -27,17 +35,27 @@ const AgentFormPage = lazy(() =>
   })),
 );
 
-const SkillsIndexPage = lazy(() =>
-  import('~/modules/skills/components/SkillsIndexPage').then((m) => ({
-    default: m.SkillsIndexPage,
+const AgentDetailPage = lazy(() =>
+  import('~/pages/agents/AgentDetailPage').then((m) => ({
+    default: m.AgentDetailPage,
   })),
 );
 
-const SkillFormPage = lazy(() =>
-  import('~/modules/skills/components/SkillFormPage').then((m) => ({
-    default: m.SkillFormPage,
-  })),
-);
+const PermissionRoute = ({
+  action,
+  element,
+}: {
+  action: string;
+  element: ReactElement;
+}) => {
+  const { hasActionPermission, isLoaded } = usePermissionCheck();
+  if (!isLoaded) return null;
+  return hasActionPermission(action) ? (
+    element
+  ) : (
+    <Navigate to="/settings/erxes-agent/providers" replace />
+  );
+};
 
 const AdminRoute = ({ element }: { element: ReactElement }) => {
   const { isAdmin, isLoaded } = useAgentAccess();
@@ -45,23 +63,48 @@ const AdminRoute = ({ element }: { element: ReactElement }) => {
   return isAdmin ? (
     element
   ) : (
-    <Navigate to="/settings/erxes-agent/agents" replace />
+    <Navigate to="/settings/erxes-agent/providers" replace />
   );
 };
 
 export const MastraSettings = () => {
   return (
     <PluginRoutesShell defaultPath="/settings/erxes-agent/agents">
-      <Route path="/agents" element={<AgentsIndexPage />} />
-      <Route path="/agents/new" element={<AgentFormPage />} />
-      <Route path="/agents/edit/:id" element={<AgentFormPage />} />
-      <Route path="/skills" element={<SkillsIndexPage />} />
-      <Route path="/skills/new" element={<SkillFormPage />} />
-      <Route path="/skills/edit/:id" element={<SkillFormPage />} />
+      <Route
+        path="/agents"
+        element={
+          <PermissionRoute
+            action={ERXES_AGENT_ACTIONS.agent.readSummary}
+            element={<AgentsIndexPage />}
+          />
+        }
+      />
+      <Route
+        path="/agents/new"
+        element={
+          <PermissionRoute
+            action={ERXES_AGENT_ACTIONS.agent.create}
+            element={<AgentFormPage />}
+          />
+        }
+      />
+      <Route
+        path="/agents/:id/*"
+        element={
+          <PermissionRoute
+            action={ERXES_AGENT_ACTIONS.agent.readConfig}
+            element={<AgentDetailPage />}
+          />
+        }
+      />
       <Route path="/providers" element={<ProvidersPage />} />
       <Route
         path="/general"
         element={<AdminRoute element={<GeneralSettingsPage />} />}
+      />
+      <Route
+        path="/plugin-tools"
+        element={<AdminRoute element={<PluginToolsPage />} />}
       />
     </PluginRoutesShell>
   );

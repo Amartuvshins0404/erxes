@@ -3,16 +3,6 @@ import {
   BlockProjectPaymentPlanInterestType,
 } from '@/project/@types/payment';
 
-export enum ContractPartyType {
-  CUSTOMER = 'customer',
-  COMPANY = 'company',
-}
-
-export interface IContractParty {
-  type: ContractPartyType;
-  id: string;
-}
-
 // Status is now an ObjectId reference to a ContractStatus document.
 // Stage semantics (reserved/draft/signed/cancelled/lost) live on ContractStatus.type.
 
@@ -47,10 +37,11 @@ export interface IContract {
   amount: number;
   currency: string;
   status: string;
-  party: IContractParty;
+  customerId: string;
   paymentPlan: IContractPaymentPlan;
   user: string;
   description: string;
+  blockAdminId?: string;
 }
 
 export interface IContractDocument extends IContract, Document {

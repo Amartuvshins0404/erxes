@@ -15,29 +15,31 @@ import * as graph from 'fbgraph';
 import { generateModels } from '~/connectionResolvers';
 
 /**
- * The integration kind is known when the popup is opened, but Facebook's
- * callback only carries `code` and `state`. We therefore round-trip the kind
- * through `state` so the callback resolves the same Meta app that issued the
- * authorization — mixing them would exchange the code against the wrong app.
+ * The OAuth `state` is sent back to us by the shared authorize redirector,
+ * which builds the callback url as `${state}/fblogin?code=...`. A query string
+ * in `state` would therefore end up before the `/fblogin` path, so the kind is
+ * carried as a `/kind/<kind>` path segment instead.
  */
+const KIND_PATH_SEGMENT = '/kind/';
+
+const buildStateUrl = (apiDomain: string, kind?: string) =>
+  kind
+    ? `${apiDomain}/pl:frontline/facebook${KIND_PATH_SEGMENT}${encodeURIComponent(kind)}`
+    : `${apiDomain}/pl:frontline/facebook`;
+
 const readKindFromState = (state?: string): string | undefined => {
-  if (!state) {
+  const [path] = (state || '').split('?');
+  const index = path.indexOf(KIND_PATH_SEGMENT);
+
+  if (index === -1) {
     return undefined;
   }
 
-  const match = /[?&]kind=([^&]+)/.exec(state);
-
-  if (!match) {
-    return undefined;
-  }
-
-  // `state` comes back from an external redirect; a malformed percent-sequence
-  // must not turn the OAuth callback into a 500.
-  try {
-    return decodeURIComponent(match[1]);
-  } catch {
-    return undefined;
-  }
+  return (
+    decodeURIComponent(
+      path.slice(index + KIND_PATH_SEGMENT.length).split('/')[0],
+    ) || undefined
+  );
 };
 
 export const loginMiddleware = async (req, res) => {
@@ -45,7 +47,9 @@ export const loginMiddleware = async (req, res) => {
   const models = await generateModels(subdomain);
 
   const kind =
-    (req.query.kind as string) || readKindFromState(req.query.state as string);
+    (req.query.kind as string) ||
+    (req.params.kind as string) ||
+    readKindFromState(req.query.state as string);
 
   const app = await resolveFacebookApp(models, kind);
 
@@ -65,16 +69,16 @@ export const loginMiddleware = async (req, res) => {
   const conf = {
     client_id: app.appId,
     client_secret: app.appSecret,
-    scope: FACEBOOK_PERMISSIONS + ',pages_read_engagement,pages_show_list',
+    scope:
+      FACEBOOK_PERMISSIONS +
+      ',pages_read_engagement,pages_show_list,pages_manage_posts',
     redirect_uri: FACEBOOK_LOGIN_REDIRECT_URL,
   };
 
   debugRequest(debugFacebook, req);
 
   if (!req.query.code) {
-    const state = kind
-      ? `${API_DOMAIN}/pl:frontline/facebook?kind=${encodeURIComponent(kind)}`
-      : `${API_DOMAIN}/pl:frontline/facebook`;
+    const state = buildStateUrl(API_DOMAIN, kind);
 
     const authUrl = graph.getOauthUrl({
       client_id: conf.client_id,
@@ -112,12 +116,9 @@ export const loginMiddleware = async (req, res) => {
       access_token,
     );
     const name = `${userAccount.first_name} ${userAccount.last_name}`;
-    // Scoped by app: a user token is only valid for the app that minted it, so
-    // connecting posting must not overwrite the Messenger account's token.
     const account = await models.FacebookAccounts.findOne(
       facebookAccountSelector(userAccount.id, app),
     );
-    let accountId: string;
     if (account) {
       await models.FacebookAccounts.updateOne(
         { _id: account._id },
@@ -126,22 +127,18 @@ export const loginMiddleware = async (req, res) => {
       const integrations = await models.FacebookIntegrations.find({
         accountId: account._id,
       });
-      accountId = account._id;
 
       for (const integration of integrations) {
         await repairIntegrations(subdomain, integration.erxesApiId);
       }
     } else {
-      const newAccount = await models.FacebookAccounts.create({
+      await models.FacebookAccounts.create({
         token: access_token,
         name,
         kind: 'facebook',
         uid: userAccount.id,
-        // Must be stamped at creation too — a first-time connect through the
-        // posting app would otherwise produce an app-unscoped account.
         appId: app.appId,
       });
-      accountId = newAccount._id;
     }
 
     const reactAppUrl = !DOMAIN.includes('zrok')

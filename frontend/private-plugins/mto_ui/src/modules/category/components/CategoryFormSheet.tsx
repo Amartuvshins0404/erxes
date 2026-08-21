@@ -1,16 +1,30 @@
 import { useMutation, useQuery } from '@apollo/client';
-import { Button, Input, Label, Select, Sheet, Spinner, Switch } from 'erxes-ui';
+import { zodResolver } from '@hookform/resolvers/zod';
+import {
+  Button,
+  Form,
+  Input,
+  Select,
+  Sheet,
+  Spinner,
+  Switch,
+  toast,
+} from 'erxes-ui';
 import { readImage } from 'erxes-ui/utils/core';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
+import { useForm } from 'react-hook-form';
 import {
   MTO_CATEGORY_CREATE,
   MTO_CATEGORY_UPDATE,
 } from '@/category/graphql/categoryMutations';
 import { MTO_CATEGORY } from '@/category/graphql/categoryQueries';
-import { CategoryLevel } from '@/category/types/category';
+import {
+  CategoryFormData,
+  categoryFormSchema,
+} from '@/category/constants/categorySchema';
 import { isSubCategory } from '@/category/hooks/useCategoryOptions';
-import { MtoUpload } from '~/components/onefit-upload';
 import { useUploadConfig } from '@/config/hooks/useUploadConfig';
+import { MtoUpload } from '~/components/MtoUpload';
 
 interface CategoryFormSheetProps {
   open: boolean;
@@ -19,11 +33,11 @@ interface CategoryFormSheetProps {
   onSaved?: () => void;
 }
 
-const DEFAULT_FORM = {
+const DEFAULT_VALUES: CategoryFormData = {
   nameEn: '',
   nameMn: '',
   logo: '',
-  level: 'main' as CategoryLevel,
+  level: 'main',
   isActive: true,
 };
 
@@ -34,9 +48,12 @@ export function CategoryFormSheet({
   onSaved,
 }: CategoryFormSheetProps) {
   const isEdit = Boolean(editId);
-  const [form, setForm] = useState(DEFAULT_FORM);
-  const [error, setError] = useState<string | null>(null);
   const { uploadUrl } = useUploadConfig();
+
+  const form = useForm<CategoryFormData>({
+    resolver: zodResolver(categoryFormSchema),
+    defaultValues: DEFAULT_VALUES,
+  });
 
   const { data: editData, loading: editLoading } = useQuery(MTO_CATEGORY, {
     variables: { _id: editId ?? '' },
@@ -45,20 +62,17 @@ export function CategoryFormSheet({
 
   const [create, { loading: creating }] = useMutation(MTO_CATEGORY_CREATE);
   const [update, { loading: updating }] = useMutation(MTO_CATEGORY_UPDATE);
-
   const loading = creating || updating;
 
   useEffect(() => {
     if (!open) {
-      setForm(DEFAULT_FORM);
-      setError(null);
+      form.reset(DEFAULT_VALUES);
       return;
     }
 
     if (editId && editData?.mtoCategory) {
       const category = editData.mtoCategory;
-
-      setForm({
+      form.reset({
         nameEn: category.name?.en ?? '',
         nameMn: category.name?.mn ?? '',
         logo: category.logo ?? '',
@@ -66,22 +80,14 @@ export function CategoryFormSheet({
         isActive: category.isActive ?? true,
       });
     }
-  }, [open, editId, editData]);
+  }, [open, editId, editData, form]);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-
-    if (!form.nameEn.trim() || !form.nameMn.trim()) {
-      setError('Name in both languages is required');
-      return;
-    }
-
+  const onSubmit = async (data: CategoryFormData) => {
     const variables = {
-      name: { en: form.nameEn.trim(), mn: form.nameMn.trim() },
-      logo: form.logo || undefined,
-      level: form.level,
-      isActive: form.isActive,
+      name: { en: data.nameEn.trim(), mn: data.nameMn.trim() },
+      logo: data.logo || undefined,
+      level: data.level,
+      isActive: data.isActive,
     };
 
     try {
@@ -91,12 +97,23 @@ export function CategoryFormSheet({
         await create({ variables });
       }
 
+      toast({
+        title: 'Success',
+        description: isEdit ? 'Category updated' : 'Category created',
+      });
       onSaved?.();
       onOpenChange(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save category');
+      toast({
+        title: 'Error',
+        description:
+          err instanceof Error ? err.message : 'Failed to save category',
+        variant: 'destructive',
+      });
     }
-  }
+  };
+
+  const logo = form.watch('logo');
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -111,108 +128,139 @@ export function CategoryFormSheet({
               <Spinner />
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="p-5 space-y-4">
-              <div className="space-y-2">
-                <Label>Level *</Label>
-                <Select
-                  value={form.level}
-                  onValueChange={(value) =>
-                    setForm({ ...form, level: value as CategoryLevel })
-                  }
-                >
-                  <Select.Trigger>
-                    <Select.Value />
-                  </Select.Trigger>
-                  <Select.Content>
-                    <Select.Item value="main">Main category</Select.Item>
-                    <Select.Item value="sub">Sub category</Select.Item>
-                  </Select.Content>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Name (EN) *</Label>
-                <Input
-                  value={form.nameEn}
-                  onChange={(e) =>
-                    setForm({ ...form, nameEn: e.target.value })
-                  }
-                  placeholder="English name"
-                  required
+            <Form {...form}>
+              <form
+                onSubmit={form.handleSubmit(onSubmit)}
+                className="p-5 space-y-4"
+              >
+                <Form.Field
+                  control={form.control}
+                  name="level"
+                  render={({ field }) => (
+                    <Form.Item>
+                      <Form.Label>Level *</Form.Label>
+                      <Select
+                        value={field.value}
+                        onValueChange={field.onChange}
+                      >
+                        <Form.Control>
+                          <Select.Trigger>
+                            <Select.Value />
+                          </Select.Trigger>
+                        </Form.Control>
+                        <Select.Content>
+                          <Select.Item value="main">Main category</Select.Item>
+                          <Select.Item value="sub">Sub category</Select.Item>
+                        </Select.Content>
+                      </Select>
+                      <Form.Message />
+                    </Form.Item>
+                  )}
                 />
-              </div>
-              <div className="space-y-2">
-                <Label>Name (MN) *</Label>
-                <Input
-                  value={form.nameMn}
-                  onChange={(e) =>
-                    setForm({ ...form, nameMn: e.target.value })
-                  }
-                  placeholder="Монгол нэр"
-                  required
+                <Form.Field
+                  control={form.control}
+                  name="nameEn"
+                  render={({ field }) => (
+                    <Form.Item>
+                      <Form.Label>Name (EN) *</Form.Label>
+                      <Form.Control>
+                        <Input {...field} placeholder="English name" />
+                      </Form.Control>
+                      <Form.Message />
+                    </Form.Item>
+                  )}
                 />
-              </div>
-              <div className="space-y-2">
-                <Label>Logo</Label>
-                <MtoUpload.Root
-                  value={form.logo}
-                  onChange={(v) =>
-                    setForm({
-                      ...form,
-                      logo: typeof v.url === 'string' ? v.url : form.logo,
-                    })
-                  }
-                  uploadUrl={uploadUrl}
-                >
-                  <div className="flex items-center gap-3">
-                    {form.logo && (
-                      <img
-                        src={readImage(form.logo)}
-                        alt="Logo preview"
-                        className="h-12 w-12 rounded object-cover border"
-                      />
-                    )}
-                    <div className="flex flex-col gap-1">
-                      <MtoUpload.Button variant="outline" size="sm" type="button">
-                        {form.logo ? 'Change logo' : 'Upload logo'}
-                      </MtoUpload.Button>
-                      {form.logo && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="text-muted-foreground"
-                          onClick={() => setForm({ ...form, logo: '' })}
-                        >
-                          Remove
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                </MtoUpload.Root>
-              </div>
-              <div className="flex items-center gap-3">
-                <Switch
-                  checked={form.isActive}
-                  onCheckedChange={(value) =>
-                    setForm({ ...form, isActive: value })
-                  }
+                <Form.Field
+                  control={form.control}
+                  name="nameMn"
+                  render={({ field }) => (
+                    <Form.Item>
+                      <Form.Label>Name (MN) *</Form.Label>
+                      <Form.Control>
+                        <Input {...field} placeholder="Монгол нэр" />
+                      </Form.Control>
+                      <Form.Message />
+                    </Form.Item>
+                  )}
                 />
-                <Label>Active</Label>
-              </div>
-              {error && <p className="text-sm text-destructive">{error}</p>}
-              <div className="flex gap-2 pt-2">
-                <Button type="submit" disabled={loading}>
-                  {isEdit ? 'Save' : 'Create'}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => onOpenChange(false)}
-                >
-                  Cancel
-                </Button>
-              </div>
-            </form>
+                <Form.Field
+                  control={form.control}
+                  name="logo"
+                  render={({ field }) => (
+                    <Form.Item>
+                      <Form.Label>Logo</Form.Label>
+                      <MtoUpload.Root
+                        value={field.value || ''}
+                        onChange={(v) =>
+                          field.onChange(
+                            typeof v.url === 'string' ? v.url : field.value,
+                          )
+                        }
+                        uploadUrl={uploadUrl}
+                      >
+                        <div className="flex items-center gap-3">
+                          {logo ? (
+                            <img
+                              src={readImage(logo)}
+                              alt="Logo preview"
+                              className="h-12 w-12 rounded object-cover border"
+                            />
+                          ) : null}
+                          <div className="flex flex-col gap-1">
+                            <MtoUpload.Button
+                              variant="outline"
+                              size="sm"
+                              type="button"
+                            >
+                              {logo ? 'Change logo' : 'Upload logo'}
+                            </MtoUpload.Button>
+                            {logo ? (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="text-muted-foreground"
+                                onClick={() => field.onChange('')}
+                              >
+                                Remove
+                              </Button>
+                            ) : null}
+                          </div>
+                        </div>
+                      </MtoUpload.Root>
+                      <Form.Message />
+                    </Form.Item>
+                  )}
+                />
+                <Form.Field
+                  control={form.control}
+                  name="isActive"
+                  render={({ field }) => (
+                    <Form.Item className="flex items-center gap-3">
+                      <Form.Control>
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </Form.Control>
+                      <Form.Label className="!mt-0">Active</Form.Label>
+                    </Form.Item>
+                  )}
+                />
+                <div className="flex gap-2 pt-2">
+                  <Button type="submit" disabled={loading}>
+                    {isEdit ? 'Save' : 'Create'}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => onOpenChange(false)}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </form>
+            </Form>
           )}
         </Sheet.Content>
       </Sheet.View>

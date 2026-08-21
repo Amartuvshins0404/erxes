@@ -23,6 +23,10 @@ import {
 } from '~/modules/unit/graphql/schemas/unit';
 
 export const types = `
+  type User @key(fields: "_id") {
+    _id: String @external
+  }
+
   ${BlockAgencyTypes}
   ${BlockListingTypes}
   ${BlockMemberTypes}

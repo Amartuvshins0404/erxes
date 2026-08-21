@@ -14,15 +14,11 @@ import {
 } from 'erxes-ui';
 import { OFFERS_CURSOR_SESSION_KEY } from '@/offer/hooks/useGetOffersList';
 import { OffersTotalCount } from './OffersTotalCount';
+import { SelectCustomer } from 'ui-modules';
 
 const STATUS_OPTIONS = [
   { value: 'draft', label: 'Draft' },
   { value: 'sent', label: 'Sent' },
-];
-
-const PARTY_TYPE_OPTIONS = [
-  { value: 'customer', label: 'Customer' },
-  { value: 'company', label: 'Company' },
 ];
 
 const CURRENCY_OPTIONS = [
@@ -44,30 +40,6 @@ const OfferStatusFilterView = () => {
             >
               {opt.label}
               {status === opt.value && (
-                <span className="ml-auto text-primary">&#10003;</span>
-              )}
-            </Command.Item>
-          ))}
-        </Command.List>
-      </Command>
-    </Filter.View>
-  );
-};
-
-const PartyTypeFilterView = () => {
-  const [partyType, setPartyType] = useQueryState<string>('partyType');
-  return (
-    <Filter.View filterKey="partyType">
-      <Command>
-        <Command.List className="p-1">
-          {PARTY_TYPE_OPTIONS.map((opt) => (
-            <Command.Item
-              key={opt.value}
-              value={opt.value}
-              onSelect={() => setPartyType(opt.value)}
-            >
-              {opt.label}
-              {partyType === opt.value && (
                 <span className="ml-auto text-primary">&#10003;</span>
               )}
             </Command.Item>
@@ -106,9 +78,9 @@ const OffersFilterPopover = () => {
   const [queries] = useMultiQueryState<{
     searchValue: string;
     status: string;
-    partyType: string;
+    customerId: string;
     currency: string;
-  }>(['searchValue', 'status', 'partyType', 'currency']);
+  }>(['searchValue', 'status', 'customerId', 'currency']);
 
   const hasFilters = Object.values(queries || {}).some((v) => v !== null);
 
@@ -134,9 +106,9 @@ const OffersFilterPopover = () => {
                   <IconProgressCheck />
                   Status
                 </Filter.Item>
-                <Filter.Item value="partyType">
+                <Filter.Item value="customerId">
                   <IconUser />
-                  Party Type
+                  Customer
                 </Filter.Item>
                 <Filter.Item value="currency">
                   <IconCoin />
@@ -146,7 +118,7 @@ const OffersFilterPopover = () => {
             </Command>
           </Filter.View>
           <OfferStatusFilterView />
-          <PartyTypeFilterView />
+          <SelectCustomer.FilterView filterKey="customerId" mode="single" />
           <CurrencyFilterView />
         </Combobox.Content>
       </Filter.Popover>
@@ -163,11 +135,11 @@ export const OffersFilter = () => {
   const [queries] = useMultiQueryState<{
     searchValue: string;
     status: string;
-    partyType: string;
+    customerId: string;
     currency: string;
-  }>(['searchValue', 'status', 'partyType', 'currency']);
+  }>(['searchValue', 'status', 'customerId', 'currency']);
 
-  const { searchValue } = queries || {};
+  const { searchValue, customerId } = queries || {};
   const statusLabel =
     STATUS_OPTIONS.find((s) => s.value === queries?.status)?.label ??
     queries?.status;
@@ -197,15 +169,19 @@ export const OffersFilter = () => {
             </Badge>
           </Filter.BarButton>
         </Filter.BarItem>
-        <Filter.BarItem queryKey="partyType">
-          <Filter.BarName>
-            <IconUser />
-            Party Type
-          </Filter.BarName>
-          <Filter.BarButton filterKey="partyType">
-            {queries?.partyType === 'customer' ? 'Customer' : 'Company'}
-          </Filter.BarButton>
-        </Filter.BarItem>
+        {customerId && (
+          <Filter.BarItem queryKey="customerId">
+            <Filter.BarName>
+              <IconUser />
+              Customer
+            </Filter.BarName>
+            <SelectCustomer.FilterBar
+              filterKey="customerId"
+              label="Customer"
+              mode="single"
+            />
+          </Filter.BarItem>
+        )}
         <Filter.BarItem queryKey="currency">
           <Filter.BarName>
             <IconCoin />

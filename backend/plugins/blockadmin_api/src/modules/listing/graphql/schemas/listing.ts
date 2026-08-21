@@ -22,10 +22,19 @@ export const types = `
     builtYear: String
   }
 
+  type BlockAdminListingAgent {
+    _id: String
+    firstName: String
+    lastName: String
+    email: String
+  }
+
   type BlockAdminListing {
     _id: String
     entityId: String
     subdomain: String
+    agencyId: String
+    agencyMemberId: String
     title: String
     type: String
     propertyType: String
@@ -38,8 +47,9 @@ export const types = `
     featuredImg: String
     viewCount: Float
     isFeatured: Boolean
-    createdAt: String
-    updatedAt: String
+    agent: BlockAdminListingAgent
+    createdAt: Date
+    updatedAt: Date
   }
 
   input BlockAdminListingStatusInput {
@@ -57,12 +67,14 @@ export const types = `
     total: Int!
     active: Int!
     draft: Int!
+    sold: Int!
     totalViews: Float!
   }
 `;
 
 const queryParams = `
   subdomain: String
+  agencyMemberId: String
   status: String
   searchValue: String
   city: String
@@ -73,7 +85,7 @@ const queryParams = `
 
 export const queries = `
   getBlockAdminListings(${queryParams}): BlockAdminListingListResponse
-  getBlockAdminListingStats(subdomain: String): BlockAdminListingStats
+  getBlockAdminListingStats(subdomain: String, agencyMemberId: String): BlockAdminListingStats
   getBlockAdminListing(_id: String!): BlockAdminListing
 `;
 

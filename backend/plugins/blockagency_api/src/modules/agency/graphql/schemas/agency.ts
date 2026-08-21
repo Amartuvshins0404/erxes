@@ -28,13 +28,15 @@ export const types = `
     primaryEmail: String
     phones: [String]
     primaryPhone: String
-    logo: String
-    coverImage: String
-    documents: [String]
+    logo: Attachment
+    coverImage: Attachment
+    documents: [Attachment]
     socialLinks: JSON
     dateFounded: String
     operationArea: AgencyOperationArea
     fieldsOfExpertise: AgencyFieldOfExpertise
+    messengerIntegrationId: String
+    widgetBundleUrl: String
     verificationStatus: AgencyVerificationStatus
     rejectionReasons: [String]
     rejectionNotes: String
@@ -75,13 +77,15 @@ export const types = `
     primaryEmail: String
     phones: [String]
     primaryPhone: String
-    logo: String
-    coverImage: String
-    documents: [String]
+    logo: AttachmentInput
+    coverImage: AttachmentInput
+    documents: [AttachmentInput]
     socialLinks: JSON
     dateFounded: String
     operationArea: AgencyOperationAreaInput
     fieldsOfExpertise: AgencyFieldOfExpertiseInput
+    messengerIntegrationId: String
+    widgetBundleUrl: String
   }
 `;
 

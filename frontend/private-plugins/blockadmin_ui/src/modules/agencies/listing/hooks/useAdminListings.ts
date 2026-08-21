@@ -4,25 +4,33 @@ import {
   mergeCursorData,
   validateFetchMore,
 } from 'erxes-ui';
-import { IAdminListing } from '../types';
+import { IAdminListing } from '../types/listingTypes';
 import { GET_ADMIN_LISTINGS } from '../graphql';
 
 type GetAdminListingsResponse = {
   getBlockAdminListings: {
     list: IAdminListing[];
-    totalCount: number;
+    totalCount?: number;
     pageInfo: {
       hasNextPage: boolean;
       hasPreviousPage: boolean;
-      startCursor: string;
-      endCursor: string;
+      startCursor: string | null | undefined;
+      endCursor: string | null | undefined;
     };
   };
 };
 
+const PER_PAGE = 30;
+
 export const useAdminListings = (options?: QueryHookOptions) => {
   const { data, loading, error, fetchMore } =
-    useQuery<GetAdminListingsResponse>(GET_ADMIN_LISTINGS, options);
+    useQuery<GetAdminListingsResponse>(GET_ADMIN_LISTINGS, {
+      ...options,
+      variables: {
+        limit: PER_PAGE,
+        ...options?.variables,
+      },
+    });
 
   const { list, pageInfo, totalCount } = data?.getBlockAdminListings || {};
 
@@ -38,7 +46,7 @@ export const useAdminListings = (options?: QueryHookOptions) => {
           direction === EnumCursorDirection.FORWARD
             ? pageInfo?.endCursor
             : pageInfo?.startCursor,
-        limit: 30,
+        limit: PER_PAGE,
         direction,
       },
       updateQuery: (prev, { fetchMoreResult }) => {

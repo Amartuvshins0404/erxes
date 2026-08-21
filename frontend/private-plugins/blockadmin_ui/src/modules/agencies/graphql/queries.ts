@@ -15,9 +15,24 @@ export const GET_AGENCIES = gql`
         type
         description
         brief
-        logo
-        coverImage
-        documents
+        logo {
+          name
+          url
+          size
+          type
+        }
+        coverImage {
+          name
+          url
+          size
+          type
+        }
+        documents {
+          name
+          url
+          size
+          type
+        }
         website
         emails
         primaryEmail
@@ -25,6 +40,7 @@ export const GET_AGENCIES = gql`
         primaryPhone
         socialLinks
         dateFounded
+        verificationStatus
         operationArea {
           city
           district
@@ -44,18 +60,64 @@ export const GET_AGENCIES = gql`
   }
 `;
 
+export const GET_AGENCY_AGENTS = gql`
+  query BlockAdminAgencyAgents($agencyId: String, $searchValue: String) {
+    getBlockAdminAgents(agencyId: $agencyId, searchValue: $searchValue) {
+      list {
+        _id
+        agencyId
+        memberId
+        role
+        description
+        country
+        city
+        district
+        facebookUrl
+        instagramUrl
+        linkedUrl
+        user {
+          _id
+          firstName
+          lastName
+          avatar
+          email
+        }
+        createdAt
+        updatedAt
+      }
+      totalCount
+    }
+  }
+`;
+
 export const GET_AGENCY_INFO = gql`
   query GetAgencyInfo($id: String!) {
     getBlockAdminAgencyInfo(_id: $id) {
       _id
+      entityId
       name
       brandName
       type
       description
       brief
-      logo
-      coverImage
-      documents
+      logo {
+        name
+        url
+        size
+        type
+      }
+      coverImage {
+        name
+        url
+        size
+        type
+      }
+      documents {
+        name
+        url
+        size
+        type
+      }
       website
       emails
       primaryEmail
@@ -72,6 +134,11 @@ export const GET_AGENCY_INFO = gql`
         services
         clientTypes
       }
+      messengerIntegrationId
+      widgetBundleUrl
+      verificationStatus
+      rejectionReasons
+      rejectionNotes
     }
   }
 `;

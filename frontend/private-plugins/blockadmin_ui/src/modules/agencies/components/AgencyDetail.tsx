@@ -1,47 +1,44 @@
-import { Form, Spinner } from 'erxes-ui';
-import { useEffect } from 'react';
-import { useParams } from 'react-router-dom';
-import { AgencyProfileSchema, useAgencyForm } from '../hooks/useAgencyForm';
+import { IconBuildingOff } from '@tabler/icons-react';
+import { Empty, ScrollArea, Spinner } from 'erxes-ui';
 import { useAgencyDetail } from '../hooks/useAgencyDetail';
-import { AgencyInfoForm } from './AgencyInfoForm';
-
-function removeTypename<T>(value: T): T {
-  if (Array.isArray(value)) {
-    return value.map(removeTypename) as unknown as T;
-  }
-  if (value !== null && typeof value === 'object') {
-    return Object.fromEntries(
-      Object.entries(value)
-        .filter(([key]) => key !== '__typename')
-        .map(([key, val]) => [key, removeTypename(val)]),
-    ) as T;
-  }
-  return value;
-}
+import { AgencyDetailProfile } from './AgencyDetailProfile';
+import { AgencyDetailSidebar } from './AgencyDetailSidebar';
+import { AgencyDetailTabs } from './AgencyDetailTabs';
 
 export const AgencyDetail = () => {
-  const { id } = useParams();
-  const { agency, loading } = useAgencyDetail({
-    variables: { id: id },
-  });
+  const { agency, loading, error } = useAgencyDetail();
 
-  const { form } = useAgencyForm();
+  if (loading) return <Spinner containerClassName="py-32" />;
 
-  useEffect(() => {
-    if (!agency) return;
-    const { _id, __typename, ...formDefaultValues } = agency;
-    form.reset(removeTypename(formDefaultValues) as AgencyProfileSchema);
-  }, [agency]);
-
-  if (loading) {
-    return <Spinner containerClassName="ba:py-32" />;
+  if (error || !agency) {
+    return (
+      <Empty className="py-32">
+        <Empty.Content>
+          <Empty.Header>
+            <Empty.Media>
+              <IconBuildingOff />
+            </Empty.Media>
+            <Empty.Title>Agency not found</Empty.Title>
+            <Empty.Description>
+              {error?.message ??
+                'This agency no longer exists or you do not have access to it.'}
+            </Empty.Description>
+          </Empty.Header>
+        </Empty.Content>
+      </Empty>
+    );
   }
 
   return (
-    <Form {...form}>
-      <form className="max-w-2xl mx-auto my-3 space-y-3">
-        <AgencyInfoForm form={form} />
-      </form>
-    </Form>
+    <div className="flex flex-col flex-auto overflow-hidden">
+      <AgencyDetailProfile />
+      <div className="flex flex-auto overflow-hidden">
+        <AgencyDetailSidebar />
+        <ScrollArea className="flex-auto bg-sidebar">
+          <AgencyDetailTabs />
+          <ScrollArea.Bar orientation="horizontal" />
+        </ScrollArea>
+      </div>
+    </div>
   );
 };

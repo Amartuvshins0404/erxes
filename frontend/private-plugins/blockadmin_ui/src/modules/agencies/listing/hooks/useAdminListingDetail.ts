@@ -1,7 +1,7 @@
 import { useQuery } from '@apollo/client';
 import { useParams } from 'react-router-dom';
 import { GET_ADMIN_LISTING_DETAIL } from '../graphql';
-import { IAdminListing } from '../types';
+import { IAdminListing } from '../types/listingTypes';
 
 export const useAdminListingDetail = () => {
   const { listingId } = useParams();

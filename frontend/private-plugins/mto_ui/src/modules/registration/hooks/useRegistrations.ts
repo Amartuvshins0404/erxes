@@ -3,19 +3,66 @@ import { useCallback } from 'react';
 import {
   EnumCursorDirection,
   mergeCursorData,
+  useNonNullMultiQueryState,
   useRecordTableCursor,
   validateFetchMore,
 } from 'erxes-ui';
 import { REGISTRATIONS_CURSOR_SESSION_KEY } from '@/registration/constants/registrationsCursorSessionKey';
 import { MTO_REGISTRATION_APPLICATIONS } from '@/registration/graphql/registrationQueries';
-import { RegistrationFilters } from '@/registration/types/registrationFilters';
+import { MtoRegistrationApplication } from '@/registration/types/registration';
 
 const REGISTRATIONS_PER_PAGE = 20;
 
-export function useRegistrations(filters?: RegistrationFilters) {
+const parseBooleanQuery = (value?: string): boolean | undefined => {
+  if (value === 'true') return true;
+  if (value === 'false') return false;
+  return undefined;
+};
+
+export function useRegistrationsFilterVariables() {
+  const queries = useNonNullMultiQueryState<{
+    membershipTypeId: string;
+    status: string;
+    cpUserId: string;
+    name: string;
+    registrationNumber: string;
+    email: string;
+    createdAtFrom: string;
+    createdAtTo: string;
+    activityCategory: string;
+    archived: string;
+  }>([
+    'membershipTypeId',
+    'status',
+    'cpUserId',
+    'name',
+    'registrationNumber',
+    'email',
+    'createdAtFrom',
+    'createdAtTo',
+    'activityCategory',
+    'archived',
+  ]);
+
+  return {
+    membershipTypeId: queries.membershipTypeId || undefined,
+    status: queries.status || undefined,
+    cpUserId: queries.cpUserId || undefined,
+    name: queries.name || undefined,
+    registrationNumber: queries.registrationNumber || undefined,
+    email: queries.email || undefined,
+    createdAtFrom: queries.createdAtFrom || undefined,
+    createdAtTo: queries.createdAtTo || undefined,
+    activityCategory: queries.activityCategory || undefined,
+    archived: parseBooleanQuery(queries.archived),
+  };
+}
+
+export function useRegistrations() {
   const { cursor } = useRecordTableCursor({
     sessionKey: REGISTRATIONS_CURSOR_SESSION_KEY,
   });
+  const filters = useRegistrationsFilterVariables();
 
   const { data, loading, error, fetchMore, refetch } = useQuery(
     MTO_REGISTRATION_APPLICATIONS,
@@ -23,7 +70,9 @@ export function useRegistrations(filters?: RegistrationFilters) {
       variables: {
         ...filters,
         cursor,
+        limit: REGISTRATIONS_PER_PAGE,
       },
+      fetchPolicy: 'cache-and-network',
     },
   );
 
@@ -31,6 +80,15 @@ export function useRegistrations(filters?: RegistrationFilters) {
     list: registrations,
     totalCount,
     pageInfo,
+  }: {
+    list?: MtoRegistrationApplication[];
+    totalCount?: number;
+    pageInfo?: {
+      hasNextPage?: boolean;
+      hasPreviousPage?: boolean;
+      startCursor?: string;
+      endCursor?: string;
+    };
   } = data?.mtoRegistrationApplications || {};
 
   const handleFetchMore = ({

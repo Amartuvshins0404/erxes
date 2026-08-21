@@ -1,5 +1,7 @@
-import { ContractPartyType } from '@/contract/@types/contract';
-import { OfferAmountType, OfferStatus } from '@/contract/@types/offer';
+import {
+  OfferAmountType,
+  OfferStatus,
+} from '@/contract/@types/offer';
 import {
   BlockProjectPaymentPlanFrequency,
   BlockProjectPaymentPlanInterestType,
@@ -7,18 +9,6 @@ import {
 } from '@/project/@types/payment';
 import { Schema } from 'mongoose';
 import { schemaWrapper } from '~/utils';
-
-const offerPartySchema = new Schema(
-  {
-    type: {
-      type: String,
-      enum: Object.values(ContractPartyType),
-      required: true,
-    },
-    id: { type: String, required: true },
-  },
-  { _id: false },
-);
 
 const offerPaymentPlanSchema = new Schema(
   {
@@ -60,12 +50,16 @@ export const offerSchema = schemaWrapper(
     {
       number: { type: String, required: true },
       currency: { type: String, required: true },
-      unit: { type: Schema.Types.ObjectId, ref: 'block_units', required: true },
+      unit: {
+        type: Schema.Types.ObjectId,
+        ref: 'block_admin_units',
+        required: true,
+      },
       date: { type: Date, required: true },
       amount: { type: Number, required: true },
       amountType: { type: String, enum: Object.values(OfferAmountType) },
       endDate: { type: Date },
-      party: { type: offerPartySchema, required: true },
+      customerId: { type: String, required: true },
       description: { type: String },
       paymentPlan: { type: offerPaymentPlanSchema, required: true },
       status: {

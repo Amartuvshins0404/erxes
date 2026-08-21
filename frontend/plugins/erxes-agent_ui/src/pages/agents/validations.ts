@@ -1,13 +1,24 @@
 import { z } from 'zod';
 
+// Safe local tools are on for new agents. Network access and terminal stay
+// opt-in.
+const DEFAULT_ADDITIONAL_TOOLS = [
+  'calculator',
+  'renderChart',
+  'renderDiagram',
+  'generatePdf',
+  'generateDocx',
+  'generateXlsx',
+  'generatePptx',
+  'removeImageBackground',
+];
+
 export const agentFormSchema = z
   .object({
     name: z.string().min(1, 'Name is required').max(200, 'Name is too long'),
     description: z.string(),
     visibility: z.enum(['private', 'shared', 'organization']),
     audienceUserIds: z.array(z.string().max(128)).max(250),
-    audienceTeamIds: z.array(z.string().max(128)).max(250),
-    audienceDepartmentIds: z.array(z.string().max(128)).max(250),
     instructions: z
       .string()
       .min(1, 'System instructions are required')
@@ -15,24 +26,15 @@ export const agentFormSchema = z
     provider: z.string(),
     model: z.string().min(1, 'Model is required'),
     permissionGroupIds: z.array(z.string()),
-    destructiveOps: z.enum(['allow', 'ask']),
-    memoryEnabled: z.boolean(),
-    debug: z.boolean(),
-    maxSteps: z.number().int().min(1).max(50),
-    temperature: z.number().nullable(),
+    additionalTools: z.array(z.string()).max(20),
     isActive: z.boolean(),
   })
   .superRefine((value, context) => {
-    if (
-      value.visibility === 'shared' &&
-      !value.audienceUserIds.length &&
-      !value.audienceTeamIds.length &&
-      !value.audienceDepartmentIds.length
-    ) {
+    if (value.visibility === 'shared' && !value.audienceUserIds.length) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['visibility'],
-        message: 'Select at least one person, team, or department',
+        message: 'Select at least one person',
       });
     }
   });
@@ -44,16 +46,10 @@ export const AGENT_FORM_DEFAULTS: AgentFormValues = {
   description: '',
   visibility: 'private',
   audienceUserIds: [],
-  audienceTeamIds: [],
-  audienceDepartmentIds: [],
   instructions: '',
   provider: '',
   model: '',
+  additionalTools: [...DEFAULT_ADDITIONAL_TOOLS],
   permissionGroupIds: [],
-  destructiveOps: 'ask',
-  memoryEnabled: true,
-  debug: false,
-  maxSteps: 10,
-  temperature: null,
   isActive: true,
 };

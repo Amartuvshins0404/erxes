@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { AgencyAttachment } from '~/modules/agency/types/form';
 import { agentFormSchema } from '../schema/member';
 
 export interface IBlockAgencyMember {
@@ -13,7 +14,7 @@ export interface IBlockAgencyMember {
   description?: string;
   country?: string;
   city?: string;
-  certificatePhotos?: string[];
+  certificatePhotos?: AgencyAttachment[];
   createdAt: Date;
   updatedAt: Date;
 }

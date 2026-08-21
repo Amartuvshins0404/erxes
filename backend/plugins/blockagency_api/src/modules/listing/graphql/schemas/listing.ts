@@ -46,8 +46,8 @@ export const types = `
     viewCount: Float
     memberId: String
     agent: BlockListingAgent
-    createdAt: String
-    updatedAt: String
+    createdAt: Date
+    updatedAt: Date
   }
 
   type BlockListingListResponse {

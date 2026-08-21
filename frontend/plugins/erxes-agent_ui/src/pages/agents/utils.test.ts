@@ -1,29 +1,14 @@
-import { resolveAgentsBasePath, duplicatedAgentNames } from './utils';
+import { duplicatedAgentNames, resolveAgentsBasePath } from './utils';
 
 describe('resolveAgentsBasePath', () => {
-  it('keeps the AI-Agents console shell for console routes', () => {
-    expect(resolveAgentsBasePath('/erxes-agent/agents')).toBe(
-      '/erxes-agent/agents',
-    );
-    expect(resolveAgentsBasePath('/erxes-agent/agents/new')).toBe(
-      '/erxes-agent/agents',
-    );
-    expect(resolveAgentsBasePath('/erxes-agent/agents/edit/abc')).toBe(
-      '/erxes-agent/agents',
-    );
-  });
-
-  it('keeps the Settings shell for settings routes', () => {
+  it('keeps agent CRUD inside settings', () => {
     expect(resolveAgentsBasePath('/settings/erxes-agent/agents')).toBe(
       '/settings/erxes-agent/agents',
     );
-    expect(resolveAgentsBasePath('/settings/erxes-agent/agents/new')).toBe(
-      '/settings/erxes-agent/agents',
-    );
   });
 
-  it('defaults to the console shell for unrelated paths', () => {
-    expect(resolveAgentsBasePath('/erxes-agent/chat')).toBe(
+  it('uses the main agent module outside settings', () => {
+    expect(resolveAgentsBasePath('/erxes-agent/agents')).toBe(
       '/erxes-agent/agents',
     );
   });

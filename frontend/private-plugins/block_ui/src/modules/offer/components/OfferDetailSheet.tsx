@@ -16,7 +16,7 @@ import { offerDetailSheetState } from '@/offer/states/offerDetailSheetState';
 import { useOffer } from '@/offer/hooks/useOffers';
 import { useUpdateOffer } from '@/offer/hooks/useManageOffer';
 import { OfferEditSheet } from './OfferEditSheet';
-import { CustomersInline, CompaniesInline, MembersInline } from 'ui-modules';
+import { CustomersInline, MembersInline, RelationWidgetSideTabs } from 'ui-modules';
 import { IOffer, IOfferPaymentPlan } from '@/offer/types/offerTypes';
 import {
   formatAmount,
@@ -65,6 +65,16 @@ export const OfferDetailSheet = () => {
               )}
             </div>
           </ScrollArea>
+
+          <RelationWidgetSideTabs
+            contentId={activeOfferId || ''}
+            contentType="block:offer"
+            customerId={offer?.customerId}
+            hookOptions={{
+              hiddenPlugins: ['sales', 'operation'],
+              hiddenModules: ['contract', 'company', 'ticket', 'oppty'],
+            }}
+          />
         </FocusSheet.Content>
 
         <Sheet.Footer className="flex-none">
@@ -87,25 +97,13 @@ const OfferOverviewBody = ({
   offer: IOffer;
   onStatusChange: (status: 'draft' | 'sent') => void;
 }) => {
-  const isCustomer = offer.party?.type === 'customer';
-  const partyId = offer.party?.id;
-
-  const partyNode = partyId ? (
-    isCustomer ? (
-      <CustomersInline.Provider customerIds={[partyId]}>
-        <span className="inline-flex items-center gap-2">
-          <CustomersInline.Avatar />
-          <CustomersInline.Title />
-        </span>
-      </CustomersInline.Provider>
-    ) : (
-      <CompaniesInline.Provider companyIds={[partyId]}>
-        <span className="inline-flex items-center gap-2">
-          <CompaniesInline.Avatar />
-          <CompaniesInline.Title />
-        </span>
-      </CompaniesInline.Provider>
-    )
+  const customerNode = offer.customerId ? (
+    <CustomersInline.Provider customerIds={[offer.customerId]}>
+      <span className="inline-flex items-center gap-2">
+        <CustomersInline.Avatar />
+        <CustomersInline.Title />
+      </span>
+    </CustomersInline.Provider>
   ) : null;
 
   return (
@@ -133,7 +131,7 @@ const OfferOverviewBody = ({
                 </Select.Content>
               </Select>,
             )}
-            {renderRow('Party', partyNode)}
+            {renderRow('Customer', customerNode)}
             {renderRow('Amount', formatAmount(offer.amount, offer.currency))}
             {renderRow('Currency', offer.currency)}
             {renderRow('Date', formatDate(offer.date))}

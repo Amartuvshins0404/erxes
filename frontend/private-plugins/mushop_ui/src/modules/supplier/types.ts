@@ -9,6 +9,7 @@ export interface ISupplier {
   logo?: string;
   coverImage?: string;
   registrationNumber?: string;
+  industry?: string;
   primaryEmail?: string;
   primaryPhone?: string;
   emails?: string[];

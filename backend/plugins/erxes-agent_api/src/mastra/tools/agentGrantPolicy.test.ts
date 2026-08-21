@@ -11,23 +11,30 @@ jest.mock('./builtins', () => ({
   },
 }));
 
-import type { OperationMeta, OperationRegistry } from './operationRegistry';
+import type { AgentToolDescriptor } from 'erxes-api-shared/utils';
+import type { NativeToolRegistry } from './nativeTools';
 import { resolveAgentGrantPolicy } from './agentGrantPolicy';
 
-const dealQuery: OperationMeta = {
-  operation: 'deals',
-  operationType: 'query',
+const dealFind: AgentToolDescriptor = {
+  id: 'sales.model.Deals.find',
+  kind: 'model',
   plugin: 'sales',
-  module: 'deal',
+  module: 'deals',
+  method: 'query',
+  destructive: false,
   description: '',
-  graphqlArgs: [],
-  returnType: null,
+  inputFields: null,
+  modelName: 'Deals',
+  op: 'find',
+  permission: { module: 'deals', action: 'dealsShow' },
+  agentUsable: true,
 };
 
 const registry = {
-  list: [dealQuery],
-  operations: new Map([[dealQuery.operation, dealQuery]]),
-} as unknown as OperationRegistry;
+  list: [dealFind],
+  tools: new Map([[dealFind.id, dealFind]]),
+  byPlugin: new Map([['sales', [dealFind]]]),
+} as unknown as NativeToolRegistry;
 
 beforeEach(() => sendTRPCMessage.mockReset());
 
@@ -54,7 +61,7 @@ describe('resolveAgentGrantPolicy', () => {
           {
             plugin: 'sales',
             module: 'deal',
-            actions: ['showDeals'],
+            actions: ['dealsShow'],
             scope: 'own',
           },
         ],
@@ -69,7 +76,7 @@ describe('resolveAgentGrantPolicy', () => {
 
     expect(policy).toEqual({
       mode: 'custom',
-      allowed: ['deals', 'builtin:calculator', 'builtin:webSearch'],
+      allowed: ['sales.model.Deals.find', 'builtin:calculator', 'builtin:webSearch'],
     });
   });
 

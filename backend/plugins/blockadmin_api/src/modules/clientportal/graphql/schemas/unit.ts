@@ -5,6 +5,7 @@ export const types = `
     _id: String
     building: BlockAdminBuilding
     zoning: BlockAdminBuildingZoning
+    project: BlockAdminProject
     number: String
     isFeatured: Boolean
 

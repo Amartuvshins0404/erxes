@@ -10,7 +10,7 @@ export const modifierMiddleware = (
   res: IResponse,
   next: NextFunction,
 ) => {
-  if (!BLOCK_API_URL) {
+  if (!BLOCK_API_URL && !isDev) {
     throw new Error('BLOCK_API_URL is not set');
   }
 

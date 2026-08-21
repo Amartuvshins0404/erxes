@@ -17,20 +17,259 @@
   animation: ea-msg-in 0.28s cubic-bezier(0.21, 1.02, 0.73, 1) both;
 }
 
-/* User message bubble — the blue gradient + width cap live here, not on the
-   Tailwind utilities `from-primary` / `to-primary/85` / `max-w-[78%]`. Those
-   are unique to this plugin, and the host (core-ui) global CSS is built
-   without scanning this plugin's source, so they aren't generated in
-   production — the bubble then renders transparent (white text on a
-   transparent background = invisible). Driving the gradient off the shared
-   --primary token keeps it self-contained and theme/brand-aware. */
+/* User message bubble — flat ink surface. Self-contained (no Tailwind
+   utilities): the host (core-ui) global CSS is built without scanning this
+   plugin's source, so plugin-unique utilities aren't generated in
+   production. */
 .ea-user-bubble {
+  max-width: 70%;
+  padding: 0.625rem 1rem;
+  border-radius: 22px;
+  line-height: 1.5rem;
+  background: #0d0d0d;
+  color: #fff;
+}
+.dark .ea-user-bubble {
+  background: #ececec;
+  color: #0d0d0d;
+}
+
+/* ── Chat surface utilities ───────────────────────────────────────────
+   Same production-purge rule as .ea-user-bubble: every value below
+   replaces a plugin-unique Tailwind utility that never reaches the
+   deployed host CSS. Keep the chat surface on these classes. */
+
+.ea-text-15 {
+  font-size: 15px;
+}
+.ea-text-11 {
+  font-size: 11px;
+}
+.ea-text-10 {
+  font-size: 10px;
+}
+
+/* Composer shell — rounded surface with a quiet border and soft shadow. */
+.ea-composer {
+  border-radius: 28px;
+  border-color: #e5e5e5;
+  background: #fff;
+  box-shadow: 0 2px 6px -2px rgba(0, 0, 0, 0.05);
+}
+.ea-composer:focus-within {
+  border-color: #d0d0d0;
+}
+.dark .ea-composer {
+  border-color: transparent;
+  background: #212121;
+  box-shadow: inset 0 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+/* Composer input cap — react-textarea-autosize stamps an inline
+   `height … !important` on every measure; `maxRows` caps that height
+   library-side and ChatPage forces a re-measure (window resize) once the
+   preview split settles, so the used box stays one line until real content
+   grows it. This rule remains the visual clamp and keeps the overflow
+   scrolling inside the textarea. Kept as an ea-* rule because max-h-40 may
+   not exist in the host CSS. */
+.ea-composer-input {
+  max-height: 10rem;
+  overflow-y: auto;
+}
+.ea-composer-input::placeholder {
+  color: color-mix(in oklch, var(--muted-foreground) 70%, transparent);
+}
+
+/* High-contrast circular send / stop action. */
+.ea-send-btn {
+  background: #0d0d0d;
+  color: #fff;
+}
+.dark .ea-send-btn {
+  background: #fff;
+  color: #000;
+}
+.ea-stop-square {
+  border-radius: 2px;
+  background: currentColor;
+}
+
+/* Quiet icon-button hover (message actions, composer controls). */
+.ea-quiet-btn:hover {
+  background: rgba(0, 0, 0, 0.07);
+}
+.dark .ea-quiet-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* Empty-state bottom pad that lifts the hero above the composer. */
+.ea-thread-bottom {
+  padding-bottom: 16vh;
+}
+
+/* Drag-over drop affordance. */
+.ea-drop-overlay {
+  border-color: color-mix(in oklch, var(--primary) 50%, transparent);
+  background: color-mix(in oklch, var(--primary) 6%, transparent);
+  backdrop-filter: blur(2px);
+}
+
+/* Attachment strip next to the user bubble. */
+.ea-attachments {
   max-width: 78%;
-  background-image: linear-gradient(
-    to bottom right,
-    var(--primary),
-    color-mix(in oklch, var(--primary) 85%, transparent)
-  );
+}
+.ea-img-zoom {
+  transition: transform 0.3s;
+}
+.group\/img:hover .ea-img-zoom {
+  transform: scale(1.02);
+}
+
+/* Pan/zoom chrome. */
+.ea-scale-label {
+  min-width: 34px;
+}
+.ea-hint {
+  color: color-mix(in oklch, var(--muted-foreground) 45%, transparent);
+}
+
+/* Dimmed label (80% muted foreground). */
+.ea-muted-80 {
+  color: color-mix(in oklch, var(--muted-foreground) 80%, transparent);
+}
+
+/* Tabs content that switches to flex layout when active. */
+.ea-tab-flex[data-state='active'] {
+  display: flex;
+}
+
+/* Chart window-slider thumb border. */
+.ea-thumb {
+  border-color: color-mix(in oklch, var(--primary) 50%, transparent);
+}
+
+/* Token tints — stand-ins for the `/<pct>` opacity-modified utilities the
+   host CSS doesn't carry for this plugin. */
+.ea-border-70 {
+  border-color: color-mix(in oklch, var(--border) 70%, transparent);
+}
+.ea-border-60 {
+  border-color: color-mix(in oklch, var(--border) 60%, transparent);
+}
+.ea-border-50 {
+  border-color: color-mix(in oklch, var(--border) 50%, transparent);
+}
+.ea-bg-muted-30 {
+  background: color-mix(in oklch, var(--muted) 30%, transparent);
+}
+.ea-bg-60 {
+  background: color-mix(in oklch, var(--background) 60%, transparent);
+}
+.ea-bg-85 {
+  background: color-mix(in oklch, var(--background) 85%, transparent);
+}
+.ea-bg-primary-10 {
+  background: color-mix(in oklch, var(--primary) 10%, transparent);
+}
+.ea-hover-accent-40:hover {
+  background: color-mix(in oklch, var(--accent) 40%, transparent);
+}
+.ea-bg-muted-40 {
+  background: color-mix(in oklch, var(--muted) 40%, transparent);
+}
+.ea-bg-muted-50 {
+  background: color-mix(in oklch, var(--muted) 50%, transparent);
+}
+.ea-bg-primary-20 {
+  background: color-mix(in oklch, var(--primary) 20%, transparent);
+}
+.ea-bg-primary-5 {
+  background: color-mix(in oklch, var(--primary) 5%, transparent);
+}
+.ea-border-primary-40 {
+  border-color: color-mix(in oklch, var(--primary) 40%, transparent);
+}
+.ea-hover-border-primary-40:hover {
+  border-color: color-mix(in oklch, var(--primary) 40%, transparent);
+}
+.ea-hover-bg-primary-4:hover {
+  background: color-mix(in oklch, var(--primary) 4%, transparent);
+}
+.ea-text-90 {
+  color: color-mix(in oklch, var(--foreground) 90%, transparent);
+}
+.ea-border-destructive-40 {
+  border-color: color-mix(in oklch, var(--destructive) 40%, transparent);
+}
+.ea-bg-destructive-8 {
+  background: color-mix(in oklch, var(--destructive) 8%, transparent);
+}
+.ea-bg-destructive-10 {
+  background: color-mix(in oklch, var(--destructive) 10%, transparent);
+}
+.ea-hover-destructive-90:hover {
+  background: color-mix(in oklch, var(--destructive) 90%, transparent);
+}
+.ea-bg-border-60 {
+  background: color-mix(in oklch, var(--border) 60%, transparent);
+}
+.ea-text-destructive-80 {
+  color: color-mix(in oklch, var(--destructive) 80%, transparent);
+}
+.ea-w-2-3 {
+  width: 66.666667%;
+}
+.ea-w-3-4 {
+  width: 75%;
+}
+.ea-center-y {
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+/* Hover/focus-revealed control (group variants aren't in the host CSS). */
+.ea-reveal {
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.group:hover .ea-reveal,
+.group\/session:hover .ea-reveal,
+.group\/agent:hover .ea-reveal,
+.ea-reveal:focus-visible {
+  opacity: 1;
+}
+
+/* Small icon-button glyph sizing (replaces the [&>svg]:size-3.5 variant). */
+.ea-icon-btn > svg {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+/* Mermaid canvas — strip the baked-in SVG background. */
+.ea-svg-canvas > svg {
+  display: block;
+  background: transparent !important;
+}
+
+/* Chat workspace sidebar rows (agents + conversations). */
+.ea-side-row {
+  color: color-mix(in oklch, var(--foreground) 80%, transparent);
+}
+.ea-side-row:hover {
+  background: color-mix(in oklch, var(--accent) 60%, transparent);
+}
+.ea-side-session:hover {
+  background: color-mix(in oklch, var(--accent) 50%, transparent);
+}
+.ea-side-active {
+  background: color-mix(in oklch, var(--accent) 70%, transparent);
+}
+
+/* Agent form two-column section grid (label column + content). */
+@media (min-width: 768px) {
+  .ea-form-grid {
+    grid-template-columns: minmax(0, 14rem) minmax(0, 1fr);
+    gap: 1.5rem;
+  }
 }
 
 /* ── Agent mark ───────────────────────────────────────────────────────────
@@ -97,278 +336,6 @@
 }
 
 /* Expanding detail panes (tool args/results, finished thoughts). */
-@keyframes ea-expand {
-  from {
-    opacity: 0;
-    transform: translateY(-4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-.ea-expand {
-  animation: ea-expand 0.18s ease-out both;
-}
-
-/* ── Agent run timeline ───────────────────────────────────────────────────
-   The assistant's reasoning + tool calls render as a single vertical thread:
-   a 1px rail with a status node per step. Replaces the old stack of bordered
-   pills. Colours come off the design tokens so they survive the production
-   CSS purge (same rule as .ea-user-bubble above). */
-.ea-trace {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  position: relative;
-}
-.ea-step {
-  position: relative;
-  display: flex;
-  align-items: stretch;
-}
-/* Gutter holds the node and draws the connecting thread behind it. */
-.ea-step-rail {
-  position: relative;
-  flex: none;
-  width: 1.5rem;
-  align-self: stretch;
-}
-.ea-step-rail::before {
-  content: '';
-  position: absolute;
-  left: 50%;
-  top: 0;
-  bottom: 0;
-  width: 1px;
-  transform: translateX(-50%);
-  background: color-mix(in oklch, var(--border) 85%, transparent);
-  z-index: 0;
-}
-/* Trim the thread so it starts/ends at the node centre, not the row edge. */
-.ea-step:first-child .ea-step-rail::before {
-  top: 0.625rem;
-}
-.ea-step:last-child .ea-step-rail::before {
-  bottom: auto;
-  height: 0.625rem;
-}
-.ea-step:only-child .ea-step-rail::before {
-  display: none;
-}
-/* Card/chip steps (search + fetch) are taller than a text line — drop the marker
-   to the card header's centre so the rail bead lines up with the card, and trim
-   the connecting thread to that same centre at the ends. */
-.ea-step.is-card .ea-step-marker {
-  top: 1.375rem;
-}
-.ea-step.is-card:first-child .ea-step-rail::before {
-  top: 1.375rem;
-}
-.ea-step.is-card:last-child .ea-step-rail::before {
-  bottom: auto;
-  height: 1.375rem;
-}
-/* Step marker — a glyph (tool steps) or a quiet hollow dot (reasoning) inside an
-   opaque disc that masks the thread, giving "beads on a string". The icon names
-   the step type at a glance, Claude-style. */
-.ea-step-marker {
-  position: absolute;
-  left: 50%;
-  top: 0.625rem;
-  width: 1.125rem;
-  height: 1.125rem;
-  border-radius: 9999px;
-  transform: translate(-50%, -50%);
-  background: var(--background);
-  box-sizing: border-box;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--muted-foreground);
-  z-index: 1;
-  transition: color 0.2s ease;
-}
-/* Web steps (search / read) carry the brand tint; errors go destructive. */
-.ea-step-marker.is-search,
-.ea-step-marker.is-read {
-  color: var(--primary);
-}
-.ea-step-marker.is-error {
-  color: var(--destructive);
-}
-/* Reasoning marker — a small hollow ring rather than a glyph, kept calm. */
-.ea-think-dot {
-  width: 0.5rem;
-  height: 0.5rem;
-  border-radius: 9999px;
-  box-shadow: inset 0 0 0 1.5px
-    color-mix(in oklch, var(--muted-foreground) 55%, transparent);
-}
-/* The short-thought summary line reads as foreground text on hover. */
-.ea-think-summary {
-  color: inherit;
-}
-/* Running marker wears the same sweep ring as the agent mark — one motion. */
-.ea-step-marker.is-running {
-  color: var(--primary);
-}
-.ea-step-marker.is-running::after {
-  content: '';
-  position: absolute;
-  inset: -3px;
-  border-radius: 9999px;
-  background: conic-gradient(
-    from 0deg,
-    transparent 0deg 210deg,
-    color-mix(in oklch, var(--primary) 30%, transparent) 300deg,
-    var(--primary) 360deg
-  );
-  -webkit-mask: radial-gradient(
-    farthest-side,
-    transparent calc(100% - 1.5px),
-    #000 calc(100% - 1.5px)
-  );
-  mask: radial-gradient(
-    farthest-side,
-    transparent calc(100% - 1.5px),
-    #000 calc(100% - 1.5px)
-  );
-  animation: ea-spin 0.9s linear infinite;
-}
-/* Step body sits to the right of the rail; first text line aligns to the node. */
-.ea-step-body {
-  flex: 1 1 auto;
-  min-width: 0;
-  padding: 0.1875rem 0 0.375rem;
-}
-/* The clickable summary row — quiet by default, faint wash on hover. */
-.ea-trace-row {
-  border-radius: var(--radius-sm);
-  transition: background-color 0.12s ease, color 0.12s ease;
-}
-.ea-trace-row:hover {
-  background: color-mix(in oklch, var(--foreground) 6%, transparent);
-}
-/* Recessed request/response panes inside an expanded tool step. */
-.ea-trace-pre {
-  background: color-mix(in oklch, var(--muted) 65%, transparent);
-}
-
-/* ── Web rows: favicons, search-result card, reading chip ──────────────────
-   Tool-data-driven, Claude-style surfaces for web search + page fetches. All
-   colours come off design tokens so they survive the production CSS purge
-   (same rule as .ea-user-bubble). Favicon URLs are supplied by the tool output
-   (DuckDuckGo's favicon service) — never constructed in the UI. */
-.ea-favicon {
-  border-radius: 4px;
-  object-fit: cover;
-}
-
-/* Web-search result card — header (engine + query + count) over result rows. */
-.ea-websearch {
-  margin-top: 0.25rem;
-  border: 1px solid color-mix(in oklch, var(--border) 85%, transparent);
-  border-radius: var(--radius);
-  background: color-mix(in oklch, var(--muted) 30%, transparent);
-  overflow: hidden;
-}
-.ea-websearch-head {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  width: 100%;
-  padding: 0.4375rem 0.625rem;
-  font-size: 0.8125rem;
-  text-align: left;
-  transition: background-color 0.12s ease;
-}
-.ea-websearch-head:hover {
-  background: color-mix(in oklch, var(--foreground) 4%, transparent);
-}
-/* Divider only while expanded — a standalone collapsed header reads cleaner. */
-.ea-websearch.is-open .ea-websearch-head {
-  border-bottom: 1px solid color-mix(in oklch, var(--border) 60%, transparent);
-}
-.ea-websearch-query {
-  font-weight: 500;
-  color: var(--foreground);
-}
-.ea-websearch-list {
-  list-style: none;
-  margin: 0;
-  padding: 0.25rem;
-}
-.ea-websearch-row {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.375rem 0.5rem;
-  border-radius: var(--radius-sm);
-  font-size: 0.8125rem;
-  color: var(--foreground);
-  text-decoration: none;
-  transition: background-color 0.12s ease;
-}
-.ea-websearch-row:hover {
-  background: color-mix(in oklch, var(--foreground) 6%, transparent);
-}
-.ea-websearch-domain {
-  max-width: 11rem;
-  font-size: 0.75rem;
-  color: var(--muted-foreground);
-}
-.ea-websearch-more {
-  display: block;
-  width: 100%;
-  padding: 0.375rem 0.625rem;
-  text-align: left;
-  font-size: 0.75rem;
-  color: var(--muted-foreground);
-  border-top: 1px solid color-mix(in oklch, var(--border) 60%, transparent);
-  transition: color 0.12s ease;
-}
-.ea-websearch-more:hover {
-  color: var(--foreground);
-}
-
-/* Fetch-url reading chip — "Reading <site>" with the page favicon. */
-.ea-readchip {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-top: 0.25rem;
-  padding: 0.4375rem 0.5rem;
-  border-radius: var(--radius-sm);
-  font-size: 0.8125rem;
-  color: var(--muted-foreground);
-  text-decoration: none;
-  transition: background-color 0.12s ease;
-}
-a.ea-readchip:hover {
-  background: color-mix(in oklch, var(--foreground) 6%, transparent);
-}
-.ea-readchip-domain {
-  max-width: 10rem;
-  font-size: 0.75rem;
-  color: var(--muted-foreground);
-}
-
-/* Nested search cards inside a group: drop the card chrome so each reads as a
-   row, separated by hairlines — the group card supplies the border. */
-.ea-nestlist {
-  padding: 0.125rem 0;
-}
-.ea-websearch.is-nested {
-  margin: 0;
-  border: none;
-  border-radius: 0;
-  background: transparent;
-}
-.ea-websearch.is-nested + .ea-websearch.is-nested {
-  border-top: 1px solid color-mix(in oklch, var(--border) 40%, transparent);
-}
-
 /* Shimmer sweep over "Thinking…" labels while the model reasons. */
 @keyframes ea-shimmer {
   0% {
@@ -394,31 +361,132 @@ a.ea-readchip:hover {
   animation: ea-shimmer 2.2s linear infinite;
 }
 
-/* Typing dots while waiting for the first event. */
-@keyframes ea-dot {
-  0%,
-  60%,
-  100% {
-    transform: translateY(0);
-    opacity: 0.35;
-  }
-  30% {
-    transform: translateY(-4px);
-    opacity: 1;
-  }
+/* ── Tool call surface ──────────────────────────────────────────────────────
+   Structured args/results inside the tool collapsible (toolValue.tsx). Kept
+   as self-contained classes — the host CSS purge strips plugin-unique
+   Tailwind utilities, so none of these may rely on the utility graph. */
+
+/* Key-value rows: quiet label column + value column. */
+.ea-kv {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin: 0;
 }
-.ea-typing-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 9999px;
-  background: var(--primary);
-  animation: ea-dot 1.2s ease-in-out infinite;
+.ea-kv-row {
+  display: grid;
+  grid-template-columns: minmax(5rem, 11rem) minmax(0, 1fr);
+  gap: 0.75rem;
+  align-items: baseline;
 }
-.ea-typing-dot:nth-child(2) {
-  animation-delay: 0.15s;
+.ea-kv-row > dt {
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: var(--muted-foreground);
 }
-.ea-typing-dot:nth-child(3) {
-  animation-delay: 0.3s;
+.ea-kv-row > dd {
+  margin: 0;
+  min-width: 0;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: color-mix(in oklch, var(--foreground) 90%, transparent);
+  overflow-wrap: break-word;
+}
+
+/* Two-line clamp for source titles/snippets (line-clamp utilities are not
+   guaranteed in the host build). */
+.ea-clamp-2 {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+/* Quiet mini table for record-list tool results. */
+.ea-tool-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+.ea-tool-table th {
+  text-align: left;
+  font-weight: 500;
+  color: var(--muted-foreground);
+  padding: 0.375rem 0.625rem;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.ea-tool-table td {
+  padding: 0.375rem 0.625rem;
+  border-bottom: 1px solid
+    color-mix(in oklch, var(--border) 50%, transparent);
+  color: color-mix(in oklch, var(--foreground) 90%, transparent);
+  max-width: 16rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ea-tool-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* ── ask_user question card ─────────────────────────────────────────────────
+   The structured clarifying question (AskUserTool.tsx). Self-contained rows:
+   selected/hover tints use token color-mix (plugin-only Tailwind variants
+   never survive the host CSS purge). */
+.ea-ask-card {
+  margin-top: 0.5rem;
+  max-width: 32rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: color-mix(in oklch, var(--muted) 40%, transparent);
+  padding: 0.875rem 1rem;
+}
+.ea-ask-card-done {
+  background: transparent;
+}
+.ea-ask-option {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.625rem;
+  padding: 0.5rem 0.5rem;
+  border-radius: calc(var(--radius) - 2px);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+.ea-ask-option:hover {
+  background: color-mix(in oklch, var(--accent) 60%, transparent);
+}
+.ea-ask-option-on {
+  border-color: color-mix(in oklch, var(--primary) 40%, transparent);
+  background: color-mix(in oklch, var(--primary) 10%, transparent);
+}
+.ea-ask-option-on:hover {
+  background: color-mix(in oklch, var(--primary) 14%, transparent);
+}
+.ea-ask-option-done {
+  cursor: default;
+}
+.ea-ask-option-done:hover {
+  background: transparent;
+}
+.ea-ask-num {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 1.375rem;
+  height: 1.375rem;
+  border-radius: 0.375rem;
+  font-size: 0.75rem;
+  line-height: 1;
+  color: var(--muted-foreground);
+  background: color-mix(in oklch, var(--muted) 70%, transparent);
+}
+.ea-ask-option-on .ea-ask-num {
+  color: var(--primary);
+  background: color-mix(in oklch, var(--primary) 14%, transparent);
 }
 
 /* Streaming caret at the end of live answer text. */
@@ -539,10 +607,9 @@ a.ea-readchip:hover {
   animation: ea-ambient-drift-2 13s ease-in-out infinite;
 }
 
-/* Honor reduced-motion for the thinking sweep — show a static arc, no spin. */
+/* Honor reduced motion for the active-agent ring. */
 @media (prefers-reduced-motion: reduce) {
-  .ea-spin-ring,
-  .ea-step-marker.is-running::after {
+  .ea-spin-ring {
     animation: none;
   }
 }
@@ -718,35 +785,10 @@ a.ea-readchip:hover {
   pointer-events: none;
 }
 
-/* ── Artifact preview panel layout ────────────────────────────────────────
-   The docked preview is a right-side column beside the chat that collapses to
-   a full-area overlay on narrow screens. These layout rules MUST live here, not
-   as Tailwind utilities: the docking relied on plugin-unique responsive +
-   arbitrary-value utilities (lg:static, lg:w-[42%], lg:min-w-[360px], …) that
-   are purged from the production host CSS. There they vanished and the panel
-   fell back to its bare `absolute inset-0` overlay — rendering as a full-screen
-   takeover instead of docking to the side. Driven off design tokens so it
-   survives the purge (same rule as .ea-user-bubble above). */
-.ea-preview-dock {
-  position: absolute;
-  inset: 0;
-  z-index: 30;
-  display: flex;
-  flex-direction: column;
-  background: var(--background);
-  border-left: 1px solid var(--border);
-}
-@media (min-width: 1024px) {
-  .ea-preview-dock {
-    position: static;
-    z-index: auto;
-    /* Width is user-adjustable via the split handle (PreviewResizer sets the
-       variable on the split container in px); 42% is the untouched default. */
-    width: var(--ea-preview-w, 42%);
-    min-width: 320px;
-    max-width: 75%;
-  }
-}
+/* ── Artifact preview panel ─────────────────────────────────────────────────
+   The docked preview lives in the second pane of the chat page's Resizable
+   split (ChatPage) — the drag handle and sizing are the library's. Only the
+   fullscreen file-list sidebar rule below remains plugin-owned. */
 
 /* ── Chat ↔ Preview split handle ──────────────────────────────────────────
    The draggable divider between the chat column and the docked Preview panel

@@ -8,6 +8,12 @@ const MtoNavigationWithGuard = lazy(() =>
   })),
 );
 
+const MtoRegistrationsNavigation = lazy(() =>
+  import('./modules/MtoRegistrationsNavigation').then((module) => ({
+    default: module.MtoRegistrationsNavigation,
+  })),
+);
+
 const MtoSettingsNavigation = lazy(() =>
   import('./modules/MtoSettingsNavigation').then((module) => ({
     default: module.MtoSettingsNavigation,
@@ -44,6 +50,11 @@ export const CONFIG: IUIConfig = {
     content: () => (
       <Suspense fallback={<div />}>
         <MtoNavigationWithGuard />
+      </Suspense>
+    ),
+    subGroup: () => (
+      <Suspense fallback={<div />}>
+        <MtoRegistrationsNavigation />
       </Suspense>
     ),
   },

@@ -49,6 +49,12 @@ const AgencyMembers = lazy(() =>
   })),
 );
 
+const AgencyProfileIntegrations = lazy(() =>
+  import('./AgencyProfileIntegrations').then((m) => ({
+    default: m.AgencyProfileIntegrations,
+  })),
+);
+
 export const AgencyProfileTabs = () => {
   const [activeTab] = useQueryState('activeTab', {
     defaultValue: 'general',
@@ -70,6 +76,7 @@ export const AgencyProfileTabs = () => {
       {activeTab === AGENCY_TABS.SOCIAL_LINKS && <AgencyProfileSocialLinks />}
       {/* Settings */}
       {activeTab === AGENCY_TABS.MEMBERS && <AgencyMembers />}
+      {activeTab === AGENCY_TABS.INTEGRATIONS && <AgencyProfileIntegrations />}
     </Suspense>
   );
 };

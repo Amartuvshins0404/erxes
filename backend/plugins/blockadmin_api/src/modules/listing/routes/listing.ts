@@ -5,9 +5,21 @@ import { IBlockAdminListing } from '../@types/listing';
 
 const router: Router = Router();
 
+/**
+ * Listing as `blockagency_api` sends it: agency-side listings carry the owning
+ * member as `memberId`, which block admin stores as `agencyMemberId` because
+ * agents are keyed by their agency-side id here too.
+ */
+type ISyncedListing = Omit<IBlockAdminListing, 'subdomain' | 'entityId'> & {
+  memberId?: string;
+};
+
+const toListingInput = ({ memberId, ...listing }: ISyncedListing) =>
+  memberId ? { ...listing, agencyMemberId: memberId } : listing;
+
 router.post(
   '/blockCreateListing',
-  async (req: IRequest<IBlockAdminListing>, res: IResponse) => {
+  async (req: IRequest<ISyncedListing>, res: IResponse) => {
     const { models } = res.locals as IContext;
 
     try {
@@ -15,7 +27,7 @@ router.post(
 
       const { entityId, data } = payload || {};
 
-      const { input } = data || {};
+      const input = toListingInput(data.input);
 
       const listing = await models.Listing.findOne({ subdomain, entityId });
 
@@ -34,7 +46,7 @@ router.post(
 
 router.post(
   '/blockUpdateListingGeneralInfo',
-  async (req: IRequest<IBlockAdminListing>, res: IResponse) => {
+  async (req: IRequest<ISyncedListing>, res: IResponse) => {
     const { models } = res.locals as IContext;
 
     try {
@@ -42,9 +54,11 @@ router.post(
 
       const { entityId, data } = payload || {};
 
-      const { input } = data || {};
-
-      models.Listing.updateListing(subdomain, entityId, input);
+      models.Listing.updateListing(
+        subdomain,
+        entityId,
+        toListingInput(data.input),
+      );
 
       return res.status(200).json({ success: true });
     } catch (error) {
@@ -55,7 +69,7 @@ router.post(
 
 router.post(
   '/blockRemoveListing',
-  async (req: IRequest<IBlockAdminListing>, res: IResponse) => {
+  async (req: IRequest<ISyncedListing>, res: IResponse) => {
     const { models } = res.locals as IContext;
 
     try {

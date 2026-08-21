@@ -26,42 +26,6 @@ const ChatPage = lazy(() =>
   import('~/modules/chat/ChatPage').then((m) => ({ default: m.ChatPage })),
 );
 
-const WorkflowsIndexPage = lazy(() =>
-  import('~/pages/workflows/WorkflowsIndexPage').then((m) => ({
-    default: m.WorkflowsIndexPage,
-  })),
-);
-
-const WorkflowDetailPage = lazy(() =>
-  import('~/pages/workflows/WorkflowDetailPage').then((m) => ({
-    default: m.WorkflowDetailPage,
-  })),
-);
-
-const WorkflowFormPage = lazy(() =>
-  import('~/pages/workflows/WorkflowFormPage').then((m) => ({
-    default: m.WorkflowFormPage,
-  })),
-);
-
-const LearningsIndexPage = lazy(() =>
-  import('~/pages/learnings/LearningsIndexPage').then((m) => ({
-    default: m.LearningsIndexPage,
-  })),
-);
-
-const SkillsIndexPage = lazy(() =>
-  import('~/modules/skills/components/SkillsIndexPage').then((m) => ({
-    default: m.SkillsIndexPage,
-  })),
-);
-
-const SkillFormPage = lazy(() =>
-  import('~/modules/skills/components/SkillFormPage').then((m) => ({
-    default: m.SkillFormPage,
-  })),
-);
-
 const PermissionRoute = ({
   action,
   children,
@@ -82,15 +46,10 @@ export const ErxesAgent = () => {
   const canReadAgents = hasActionPermission(
     ERXES_AGENT_ACTIONS.agent.readSummary,
   );
-  const canReadWorkflows = hasActionPermission(
-    ERXES_AGENT_ACTIONS.workflow.read,
-  );
   const defaultPath = canChat
     ? '/erxes-agent/chat'
     : canReadAgents
     ? '/erxes-agent/agents'
-    : canReadWorkflows
-    ? '/erxes-agent/workflows'
     : '/';
 
   return (
@@ -127,14 +86,6 @@ export const ErxesAgent = () => {
           </PermissionRoute>
         }
       />
-      <Route
-        path="/agents/edit/:id"
-        element={
-          <PermissionRoute action={ERXES_AGENT_ACTIONS.agent.update}>
-            <AgentFormPage />
-          </PermissionRoute>
-        }
-      />
       {/* Per-agent workspace tabs, each scoped to the selected agent. The
           nested `*` lets AgentDetailPage own its tab sub-routes. */}
       <Route
@@ -142,70 +93,6 @@ export const ErxesAgent = () => {
         element={
           <PermissionRoute action={ERXES_AGENT_ACTIONS.agent.readConfig}>
             <AgentDetailPage />
-          </PermissionRoute>
-        }
-      />
-      <Route
-        path="/workflows"
-        element={
-          <PermissionRoute action={ERXES_AGENT_ACTIONS.workflow.read}>
-            <WorkflowsIndexPage />
-          </PermissionRoute>
-        }
-      />
-      <Route
-        path="/workflows/new"
-        element={
-          <PermissionRoute action={ERXES_AGENT_ACTIONS.workflow.createDraft}>
-            <WorkflowFormPage />
-          </PermissionRoute>
-        }
-      />
-      <Route
-        path="/workflows/edit/:id"
-        element={
-          <PermissionRoute action={ERXES_AGENT_ACTIONS.workflow.updateDraft}>
-            <WorkflowFormPage />
-          </PermissionRoute>
-        }
-      />
-      <Route
-        path="/workflows/:id"
-        element={
-          <PermissionRoute action={ERXES_AGENT_ACTIONS.workflow.read}>
-            <WorkflowDetailPage />
-          </PermissionRoute>
-        }
-      />
-      <Route
-        path="/skills"
-        element={
-          <PermissionRoute action={ERXES_AGENT_ACTIONS.skills.read}>
-            <SkillsIndexPage />
-          </PermissionRoute>
-        }
-      />
-      <Route
-        path="/skills/new"
-        element={
-          <PermissionRoute action={ERXES_AGENT_ACTIONS.skills.create}>
-            <SkillFormPage />
-          </PermissionRoute>
-        }
-      />
-      <Route
-        path="/skills/edit/:id"
-        element={
-          <PermissionRoute action={ERXES_AGENT_ACTIONS.skills.update}>
-            <SkillFormPage />
-          </PermissionRoute>
-        }
-      />
-      <Route
-        path="/learnings"
-        element={
-          <PermissionRoute action={ERXES_AGENT_ACTIONS.learning.read}>
-            <LearningsIndexPage />
           </PermissionRoute>
         }
       />

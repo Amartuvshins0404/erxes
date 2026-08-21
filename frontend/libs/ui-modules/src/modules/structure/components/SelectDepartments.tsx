@@ -55,7 +55,13 @@ export const SelectDepartmentsProvider = ({
   const [selectedDepartments, setSelectedDepartments] = useState<IDepartment[]>(
     [],
   );
-  const departmentIds = !value ? [] : Array.isArray(value) ? value : [value];
+  let departmentIds: string[] = [];
+
+  if (Array.isArray(value)) {
+    departmentIds = value;
+  } else if (value) {
+    departmentIds = [value];
+  }
 
   const handleSelectCallback = (department: IDepartment) => {
     if (!department) return;
@@ -67,14 +73,14 @@ export const SelectDepartmentsProvider = ({
     const newSelectedDepartmentIds = isSingleMode
       ? [department._id]
       : isSelected
-      ? multipleValue.filter((d) => d !== department._id)
-      : [...multipleValue, department._id];
+        ? multipleValue.filter((d) => d !== department._id)
+        : [...multipleValue, department._id];
 
     const newSelectedDepartments = isSingleMode
       ? [department]
       : isSelected
-      ? selectedDepartments.filter((d) => d._id !== department._id)
-      : [...selectedDepartments, department];
+        ? selectedDepartments.filter((d) => d._id !== department._id)
+        : [...selectedDepartments, department];
 
     setSelectedDepartments(newSelectedDepartments);
     onValueChange?.(isSingleMode ? department._id : newSelectedDepartmentIds);
@@ -105,7 +111,7 @@ export const SelectDepartmentsCommand = ({
 }) => {
   const [search, setSearch] = useState<string>('');
   const [debouncedSearch] = useDebounce(search, 500);
-  const { selectedDepartments, departmentIds } = useSelectDepartmentsContext();
+  const { departmentIds } = useSelectDepartmentsContext();
   const [noDepartmentsSearchValue, setNoDepartmentsSearchValue] =
     useState<string>('');
 
@@ -137,7 +143,7 @@ export const SelectDepartmentsCommand = ({
       />
 
       <Command.List>
-        {selectedDepartments?.length > 0 && (
+        {(departmentIds?.length ?? 0) > 0 && (
           <>
             <div className="flex flex-wrap justify-start p-2 gap-2">
               <DepartmentsList />
@@ -234,7 +240,13 @@ export const DepartmentsList = ({
   const { value, selectedDepartments, setSelectedDepartments, onSelect } =
     useSelectDepartmentsContext();
 
-  const selectedDepartmentIds = Array.isArray(value) ? value : [value];
+  let selectedDepartmentIds: string[] = [];
+
+  if (Array.isArray(value)) {
+    selectedDepartmentIds = value;
+  } else if (value) {
+    selectedDepartmentIds = [value];
+  }
 
   if (!value?.length) {
     return <Combobox.Value placeholder={placeholder || ''} />;
@@ -248,6 +260,7 @@ export const DepartmentsList = ({
           departmentId={departmentId}
           department={selectedDepartments.find((d) => d._id === departmentId)}
           renderAsPlainText={renderAsPlainText}
+          showMissingId
           variant={'secondary'}
           className={cn('min-w-0', className)}
           onCompleted={(department) =>
@@ -259,9 +272,9 @@ export const DepartmentsList = ({
           }
           onClose={() =>
             onSelect?.(
-              selectedDepartments.find(
-                (d) => d._id === departmentId,
-              ) as IDepartment,
+              (selectedDepartments.find((d) => d._id === departmentId) ?? {
+                _id: departmentId,
+              }) as IDepartment,
             )
           }
           {...props}
@@ -345,6 +358,7 @@ const SelectDepartmentsBadgesView = () => {
         <DepartmentBadge
           key={departmentId}
           departmentId={departmentId}
+          showMissingId
           onCompleted={(department) =>
             cacheSelectedDepartment(
               department,
@@ -354,9 +368,9 @@ const SelectDepartmentsBadgesView = () => {
           }
           onClose={() =>
             onSelect?.(
-              selectedDepartments.find(
-                (p) => p._id === departmentId,
-              ) as IDepartment,
+              (selectedDepartments.find((p) => p._id === departmentId) ?? {
+                _id: departmentId,
+              }) as IDepartment,
             )
           }
         />

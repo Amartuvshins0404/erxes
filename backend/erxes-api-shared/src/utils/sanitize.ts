@@ -55,8 +55,11 @@ export const sanitizeKey = (key: string): string => {
   }
 
   // Allow alphanumeric, Unicode letters/marks (for non-Latin filenames),
-  // slash, dash, underscore, space, parentheses, and dot
-  if (!/^[a-zA-Z0-9/_\-. ()\p{L}\p{M}]+$/u.test(key)) {
+  // slash, dash, underscore, space, parentheses, dot and comma.
+  // Traversal and protocol schemes are rejected above, so this list only has to
+  // exclude characters that break a storage key or a URL. A comma does neither,
+  // and excluding it made every comma-named upload permanently unreadable.
+  if (!/^[a-zA-Z0-9/_\-., ()\p{L}\p{M}]+$/u.test(key)) {
     throw new Error('Invalid key: contains disallowed characters');
   }
 

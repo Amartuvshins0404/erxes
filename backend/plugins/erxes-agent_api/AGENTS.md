@@ -6,7 +6,7 @@
 - **Project:** `erxes-agent_api`
 - **Layer:** Backend API
 - **Path:** `backend/plugins/erxes-agent_api`
-- **Last synchronized:** `2026-08-21`
+- **Last synchronized:** `2026-08-25`
 
 ## Scope
 
@@ -99,6 +99,12 @@
 ## Recent Changes
 
 <!-- Newest first. Keep at most 10 entries. -->
+
+### `2026-08-25` — Runtime index DDL removed from provider saves
+
+- **Summary:** `saveProvider` no longer runs `syncIndexes()` per save: the WeakMap-deduped `ensureProviderIndexes` helper is deleted, and tenant uniqueness relies solely on the declared `{provider: 1, ownerId: 1}` unique schema index that Mongoose autoIndex builds once per model — eliminating the "Connection operation buffering timed out after 10000ms" 500s on `mastraProviderSave` when a SAAS pod's base connection is still connecting.
+- **Affected areas:** `src/modules/provider/db/models/Provider.ts`, `src/modules/provider/__tests__/buildProviderUpdate.test.ts` (hot-path no-DDL test + uniqueness-declaration contract).
+- **Contracts changed:** None
 
 ### `2026-08-21` — Native tool input guard (pre-transport validation)
 

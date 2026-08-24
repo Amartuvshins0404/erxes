@@ -1,7 +1,7 @@
 {
-  "name": "command_ui",
+  "name": "cf_os_ui",
   "$schema": "../../../node_modules/nx/schemas/project-schema.json",
-  "sourceRoot": "frontend/plugins/command_ui/src",
+  "sourceRoot": "frontend/plugins/cf_os_ui/src",
   "projectType": "application",
   "tags": [],
   "targets": {
@@ -11,10 +11,10 @@
       "defaultConfiguration": "production",
       "options": {
         "target": "web",
-        "outputPath": "dist/frontend/plugins/command_ui",
-        "main": "frontend/plugins/command_ui/src/main.ts",
-        "tsConfig": "frontend/plugins/command_ui/tsconfig.app.json",
-        "rspackConfig": "frontend/plugins/command_ui/rspack.config.ts",
+        "outputPath": "dist/frontend/plugins/cf_os_ui",
+        "main": "frontend/plugins/cf_os_ui/src/main.ts",
+        "tsConfig": "frontend/plugins/cf_os_ui/tsconfig.app.json",
+        "rspackConfig": "frontend/plugins/cf_os_ui/rspack.config.ts",
         "assets": []
       },
       "configurations": {
@@ -25,20 +25,20 @@
           "mode": "production",
           "optimization": true,
           "sourceMap": false,
-          "rspackConfig": "frontend/plugins/command_ui/rspack.config.prod.ts"
+          "rspackConfig": "frontend/plugins/cf_os_ui/rspack.config.prod.ts"
         }
       }
     },
     "serve": {
       "executor": "@nx/rspack:module-federation-dev-server",
       "options": {
-        "buildTarget": "command_ui:build:development",
+        "buildTarget": "cf_os_ui:build:development",
         "port": 3010
       },
       "configurations": {
         "development": {},
         "production": {
-          "buildTarget": "command_ui:build:production"
+          "buildTarget": "cf_os_ui:build:production"
         }
       }
     },
@@ -46,14 +46,14 @@
       "executor": "@nx/rspack:module-federation-static-server",
       "defaultConfiguration": "production",
       "options": {
-        "serveTarget": "command_ui:serve"
+        "serveTarget": "cf_os_ui:serve"
       },
       "configurations": {
         "development": {
-          "serveTarget": "command_ui:serve:development"
+          "serveTarget": "cf_os_ui:serve:development"
         },
         "production": {
-          "serveTarget": "command_ui:serve:production"
+          "serveTarget": "cf_os_ui:serve:production"
         }
       }
     }

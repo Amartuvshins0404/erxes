@@ -8,10 +8,10 @@
     "paths": {
       "erxes-ui": ["frontend/libs/erxes-ui/src"],
       "erxes-ui/*": ["frontend/libs/erxes-ui/src/*"],
-      "@/*": ["frontend/plugins/command_ui/src/modules/*"],
-      "@": ["frontend/plugins/command_ui/src/modules"],
-      "~/*": ["frontend/plugins/command_ui/src/*"],
-      "~": ["frontend/plugins/command_ui/src"],
+      "@/*": ["frontend/plugins/cf_os_ui/src/modules/*"],
+      "@": ["frontend/plugins/cf_os_ui/src/modules"],
+      "~/*": ["frontend/plugins/cf_os_ui/src/*"],
+      "~": ["frontend/plugins/cf_os_ui/src"],
       "ui-modules": ["frontend/libs/ui-modules/src"]
     }
   },

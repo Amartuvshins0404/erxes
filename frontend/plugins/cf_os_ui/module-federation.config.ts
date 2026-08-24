@@ -12,10 +12,10 @@ const coreLibraries = new Set([
 ]);
 
 const config: ModuleFederationConfig = {
-  name: 'command_ui',
+  name: 'cf_os_ui',
   exposes: {
     './config': './src/config.tsx',
-    './command': './src/modules/CommandMain.tsx',
+    './cf_os': './src/modules/CfOsMain.tsx',
   },
   shared: (libraryName, defaultConfig) =>
     coreLibraries.has(libraryName) ? defaultConfig : false,

@@ -1,9 +1,9 @@
-# `cf_os_ui` Plugin Guide
+# `cf-os_ui` Plugin Guide
 
 ## Identity
 
 - **Plugin:** `cf-os`
-- **Project:** `cf_os_ui`
+- **Project:** `cf-os_ui`
 - **Layer:** `Frontend UI`
 - **Path:** `frontend/plugins/cf_os_ui`
 - **Last synchronized:** `2026-08-20`
@@ -26,7 +26,7 @@
 
 - Adds a `command` item to the Erxes plugin navigation.
 - Renders `https://os-erxes.darjs.dev/` inside the Erxes content area.
-- Builds as the `cf_os_ui` Module Federation remote.
+- Builds as the `cf-os_ui` Module Federation remote.
 
 ## Architecture
 
@@ -51,8 +51,9 @@
 
 ## Local Invariants
 
-- The remote name is `cf_os_ui`; the MF container name must use underscores.
-  `CONFIG.name` is `cf_os` for the same reason, with `permissionName: 'cf-os'`.
+- The Nx project and MF remote name are `cf-os_ui` (mirrors `erxes-agent_ui`);
+  the runtime normalizes the container to `cf_os_ui`. `CONFIG.name` is `cf_os`,
+  with `permissionName: 'cf-os'`.
 - The plugin route is `/cf-os`; the visible sidebar label is `Command`
   (from `navigationGroup.name = 'command'`).
 - Enable the plugin with `cf-os` in `ENABLED_PLUGINS`; core-api maps it to the
@@ -76,7 +77,7 @@
 
 ## Validation
 
-- `pnpm nx build cf_os_ui`
+- `pnpm nx build cf-os_ui`
 - Confirm the deployed app loads at `https://os-erxes.darjs.dev/`.
 - In Erxes, confirm the `command` navigation item opens the embedded app while the Erxes header and global sidebar remain visible.
 
@@ -84,9 +85,9 @@
 
 <!-- Newest first. Keep at most 10 entries. -->
 
-### `2026-08-20` — Rename remote to `cf_os_ui`, keep `command` label
+### `2026-08-20` — Rename remote to `cf-os_ui`, keep `command` label
 
-- **Summary:** Renamed the plugin project/remote to `cf_os_ui` with the `/cf-os`
+- **Summary:** Renamed the plugin project/remote to `cf-os_ui` with the `/cf-os`
   route; the sidebar label stays `command`.
 - **Affected areas:** Project config, Module Federation exposes,
   `src/config.tsx`, `src/modules/CfOsMain.tsx`.

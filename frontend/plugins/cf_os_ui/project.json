@@ -1,5 +1,5 @@
 {
-  "name": "cf_os_ui",
+  "name": "cf-os_ui",
   "$schema": "../../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "frontend/plugins/cf_os_ui/src",
   "projectType": "application",
@@ -32,13 +32,13 @@
     "serve": {
       "executor": "@nx/rspack:module-federation-dev-server",
       "options": {
-        "buildTarget": "cf_os_ui:build:development",
+        "buildTarget": "cf-os_ui:build:development",
         "port": 3010
       },
       "configurations": {
         "development": {},
         "production": {
-          "buildTarget": "cf_os_ui:build:production"
+          "buildTarget": "cf-os_ui:build:production"
         }
       }
     },
@@ -46,14 +46,14 @@
       "executor": "@nx/rspack:module-federation-static-server",
       "defaultConfiguration": "production",
       "options": {
-        "serveTarget": "cf_os_ui:serve"
+        "serveTarget": "cf-os_ui:serve"
       },
       "configurations": {
         "development": {
-          "serveTarget": "cf_os_ui:serve:development"
+          "serveTarget": "cf-os_ui:serve:development"
         },
         "production": {
-          "serveTarget": "cf_os_ui:serve:production"
+          "serveTarget": "cf-os_ui:serve:production"
         }
       }
     }

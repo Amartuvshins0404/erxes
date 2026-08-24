@@ -12,7 +12,7 @@ const coreLibraries = new Set([
 ]);
 
 const config: ModuleFederationConfig = {
-  name: 'cf_os_ui',
+  name: 'cf-os_ui',
   exposes: {
     './config': './src/config.tsx',
     './cf_os': './src/modules/CfOsMain.tsx',

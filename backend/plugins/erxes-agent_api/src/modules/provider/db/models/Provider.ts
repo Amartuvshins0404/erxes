@@ -24,30 +24,6 @@ export interface IMastraProviderModel extends Model<IMastraProviderDocument> {
   removeProvider(_id: string): Promise<{ deletedCount?: number }>;
 }
 
-const providerIndexSyncs = new WeakMap<IMastraProviderModel, Promise<void>>();
-
-export const ensureProviderIndexes = (
-  model: IMastraProviderModel,
-): Promise<void> => {
-  const existing = providerIndexSyncs.get(model);
-  if (existing) return existing;
-
-  const synchronization = model
-    .syncIndexes()
-    .then(() => undefined)
-    .catch((error: unknown) => {
-      providerIndexSyncs.delete(model);
-      throw error;
-    });
-  providerIndexSyncs.set(model, synchronization);
-  return synchronization;
-};
-
-// Build the persisted update from an incoming save doc. Both `apiKey` and the
-// custom `headers` (whose values can carry auth secrets) are WRITE-ONLY: a
-// blank/empty value is dropped so the existing stored secret is kept (the masked
-// UI submits an empty key/header map when the admin doesn't re-type them). A
-// non-empty value sets/replaces it. Mirrors the voice BYOK blank-token handling.
 export const buildProviderUpdate = (doc: IMastraProvider): IMastraProvider => {
   const { apiKey, headers, ...rest } = doc;
   const update: IMastraProvider = { ...rest };
@@ -106,8 +82,6 @@ export const loadProviderClass = (_models: IModels) => {
       doc: IMastraProvider,
       owner: ProviderOwner,
     ) {
-      await ensureProviderIndexes(_models.MastraProvider);
-
       const selector = {
         provider: doc.provider,
         ...ownerFilter(owner),

@@ -2,39 +2,66 @@
 // dropped from the update so the stored secret is preserved (the masked UI
 // submits an empty key when the admin doesn't re-type it), while a real key
 // replaces it.
+//
+// Also pins the index contract: saveProvider must run ZERO runtime DDL
+// (syncIndexes in the hot path is what made mastraProviderSave hang 10s on a
+// buffering connection); the tenant-scoped uniqueness lives solely as a schema
+// declaration that Mongoose auto-indexes once per model.
 import {
   buildProviderUpdate,
-  ensureProviderIndexes,
-  type IMastraProviderModel,
+  loadProviderClass,
+  type ProviderOwner,
 } from '@/provider/db/models/Provider';
+import { providerSchema } from '@/provider/db/definitions/provider';
+import type { IMastraProvider } from '@/provider/@types/provider';
+import type { IModels } from '~/connectionResolvers';
 
-describe('ensureProviderIndexes', () => {
-  it('reconciles current schema indexes once per tenant model', async () => {
-    const syncIndexes = jest.fn().mockResolvedValue(['provider_1']);
-    const model = { syncIndexes } as unknown as IMastraProviderModel;
+const makeFakeModel = () => {
+  const syncIndexes = jest.fn();
+  const model = {
+    syncIndexes,
+    findOne: jest.fn().mockResolvedValue(null),
+    updateMany: jest.fn().mockResolvedValue({ modifiedCount: 0 }),
+    create: jest.fn().mockResolvedValue({}),
+  };
+  return { syncIndexes, model };
+};
 
-    await Promise.all([
-      ensureProviderIndexes(model),
-      ensureProviderIndexes(model),
-    ]);
-    await ensureProviderIndexes(model);
+describe('saveProvider hot path', () => {
+  it('persists a provider without running any index synchronization', async () => {
+    const { syncIndexes, model } = makeFakeModel();
+    loadProviderClass({
+      MastraProvider: model,
+    } as unknown as IModels);
 
-    expect(syncIndexes).toHaveBeenCalledTimes(1);
-  });
+    const owner: ProviderOwner = { scope: 'organization', ownerId: null };
+    const doc: IMastraProvider = { provider: 'openai', label: 'OpenAI' };
 
-  it('retries after an index synchronization failure', async () => {
-    const syncIndexes = jest
-      .fn()
-      .mockRejectedValueOnce(new Error('index unavailable'))
-      .mockResolvedValue([]);
-    const model = { syncIndexes } as unknown as IMastraProviderModel;
+    const saveProvider = providerSchema.statics.saveProvider as unknown as (
+      doc: IMastraProvider,
+      owner: ProviderOwner,
+    ) => Promise<unknown>;
 
-    await expect(ensureProviderIndexes(model)).rejects.toThrow(
-      'index unavailable',
+    await saveProvider(doc, owner);
+
+    expect(syncIndexes).not.toHaveBeenCalled();
+    expect(model.create).toHaveBeenCalledTimes(1);
+    expect(model.create).toHaveBeenCalledWith(
+      expect.objectContaining({ provider: 'openai' }),
     );
-    await expect(ensureProviderIndexes(model)).resolves.toBeUndefined();
+  });
+});
 
-    expect(syncIndexes).toHaveBeenCalledTimes(2);
+describe('provider uniqueness contract', () => {
+  it('declares the tenant-scoped unique compound index for auto-indexing', () => {
+    const declared = providerSchema
+      .indexes()
+      .some(
+        ([keys, options]) =>
+          keys.provider === 1 && keys.ownerId === 1 && options?.unique === true,
+      );
+
+    expect(declared).toBe(true);
   });
 });
 

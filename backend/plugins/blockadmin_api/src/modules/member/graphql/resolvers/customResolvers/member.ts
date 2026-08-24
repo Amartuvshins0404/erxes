@@ -1,7 +1,9 @@
-import { normalizeAttachments } from '@/agency/utils';
 import { IBlockAdminAgentDocument } from '@/member/@types/member';
+import { toAgentCertificatePhotos, toAgentUser } from '@/member/utils';
 
 export const BlockAdminAgent = {
-  certificatePhotos: ({ certificatePhotos }: IBlockAdminAgentDocument) =>
-    normalizeAttachments(certificatePhotos),
+  certificatePhotos: (agent: IBlockAdminAgentDocument) =>
+    toAgentCertificatePhotos(agent),
+
+  user: (agent: IBlockAdminAgentDocument) => toAgentUser(agent),
 };

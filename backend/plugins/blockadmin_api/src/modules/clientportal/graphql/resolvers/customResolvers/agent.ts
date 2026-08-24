@@ -1,11 +1,16 @@
-import { normalizeAttachments } from '@/agency/utils';
 import { IBlockAdminAgentDocument } from '@/member/@types/member';
-import { findAgentAgency } from '@/member/utils';
+import {
+  findAgentAgency,
+  toAgentCertificatePhotos,
+  toAgentUser,
+} from '@/member/utils';
 import { IContext } from '~/connectionResolvers';
 
 export default {
-  certificatePhotos: ({ certificatePhotos }: IBlockAdminAgentDocument) =>
-    normalizeAttachments(certificatePhotos),
+  certificatePhotos: (agent: IBlockAdminAgentDocument) =>
+    toAgentCertificatePhotos(agent),
+
+  user: (agent: IBlockAdminAgentDocument) => toAgentUser(agent),
 
   agency: (
     { subdomain, agencyId }: IBlockAdminAgentDocument,

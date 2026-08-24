@@ -1,8 +1,11 @@
 import { IBlockAgencyDocument } from '@/agency/@types/agency';
+import { IAttachmentValue, normalizeAttachments } from '@/agency/utils';
 import {
   AgentQueryParams,
   IBlockAdminAgentDocument,
+  IBlockAdminAgentUser,
 } from '@/member/@types/member';
+import { isDev } from 'erxes-api-shared/utils';
 import { FilterQuery } from 'mongoose';
 import { IModels } from '~/connectionResolvers';
 
@@ -71,6 +74,42 @@ export const findAgentAgency = async (
     (agencyId ? await models.Agency.findOne({ subdomain }).lean() : null)
   );
 };
+
+const { BLOCKAGENCY_API_URL = '' } = process.env;
+
+export const toAgencyFileUrl = (
+  value: string | null | undefined,
+  subdomain: string,
+): string | null | undefined => {
+  if (!value || /^(https?:\/\/|\/)/.test(value)) {
+    return value;
+  }
+
+  const domain = isDev
+    ? 'http://localhost:4000'
+    : BLOCKAGENCY_API_URL.replace('<subdomain>', subdomain);
+
+  if (!domain) {
+    return value;
+  }
+
+  return `${domain}/read-file?key=${encodeURIComponent(value)}`;
+};
+
+export const toAgentUser = ({
+  subdomain,
+  user,
+}: IBlockAdminAgentDocument): IBlockAdminAgentUser | null =>
+  user ? { ...user, avatar: toAgencyFileUrl(user.avatar, subdomain) } : null;
+
+export const toAgentCertificatePhotos = ({
+  subdomain,
+  certificatePhotos,
+}: IBlockAdminAgentDocument): IAttachmentValue[] =>
+  normalizeAttachments(certificatePhotos).map((photo) => ({
+    ...photo,
+    url: toAgencyFileUrl(photo.url, subdomain) || photo.url,
+  }));
 
 export const generateFilter = (
   params: AgentQueryParams,

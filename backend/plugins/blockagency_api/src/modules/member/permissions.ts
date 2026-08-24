@@ -121,15 +121,9 @@ export const permissions: IPermissionConfig = {
     },
     {
       id: 'blockagency:agency',
-      name: 'Blockagency Agency',
-      description: 'Standard agency with limited access',
+      name: 'Blockagency Agent',
+      description: 'Agency member with access to members only',
       permissions: [
-        {
-          plugin: 'blockagency',
-          module: 'agency',
-          actions: ['agencyRead', 'agencyCreate', 'agencyUpdate'],
-          scope: 'own',
-        },
         {
           plugin: 'blockagency',
           module: 'member',

@@ -25,3 +25,20 @@ export const UPDATE_MEMBER_PROFILE = gql`
     }
   }
 `;
+
+
+export const UPDATE_MEMBER_USER_PROFILE = gql`
+  mutation BlockAgentUpdateMemberUserProfile(
+    $username: String!
+    $email: String!
+    $details: UserDetails
+  ) {
+    usersEditProfile(username: $username, email: $email, details: $details) {
+      _id
+      details {
+        avatar
+        fullName
+      }
+    }
+  }
+`;

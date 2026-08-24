@@ -1,19 +1,32 @@
+import {
+  checkLogin,
+  checkPermissionGroup,
+} from 'erxes-api-shared/core-modules';
 import { IContext } from '~/connectionResolvers';
 import { ensureTenantAgency } from '~/modules/agency/utils';
 
 export const blockAgencyQueries = {
-  // `ensureTenantAgency` keeps the read lean, so legacy string attachments stay
-  // readable and are normalized by the BlockAgency custom resolvers.
-  getAgencyInfo: async (_root: undefined, _args: unknown, { models, subdomain }: IContext) =>
-    ensureTenantAgency(models, subdomain),
+  getAgencyInfo: async (
+    _root: undefined,
+    _args: unknown,
+    { models, user, subdomain }: IContext,
+  ) => {
+    checkLogin(user);
+    const checkPermission = checkPermissionGroup(subdomain, user);
+    await checkPermission('agencyRead');
+
+    return ensureTenantAgency(models, subdomain);
+  },
 
   getAgencyVerificationStatus: async (
     _root: undefined,
     _args: unknown,
-    { models }: IContext,
+    { models, user, subdomain }: IContext,
   ) => {
-    const agencyVerificationStatus = await models.BlockAgency.findOne({});
+    checkLogin(user);
+    const checkPermission = checkPermissionGroup(subdomain, user);
+    await checkPermission('agencyRead');
 
-    return agencyVerificationStatus;
+    return models.BlockAgency.findOne({});
   },
 };

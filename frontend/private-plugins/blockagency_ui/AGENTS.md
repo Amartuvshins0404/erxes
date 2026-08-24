@@ -6,7 +6,7 @@
 - **Project:** `blockagency_ui`
 - **Layer:** `Frontend UI`
 - **Path:** `frontend/private-plugins/blockagency_ui`
-- **Last synchronized:** `2026-08-21`
+- **Last synchronized:** `2026-08-24`
 
 ## Scope
 
@@ -48,9 +48,14 @@
 - Unit index with status filters, KPI counts, status mutation, and member
   assignment.
 - Member index with profile view and create/update/remove mutations. The
+  profile picture there writes to the signed-in user's core record, so it is the
+  same avatar the members list and the app shell render. The
   profile form manages certificate photos in a three column certificate grid
   that uploads images and pdfs and previews each one.
 - Dashboard index with listing stats.
+- Sidebar entries are permission-aware: `agency profile` and `dashboard` need
+  the `agency` module, `profile` is shown only to users *without* it (an agent,
+  not a Blockagency Admin), and `listing`/`units` are ungated.
 - `./blockagencySettings` and `./widgets` are still generated placeholders and
   render static text; they are not wired to real behavior yet.
 
@@ -94,6 +99,10 @@
   `BlockAgencyUpdateUnitStatus`, `BlockAgencyAssignUnitToMember`,
   `BlockAgentCreateMember`, `BlockAgentUpdateMember`,
   `BlockAgentUpdateMemberProfile`, `BlockAgentRemoveMember`.
+- Core's own team-member GraphQL for the agent's profile picture:
+  `BlockAgentGetMemberUserDetail` (core `userDetail`) and
+  `BlockAgentUpdateMemberUserProfile` (core `usersEditProfile`), which every
+  signed-in user may call for their own record.
 - `frontline_ui/selectErxesMessenger` — an **optional** runtime remote. It is
   deliberately absent from `module-federation.config.ts` `remotes` so this
   plugin still builds and runs when `frontline` is not enabled.
@@ -137,6 +146,23 @@
 - Every expose in `module-federation.config.ts` must point at a file with a
   default export, because `useRemoteComponent` and the core-ui plugin loader
   read `default`.
+- `BlockagencyNavigation` decides who sees each entry, and the two rules there
+  are not symmetric. `agency profile`/`dashboard` use `Can module="agency"`,
+  which passes on *any* action in that module. `profile` is the signed-in
+  agent's own record, so it renders only when
+  `hasModulePermission('agency', 'blockagency')` is false — a Blockagency Admin
+  (and the tenant owner, who holds every permission) manages people through the
+  agency profile's members tab instead. Do not replace that negated check with a
+  `Can`, which cannot express "must not hold".
+- An agent's avatar lives on the core user, not on the agency member document —
+  members lists resolve it through core's `userDetail`, so writing it anywhere
+  else would never show up there. `useUpdateMemberAvatar` therefore saves it
+  with core's `usersEditProfile`, which **replaces `details` wholesale and
+  rebuilds `fullName` from `firstName`/`lastName`**. Read the current `details`
+  first and resend every field, and keep the `preserveFullName` guard: a profile
+  that only filled `fullName` would otherwise come back blank after saving a
+  picture. The mutation selects `details { avatar fullName }` back so Apollo
+  updates the cached `User` the members list already reads.
 - GraphQL operation names stay prefixed so they remain unique repo-wide.
 - Member management controls (role select, delete, add) render only for agency
   admins, resolved by `useIsAgencyAdmin` (`src/modules/member/hooks/`) as
@@ -217,12 +243,44 @@
   Repeat with `frontline` removed from `ENABLED_PLUGINS` and confirm the field
   reports that the plugin is unavailable instead of hanging on a skeleton.
 
+- Smoke: sign in as a user holding only the `Blockagency Agent` default group
+  and confirm the sidebar shows `profile`, `listing`, `units`; sign in as a
+  `Blockagency Admin` and confirm it shows `agency profile`, `dashboard`,
+  `listing`, `units` — and no `profile`.
+
+- Smoke: on `blockagency/profile` upload a picture, then open the agency
+  profile's members tab and confirm the row's avatar changed without a reload,
+  and that the member's name is still intact.
+
 `project.json` defines no `test` target, so `pnpm nx test blockagency_ui` does
 not apply.
 
 ## Recent Changes
 
 <!-- Newest first. Keep at most 10 entries. -->
+
+### `2026-08-24` — Agent profile picture actually saves
+
+- **Summary:** The avatar upload on `blockagency/profile` had an empty
+  `onChange`, so a picked image was uploaded and then dropped — nothing reached
+  the core user, which is why the members list never changed. It now saves
+  through core's `usersEditProfile` (whole `details` read back and resent,
+  `fullName` preserved), reports success/failure, refreshes the app shell's
+  avatar, and gained explicit upload/remove buttons.
+- **Affected areas:** `src/modules/member/components/MemberProfile.tsx`,
+  `src/modules/member/hooks/useUpdateMemberAvatar.ts` (new),
+  `src/modules/member/graphql/{queries,mutations}.ts`,
+  `src/modules/member/types/member.ts`
+- **Contracts changed:** None owned here; consumes core's `userDetail` query and
+  `usersEditProfile` mutation.
+
+### `2026-08-24` — `Profile` sidebar entry hidden from Blockagency Admins
+
+- **Summary:** The `profile` navigation entry shows the signed-in agent's own
+  record, so it now renders only for users without the `blockagency` `agency`
+  module; admins reach people through the agency profile's members tab.
+- **Affected areas:** `src/modules/BlockagencyNavigation.tsx`
+- **Contracts changed:** None.
 
 ### `2026-08-21` — Favorite toggles carry a breadcrumb
 
@@ -324,33 +382,3 @@ not apply.
   the new `BlockAgencyInfoFields` fragment instead of only `_id`, and
   `GetAgencyInfo` selects the same fragment; `useUpdateAgency` writes the
   result into the cache instead of refetching `GetAgencyInfo`.
-
-### `2026-08-20` — Agency logo, cover image, and documents are attachments
-
-- **Summary:** The identity and documents forms now read and write
-  `Attachment` objects instead of url strings, `UploadImage` emits the uploaded
-  file's info, mutation input is stripped of `__typename`, and each uploaded
-  document opens a dialog preview (image/video/audio/pdf inline, download
-  fallback for everything else).
-- **Affected areas:** `src/modules/agency/schema/form.ts`,
-  `src/modules/agency/types/form.ts`,
-  `src/modules/agency/utils/attachment.ts`,
-  `src/modules/agency/form/upload.tsx`,
-  `src/modules/agency/form/MultipleDocumentUpload.tsx`,
-  `src/modules/agency/components/AgencyProfileIdentity.tsx`,
-  `src/modules/agency/components/AgencyProfileDocuments.tsx`,
-  `src/modules/agency/graphql/queries.ts`
-- **Contracts changed:** `GetAgencyInfo` selects attachment subfields for
-  `logo`, `coverImage`, and `documents`; `UpdateAgencyInfo` sends
-  `AttachmentInput` values for those fields.
-
-### `2026-08-11` — Fix cross-plugin loading of the erxes messenger picker
-
-- **Summary:** `useRemoteComponent` now resolves the federation instance that
-  owns the requested remote before loading, so
-  `frontline_ui/selectErxesMessenger` loads from the agency profile instead of
-  failing with "Unable to locate … in blockagency_ui", and the integrations
-  field renders an unavailable state instead of a permanent skeleton.
-- **Affected areas:** `src/modules/agency/hooks/useRemoteComponent.ts`,
-  `src/modules/agency/components/AgencyProfileIntegrations.tsx`
-- **Contracts changed:** `None`

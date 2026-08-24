@@ -6,7 +6,7 @@
 - **Project:** `blockagency_api`
 - **Layer:** `Backend API`
 - **Path:** `backend/plugins/blockagency_api`
-- **Last synchronized:** `2026-08-21`
+- **Last synchronized:** `2026-08-24`
 
 ## Scope
 
@@ -36,7 +36,8 @@
   tenant's erxes owners as its `admin` members, so an agency is never left
   without one.
 - `updateAgencyInfo` patches any subset of profile fields and is mirrored to
-  block-admin by `wrapMutationResolver`.
+  block-admin by `wrapMutationResolver`. It requires the `agencyUpdate`
+  permission, as the two agency reads require `agencyRead`.
 - Attachment fields (`logo`, `coverImage`, `documents`) are stored as
   `Attachment` subdocuments and normalized on read, so records written before
   the migration — which held plain url strings — still resolve.
@@ -164,6 +165,33 @@
   so `src/modules/member/utils.ts` denormalizes `{_id, firstName, lastName,
   avatar, email}` into every mirrored member payload. Keep that shape in sync
   with `blockadmin_api`'s `BlockAdminAgentUser`.
+- The `blockagency:agency` default group is named `Blockagency Agent` and holds
+  `member` permissions only. Its `id` must stay `blockagency:agency`: a user is
+  linked to a default group by id (`user.permissionGroupIds`), and the id is
+  resolved live against this config, so renaming it would leave every already
+  assigned user matching nothing and silently holding no permissions. The
+  agency profile and agency dashboard nav entries are gated by
+  `Can module="agency"` in `blockagency_ui`, which passes on *any* action in the
+  `agency` module, so granting that group even `agencyRead` puts both pages back
+  in its sidebar. Agency-module actions belong to `blockagency:admin`.
+- Default groups are not stored per tenant: `currentUserPermissions` and
+  `canGroup` read them live out of this plugin's config by id (`plugin:group`),
+  so editing `src/modules/member/permissions.ts` changes what every user already
+  assigned to that group can do as soon as the plugin restarts — no migration,
+  and no way to keep an old grant for existing users.
+- Every `agency` module resolver enforces its declared permission:
+  `getAgencyInfo` and `getAgencyVerificationStatus` require `agencyRead`,
+  `updateAgencyInfo` requires `agencyUpdate`, each after `checkLogin`. Without
+  that, hiding a page from a permission group would only remove the sidebar
+  entry while the query still answered anyone. `getAgencyInfo` also creates the
+  agency and seeds owners, so the permission gate sits in front of a write —
+  internal callers must keep using `ensureTenantAgency` directly, never the
+  resolver.
+- `listing` and `unit` resolvers call `checkLogin` only: the plugin declares no
+  permission module for either, so there is no action to check yet. Anything
+  finer-grained there needs new actions in `src/modules/member/permissions.ts`
+  plus a decision about which default groups receive them — do not invent one
+  silently.
 - Inbound webhook routes stay behind `validationMiddleware`.
 - tRPC procedures stay unannotated unless the procedure is deliberately made
   agent-callable with a permission this plugin registers.
@@ -175,6 +203,13 @@
 - Smoke: open the agency profile in `blockagency_ui`, upload a logo and a
   document, reload, and confirm both render and that `getAgencyInfo` returns no
   `Attachment.url` errors for an agency created before the migration.
+- Smoke: assign a non-owner team member only the `Blockagency Agency` group and
+  confirm the sidebar shows `profile`/`listing`/`units` but neither `agency
+  profile` nor `dashboard`, while a `Blockagency Admin` user still sees both.
+- Smoke: as that same `Blockagency Agency` user, call `getAgencyInfo` and
+  `updateAgencyInfo` directly against the gateway and confirm both fail with
+  `Permission required` (`FORBIDDEN`), and that an anonymous call to
+  `blockGetListings` fails with `Login required`.
 
 `project.json` defines no `test` target, so `pnpm nx test blockagency_api` does
 not apply.
@@ -182,6 +217,36 @@ not apply.
 ## Recent Changes
 
 <!-- Newest first. Keep at most 10 entries. -->
+
+### `2026-08-24` — Agency permissions enforced, listing/unit require login
+
+- **Summary:** `getAgencyInfo`/`getAgencyVerificationStatus` now check
+  `agencyRead` and `updateAgencyInfo` checks `agencyUpdate` (all behind
+  `checkLogin`), so the declared agency permissions are actually enforced
+  instead of being advisory; every `listing` and `unit` resolver gained
+  `checkLogin`, which were previously reachable without any session.
+- **Affected areas:** `src/modules/agency/graphql/resolvers/{queries,mutations}/agency.ts`,
+  `src/modules/listing/graphql/resolvers/{queries,mutations}/listing.ts`,
+  `src/modules/unit/graphql/resolvers/{queries,mutations}/unit.ts`
+- **Contracts changed:** None in shape. `getAgencyInfo`,
+  `getAgencyVerificationStatus`, and `updateAgencyInfo` now return `FORBIDDEN`
+  for users without the matching agency action — including the
+  `blockagency:agency` group — and every listing/unit operation returns
+  `Login required` for anonymous callers.
+
+### `2026-08-24` — `Blockagency Agent` group no longer sees the agency profile
+
+- **Summary:** Removed the `agency` module block from the `blockagency:agency`
+  default group, so users in it keep member access only; the agency profile and
+  agency dashboard sidebar entries (both gated by `Can module="agency"`)
+  disappear for them and stay with `blockagency:admin`. Renamed it to
+  `Blockagency Agent` to match what it now grants, keeping the `id` unchanged so
+  existing assignments survive.
+- **Affected areas:** `src/modules/member/permissions.ts`
+- **Contracts changed:** `blockagency:agency` no longer grants `agencyRead`,
+  `agencyCreate`, or `agencyUpdate`, and its display name is now
+  `Blockagency Agent`. Default groups resolve live from this config, so the
+  change applies to everyone already in that group on restart.
 
 ### `2026-08-21` — Member `certificatePhotos` are attachments
 

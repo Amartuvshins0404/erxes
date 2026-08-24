@@ -1,3 +1,7 @@
+import {
+  checkLogin,
+  checkPermissionGroup,
+} from 'erxes-api-shared/core-modules';
 import { IContext } from '~/connectionResolvers';
 import { IBlockAgency } from '~/modules/agency/@types/agency';
 import { ensureTenantAgency } from '~/modules/agency/utils';
@@ -6,8 +10,12 @@ export const blockAgencyMutations = {
   updateAgencyInfo: async (
     _root: undefined,
     { input }: { input: IBlockAgency },
-    { models, subdomain }: IContext,
+    { models, user, subdomain }: IContext,
   ) => {
+    checkLogin(user);
+    const checkPermission = checkPermissionGroup(subdomain, user);
+    await checkPermission('agencyUpdate');
+
     // Creating the agency here also seeds the tenant's owners as its admins,
     // so every creation path goes through `ensureTenantAgency`.
     const agency = await ensureTenantAgency(models, subdomain);

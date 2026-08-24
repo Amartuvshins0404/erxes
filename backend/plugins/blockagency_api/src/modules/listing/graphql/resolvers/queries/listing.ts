@@ -1,3 +1,4 @@
+import { checkLogin } from 'erxes-api-shared/core-modules';
 import { ICursorPaginateParams } from 'erxes-api-shared/core-types';
 import { cursorPaginate } from 'erxes-api-shared/utils';
 import { IContext } from '~/connectionResolvers';
@@ -11,16 +12,20 @@ export const blockListingQueries = {
   blockGetListing: async (
     _root: undefined,
     { _id }: { _id: string },
-    { models }: IContext,
+    { models, user }: IContext,
   ) => {
+    checkLogin(user);
+
     return models.BlockListing.getListing(_id);
   },
 
   blockGetListings: async (
     _root: undefined,
     params: ListingQueryParams & ICursorPaginateParams,
-    { models }: IContext,
+    { models, user }: IContext,
   ) => {
+    checkLogin(user);
+
     const filter = await generateFilter(params);
 
     const { list, pageInfo, totalCount } =
@@ -36,8 +41,10 @@ export const blockListingQueries = {
   blockGetListingStats: async (
     _root: undefined,
     _args: unknown,
-    { models }: IContext,
+    { models, user }: IContext,
   ) => {
+    checkLogin(user);
+
     const [total, active, draft, viewsAgg] = await Promise.all([
       models.BlockListing.countDocuments({}),
       models.BlockListing.countDocuments({ status: 'active' }),

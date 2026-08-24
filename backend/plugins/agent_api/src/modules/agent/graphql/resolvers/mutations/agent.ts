@@ -18,6 +18,7 @@ import {
   destroyServer,
   fixAndRestartServer,
   getGatewayToken,
+  probeManagedRuntimeHealth,
   setKimiApiKey,
   updateAgentFile,
   updateDiscordSettings,
@@ -334,8 +335,32 @@ export const agentMutations = {
     },
     { models, subdomain, user }: IContext,
   ) => {
+    await ensureLegacyIdentifierLinks(models);
+    const identifier = await assertIdentifierManageAccess(
+      models,
+      identifierId,
+      user,
+    );
+
+    if (identifier.kind && identifier.kind !== 'assistant') {
+      throw new Error(
+        'This identifier belongs to AI Agents and cannot deploy OpenClaw.',
+      );
+    }
+
+    const agentServer = await models.AgentServer.findOne({
+      identifierId,
+    });
+
+    // A retry that omits provider/credentialMode must reuse what the assistant
+    // already runs. Resolving from input alone silently rewrote the record to
+    // the kimi/api_key defaults whenever a caller left the fields blank.
+    const requestedProvider = input?.provider?.trim() || undefined;
+    const storedProvider = agentServer?.provider?.trim() || undefined;
+    const provider = requestedProvider ?? storedProvider;
+
     const credentialMode = resolveManagedLlmCredentialMode(
-      input?.credentialMode,
+      input?.credentialMode ?? agentServer?.credentialMode,
     );
     const apiKey = input?.apiKey?.trim() || input?.kimiApiKey?.trim();
 
@@ -347,9 +372,16 @@ export const agentMutations = {
       throw new Error('apiKey is too long');
     }
 
+    // The stored model is only meaningful while the provider is unchanged.
+    const model =
+      input?.model?.trim() ||
+      (provider === storedProvider
+        ? agentServer?.providerModel?.trim() || undefined
+        : undefined);
+
     const connection = resolveManagedLlmConnection(
-      input?.provider,
-      input?.model,
+      provider,
+      model,
       credentialMode,
     );
 
@@ -375,23 +407,6 @@ export const agentMutations = {
       description: input?.description,
       systemPrompt: input?.systemPrompt,
     };
-
-    await ensureLegacyIdentifierLinks(models);
-    const identifier = await assertIdentifierManageAccess(
-      models,
-      identifierId,
-      user,
-    );
-
-    if (identifier.kind && identifier.kind !== 'assistant') {
-      throw new Error(
-        'This identifier belongs to AI Agents and cannot deploy OpenClaw.',
-      );
-    }
-
-    const agentServer = await models.AgentServer.findOne({
-      identifierId,
-    });
 
     if (agentServer) {
       if (
@@ -492,6 +507,9 @@ export const agentMutations = {
         agentId?: string;
         serverId?: string;
         sourceSubdomain?: string;
+        provider?: string;
+        model?: string;
+        credentialMode?: string;
       };
     },
     { models, user }: IContext,
@@ -528,14 +546,59 @@ export const agentMutations = {
       throw new Error('This identifier already has an assistant server');
     }
 
+    // The pasted provider/model/credentialMode travel with the transfer bundle
+    // so the linked record keeps its real LLM connection instead of defaulting
+    // to kimi/api_key in the connection dialog later. Validate through the
+    // same resolvers the deploy path uses.
+    const credentialMode = input?.credentialMode?.trim()
+      ? resolveManagedLlmCredentialMode(input.credentialMode)
+      : undefined;
+    const connection = input?.provider?.trim()
+      ? resolveManagedLlmConnection(
+          input.provider,
+          input?.model,
+          credentialMode ?? 'api_key',
+        )
+      : undefined;
+
+    const url =
+      input?.serverUrl?.trim() || `https://${serverName}.assistant.erxes.io`;
+
+    // The record is created as approved, so a typo'd server name or URL used
+    // to produce a permanently broken "approved" assistant. Refuse to link a
+    // runtime that does not answer its health endpoint.
+    if (!(await probeManagedRuntimeHealth(url))) {
+      throw new Error(
+        `Could not reach the assistant runtime at ${url}. Check the server name and URL from the transfer dialog, then try again.`,
+      );
+    }
+
+    // When the deployer knows this server, the pasted token must match its
+    // live gateway token — otherwise the chat UI cannot authenticate. A failed
+    // lookup is tolerated (the runtime itself was just verified reachable).
+    let liveGatewayToken: string | undefined;
+    try {
+      liveGatewayToken = await getGatewayToken(serverName);
+    } catch {
+      liveGatewayToken = undefined;
+    }
+
+    if (liveGatewayToken && liveGatewayToken !== gatewayToken) {
+      throw new Error(
+        'The gateway token does not match this server. Re-open the transfer dialog on the source SaaS and copy the current token.',
+      );
+    }
+
     return models.AgentServer.create({
       identifierId,
       agentId: input?.agentId?.trim() || identifier.slug,
       name: serverName,
-      url:
-        input?.serverUrl?.trim() || `https://${serverName}.assistant.erxes.io`,
+      url,
       token: gatewayToken,
       serverId: input?.serverId?.trim() || '',
+      provider: connection?.provider,
+      providerModel: connection?.model,
+      credentialMode,
       status: SERVER_STATUSES.APPROVED,
       transferredFromSubdomain: input?.sourceSubdomain?.trim() || undefined,
       transferredAt: new Date(),
@@ -558,12 +621,18 @@ export const agentMutations = {
 
     const gatewayToken = agent.token || (await getGatewayToken(agent.name));
 
-    if (!agent.token && gatewayToken) {
-      await models.AgentServer.updateOne(
-        { _id: agent._id },
-        { $set: { token: gatewayToken } },
-      );
-    }
+    // Issuing transfer credentials means another SaaS is about to point at this
+    // same server. Mark the record so destroyAgent won't tear the server down
+    // when the source-side entry is later cleaned up.
+    await models.AgentServer.updateOne(
+      { _id: agent._id },
+      {
+        $set: {
+          transferCredentialsIssuedAt: new Date(),
+          ...(!agent.token && gatewayToken ? { token: gatewayToken } : {}),
+        },
+      },
+    );
 
     return {
       kind: 'assistant',
@@ -573,6 +642,9 @@ export const agentMutations = {
       gatewayToken,
       agentId: agent.agentId,
       serverId: agent.serverId,
+      provider: agent.provider,
+      model: agent.providerModel,
+      credentialMode: agent.credentialMode,
       status: agent.status,
     };
   },
@@ -622,7 +694,13 @@ export const agentMutations = {
     }
 
     try {
-      await destroyServer(agent);
+      // A record whose transfer credentials were issued may be referenced by
+      // another SaaS: deleting it must only remove the local record, never the
+      // shared server (2026-08-24: a transfer + source cleanup destroyed a
+      // customer's live assistant this way).
+      if (!agent.transferCredentialsIssuedAt) {
+        await destroyServer(agent);
+      }
 
       await models.AgentServer.deleteOne({ _id: agent._id });
 

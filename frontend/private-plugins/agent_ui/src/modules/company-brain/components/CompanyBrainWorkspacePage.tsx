@@ -80,6 +80,11 @@ const workspaceFormSchema = z.object({
   transferServerId: z.string().optional(),
   transferServerPassword: z.string().optional(),
   transferSourceSubdomain: z.string().optional(),
+  transferProvider: z.string().optional(),
+  transferModel: z.string().optional(),
+  transferCredentialMode: z
+    .union([z.enum(['api_key', 'subscription']), z.literal('')])
+    .optional(),
   description: z.string().optional(),
 });
 
@@ -358,13 +363,28 @@ const AssistantDiscordManageSheet = ({
     }
   };
 
+  // Retry must re-deploy with the assistant's own provider and credential
+  // mode; sending a bare apiToken converted subscription assistants to
+  // api_key mode (mirrors handleRetryManagedProvisioning below).
+  const retryUsesSubscription = agent?.credentialMode === 'subscription';
+  const retryNeedsCredential =
+    !retryUsesSubscription ||
+    subscriptionProviderNeedsCredential(agent?.provider);
+  const retrySubscriptionOption = getSubscriptionProviderOption(
+    agent?.provider,
+  );
+
   const handleRetryProvisioning = async () => {
-    if (!retryApiToken.trim()) {
-      const message = 'An API key is required to retry provisioning.';
+    if (retryNeedsCredential && !retryApiToken.trim()) {
+      const message = retryUsesSubscription
+        ? `${retrySubscriptionOption.credentialLabel} is required to retry provisioning.`
+        : 'An API key is required to retry provisioning.';
       setError(message);
       toast({
         variant: 'destructive',
-        title: 'API key required',
+        title: retryUsesSubscription
+          ? `${retrySubscriptionOption.credentialLabel} required`
+          : 'API key required',
         description: message,
       });
       return;
@@ -373,9 +393,19 @@ const AssistantDiscordManageSheet = ({
     try {
       setError('');
       await deployManagedAgent({
-        apiToken: retryApiToken,
         provider: agent?.provider || 'kimi',
-        model: agent?.model || getManagedAssistantModel(agent?.provider),
+        model:
+          agent?.model ||
+          (retryUsesSubscription
+            ? getSubscriptionAssistantModel(agent?.provider)
+            : getManagedAssistantModel(agent?.provider)),
+        credentialMode: retryUsesSubscription ? 'subscription' : 'api_key',
+        apiToken: retryUsesSubscription ? undefined : retryApiToken,
+        subscriptionToken:
+          retryUsesSubscription &&
+          subscriptionProviderNeedsCredential(agent?.provider)
+            ? retryApiToken
+            : undefined,
       });
       setRetryApiToken('');
       await refetchAgent();
@@ -590,18 +620,28 @@ const AssistantDiscordManageSheet = ({
           {runtimeFailed && (
             <div className="space-y-2 rounded-lg border border-border bg-muted/20 p-3">
               <div className="text-sm font-medium">Retry provisioning</div>
-              <Input
-                value={retryApiToken}
-                onChange={(event) => setRetryApiToken(event.target.value)}
-                placeholder="Paste the provider API key"
-                type="password"
-                autoComplete="off"
-                disabled={retryingProvisioning}
-              />
+              {retryNeedsCredential && (
+                <Input
+                  value={retryApiToken}
+                  onChange={(event) => setRetryApiToken(event.target.value)}
+                  placeholder={
+                    retryUsesSubscription
+                      ? retrySubscriptionOption.credentialPlaceholder ||
+                        `Paste the ${retrySubscriptionOption.credentialLabel}`
+                      : 'Paste the provider API key'
+                  }
+                  type="password"
+                  autoComplete="off"
+                  disabled={retryingProvisioning}
+                />
+              )}
               <Button
                 type="button"
                 variant="outline"
-                disabled={retryingProvisioning || !retryApiToken.trim()}
+                disabled={
+                  retryingProvisioning ||
+                  (retryNeedsCredential && !retryApiToken.trim())
+                }
                 onClick={handleRetryProvisioning}
                 className="gap-2"
               >
@@ -1010,6 +1050,9 @@ export const CompanyBrainWorkspacePage = ({
       transferServerId: '',
       transferServerPassword: '',
       transferSourceSubdomain: '',
+      transferProvider: '',
+      transferModel: '',
+      transferCredentialMode: '',
       description: '',
     },
   });
@@ -1099,6 +1142,9 @@ export const CompanyBrainWorkspacePage = ({
       transferServerId: '',
       transferServerPassword: '',
       transferSourceSubdomain: '',
+      transferProvider: '',
+      transferModel: '',
+      transferCredentialMode: '',
       description: '',
     });
     setAssistantCreationSheetStep('details');
@@ -1805,6 +1851,9 @@ export const CompanyBrainWorkspacePage = ({
             serverId: values.transferServerId?.trim() || undefined,
             sourceSubdomain:
               values.transferSourceSubdomain?.trim() || undefined,
+            provider: values.transferProvider?.trim() || undefined,
+            model: values.transferModel?.trim() || undefined,
+            credentialMode: values.transferCredentialMode || undefined,
           });
         } else {
           await transferOpencode({
@@ -2523,6 +2572,122 @@ export const CompanyBrainWorkspacePage = ({
                             </Form.Item>
                           )}
                         />
+                        {mode === 'assistant' && (
+                          <>
+                            <Form.Field
+                              name="transferCredentialMode"
+                              render={({ field }) => (
+                                <Form.Item>
+                                  <Form.Label>
+                                    Credential mode (optional)
+                                  </Form.Label>
+                                  <Select
+                                    value={field.value || ''}
+                                    onValueChange={(nextMode) => {
+                                      field.onChange(nextMode);
+                                      // The provider list depends on the mode,
+                                      // so a stale selection must not survive.
+                                      form.setValue('transferProvider', '', {
+                                        shouldDirty: true,
+                                      });
+                                      form.setValue('transferModel', '', {
+                                        shouldDirty: true,
+                                      });
+                                    }}
+                                  >
+                                    <Form.Control>
+                                      <Select.Trigger>
+                                        <Select.Value placeholder="Match the source assistant" />
+                                      </Select.Trigger>
+                                    </Form.Control>
+                                    <Select.Content>
+                                      <Select.Item value="api_key">
+                                        API key
+                                      </Select.Item>
+                                      <Select.Item value="subscription">
+                                        Provider subscription
+                                      </Select.Item>
+                                    </Select.Content>
+                                  </Select>
+                                  <Form.Message />
+                                </Form.Item>
+                              )}
+                            />
+                            <Form.Field
+                              name="transferProvider"
+                              render={({ field }) => {
+                                const transferUsesSubscription =
+                                  form.watch('transferCredentialMode') ===
+                                  'subscription';
+                                const transferProviderOptions =
+                                  transferUsesSubscription
+                                    ? ASSISTANT_SUBSCRIPTION_PROVIDER_OPTIONS
+                                    : ASSISTANT_PROVIDER_OPTIONS;
+
+                                return (
+                                  <Form.Item>
+                                    <Form.Label>
+                                      LLM provider (optional)
+                                    </Form.Label>
+                                    <Select
+                                      value={field.value || ''}
+                                      onValueChange={(nextProvider) => {
+                                        field.onChange(nextProvider);
+                                        form.setValue(
+                                          'transferModel',
+                                          transferUsesSubscription
+                                            ? getSubscriptionAssistantModel(
+                                                nextProvider,
+                                              )
+                                            : getManagedAssistantModel(
+                                                nextProvider,
+                                              ),
+                                          { shouldDirty: true },
+                                        );
+                                      }}
+                                    >
+                                      <Form.Control>
+                                        <Select.Trigger>
+                                          <Select.Value placeholder="Match the source assistant" />
+                                        </Select.Trigger>
+                                      </Form.Control>
+                                      <Select.Content>
+                                        {transferProviderOptions.map(
+                                          (option) => (
+                                            <Select.Item
+                                              key={option.value}
+                                              value={option.value}
+                                            >
+                                              {option.label}
+                                            </Select.Item>
+                                          ),
+                                        )}
+                                      </Select.Content>
+                                    </Select>
+                                    <Form.Message />
+                                  </Form.Item>
+                                );
+                              }}
+                            />
+                            <Form.Field
+                              name="transferModel"
+                              render={({ field }) => (
+                                <Form.Item>
+                                  <Form.Label>Model (optional)</Form.Label>
+                                  <Form.Control>
+                                    <Input
+                                      {...field}
+                                      value={field.value || ''}
+                                      placeholder="Auto-filled from the provider"
+                                      autoComplete="off"
+                                    />
+                                  </Form.Control>
+                                  <Form.Message />
+                                </Form.Item>
+                              )}
+                            />
+                          </>
+                        )}
                       </>
                     )}
 

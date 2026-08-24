@@ -1,6 +1,7 @@
 import { AgentDeployScreen } from '../deploy/components/AgentDeployScreen';
 import { AgentTransferCredentialsDialog } from '../deploy/components/AgentTransferCredentialsDialog';
 import { useAgent } from './hooks/useAgent';
+import { useAgentRuntimeHealth } from './hooks/useAgentRuntimeHealth';
 import { useFixAndRestart } from '../detail/hooks/useFixAndRestart';
 import { Button, Card, Spinner } from 'erxes-ui';
 import {
@@ -18,7 +19,7 @@ import { LlmConnectionDialog } from '../detail/components/LlmConnectionDialog';
 import { DestroyServerDialog } from '../deploy/components/DestroyServerDialog';
 import { useAgentDestroy } from '../deploy/hooks/useAgentDestroy';
 import { isManagedAssistantAgent } from '../deploy/utils/isManagedAssistantAgent';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { SERVER_STATUSES } from '../deploy/constants';
 import { useCurrentIdentifierId } from '../assistant-orgs/hooks/useAssistantOrg';
 import { useDeleteIdentifier } from '../assistant-orgs/hooks/useDeleteAssistantOrg';
@@ -37,11 +38,70 @@ export const AgentMain = () => {
   const [restartOpen, setRestartOpen] = useState(false);
   const [destroyOpen, setDestroyOpen] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
-  const refreshIframe = useCallback(() => setIframeKey((k) => k + 1), []);
+  // Gates the chat iframe: only mount it once the runtime actually answers, so
+  // a recreating pod shows the connecting overlay instead of a raw 5xx.
+  const [runtimeReady, setRuntimeReady] = useState(false);
 
   const runtimeUrl = agent?.url?.trim().replace(/\/+$/, '');
   const isApproved =
     !!agent && agent.status === SERVER_STATUSES.APPROVED && !!runtimeUrl;
+  // Only managed OpenClaw pods expose the health probe and get recreated behind
+  // a stable URL; legacy self-hosted agents keep their original ungated iframe.
+  const managed = isManagedAssistantAgent(agent);
+  const healthGated = isApproved && managed;
+
+  const {
+    healthy: runtimeHealthy,
+    refetch: refetchRuntimeHealth,
+    startPolling: startHealthPolling,
+    stopPolling: stopHealthPolling,
+  } = useAgentRuntimeHealth(identifierId, { skip: !healthGated });
+
+  const refreshIframe = useCallback(() => {
+    // Force the connecting overlay back up until the fresh pod reports healthy.
+    setRuntimeReady(false);
+    setIframeKey((k) => k + 1);
+  }, []);
+
+  // Mirror the probe into a sticky ready flag that drives the overlay/iframe.
+  useEffect(() => {
+    if (!isApproved) {
+      setRuntimeReady(false);
+      return;
+    }
+
+    // Legacy agents are not health-probed; show their runtime as before.
+    if (!healthGated) {
+      setRuntimeReady(true);
+      return;
+    }
+
+    if (runtimeHealthy === true) {
+      setRuntimeReady(true);
+    } else if (runtimeHealthy === false) {
+      setRuntimeReady(false);
+    }
+  }, [isApproved, healthGated, runtimeHealthy]);
+
+  // Probe often while waiting for the pod, then back off once it is serving.
+  useEffect(() => {
+    if (!healthGated) {
+      return;
+    }
+
+    if (!runtimeReady) {
+      refetchRuntimeHealth().catch(() => undefined);
+    }
+
+    startHealthPolling(runtimeReady ? 15000 : 3000);
+    return () => stopHealthPolling();
+  }, [
+    healthGated,
+    runtimeReady,
+    refetchRuntimeHealth,
+    startHealthPolling,
+    stopHealthPolling,
+  ]);
   // The connection dialog only opens when the user asks for it (key button).
   // It used to force itself open whenever the provider probe failed, but that
   // probe returns false for a quota-exhausted or rate-limited key as well as a
@@ -83,6 +143,13 @@ export const AgentMain = () => {
   return (
     <div className="relative h-full flex flex-col">
       <RestartingOverlay visible={restarting} />
+      <RestartingOverlay
+        visible={!restarting && !runtimeReady}
+        immediate
+        loadingTitle="Connecting…"
+        loadingDescription="Reaching your assistant runtime"
+        footerText="Your assistant is starting up. This can take a moment — you'll be connected automatically."
+      />
       <div className="flex items-center justify-start px-4 py-2 border-b">
         <div className="flex items-center gap-2">
           <Button
@@ -145,13 +212,17 @@ export const AgentMain = () => {
           </Button>
         </div>
       </div>
-      <iframe
-        key={iframeKey}
-        src={`${runtimeUrl}/#token=${agent.token}`}
-        title="Agent"
-        className="w-full flex-1 border-0 transition-opacity duration-200 opacity-100"
-        allow="clipboard-read; clipboard-write; microphone"
-      />
+      {runtimeReady ? (
+        <iframe
+          key={iframeKey}
+          src={`${runtimeUrl}/#token=${agent.token}`}
+          title="Agent"
+          className="w-full flex-1 border-0 transition-opacity duration-200 opacity-100"
+          allow="clipboard-read; clipboard-write; microphone"
+        />
+      ) : (
+        <div className="w-full flex-1" />
+      )}
       <RestartServerDialog
         open={restartOpen}
         onOpenChange={setRestartOpen}

@@ -38,3 +38,11 @@ export const AGENT_LLM_SUBSCRIPTION_AUTH_STATUS = gql`
     }
   }
 `;
+
+export const AGENT_RUNTIME_HEALTH = gql`
+  query AgentRuntimeHealth($identifierId: String!) {
+    agentRuntimeHealth(identifierId: $identifierId) {
+      healthy
+    }
+  }
+`;

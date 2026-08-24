@@ -59,6 +59,7 @@ const AgentManagedRetry = () => {
           ? { subscriptionToken: credential }
           : { apiToken: credential }),
       });
+      setCredential('');
       await refetch();
       toast({
         variant: 'success',
@@ -117,6 +118,7 @@ const AgentManagedRetry = () => {
                   `Paste your ${credentialLabel}`
                 : `Paste your ${credentialLabel}`
             }
+            type="password"
             autoComplete="off"
             disabled={loading}
           />

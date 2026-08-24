@@ -192,6 +192,26 @@ export const verifyManagedRuntime = async (runtimeUrl: string) => {
   }
 };
 
+// Cheap, non-throwing liveness check for polling from the UI: a single
+// authenticated GET to the runtime health endpoint. Any error (pod still
+// booting, network drop, timeout) resolves to false so the caller can keep the
+// "reconnecting" overlay up instead of surfacing a raw 5xx in the chat iframe.
+export const probeManagedRuntimeHealth = async (
+  runtimeUrl: string,
+): Promise<boolean> => {
+  try {
+    const baseUrl = normalizeRuntimeUrl(runtimeUrl);
+    const response = await managedRuntimeRequest(
+      `${baseUrl}/api/erxes-ai-assistant/health`,
+      { headers: { 'x-erxes-ai-assistant-secret': getRuntimeSharedSecret() } },
+    );
+
+    return response.ok;
+  } catch {
+    return false;
+  }
+};
+
 export const deployManagedServer = async (
   payload: ManagedDeployPayload,
 ): Promise<ManagedDeployResponse> => {

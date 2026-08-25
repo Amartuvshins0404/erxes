@@ -48,7 +48,8 @@
 | Area | Path | Responsibility |
 | ---- | ---- | -------------- |
 | Chat surface | `src/modules/main/AgentMain.tsx` | toolbar, health-gated runtime iframe, dialogs |
-| Runtime health | `src/modules/main/hooks/useAgentRuntimeHealth.tsx` | polls `agentRuntimeHealth` (network-only) |
+| Runtime health | `src/modules/main/hooks/useAgentRuntimeHealth.tsx` | polls `agentRuntimeHealth` (network-only), exposes `probeFailed` |
+| Ready decision | `src/modules/main/runtimeReady.ts` | pure gate logic (`getRuntimeReadyUpdate`), fails open on probe error; tested in `runtimeReady.spec.ts` |
 | Provisioning UI | `src/modules/deploy/` | deploy form, progress, retry, transfer dialog |
 | Company Brain | `src/modules/company-brain/` | creation wizard, Discord manage sheets, provider catalog (`llmProviders.ts`) |
 | Connection dialog | `src/modules/detail/components/LlmConnectionDialog.tsx` | provider/API-key/subscription switching |
@@ -83,8 +84,11 @@
   record — never hardcode kimi/api_key.
 - The chat iframe for a managed assistant must stay unmounted until
   `agentRuntimeHealth` reports healthy; `refreshIframe` must reset the gate.
-- Credential inputs are `type="password"` and cleared after successful
-  submission.
+- Credential inputs use the plugin's `SecretInput`
+  (`src/modules/components/SecretInput.tsx`): password-masked with a reveal
+  toggle that auto-hides after 10s, cleared after successful submission.
+  There is no shared erxes-ui reveal component — core-ui composes its own the
+  same way.
 - Loading/overlay visuals use `erxes-ui` `Spinner` — no hand-rolled
   spinners.
 
@@ -92,6 +96,7 @@
 
 - `pnpm nx lint agent_ui`
 - `pnpm nx build agent_ui`
+- `pnpm nx test agent_ui`
 - Smoke: with a failed subscription assistant, the retry card shows the
   provider's credential label (or no input for device-code providers); after
   a key change the chat area shows "Connecting…" until the runtime answers,

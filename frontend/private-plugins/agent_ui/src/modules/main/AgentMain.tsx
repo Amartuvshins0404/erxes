@@ -24,6 +24,7 @@ import { SERVER_STATUSES } from '../deploy/constants';
 import { useCurrentIdentifierId } from '../assistant-orgs/hooks/useAssistantOrg';
 import { useDeleteIdentifier } from '../assistant-orgs/hooks/useDeleteAssistantOrg';
 import { useNavigate } from 'react-router-dom';
+import { getRuntimeReadyUpdate } from './runtimeReady';
 
 export const AgentMain = () => {
   const navigate = useNavigate();
@@ -52,6 +53,7 @@ export const AgentMain = () => {
 
   const {
     healthy: runtimeHealthy,
+    probeFailed,
     refetch: refetchRuntimeHealth,
     startPolling: startHealthPolling,
     stopPolling: stopHealthPolling,
@@ -65,23 +67,17 @@ export const AgentMain = () => {
 
   // Mirror the probe into a sticky ready flag that drives the overlay/iframe.
   useEffect(() => {
-    if (!isApproved) {
-      setRuntimeReady(false);
-      return;
-    }
+    const next = getRuntimeReadyUpdate({
+      isApproved,
+      healthGated,
+      runtimeHealthy,
+      probeFailed,
+    });
 
-    // Legacy agents are not health-probed; show their runtime as before.
-    if (!healthGated) {
-      setRuntimeReady(true);
-      return;
+    if (next !== undefined) {
+      setRuntimeReady(next);
     }
-
-    if (runtimeHealthy === true) {
-      setRuntimeReady(true);
-    } else if (runtimeHealthy === false) {
-      setRuntimeReady(false);
-    }
-  }, [isApproved, healthGated, runtimeHealthy]);
+  }, [isApproved, healthGated, runtimeHealthy, probeFailed]);
 
   // Probe often while waiting for the pod, then back off once it is serving.
   useEffect(() => {

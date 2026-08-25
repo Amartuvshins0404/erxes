@@ -17,6 +17,7 @@ import {
   type ComponentType,
 } from 'react';
 import { Control, FieldPath, FieldValues, useWatch } from 'react-hook-form';
+import { SecretInput } from '~/modules/components/SecretInput';
 import { AGENT_MANAGED_LLM_MODELS } from '../graphql/llm';
 
 export interface LlmProviderOption {
@@ -411,11 +412,10 @@ export const LlmProviderApiKeyFields = <TFormValues extends FieldValues>({
               </Form.Label>
               <Form.Control>
                 <div className="relative">
-                  <IconKey className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
+                  <IconKey className="pointer-events-none absolute left-3 top-1/2 z-10 size-4 -translate-y-1/2 text-muted-foreground" />
+                  <SecretInput
                     {...field}
                     value={String(field.value || '')}
-                    type="password"
                     placeholder={apiKeyPlaceholder}
                     className="pl-9"
                     autoComplete="off"

@@ -92,6 +92,11 @@
 
 ## Local Invariants
 
+- Pasted credentials (apiKey, kimiApiKey, subscriptionToken) are normalized
+  through `normalizeCredential` (trims and strips wrapping quotes) before
+  validation or forwarding.
+- Error details extracted from deployer/runtime responses must pass through
+  `sanitizeProvisioningError` before reaching a user-facing message.
 - Retry/redeploy must never change a stored provider/credentialMode unless
   the caller explicitly sends new values.
 - `destroyAgent` must not call the deployer's destroy for a record whose

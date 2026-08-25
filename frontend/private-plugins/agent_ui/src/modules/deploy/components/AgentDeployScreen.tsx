@@ -1,5 +1,6 @@
 import { IconRefresh, IconSparkles } from '@tabler/icons-react';
-import { Button, Input, Sheet, Skeleton, useToast } from 'erxes-ui';
+import { Button, Sheet, Skeleton, useToast } from 'erxes-ui';
+import { SecretInput } from '~/modules/components/SecretInput';
 import { useEffect, useState } from 'react';
 import {
   ASSISTANT_PROVIDER_OPTIONS,
@@ -108,7 +109,7 @@ const AgentManagedRetry = () => {
           >
             {credentialLabel}
           </label>
-          <Input
+          <SecretInput
             id="managed-provider-credential"
             value={credential}
             onChange={(event) => setCredential(event.target.value)}
@@ -118,7 +119,6 @@ const AgentManagedRetry = () => {
                   `Paste your ${credentialLabel}`
                 : `Paste your ${credentialLabel}`
             }
-            type="password"
             autoComplete="off"
             disabled={loading}
           />

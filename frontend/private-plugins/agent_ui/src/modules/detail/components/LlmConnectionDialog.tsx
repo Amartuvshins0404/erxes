@@ -11,13 +11,13 @@ import {
   AlertDialog,
   Button,
   Form,
-  Input,
   Select,
   useToast,
 } from 'erxes-ui';
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
+import { SecretInput } from '~/modules/components/SecretInput';
 import { LlmProviderApiKeyFields } from '~/modules/company-brain/components/LlmProviderApiKeyFields';
 import { SubscriptionProviderGuide } from '~/modules/company-brain/components/SubscriptionProviderGuide';
 import {
@@ -487,9 +487,8 @@ export const LlmConnectionDialog = ({
                               {subscriptionOption.credentialLabel}
                             </Form.Label>
                             <Form.Control>
-                              <Input
+                              <SecretInput
                                 {...field}
-                                type="password"
                                 autoComplete="off"
                                 placeholder={
                                   subscriptionOption.credentialPlaceholder

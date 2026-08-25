@@ -1,4 +1,5 @@
 import { Button, cn, Input, Label, ToggleGroup, useToast } from 'erxes-ui';
+import { SecretInput } from '~/modules/components/SecretInput';
 import { IconSettings } from '@tabler/icons-react';
 import { useState } from 'react';
 import { useQuery } from '@apollo/client';
@@ -124,9 +125,8 @@ export const SettingsContent = ({
                 >
                   Change Discord Bot Token
                 </Label>
-                <Input
+                <SecretInput
                   id="botToken"
-                  type="password"
                   placeholder="Enter bot token"
                   value={botToken}
                   onChange={(e) => setBotToken(e.target.value)}

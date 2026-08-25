@@ -68,6 +68,14 @@ const sanitizeProvisioningError = (message: string) =>
     .replace(/[A-Fa-f0-9]{32,}/g, '[redacted]')
     .slice(0, 500);
 
+// Users paste credentials wrapped in quotes from .env files and docs; strip
+// the wrapping so the runtime receives the bare secret.
+const normalizeCredential = (value?: string) =>
+  value
+    ?.trim()
+    .replace(/^["']+|["']+$/g, '')
+    .trim() || undefined;
+
 const provisioningUpdate = (stage: string, error?: string) => {
   const now = new Date();
 
@@ -362,7 +370,9 @@ export const agentMutations = {
     const credentialMode = resolveManagedLlmCredentialMode(
       input?.credentialMode ?? agentServer?.credentialMode,
     );
-    const apiKey = input?.apiKey?.trim() || input?.kimiApiKey?.trim();
+    const apiKey =
+      normalizeCredential(input?.apiKey) ||
+      normalizeCredential(input?.kimiApiKey);
 
     if (credentialMode === 'api_key' && !apiKey) {
       throw new Error('apiKey is required for API-key connections');
@@ -385,7 +395,7 @@ export const agentMutations = {
       credentialMode,
     );
 
-    const subscriptionToken = input?.subscriptionToken?.trim();
+    const subscriptionToken = normalizeCredential(input?.subscriptionToken);
     if (
       credentialMode === 'subscription' &&
       managedLlmSubscriptionNeedsToken(connection.provider) &&
@@ -1047,10 +1057,7 @@ export const agentMutations = {
     const credentialMode = resolveManagedLlmCredentialMode(
       input?.credentialMode,
     );
-    const apiKey = input?.apiKey
-      ?.trim()
-      .replace(/^["']+|["']+$/g, '')
-      .trim();
+    const apiKey = normalizeCredential(input?.apiKey);
 
     if (credentialMode === 'api_key' && !apiKey) {
       throw new Error('apiKey is required for API-key connections');
@@ -1065,7 +1072,7 @@ export const agentMutations = {
       input?.model,
       credentialMode,
     );
-    const subscriptionToken = input?.subscriptionToken?.trim();
+    const subscriptionToken = normalizeCredential(input?.subscriptionToken);
 
     if (
       credentialMode === 'subscription' &&
@@ -1121,14 +1128,15 @@ export const agentMutations = {
 
       try {
         await setKimiApiKey(server.name, apiKey || '');
-      } catch (err: any) {
-        // Surface the deployer's reason (e.g. wrong key format) instead of a generic toast.
-        const detail = String(err?.message || '').match(
-          /"error"\s*:\s*"([^"]+)"/,
-        )?.[1];
+      } catch (err) {
+        // Surface the deployer's reason (e.g. wrong key format) instead of a
+        // generic toast, but never echo secrets from the error body back.
+        const message = err instanceof Error ? err.message : String(err);
+        const detail = message.match(/"error"\s*:\s*"([^"]+)"/)?.[1];
         throw new Error(
-          detail ||
-            'Could not apply the Kimi connection. Verify the API key and try again.',
+          detail
+            ? sanitizeProvisioningError(detail)
+            : 'Could not apply the Kimi connection. Verify the API key and try again.',
         );
       }
 

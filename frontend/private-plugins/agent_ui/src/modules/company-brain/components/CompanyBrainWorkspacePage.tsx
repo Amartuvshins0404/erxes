@@ -59,6 +59,7 @@ import {
   subscriptionProviderNeedsCredential,
   subscriptionProviderUsesDeviceCode,
 } from '~/modules/company-brain/llmProviders';
+import { SecretInput } from '~/modules/components/SecretInput';
 import { SubscriptionProviderGuide } from './SubscriptionProviderGuide';
 import { useManagedDiscordSetup } from '../hooks/useManagedDiscordSetup';
 
@@ -621,7 +622,7 @@ const AssistantDiscordManageSheet = ({
             <div className="space-y-2 rounded-lg border border-border bg-muted/20 p-3">
               <div className="text-sm font-medium">Retry provisioning</div>
               {retryNeedsCredential && (
-                <Input
+                <SecretInput
                   value={retryApiToken}
                   onChange={(event) => setRetryApiToken(event.target.value)}
                   placeholder={
@@ -630,7 +631,6 @@ const AssistantDiscordManageSheet = ({
                         `Paste the ${retrySubscriptionOption.credentialLabel}`
                       : 'Paste the provider API key'
                   }
-                  type="password"
                   autoComplete="off"
                   disabled={retryingProvisioning}
                 />
@@ -1550,7 +1550,7 @@ export const CompanyBrainWorkspacePage = ({
               <p className="text-xs text-muted-foreground">
                 Reuses this assistant and the existing managed server name.
               </p>
-              <Input
+              <SecretInput
                 value={managedRetryApiToken}
                 onChange={(event) =>
                   setManagedRetryApiToken(event.target.value)
@@ -1561,7 +1561,6 @@ export const CompanyBrainWorkspacePage = ({
                           .credentialPlaceholder
                       : 'Paste the provider API key'
                   }
-                type="password"
                 autoComplete="off"
                 disabled={deployingManagedAssistant}
               />
@@ -1647,7 +1646,7 @@ export const CompanyBrainWorkspacePage = ({
                   <p className="text-xs text-muted-foreground">
                     Reuses this assistant and the existing managed server name.
                   </p>
-                  <Input
+                  <SecretInput
                     value={managedRetryApiToken}
                     onChange={(event) =>
                       setManagedRetryApiToken(event.target.value)
@@ -1659,7 +1658,6 @@ export const CompanyBrainWorkspacePage = ({
                             ).credentialPlaceholder
                           : 'Paste the provider API key'
                       }
-                    type="password"
                     autoComplete="off"
                     disabled={deployingManagedAssistant}
                   />
@@ -2338,9 +2336,8 @@ export const CompanyBrainWorkspacePage = ({
                                     {subscriptionOption.credentialLabel}
                                   </Form.Label>
                                   <Form.Control>
-                                    <Input
+                                    <SecretInput
                                       {...field}
-                                      type="password"
                                       autoComplete="off"
                                       placeholder={
                                         subscriptionOption.credentialPlaceholder

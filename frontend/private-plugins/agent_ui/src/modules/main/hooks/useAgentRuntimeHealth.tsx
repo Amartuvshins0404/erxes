@@ -16,7 +16,7 @@ export const useAgentRuntimeHealth = (
   identifierId?: string,
   options?: UseAgentRuntimeHealthOptions,
 ) => {
-  const { data, loading, refetch, startPolling, stopPolling } =
+  const { data, error, loading, refetch, startPolling, stopPolling } =
     useQuery<AgentRuntimeHealthResult>(AGENT_RUNTIME_HEALTH, {
       variables: { identifierId },
       skip: options?.skip || !identifierId,
@@ -27,6 +27,8 @@ export const useAgentRuntimeHealth = (
 
   return {
     healthy: data?.agentRuntimeHealth?.healthy ?? null,
+    // Fail open: a broken/missing probe must never gate the runtime off.
+    probeFailed: Boolean(error),
     loading,
     refetch,
     startPolling,

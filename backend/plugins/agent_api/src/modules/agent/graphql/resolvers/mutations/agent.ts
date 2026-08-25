@@ -18,7 +18,7 @@ import {
   destroyServer,
   fixAndRestartServer,
   getGatewayToken,
-  probeManagedRuntimeHealth,
+  isRuntimeReachable,
   setKimiApiKey,
   updateAgentFile,
   updateDiscordSettings,
@@ -531,6 +531,15 @@ export const agentMutations = {
       throw new Error('serverName is required');
     }
 
+    // The name is interpolated into deployer URL paths and the derived
+    // runtime hostname — restrict it to the shape the deployer itself
+    // generates so pasted input cannot traverse into other routes.
+    if (!/^[a-z0-9][a-z0-9-]{0,62}$/.test(serverName)) {
+      throw new Error(
+        'serverName may only contain lowercase letters, numbers, and dashes',
+      );
+    }
+
     if (!gatewayToken) {
       throw new Error('gatewayToken is required');
     }
@@ -576,8 +585,9 @@ export const agentMutations = {
 
     // The record is created as approved, so a typo'd server name or URL used
     // to produce a permanently broken "approved" assistant. Refuse to link a
-    // runtime that does not answer its health endpoint.
-    if (!(await probeManagedRuntimeHealth(url))) {
+    // runtime that does not answer its health endpoint. The URL is pasted
+    // user input, so the check sends no credentials (isRuntimeReachable).
+    if (!(await isRuntimeReachable(url))) {
       throw new Error(
         `Could not reach the assistant runtime at ${url}. Check the server name and URL from the transfer dialog, then try again.`,
       );

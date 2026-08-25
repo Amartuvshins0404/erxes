@@ -103,7 +103,12 @@
   `transferCredentialsIssuedAt` is set — another SaaS may share the server.
 - Only annotate safe tRPC procedures with `.meta({ agent })`; deployer and
   runtime secrets must never be returned to clients.
-- `probeManagedRuntimeHealth` must stay non-throwing; the UI polls it.
+- `probeManagedRuntimeHealth` must stay non-throwing; the UI polls it. It
+  sends the runtime shared secret, so it may only be called with URLs from
+  our own records — user-typed URLs (transfer) go through
+  `isRuntimeReachable`, which sends no credentials and accepts 401 as alive.
+- Transfer `serverName` must match `^[a-z0-9][a-z0-9-]{0,62}$` before being
+  interpolated into deployer URL paths.
 
 ## Validation
 

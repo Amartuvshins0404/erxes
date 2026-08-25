@@ -192,21 +192,45 @@ export const verifyManagedRuntime = async (runtimeUrl: string) => {
   }
 };
 
+// A liveness probe never needs the full 30s request budget; a healthy
+// runtime answers in well under a second, and the UI polls this every few
+// seconds — long hangs would pile up concurrent sockets server-side.
+const PROBE_TIMEOUT_MS = 5_000;
+
 // Cheap, non-throwing liveness check for polling from the UI: a single
 // authenticated GET to the runtime health endpoint. Any error (pod still
 // booting, network drop, timeout) resolves to false so the caller can keep the
 // "reconnecting" overlay up instead of surfacing a raw 5xx in the chat iframe.
+// Only for URLs owned by our own records — it sends the shared secret.
 export const probeManagedRuntimeHealth = async (
   runtimeUrl: string,
 ): Promise<boolean> => {
   try {
     const baseUrl = normalizeRuntimeUrl(runtimeUrl);
-    const response = await managedRuntimeRequest(
-      `${baseUrl}/api/erxes-ai-assistant/health`,
-      { headers: { 'x-erxes-ai-assistant-secret': getRuntimeSharedSecret() } },
-    );
+    const response = await fetch(`${baseUrl}/api/erxes-ai-assistant/health`, {
+      headers: { 'x-erxes-ai-assistant-secret': getRuntimeSharedSecret() },
+      signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+    });
 
     return response.ok;
+  } catch {
+    return false;
+  }
+};
+
+// Reachability check for URLs a USER typed (transfer): never send any secret
+// to an address we do not control. A real runtime rejects the unauthenticated
+// request with 401 — that, or any 2xx, proves something is listening there.
+export const isRuntimeReachable = async (
+  runtimeUrl: string,
+): Promise<boolean> => {
+  try {
+    const baseUrl = normalizeRuntimeUrl(runtimeUrl);
+    const response = await fetch(`${baseUrl}/api/erxes-ai-assistant/health`, {
+      signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+    });
+
+    return response.ok || response.status === 401;
   } catch {
     return false;
   }

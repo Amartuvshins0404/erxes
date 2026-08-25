@@ -1,4 +1,5 @@
 import { getEnv } from 'erxes-api-shared/utils';
+import { deployerHeaders } from '../agent/utils';
 import { IOpencodeServerDocument } from './@types/opencode';
 
 const LOCAL_DEPLOYER_URL = 'http://localhost:4200';
@@ -101,7 +102,7 @@ export const deployOpencodeServer = async (
 
   const response = await fetch(`${deployer}/opencode/deploy`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: deployerHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(payload),
   });
 
@@ -119,7 +120,7 @@ export const destroyOpencodeServer = async (
   const deployer = getDeployerUrl();
   const response = await fetch(`${deployer}/opencode/${server.name}`, {
     method: 'DELETE',
-    headers: { 'Content-Type': 'application/json' },
+    headers: deployerHeaders({ 'Content-Type': 'application/json' }),
   });
 
   if (!response.ok) {
@@ -134,7 +135,7 @@ export const fixAndRestartOpencodeServer = async (
   const deployer = getDeployerUrl();
   const response = await fetch(`${deployer}/opencode/${serverName}/fix-restart`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: deployerHeaders({ 'Content-Type': 'application/json' }),
   });
 
   if (!response.ok) {
@@ -155,7 +156,7 @@ export const setOpencodeApiKey = async ({
   const deployer = getDeployerUrl();
   const response = await fetch(`${deployer}/opencode/${serverName}/set-api-key`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: deployerHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({ provider, apiKey }),
   });
 
@@ -169,7 +170,9 @@ export const getOpencodeServerInfo = async (
   serverName: string,
 ): Promise<ServerInfoResponse> => {
   const deployer = getDeployerUrl();
-  const response = await fetch(`${deployer}/opencode/${serverName}/status`);
+  const response = await fetch(`${deployer}/opencode/${serverName}/status`, {
+    headers: deployerHeaders(),
+  });
 
   if (!response.ok) {
     const message = await getErrorMessage(response, 'Status check failed');
@@ -183,7 +186,10 @@ export const getOpencodeGatewayToken = async (
   serverName: string,
 ): Promise<string> => {
   const deployer = getDeployerUrl();
-  const response = await fetch(`${deployer}/opencode/${serverName}/gateway-token`);
+  const response = await fetch(
+    `${deployer}/opencode/${serverName}/gateway-token`,
+    { headers: deployerHeaders() },
+  );
 
   if (!response.ok) {
     const message = await getErrorMessage(response, 'Gateway token fetch failed');
@@ -200,6 +206,7 @@ export const getOpencodeServerPassword = async (
   const deployer = getDeployerUrl();
   const response = await fetch(
     `${deployer}/opencode/${serverName}/server-password`,
+    { headers: deployerHeaders() },
   );
 
   if (!response.ok) {

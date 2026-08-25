@@ -15,6 +15,7 @@ export interface IAgentServer {
   credentialStatus?: 'pending' | 'connected' | 'failed';
   transferredFromSubdomain?: string;
   transferredAt?: Date;
+  transferCredentialsIssuedAt?: Date;
 
   status: string;
   provisioning?: {

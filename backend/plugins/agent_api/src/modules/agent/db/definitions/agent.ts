@@ -31,6 +31,10 @@ export const agentServerSchema = schemaWrapper(
         label: 'Transferred from subdomain',
       },
       transferredAt: { type: Date, label: 'Transferred at' },
+      transferCredentialsIssuedAt: {
+        type: Date,
+        label: 'Transfer credentials issued at',
+      },
 
       status: { type: String, enum: SERVER_STATUSES.ALL, label: 'Status' },
       provisioning: {

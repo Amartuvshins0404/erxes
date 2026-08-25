@@ -64,6 +64,9 @@ export const AgentTransferCredentialsDialog = ({
             <Row label="Gateway token" value={credentials?.gatewayToken} />
             <Row label="Agent ID" value={credentials?.agentId} />
             <Row label="Server ID" value={credentials?.serverId} />
+            <Row label="LLM provider" value={credentials?.provider} />
+            <Row label="Model" value={credentials?.model} />
+            <Row label="Credential mode" value={credentials?.credentialMode} />
           </div>
         )}
 

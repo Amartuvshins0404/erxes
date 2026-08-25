@@ -239,9 +239,17 @@ export const MessageInput = ({
     e.target.value = '';
   };
 
+  // A drop aimed at an open dialog (e.g. the Facebook post composer) still
+  // reaches the editor and bubbles here, attaching the file to the conversation
+  // as well. Ignore drops while any modal is open.
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
+
+    if (document.querySelector('[role="dialog"][data-state="open"]')) {
+      return;
+    }
+
     handleFileUpload(e.dataTransfer.files);
   };
 
@@ -464,9 +472,21 @@ export const MessageInput = ({
 
   if (hideInput) return null;
 
+  // The rich-text editor registers its own drop listener and inserts dropped
+  // images as blocks. Chrome does not reliably honour pointer-events: none for
+  // HTML5 drag-and-drop, so an open dialog does not stop it. Intercept in the
+  // CAPTURE phase, which runs before the editor's own handler.
+  const blockDropWhenModalOpen = (e: React.DragEvent<HTMLDivElement>) => {
+    if (document.querySelector('[role="dialog"][data-state="open"]')) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  };
+
   return (
-    <div className="p-2 h-full">
+    <div className="p-2 h-full" onDropCapture={blockDropWhenModalOpen}>
       <div
+        onDropCapture={blockDropWhenModalOpen}
         onDrop={handleDrop}
         onKeyDown={handleKeyDown}
         onDragOver={(e) => e.preventDefault()}

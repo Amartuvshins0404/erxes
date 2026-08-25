@@ -10,7 +10,9 @@ import {
   getGatewayToken,
   listAgents,
   listDiscordGuilds,
+  probeManagedRuntimeHealth,
 } from '~/modules/agent/utils';
+import { SERVER_STATUSES } from '~/modules/agent/constants';
 import { fetchManagedLlmModels } from '~/modules/agent/managedLlmProviders';
 import {
   createDiscordConnectUrl,
@@ -59,13 +61,27 @@ export const agentQueries = {
       return null;
     }
 
-    if (agent.token) {
+    // Always prefer the live token: a stored copy goes stale when the server
+    // is re-provisioned, and serving it breaks the Control UI websocket auth.
+    // Only approved agents have a server to ask — polling a pending/failed
+    // record would hit the deployer with a doomed request on every refetch.
+    if (agent.status !== SERVER_STATUSES.APPROVED) {
       return { ...agent, identifierId: agent.identifierId };
     }
 
     try {
       const token = await getGatewayToken(agent.name);
-      return { ...agent, token, identifierId: agent.identifierId };
+      if (token && token !== agent.token) {
+        await models.AgentServer.updateOne(
+          { _id: agent._id },
+          { $set: { token } },
+        );
+      }
+      return {
+        ...agent,
+        token: token || agent.token,
+        identifierId: agent.identifierId,
+      };
     } catch {
       return { ...agent, identifierId: agent.identifierId };
     }
@@ -437,5 +453,29 @@ export const agentQueries = {
     }
 
     return result;
+  },
+
+  agentRuntimeHealth: async (
+    _root: undefined,
+    { identifierId }: { identifierId: string },
+    { models, user }: IContext,
+  ) => {
+    await ensureLegacyIdentifierLinks(models);
+    await assertIdentifierAccess(models, identifierId, user);
+
+    const server = await models.AgentServer.findOne({ identifierId }).lean();
+
+    // Only an approved runtime with a URL can be reachable; anything else is
+    // reported unhealthy so the UI keeps showing the connecting/deploy state
+    // instead of pointing the chat iframe at a runtime that cannot answer.
+    if (
+      !server ||
+      server.status !== SERVER_STATUSES.APPROVED ||
+      !server.url?.trim()
+    ) {
+      return { healthy: false };
+    }
+
+    return { healthy: await probeManagedRuntimeHealth(server.url) };
   },
 };

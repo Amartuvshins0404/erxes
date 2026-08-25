@@ -97,6 +97,21 @@ const getManagedDeployerSecret = () =>
 const getOptionalManagedDeployerSecret = () =>
   getEnv({ name: 'MANAGED_OPENCLAW_DEPLOYER_SECRET' }).trim();
 
+// Every deployer route is moving behind this header. The deployer checks it in
+// shadow mode (counts, does not reject) until every caller sends it, so build
+// headers here rather than per call site -- 22 of 24 call sites were sending
+// none, and the ones that break only surface once enforcement flips.
+// Omitted when the secret is unset so dev environments behave as before.
+export const deployerHeaders = (
+  extra: Record<string, string> = {},
+): Record<string, string> => {
+  const secret = getOptionalManagedDeployerSecret();
+
+  return secret
+    ? { ...extra, 'x-erxes-managed-deployer-secret': secret }
+    : extra;
+};
+
 const getRuntimeSharedSecret = () =>
   getRequiredEnv('ERXES_AI_ASSISTANT_RUNTIME_SHARED_SECRET');
 
@@ -128,7 +143,7 @@ export const deployServer = async (
 
   const response = await fetch(DEPLOYER_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: deployerHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(body),
   });
 
@@ -174,6 +189,50 @@ export const verifyManagedRuntime = async (runtimeUrl: string) => {
   if (!authenticated.ok) {
     const message = await readDeployerError(authenticated);
     throw new Error(`Managed runtime health check failed: ${message}`);
+  }
+};
+
+// A liveness probe never needs the full 30s request budget; a healthy
+// runtime answers in well under a second, and the UI polls this every few
+// seconds — long hangs would pile up concurrent sockets server-side.
+const PROBE_TIMEOUT_MS = 5_000;
+
+// Cheap, non-throwing liveness check for polling from the UI: a single
+// authenticated GET to the runtime health endpoint. Any error (pod still
+// booting, network drop, timeout) resolves to false so the caller can keep the
+// "reconnecting" overlay up instead of surfacing a raw 5xx in the chat iframe.
+// Only for URLs owned by our own records — it sends the shared secret.
+export const probeManagedRuntimeHealth = async (
+  runtimeUrl: string,
+): Promise<boolean> => {
+  try {
+    const baseUrl = normalizeRuntimeUrl(runtimeUrl);
+    const response = await fetch(`${baseUrl}/api/erxes-ai-assistant/health`, {
+      headers: { 'x-erxes-ai-assistant-secret': getRuntimeSharedSecret() },
+      signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+    });
+
+    return response.ok;
+  } catch {
+    return false;
+  }
+};
+
+// Reachability check for URLs a USER typed (transfer): never send any secret
+// to an address we do not control. A real runtime rejects the unauthenticated
+// request with 401 — that, or any 2xx, proves something is listening there.
+export const isRuntimeReachable = async (
+  runtimeUrl: string,
+): Promise<boolean> => {
+  try {
+    const baseUrl = normalizeRuntimeUrl(runtimeUrl);
+    const response = await fetch(`${baseUrl}/api/erxes-ai-assistant/health`, {
+      signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+    });
+
+    return response.ok || response.status === 401;
+  } catch {
+    return false;
   }
 };
 
@@ -225,7 +284,7 @@ export const approveServer = async (
 
   const response = await fetch(DEPLOYER_URL, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: deployerHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(body),
   });
 
@@ -322,7 +381,9 @@ export interface AgentFile {
 export const listAgents = async (serverName: string): Promise<AgentItem[]> => {
   const DEPLOYER = getDeployerUrl();
 
-  const response = await fetch(`${DEPLOYER}/agents/${serverName}/list`);
+  const response = await fetch(`${DEPLOYER}/agents/${serverName}/list`, {
+    headers: deployerHeaders(),
+  });
 
   if (!response.ok) {
     const message = await response.text();
@@ -342,7 +403,9 @@ export const getAgentDetails = async (
   const url = new URL(`${DEPLOYER}/agents/${serverName}/get-agent-details`);
   if (agentId) url.searchParams.set('agentId', agentId);
 
-  const response = await fetch(url.toString());
+  const response = await fetch(url.toString(), {
+    headers: deployerHeaders(),
+  });
 
   if (!response.ok) {
     const message = await response.text();
@@ -360,7 +423,7 @@ export const addAgent = async (
   const DEPLOYER = getDeployerUrl();
   const response = await fetch(`${DEPLOYER}/agents/${serverName}/addagent`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: deployerHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(agent),
   });
 
@@ -378,7 +441,7 @@ export const updateDiscordSettings = async (
   const DEPLOYER = getDeployerUrl();
   const response = await fetch(`${DEPLOYER}/tools/${serverName}/discord`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: deployerHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({ botToken, dmPolicy }),
   });
 
@@ -397,7 +460,7 @@ export const addDiscordGuild = async (
     `${DEPLOYER}/tools/${serverName}/adddiscordguild`,
     {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: deployerHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ guildId }),
     },
   );
@@ -412,7 +475,10 @@ export const listDiscordGuilds = async (
   serverName: string,
 ): Promise<{ guildId: string; requireMention: boolean }[]> => {
   const DEPLOYER = getDeployerUrl();
-  const response = await fetch(`${DEPLOYER}/tools/${serverName}/discordguilds`);
+  const response = await fetch(
+    `${DEPLOYER}/tools/${serverName}/discordguilds`,
+    { headers: deployerHeaders() },
+  );
 
   if (!response.ok) {
     const message = await response.text();
@@ -433,6 +499,7 @@ export const getGatewayToken = async (serverName: string): Promise<string> => {
   const DEPLOYER = getDeployerUrl();
   const response = await fetch(
     `${DEPLOYER}/agents/${serverName}/gateway-token`,
+    { headers: deployerHeaders() },
   );
 
   if (!response.ok) {
@@ -450,7 +517,7 @@ export const fixAndRestartServer = async (
   const DEPLOYER = getDeployerUrl();
   const response = await fetch(`${DEPLOYER}/agents/${serverName}/fix-restart`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: deployerHeaders({ 'Content-Type': 'application/json' }),
   });
 
   if (!response.ok) {
@@ -463,6 +530,7 @@ export const checkKimiKeySet = async (serverName: string): Promise<boolean> => {
   const DEPLOYER = getDeployerUrl();
   const response = await fetch(
     `${DEPLOYER}/agents/${serverName}/check-kimi-key`,
+    { headers: deployerHeaders() },
   );
 
   if (!response.ok) {
@@ -483,7 +551,7 @@ export const setKimiApiKey = async (
     `${DEPLOYER}/agents/${serverName}/set-kimi-key`,
     {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: deployerHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ kimiApiKey }),
     },
   );
@@ -505,7 +573,7 @@ export const updateAgentFile = async (
     `${DEPLOYER}/agents/${serverName}/update-agent-file`,
     {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: deployerHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ filename, content, agentId }),
     },
   );

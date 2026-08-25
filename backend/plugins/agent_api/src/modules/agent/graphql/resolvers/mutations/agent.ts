@@ -1047,7 +1047,10 @@ export const agentMutations = {
     const credentialMode = resolveManagedLlmCredentialMode(
       input?.credentialMode,
     );
-    const apiKey = input?.apiKey?.trim();
+    const apiKey = input?.apiKey
+      ?.trim()
+      .replace(/^["']+|["']+$/g, '')
+      .trim();
 
     if (credentialMode === 'api_key' && !apiKey) {
       throw new Error('apiKey is required for API-key connections');
@@ -1118,9 +1121,14 @@ export const agentMutations = {
 
       try {
         await setKimiApiKey(server.name, apiKey || '');
-      } catch {
+      } catch (err: any) {
+        // Surface the deployer's reason (e.g. wrong key format) instead of a generic toast.
+        const detail = String(err?.message || '').match(
+          /"error"\s*:\s*"([^"]+)"/,
+        )?.[1];
         throw new Error(
-          'Could not apply the Kimi connection. Verify the API key and try again.',
+          detail ||
+            'Could not apply the Kimi connection. Verify the API key and try again.',
         );
       }
 

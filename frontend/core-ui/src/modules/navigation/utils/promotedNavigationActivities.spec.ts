@@ -43,4 +43,14 @@ describe('promoted navigation activities', () => {
       rest: [sales, operation],
     });
   });
+
+  it('keeps the full plugin list when neither product is loaded', () => {
+    const sales = activity('sales');
+    const operation = activity('operation');
+
+    expect(splitPromotedNavigationActivities([sales, operation])).toEqual({
+      promoted: [],
+      rest: [sales, operation],
+    });
+  });
 });

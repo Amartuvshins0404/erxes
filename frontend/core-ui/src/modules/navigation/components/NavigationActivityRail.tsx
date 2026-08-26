@@ -37,8 +37,10 @@ export const NavigationActivityRail = ({
 }>) => {
   const { isMobile, state } = Sidebar.useSidebar();
   const expanded = isMobile ? mobileExpanded : state === 'expanded';
+  const hoverEnabled = !expanded && !isMobile;
   const { promoted, rest } = splitPromotedNavigationActivities(activities);
   const visibleRest = splitPromotedNavigationActivities(visibleActivities).rest;
+  const usePromotedRail = promoted.length > 0;
 
   return (
     <aside
@@ -49,45 +51,57 @@ export const NavigationActivityRail = ({
       )}
     >
       <NavigationRailLogo expanded={expanded} />
-      <div className="mb-1 flex shrink-0 flex-col gap-1">
-        <NavigationInboxButton
-          expanded={expanded}
-          isInboxActive={isInboxActive}
-          onSelectInbox={onSelectInbox}
-        />
+      {usePromotedRail ? (
+        <div className="mb-1 flex shrink-0 flex-col gap-1">
+          <NavigationInboxButton
+            expanded={expanded}
+            isInboxActive={isInboxActive}
+            onSelectInbox={onSelectInbox}
+          />
+          <NavigationActivitySearchButton
+            expanded={expanded}
+            onSearch={onSearch}
+          />
+          {promoted.map((activity) => (
+            <NavigationActivityButton
+              key={activity.id}
+              activity={activity}
+              active={!isSettings && activity.id === activeActivityId}
+              expanded={expanded}
+              onSelect={() => onSelectActivity(activity)}
+            />
+          ))}
+        </div>
+      ) : (
         <NavigationActivitySearchButton
           expanded={expanded}
           onSearch={onSearch}
         />
-        {promoted.map((activity) => (
-          <NavigationActivityButton
-            key={activity.id}
-            activity={activity}
-            active={!isSettings && activity.id === activeActivityId}
-            expanded={expanded}
-            onSelect={() => onSelectActivity(activity)}
-          />
-        ))}
-      </div>
+      )}
       <div
         className={cn(
           'flex min-h-0 flex-1 flex-col items-stretch gap-1 overflow-x-hidden overflow-y-auto',
           !expanded && 'hide-scroll',
         )}
       >
-        <NavigationFavoritesSection expanded={expanded} />
+        <NavigationFavoritesSection
+          expanded={expanded}
+          isInboxActive={isInboxActive}
+          onSelectInbox={onSelectInbox}
+          showInbox={!usePromotedRail}
+        />
         <NavigationActivityGroups
           activeActivityId={activeActivityId}
-          activities={visibleRest}
+          activities={usePromotedRail ? visibleRest : visibleActivities}
           expanded={expanded}
-          hoverEnabled={!expanded && !isMobile}
+          hoverEnabled={hoverEnabled}
           isActivityPinned={isActivityPinned}
           isSettings={isSettings}
           onActivityPinnedChange={onActivityPinnedChange}
           onSelectActivity={onSelectActivity}
         />
         <NavigationActivityMore
-          activities={rest}
+          activities={usePromotedRail ? rest : activities}
           expanded={expanded}
           isActivityPinned={isActivityPinned}
           onPinnedChange={onActivityPinnedChange}

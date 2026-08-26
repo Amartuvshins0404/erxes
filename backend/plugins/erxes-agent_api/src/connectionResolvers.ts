@@ -39,6 +39,14 @@ import {
   IMastraSandboxSessionModel,
 } from '@/sandbox/@types/session';
 import { sandboxSessionSchema } from '@/sandbox/db/definitions/session';
+import {
+  CfOsExchangeResult,
+  ICfOsConnectCodeDocument,
+} from '@/cfos/@types/connectCode';
+import {
+  ICfOsConnectCodeModel,
+  loadCfOsConnectCodeClass,
+} from '@/cfos/db/models/CfOsConnectCode';
 
 export interface IModels {
   MastraAgent: IMastraAgentModel;
@@ -49,7 +57,10 @@ export interface IModels {
   MastraWorkingMemory: IMastraWorkingMemoryModel;
   MastraArtifact: IMastraArtifactModel;
   MastraSandboxSession: IMastraSandboxSessionModel;
+  CfOsConnectCodes: ICfOsConnectCodeModel;
 }
+
+export type { CfOsExchangeResult };
 
 export interface IContext extends IMainContext {
   models: IModels;
@@ -100,6 +111,11 @@ export const loadClasses = (db: mongoose.Connection): IModels => {
     IMastraSandboxSessionDocument,
     IMastraSandboxSessionModel
   >('mastra_sandbox_sessions', sandboxSessionSchema);
+
+  models.CfOsConnectCodes = db.model<
+    ICfOsConnectCodeDocument,
+    ICfOsConnectCodeModel
+  >('cf_os_connect_codes', loadCfOsConnectCodeClass(models));
 
   return models;
 };

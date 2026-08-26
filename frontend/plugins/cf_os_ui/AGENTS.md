@@ -6,7 +6,7 @@
 - **Project:** `cf-os_ui`
 - **Layer:** `Frontend UI`
 - **Path:** `frontend/plugins/cf_os_ui`
-- **Last synchronized:** `2026-08-20`
+- **Last synchronized:** `2026-08-26`
 
 ## Scope
 
@@ -25,7 +25,7 @@
 ## Current Capabilities
 
 - Adds a `command` item to the Erxes plugin navigation.
-- Renders the Command app from `CF_OS_URL` inside the Erxes content area.
+- Mints a short-lived connect code as the signed-in dashboard user and embeds the Command app from `CF_OS_URL`; Cloudflare OS redeems the code for passwordless sign-in.
 - Builds as the `cf-os_ui` Module Federation remote.
 
 ## Architecture
@@ -60,6 +60,7 @@
   `cf_os_ui` remote via `remoteName()`.
 - The embedded page must remain full-height and full-width so the Erxes shell stays visible above it.
 - The embedded app must not receive Erxes credentials through JavaScript or URL parameters.
+- Only the single-use, two-minute connect code may cross through the iframe URL; raw Erxes session credentials never enter the frontend.
 
 ## UI Conventions
 
@@ -84,6 +85,12 @@
 ## Recent Changes
 
 <!-- Newest first. Keep at most 10 entries. -->
+
+### `2026-08-26` — Passwordless embedded Command sign-in
+
+- **Summary:** The plugin requests a single-use connect code through the authenticated erxes-agent backend and passes it to the embedded Cloudflare OS login flow, removing the second password prompt.
+- **Affected areas:** `src/modules/CfOsMain.tsx`, `src/modules/useCfOsConnect.ts`, runtime `CF_OS_URL` configuration.
+- **Contracts changed:** Consumes `POST /pl:erxes-agent/cf-os/connect-code`; iframe URL receives a short-lived `cfOsCode` query value.
 
 ### `2026-08-20` — Rename remote to `cf-os_ui`, keep `command` label
 

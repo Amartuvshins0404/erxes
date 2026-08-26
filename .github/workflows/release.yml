@@ -1,31 +1,47 @@
-name: Release
+name: Release private Docker images
 
 on:
-  push:
-    tags:
-      - '[0-9]*'
+  release:
+    types:
+      - published
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to release (e.g. 3.0.4)'
+        description: 'Existing exact private/public release version (for repair only)'
         required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: private-release-${{ github.event.release.tag_name || inputs.version }}
+  cancel-in-progress: false
 
 jobs:
-  tag-docker-images:
-    name: Tag ${{ matrix.image }}
+  preflight:
+    name: Verify release contract
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        image:
-          - erxes/erxes-next-agent_api
-          - erxes/erxes-next-block_api
-          - erxes/erxes-next-blockadmin_api
-          - erxes/erxes-next-btk_api
-          - erxes/erxes-next-btkadmin_api
-          - erxes/erxes-next-onefit_api
-          - erxes/erxes-next-blockagency_api
-      fail-fast: false
+    timeout-minutes: 20
+    outputs:
+      expected_count: ${{ steps.metadata.outputs.expected_count }}
+      plan_json: ${{ steps.images.outputs.plan_json }}
+      private_identity: ${{ steps.metadata.outputs.private_identity }}
+      public_release_url: ${{ steps.metadata.outputs.public_release_url }}
+      version: ${{ steps.metadata.outputs.version }}
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify version and GitHub release state
+        id: metadata
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RELEASE_EVENT_ID: ${{ github.event.release.id }}
+          RELEASE_EVENT_TAG: ${{ github.event.release.tag_name }}
+          REQUESTED_VERSION: ${{ github.event.release.tag_name || inputs.version }}
+        run: node scripts/release/release-contract.mjs verify-metadata
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -35,7 +51,92 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Tag ${{ matrix.image }}
-        run: |
-          VERSION="${{ github.event.inputs.version || github.ref_name }}"
-          docker buildx imagetools create -t "${{ matrix.image }}:$VERSION" "${{ matrix.image }}:latest"
+      - name: Verify complete source and target image state
+        id: images
+        env:
+          RELEASE_VERSION: ${{ steps.metadata.outputs.version }}
+        run: node scripts/release/release-contract.mjs verify-images
+
+  tag_images:
+    name: Tag ${{ matrix.image }}
+    needs:
+      - preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.preflight.outputs.plan_json) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Preserve or create exact version tag
+        env:
+          RELEASE_IMAGE: ${{ matrix.image }}
+          RELEASE_VERSION: ${{ needs.preflight.outputs.version }}
+          SOURCE_DIGEST: ${{ matrix.source_digest }}
+        run: node scripts/release/release-contract.mjs tag-image
+
+  verify:
+    name: Verify complete versioned image set
+    if: ${{ always() && needs.preflight.result == 'success' }}
+    needs:
+      - preflight
+      - tag_images
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      verified_count: ${{ steps.verify.outputs.verified_count }}
+      verified_json: ${{ steps.verify.outputs.verified_json }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Verify all exact version manifests
+        id: verify
+        env:
+          RELEASE_PLAN_JSON: ${{ needs.preflight.outputs.plan_json }}
+          RELEASE_VERSION: ${{ needs.preflight.outputs.version }}
+        run: node scripts/release/release-contract.mjs verify-tags
+
+  summary:
+    name: Release result
+    if: ${{ always() }}
+    needs:
+      - preflight
+      - tag_images
+      - verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Write safe release summary
+        env:
+          FINAL_STATUS: ${{ needs.preflight.result == 'success' && needs.tag_images.result == 'success' && needs.verify.result == 'success' && 'PASS' || 'FAIL' }}
+          PRIVATE_IDENTITY: ${{ needs.preflight.outputs.private_identity }}
+          PUBLIC_RELEASE_URL: ${{ needs.preflight.outputs.public_release_url }}
+          REQUESTED_VERSION: ${{ github.event.release.tag_name || inputs.version }}
+          RELEASE_VERSION: ${{ needs.preflight.outputs.version }}
+          VERIFIED_IMAGES_JSON: ${{ needs.verify.outputs.verified_json }}
+        run: node scripts/release/release-contract.mjs summary

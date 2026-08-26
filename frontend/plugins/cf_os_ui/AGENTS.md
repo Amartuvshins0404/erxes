@@ -35,6 +35,7 @@
 | Configuration | `src/config.tsx`                          | Registers navigation and the route.    |
 | Entry point   | `src/modules/CfOsMain.tsx`                | Embeds the deployed Command app.      |
 | Federation    | `module-federation.config.ts`             | Exposes config and the CF OS page.    |
+| Build config  | `rspack.config.ts`                         | Injects build-time `CF_OS_URL` into the remote bundle. |
 
 ## Contracts
 
@@ -56,7 +57,7 @@
   with `permissionName: 'cf-os'`.
 - The plugin route is `/cf-os`; the visible sidebar label is `Command`
   (from `navigationGroup.name = 'command'`).
-- Enable the plugin with `cf-os` in `ENABLED_PLUGINS`; core-api maps it to the
+- Enable the plugin with `cf_os` in `ENABLED_PLUGINS`; core-api maps it to the
   `cf_os_ui` remote via `remoteName()`.
 - The embedded page must remain full-height and full-width so the Erxes shell stays visible above it.
 - The embedded app must not receive Erxes credentials through JavaScript or URL parameters.
@@ -85,6 +86,12 @@
 ## Recent Changes
 
 <!-- Newest first. Keep at most 10 entries. -->
+
+### `2026-08-26` — Inject the Command URL into the remote bundle
+
+- **Summary:** The remote's Rspack build now defines `process.env.CF_OS_URL`, matching how other separately built remotes expose build-time environment values.
+- **Affected areas:** `rspack.config.ts`, Command URL configuration.
+- **Contracts changed:** The `cf_os_ui` build requires `CF_OS_URL` to produce a usable deployed remote.
 
 ### `2026-08-26` — Passwordless embedded Command sign-in
 

@@ -6,13 +6,13 @@
 - **Project:** `erxes-agent_api`
 - **Layer:** Backend API
 - **Path:** `backend/plugins/erxes-agent_api`
-- **Last synchronized:** `2026-08-25`
+- **Last synchronized:** `2026-08-26`
 
 ## Scope
 
 ### Owns
 
-- AI team-member configuration, provider settings, streamed chat execution, native chat persistence, file-based runtime skills, artifacts, and permission-scoped tool routing.
+- AI team-member configuration, provider settings, streamed chat execution, native chat persistence, file-based runtime skills, artifacts, permission-scoped tool routing, and the dashboard-to-Cloudflare-OS connect-code exchange.
 
 ### Does not own
 
@@ -35,6 +35,7 @@
 - Wraps empty operation results (`{}`/`[]`/`null`) in an explicit `resultCount: 0` envelope with filter-check/pivot guidance instead of forwarding an anonymous empty payload.
 - Anchors the system prompt to the current date and lets the native Mastra loop own turn lifecycle: a turn ends only when the model itself answers — no tool budget, no step ceiling, no completion guard. When the sandbox workspace tools are active, the prompt also carries the workspace doctrine (batch writes, idempotent full-file content, `workspaceReused: false` means the workspace was recreated empty — rewrite from plan, never probe; publish once after all writes).
 - Streams the model's reply as-is: mid-stream provider failures append a plain-language failure note, error/abort finishes with no text create the assistant row Mastra never saved, and a turn that goes silent after tool work (no answer, no artifact) closes with a persisted plain-language note. A completed turn's text is never rewritten, synthesized, or replaced.
+- Mints single-use, two-minute Cloudflare OS connect codes for authenticated dashboard users and lets the gatekeeper exchange each code once for a one-day Erxes session token.
 
 ## Architecture
 
@@ -49,6 +50,7 @@
 | Runtime skills   | `backend/plugins/erxes-agent_api/skills`                             | Stores read-only Agent Skills files loaded by the Mastra workspace.                             |
 | GraphQL API      | `backend/plugins/erxes-agent_api/src/modules/*/graphql`              | Exposes agent, provider, settings, session, and artifact contracts.                             |
 | Plugin tool curation | `backend/plugins/erxes-agent_api/src/modules/plugintools`        | Stores per-plugin agent-tool curation and exposes the inventory/curation REST contract.      |
+| CF OS sign-in | `backend/plugins/erxes-agent_api/src/modules/cfos` | Mints and redeems tenant-scoped, single-use dashboard SSO codes. |
 
 ## Contracts
 
@@ -57,6 +59,7 @@
 - Plugin-prefixed GraphQL queries and mutations for agents, providers, settings, sessions, and artifacts. `MastraSettings`/`MastraSettingsInput` include `sandboxMode` (`"onserver"` | `"isolated"`, default `"onserver"`).
 - `GET /pl:erxes-agent/plugin-tools` (REST, `settings.statusRead`) returns every active plugin's full agent-tool inventory (supported/enabled/disabledTools/tools incl. `agentUsable=false` entries); `POST /pl:erxes-agent/plugin-tools/curation` (REST, `settings.manage`) upserts the plugin's curation row (`enabled`, `disabledTools`) and invalidates the native tool registry. Reached through the gateway proxy with the browser session forwarded as the user header (same auth as `/chat/stream`).
 - `POST /chat/stream` SSE chat transport and plugin-owned file/artifact routes. The stream closes immediately after the `finish` chunk, which carries the reconciled native message id and interrupted flag in `messageMetadata`; the only post-text transient data part is `data-thread-title` (sent before `finish`). Tool input is forwarded only as complete `tool-input-available` chunks — partial `tool-input-start`/`tool-input-delta` chunks are folded server-side but never sent to the client.
+- `POST /pl:erxes-agent/cf-os/connect-code` mints a single-use code for the authenticated dashboard user; `POST /pl:erxes-agent/cf-os/exchange` redeems it for the configured gatekeeper when `x-cf-os-secret` matches `CF_OS_EXCHANGE_SECRET`.
 
 ### Consumes
 
@@ -67,6 +70,7 @@
 ## Data and State
 
 - Plugin configuration and domain records use tenant-scoped Mongoose models from `src/modules/*/db`.
+- `cf_os_connect_codes` stores SHA-256 code hashes, user identity, expiry, and one-time redemption state; Mongo TTL cleanup is secondary to the mandatory exchange-time expiry check.
 - Native chat threads, messages, resources, and working memory live in the configured Mastra memory database.
 - Runtime skills are read-only files copied into `dist/skills` during the backend build.
 - Per-turn execution state uses `AsyncLocalStorage`; exact-call caches and state-changing tool queues never cross turn boundaries.
@@ -99,6 +103,12 @@
 ## Recent Changes
 
 <!-- Newest first. Keep at most 10 entries. -->
+
+### `2026-08-26` — Cloudflare OS dashboard SSO exchange
+
+- **Summary:** Added authenticated code minting and gatekeeper-only one-time exchange so the embedded CF OS app can sign in the current dashboard user without asking for their password again.
+- **Affected areas:** `src/modules/cfos`, `src/routes.ts`, `src/connectionResolvers.ts`.
+- **Contracts changed:** New `POST /cf-os/connect-code` and `POST /cf-os/exchange` REST routes; deployment requires `CF_OS_EXCHANGE_SECRET` and the existing `JWT_TOKEN_SECRET`.
 
 ### `2026-08-25` — Runtime index DDL removed from provider saves
 

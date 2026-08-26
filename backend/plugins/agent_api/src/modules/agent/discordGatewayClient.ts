@@ -63,6 +63,7 @@ const gatewayRequest = async <T>(
     method?: string;
     query?: Record<string, QueryValue>;
     body?: unknown;
+    timeoutMs?: number;
   } = {},
 ) => {
   const url = new URL(`${getGatewayBaseUrl()}${path}`);
@@ -76,6 +77,9 @@ const gatewayRequest = async <T>(
       'x-erxes-gateway-admin-secret': getGatewaySecret(),
     },
     body: options.body ? JSON.stringify(options.body) : undefined,
+    // Only best-effort callers pass a timeout; interactive queries keep the
+    // platform default so slow-but-succeeding requests aren't cut off.
+    signal: options.timeoutMs ? AbortSignal.timeout(options.timeoutMs) : undefined,
   });
 
   const body = await parseJsonResponse(response);
@@ -247,3 +251,26 @@ export const updateDiscordBinding = (
       body,
     },
   );
+
+// Bindings freeze tenantId/assistantId at connect time, so a transferred
+// assistant's Discord connections stay registered to the source org — the new
+// owner can't see or manage them. Rehome moves every binding of the runtime
+// to its new owner (matched by runtime URL, the one field that never goes
+// stale) and clones a guild installation for the new tenant when needed.
+export const rehomeDiscordBindings = (body: {
+  openclawUrl: string;
+  tenantId: string;
+  assistantId: string;
+  assistantName?: string;
+}) =>
+  gatewayRequest<{
+    matched: number;
+    rehomed: number;
+    installationsCloned: number;
+  }>('/api/bindings/rehome', {
+    method: 'POST',
+    body,
+    // Called best-effort from transferAgent — a hung gateway must not hang
+    // the transfer mutation.
+    timeoutMs: 10_000,
+  });

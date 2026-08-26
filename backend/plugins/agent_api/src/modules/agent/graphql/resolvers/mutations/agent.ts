@@ -37,6 +37,7 @@ import {
   deleteDiscordBinding,
   getDiscordBinding,
   getDiscordInstallation,
+  rehomeDiscordBindings,
   updateDiscordBinding,
 } from '~/modules/agent/discordGatewayClient';
 
@@ -522,7 +523,7 @@ export const agentMutations = {
         credentialMode?: string;
       };
     },
-    { models, user }: IContext,
+    { models, subdomain, user }: IContext,
   ) => {
     const serverName = input?.serverName?.trim();
     const gatewayToken = input?.gatewayToken?.trim();
@@ -609,7 +610,7 @@ export const agentMutations = {
       );
     }
 
-    return models.AgentServer.create({
+    const createdServer = await models.AgentServer.create({
       identifierId,
       agentId: input?.agentId?.trim() || identifier.slug,
       name: serverName,
@@ -623,6 +624,34 @@ export const agentMutations = {
       transferredFromSubdomain: input?.sourceSubdomain?.trim() || undefined,
       transferredAt: new Date(),
     });
+
+    // The runtime's Discord bindings on the central gateway still belong to
+    // the source org — move them to this org so the connection shows up and
+    // stays manageable here. Best-effort: a gateway hiccup must not fail the
+    // transfer itself (the bindings can be re-homed later; chat keeps working
+    // either way because message routing follows the runtime URL).
+    try {
+      const rehome = await rehomeDiscordBindings({
+        openclawUrl: url,
+        tenantId: subdomain,
+        assistantId: identifierId,
+        assistantName: identifier.name,
+      });
+
+      if (rehome.matched > 0) {
+        console.log(
+          `transferAgent: re-homed ${rehome.rehomed} Discord binding(s) ` +
+            `(+${rehome.installationsCloned} installation(s)) for ${serverName}`,
+        );
+      }
+    } catch (err) {
+      console.error(
+        `transferAgent: Discord binding rehome failed for ${serverName}:`,
+        err,
+      );
+    }
+
+    return createdServer;
   },
 
   createAgentTransferCredentials: async (

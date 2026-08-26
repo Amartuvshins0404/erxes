@@ -28,4 +28,32 @@ describe('isManagedAssistantAgent', () => {
       }),
     ).toBe(false);
   });
+
+  it('classifies transferred assistants as managed', () => {
+    expect(
+      isManagedAssistantAgent({
+        name: 'bilguunenkh-aemon',
+        provisioning: null,
+        transferredAt: '2026-08-24T06:00:00.000Z',
+      }),
+    ).toBe(true);
+
+    expect(
+      isManagedAssistantAgent({
+        name: 'bilguunenkh-aemon',
+        provisioning: null,
+        transferredFromSubdomain: 'bilguunenkh',
+      }),
+    ).toBe(true);
+  });
+
+  it('classifies servers with a managed provider connection as managed', () => {
+    expect(
+      isManagedAssistantAgent({
+        name: 'support-assistant',
+        provisioning: null,
+        provider: 'moonshot',
+      }),
+    ).toBe(true);
+  });
 });

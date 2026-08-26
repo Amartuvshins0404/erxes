@@ -17,6 +17,8 @@ export const GET_AGENT = gql`
       createdAt
       updatedAt
       status
+      transferredAt
+      transferredFromSubdomain
       provisioning {
         stage
         message

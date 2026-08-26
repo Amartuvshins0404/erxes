@@ -12,7 +12,6 @@ export const CONFIG: IUIConfig = {
     name: 'command',
     defaultPath: 'cf-os',
     icon: IconTerminal2,
-    content: () => null,
   },
   modules: [
     {

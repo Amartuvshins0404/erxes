@@ -25,6 +25,7 @@
 ## Current Capabilities
 
 - Adds a `command` item to the Erxes plugin navigation.
+- Registers no core sub-module panel, so the Command iframe uses the full content width.
 - Mints a short-lived connect code as the signed-in dashboard user and embeds the Command app from `CF_OS_URL`; Cloudflare OS redeems the code for passwordless sign-in.
 - Builds as the `cf-os_ui` Module Federation remote.
 
@@ -86,6 +87,12 @@
 ## Recent Changes
 
 <!-- Newest first. Keep at most 10 entries. -->
+
+### `2026-08-26` — Remove the empty Command navigation panel
+
+- **Summary:** The Command navigation group now carries only its rail label, default path, and icon, so core skips the blank plugin-level sidebar.
+- **Affected areas:** `src/config.tsx` navigation group.
+- **Contracts changed:** None.
 
 ### `2026-08-26` — Inject the Command URL into the remote bundle
 

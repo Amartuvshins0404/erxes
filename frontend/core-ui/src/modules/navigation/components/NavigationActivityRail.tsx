@@ -1,10 +1,13 @@
+import { NavigationActivityButton } from '@/navigation/components/navigation-activity-rail/NavigationActivityButton';
 import { NavigationActivityGroups } from '@/navigation/components/navigation-activity-rail/NavigationActivityGroups';
 import { NavigationActivitySearchButton } from '@/navigation/components/navigation-activity-rail/NavigationActivitySearchButton';
 import { NavigationFavoritesSection } from '@/navigation/components/navigation-activity-rail/NavigationFavoritesSection';
+import { NavigationInboxButton } from '@/navigation/components/navigation-activity-rail/NavigationInboxButton';
 import { NavigationActivityMore } from '@/navigation/components/NavigationActivityMore';
 import { NavigationRailLogo } from '@/navigation/components/NavigationRailLogo';
 import { NavigationSidebarFooter } from '@/navigation/components/NavigationSidebarFooter';
 import { INavigationActivity } from '@/navigation/types/NavigationActivity';
+import { splitPromotedNavigationActivities } from '@/navigation/utils/promotedNavigationActivities';
 import { cn, Sidebar } from 'erxes-ui';
 
 export const NavigationActivityRail = ({
@@ -34,7 +37,8 @@ export const NavigationActivityRail = ({
 }>) => {
   const { isMobile, state } = Sidebar.useSidebar();
   const expanded = isMobile ? mobileExpanded : state === 'expanded';
-  const hoverEnabled = !expanded && !isMobile;
+  const { promoted, rest } = splitPromotedNavigationActivities(activities);
+  const visibleRest = splitPromotedNavigationActivities(visibleActivities).rest;
 
   return (
     <aside
@@ -45,30 +49,45 @@ export const NavigationActivityRail = ({
       )}
     >
       <NavigationRailLogo expanded={expanded} />
-      <NavigationActivitySearchButton expanded={expanded} onSearch={onSearch} />
+      <div className="mb-1 flex shrink-0 flex-col gap-1">
+        <NavigationInboxButton
+          expanded={expanded}
+          isInboxActive={isInboxActive}
+          onSelectInbox={onSelectInbox}
+        />
+        <NavigationActivitySearchButton
+          expanded={expanded}
+          onSearch={onSearch}
+        />
+        {promoted.map((activity) => (
+          <NavigationActivityButton
+            key={activity.id}
+            activity={activity}
+            active={!isSettings && activity.id === activeActivityId}
+            expanded={expanded}
+            onSelect={() => onSelectActivity(activity)}
+          />
+        ))}
+      </div>
       <div
         className={cn(
           'flex min-h-0 flex-1 flex-col items-stretch gap-1 overflow-x-hidden overflow-y-auto',
           !expanded && 'hide-scroll',
         )}
       >
-        <NavigationFavoritesSection
-          expanded={expanded}
-          isInboxActive={isInboxActive}
-          onSelectInbox={onSelectInbox}
-        />
+        <NavigationFavoritesSection expanded={expanded} />
         <NavigationActivityGroups
           activeActivityId={activeActivityId}
-          activities={visibleActivities}
+          activities={visibleRest}
           expanded={expanded}
-          hoverEnabled={hoverEnabled}
+          hoverEnabled={!expanded && !isMobile}
           isActivityPinned={isActivityPinned}
           isSettings={isSettings}
           onActivityPinnedChange={onActivityPinnedChange}
           onSelectActivity={onSelectActivity}
         />
         <NavigationActivityMore
-          activities={activities}
+          activities={rest}
           expanded={expanded}
           isActivityPinned={isActivityPinned}
           onPinnedChange={onActivityPinnedChange}

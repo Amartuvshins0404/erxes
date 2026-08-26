@@ -24,12 +24,13 @@ export const CONFIG: IUIConfig = {
     // Rail label + icon only. No `content` on purpose: core skips the
     // sub-module panel when a group has no contents, and the plugin renders
     // its own in-page sidebar (agents + conversations) instead.
-    name: 'erxes AI Agents',
+    name: 'AI Agent',
+    defaultPath: 'erxes-agent',
     icon: IconRobot,
   },
   modules: [
     {
-      name: 'erxes AI Agents',
+      name: 'AI Agent',
       icon: IconRobot,
       path: 'erxes-agent',
     },

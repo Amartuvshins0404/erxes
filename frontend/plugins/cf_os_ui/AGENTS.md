@@ -25,7 +25,7 @@
 ## Current Capabilities
 
 - Adds a `command` item to the Erxes plugin navigation.
-- Renders `https://os.erxes.io/` inside the Erxes content area.
+- Renders the Command app from `CF_OS_URL` inside the Erxes content area.
 - Builds as the `cf-os_ui` Module Federation remote.
 
 ## Architecture
@@ -47,7 +47,7 @@
 ### Consumes
 
 - Public `erxes-ui` types and icons.
-- The deployed CF OS URL at `https://os.erxes.io/`.
+- The Command URL comes from `CF_OS_URL` (runtime `window.env.CF_OS_URL`, falling back to build-time `CF_OS_URL`); nothing is hardcoded.
 
 ## Local Invariants
 
@@ -78,7 +78,7 @@
 ## Validation
 
 - `pnpm nx build cf-os_ui`
-- Confirm the deployed app loads at `https://os.erxes.io/`.
+- Confirm `CF_OS_URL` is set and the deployed app loads in the frame.
 - In Erxes, confirm the `command` navigation item opens the embedded app while the Erxes header and global sidebar remain visible.
 
 ## Recent Changes

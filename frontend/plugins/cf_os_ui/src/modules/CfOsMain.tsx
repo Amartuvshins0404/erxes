@@ -1,4 +1,4 @@
-const COMMAND_URL = 'https://os-erxes.darjs.dev/';
+const COMMAND_URL = 'https://os.erxes.io/';
 
 export function CfOsMain() {
   return (

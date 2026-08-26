@@ -7,7 +7,9 @@
     "dev:apis": "dotenv -e .env -- node scripts/start-api-dev.js",
     "dev:uis": "dotenv -e .env -- node scripts/start-ui-dev.js",
     "create-plugin": "node scripts/create-plugin.js",
-    "release": "release-it"
+    "release": "node scripts/release/release-private.mjs",
+    "release:test": "node --test scripts/release/release-contract.test.mjs",
+    "release:validate": "node scripts/release/release-contract.mjs validate-repository"
   },
   "engines": {
     "pnpm": ">=8",

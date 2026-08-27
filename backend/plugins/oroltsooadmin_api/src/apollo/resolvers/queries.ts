@@ -1,0 +1,7 @@
+import { postQueries } from '@/post/graphql/resolvers/queries/post';
+import { profileQueries } from '@/profile/graphql/resolvers/queries/profile';
+
+export const queries = {
+  ...profileQueries,
+  ...postQueries,
+};

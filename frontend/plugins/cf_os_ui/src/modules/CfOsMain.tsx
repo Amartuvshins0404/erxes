@@ -1,7 +1,10 @@
+import { useAtomValue } from 'jotai';
+import { currentUserState } from 'ui-modules';
 import { useCfOsConnect } from './useCfOsConnect';
 
 export function CfOsMain() {
-  const { src, error } = useCfOsConnect();
+  const userId = useAtomValue(currentUserState)?._id;
+  const { src, error } = useCfOsConnect(userId);
 
   if (error) {
     return (
@@ -21,6 +24,7 @@ export function CfOsMain() {
 
   return (
     <iframe
+      key={userId}
       className="h-full min-h-0 w-full border-0"
       title="Command (CF OS)"
       src={src}

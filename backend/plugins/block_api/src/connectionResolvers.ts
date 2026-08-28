@@ -22,6 +22,11 @@ import {
   IContractPaymentModel,
   loadContractPaymentClass,
 } from '@/contract/db/models/Payment';
+import { IContractPaymentSettingsDocument } from '@/contract/@types/paymentSettings';
+import {
+  IContractPaymentSettingsModel,
+  loadContractPaymentSettingsClass,
+} from '@/contract/db/models/PaymentSettings';
 import { IContractPaymentTransactionDocument } from '@/contract/@types/transaction';
 import {
   IContractPaymentTransactionModel,
@@ -99,6 +104,7 @@ export interface IModels {
   ContractStatus: IContractStatusModel;
   ContractPayment: IContractPaymentModel;
   ContractPaymentTransaction: IContractPaymentTransactionModel;
+  ContractPaymentSettings: IContractPaymentSettingsModel;
   CustomerSync: ICustomerSyncModel;
 }
 
@@ -179,6 +185,14 @@ export const loadClasses = (
   >(
     'block_contract_payment_transactions',
     loadContractPaymentTransactionClass(models),
+  );
+
+  models.ContractPaymentSettings = db.model<
+    IContractPaymentSettingsDocument,
+    IContractPaymentSettingsModel
+  >(
+    'block_contract_payment_settings',
+    loadContractPaymentSettingsClass(models),
   );
 
   models.ProjectMember = db.model<IProjectMemberDocument, IProjectMemberModel>(

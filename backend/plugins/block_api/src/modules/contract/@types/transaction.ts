@@ -8,6 +8,7 @@ export interface IContractPaymentTransaction {
   note?: string;
   createdBy?: string;
   paymentMethod?: string;
+  invoiceId?: string;
 }
 
 export interface IContractPaymentTransactionDocument

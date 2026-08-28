@@ -1,3 +1,5 @@
+import { IContractPaymentSettingsInput } from '@/contract/@types/paymentSettings';
+import { createContractPaymentInvoice } from '@/contract/utils/onlinePayment';
 import { IContext } from '~/connectionResolvers';
 
 export const contractPaymentMutations = {
@@ -52,5 +54,26 @@ export const contractPaymentMutations = {
     { models }: IContext,
   ) => {
     return models.ContractPayment.removeTransaction(_id);
+  },
+
+  blockUpdateContractPaymentSettings: async (
+    _parent: undefined,
+    { input }: { input: IContractPaymentSettingsInput },
+    { models }: IContext,
+  ) => {
+    return models.ContractPaymentSettings.updateSettings(input);
+  },
+
+  blockCreateContractPaymentInvoice: async (
+    _parent: undefined,
+    { paymentId, amount }: { paymentId: string; amount?: number },
+    { models, subdomain }: IContext & { subdomain: string },
+  ) => {
+    return createContractPaymentInvoice({
+      models,
+      subdomain,
+      paymentId,
+      amount,
+    });
   },
 };

@@ -1,6 +1,7 @@
 import * as path from 'path';
 import { startPlugin } from 'erxes-api-shared/utils';
 import { typeDefs } from '~/apollo/typeDefs';
+import { payments } from '~/meta/payments';
 import { permissions } from '~/meta/permissions';
 import { wrapMutationResolver } from '~/modules/admin/utils';
 import resolvers from './apollo/resolvers';
@@ -27,6 +28,7 @@ startPlugin({
   ),
   meta: {
     permissions,
+    payments,
     properties: {
       types: [
         {

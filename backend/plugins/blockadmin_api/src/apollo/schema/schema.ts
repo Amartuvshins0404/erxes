@@ -94,6 +94,7 @@ import {
 } from '@/member/graphql/schemas/member';
 
 import {
+  mutations as ClientPortalBlockMutations,
   queries as ClientPortalBlockQueries,
   types as ClientPortalBlockTypes,
 } from '~/modules/clientportal/graphql/schemas';
@@ -193,6 +194,8 @@ export const mutations = `
   ${ProductMutations}
   ${MembershipMutations}
   ${MembershipPlanMutations}
+
+  ${ClientPortalBlockMutations}
   `;
 
 export default { types, queries, mutations };

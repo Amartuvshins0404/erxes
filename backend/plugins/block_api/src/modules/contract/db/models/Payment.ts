@@ -24,8 +24,16 @@ export interface IContractPaymentModel extends Model<IContractPaymentDocument> {
       note?: string;
       createdBy?: string;
       paymentMethod?: string;
+      invoiceId?: string;
     },
   ): Promise<IContractPaymentTransactionDocument>;
+  recordOnlinePayment(input: {
+    paymentId: string;
+    invoiceId: string;
+    amount: number;
+    date?: Date;
+    paymentMethod?: string;
+  }): Promise<IContractPaymentTransactionDocument>;
   updateTransaction(
     _id: string,
     input: { amount?: number; date?: Date; note?: string; paymentMethod?: string },
@@ -398,7 +406,14 @@ export const loadContractPaymentClass = (models: IModels, subdomain: string) => 
 
     public static async addTransaction(
       paymentId: string,
-      input: { amount: number; date?: Date; note?: string; createdBy?: string; paymentMethod?: string },
+      input: {
+        amount: number;
+        date?: Date;
+        note?: string;
+        createdBy?: string;
+        paymentMethod?: string;
+        invoiceId?: string;
+      },
     ) {
       const payment = await models.ContractPayment.findOne({ _id: paymentId });
       if (!payment) throw new Error('Payment not found');
@@ -411,6 +426,7 @@ export const loadContractPaymentClass = (models: IModels, subdomain: string) => 
         note: input.note,
         createdBy: input.createdBy,
         paymentMethod: input.paymentMethod,
+        invoiceId: input.invoiceId,
       });
 
       const recomputed = await ContractPayment.recomputeStatus(paymentId);
@@ -420,6 +436,50 @@ export const loadContractPaymentClass = (models: IModels, subdomain: string) => 
         );
       }
       return tx;
+    }
+
+    // Entry point for payment_api's paid-invoice callback. That callback is
+    // retried by BullMQ and can also be replayed by an invoice re-check, so the
+    // invoice id is the idempotency key: a transaction already recorded for it
+    // is returned untouched instead of crediting the payment twice.
+    public static async recordOnlinePayment(input: {
+      paymentId: string;
+      invoiceId: string;
+      amount: number;
+      date?: Date;
+      paymentMethod?: string;
+    }) {
+      const existing = await models.ContractPaymentTransaction.findOne({
+        invoiceId: input.invoiceId,
+      });
+
+      if (existing) {
+        return existing;
+      }
+
+      try {
+        return await ContractPayment.addTransaction(input.paymentId, {
+          amount: input.amount,
+          date: input.date,
+          paymentMethod: input.paymentMethod,
+          invoiceId: input.invoiceId,
+          note: `Online payment (invoice ${input.invoiceId})`,
+        });
+      } catch (e: any) {
+        // Two concurrent callbacks for the same invoice: the unique index on
+        // `invoiceId` rejects the loser, whose transaction already exists.
+        if (e?.code === 11000) {
+          const recorded = await models.ContractPaymentTransaction.findOne({
+            invoiceId: input.invoiceId,
+          });
+
+          if (recorded) {
+            return recorded;
+          }
+        }
+
+        throw e;
+      }
     }
 
     public static async updateTransaction(

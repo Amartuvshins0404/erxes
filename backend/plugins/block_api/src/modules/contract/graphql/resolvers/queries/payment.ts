@@ -223,4 +223,12 @@ export const contractPaymentQueries = {
       date: -1,
     });
   },
+
+  blockGetContractPaymentSettings: async (
+    _parent: undefined,
+    _args: undefined,
+    { models }: IContext,
+  ) => {
+    return models.ContractPaymentSettings.getSettings();
+  },
 };

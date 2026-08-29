@@ -71,7 +71,9 @@ export const createContractPaymentInvoice = async ({
     throw new Error('This payment has nothing left to pay');
   }
 
-  const settings = await models.ContractPaymentSettings.getSettings();
+  const settings = await models.ContractPaymentSettings.getSettings(
+    payment.projectId,
+  );
   const paymentIds = settings?.paymentIds || [];
 
   if (!paymentIds.length) {
@@ -147,14 +149,26 @@ export const createContractPaymentInvoice = async ({
   };
 };
 
-// The paid-invoice callback carries the invoice, not the method that settled
-// it, so the actual kind (`qpay`, …) is read back from the invoice's paid
-// transaction. Falls back to a neutral label when payment_api cannot answer.
-export const resolveInvoicePaymentKind = async (
+interface IInvoiceTransaction {
+  status?: string;
+  paymentKind?: string;
+  payment?: { kind?: string };
+}
+
+interface IPaymentInvoice {
+  _id: string;
+  amount?: number;
+  status?: string;
+  contentType?: string;
+  contentTypeId?: string;
+  transactions?: IInvoiceTransaction[];
+}
+
+const fetchInvoice = (
   subdomain: string,
   invoiceId: string,
-): Promise<string> => {
-  const invoice = await sendTRPCMessage({
+): Promise<IPaymentInvoice | null> =>
+  sendTRPCMessage({
     subdomain,
     pluginName: 'payment',
     module: 'payment',
@@ -163,9 +177,106 @@ export const resolveInvoicePaymentKind = async (
     defaultValue: null,
   });
 
-  const paidTransaction = (invoice?.transactions || []).find(
-    (transaction: { status?: string }) => transaction.status === 'paid',
-  );
+// The paid-invoice callback carries the invoice, not the method that settled
+// it, so the actual kind (`qpay`, …) is read off the invoice's transactions:
+// `paymentKind` is stamped on the transaction itself and survives a deleted
+// payment method, with the joined method as a fallback and a neutral label
+// when payment_api cannot answer at all.
+export const pickInvoicePaymentKind = (
+  invoice: IPaymentInvoice | null,
+): string => {
+  const transactions = invoice?.transactions || [];
+  const transaction =
+    transactions.find((item) => item.status === 'paid') || transactions[0];
 
-  return paidTransaction?.payment?.kind || 'online';
+  return transaction?.paymentKind || transaction?.payment?.kind || 'online';
+};
+
+export const resolveInvoicePaymentKind = async (
+  subdomain: string,
+  invoiceId: string,
+): Promise<string> => pickInvoicePaymentKind(await fetchInvoice(subdomain, invoiceId));
+
+interface ICheckInvoiceArgs {
+  models: IModels;
+  subdomain: string;
+  contractId: string;
+  invoiceId: string;
+  customerId: string;
+}
+
+export interface IContractPaymentInvoiceCheck {
+  status: string;
+  paymentStatus: string;
+  paidAmount: number;
+  amount: number;
+}
+
+// Re-asks the payment provider about an invoice the customer says they paid,
+// for when QPay's callback to payment_api never arrived. payment_api's own
+// tRPC `checkInvoice` only reports the status — unlike its GraphQL
+// `invoicesCheck` it does not re-fire the plugin callback — so a paid result
+// has to be credited here, through the same idempotent path the callback uses.
+export const checkContractPaymentInvoice = async ({
+  models,
+  subdomain,
+  contractId,
+  invoiceId,
+  customerId,
+}: ICheckInvoiceArgs): Promise<IContractPaymentInvoiceCheck> => {
+  const invoice = await fetchInvoice(subdomain, invoiceId);
+
+  if (!invoice) {
+    throw new Error('Invoice not found');
+  }
+
+  if (invoice.contentType !== CONTRACT_PAYMENT_CONTENT_TYPE) {
+    throw new Error('Invoice does not belong to a contract payment');
+  }
+
+  const payment = await models.ContractPayment.findOne({
+    _id: invoice.contentTypeId,
+  });
+
+  if (!payment) {
+    throw new Error('Payment not found');
+  }
+
+  // The caller is trusted to have authenticated the customer, but not to have
+  // picked the right payment: the invoice must belong to the contract and the
+  // customer the caller actually verified.
+  if (
+    payment.contractId.toString() !== contractId ||
+    payment.customerId !== customerId
+  ) {
+    throw new Error('Payment not found');
+  }
+
+  const status = await sendTRPCMessage({
+    subdomain,
+    pluginName: 'payment',
+    method: 'mutation',
+    module: 'payment',
+    action: 'checkInvoice',
+    input: { _id: invoiceId },
+    defaultValue: null,
+  });
+
+  if (status === 'paid' && invoice.amount) {
+    await models.ContractPayment.recordOnlinePayment({
+      paymentId: payment._id.toString(),
+      invoiceId,
+      amount: invoice.amount,
+      paymentMethod: pickInvoicePaymentKind(invoice),
+    });
+  }
+
+  const current = await models.ContractPayment.findOne({ _id: payment._id });
+
+  return {
+    status: status || invoice.status || 'pending',
+    paymentStatus: current?.status || payment.status,
+    paidAmount: current?.paidAmount || 0,
+    amount: current?.amount || payment.amount,
+  };
 };

@@ -3,6 +3,7 @@ import { IconPlus } from '@tabler/icons-react';
 import { useState } from 'react';
 import { useCreateContract } from '@/contract/hooks/useManageContract';
 import { ContractFormData } from '@/contract/constants/contractSchema';
+import { buildContractInput } from '@/contract/utils/contractInput';
 import { format } from 'date-fns';
 import { ContractFormSheet } from './ContractFormSheet';
 
@@ -36,44 +37,47 @@ export const ContractAddForm = ({ onClose }: { onClose: () => void }) => {
   const { createContract, loading } = useCreateContract();
 
   const handleSubmit = (data: ContractFormData) => {
-    const paymentPlan = data.paymentPlan?.frequency ? data.paymentPlan : undefined;
-    const amount =
-      typeof data.amount === 'number' && !isNaN(data.amount)
-        ? data.amount
-        : undefined;
+    const unit = unitId || data.unit;
 
-    createContract({
-      variables: {
-        input: {
-          unit: unitId || data.unit,
-          number:
-            data.number ||
-            `${format(new Date(), 'yyMMddHHmmss').replace(/^0+/g, '')}`,
-          currency: data.currency,
-          date: data.date || new Date().toISOString(),
-          amount,
-          status: data.status || undefined,
-          customerId: data.customerId || undefined,
-          paymentPlan,
-          user: data.user || undefined,
+    if (!unit) {
+      toast({
+        title: 'Select a unit',
+        description: 'A contract must be attached to a unit.',
+        variant: 'destructive',
+      });
+
+      return;
+    }
+
+    const input = buildContractInput(data, unit);
+
+    createContract(
+      {
+        ...input,
+        // A new contract gets a generated number and today's date unless the
+        // form supplied them; editing never regenerates either.
+        number:
+          input.number ||
+          `${format(new Date(), 'yyMMddHHmmss').replace(/^0+/g, '')}`,
+        date: input.date || new Date().toISOString(),
+      },
+      {
+        onCompleted: () => {
+          toast({
+            title: 'Contract created successfully',
+            variant: 'success',
+          });
+          onClose();
+        },
+        onError: (error) => {
+          toast({
+            title: 'Error',
+            description: error.message,
+            variant: 'destructive',
+          });
         },
       },
-      refetchQueries: ['BlockGetContracts'],
-      onCompleted: () => {
-        toast({
-          title: 'Contract created successfully',
-          variant: 'success',
-        });
-        onClose();
-      },
-      onError: (error) => {
-        toast({
-          title: 'Error',
-          description: error.message,
-          variant: 'destructive',
-        });
-      },
-    });
+    );
   };
 
   return (

@@ -259,7 +259,7 @@ const OfferPaymentSchedule = ({
   unit,
 }: {
   form: UseFormReturn<OfferFormData>;
-  unit: IUnit;
+  unit?: IUnit;
 }) => {
   const pricePerUnit = form.watch('price.price') || 0;
   const currency = form.watch('price.currency') || 'MNT';
@@ -378,7 +378,7 @@ export const OfferSummary = ({
   unit,
 }: {
   form: UseFormReturn<OfferFormData>;
-  unit: IUnit;
+  unit?: IUnit;
 }) => {
   const price = form.watch('price.price') || 0;
   const currency = form.watch('price.currency');

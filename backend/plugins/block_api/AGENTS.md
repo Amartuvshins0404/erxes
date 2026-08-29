@@ -6,7 +6,7 @@
 - **Project:** `block_api`
 - **Layer:** `Backend API`
 - **Path:** `backend/plugins/block_api`
-- **Last synchronized:** `2026-08-27`
+- **Last synchronized:** `2026-08-30`
 
 ## Scope
 
@@ -31,7 +31,8 @@
 - Offer mirroring to block-admin, mirroring Contract's design: `Offer.updateOffer` throws `'Sent offers cannot be edited'` once `status === 'sent'` (5-minute revert window, same pattern as Contract), and `blockCreateOffer`/`blockUpdateOffer`/`blockSendOfferEmail` all auto-mirror via `wrapMutationResolver` — block-admin only actually syncs the offer once its status is `sent`. On-demand manual re-sync of a single sent offer (`blockManualSyncOffer`) mirrors `blockManualSyncContract`'s design.
 - Every mutation in `resolvers.Mutation` is globally wrapped by `wrapMutationResolver` (`src/main.ts`), which fires a best-effort webhook to `${BLOCK_ADMIN_API_URL}/webhook/{mutationName}` after any mutation that returns a truthy entity — most of these paths have no matching route in `blockadmin_api` and are ignored there; only the explicitly-built webhook paths below are consumed.
 - Online payment of a scheduled contract payment through the org's own payment plugin: `blockCreateContractPaymentInvoice` (staff) and the `POST /webhook/createContractPaymentInvoice` receiver (client portal, called by `blockadmin_api`) both build a payment_api invoice with `contentType: 'block:contractPayment'` and the org's configured methods (QPay), and payment_api's paid-invoice callback lands back here on the `block-payments` queue, where it is recorded as a `ContractPaymentTransaction` and re-synced to block-admin like any manual transaction.
-- Org-wide online-payment configuration (`blockGetContractPaymentSettings` / `blockUpdateContractPaymentSettings`): which payment_api payment-method ids may be charged, and whether a customer may pay less than a scheduled payment's remaining amount.
+- Reconciliation of a lost paid-invoice callback: `POST /webhook/checkContractPaymentInvoice` re-asks payment_api about one invoice and, when it comes back `paid`, credits it through the same idempotent path the queue callback uses — needed because payment_api's tRPC `checkInvoice` reports status without re-firing the plugin callback (only its GraphQL `invoicesCheck` does that).
+- Online-payment configuration at two levels (`blockGetContractPaymentSettings(projectId)` / `blockUpdateContractPaymentSettings(input, projectId)`): one org-wide default document plus an optional per-project override, holding which payment_api payment-method ids may be charged and whether a customer may pay less than a scheduled payment's remaining amount. An invoice resolves the settings for its own payment's `projectId`.
 - Agent-callable tRPC read tools: `unit.findOne`/`unit.find`/`unit.count` (permission `unit.showUnits`) and `project.findOne`/`project.find` (permission `project.showProjects`) are exposed via `.meta({ agent: ... })`, discovered through the platform's auto-mounted `/agent-tools/manifest`. Sellable units are `status: 'available'` with `locked: false`.
 
 ## Architecture
@@ -55,8 +56,9 @@
 
 - GraphQL (all operations prefixed `block`/`getBlock`/`createBlock` etc., unique repo-wide): contract (`blockCreateContract`, `blockUpdateContract`, `blockUpdateContractStatus`, `blockManualSyncContract`, `blockGetContract(s)`, `blockGetContractsList`, `blockGetUnitContractOverview`), contract payments/transactions (`blockGetContractPayments`, `blockAddPaymentTransaction`, `blockUpdatePaymentTransaction`, `blockRemovePaymentTransaction`, ...), contract statuses (`*BlockContractStatus*`), projects/buildings/units/oppty/offers/invoices/documents/notes/attachments (see `src/modules/*/graphql/schemas`), customer sync (`blockSyncCustomer`, `blockGetCustomerSync`).
 - tRPC agent tools (auto-mounted `/agent-tools/manifest` + `/agent-tools/call` via `trpcAppRouter` in `src/main.ts`): `unit.findOne`, `unit.find`, `unit.count` (`unit.showUnits` permission), `project.findOne`, `project.find` (`project.showProjects` permission). Read-only; find/count inputs are strict and results bounded.
-- GraphQL online payment: `blockCreateContractPaymentInvoice(paymentId, amount)` → `{invoiceId, url, amount, currency}`, `blockGetContractPaymentSettings`, `blockUpdateContractPaymentSettings(input)`.
+- GraphQL online payment: `blockCreateContractPaymentInvoice(paymentId, amount)` → `{invoiceId, url, amount, currency}`, `blockGetContractPaymentSettings(projectId)`, `blockUpdateContractPaymentSettings(input, projectId)`.
 - HTTP `POST /webhook/createContractPaymentInvoice` (HMAC-validated with `BLOCK_ADMIN_SECRET`, payload `{payload: {entityId: <ContractPayment._id>, data: {amount?, cpUserId?, email?, phone?, redirectUri?}}}`) — consumed only by `blockadmin_api` on behalf of a client-portal customer; answers `{success, invoice}`.
+- HTTP `POST /webhook/checkContractPaymentInvoice` (payload `{payload: {entityId: <Contract._id>, data: {invoiceId, customerId}}}`) — same channel; re-checks the invoice, credits it if paid, and answers `{success, check: {status, paymentStatus, paidAmount, amount}}`.
 - `meta.payments` handlers (`callback`, `transactionCallback`) registered through `startPlugin`, so payment_api can deliver paid invoices whose `contentType` is `block:contractPayment` on the `block-payments` queue.
 - Webhook calls to `blockadmin_api` at `${BLOCK_ADMIN_API_URL}/webhook/{path}` (HMAC-signed with `BLOCK_ADMIN_SECRET`): `customerSync`, `blockCreateContract`, `blockUpdateContract`, `blockUpdateContractStatus`, `contractSigned`, `blockSyncContractPayments`. Every other mutation name is also fired generically by `wrapMutationResolver` but has no consuming route on the other side.
 
@@ -69,7 +71,7 @@
 ## Data and State
 
 - MongoDB collections scoped by `subdomain` implicitly (single-tenant DB per org deployment); no explicit `subdomain` field needed on block_api's own schemas since the whole DB is the tenant.
-- `block_contract_payment_settings` is an org-wide singleton (`paymentIds`, `allowPartial`); `ContractPaymentSettings.getSettings()` returns the first (and only) document, and `updateSettings` creates it on first write.
+- `block_contract_payment_settings` holds one org-wide default (`projectId: null`) plus at most one document per project (`paymentIds`, `allowPartial`). `getSettings(projectId)` returns the project's document when it exists and otherwise the default; `updateSettings(input, projectId)` creates the document for that scope on first write.
 - `block_contract_payment_transactions.invoiceId` holds the payment_api invoice id for online payments and carries a unique sparse index — it is the idempotency key for paid-invoice callbacks. Manual transactions leave it unset.
 - Key collections: `block_projects`, `block_buildings`, `block_zonings`, `block_units`, `block_unit_types`, `block_contracts`, `block_contract_statuses`, `block_contract_payments`, `block_contract_payment_transactions`, `block_opptys`, `block_oppty_statuses`, `block_offers`, `block_customer_syncs`.
 - `Contract.status` is an ObjectId reference into this org's own `ContractStatus` collection — never a fixed enum. Only `ContractStatus.type` carries the fixed semantic value (`reserved|draft|signed|lost|cancelled`) that must be resolved before mirroring to block-admin.
@@ -89,7 +91,10 @@
 - `blockUpdateOffer` must always reshape `args.input` to the full DB record via `buildOfferMirrorInput(updated)` after the write, even though its GraphQL arg is a full `BlockOfferInput!` — the frontend's status-only Select (`OfferDetailSheet.handleStatusChange`) calls this same mutation with a deliberately partial input (no `customerId`, `paymentPlan`, etc.), so forwarding the caller's raw `input` as-is silently drops fields block-admin's `syncIfSent` needs (this was the root cause of the "offer sent" notification not firing — fixed 2026-08-11). Contract avoids this class of bug entirely by routing status-only changes through a dedicated `blockUpdateContractStatus` mutation instead of overloading `blockUpdateContract`; Offer instead fixes it by making the shared update path always mirror complete data regardless of what was sent.
 - Contract payment invoices are always created against **this org's** payment plugin (`sendTRPCMessage` with the org's own `subdomain`), never blockadmin's — the developer org owns the QPay merchant account, and creating the invoice here is also what makes payment_api route the paid-invoice callback back to `block`, where the payment schedule actually lives. `blockadmin_api` must therefore ask for the invoice over the webhook rather than billing the customer itself.
 - `ContractPayment.recordOnlinePayment` is the only entry point for a paid invoice, and it is idempotent by `invoiceId` (BullMQ retries the callback, and an invoice re-check replays it): it returns the existing transaction rather than crediting twice, and treats a duplicate-key error as the same case. Never call `addTransaction` directly from the payments callback.
+- A project's settings document replaces the org-wide default outright for that project — resolution is per document, not per field, so a project row with an empty `paymentIds` switches online payment off for that project rather than falling back to the default's methods. The default is matched with `{projectId: null}`, which also picks up documents written before `projectId` existed on this schema.
 - An online invoice defaults to the payment's full remaining amount (`amount - paidAmount`); a smaller amount is only accepted when `ContractPaymentSettings.allowPartial` is on. A payment that is already `paid`/`cancelled`, or has nothing remaining, must never produce an invoice.
+- The webhook caller (`blockadmin_api`) is trusted to have authenticated the client-portal user, but never to have picked the right record: `checkContractPaymentInvoice` re-verifies that the invoice's `contentType` is `block:contractPayment` and that its payment's `contractId`/`customerId` match the ones the caller claims to have verified, before crediting anything.
+- payment_api's tRPC `payment.checkInvoice` reports an invoice's status (and can flip it to `paid`) but does **not** enqueue the plugin callback — only its GraphQL `invoicesCheck` mutation does. Anything here that polls it must therefore credit the result itself via `recordOnlinePayment`; treating tRPC `checkInvoice` as "the callback will follow" silently leaves the contract payment unpaid forever.
 - `CONTRACT_PAYMENT_CONTENT_TYPE` (`'block:contractPayment'`) is a contract with payment_api, which splits it to route the callback to this plugin — changing that string silently breaks every in-flight invoice, since pending invoices already carry the old value.
 - Agent-facing tRPC reads must stay bounded and strict: every `.meta({ agent })` find-style procedure caps `limit` (default 20, max 100), rejects unknown top-level input keys via `.strict()` Zod schemas, and only safe read procedures get annotated. Never annotate raw-mongo or mutation helpers.
 
@@ -98,12 +103,25 @@
 - `pnpm nx lint block_api`
 - `pnpm nx build block_api`
 - `pnpm nx test block_api` (when `project.json` defines a test target)
-- Smoke (online payment): set `blockUpdateContractPaymentSettings(input: {paymentIds: ["<qpay method id>"]})`, call `blockCreateContractPaymentInvoice(paymentId)` for an unpaid scheduled payment, pay the returned widget url with QPay, then confirm a `ContractPaymentTransaction` exists with that `invoiceId`, the payment flipped to `paid`/`partial`, and block-admin's mirrored schedule reflects it; re-deliver the same callback and confirm no second transaction appears.
+- Smoke (lost callback): pay an invoice with `block_api` stopped, restart it, then `POST /webhook/checkContractPaymentInvoice` for that contract/invoice — the payment must be credited exactly once and a repeat call must change nothing.
+- Smoke (online payment): set `blockUpdateContractPaymentSettings(input: {paymentIds: ["<qpay method id>"]}, projectId: "<project>")`, call `blockCreateContractPaymentInvoice(paymentId)` for an unpaid scheduled payment, pay the returned widget url with QPay, then confirm a `ContractPaymentTransaction` exists with that `invoiceId`, the payment flipped to `paid`/`partial`, and block-admin's mirrored schedule reflects it; re-deliver the same callback and confirm no second transaction appears.
 - Smoke: create a contract, move its status to a `signed`-typed `ContractStatus`, confirm `block_admin_contracts`/`block_admin_contract_payments` in blockAdmin's DB reflect it; then call `blockManualSyncContract(contractId)` again and confirm no duplicate rows and payments/transactions are intact.
 
 ## Recent Changes
 
 <!-- Newest first. Keep at most 10 entries. -->
+
+### `2026-08-30` — Per-project online-payment settings
+
+- **Summary:** `block_contract_payment_settings` gained a `projectId`, so a project can override the org-wide default; `getSettings`/`updateSettings` take an optional project scope, the GraphQL query and mutation take a `projectId` argument, and invoice creation resolves settings for the payment's own `projectId` with the org default as fallback.
+- **Affected areas:** `src/modules/contract/db/{definitions,models}/PaymentSettings.ts`, `src/modules/contract/@types/paymentSettings.ts`, `src/modules/contract/utils/onlinePayment.ts`, `src/modules/contract/graphql/{schemas,resolvers}/payment.ts`.
+- **Contracts changed:** `blockGetContractPaymentSettings` now takes `projectId: String`; `blockUpdateContractPaymentSettings` takes `projectId: String`; `BlockContractPaymentSettings` exposes `projectId`.
+
+### `2026-08-29` — Invoice re-check for lost payment callbacks
+
+- **Summary:** Added `checkContractPaymentInvoice` (util + `POST /webhook/checkContractPaymentInvoice`), which re-asks payment_api about one contract-payment invoice, re-verifies it against the claimed contract/customer, and credits a `paid` result through `recordOnlinePayment` — payment_api's tRPC `checkInvoice` does not re-fire the plugin callback, so the caller must do the crediting. Payment-method detection now prefers the transaction's own `paymentKind` over the joined payment method, so it survives a deleted method.
+- **Affected areas:** `src/modules/contract/utils/onlinePayment.ts`, `src/modules/contract/routes/payment.ts`.
+- **Contracts changed:** Added webhook `POST /webhook/checkContractPaymentInvoice`. No GraphQL changes.
 
 ### `2026-08-27` — QPay online payment for contract payments
 
@@ -152,15 +170,3 @@
 - **Summary:** Replaced per-transaction single-row sync with one "sync all payments for this contract" mechanism (`ContractPayment.syncAllForContract`), triggered after every transaction add/update/remove and after contract regenerate, so block-admin's payment schedule is always replaced wholesale rather than patched row by row.
 - **Affected areas:** `src/modules/contract/db/models/Payment.ts`, `src/modules/contract/utils/paymentsSync.ts`.
 - **Contracts changed:** Webhook `blockSyncContractPayments` now always carries the full current payment list for the contract.
-
-### `2026-08-10` — Signed-only contract mirroring
-
-- **Summary:** Contracts (and their payment schedules) are now mirrored to block-admin only once their resolved status type is explicitly `signed`, checked at each of the three mutation entry points (create, update, status-change) rather than relying on an internal early-return; cancelled contracts clear their mirrored schedule.
-- **Affected areas:** `src/modules/contract/db/models/Contract.ts`, `src/modules/contract/graphql/resolvers/mutations/contract.ts`.
-- **Contracts changed:** None (webhook shapes unchanged; gating logic only).
-
-### `2026-08-10` — Customer sync verifies identity against core
-
-- **Summary:** `syncCustomerToBlockAdmin` now sends the customer's email/phone (not stored PII) to block-admin, which independently re-verifies against erxes core before linking, rather than trusting client-supplied data.
-- **Affected areas:** `src/modules/admin/utils.ts`.
-- **Contracts changed:** Webhook `customerSync` payload now carries `{email, phone}` instead of no identity data.

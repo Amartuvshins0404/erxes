@@ -13,6 +13,17 @@ interface IPaymentInvoiceResponse {
   };
 }
 
+interface IPaymentCheckResponse {
+  success?: boolean;
+  error?: string;
+  check?: {
+    status: string;
+    paymentStatus: string;
+    paidAmount: number;
+    amount: number;
+  };
+}
+
 export const cpPaymentMutations = {
   // The portal never creates the invoice itself: the money belongs to the org
   // that owns the contract, so the request is forwarded to that org's block_api,
@@ -72,6 +83,54 @@ export const cpPaymentMutations = {
     }
 
     return result.invoice;
+  },
+
+  // Reconciliation for a customer who paid but whose row is still unpaid,
+  // because QPay's callback to the org's payment_api never arrived. Keyed on
+  // the contract (whose mirrored `_id` is stable) plus the invoice id returned
+  // when the invoice was created — never on a payment's own `_id`, which is
+  // replaced wholesale on every schedule sync.
+  cpBlockAdminCheckPaymentInvoice: async (
+    _parent: undefined,
+    { contractId, invoiceId }: { contractId: string; invoiceId: string },
+    { models, cpUser }: IContext,
+  ) => {
+    const contract = await models.Contract.findOne({ _id: contractId }).lean();
+
+    if (!contract) {
+      throw new Error('Contract not found');
+    }
+
+    const blockCustomer = await models.BlockCustomer.findOne({
+      customerId: cpUser?.erxesCustomerId,
+      subdomain: contract.subdomain,
+    }).lean();
+
+    // `Contract.customerId` mirrors block_api's org-side customer id, which is
+    // `BlockCustomer.entityId` — not the verified core `customerId`.
+    if (!blockCustomer || blockCustomer.entityId !== contract.customerId) {
+      throw new Error('Contract not found');
+    }
+
+    const response = await sendBlockMessage({
+      subdomain: contract.subdomain,
+      path: 'checkContractPaymentInvoice',
+      payload: {
+        entityId: contract.entityId,
+        data: {
+          invoiceId,
+          customerId: blockCustomer.entityId,
+        },
+      },
+    });
+
+    const result = (await response.json()) as IPaymentCheckResponse;
+
+    if (!response.ok || !result?.check) {
+      throw new Error(result?.error || 'Failed to check payment invoice');
+    }
+
+    return result.check;
   },
 };
 

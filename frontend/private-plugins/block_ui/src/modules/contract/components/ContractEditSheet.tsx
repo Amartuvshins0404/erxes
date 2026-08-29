@@ -6,6 +6,7 @@ import { useContract } from '@/contract/hooks/useContracts';
 import { useUpdateContract } from '@/contract/hooks/useManageContract';
 import { useUnit } from '@/unit/hooks/useUnit';
 import { ContractFormData } from '@/contract/constants/contractSchema';
+import { buildContractInput } from '@/contract/utils/contractInput';
 import { contractDetailSheetState } from '@/contract/states/contractDetailSheetState';
 import { ContractFormSheet } from './ContractFormSheet';
 
@@ -97,24 +98,8 @@ const ContractEditBody = ({
   };
 
   const handleSubmit = async (data: ContractFormData) => {
-    const paymentPlan = data.paymentPlan?.frequency ? data.paymentPlan : undefined;
-    const amount =
-      typeof data.amount === 'number' && !isNaN(data.amount)
-        ? data.amount
-        : undefined;
-
     try {
-      await updateContract(contractId, {
-        unit: contract.unit,
-        number: data.number,
-        currency: data.currency,
-        date: data.date,
-        amount,
-        status: data.status || undefined,
-        customerId: data.customerId || undefined,
-        paymentPlan,
-        user: data.user || undefined,
-      });
+      await updateContract(contractId, buildContractInput(data, contract.unit));
       toast({
         title: 'Contract updated',
         variant: 'success',

@@ -9,25 +9,47 @@ import { IModels } from '~/connectionResolvers';
 
 export interface IContractPaymentSettingsModel
   extends Model<IContractPaymentSettingsDocument> {
-  getSettings(): Promise<IContractPaymentSettings | null>;
+  getSettings(projectId?: string): Promise<IContractPaymentSettings | null>;
   updateSettings(
     input: IContractPaymentSettingsInput,
+    projectId?: string,
   ): Promise<IContractPaymentSettingsDocument>;
 }
 
 export const loadContractPaymentSettingsClass = (models: IModels) => {
-  // Org-wide singleton: there is one online-payment configuration per org
-  // deployment, so every read/write targets the first (and only) document.
+  // Two levels: one org-wide default document (`projectId: null`) and an
+  // optional per-project override. A project document, once saved, replaces the
+  // default outright for that project rather than merging field by field.
   class ContractPaymentSettings {
-    public static async getSettings() {
-      return models.ContractPaymentSettings.findOne().lean();
+    public static async getSettings(projectId?: string) {
+      if (projectId) {
+        const projectSettings = await models.ContractPaymentSettings.findOne({
+          projectId,
+        }).lean();
+
+        if (projectSettings) {
+          return projectSettings;
+        }
+      }
+
+      // Matches both an explicit `null` and documents written before
+      // `projectId` existed on this schema.
+      return models.ContractPaymentSettings.findOne({ projectId: null }).lean();
     }
 
-    public static async updateSettings(input: IContractPaymentSettingsInput) {
-      const existing = await models.ContractPaymentSettings.findOne();
+    public static async updateSettings(
+      input: IContractPaymentSettingsInput,
+      projectId?: string,
+    ) {
+      const scope = projectId || null;
+
+      const existing = await models.ContractPaymentSettings.findOne({
+        projectId: scope,
+      });
 
       if (!existing) {
         return models.ContractPaymentSettings.create({
+          projectId: scope,
           paymentIds: (input.paymentIds || []).filter(Boolean),
           allowPartial: input.allowPartial || false,
         });

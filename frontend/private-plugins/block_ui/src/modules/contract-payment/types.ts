@@ -34,3 +34,19 @@ export interface IContractPaymentTransaction {
   createdAt?: string;
   updatedAt?: string;
 }
+
+export interface IContractPaymentSettings {
+  _id: string;
+  // `null` on the org-wide default; a project id when this project overrides it.
+  projectId?: string | null;
+  paymentIds?: string[];
+  allowPartial?: boolean;
+  updatedAt?: string;
+}
+
+export interface IPaymentMethod {
+  _id: string;
+  name: string;
+  kind: string;
+  status: string;
+}

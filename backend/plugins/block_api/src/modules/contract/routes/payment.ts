@@ -1,6 +1,9 @@
 import { getSubdomain } from 'erxes-api-shared/utils';
 import { Router } from 'express';
-import { createContractPaymentInvoice } from '@/contract/utils/onlinePayment';
+import {
+  checkContractPaymentInvoice,
+  createContractPaymentInvoice,
+} from '@/contract/utils/onlinePayment';
 import { generateModels } from '~/connectionResolvers';
 import { IRequest, IResponse } from '~/types';
 
@@ -48,6 +51,50 @@ router.post(
       return res.status(200).json({
         success: true,
         invoice,
+      });
+    } catch (error) {
+      return res.status(400).json({
+        error: error.message,
+      });
+    }
+  },
+);
+
+// Reconciliation path for a customer who paid but whose invoice never came
+// back through payment_api's callback. `customerId` is the org-side customer
+// blockadmin_api verified against the requesting client-portal user; block_api
+// re-checks it against the payment before crediting anything.
+router.post(
+  '/checkContractPaymentInvoice',
+  async (
+    req: IRequest<{ invoiceId?: string; customerId?: string }>,
+    res: IResponse,
+  ) => {
+    const subdomain = getSubdomain(req);
+    const models = await generateModels(subdomain);
+
+    try {
+      const { payload } = req.body || {};
+
+      const { entityId, data } = payload || {};
+
+      if (!entityId || !data?.invoiceId || !data?.customerId) {
+        return res.status(400).json({
+          error: 'Contract id, invoice id and customer id are required',
+        });
+      }
+
+      const check = await checkContractPaymentInvoice({
+        models,
+        subdomain,
+        contractId: entityId,
+        invoiceId: data.invoiceId,
+        customerId: data.customerId,
+      });
+
+      return res.status(200).json({
+        success: true,
+        check,
       });
     } catch (error) {
       return res.status(400).json({

@@ -3,7 +3,6 @@ import { IContract } from '../types/contractTypes';
 import { QueryHookOptions, useQuery } from '@apollo/client';
 import {
   EnumCursorDirection,
-  ICursorListResponse,
   mergeCursorData,
   useNonNullMultiQueryState,
   validateFetchMore,
@@ -36,15 +35,14 @@ export const useContractsFilterVariables = (variables?: {
   }>();
   const projectId = projectIdParam || id || '';
 
-  const { searchValue, status, customerId, currency, date, user } =
+  const { searchValue, status, customerId, currency, user } =
     useNonNullMultiQueryState<{
       searchValue: string;
       status: string;
       customerId: string;
       currency: string;
-      date: string;
       user: string;
-    }>(['searchValue', 'status', 'customerId', 'currency', 'date', 'user']);
+    }>(['searchValue', 'status', 'customerId', 'currency', 'user']);
 
   return {
     filter: {

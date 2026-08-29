@@ -226,9 +226,9 @@ export const contractPaymentQueries = {
 
   blockGetContractPaymentSettings: async (
     _parent: undefined,
-    _args: undefined,
+    { projectId }: { projectId?: string },
     { models }: IContext,
   ) => {
-    return models.ContractPaymentSettings.getSettings();
+    return models.ContractPaymentSettings.getSettings(projectId);
   },
 };

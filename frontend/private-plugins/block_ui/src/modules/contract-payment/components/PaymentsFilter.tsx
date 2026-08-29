@@ -218,7 +218,6 @@ export const PaymentsFilter = () => {
             </Filter.BarName>
             <SelectCustomer.FilterBar
               filterKey="payment_customerId"
-              label="Customer"
               mode="single"
             />
           </Filter.BarItem>

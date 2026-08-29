@@ -58,10 +58,13 @@ export const contractPaymentMutations = {
 
   blockUpdateContractPaymentSettings: async (
     _parent: undefined,
-    { input }: { input: IContractPaymentSettingsInput },
+    {
+      input,
+      projectId,
+    }: { input: IContractPaymentSettingsInput; projectId?: string },
     { models }: IContext,
   ) => {
-    return models.ContractPaymentSettings.updateSettings(input);
+    return models.ContractPaymentSettings.updateSettings(input, projectId);
   },
 
   blockCreateContractPaymentInvoice: async (

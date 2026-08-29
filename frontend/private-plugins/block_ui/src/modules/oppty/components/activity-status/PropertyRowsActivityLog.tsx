@@ -18,7 +18,7 @@ const ZoningName = ({ zoningId }: { zoningId?: string | null }) => {
 
 const UnitName = ({ unitId }: { unitId?: string | null }) => {
   const { unit } = useUnit(unitId);
-  const name = unit?.name || unit?.number || unitId;
+  const name = unit?.number || unitId;
   if (!name) return null;
   return <span className="font-medium">{name}</span>;
 };

@@ -6,7 +6,7 @@
 - **Project:** `blockadmin_api`
 - **Layer:** `Backend API`
 - **Path:** `backend/plugins/blockadmin_api`
-- **Last synchronized:** `2026-08-27`
+- **Last synchronized:** `2026-08-29`
 
 ## Scope
 
@@ -41,6 +41,7 @@
 - Exposes blockadmin GraphQL schema sections through `src/apollo/schema/schema.ts`.
 - Daily BullMQ-scheduled worker (`src/worker/`) that sends client-portal payment reminder/overdue notifications for every org's contract payments in one global scan (no per-org loop needed, since `ContractPayment` rows already carry their own `subdomain`).
 - Client-portal online payment (`cpBlockAdminCreatePaymentInvoice`): a customer can start paying one mirrored scheduled payment, which is forwarded to the owning org's `block_api` (`POST /webhook/createContractPaymentInvoice`) and answered with that org's payment_api invoice url (QPay). Blockadmin bills nothing itself and stores no invoice state — the settled payment comes back through the normal `blockSyncContractPayments` mirror, which is what flips the row to `paid` and notifies the customer.
+- Client-portal payment reconciliation (`cpBlockAdminCheckPaymentInvoice`): re-asks the owning org whether an invoice the customer says they paid actually settled, for when QPay's callback to that org's payment_api never arrived. Keyed on `{contractId, invoiceId}`, never on a payment's own `_id`.
 - `blockSyncContractPayments`'s webhook route sends a "payment successful" notification the moment a specific payment row transitions into `paid` status, detected by diffing the schedule's prior statuses (fetched before the bulk replace) against the newly-synced rows — payments are always mirrored as a full wholesale replace, never a per-row update, so this diff is the only way to know which row just changed.
 
 ## Architecture
@@ -77,6 +78,7 @@
   - `cpBlockAdminGetContractPayments(contractId)` / `cpBlockAdminGetContractSummary(contractId)` / `cpBlockAdminGetOffer(offerId)` — look up the single record by its blockadmin `_id` (the same `_id` the list queries return); do **not** currently verify it belongs to the requesting `cpUser` (see Local Invariants).
   - `cpBlockAdminGetPayments` / `cpBlockAdminGetSummary` — the same payments/summary shape aggregated across *every* contract the customer holds (no `contractId`), by querying `ContractPayment` directly on `customerId` rather than joining through `Contract`.
 - GraphQL client-portal mutation `cpBlockAdminCreatePaymentInvoice(paymentId, amount): CpBlockPaymentInvoice` — requires an authenticated `cpUser`, verifies the mirrored payment belongs to that customer's `BlockCustomer` in the payment's own org, and returns `{invoiceId, url, amount, currency}` produced by that org's `block_api`.
+- GraphQL client-portal mutation `cpBlockAdminCheckPaymentInvoice(contractId, invoiceId): CpBlockPaymentCheck` — same `cpUser` + `BlockCustomer` ownership check as above (on the contract), forwarded to the owning org's `POST /webhook/checkContractPaymentInvoice`; returns `{status, paymentStatus, paidAmount, amount}` where `status` is the invoice's and `paymentStatus` is the scheduled payment's after any crediting.
 - GraphQL client-portal agency/listing browse queries — marked `forClientPortal: true` only, so they need a client-portal app token but no authenticated `cpUser`:
   - `cpGetBlockAdminAgencies(verificationStatus, searchValue, city, district, + offset params): [CpBlockAdminAgency]` / `cpGetBlockAdminAgencyInfo(_id!): CpBlockAdminAgency`.
   - `cpGetBlockAdminListings(agencyId, agencyMemberId, status, type, propertyType, searchValue, city, district, + offset params): [CpBlockAdminListing]`, `cpGetBlockAdminListing(_id!): CpBlockAdminListing`, `cpGetBlockAdminListingStats(agencyId, agencyMemberId): CpBlockAdminListingStats` (`total`/`active`/`draft`/`sold`/`totalViews`).
@@ -91,6 +93,7 @@
 - Contract/customer webhook payload shape `{ subdomain, payload: { entityId, data: { input? , email?, phone?, payments? } } }`, HMAC-signed with `BLOCK_ADMIN_SECRET`, sent by `block_api`'s `sendMessage`/`sendMessageAwait`.
 - `sendTRPCMessage` to erxes core (via `BlockCustomer`'s `resolveBlockCustomer`) to independently verify a customer's email/phone before linking — never trusts the webhook payload's identity claim alone.
 - `sendTRPCMessage` to erxes core's `cpUsers.list`/`cpNotifications.create` tRPC routes, via the shared `notifyBlockCustomer` helper (used by the payment reminder worker and the contract-signed webhook route) — addressed at the *relevant record's own* `subdomain` (the originating org), never blockadmin's own worker-local subdomain.
+- `block_api`'s `POST /webhook/checkContractPaymentInvoice` (same signed channel) as the only way to force a re-check of an org's invoice.
 - `block_api`'s `POST /webhook/createContractPaymentInvoice` (via `sendBlockMessage`, HMAC-signed with `BLOCK_ADMIN_SECRET` and addressed at `BLOCK_API_URL` for the payment's own `subdomain`) as the only way to bill a customer for a mirrored contract payment.
 - Public `erxes-api-shared` utilities and GraphQL JSON/scalar conventions.
 
@@ -139,6 +142,8 @@
 - Every mirrored entity's schema-level Mongoose `ref` on its `unit` field must point at `block_admin_units` (blockadmin's own collection), not `block_units` (block_api's org-side collection name) — `ref` doesn't affect query correctness (nothing here calls `.populate()`), but a wrong value is a copy-paste tell that the field itself may also be unresolved; `Offer.unit`'s `ref` had this exact bug (fixed 2026-08-11, matching the same fix already applied to `Contract.unit`) — always resolve an incoming `input.unit` (block_api's org-side unit id) through `Unit.getUnit(subdomain, input.unit)` to get blockadmin's own unit `_id` before storing it.
 - Offer intentionally has no `blockGetOffers`-equivalent invoice-generation logic in blockadmin — that math (discount/down-payment/installment/interest) is block_api's job; blockadmin only ever mirrors the offer's own fields once `sent`, the same way it mirrors contract payments as already-computed rows rather than recomputing a payment plan itself.
 - Blockadmin never creates a payment invoice itself and never stores one: the money belongs to the org that owns the contract, and `block_admin_contract_payments` rows are wholesale-replaced on every schedule sync, so any invoice state written here would be destroyed on the next sync. `cpBlockAdminCreatePaymentInvoice` therefore only forwards to the owning org and returns its answer, and a settled payment reaches the portal through the ordinary payment mirror.
+- A mirrored payment's `_id` changes on every schedule sync (`replaceForContract` deletes and reinserts the rows), so nothing client-portal-facing may hold one across a payment: poll the schedule by `contractId` (a `Contract`'s `_id` is stable — it is upserted by `{subdomain, entityId}`), and address a specific in-flight payment by the `invoiceId` the create mutation returned. `cpBlockAdminCheckPaymentInvoice` is keyed that way for exactly this reason.
+- `Contract.customerId` and `ContractPayment.customerId` both mirror block_api's org-side customer id, which is `BlockCustomer.entityId` — never the verified core `customerId`. Every client-portal ownership check compares against `entityId`; comparing against `BlockCustomer.customerId` silently rejects every legitimate request.
 - Unlike the client-portal detail *queries* below, `cpBlockAdminCreatePaymentInvoice` does verify ownership — it resolves `BlockCustomer` by `{customerId: cpUser.erxesCustomerId, subdomain: payment.subdomain}` and requires `blockCustomer.entityId === payment.customerId`, so a guessed `_id` cannot be used to bill or expose another customer's payment. Keep that check on any new client-portal mutation.
 - Client-portal single-record detail queries (`cpBlockAdminGetContractPayments`/`cpBlockAdminGetContractSummary`/`cpBlockAdminGetOffer`) look up strictly by the id argument (`Contract.findOne({_id})`/`Offer.findOne({_id})`) with no check that the record belongs to the requesting `cpUser` — any authenticated cp user can currently fetch any contract's payments/summary or any offer by guessing/enumerating its `_id`. This was already true for contracts before the offer queries were added; the offer queries were built to match that existing pattern rather than introduce a new, inconsistent one. Fixing it (e.g. re-adding an ownership join through `BlockCustomer`) needs to cover contracts and offers together.
 - `CpBlockOfferPaymentPlan` is a client-portal-only type, deliberately **not** reusing the admin-facing `BlockAdminOfferPaymentPlan` — the admin type has a non-null `type: BlockAdminProjectPaymentPlanType!` field that block_api never actually populates (Offer's org-side payment plan has no `type` field at all), so querying it would throw "Cannot return null for non-nullable field". Do not reuse `BlockAdminOfferPaymentPlan` for client-portal or admin-panel work without fixing that field first.
@@ -152,12 +157,19 @@
 - Agent image smoke scenario: give an agent an avatar and a certificate photo in `blockagency_ui`, then read `cpBlockAdminAgentInfo` and confirm `user.avatar` and `certificatePhotos[].url` come back as absolute `…/read-file?key=…` urls that open in a browser without a session.
 - Blockadmin smoke scenario: send a signed `POST /webhook/syncProduct` payload with `BLOCK_ADMIN_SECRET`; `block_admin_supplier_products` upserts by source `entityId`.
 - Contract smoke scenario: sign a contract in `block_api`, confirm `block_admin_contracts`/`block_admin_contract_payments` reflect it; call the same sync again (e.g. via `block_api`'s `blockManualSyncContract`) and confirm it upserts cleanly with no immutable-field error and no duplicate payment rows.
+- Online payment reconciliation smoke scenario: create an invoice via `cpBlockAdminCreatePaymentInvoice`, pay it while the org's `block_api` is stopped (so the callback is lost), restart it and call `cpBlockAdminCheckPaymentInvoice(contractId, invoiceId)` — it must return `status: "paid"`, the scheduled payment must be credited exactly once, and a second call must not credit it again.
 - Online payment smoke scenario: with QPay configured in the owning org's payment plugin and selected in that org's `blockUpdateContractPaymentSettings`, call `cpBlockAdminCreatePaymentInvoice(paymentId)` as a cp user for one of their unpaid mirrored payments, pay the returned url, then confirm the org's `block_api` recorded the transaction and the next `blockSyncContractPayments` flips the mirrored row to `paid` with a "payment successful" notification.
 - Worker smoke scenario: seed a `ContractPayment` with `dueDate` 1/3/5 days out and one with a past `dueDate`, both `status: 'unpaid'` with a real `customerId`; manually invoke `runPaymentReminders` (or wait for the `0 9 * * *` `Asia/Ulaanbaatar` schedule) and confirm a `cpNotifications.create` call fires for each, addressed at the payment's own `subdomain`.
 
 ## Recent Changes
 
 <!-- Newest first. Keep at most 10 entries. -->
+
+### `2026-08-29` — Client-portal invoice re-check
+
+- **Summary:** Added `cpBlockAdminCheckPaymentInvoice(contractId, invoiceId)`, which verifies the contract belongs to the requesting `cpUser` and forwards to the owning org's new `checkContractPaymentInvoice` webhook, so a customer whose QPay callback was lost can settle their row from the portal. Keyed on the contract plus invoice id because a mirrored payment's `_id` does not survive a schedule sync.
+- **Affected areas:** `src/modules/clientportal/graphql/resolvers/mutations/payment.ts`, `src/modules/clientportal/graphql/schemas/payment.ts`.
+- **Contracts changed:** Added GraphQL mutation `cpBlockAdminCheckPaymentInvoice` and type `CpBlockPaymentCheck`; now calls `block_api`'s `checkContractPaymentInvoice` webhook.
 
 ### `2026-08-27` — Client-portal online payment for mirrored contract payments
 
@@ -211,9 +223,3 @@
 - **Summary:** Added `CpBlockOffer.paymentSchedule` (`rows: [CpBlockOfferScheduleRow], total: Float`), a computed field returning an offer's full barter/down-payment/progress-payment/completion-payment breakdown — a line-for-line TypeScript port of `block_ui`'s `OfferDetailSheet.tsx#OfferSchedule` calculation (installment-date generation by frequency, FLAT/REDUCING/default interest, discount/barter/down/completion splits), so client-portal consumers get the same numbers without re-implementing that math.
 - **Affected areas:** `src/modules/clientportal/utils/offerPaymentSchedule.ts` (new), `src/modules/clientportal/graphql/resolvers/customResolvers/offer.ts`, `src/modules/clientportal/graphql/schemas/offer.ts`.
 - **Contracts changed:** Added field `CpBlockOffer.paymentSchedule: CpBlockOfferPaymentSchedule` and types `CpBlockOfferPaymentSchedule`/`CpBlockOfferScheduleRow`.
-
-### `2026-08-11` — Client-portal Offer queries
-
-- **Summary:** Added `cpBlockAdminGetOffers` (list, scoped via `BlockCustomer`) and `cpBlockAdminGetOffer(offerId)` (single-record lookup by `_id`), matching `cpBlockAdminGetContracts`'s current pattern exactly — including that the single-record query does not verify ownership (see Local Invariants). `CpBlockOffer` gets the same `unitDetail`/`project`/`unitType` custom-resolver treatment as `CpBlockContract`. Deliberately did not reuse the admin-facing `BlockAdminOfferPaymentPlan` type (it has a landmine non-null `type` field block_api never populates) — defined a clean `CpBlockOfferPaymentPlan` instead.
-- **Affected areas:** `src/modules/clientportal/graphql/schemas/offer.ts` (new), `src/modules/clientportal/graphql/resolvers/queries/offer.ts` (new), `src/modules/clientportal/graphql/resolvers/customResolvers/offer.ts` (new), `src/modules/clientportal/graphql/schemas/index.ts`, `src/modules/clientportal/graphql/resolvers/queries/index.ts`, `src/modules/clientportal/graphql/resolvers/customResolvers/index.ts`.
-- **Contracts changed:** Added GraphQL queries `cpBlockAdminGetOffers: [CpBlockOffer]` and `cpBlockAdminGetOffer(offerId: String!): CpBlockOffer`.

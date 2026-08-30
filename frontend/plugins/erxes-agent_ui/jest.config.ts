@@ -1,16 +1,11 @@
-/* eslint-disable */
+// Default export required by Jest - do not remove
 export default {
-  displayName: 'mastra-ui',
+  displayName: 'erxes-agent-ui',
   preset: '../../../jest.preset.js',
   testEnvironment: 'node',
   transform: {
-    '^.+\\.[tj]sx?$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.spec.json' }],
+    '^.+\\.[tj]s$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.spec.json' }],
   },
-  moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'html'],
-  // Mirror the `~` alias (tsconfig paths) so component tests can import runtime
-  // modules, not just type-only shapes.
-  moduleNameMapper: {
-    '^~/(.*)$': '<rootDir>/src/$1',
-  },
+  moduleFileExtensions: ['ts', 'js', 'html'],
   coverageDirectory: '../../coverage/plugins/erxes-agent_ui',
 };

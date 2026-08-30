@@ -1,9 +1,15 @@
 import { apolloCustomScalars } from 'erxes-api-shared/utils';
-import { queries } from './queries';
+import { customResolvers } from './resolvers';
 import { mutations } from './mutations';
+import { queries } from './queries';
 
 export const resolvers = {
-  Query: { ...queries },
-  Mutation: { ...mutations },
+  Mutation: {
+    ...mutations,
+  },
+  Query: {
+    ...queries,
+  },
   ...apolloCustomScalars,
+  ...customResolvers,
 };

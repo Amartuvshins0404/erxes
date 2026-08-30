@@ -551,18 +551,17 @@
 
 <!-- Newest first. Keep at most 10 entries. -->
 
-### `2026-08-31` — cf-os passwordless sign-in grafted onto the BYOK plugin
+### `2026-08-31` — cf-os passwordless sign-in kept alive on the BYOK plugin
 
-- **Summary:** While merging `origin/main` (whose legacy-plugin lineage
-  carried the cf-os passwordless dashboard sign-in from commit `25a929c82c`),
-  the `src/modules/cfos` module arrived without its model registration or
-  route mounts, because the rewrite's `connectionResolvers.ts` and
-  `routes.ts` won those conflicts. The `CfOsConnectCodes` model (collection
-  `cf_os_connect_codes`, hashed single-use codes with a TTL index) is now
+- **Summary:** The BYOK rewrite replaces the legacy runtime wholesale,
+  and the cf-os passwordless dashboard sign-in (legacy commit
+  `25a929c82c`) lives inside this plugin: `cf_os_ui` calls
+  `/pl:erxes-agent/cf-os/connect-code`. The `src/modules/cfos` module is
+  therefore kept, with the `CfOsConnectCodes` model (collection
+  `cf_os_connect_codes`, hashed single-use codes with a TTL index)
   registered in `IModels`/`loadClasses`, and `registerCfOsRoutes(router)`
-  mounts `POST /cf-os/connect-code` (dashboard mint) and
+  mounting `POST /cf-os/connect-code` (dashboard mint) and
   `POST /cf-os/exchange` (gatekeeper-only, `x-cf-os-secret`) — the
-  `cf_os_ui` plugin calls `/pl:erxes-agent/cf-os/connect-code`, so the
   feature stays alive on the rewritten plugin.
 - **Affected areas:** `src/connectionResolvers.ts`, `src/routes.ts`,
   `src/modules/cfos/**` (merged in), `AGENTS.md`.

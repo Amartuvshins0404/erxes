@@ -10,7 +10,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { AGENTS_THREAD_DETAIL } from '../graphql/threads';
 import type { IAgentsThreadDetailData } from '../graphql/threads';
 import { mapStoredMessagesToUIMessages } from '../mapStoredMessages';
-import type { IAgentsRequestSelection } from '../transport';
+import type { IAgentsRequestSelection, IPendingAnswer } from '../transport';
 import { AgentsChatTransport } from '../transport';
 
 /** Thinking depth selectable per turn in the chat UI. */
@@ -110,14 +110,13 @@ export const useAgentsChat = (): IUseAgentsChatResult => {
   const threadIdRef = useRef<string | undefined>(undefined);
   const selectionRef = useRef<IAgentsRequestSelection>({});
   /**
-   * The ask_user answer awaiting submission. Set by `submitAnswer`, read
-   * exactly once by the transport's send path (which turns it into the
-   * `POST /agents/answer` resume request), and cleared on read so a later
-   * send never replays it.
+   * The ask_user answer awaiting submission, with the suspended tool call it
+   * resolves. Set by `submitAnswer`, read exactly once by the transport's
+   * send path (which turns it into the `POST /agents/answer` resume request
+   * and scopes its chunk filter to that tool call), and cleared on read so a
+   * later send never replays it.
    */
-  const pendingAnswerRef = useRef<
-    string | string[] | (string | string[])[] | undefined
-  >(undefined);
+  const pendingAnswerRef = useRef<IPendingAnswer | undefined>(undefined);
 
   /** Generates the conversation's thread id on first use. */
   const ensureThreadId = useCallback(() => {
@@ -180,13 +179,14 @@ export const useAgentsChat = (): IUseAgentsChatResult => {
   }, []);
 
   /**
-   * Submits the answer to a suspended ask_user question: stage it on the
-   * transport, resolve the suspended tool part locally, then send a user
-   * message carrying the answer. The transport reroutes that one request to
-   * `POST /agents/answer`, whose resumed stream is processed by the send-side
-   * state machine — the SDK's own resume path cannot apply it (it builds an
-   * empty streaming state, so the resumed `tool-output-available` chunk finds
-   * no matching tool part and the whole stream is discarded).
+   * Submits the answer to a suspended ask_user question: resolve the
+   * suspended tool part locally, stage the answer (with its tool call id) on
+   * the transport, then send a user message carrying the answer. The
+   * transport reroutes that one request to `POST /agents/answer`, whose
+   * resumed stream is processed by the send-side state machine — the SDK's
+   * own resume path cannot apply it (it builds an empty streaming state, so
+   * the resumed suspension replay finds no matching tool part and the whole
+   * stream is discarded).
    */
   const submitAnswer = useCallback(
     (answer: string | string[] | (string | string[])[]) => {
@@ -194,7 +194,6 @@ export const useAgentsChat = (): IUseAgentsChatResult => {
         return;
       }
 
-      pendingAnswerRef.current = answer;
       setAnswerBusy(true);
 
       const answerText =
@@ -205,6 +204,11 @@ export const useAgentsChat = (): IUseAgentsChatResult => {
               .join(' · ');
       const lastMessage = chat.messages[chat.messages.length - 1];
       const suspension = findAskUserSuspension(lastMessage);
+
+      pendingAnswerRef.current = {
+        answer,
+        suspendedToolCallId: suspension?.toolCallId,
+      };
 
       if (lastMessage && suspension) {
         // The spread over the tool-part union loses its discriminants, so the

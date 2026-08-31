@@ -147,14 +147,23 @@
   surfaces to the UI as a `data-tool-call-suspended` SSE part carrying the
   questions. `POST /agents/answer`
   (`{ threadId, answer, provider?, model?, thinkingLevel? }` → SSE)
-  resumes the run via `agent.resumeStream(answer)` scoped to the newest
-  suspended non-approval tool call, so the model continues with the user's
-  answers. `answer` is a string (single free-text/single-select), a string
-  array (one multi-select question), or one entry per question
-  positionally (each a string or string array); the tool normalizes every
-  shape into per-question text for the model. Ownership is re-checked
-  before any resume, and a run suspended on an approval gate is rejected
-  with 409 (it must go through `/agents/approve`).
+  persists the answer as a real user message (`memory.saveMessages`,
+  formatted exactly like the UI bubble: ', ' inside a multi-select, ' · '
+  between questions) and then resumes the run via
+  `agent.resumeStream(answer)` scoped to the newest suspended non-approval
+  tool call, so the model continues with the user's answers and the
+  transcript keeps the answer across reloads. `answer` is a string (single
+  free-text/single-select), a string array (one multi-select question), or
+  one entry per question positionally (each a string or string array); the
+  tool normalizes every shape into per-question text for the model.
+  Ownership is re-checked before any resume, and a run suspended on an
+  approval gate is rejected with 409 (it must go through `/agents/approve`).
+- Every agent run entry point passes `maxSteps: AGENTS_MAX_STEPS` (32) —
+  chat `stream`, answer `resumeStream`, and `approveToolCall` /
+  `declineToolCall`. Mastra's default of 5 is exhausted silently by real
+  turns (searchTools discovery + code-mode iterations + the ask_user step
+  counting against the resumed run's budget), which ended runs right after
+  their last tool result with no final answer and nothing surfaced.
 - Threads and titles are handled entirely by Mastra: the agent auto-creates a
   missing thread during `stream`, and `generateTitle: true` derives a
   descriptive title from the first user message asynchronously (agent model,
@@ -600,14 +609,12 @@
   server-side models listing and the stale-model re-save refresh, tenant
   settings resolvers incl. the admin-only gating, thread list/detail
   resolvers, and the `agentsThreadRemove` mutation).
-- `pnpm nx build erxes-agent_api` remains blocked upstream of this plugin:  `erxes-api-shared:build` fails repo-wide (`@babel/preset-env@7.26.9` linked
-  against `@babel/core@8.0.1` breaks preconstruct) and
-  `backend/erxes-api-shared/dist` is empty, so its package types/entrypoints
-  cannot be produced; the same failure reproduces on untouched plugins such as
-  `sales_api`. Do not work around it inside this plugin.
+- `pnpm nx build erxes-agent_api` passes (the earlier repo-wide
+  `erxes-api-shared:build` failure has been resolved upstream of this
+  plugin).
 - `cd backend/plugins/erxes-agent_api && npx tsc --project tsconfig.json --noEmit`
-  compiles this plugin cleanly and is the reliable local type check while the
-  shared library build is broken. Under nodenext, un-exported deep imports need
+  compiles this plugin cleanly and is the reliable local type check. Under
+  nodenext, un-exported deep imports need
   narrowly scoped `paths` entries to real declaration files
   (`@apollo/server/dist/esm/express4` → its `dist/cjs` declaration twin), and
   type-only imports of ESM-only packages need `'resolution-mode': 'import'`.
@@ -654,6 +661,25 @@
 - **Affected areas:** `src/modules/agents/agent.ts`
   (`DEFAULT_INSTRUCTIONS` only).
 - **Contracts changed:** None (system-prompt text only).
+
+### `2026-08-31` — Ask_user answer durability and the agent step budget
+
+- **Summary:** Fixed ask_user answers vanishing on reload and resumed runs
+  dying after tool results: `POST /agents/answer` now persists the answer
+  as a real user message via `memory.saveMessages` before resuming
+  (formatted identically to the UI bubble), and every agent run entry point
+  (chat `stream`, answer `resumeStream`, `approveToolCall`,
+  `declineToolCall`) passes `maxSteps: AGENTS_MAX_STEPS` (32) instead of
+  Mastra's default 5, which real turns (searchTools discovery + code-mode
+  iterations + the resumed ask_user step) exhausted silently — the run
+  stopped right after its last tool result with no final answer.
+- **Affected areas:** `src/routes.ts` (`AGENTS_MAX_STEPS`, answer
+  persistence + typed answer normalization),
+  `src/__tests__/routes.test.ts` (`saveMessages` fake, persistence and
+  maxSteps assertions).
+- **Contracts changed:** `POST /agents/answer` now writes one user message
+  to thread memory before resuming (no request/response wire change); all
+  four agent-run entry points carry an explicit `maxSteps`.
 
 ### `2026-08-31` — Code mode: sandboxed agent code execution behind a tenant-wide admin toggle
 
@@ -861,31 +887,4 @@
   `copilot_user_connections` → `agents_user_connections`; tRPC namespace
   `erxesAiSupport` → `erxesAgent`.
 
-
-### `2026-08-28` — Opencode-style BYOK: provider + key only, model defaulted server-side
-
-- **Summary:** Simplified the BYOK surface to "select provider → paste API
-  key → done": the model picker GraphQL surface was removed entirely
-  (`copilotProviderModels` query, `fetchProviderModels` module, and the
-  `model` argument/field), the stored model is always the provider default
-  via the new `getProviderDefaultModel` in `providers.ts`, and switching
-  provider never carries the stored key over — an omitted `apiKey` keeps the
-  stored key only for the same provider, so switching providers or a fresh
-  setup requires (re-)entering the key. `BYOK_PROVIDERS` moved into the
-  update mutation resolver file as the single whitelist source.
-- **Affected areas:** `src/modules/copilot/providers.ts`
-  (+`getProviderDefaultModel`), deleted
-  `src/modules/copilot/providerModels.ts` and
-  `src/modules/copilot/graphql/resolvers/queries/providerModels.ts`,
-  `src/modules/copilot/graphql/schemas/connection.ts`,
-  `src/modules/copilot/graphql/resolvers/queries/connection.ts`,
-  `src/modules/copilot/graphql/resolvers/mutations/connection.ts`,
-  `src/apollo/resolvers/queries.ts`,
-  `src/modules/copilot/__tests__/connectionResolvers.test.ts` (now 112
-  total).
-- **Contracts changed:** Removed GraphQL query
-  `copilotProviderModels(provider, apiKey)`; removed `model` from the
-  `CopilotConnection` type and from `copilotConnectionUpdate`, whose
-  signature is now `copilotConnectionUpdate(provider: String!, apiKey:
-  String): CopilotConnection` with the model always defaulted server-side.
 

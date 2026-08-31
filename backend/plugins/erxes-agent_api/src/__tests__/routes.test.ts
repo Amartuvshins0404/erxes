@@ -200,6 +200,7 @@ interface IMemoryFake {
   getThreadById: jest.Mock;
   listThreads: jest.Mock;
   recall: jest.Mock;
+  saveMessages: jest.Mock;
 }
 
 const threadPage = (
@@ -232,6 +233,7 @@ const buildMemory = (): IMemoryFake => ({
   getThreadById: jest.fn(async () => null),
   listThreads: jest.fn(async () => threadPage([])),
   recall: jest.fn(async () => messagePage([], null)),
+  saveMessages: jest.fn(async ({ messages }) => ({ messages })),
 });
 
 interface IStreamOptions {
@@ -289,6 +291,7 @@ const declineToolCallMock = jest.fn<
 interface IResumeOptions {
   runId?: string;
   toolCallId?: string;
+  maxSteps?: number;
   memory?: {
     thread: string;
     resource: string;
@@ -941,12 +944,61 @@ describe('POST /agents/answer — ask_user answer resume', () => {
       expect.objectContaining({
         runId: 'run-1',
         toolCallId: 'call-ask-1',
+        maxSteps: 32,
         memory: {
           thread: 't1',
           resource: 'user-1',
           onTitleGenerated: expect.any(Function),
         },
       }),
+    );
+  });
+
+  it('persists the answer as a user message before resuming', async () => {
+    memory.getThreadById.mockResolvedValue({ resourceId: 'user-1' });
+    listSuspendedRunsMock.mockResolvedValue({
+      runs: [askUserRun('run-1')],
+      total: 1,
+    });
+    const res = buildRes();
+    await answerHandler(
+      buildReq({
+        user: ACTING_USER,
+        body: {
+          threadId: 't1',
+          answer: ['Сар сонгосон', ['Долоо хоног 1', 'Долоо хоног 2']],
+        },
+      }),
+      res,
+    );
+
+    expect(res.statusCode).toBe(200);
+    // The optimistic UI bubble is client-only, so the backend must store the
+    // answer itself — formatted exactly as the UI renders it (' · ' between
+    // questions, ', ' inside a multi-select) — or it vanishes on reload.
+    expect(memory.saveMessages).toHaveBeenCalledTimes(1);
+    const { messages } = memory.saveMessages.mock.calls[0][0];
+    expect(messages).toHaveLength(1);
+    expect(messages[0]).toMatchObject({
+      role: 'user',
+      threadId: 't1',
+      resourceId: 'user-1',
+      content: {
+        format: 2,
+        parts: [
+          {
+            type: 'text',
+            text: 'Сар сонгосон · Долоо хоног 1, Долоо хоног 2',
+          },
+        ],
+      },
+    });
+    expect(messages[0].id).toMatch(UUID_PATTERN);
+    expect(messages[0].createdAt).toBeInstanceOf(Date);
+    // The answer must be stored before the resumed run persists its own
+    // messages, so the transcript keeps the user turn before the reply.
+    expect(memory.saveMessages.mock.invocationCallOrder[0]).toBeLessThan(
+      resumeStreamMock.mock.invocationCallOrder[0],
     );
   });
 
@@ -1022,6 +1074,8 @@ describe('POST /agents/answer — ask_user answer resume', () => {
     );
     expect(approveToolCallMock).not.toHaveBeenCalled();
     expect(resumeStreamMock).not.toHaveBeenCalled();
+    // An approval is not an answer; nothing may be persisted for it.
+    expect(memory.saveMessages).not.toHaveBeenCalled();
   });
 
   it('resumes the newest suspended ask_user run with the answer and streams it', async () => {
@@ -1050,6 +1104,7 @@ describe('POST /agents/answer — ask_user answer resume', () => {
       expect.objectContaining({
         runId: 'run-2',
         toolCallId: 'call-ask-1',
+        maxSteps: 32,
         memory: {
           thread: 't1',
           resource: 'user-1',
@@ -1083,6 +1138,10 @@ describe('POST /agents/answer — ask_user answer resume', () => {
     expect(res.statusCode).toBe(200);
     const [resumeData] = resumeStreamMock.mock.calls[0];
     expect(resumeData).toEqual(['Deal A', 'Deal B']);
+    // The persisted message shows the same trimmed values, formatted exactly
+    // as the UI renders the answer bubble (a bare array joins with ' · ').
+    const { messages } = memory.saveMessages.mock.calls[0][0];
+    expect(messages[0].content.parts[0].text).toBe('Deal A · Deal B');
   });
 
   it('carries the provider/model/thinking selection onto the resumed run', async () => {

@@ -79,7 +79,7 @@ export const ChatPanel = ({ chat, className }: IChatPanelProps) => {
   const isEmpty = messages.length === 0 && !loadingThread;
 
   const errorBanner = error ? (
-    <div className="flex items-start gap-2 border-b border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+    <div className="flex items-start gap-2 border-b border-destructive/30 bg-destructive/10 px-3 py-2 text-[13px] text-destructive sm:text-sm">
       <IconAlertCircle className="mt-0.5 size-4 shrink-0" />
       <p className="min-w-0 flex-1 break-words">{describeError(error)}</p>
       <Button
@@ -137,14 +137,20 @@ export const ChatPanel = ({ chat, className }: IChatPanelProps) => {
 
   if (isEmpty) {
     return (
-      <div className={`flex h-full min-h-0 flex-col ${className ?? ''}`}>
+      <div className={`flex h-full min-h-0 flex-1 flex-col ${className ?? ''}`}>
         {errorBanner}
         {/* Scroll-safe centering: centers when there is room, scrolls when the
             container is short (narrow side panel, mobile, split screens). */}
         <div className="min-h-0 flex-1 overflow-y-auto">
-          <div className="mx-auto flex min-h-full w-full max-w-2xl flex-col items-center justify-center gap-6 px-4 py-8">
-            <div className="flex flex-col items-center gap-4 text-center">
-              <BloubBot size={104} cycle={CALM_FACE_CYCLE} />
+          <div className="mx-auto flex min-h-full w-full max-w-xl flex-col items-center justify-center gap-5 px-4 py-6 sm:gap-6 sm:py-8 sm:max-w-2xl">
+            <div className="flex flex-col items-center gap-3 text-center sm:gap-4">
+              {/* Scaled down on short/narrow viewports so the hero never
+                  pushes the composer out of the panel. */}
+              <BloubBot
+                size={104}
+                cycle={CALM_FACE_CYCLE}
+                className="size-20 sm:size-24 md:size-[104px]"
+              />
               <div className="space-y-1">
                 <h2 className="text-lg font-semibold md:text-xl">
                   How can I help you today?
@@ -161,7 +167,7 @@ export const ChatPanel = ({ chat, className }: IChatPanelProps) => {
                   key={suggestion}
                   type="button"
                   onClick={() => sendMessage({ text: suggestion })}
-                  className="rounded-full border bg-card px-3 py-1.5 text-[13px] text-muted-foreground shadow-sm transition-colors hover:border-foreground/20 hover:text-foreground"
+                  className="rounded-full border bg-card px-3 py-1.5 text-xs text-muted-foreground shadow-sm transition-colors hover:border-foreground/20 hover:text-foreground sm:text-[13px]"
                 >
                   {suggestion}
                 </button>
@@ -174,7 +180,7 @@ export const ChatPanel = ({ chat, className }: IChatPanelProps) => {
   }
 
   return (
-    <div className={`flex h-full min-h-0 flex-col ${className ?? ''}`}>
+    <div className={`flex h-full min-h-0 flex-1 flex-col ${className ?? ''}`}>
       {errorBanner}
       <MessageList
         messages={messages}
@@ -187,8 +193,10 @@ export const ChatPanel = ({ chat, className }: IChatPanelProps) => {
         answerBusy={answerBusy || isStreaming}
         onAnswer={submitAnswer}
       />
-      <div className="bg-background/80 px-3 pb-3 pt-1 backdrop-blur">
-        <div className="mx-auto w-full max-w-3xl">{composer}</div>
+      {/* `pb` keeps the composer clear of the iOS home indicator without
+          adding dead space on every other device. */}
+      <div className="bg-background/80 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-1 backdrop-blur sm:px-4">
+        <div className="mx-auto w-full max-w-2xl md:max-w-3xl">{composer}</div>
       </div>
     </div>
   );

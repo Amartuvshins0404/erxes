@@ -235,10 +235,13 @@ export const ThreadList = ({
                           </span>
                         )}
                       </button>
+                      {/* Always visible where there is no reliable hover
+                          (touch, and the drawer below `lg`); hover-revealed
+                          only on the roomier pointer layouts. */}
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="size-6 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 hover:text-destructive"
+                        className="size-6 shrink-0 text-muted-foreground transition-opacity lg:opacity-0 lg:group-hover:opacity-100 lg:focus-visible:opacity-100 hover:text-destructive"
                         aria-label="Delete conversation"
                         onClick={() => setThreadToDelete(thread.id)}
                       >

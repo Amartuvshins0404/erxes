@@ -48,7 +48,7 @@ export const Composer = ({
 
   return (
     <div className="rounded-[22px] border bg-card shadow-sm transition-colors hover:border-foreground/20">
-      <div className="px-4 pt-3">
+      <div className="px-3.5 pt-3 sm:px-4">
         <ChatInput
           value={text}
           onChange={setText}
@@ -58,9 +58,11 @@ export const Composer = ({
           ariaLabel="Message"
         />
       </div>
+      {/* One row at every width: the pickers shrink (and truncate) instead of
+          pushing the send control out of the card on a phone. */}
       <div className="flex items-center gap-2 px-2.5 pb-2.5 pt-1.5">
         {pickers && (
-          <div className="ml-auto flex min-w-0 items-center gap-2">
+          <div className="flex min-w-0 flex-1 items-center gap-2">
             {pickers}
           </div>
         )}

@@ -243,7 +243,7 @@ export const ArtifactCard = ({ artifact }: IArtifactCardProps) => {
       </div>
       <div
         className={`p-3 transition-[height] duration-300 ease-in-out ${
-          expanded ? 'h-[75vh]' : 'h-[380px]'
+          expanded ? 'h-[70vh] sm:h-[75vh]' : 'h-[320px] sm:h-[380px]'
         }`}
       >
         {renderPreview()}

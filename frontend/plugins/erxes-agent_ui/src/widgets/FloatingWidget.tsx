@@ -1,4 +1,5 @@
-import { Sheet } from 'erxes-ui';
+import { IconHistory } from '@tabler/icons-react';
+import { Button, Sheet } from 'erxes-ui';
 import {
   useCallback,
   useEffect,
@@ -11,6 +12,7 @@ import { LAUNCHER_CYCLE } from '@/agents/botCycles';
 import { BloubBot } from '@/agents/components/BloubBot';
 import { ChatPanel } from '@/agents/components/ChatPanel';
 import { ThreadList } from '@/agents/components/ThreadList';
+import { ThreadsDrawer } from '@/agents/components/ThreadsDrawer';
 import { useAgentsChat } from '@/agents/hooks/useAgentsChat';
 import { useAgentsThreads } from '@/agents/hooks/useAgentsThreads';
 
@@ -82,6 +84,7 @@ const readStoredPosition = (): ILauncherPosition | null => {
  */
 export const FloatingWidget = () => {
   const [open, setOpen] = useState(false);
+  const [threadsOpen, setThreadsOpen] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [position, setPosition] = useState<ILauncherPosition>(() =>
     typeof window === 'undefined'
@@ -116,6 +119,24 @@ export const FloatingWidget = () => {
       // important enough to fail the interaction over.
     }
   }, []);
+
+  // Shared by the in-panel sidebar and the drawer, so picking a thread closes
+  // the drawer wherever it was opened from.
+  const handleSelectThread = (threadId: string) => {
+    setThreadsOpen(false);
+    void chat.openThread(threadId);
+  };
+
+  const handleNewConversation = () => {
+    setThreadsOpen(false);
+    chat.startNewConversation();
+  };
+
+  const handleThreadDeleted = (threadId: string) => {
+    if (chat.threadId === threadId) {
+      chat.startNewConversation();
+    }
+  };
 
   const handlePointerDown = (event: ReactPointerEvent<HTMLButtonElement>) => {
     if (event.button !== 0) {
@@ -180,31 +201,35 @@ export const FloatingWidget = () => {
       <Sheet open={open} onOpenChange={setOpen}>
         <Sheet.View
           side="right"
-          className="flex w-full flex-col p-0 sm:max-w-4xl"
+          className="flex w-[calc(100vw-1rem)] flex-col p-0 sm:max-w-4xl"
         >
-          <Sheet.Header>
+          <Sheet.Header className="gap-2">
             <Sheet.Title className="flex items-center gap-2 text-base font-semibold">
               <BloubBot size={24} state="idle" />
               Agents
             </Sheet.Title>
+            {/* Below `lg` the in-panel sidebar is hidden, so history lives in
+                a drawer — without this a phone had no way back to a thread. */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="ml-auto lg:hidden"
+              onClick={() => setThreadsOpen(true)}
+              aria-label="Open conversations"
+              title="Conversations"
+            >
+              <IconHistory />
+            </Button>
             <Sheet.Close aria-label="Close Agents" />
           </Sheet.Header>
           <Sheet.Content className="flex min-h-0 flex-1">
-            <aside className="hidden w-60 flex-none border-r md:block">
+            <aside className="hidden w-60 flex-none border-r lg:block xl:w-64">
               <ThreadList
                 threadsState={threadsState}
                 activeThreadId={chat.threadId}
-                onSelectThread={(threadId) => {
-                  void chat.openThread(threadId);
-                }}
-                onNewConversation={() => {
-                  chat.startNewConversation();
-                }}
-                onThreadDeleted={(threadId) => {
-                  if (chat.threadId === threadId) {
-                    chat.startNewConversation();
-                  }
-                }}
+                onSelectThread={handleSelectThread}
+                onNewConversation={handleNewConversation}
+                onThreadDeleted={handleThreadDeleted}
               />
             </aside>
             <div className="flex min-w-0 flex-1">
@@ -213,6 +238,16 @@ export const FloatingWidget = () => {
           </Sheet.Content>
         </Sheet.View>
       </Sheet>
+
+      <ThreadsDrawer
+        open={threadsOpen}
+        onOpenChange={setThreadsOpen}
+        threadsState={threadsState}
+        activeThreadId={chat.threadId}
+        onSelectThread={handleSelectThread}
+        onNewConversation={handleNewConversation}
+        onThreadDeleted={handleThreadDeleted}
+      />
 
       {!open && (
         <button

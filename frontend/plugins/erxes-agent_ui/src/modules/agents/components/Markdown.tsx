@@ -20,7 +20,7 @@ export const Markdown = ({ content }: { content: string }) => {
         '[&_h1]:my-2 [&_h1]:text-lg [&_h1]:font-semibold md:[&_h1]:text-xl',
         '[&_h2]:my-2 [&_h2]:text-lg [&_h2]:font-semibold md:[&_h2]:text-xl',
         '[&_h3]:my-1.5 [&_h3]:text-base [&_h3]:font-semibold md:[&_h3]:text-lg',
-        '[&_pre]:my-2 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:border [&_pre]:bg-muted/60 [&_pre]:p-3 [&_pre]:text-[13px] md:[&_pre]:text-sm',
+        '[&_pre]:my-2 [&_pre]:overflow-x-auto [&_pre]:whitespace-pre-wrap [&_pre]:break-words [&_pre]:rounded-lg [&_pre]:border [&_pre]:bg-muted/60 [&_pre]:p-3 [&_pre]:text-[13px] md:[&_pre]:text-sm',
         '[&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_pre_code]:font-mono',
         '[&_code]:rounded-md [&_code]:bg-muted [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:text-[13px] [&_code]:font-mono',
         '[&_a]:text-primary [&_a]:underline-offset-2 hover:[&_a]:underline',

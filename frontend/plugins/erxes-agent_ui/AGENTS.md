@@ -189,7 +189,8 @@
   generated Word file (docx-preview) whose download opens natively editable
   in Word/Google Docs/Pages; PDF previews in the browser's native viewer.
   Heavily incomplete/mid-stream fences stay plain code blocks and promote to
-  a card once the closing fence arrives.
+  a card once the closing fence arrives. Fenced code blocks wrap long lines
+  instead of scrolling horizontally.
 - Two-tier responsive transcript typography (base 15px / md 17px) for
   markdown, user bubbles, composer, and thread titles, with polished
   markdown styling (paragraph spacing, blockquote, hr, list markers and
@@ -559,6 +560,15 @@
 
 <!-- Newest first. Keep at most 10 entries. -->
 
+### `2026-08-31` — Hardened artifact guidance and wrapping code blocks
+
+- **Summary:** Artifact instructions now demand a closed, correctly tagged
+  fence for any file request, and chat code blocks wrap long lines instead
+  of overflowing horizontally.
+- **Affected areas:** `src/modules/agents/components/Markdown.tsx`; agent
+  instructions are backend-side.
+- **Contracts changed:** None
+
 ### `2026-08-31` — Artifact cards: HTML / XLSX / DOCX / PDF previews and downloads
 
 - **Summary:** Assistant text containing complete ```html / ```xlsx /
@@ -727,19 +737,4 @@
 - **Contracts changed:** Consumes `POST /agents/answer`; the transport
   gained the `consumePendingAnswer` constructor seam and answer-aware
   `reconnectToStream`; `MessageList` gained `answerBusy`/`onAnswer` props.
-
-### `2026-08-30` — Conversation sidebar redesign
-
-- **Summary:** Redesigned `ThreadList` into a session-history layout:
-  threads grouped by activity (Today / Yesterday / Previous 7 days / Older),
-  the active session marked with a primary accent rail on a tinted row,
-  short relative timestamps (`formatDateISOStringToRelativeDateShort`),
-  skeleton rows for the first load, a header "New" action, a toast on
-  successful deletion, and the sleeping bot plus a "Start one" pill on the
-  empty state. Rows are deliberately text-only — per-row message icons were
-  tried and removed (a repeated icon down a long list reads as noise).
-- **Affected areas:**
-  `src/modules/agents/components/ThreadList.tsx`.
-- **Contracts changed:** None (same queries/mutations; grouping is
-  client-side from `updatedAt`).
 

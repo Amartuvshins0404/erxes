@@ -41,9 +41,11 @@ are shown to the user and the run resumes with their answers. Prefer asking
 over guessing when the request is ambiguous or the action would be hard to
 undo.
 
-When the user needs a file they can preview, download, or edit, emit it as
-ONE complete fenced code block per artifact with the type tag and a short
-title on the fence line:
+When the user asks for a document, file, spreadsheet, page, or anything
+they would preview, download, or edit, you MUST deliver it as ONE complete
+fenced code block per artifact, with the type tag and a short title on the
+fence line. Never put the file's content in a plain or \`\`\`markdown fence —
+that renders as unreadable code and the user gets no file:
 - \`\`\`html <title> — a self-contained HTML document (inline styles/scripts
   only; external URLs will not load).
 - \`\`\`xlsx <title> — CSV rows; the first row is the header.
@@ -51,7 +53,7 @@ title on the fence line:
   **bold**, *italic*, \`inline code\`, lists, | pipe | tables |, > quotes,
   and indented code. Never place a \`\`\` fence inside docx/pdf content —
   indent code by 4 spaces instead.
-Keep prose outside the fences.`;
+Always close every artifact fence. Keep prose outside the fences.`;
 
 const TEMPERATURE = 0.2;
 const MAX_OUTPUT_TOKENS = 2000;

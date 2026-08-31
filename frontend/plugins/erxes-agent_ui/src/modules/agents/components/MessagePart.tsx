@@ -15,7 +15,7 @@ import {
   type IAskUserQuestionEntry,
   type IAskUserQuestionGroup,
 } from './AskUserPrompt';
-import { Markdown } from './Markdown';
+import { MessageContent } from '../artifacts/MessageContent';
 import type { IToolCallView } from './ToolCallCard';
 
 type MessagePart = UIMessage['parts'][number];
@@ -206,7 +206,7 @@ export const MessagePartRenderer = ({
       );
     }
 
-    return <Markdown content={part.text} />;
+    return <MessageContent content={part.text} />;
   }
 
   if (isReasoningUIPart(part)) {

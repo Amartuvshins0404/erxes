@@ -29,6 +29,15 @@
       ],
       "ui-modules/*": [
         "frontend/libs/ui-modules/src/*"
+      ],
+      "@univerjs/presets": [
+        "node_modules/@univerjs/presets/lib/types/index.d.ts"
+      ],
+      "@univerjs/presets/preset-sheets-core": [
+        "node_modules/@univerjs/preset-sheets-core/lib/types/index.d.ts"
+      ],
+      "@univerjs/presets/preset-sheets-core/locales/en-US": [
+        "node_modules/@univerjs/preset-sheets-core/lib/types/locales/en-US.d.ts"
       ]
     }
   },

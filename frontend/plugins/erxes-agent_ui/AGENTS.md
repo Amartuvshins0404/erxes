@@ -39,6 +39,9 @@
 - The animated bot avatar: the MIT-licensed, framework-free bloub engine
   vendored under `src/modules/agents/bloub/` (unchanged upstream code) plus
   the React wrapper `src/modules/agents/components/BloubBot.tsx`.
+- The artifact layer under `src/modules/agents/artifacts/`: the fence
+  splitter, artifact cards with previews/downloads, and the HTML / XLSX /
+  DOCX / PDF converters for files the assistant emits as tagged fences.
 - Plugin navigation, routing, and the `CONFIG` contract.
 
 ### Does not own
@@ -169,6 +172,17 @@
   administrators" note. The sandbox environment renders as a fixed
   "In-process (built-in server)" card marked Default — the backend
   validates the enum, the UI does not edit it.
+- Artifact cards: when assistant text contains a complete fence tagged
+  `html`, `xlsx`, `docx`, or `pdf` (title after the tag), the transcript
+  renders it as a card (type icon, title, format badge, Copy source /
+  Download / Expand actions, inline 380px ⇄ 75vh expansion) instead of a
+  code block. HTML previews inside a `sandbox="allow-scripts"` iframe with
+  an injected CSP; spreadsheets open as an editable Univer grid (edits are
+  session-local, exported through exceljs on download); docx previews the
+  generated Word file (docx-preview) whose download opens natively editable
+  in Word/Google Docs/Pages; PDF previews in the browser's native viewer.
+  Heavily incomplete/mid-stream fences stay plain code blocks and promote to
+  a card once the closing fence arrives.
 - Two-tier responsive transcript typography (base 15px / md 17px) for
   markdown, user bubbles, composer, and thread titles, with polished
   markdown styling (paragraph spacing, blockquote, hr, list markers and
@@ -204,6 +218,7 @@
 | Components          | `src/modules/agents/components/*`              | Chat panel (transcript + empty state + composer layouts), message list, parts, approval, tool call helpers, composer, `ChatInput`, markdown, thread list (with delete), provider picker, `BloubBot` avatar wrapper |
 | Bot cycles          | `src/modules/agents/botCycles.ts`              | Curated module-level montages (`CALM_FACE_CYCLE`, `LAUNCHER_CYCLE`) with stable references |
 | Bot avatar (vendored) | `src/modules/agents/bloub/*`                 | MIT-licensed framework-free bloub engine (upstream, unchanged) + `README.md` credit/license; the pure `engine.sample(t)` the `BloubBot` wrapper renders |
+| Artifacts            | `src/modules/agents/artifacts/*`             | `parseArtifacts` fence splitter, `MessageContent`/`ArtifactCard` rendering, sandboxed `HtmlPreview` + lazy previews (`SpreadsheetEditor`/`DocxPreview`/`PdfPreview`), converters (`csv`, `mdBlocks`, `xlsx`, `docx`, `pdf`), `download` |
 | Types               | `src/modules/agents/types.ts`                  | REST and stored-message shapes                    |
 | Federation          | `module-federation.config.ts`                  | Remote name, exposes, and shared library policy   |
 
@@ -237,6 +252,11 @@
 - `ai` (`DefaultChatTransport`, `UIMessage`, part type guards,
   `lastAssistantMessageIsCompleteWithApprovalResponses`) and
   `@ai-sdk/react` (`useChat`), matched to the backend's AI SDK major.
+- Artifact dependencies (root `package.json`, introduced via upstream PR
+  `erxes/erxes#9180`): `@univerjs/presets` + `@univerjs/preset-sheets-core`
+  (editable spreadsheet grid), `docx` (Word generation), plus the
+  already-present `exceljs` (xlsx export), `docx-preview` (Word preview)
+  and `@react-pdf/renderer` (PDF generation).
 - `erxes-ui` for `IUIConfig`, navigation items, `Breadcrumb`, `Button`,
   `buttonVariants`, `Sheet`, `AlertDialog`, `Input`, `Label`, `Textarea`,
   `Collapsible`, `Avatar`, `Spinner`, `Badge`, `toast`, and
@@ -308,6 +328,36 @@
   composer's `onSend`); do not introduce a second send path. The empty state
   (hero + composer + chips) lives in `ChatPanel` — `MessageList` is
   transcript-only and has no empty branch.
+- Artifact security invariants (non-negotiable):
+  - Only **complete** fences whose language is in the `html | xlsx | docx |
+    pdf` allow-list (`parseArtifacts.ts`) become cards; everything else
+    stays a plain code block. Never widen the allow-list without revisiting
+    every preview below.
+  - The HTML preview iframe uses `sandbox="allow-scripts"` ONLY (opaque
+    origin — no parent DOM/cookie/storage access), `srcDoc`,
+    `referrerPolicy="no-referrer"`, and injects a strict CSP meta as the
+    first policy (model-provided CSPs may only intersect and tighten). Do
+    NOT add `allow-same-origin`, `allow-popups`, or an "open in new tab"
+    action for HTML: a top-level `blob:`/`srcdoc` document inherits our
+    origin.
+  - Every heavy library (`exceljs`, `docx`, `docx-preview`,
+    `@react-pdf/renderer`, `@univerjs/*`) loads behind a dynamic
+    `import()`/`React.lazy` boundary (`ArtifactCard.tsx`); the module
+    federation entry must not gain a static import of any of them.
+  - The Univer grid is mounted vanilla (`createUniver` from
+    `@univerjs/presets`, `UniverSheetsCorePreset`, en-US locale from
+    `preset-sheets-core/locales/en-US`, CSS via
+    `@univerjs/presets/lib/styles/preset-sheets-core.css` — do not import
+    `@univerjs/core` directly, it is not a root dependency) and disposed
+    with `disposeUnit` on unmount. Cell seeds/exports use plain
+    `CellValue[][]` values, never the `CellValueType` enum (not
+    re-exported by the presets).
+  - Spreadsheet edits are session-local by design; Download reads the live
+    grid through the editor handle and falls back to the fence's parsed CSV
+    when the editor has not mounted.
+  - Generated docx files must stay native, fully editable OOXML (real
+    heading styles, `Table`/`TableRow`/`TableCell`, `TextRun` formatting —
+    no rasterized or protected output).
 - The transcript renders only approval prompts for tool parts; do not
   reintroduce tool-execution cards or spinner rows for tool states.
 - Transcript auto-scroll must follow the inbox ScrollArea viewport pattern
@@ -481,6 +531,15 @@
   reload, while a simple click opens the full-height side panel with
   threads and chat on any page, whose empty state matches the full page
   without floating or clipping (also on mobile).
+- Smoke (artifacts): ask the agent for "a quarterly sales report as a
+  spreadsheet" and confirm the reply renders an artifact card instead of a
+  code block — the spreadsheet opens as an editable grid (edit a cell,
+  Download, open in Excel, edit present), an html artifact's preview runs
+  scripts but sends no external network requests (devtools) and cannot
+  touch the parent page, a docx download opens in Word/Google Docs with
+  real, editable headings/tables, a pdf preview uses the native viewer, a
+  mid-stream fence shows as a plain code block until the closing fence
+  arrives, and reopening the thread regenerates the cards from stored text.
 - Smoke (code mode settings): open `/settings/erxes-agent/code-mode`
   (settings sidebar "Agents / Code mode") — as an admin the `Switch`
   reflects the tenant state, toggling saves immediately with a toast and
@@ -491,6 +550,31 @@
 ## Recent Changes
 
 <!-- Newest first. Keep at most 10 entries. -->
+
+### `2026-08-31` — Artifact cards: HTML / XLSX / DOCX / PDF previews and downloads
+
+- **Summary:** Assistant text containing complete ```html / ```xlsx /
+  ```docx / ```pdf fences now renders as artifact cards (icon + title +
+  format badge, Copy source / Download / Expand with inline 380px ⇄ 75vh
+  expansion) instead of plain code blocks: HTML previews in a
+  `sandbox="allow-scripts"` iframe with an injected first CSP; spreadsheets
+  open as an editable Univer grid whose Download exports the live grid via
+  exceljs (CSV fallback before mount); docx and pdf are generated on mount
+  (`docx` Packer / `@react-pdf/renderer`, lazy chunks) with a spinner,
+  retry-on-error preview, and a docx download that opens natively editable
+  in Word/Google Docs/Pages. A new `artifacts/` layer
+  (`parseArtifacts` splitter with CommonMark fence rules + unit tests,
+  `MessageContent`, `ArtifactCard`, `HtmlPreview`, lazy previews,
+  `csv`/`mdBlocks`/`xlsx`/`docx`/`pdf` converters) hangs off the
+  `MessagePart` assistant-text branch; the backend instructions gained the
+  matching fence convention. New deps landed first as upstream PR
+  `erxes/erxes#9180` (`docx`, `@univerjs/presets`,
+  `@univerjs/preset-sheets-core`).
+- **Affected areas:** `src/modules/agents/artifacts/*` (new),
+  `src/modules/agents/components/MessagePart.tsx` (text branch swaps
+  `Markdown` for `MessageContent`), root `package.json` (mirrored deps).
+- **Contracts changed:** None (pure presentation over existing message
+  text; no GraphQL/REST changes).
 
 ### `2026-08-31` — Code mode settings page (tenant-wide admin toggle)
 
@@ -657,25 +741,4 @@
   `frozenAt={0}` avatar remains as the sole sender indicator).
 - **Affected areas:** `src/modules/agents/components/MessageList.tsx`.
 - **Contracts changed:** None.
-
-### `2026-08-30` — Animated bloub bot avatar; calm, responsive empty state
-
-- **Summary:** Vendored the MIT-licensed framework-free bloub bot engine
-  under `src/modules/agents/bloub/` (upstream unchanged except `gaze.ts`
-  import paths; `README.md` carries the credit + license) and added the
-  React wrapper `BloubBot.tsx` (owns the rAF loop, montage cursor and SVG;
-  `engine.sample(t)` stays pure). Wired it into the chat: each assistant
-  message avatar (frozen idle, size 24), the "Thinking…" indicator (the
-  three-dots `thinking` state, size 20), and the empty-state hero. The hero
-  first shipped playing the full 14-state montage, which looked weird in the
-  narrow side panel — at the "thinking" block it collapsed to three dots
-  that read as a loading spinner and floated in an oversized box — so the
-  one shared empty state is now a calm idle avatar (size 96) with
-  scroll-safe centering, so it holds up identically on the full page, the
-  floating side panel and mobile.
-- **Affected areas:** `src/modules/agents/bloub/**` (new, vendored),
-  `src/modules/agents/components/BloubBot.tsx` (new),
-  `src/modules/agents/components/MessageList.tsx`.
-- **Contracts changed:** None (self-contained UI; no exposes, `CONFIG`,
-  routes, or GraphQL operations changed).
 

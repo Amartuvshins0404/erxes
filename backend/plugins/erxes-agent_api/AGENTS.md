@@ -129,6 +129,14 @@
   a failed model stream is logged server-side
   (`[erxes-agent] chat stream failed:`) and the client receives the
   provider's readable error message, not a generic dead end.
+- Teaches the artifact fence convention in the fixed agent instructions
+  (`DEFAULT_INSTRUCTIONS` in `src/modules/agents/agent.ts`): when the user
+  needs a file they can preview/download/edit, the model emits ONE complete
+  fenced code block per artifact — ```html (self-contained HTML),
+  ```xlsx <title> (CSV rows, first row headers), ```docx/```pdf <title>
+  (a markdown subset; never a ``` fence inside the content — 4-space
+  indented code instead) — with the title on the fence line. Prompt-only
+  convention; the UI renders matching fences as artifact cards.
 - Human-in-the-loop questions through the plugin-owned `ask_user` tool
   (`src/modules/agents/askUser.ts`, injected as `askUser` alongside the
   two-tier tool bridge; replaces Mastra's built-in single-question tool):
@@ -633,6 +641,20 @@
 
 <!-- Newest first. Keep at most 10 entries. -->
 
+### `2026-08-31` — Artifact fence convention in the fixed agent instructions
+
+- **Summary:** `DEFAULT_INSTRUCTIONS` (the chat agent's fixed
+  instructions) gained a prompt-only convention: file deliverables are
+  emitted as ONE complete tagged fence per artifact — ```html
+  (self-contained HTML), ```xlsx <title> (CSV rows, first row = header),
+  ```docx/```pdf <title> (a markdown subset; no ``` fences inside the
+  content, indented code instead) — with the title on the fence line, so
+  the agents UI renders them as preview/download artifact cards. No schema,
+  route, tool, or model changes.
+- **Affected areas:** `src/modules/agents/agent.ts`
+  (`DEFAULT_INSTRUCTIONS` only).
+- **Contracts changed:** None (system-prompt text only).
+
 ### `2026-08-31` — Code mode: sandboxed agent code execution behind a tenant-wide admin toggle
 
 - **Summary:** Added code mode: when an admin enables it
@@ -866,32 +888,4 @@
   `CopilotConnection` type and from `copilotConnectionUpdate`, whose
   signature is now `copilotConnectionUpdate(provider: String!, apiKey:
   String): CopilotConnection` with the model always defaulted server-side.
-
-### `2026-08-28` — Server-side provider model listing; BYOK drops baseUrl and cloudflare
-
-- **Summary:** Users now pick their model from each provider's live
-  `/models` endpoint: new `fetchProviderModels`/`PROVIDER_MODELS_ENDPOINTS`/
-  `BYOK_PROVIDERS` module fetches the list server-side with the user's key
-  (both `Authorization: Bearer` and `x-api-key` headers, 10s timeout,
-  deduplicated sorted string ids; the key never leaves the server and never
-  appears in errors), exposed through the new `copilotProviderModels`
-  query (explicit `apiKey` wins, else the stored key of a matching
-  provider). The BYOK surface no longer accepts or returns a `baseUrl`
-  (config only ever carries `apiKey`), and `cloudflare-ai-gateway` was
-  dropped from the BYOK whitelist — `copilotConnectionUpdate` now rejects
-  it, while `providers.ts` keeps resolving stored cloudflare connections.
-- **Affected areas:** `src/modules/copilot/providerModels.ts` (new),
-  `src/modules/copilot/graphql/resolvers/queries/providerModels.ts` (new),
-  `src/modules/copilot/graphql/schemas/connection.ts`,
-  `src/modules/copilot/graphql/resolvers/queries/connection.ts`,
-  `src/modules/copilot/graphql/resolvers/mutations/connection.ts`,
-  `src/apollo/resolvers/queries.ts`,
-  `src/modules/copilot/__tests__/connectionResolvers.test.ts` (+9 tests,
-  now 116).
-- **Contracts changed:** Added GraphQL query
-  `copilotProviderModels(provider: String!, apiKey: String): [String]`;
-  removed `CopilotConnection.baseUrl` and the `baseUrl` argument from
-  `copilotConnectionUpdate`; the update mutation's provider whitelist is now
-  `openai`, `grok`, `kimi`, `kimi-code` (`cloudflare-ai-gateway` is
-  rejected with `Unsupported AI provider`).
 

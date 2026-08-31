@@ -17,20 +17,20 @@ const activity = (
 });
 
 describe('promoted navigation activities', () => {
-  it('ranks Command before AI Agent', () => {
+  it('ranks Command', () => {
     expect(getPromotedNavigationRank(activity('cf-os'))).toBe(0);
-    expect(getPromotedNavigationRank(activity('erxes-agent'))).toBe(1);
     expect(getPromotedNavigationRank(activity('/cf-os/'))).toBe(0);
   });
 
   it('leaves other plugins unpromoted', () => {
     expect(isPromotedNavigationActivity(activity('sales'))).toBe(false);
+    expect(isPromotedNavigationActivity(activity('erxes-agent'))).toBe(false);
     expect(isPromotedNavigationActivity(activity('erxes-agent/agents'))).toBe(
       false,
     );
   });
 
-  it('pulls Command and AI Agent out of the plugin list and sorts them', () => {
+  it('pulls Command out of the plugin list', () => {
     const sales = activity('sales');
     const agent = activity('erxes-agent', 'AI Agent');
     const command = activity('cf-os', 'command');
@@ -39,8 +39,8 @@ describe('promoted navigation activities', () => {
     expect(
       splitPromotedNavigationActivities([sales, agent, command, operation]),
     ).toEqual({
-      promoted: [command, agent],
-      rest: [sales, operation],
+      promoted: [command],
+      rest: [sales, agent, operation],
     });
   });
 

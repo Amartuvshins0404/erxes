@@ -1,4 +1,7 @@
-import { lastAssistantMessageIsCompleteWithApprovalResponses } from 'ai';
+import {
+  isToolUIPart,
+  lastAssistantMessageIsCompleteWithApprovalResponses,
+} from 'ai';
 import type { UIMessage } from 'ai';
 import { useChat } from '@ai-sdk/react';
 import { useLazyQuery } from '@apollo/client';
@@ -12,6 +15,36 @@ import { AgentsChatTransport } from '../transport';
 
 /** Thinking depth selectable per turn in the chat UI. */
 export type IAgentsThinkingLevel = 'off' | 'minimal' | 'low' | 'medium' | 'high';
+
+/**
+ * Finds the suspended ask_user tool call in an assistant message: the
+ * `data-tool-call-suspended` data part carries the tool call id that the
+ * message's tool part is keyed by.
+ */
+const findAskUserSuspension = (
+  message: UIMessage | undefined,
+): { toolCallId: string } | null => {
+  if (!message || message.role !== 'assistant') {
+    return null;
+  }
+
+  for (const part of message.parts) {
+    const typed = part as {
+      type: string;
+      data?: { toolName?: string; toolCallId?: string };
+    };
+
+    if (
+      typed.type === 'data-tool-call-suspended' &&
+      typed.data?.toolName === 'askUser' &&
+      typed.data.toolCallId
+    ) {
+      return { toolCallId: typed.data.toolCallId };
+    }
+  }
+
+  return null;
+};
 
 export interface IUseAgentsChatResult {
   messages: UIMessage[];
@@ -38,8 +71,13 @@ export interface IUseAgentsChatResult {
   selectThinkingLevel: (level: IAgentsThinkingLevel) => void;
   /** True while an ask_user answer is being submitted and resumed. */
   answerBusy: boolean;
-  /** Submits the answer to the thread's suspended ask_user question. */
-  submitAnswer: (answer: string | string[]) => void;
+  /**
+   * Submits the answer(s) to the thread's suspended ask_user question(s):
+   * a bare string (or string array for one multi-select question) for a
+   * single-question card, or one entry per question positionally for a
+   * batched card.
+   */
+  submitAnswer: (answer: string | string[] | (string | string[])[]) => void;
 }
 
 /**
@@ -47,7 +85,13 @@ export interface IUseAgentsChatResult {
  * `AgentsChatTransport`. The framework owns message state, streaming, and
  * tool-approval handling; this hook only adds:
  *
- * - server thread tracking (learned from the `X-Agents-Thread-Id` header),
+ * - thread continuity: the thread id is generated client-side on the first
+ *   send (`crypto.randomUUID()`) and pinned to every subsequent turn in the
+ *   request body. The backend accepts client-supplied ids (auto-creating
+ *   unknown ones, 403 for foreign threads). The `X-Agents-Thread-Id`
+ *   response header is still captured when readable, but a cross-origin
+ *   caller cannot read it unless the gateway exposes it, so it must never
+ *   be the sole carrier of the id,
  * - automatic resend after an approval decision via the SDK's native
  *   `sendAutomaticallyWhen` predicate (the transport routes that resend to
  *   the backend's `/agents/approve` resume endpoint),
@@ -67,11 +111,21 @@ export const useAgentsChat = (): IUseAgentsChatResult => {
   const selectionRef = useRef<IAgentsRequestSelection>({});
   /**
    * The ask_user answer awaiting submission. Set by `submitAnswer`, read
-   * exactly once by the transport's reconnect path (which turns it into the
+   * exactly once by the transport's send path (which turns it into the
    * `POST /agents/answer` resume request), and cleared on read so a later
-   * reconnect (page reload) stays a no-op.
+   * send never replays it.
    */
-  const pendingAnswerRef = useRef<string | string[] | undefined>(undefined);
+  const pendingAnswerRef = useRef<
+    string | string[] | (string | string[])[] | undefined
+  >(undefined);
+
+  /** Generates the conversation's thread id on first use. */
+  const ensureThreadId = useCallback(() => {
+    if (!threadIdRef.current) {
+      threadIdRef.current = crypto.randomUUID();
+      setThreadId(threadIdRef.current);
+    }
+  }, []);
 
   const transport = useMemo(
     () =>
@@ -96,6 +150,20 @@ export const useAgentsChat = (): IUseAgentsChatResult => {
     sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses,
   });
 
+  /**
+   * Sends a turn after guaranteeing the conversation has a thread id, so the
+   * very first request already carries one and every later turn pins the same
+   * thread in the body.
+   */
+  const sendMessage = useCallback(
+    (...args: Parameters<typeof chat.sendMessage>) => {
+      ensureThreadId();
+
+      return chat.sendMessage(...args);
+    },
+    [chat, ensureThreadId],
+  );
+
   const selectModel = useCallback((nextProvider: string, nextModel: string) => {
     selectionRef.current = {
       ...selectionRef.current,
@@ -112,20 +180,62 @@ export const useAgentsChat = (): IUseAgentsChatResult => {
   }, []);
 
   /**
-   * Submits the answer to the suspended ask_user question: stage it on the
-   * transport and trigger the chat's resume path, whose reconnect consumer
-   * POSTs to `/agents/answer` and pipes the resumed stream through the same
-   * state machine as any other turn.
+   * Submits the answer to a suspended ask_user question: stage it on the
+   * transport, resolve the suspended tool part locally, then send a user
+   * message carrying the answer. The transport reroutes that one request to
+   * `POST /agents/answer`, whose resumed stream is processed by the send-side
+   * state machine — the SDK's own resume path cannot apply it (it builds an
+   * empty streaming state, so the resumed `tool-output-available` chunk finds
+   * no matching tool part and the whole stream is discarded).
    */
   const submitAnswer = useCallback(
-    (answer: string | string[]) => {
+    (answer: string | string[] | (string | string[])[]) => {
       if (chat.status !== 'ready') {
         return;
       }
 
       pendingAnswerRef.current = answer;
       setAnswerBusy(true);
-      void chat.resumeStream().finally(() => setAnswerBusy(false));
+
+      const answerText =
+        typeof answer === 'string'
+          ? answer
+          : answer
+              .map((part) => (Array.isArray(part) ? part.join(', ') : part))
+              .join(' · ');
+      const lastMessage = chat.messages[chat.messages.length - 1];
+      const suspension = findAskUserSuspension(lastMessage);
+
+      if (lastMessage && suspension) {
+        // The spread over the tool-part union loses its discriminants, so the
+        // patched array needs one explicit narrowing cast.
+        const patchedParts = lastMessage.parts.map((part) => {
+          if (
+            isToolUIPart(part) &&
+            part.toolCallId === suspension.toolCallId
+          ) {
+            return {
+              ...part,
+              state: 'output-available' as const,
+              output: {
+                content: `User answered: ${answerText}`,
+                isError: false,
+              },
+            };
+          }
+
+          return part;
+        }) as UIMessage['parts'];
+
+        chat.setMessages([
+          ...chat.messages.slice(0, -1),
+          { ...lastMessage, parts: patchedParts },
+        ]);
+      }
+
+      void chat
+        .sendMessage({ text: answerText })
+        .finally(() => setAnswerBusy(false));
     },
     [chat],
   );
@@ -178,7 +288,7 @@ export const useAgentsChat = (): IUseAgentsChatResult => {
     error: chat.error,
     threadId,
     loadingThread,
-    sendMessage: chat.sendMessage,
+    sendMessage,
     addToolApprovalResponse: chat.addToolApprovalResponse,
     stop: chat.stop,
     clearError: chat.clearError,

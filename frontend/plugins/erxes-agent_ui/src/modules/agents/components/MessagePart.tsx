@@ -10,7 +10,11 @@ import { Collapsible } from 'erxes-ui';
 import { useState } from 'react';
 
 import { ApprovalPrompt } from './ApprovalPrompt';
-import { AskUserPrompt, type IAskUserQuestion } from './AskUserPrompt';
+import {
+  AskUserPrompt,
+  type IAskUserQuestionEntry,
+  type IAskUserQuestionGroup,
+} from './AskUserPrompt';
 import { Markdown } from './Markdown';
 import type { IToolCallView } from './ToolCallCard';
 
@@ -59,15 +63,21 @@ export interface IMessagePartRendererProps {
   }) => void;
   /** True while an ask_user answer is being submitted. */
   answerBusy: boolean;
-  onAnswer: (answer: string | string[]) => void;
+  onAnswer: (answer: string | string[] | (string | string[])[]) => void;
+  /** Tool calls already resolved somewhere in the message. */
+  answeredToolCallIds: Set<string>;
 }
 
 /**
- * Extracts the ask_user question from a `data-tool-call-suspended` data part
- * emitted by the backend when the ask_user tool suspends. Returns null for
- * every other suspension or a malformed payload.
+ * Extracts the ask_user questions from a `data-tool-call-suspended` data
+ * part emitted by the backend when the ask_user tool suspends. The payload
+ * carries a `questions` batch (the plugin's multi-question tool); a legacy
+ * single-question payload is normalized into a one-entry group. Returns
+ * null for every other suspension or a malformed payload.
  */
-const readAskUserQuestion = (part: MessagePart): IAskUserQuestion | null => {
+const readAskUserQuestions = (
+  part: MessagePart,
+): IAskUserQuestionGroup | null => {
   if (!isDataUIPart(part)) {
     return null;
   }
@@ -80,36 +90,98 @@ const readAskUserQuestion = (part: MessagePart): IAskUserQuestion | null => {
 
   const data = typed.data as {
     toolName?: string;
-    suspendPayload?: unknown;
+    toolCallId?: string;
+    suspendPayload?: {
+      questions?: unknown;
+      question?: unknown;
+      options?: unknown;
+      selectionMode?: unknown;
+    };
   } | null;
 
   if (data?.toolName !== 'askUser') {
     return null;
   }
 
-  const payload = data.suspendPayload as Partial<IAskUserQuestion> | null;
+  const payload = data.suspendPayload;
 
-  if (!payload || typeof payload.question !== 'string' || !payload.question) {
+  if (!payload) {
     return null;
   }
 
-  const options = Array.isArray(payload.options)
-    ? payload.options.filter(
-        (option): option is { label: string; description?: string } =>
-          typeof option === 'object' &&
-          option !== null &&
-          typeof option.label === 'string',
-      )
-    : undefined;
+  const raw = (
+    Array.isArray(payload.questions) && payload.questions.length
+      ? payload.questions
+      : [payload]
+  ) as Record<string, unknown>[];
 
-  return {
-    question: payload.question,
-    ...(options?.length ? { options } : {}),
-    ...(payload.selectionMode === 'multi_select'
-      ? { selectionMode: 'multi_select' as const }
-      : {}),
-  };
+  const questions: IAskUserQuestionEntry[] = [];
+
+  for (const entry of raw) {
+    if (typeof entry.question !== 'string' || !entry.question) {
+      continue;
+    }
+
+    const options = Array.isArray(entry.options)
+      ? entry.options.filter(
+          (option): option is { label: string; description?: string } =>
+            typeof option === 'object' &&
+            option !== null &&
+            typeof (option as { label?: unknown }).label === 'string',
+        )
+      : undefined;
+
+    questions.push({
+      question: entry.question,
+      ...(options?.length ? { options } : {}),
+      ...(entry.selectionMode === 'multi_select'
+        ? { selectionMode: 'multi_select' as const }
+        : {}),
+    });
+  }
+
+  return questions.length ? { questions } : null;
 };
+
+/**
+ * Whether an assistant message renders anything at all: text, reasoning, an
+ * approval prompt, or an unanswered ask_user card. The transcript skips
+ * messages without any of these so answered interruptions never leave
+ * empty avatar-only rows behind.
+ */
+export const hasVisibleParts = (
+  parts: MessagePart[],
+  answeredToolCallIds: Set<string>,
+): boolean =>
+  parts.some((part) => {
+    if (isTextUIPart(part)) {
+      return part.text.trim().length > 0;
+    }
+
+    if (isReasoningUIPart(part)) {
+      return part.text.trim().length > 0;
+    }
+
+    if (isToolUIPart(part)) {
+      return part.state === 'approval-requested';
+    }
+
+    if (isDataUIPart(part)) {
+      const typed = part as {
+        type: string;
+        data?: { toolName?: string; toolCallId?: string };
+      };
+
+      return (
+        typed.type === 'data-tool-call-suspended' &&
+        typed.data?.toolName === 'askUser' &&
+        !!typed.data.toolCallId &&
+        !answeredToolCallIds.has(typed.data.toolCallId)
+      );
+    }
+
+    return false;
+  });
 
 /**
  * Renders one UIMessage part according to its type. Tool parts surface only
@@ -123,6 +195,7 @@ export const MessagePartRenderer = ({
   onApprovalRespond,
   answerBusy,
   onAnswer,
+  answeredToolCallIds,
 }: IMessagePartRendererProps) => {
   if (isTextUIPart(part)) {
     if (role === 'user') {
@@ -170,18 +243,29 @@ export const MessagePartRenderer = ({
     );
   }
 
-  // Data parts: the ask_user suspension carries the question the assistant
+  // Data parts: the ask_user suspension carries the questions the assistant
   // asked; approval suspensions' metadata is already surfaced by the tool
-  // part above. Everything else stays hidden.
+  // part above. Everything else stays hidden. An answered suspension's data
+  // part stays in the message, so the card is dropped once its tool call is
+  // resolved.
   if (isDataUIPart(part)) {
-    const question = readAskUserQuestion(part);
+    const group = readAskUserQuestions(part);
 
-    if (!question) {
+    if (!group) {
+      return null;
+    }
+
+    const typed = part as { data?: { toolCallId?: string } };
+
+    if (
+      typed.data?.toolCallId &&
+      answeredToolCallIds.has(typed.data.toolCallId)
+    ) {
       return null;
     }
 
     return (
-      <AskUserPrompt question={question} busy={answerBusy} onAnswer={onAnswer} />
+      <AskUserPrompt group={group} busy={answerBusy} onAnswer={onAnswer} />
     );
   }
 

@@ -13,12 +13,19 @@ import {
   loadCfOsConnectCodeClass,
 } from '@/cfos/db/models/CfOsConnectCode';
 import { ICfOsConnectCodeDocument } from '@/cfos/@types/connectCode';
+import {
+  IAgentsSettingsModel,
+  loadAgentsSettingsClass,
+} from '@/agents/db/models/Settings';
+import { IAgentsSettingsDocument } from '@/agents/@types/settings';
 
 export interface IModels {
   /** Per-user BYOK agents connection; one document per user per tenant. */
   AgentsConnection: IAgentsConnectionModel;
   /** Single-use cf-os passwordless sign-in codes. */
   CfOsConnectCodes: ICfOsConnectCodeModel;
+  /** Tenant-wide agents settings; one document per tenant. */
+  AgentsSettings: IAgentsSettingsModel;
 }
 
 export interface IContext extends IMainContext {
@@ -48,6 +55,13 @@ export const loadClasses = (db: mongoose.Connection): IModels => {
     ICfOsConnectCodeDocument,
     ICfOsConnectCodeModel
   >('cf_os_connect_codes', loadCfOsConnectCodeClass(models));
+
+  // Tenant-wide settings singleton (admin-controlled code mode flag);
+  // registered on the per-subdomain connection like every other model.
+  models.AgentsSettings = db.model<
+    IAgentsSettingsDocument,
+    IAgentsSettingsModel
+  >('agents_settings', loadAgentsSettingsClass(models));
 
   return models;
 };

@@ -22,8 +22,10 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PageHeader } from 'ui-modules';
 
+import { ProviderIcon } from '@/agents/components/ProviderIcon';
 import {
-  PROVIDER_OPTIONS,
+  getProviderLabel,
+  getProviderOption,
   ProviderPicker,
 } from '@/agents/components/ProviderPicker';
 import {
@@ -38,10 +40,6 @@ import type {
   IAgentsConnectionUpsertVariables,
 } from '@/agents/graphql/connection';
 import { useAgentsConnection } from '@/agents/hooks/useAgentsConnection';
-
-/** Human label for a stored provider value (`openai` -> `OpenAI`). */
-const getProviderLabel = (value: string): string =>
-  PROVIDER_OPTIONS.find((option) => option.value === value)?.label ?? value;
 
 /**
  * Settings BYOK management: every configured provider is listed with its
@@ -161,7 +159,7 @@ export const SettingsConnectionPage = () => {
             {error}
           </p>
         ) : (
-          <div className="mx-auto max-w-xl space-y-4 p-6">
+          <div className="mx-auto max-w-2xl space-y-4 p-6">
             <div className="rounded-xl border p-6">
               <div className="mb-4">
                 <Label className="font-sans text-sm font-medium normal-case">
@@ -174,44 +172,67 @@ export const SettingsConnectionPage = () => {
               </div>
 
               {connections.length === 0 ? (
-                <p className="rounded-lg border border-dashed p-3 text-sm text-muted-foreground">
-                  No provider configured yet. Add one below.
-                </p>
+                <div className="flex flex-col items-center gap-1.5 rounded-lg border border-dashed p-6 text-center">
+                  <IconSparkles
+                    className="size-5 text-muted-foreground"
+                    aria-hidden="true"
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    No provider configured yet. Add one below.
+                  </p>
+                </div>
               ) : (
                 <ul className="space-y-2">
-                  {connections.map((connection) => (
-                    <li
-                      key={connection.provider}
-                      className="flex items-center gap-2 rounded-lg border px-3 py-2"
-                    >
-                      <span
-                        className="size-2 shrink-0 rounded-full bg-emerald-500"
-                        aria-hidden="true"
-                      />
-                      <span className="min-w-0 flex-1 truncate text-sm font-medium">
-                        {getProviderLabel(connection.provider)}{' '}
-                        <span className="font-normal text-muted-foreground">
-                          ({connection.model})
-                        </span>
-                      </span>
-                      <span className="shrink-0 text-xs text-muted-foreground">
-                        {connection.updatedAt
-                          ? formatDateISOStringToRelativeDate(
-                              connection.updatedAt,
-                            )
-                          : ''}
-                      </span>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="size-7 shrink-0 text-muted-foreground hover:text-destructive"
-                        aria-label={`Remove ${getProviderLabel(connection.provider)} key`}
-                        onClick={() => setRemovingProvider(connection.provider)}
+                  {connections.map((connection) => {
+                    const option = getProviderOption(connection.provider);
+
+                    return (
+                      <li
+                        key={connection.provider}
+                        className="flex items-center gap-3 rounded-lg border px-3 py-2.5"
                       >
-                        <IconTrash className="size-3.5" />
-                      </Button>
-                    </li>
-                  ))}
+                        <ProviderIcon
+                          provider={connection.provider}
+                          className="size-8"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium">
+                            {getProviderLabel(connection.provider)}{' '}
+                            <span className="font-normal text-muted-foreground">
+                              ({connection.model})
+                            </span>
+                          </p>
+                          {option && (
+                            <p className="truncate text-xs text-muted-foreground">
+                              {option.description}
+                            </p>
+                          )}
+                        </div>
+                        <span className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
+                          <span
+                            className="size-1.5 shrink-0 rounded-full bg-emerald-500"
+                            aria-hidden="true"
+                          />
+                          {connection.updatedAt
+                            ? formatDateISOStringToRelativeDate(
+                                connection.updatedAt,
+                              )
+                            : ''}
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="size-7 shrink-0 text-muted-foreground hover:text-destructive"
+                          aria-label={`Remove ${getProviderLabel(connection.provider)} key`}
+                          onClick={() =>
+                            setRemovingProvider(connection.provider)
+                          }
+                        >
+                          <IconTrash className="size-3.5" />
+                        </Button>
+                      </li>
+                    );
+                  })}
                 </ul>
               )}
             </div>
@@ -307,9 +328,12 @@ export const SettingsConnectionPage = () => {
       >
         <AlertDialog.Content>
           <AlertDialog.Header>
-            <AlertDialog.Title>
-              Remove{' '}
-              {removingProvider ? getProviderLabel(removingProvider) : ''} key
+            <AlertDialog.Title className="flex items-center gap-2">
+              {removingProvider && (
+                <ProviderIcon provider={removingProvider} className="size-5" />
+              )}
+              Remove {removingProvider ? getProviderLabel(removingProvider) : ''}{' '}
+              key
             </AlertDialog.Title>
             <AlertDialog.Description>
               This provider disappears from the chat's model picker until a new

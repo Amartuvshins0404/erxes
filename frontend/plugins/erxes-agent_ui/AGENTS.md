@@ -20,7 +20,7 @@
   global floating widget side panel.
 - The plugin settings surface under `/settings/erxes-agent/*`: the
   settings router (`ErxesAgentSettings`), the settings sidebar
-  navigation (`ErxesAgentSettingsNavigation`), and the opencode-style
+  navigation (`ErxesAgentSettingsNavigation`), the opencode-style
   BYOK form at `src/pages/settings/SettingsConnectionPage.tsx` (select
   provider -> paste API key -> save; several providers can be configured
   side by side, each listed with its own entry and removable individually.
@@ -29,7 +29,11 @@
   by provider, with an implicit Auto (server default) entry, and a
   per-turn thinking-level picker (off/minimal/low/medium/high) sits next to
   it; both selections ride along with every chat turn. The chat surfaces
-  never query or manage keys; they only consume the models listing.
+  never query or manage keys; they only consume the models listing), and
+  the tenant-wide code mode page at
+  `src/pages/settings/SettingsCodeModePage.tsx` (admin-gated switch over
+  the backend's `agentsSettings` flags; every user can read the state,
+  only `manageAgentsSettings` holders can change it).
 - The AI SDK chat transport, stored-history mapping, REST client, and GraphQL
   documents under `src/modules/agents`.
 - The animated bot avatar: the MIT-licensed, framework-free bloub engine
@@ -52,8 +56,8 @@
   contributes a navigation group named `Agents` (icon + `defaultPath`
   `erxes-agent`, no panel `content`) and one module named `agents` at path
   `erxes-agent` (the chat page is the plugin root), plus a
-  `settingsNavigation` sidebar group ("Agents" / "API key") for the host
-  settings area. With no navigationGroup content the host renders no
+  `settingsNavigation` sidebar group ("Agents" / "API key" / "Code mode")
+  for the host settings area. With no navigationGroup content the host renders no
   secondary plugin panel: the rail click lands on the chat page directly.
 - Plugin routes mount the chat page directly at the plugin root
   (`<Route index element={<IndexPage />} />`) with no intermediate route
@@ -85,8 +89,7 @@
   curated `MESSAGE_AVATAR_SHUFFLE_POOL` with each state held its measured
   duration), the streaming "Thinking…"
   indicator and the thread-loading state (`thinking`), the thread list's
-  empty state (`sleep`), the approval prompt (`alert`), the ask_user card
-  (`wide`), the side-panel
+  empty state (`sleep`), the approval prompt (`alert`), the side-panel
   header (`idle`), and the floating launcher (`LAUNCHER_CYCLE`, `orbit`
   while dragged). The engine's `sample(t)` is a pure function of time; the
   wrapper owns the rAF loop, the montage cursor and the SVG.
@@ -101,13 +104,16 @@
   auto-resends, which the transport routes to the backend's
   `POST /agents/approve` resume endpoint. All other tool execution states
   are hidden in the transcript (no tool cards).
-- ask_user questions rendered inline as an `AskUserPrompt` card (wide-eyed
-  bot, question text, choice chips for options, multi-select chip state +
+- ask_user questions rendered inline as an `AskUserPrompt` card (question
+  text, choice chips for options, multi-select chip state +
   send counter, and a free-text input revealed by "None of these — type my
   own answer"). The suspension arrives as a `data-tool-call-suspended` data
-  part; answering stages the answer and triggers `chat.resumeStream()`,
-  whose transport consumer POSTs to the backend's `POST /agents/answer` and
-  pipes the resumed stream through the same useChat state machine.
+  part; answering stages the answer on the transport, resolves the
+  suspended tool part locally, and sends a user message carrying the
+  answer, which the transport reroutes to the backend's `POST /agents/answer`
+  and processes as a normal send (the SDK's own resume path builds an empty
+  streaming state, so the resumed `tool-output-available` chunk would find
+  no matching tool part and the whole stream would be discarded).
 - Loads stored threads and thread messages over GraphQL and maps them to AI
   SDK `UIMessage`s for rendering; the thread list refreshes itself through
   the `agentsThreadsChanged` subscription (debounced refetch).
@@ -128,12 +134,15 @@
   full-height right `Sheet` side panel with the thread sidebar (md and up)
   and the same chat surface.
 - BYOK in settings: each user manages their own AI connection on the
-  opencode-style form at `/settings/erxes-agent/connection`
+  form at `/settings/erxes-agent/connection`
   (also reachable via the chat page header "Settings" button). The form is
-  provider card grid -> API key -> save, with a step reveal (the key
-  section appears only once a provider is chosen or stored), a show/hide
-  toggle on the password input, a connected-status row with relative
-  `updatedAt`, and an `AlertDialog`-confirmed remove. Omitting `apiKey`
+  provider card grid -> API key -> save, with every provider card,
+  configured row and remove-dialog title led by the provider's brand mark
+  (`ProviderIcon`), a primary check badge on the selected card, a step
+  reveal (the key section appears only once a provider is chosen or
+  stored), a show/hide toggle on the password input, a connected-status
+  row with relative `updatedAt`, and an `AlertDialog`-confirmed remove.
+  Omitting `apiKey`
   keeps the stored key only when the provider is unchanged; switching
   providers requires a fresh key. The stored key is never rendered back.
   The model is always visible, never hidden: each configured entry shows
@@ -143,6 +152,23 @@
   runs (`Auto (gpt-5.6-luna)`). The chat surfaces have no key UI at all:
   chatting starts directly, and a missing key surfaces only as the
   backend's 400 error in the chat error banner.
+- Chat model picker: a grouped list of every configured provider's models
+  (fetched server-side), where the Auto entry and every model row lead
+  with their provider's brand mark or a sparkles icon (Auto) and model ids
+  render in mono; Radix renders the selected item's content in the
+  trigger, so the active provider's mark identifies the choice there too.
+  Per-provider group headers are uppercase micro-labels with the mark.
+- Code mode in settings: the tenant-wide toggle page at
+  `/settings/erxes-agent/code-mode` (settings sidebar "Agents / Code
+  mode"). Every agents user can read the current state
+  (`AgentsSettings` query); the `Switch` is disabled unless
+  `usePermissionCheck().hasActionPermission('manageAgentsSettings',
+  'erxes-agent')` holds, in which case toggling saves immediately through
+  `AgentsSettingsUpdate` (`refetchQueries` + success/error toasts).
+  Non-admins see the live state plus a muted "Managed by your
+  administrators" note. The sandbox environment renders as a fixed
+  "In-process (built-in server)" card marked Default — the backend
+  validates the enum, the UI does not edit it.
 - Two-tier responsive transcript typography (base 15px / md 17px) for
   markdown, user bubbles, composer, and thread titles, with polished
   markdown styling (paragraph spacing, blockquote, hr, list markers and
@@ -157,19 +183,23 @@
 | ------------------- | ---------------------------------------------- | ------------------------------------------------- |
 | Host contract       | `src/config.tsx`                               | Exports `CONFIG` consumed by `core-ui`            |
 | Routing             | `src/modules/ErxesAgentMain.tsx`               | Declares the plugin's main routes (chat at index) |
-| Settings routing    | `src/modules/ErxesAgentSettings.tsx`           | Declares the plugin's settings routes (`connection`) |
-| Settings navigation | `src/modules/ErxesAgentSettingsNavigation.tsx` | Settings sidebar group ("Agents" / "API key")     |
+| Settings routing    | `src/modules/ErxesAgentSettings.tsx`           | Declares the plugin's settings routes (`connection`, `code-mode`) |
+| Settings navigation | `src/modules/ErxesAgentSettingsNavigation.tsx` | Settings sidebar group ("Agents" / "API key" / "Code mode") |
 | Chat page           | `src/pages/agents/IndexPage.tsx`               | Full-page chat with thread sidebar                |
-| Settings page       | `src/pages/settings/SettingsConnectionPage.tsx`| Opencode-style BYOK form (save/remove connection) |
+| Settings page       | `src/pages/settings/SettingsConnectionPage.tsx`| Brand-mark BYOK form (save/remove connection)     |
+| Code mode page      | `src/pages/settings/SettingsCodeModePage.tsx`  | Tenant-wide code mode toggle (admin-gated switch + fixed sandbox environment card) |
 | Floating widget     | `src/widgets/FloatingWidget.tsx`               | Right-edge chevron handle + full-height `Sheet` side panel |
 | Chat hook           | `src/modules/agents/hooks/useAgentsChat.ts`    | `useChat` wrapper: thread tracking, approval resend, ask-user answer resume, history |
 | Threads hook        | `src/modules/agents/hooks/useAgentsThreads.ts` | Loads the user's agents threads                   |
 | Connection hook     | `src/modules/agents/hooks/useAgentsConnection.ts` | Loads the user's BYOK connection               |
-| Provider picker     | `src/modules/agents/components/ProviderPicker.tsx` | Provider whitelist + selectable card grid (settings form) |
-| Transport           | `src/modules/agents/transport.ts`              | `DefaultChatTransport` subclass; routes approval resend to `/agents/approve`, ask-user answers through the reconnect consumer to `/agents/answer` |
+| Provider icons      | `src/modules/agents/components/ProviderIcon.tsx` | Inline brand marks per provider (OpenAI, xAI, Kimi; Kimi Code = Kimi mark + code badge) |
+| Provider picker     | `src/modules/agents/components/ProviderPicker.tsx` | Provider whitelist, brand-mark card grid, and label helpers (settings form) |
+| Settings hook       | `src/modules/agents/hooks/useAgentsSettings.ts` | Loads the tenant-wide agents settings (code mode flag) |
+| Transport           | `src/modules/agents/transport.ts`              | `DefaultChatTransport` subclass; routes approval resends to `/agents/approve` and ask-user answer sends to `/agents/answer` |
 | History mapping     | `src/modules/agents/mapStoredMessages.ts`      | Stored Mastra messages → AI SDK `UIMessage`s      |
 | REST URLs           | `src/modules/agents/api.ts`                    | `/agents/chat`, `/agents/approve`, `/agents/answer` SSE endpoint URLs |
 | GraphQL documents   | `src/modules/agents/graphql/connection.ts`     | `AgentsConnection*` BYOK operations               |
+| GraphQL documents   | `src/modules/agents/graphql/settings.ts`       | `AgentsSettings` query + `AgentsSettingsUpdate` mutation |
 | GraphQL documents   | `src/modules/agents/graphql/threads.ts`        | `Agents*` thread list/detail operations and the `AgentsThreadsChanged` subscription |
 | Components          | `src/modules/agents/components/*`              | Chat panel (transcript + empty state + composer layouts), message list, parts, approval, tool call helpers, composer, `ChatInput`, markdown, thread list (with delete), provider picker, `BloubBot` avatar wrapper |
 | Bot cycles          | `src/modules/agents/botCycles.ts`              | Curated module-level montages (`CALM_FACE_CYCLE`, `LAUNCHER_CYCLE`) with stable references |
@@ -201,8 +231,9 @@
 - Backend GraphQL: `AgentsConnections`, `AgentsModels`,
   `AgentsConnectionUpsert`, `AgentsConnectionRemove` (the former singular
   `AgentsConnection`/`AgentsConnectionUpdate` operations are gone),
-  `AgentsThreads`, `AgentsThreadDetail`, `AgentsThreadRemove`, and the
-  `AgentsThreadsChanged` subscription (refetch signal only).
+  `AgentsThreads`, `AgentsThreadDetail`, `AgentsThreadRemove`, the
+  `AgentsThreadsChanged` subscription (refetch signal only), and the
+  tenant settings pair `AgentsSettings` / `AgentsSettingsUpdate`.
 - `ai` (`DefaultChatTransport`, `UIMessage`, part type guards,
   `lastAssistantMessageIsCompleteWithApprovalResponses`) and
   `@ai-sdk/react` (`useChat`), matched to the backend's AI SDK major.
@@ -210,7 +241,8 @@
   `buttonVariants`, `Sheet`, `AlertDialog`, `Input`, `Label`, `Textarea`,
   `Collapsible`, `Avatar`, `Spinner`, `Badge`, `toast`, and
   `REACT_APP_API_URL`.
-- `ui-modules` for `PageHeader`.
+- `ui-modules` for `PageHeader` and the permission gate
+  (`usePermissionCheck`, `hasActionPermission(action, pluginName)`).
 - `react-markdown` for assistant text, `@tabler/icons-react` for icons, and
   `react-router` / `react-router-dom` for routing.
 
@@ -222,9 +254,12 @@
   (`AgentsThreads` query with a subscription-driven debounced refetch;
   `AgentsThreadDetail` lazy query with `network-only` for opening a
   thread; `AgentsThreadRemove` with `refetchQueries`).
-- Chat state via the AI SDK's `useChat`; the plugin holds the server thread id
-  (learned from the `X-Agents-Thread-Id` response header) in a ref + React
-  state.
+- Chat state via the AI SDK's `useChat`; the plugin holds the conversation's
+  thread id in a ref + React state. The id is generated client-side on the
+  first send (`crypto.randomUUID()`) and pinned to every turn in the request
+  body — the `X-Agents-Thread-Id` response header is advisory only, because
+  a cross-origin browser cannot read a custom response header unless the
+  gateway lists it in `Access-Control-Expose-Headers` (it does not).
 - No Jotai atoms and no persisted client state.
 
 ## Local Invariants
@@ -281,8 +316,14 @@
   inside `setTimeout(0)`); it pauses while the user is scrolled up
   (near-bottom threshold 120px), re-arms when the transcript empties, and
   always jumps to the bottom once thread history finishes loading.
-- The BYOK API keys are write-only in the UI: `agentsConnections` never returns
-  it, the settings form renders it only in a password input (with a local
+- Code mode settings gating mirrors the backend: the switch saves through
+  `AgentsSettingsUpdate` only for `manageAgentsSettings` holders
+  (`usePermissionCheck` with the dashed plugin name `'erxes-agent'`);
+  everyone else gets a read-only view. The environment card is
+  display-only — the backend's `AGENTS_CODE_MODE_ENVIRONMENTS` enum is the
+  single source, and only `in-process` exists.
+- The BYOK API keys are write-only in the UI: `agentsConnections` never
+  returns it, the settings form renders it only in a password input (with a local
   show/hide toggle), and an empty `apiKey` on upsert must be omitted (not
   sent as an empty string, which clears that provider's stored key).
   Omitting `apiKey` keeps that provider's stored key. Each provider entry
@@ -303,6 +344,15 @@
   `autoModel` prop (`ChatPanel` passes the first configured connection's
   stored model — what the server default runs); it falls back to
   "Auto (server default)" only while that value is unknown.
+- Provider brand marks live only in `ProviderIcon.tsx` (inline SVG paths:
+  OpenAI from simple-icons CC0, xAI + Kimi from svgl.app; Kimi Code is the
+  Kimi mark plus a code badge — there is no separate Kimi Code logo). A new
+  `PROVIDER_OPTIONS` entry needs a matching `provider ===` branch there or
+  it falls back to the sparkles tile. Model-picker items must keep
+  `ProviderIcon` inside their children: Radix renders the selected item's
+  content in the trigger, which is how the active provider's mark appears
+  there — and do not re-add a manual chevron to the trigger, the
+  `erxes-ui` `Select.Trigger` already appends one.
 - The `navigationGroup` in `src/config.tsx` must NOT define `content` (or
   `subGroup`): the host renders a secondary plugin panel whenever group
   content exists, and the chat page must fill the width directly with no
@@ -310,8 +360,10 @@
   page via the activity `defaultPath`. (`IUIConfig.navigationGroup.content`
   became optional in `erxes-ui` to enable this.)
 - `src/modules/agents/bloub/` is vendored MIT code (see its `README.md`):
-  keep it pristine — the only edit was rewriting `gaze.ts`'s three `@/`
-  imports to relative `./bot/*`. Do not "clean up" the French comments,
+  keep it pristine — the only edits are rewriting `gaze.ts`'s three `@/`
+  imports to relative `./bot/*` and the deliberate plugin-added `writing`
+  state in `states.ts` (registered in `StateId`, `STATES`, `POSES` and
+  `SEQUENCE`, marked with a comment). Do not "clean up" the French comments,
   the non-null assertions (upstream style; they surface as lint warnings,
   not errors), or the measured constants (rounding them breaks the avatar).
   All bot rendering goes through the React wrapper `BloubBot.tsx`; never
@@ -340,16 +392,36 @@
   minus the state on screen (never an immediate repeat), holding each its
   measured duration from the vendored `makeBlock`, and memory stays O(1).
 - The assistant message avatar is contextual, never frozen: the streaming
-  tail shows `thinking`, a message with a pending ask_user suspension shows
+  tail shows the `writing` state (a plugin-added bloub state — pen strokes
+  with a fading ink trail; NOT upstream code, see the vendored-engine
+  invariant), a message with a pending ask_user suspension shows
   `wide`, and every settled message plays the `MESSAGE_AVATAR_SHUFFLE_POOL`
   walk. `frozenAt` remains available but no transcript avatar uses it.
+- Thread continuity is client-owned: `useAgentsChat` generates the thread id
+  on the first send (`crypto.randomUUID()` via `ensureThreadId`, called from
+  the wrapped `sendMessage`) and the transport includes it in every request
+  body (`threadId`), including approve/answer resumes. Do NOT restore
+  header-based thread tracking — the backend's `X-Agents-Thread-Id` response
+  header is invisible to the cross-origin browser (the gateway's
+  `cors(corsOptions)` never lists it under `Access-Control-Expose-Headers`),
+  so relying on it silently breaks every conversation into per-turn fresh
+  threads with no memory. The header capture in the transport stays as
+  advisory only.
 - Ask-user answers must resume through `POST /agents/answer` (threadId-keyed
-  resume), never a fresh `sendMessage`: `submitAnswer` stages the answer on
-  the transport's `consumePendingAnswer` seam and calls
-  `chat.resumeStream()`, whose reconnect consumer turns it into the answer
-  POST and returns the resumed stream — reusing the SDK's resume state
-  machine instead of hand-rolling stream injection. The staged answer is
-  consumed exactly once, and `startNewConversation` clears any stale one.
+  resume), never a fresh `sendMessage` against `/agents/chat`. But the answer
+  request must travel as a NORMAL SEND, not `chat.resumeStream()`: the SDK's
+  resume path builds its streaming state from an empty message, so the
+  resumed stream's leading `tool-output-available` chunk finds no matching
+  tool part and the SDK discards the ENTIRE stream (the symptom was a 200
+  SSE with nothing rendered and nothing stored). `submitAnswer` therefore
+  stages the answer on the transport's `consumePendingAnswer` seam, marks
+  the suspended tool part answered locally via `chat.setMessages`, and calls
+  `chat.sendMessage({ text: answer })`; `sendMessages` consumes the staged
+  answer, reroutes that one request to `/agents/answer`, and drops
+  `tool-output-available` chunks en route (they cannot match the fresh
+  streaming state). `MessageList` hides an answered suspension card by
+  toolCallId. The staged answer is consumed exactly once, and
+  `startNewConversation` clears any stale one.
 - All bot avatars render in the design system primary: `BloubBot`'s `color`
   prop defaults to `var(--primary)` and no caller overrides it. Catalog ids
   resolve through the vendored skins map; any other CSS color passes
@@ -395,10 +467,13 @@
   row reveals a working delete confirm,
   `/settings/erxes-agent/connection` (settings sidebar "Agents / API
   key", chat header "Settings") saves and removes the connection — the
+  provider cards and configured rows lead with their brand marks, the
   provider cards show each default model in parentheses
   (`OpenAI (gpt-5.6-luna)`), the configured entry shows the stored model
-  in parentheses, and the chat model picker's Auto entry shows the actual
-  default model — chatting
+  in parentheses, the chat model picker's Auto entry shows the actual
+  default model, and opening the picker shows per-provider group headers
+  with marks and mono model rows (the selected choice's mark appears in
+  the trigger) — chatting
   with no stored key shows only the backend's "Add your API key" error
   banner with no other key UI,
   and the floating bot launcher: shows the calm face cycle, dragging it
@@ -406,10 +481,107 @@
   reload, while a simple click opens the full-height side panel with
   threads and chat on any page, whose empty state matches the full page
   without floating or clipping (also on mobile).
+- Smoke (code mode settings): open `/settings/erxes-agent/code-mode`
+  (settings sidebar "Agents / Code mode") — as an admin the `Switch`
+  reflects the tenant state, toggling saves immediately with a toast and
+  survives a reload; as a non-admin the switch is disabled and the
+  "Managed by your administrators" note shows; the environment card reads
+  "In-process (built-in server)" marked Default.
 
 ## Recent Changes
 
 <!-- Newest first. Keep at most 10 entries. -->
+
+### `2026-08-31` — Code mode settings page (tenant-wide admin toggle)
+
+- **Summary:** Added the tenant-wide code mode settings surface: new
+  `AgentsSettings` / `AgentsSettingsUpdate` GraphQL documents
+  (`graphql/settings.ts`) + `useAgentsSettings` hook, and the
+  `SettingsCodeModePage` at `/settings/erxes-agent/code-mode` (settings
+  sidebar "Agents / Code mode") with an instant-apply `Switch`, toast
+  feedback, and the fixed "In-process (built-in server)" environment card.
+  Edit controls are gated by `usePermissionCheck`
+  (`manageAgentsSettings` on `erxes-agent`); non-admins get a read-only
+  state with a muted note. No chat-surface changes.
+- **Affected areas:**
+  `src/pages/settings/SettingsCodeModePage.tsx` (new),
+  `src/modules/agents/hooks/useAgentsSettings.ts` (new),
+  `src/modules/agents/graphql/settings.ts` (new),
+  `src/modules/ErxesAgentSettings.tsx` (route),
+  `src/modules/ErxesAgentSettingsNavigation.tsx` (nav item).
+- **Contracts changed:** Consumes `AgentsSettings` query and
+  `AgentsSettingsUpdate` mutation; settings navigation gains the
+  "Code mode" item (exposes and `CONFIG` unchanged).
+
+### `2026-08-31` — ask_user answer fix, writing avatar, question card slimmed
+
+- **Summary:** Fixed answering an ask_user question producing nothing: the
+  answer went through `chat.resumeStream()`, whose resume path builds an
+  empty streaming state, so the resumed `tool-output-available` chunk found
+  no tool part and the SDK discarded the whole stream (200 SSE, nothing
+  rendered or stored). Answers now travel as a normal send — `submitAnswer`
+  stages the answer, marks the suspended tool part answered locally, and
+  sends a user message carrying the answer; `sendMessages` reroutes it to
+  `POST /agents/answer` and drops `tool-output-available` chunks en route;
+  `MessageList` hides an answered suspension card by toolCallId. Also: the
+  streaming message avatar now plays a plugin-added `writing` bloub state
+  (pen strokes + fading ink trail, registered in the vendored engine) and
+  the bot avatar was removed from the question card.
+- **Affected areas:**
+  `src/modules/agents/{transport.ts, hooks/useAgentsChat.ts, botCycles.ts
+  (docs), bloub/bot/states.ts}`,
+  `src/modules/agents/components/{MessageList, MessagePart, AskUserPrompt}.tsx`.
+- **Contracts changed:** None (same `POST /agents/answer` contract; only the
+  client-side routing of the request changed).
+
+### `2026-08-31` — Fix fresh-thread-per-turn: client-generated thread ids
+
+- **Summary:** Every chat turn had been creating a new server thread with no
+  memory of the previous ones: the transport learned the thread id only from
+  the `X-Agents-Thread-Id` response header, which a cross-origin browser
+  cannot read because the gateway's CORS never lists it under
+  `Access-Control-Expose-Headers`. Thread continuity is now client-owned —
+  `useAgentsChat` generates the id on the first send (`crypto.randomUUID()`)
+  via `ensureThreadId` and the wrapped `sendMessage`, and the transport pins
+  it in every request body (chat, approve, answer); header capture stays
+  advisory only. The backend already accepted client-supplied ids
+  (auto-create unknown, 403 foreign).
+- **Affected areas:**
+  `src/modules/agents/hooks/useAgentsChat.ts`,
+  `src/modules/agents/transport.ts` (doc comment only).
+- **Contracts changed:** None (the backend contract already documented
+  client-supplied thread ids).
+
+### `2026-08-31` — Model picker redesign with provider brand marks
+
+- **Summary:** Reworked the chat `ModelPicker`: the Auto entry and every
+  model row lead with their provider's brand mark (`IconSparkles` for
+  Auto), per-provider group headers became uppercase micro-labels with the
+  mark, model ids render in mono, and the duplicate manual chevron was
+  removed (the `erxes-ui` trigger appends its own). Radix renders the
+  selected item's content in the trigger, so the active provider's mark
+  identifies the choice there too. The provider label helper moved to
+  `ProviderPicker` exports (shared with the settings page).
+- **Affected areas:**
+  `src/modules/agents/components/{ModelPicker, ProviderPicker}.tsx`.
+- **Contracts changed:** None (same props, `__auto__` sentinel and
+  `provider|model` values).
+
+### `2026-08-31` — BYOK settings redesign with provider icons
+
+- **Summary:** Redesigned the settings connection form around the new
+  `ProviderIcon` component (inline brand marks: OpenAI from simple-icons
+  CC0, xAI + Kimi from svgl.app; Kimi Code is the Kimi mark plus a code
+  badge): provider cards lead with a 36px mark and gain a primary check
+  badge when selected, configured-provider rows show the mark, the
+  provider description and the relative updated time, the empty state got
+  an icon-led dashed block, the remove dialog title carries the mark, and
+  the page widened to `max-w-2xl`.
+- **Affected areas:**
+  `src/modules/agents/components/{ProviderIcon (new), ProviderPicker}.tsx`,
+  `src/pages/settings/SettingsConnectionPage.tsx`.
+- **Contracts changed:** None (same queries/mutations; layout and
+  presentation only).
 
 ### `2026-08-31` — ask-user card, contextual message avatar with shuffle walk
 
@@ -506,108 +678,4 @@
   `src/modules/agents/components/MessageList.tsx`.
 - **Contracts changed:** None (self-contained UI; no exposes, `CONFIG`,
   routes, or GraphQL operations changed).
-
-### `2026-08-30` — Model always visible in parentheses
-
-- **Summary:** The stored/default model is no longer hidden anywhere: the
-  settings page's configured entries show the stored model in parentheses
-  (`OpenAI (gpt-5.6-luna)`), the provider cards show the default model a
-  fresh entry will store (new `PROVIDER_OPTIONS.defaultModel` display
-  copy mirroring the backend `PROVIDER_DEFAULTS`), and the chat model
-  picker's Auto entry shows the model the server default actually runs via
-  the new `autoModel` prop (`ChatPanel` re-added a display-only
-  `useAgentsConnection` query for it — no gating, no key UI). Together
-  with the backend change that refreshes a stale stored model to the
-  current provider default on re-save, an OpenAI entry always visibly
-  reads `gpt-5.6-luna`.
-- **Affected areas:**
-  `src/modules/agents/components/{ProviderPicker,ModelPicker,ChatPanel}.tsx`,
-  `src/pages/settings/SettingsConnectionPage.tsx`.
-- **Contracts changed:** None (all values come from existing
-  `AgentsConnections` query fields).
-
-### `2026-08-30` — No secondary nav panel: chat page fills the width
-
-- **Summary:** Removed the plugin's navigation panel content (the
-  "API key" settings shortcut module `ErxesAgentNavigation` was deleted and
-  `CONFIG.navigationGroup.content` dropped), so the host no longer renders
-  the secondary 256px plugin sidebar next to the chat page — the rail click
-  lands directly on the full-width chat. Enabled by making
-  `IUIConfig.navigationGroup.content` optional in `erxes-ui` (type-only
-  change). Settings remains reachable via the chat header "Settings"
-  button and the settings sidebar.
-- **Affected areas:** `src/config.tsx`, deleted
-  `src/modules/ErxesAgentNavigation.tsx`, `frontend/libs/erxes-ui/src/types/UIConfig.ts`.
-- **Contracts changed:** `CONFIG.navigationGroup` no longer carries
-  `content`; `IUIConfig.navigationGroup.content` is now optional in
-  `erxes-ui`.
-
-### `2026-08-30` — Chat is direct: in-chat API key step removed
-
-- **Summary:** Removed the chat panel's "API key required." pointer row
-  and its "Add API key" button (the floating widget shared `ChatPanel`, so
-  both surfaces lost it); the chat no longer queries the BYOK connection,
-  chatting starts directly, and a missing key surfaces only as the
-  backend's 400 error in the existing error banner. The pickers lost their
-  connection-based disabled state — the model picker still self-disables
-  while no provider models exist, and the thinking picker stays enabled.
-- **Affected areas:** `src/modules/agents/components/ChatPanel.tsx`.
-- **Contracts changed:** None (the chat simply no longer runs the
-  `AgentsConnections` query; all backend contracts are unchanged).
-
-### `2026-08-28` — Multi-provider BYOK, chat model + thinking pickers, nav panel slimmed
-
-- **Summary:** The settings BYOK page now manages several providers side by
-  side (configured entries listed with per-entry remove via
-  `AgentsConnectionRemove`, add/update form with provider cards and a
-  revealed-after-selection password key input), the chat gained a model
-  picker fed by the new `AgentsModels` query (grouped by provider, Auto =
-  server default) and a per-turn thinking-level picker
-  (off/minimal/low/medium/high), and both selections ride along with every
-  chat turn and the approval resend through the transport's
-  `getRequestSelection`. The nav panel content was slimmed to a single
-  settings shortcut — no duplicate chat entry point — so the rail click
-  lands directly on the chat page.
-- **Affected areas:** `src/modules/agents/graphql/connection.ts`,
-  `src/modules/agents/hooks/{useAgentsConnection,useAgentsModels,useAgentsChat}.ts`,
-  `src/modules/agents/transport.ts`,
-  `src/modules/agents/components/{ModelPicker,ThinkingPicker,ChatPanel}.tsx`,
-  `src/pages/settings/SettingsConnectionPage.tsx`,
-  `src/modules/ErxesAgentNavigation.tsx`, `src/config.tsx`.
-- **Contracts changed:** Consumes `AgentsConnections`, `AgentsModels`,
-  `AgentsConnectionUpsert`, `AgentsConnectionRemove` (singular
-  `AgentsConnection`/`AgentsConnectionUpdate` gone); chat and approve bodies
-  now carry optional `provider`/`model`/`thinkingLevel`.
-
-### `2026-08-28` — Rename plugin to `erxes-agent`; flatten routes; chevron launcher; chat hero
-
-- **Summary:** Renamed the former AI support plugin to the revived
-  `erxes-agent` name (project `erxes-agent_ui`, `CONFIG.name`
-  `erxes_agent`, path `/erxes-agent`), renamed every legacy chat-assistant
-  identifier to `agents` (hooks, transport, REST URLs,
-  `X-Agents-Thread-Id` header, and the `Agents*` GraphQL operations
-  matching the renamed backend), flattened the chat page to the plugin
-  root (index route, no intermediate segment, no redirect), replaced
-  the bottom-right round launcher with a right-edge vertical-center chevron
-  handle that hides while the sheet is open, and replaced the empty chat
-  state with a hero plus four suggestion chips that send through the
-  composer's existing `sendMessage({ text })` path.
-- **Affected areas:** `project.json`, `module-federation.config.ts`,
-  `jest.config.ts`, `tsconfig.json`, `src/config.tsx`,
-  `src/modules/ErxesAgentMain.tsx`, `src/modules/ErxesAgentNavigation.tsx`,
-  `src/modules/ErxesAgentSettings.tsx`,
-  `src/modules/ErxesAgentSettingsNavigation.tsx`,
-  `src/pages/agents/IndexPage.tsx`,
-  `src/pages/settings/SettingsConnectionPage.tsx`,
-  `src/widgets/FloatingWidget.tsx`, `src/modules/agents/**` (module
-  directory renamed as part of the identifier rename); deleted the empty
-  `src/modules/support` directory.
-- **Contracts changed:** Exposes are now `./config`, `./erxes_agent`,
-  `./erxes_agentSettings`, and `./floatingWidget`; `CONFIG.name` is now
-  `erxes_agent` with `permissionName: 'erxes-agent'` and
-  `path: 'erxes-agent'`; main route flattened to `/erxes-agent` (index
-  route, no redirect); now consumes the `AgentsConnection*`, `AgentsThreads`,
-  `AgentsThreadDetail`, `AgentsThreadRemove`, and `AgentsThreadsChanged`
-  GraphQL operations, REST `POST /agents/chat` + `POST /agents/approve`
-  behind `/pl:erxes-agent`, and the `X-Agents-Thread-Id` header.
 

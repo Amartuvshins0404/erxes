@@ -15,7 +15,12 @@ import {
   createModelConfig,
   resolveModelConnection,
 } from '@/agents/providers';
+import { buildAskUserTool } from '@/agents/askUser';
 import { buildAgentsTools } from '@/agents/tools';
+import {
+  buildCodeModeAddition,
+  type IAgentsCodeModeAddition,
+} from '@/agents/codeMode';
 
 /**
  * Builds the single agents chat agent per request from one of the acting
@@ -27,12 +32,14 @@ import { buildAgentsTools } from '@/agents/tools';
 
 const DEFAULT_INSTRUCTIONS = `You are a helpful assistant inside the erxes XOS. Answer concisely and accurately.
 
-You can ask the user a question with the ask_user tool when you need
+You can ask the user questions with the ask_user tool when you need
 clarification, must validate an assumption, or need the user to decide
-between options. Provide 2-4 options for structured choices or omit them
-for an open-ended question; the question is shown to the user and the run
-resumes with their answer. Prefer asking over guessing when the request is
-ambiguous or the action would be hard to undo.`;;
+between options. Batch related questions into ONE call via the questions
+array instead of suspending once per question. Provide 2-4 options for
+structured choices or omit them for an open-ended question; the questions
+are shown to the user and the run resumes with their answers. Prefer asking
+over guessing when the request is ambiguous or the action would be hard to
+undo.`;
 
 const TEMPERATURE = 0.2;
 const MAX_OUTPUT_TOKENS = 2000;
@@ -131,6 +138,7 @@ export const buildAgentsAgent = async ({
   memory,
   mastra,
   thinkingLevel = 'off',
+  codeMode,
 }: {
   /** The BYOK connection the chat selected for this turn. */
   connection: IAiAgentConnection;
@@ -145,6 +153,12 @@ export const buildAgentsAgent = async ({
   mastra?: Mastra;
   /** Thinking depth for this turn; mapped to per-provider options. */
   thinkingLevel?: IAgentsThinkingLevel;
+  /**
+   * When enabled, the agent additionally carries the code-mode tool:
+   * model-authored TypeScript runs in the tenant's in-process QuickJS
+   * sandbox, orchestrating the bridged tools as `external_*` functions.
+   */
+  codeMode?: { enabled: boolean };
 }): Promise<Agent> => {
   const resolved = resolveModelConnection({
     connection,
@@ -153,10 +167,14 @@ export const buildAgentsAgent = async ({
 
   // @mastra/core/agent is ESM-only; load it dynamically from CommonJS.
   const { Agent } = await import('@mastra/core/agent');
-  const [{ searchTools, callTool }, { askUserTool }] = await Promise.all([
-    buildAgentsTools(),
-    import('@mastra/core/tools'),
-  ]);
+  const [{ searchTools, callTool }, askUserTool, codeModeAddition] =
+    await Promise.all([
+      buildAgentsTools(),
+      buildAskUserTool(),
+      codeMode?.enabled
+        ? buildCodeModeAddition()
+        : Promise.resolve<IAgentsCodeModeAddition | null>(null),
+    ]);
 
   // Anthropic thinking consumes the output-token budget, so raise the cap
   // when a budget is requested instead of starving the visible response.
@@ -179,11 +197,22 @@ export const buildAgentsAgent = async ({
   return new Agent({
     id: 'agents',
     name: 'agents',
-    instructions: DEFAULT_INSTRUCTIONS,
+    instructions: codeModeAddition
+      ? `${DEFAULT_INSTRUCTIONS}\n\n${codeModeAddition.instructions}`
+      : DEFAULT_INSTRUCTIONS,
     // The model sees the two-tier tool bridge (discover tools, then execute
-    // one) plus Mastra's built-in ask_user tool for human-in-the-loop
-    // questions. The acting user is provided per-request via RequestContext.
-    tools: { searchTools, callTool, askUser: askUserTool },
+    // one) plus the plugin's multi-question ask_user tool for
+    // human-in-the-loop questions. With code mode on, the sandboxed
+    // execute_typescript tool is added under its own id. The acting user is
+    // provided per-request via RequestContext.
+    tools: {
+      searchTools,
+      callTool,
+      askUser: askUserTool,
+      ...(codeModeAddition
+        ? { [codeModeAddition.tool.id]: codeModeAddition.tool }
+        : {}),
+    },
     // `modelSettings` is not an Agent constructor option — it lives on each
     // entry of a model-fallback array (AgentConfig.model accepts
     // `MastraModelConfig | ModelWithRetries[]`). A single-entry array applies

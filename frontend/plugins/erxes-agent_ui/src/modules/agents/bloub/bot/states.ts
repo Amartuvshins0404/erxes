@@ -18,6 +18,7 @@ import {
 import { EYE_H, EYE_SPLIT, EYE_W, REST_GAZE, type HeadGaze } from './face'
 import { TAU, clamp, easings } from './math'
 import {
+  capsulePath,
   circle,
   hullOfCircles,
   polyPath,
@@ -150,6 +151,7 @@ function spinningTriangle(rot: number): Silhouette {
 export type StateId =
   | 'idle'
   | 'thinking'
+  | 'writing'
   | 'wink'
   | 'wide'
   | 'alert'
@@ -239,6 +241,69 @@ export const STATES: StateDef[] = [
             opacity: 0.55 + 0.45 * k
           }
         })
+      })
+    }
+  },
+
+  {
+    id: 'writing',
+    duration: 2.4,
+    morph: 0.45,
+    blinkIn: true,
+    baseBody: true,
+    baseFace: false,
+    // Plugin-added state (not upstream): the bot looks down at a pen sweeping
+    // short strokes to its lower right, leaving a fading ink trail — the
+    // streaming indicator of the agents chat. The body keeps the rest
+    // silhouette (baseBody), so morphs from and to every other state stay
+    // continuous.
+    pose: (t) => {
+      // One stroke per 1.2 s: the pen sweeps right, then the line fades and
+      // the stroke restarts from the left.
+      const STROKE = 1.2
+      const u = (t % STROKE) / STROKE
+      const sweep = easings.easeInOutCubic(clamp(u / 0.8))
+      const visible = clamp(u / 0.1) * clamp((1 - u) / 0.22)
+      // Nib path, just outside the lower-right of the body. The bob rides on
+      // top of the stroke line; the ink trail follows the line only, so the
+      // trail reads as written while the pen hand wiggles.
+      const penAt = (p: number) => ({
+        x: 0.62 + p * 0.46,
+        y: 0.82 - p * 0.13
+      })
+      const tip = penAt(sweep)
+      const tipY = tip.y + Math.sin(u * TAU * 2) * 0.015
+      const rot = -38
+      const rad = (rot * Math.PI) / 180
+      return base({
+        // looking down-right at the page, concentrated
+        gaze: { yaw: 14, pitch: -16, roll: -6 },
+        split: 15,
+        eyes: pair(0.2, 0.34),
+        offY: 0.03,
+        dots: [
+          {
+            // the pen: a capsule whose lower-left end is the nib
+            x: tip.x + Math.cos(rad) * 0.21,
+            y: tipY - Math.abs(Math.sin(rad)) * 0.21,
+            r: 0.1,
+            d: capsulePath(0.42, 0.14),
+            rot,
+            opacity: visible
+          },
+          // fresh ink at the nib, then the fading trail of the stroke
+          ...[0, 1, 2, 3].map((k) => {
+            const p = sweep - 0.18 * (k + 1)
+            const from = penAt(clamp(p))
+
+            return {
+              x: from.x,
+              y: from.y,
+              r: k === 0 ? 0.075 : 0.055,
+              opacity: p > 0 ? visible * (0.9 - k * 0.22) : 0
+            }
+          })
+        ]
       })
     }
   },
@@ -583,6 +648,7 @@ export const STATE_BY_ID = new Map(STATES.map((s) => [s.id, s]))
 export const POSES: Record<StateId, number> = {
   idle: 1,
   thinking: 1.1,
+  writing: 0.9,
   wink: 0.8,
   wide: 0.8,
   alert: 0.75,
@@ -601,6 +667,7 @@ export const POSES: Record<StateId, number> = {
 export const SEQUENCE: StateId[] = [
   'idle',
   'thinking',
+  'writing',
   'wink',
   'wide',
   'alert',

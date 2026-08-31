@@ -19,11 +19,11 @@ const MAX_EXPORT_COLUMNS = 50;
 const isBlankCell = (value: string | number | null): boolean =>
   value === null || value === '';
 
-const normalizeCell = (value: string | number | boolean | null): string | number => {
+const normalizeCell = (value: unknown): string | number => {
   if (typeof value === 'number') {
     return value;
   }
-  return value === null ? '' : String(value);
+  return value === null || value === undefined ? '' : String(value);
 };
 
 const trimEmptyEdges = (values: (string | number)[][]): (string | number)[][] => {
@@ -119,9 +119,7 @@ export const SpreadsheetEditor = ({ content, handleRef }: ISpreadsheetEditorProp
                 Math.min(active.getMaxColumns(), MAX_EXPORT_COLUMNS),
               )
               .getValues()
-              .map((row: (string | number | boolean | null)[]) =>
-                row.map(normalizeCell),
-              );
+              .map((row) => row.map(normalizeCell));
 
             return trimEmptyEdges(values);
           },

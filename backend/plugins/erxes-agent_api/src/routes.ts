@@ -531,19 +531,6 @@ const findSuspendedToolCall = async (
   };
 };
 
-/**
- * Formats an answer exactly as the UI renders it in the answer bubble:
- * multi-select answers join with ', ', batched multi-question answers with
- * ' · '. Persisting that same text keeps the stored transcript identical to
- * what the user saw in the optimistic local bubble.
- */
-const formatAnswerText = (answer: string | (string | string[])[]): string =>
-  typeof answer === 'string'
-    ? answer
-    : answer
-        .map((part) => (Array.isArray(part) ? part.join(', ') : part))
-        .join(' · ');
-
 router.post('/agents/answer', async (req, res) => {
   const identity = getIdentity(req);
 
@@ -657,32 +644,6 @@ router.post('/agents/answer', async (req, res) => {
     }
 
     const requestContext = await buildToolRequestContext(identity);
-
-    // The answer is a real turn of the conversation, not just resume fuel:
-    // persist it as a user message before resuming, so it survives reloads
-    // (the UI's answer bubble lives only in its local stream state). The
-    // text matches the UI's rendering of the same answer.
-    await runtime.memory.saveMessages({
-      messages: [
-        {
-          id: randomUUID(),
-          role: 'user',
-          threadId,
-          resourceId: identity.userId,
-          createdAt: new Date(),
-          content: {
-            format: 2,
-            parts: [
-              {
-                type: 'text',
-                text: formatAnswerText(answer),
-                createdAt: Date.now(),
-              },
-            ],
-          },
-        },
-      ],
-    });
 
     // A resumed first-turn run can still be the one that generates the
     // thread's title, so the answer path passes the same title event hook.

@@ -954,7 +954,7 @@ describe('POST /agents/answer — ask_user answer resume', () => {
     );
   });
 
-  it('persists the answer as a user message before resuming', async () => {
+  it('does not persist the answer as a user message before resuming', async () => {
     memory.getThreadById.mockResolvedValue({ resourceId: 'user-1' });
     listSuspendedRunsMock.mockResolvedValue({
       runs: [askUserRun('run-1')],
@@ -973,33 +973,10 @@ describe('POST /agents/answer — ask_user answer resume', () => {
     );
 
     expect(res.statusCode).toBe(200);
-    // The optimistic UI bubble is client-only, so the backend must store the
-    // answer itself — formatted exactly as the UI renders it (' · ' between
-    // questions, ', ' inside a multi-select) — or it vanishes on reload.
-    expect(memory.saveMessages).toHaveBeenCalledTimes(1);
-    const { messages } = memory.saveMessages.mock.calls[0][0];
-    expect(messages).toHaveLength(1);
-    expect(messages[0]).toMatchObject({
-      role: 'user',
-      threadId: 't1',
-      resourceId: 'user-1',
-      content: {
-        format: 2,
-        parts: [
-          {
-            type: 'text',
-            text: 'Сар сонгосон · Долоо хоног 1, Долоо хоног 2',
-          },
-        ],
-      },
-    });
-    expect(messages[0].id).toMatch(UUID_PATTERN);
-    expect(messages[0].createdAt).toBeInstanceOf(Date);
-    // The answer must be stored before the resumed run persists its own
-    // messages, so the transcript keeps the user turn before the reply.
-    expect(memory.saveMessages.mock.invocationCallOrder[0]).toBeLessThan(
-      resumeStreamMock.mock.invocationCallOrder[0],
-    );
+    // The answer survives inside the ask_user tool result that the resumed
+    // run persists (the UI renders it as the answered Q&A card), so storing
+    // it a second time as a user message would only duplicate model context.
+    expect(memory.saveMessages).not.toHaveBeenCalled();
   });
 
   it('refuses to resume a run owned by another user', async () => {
@@ -1138,10 +1115,9 @@ describe('POST /agents/answer — ask_user answer resume', () => {
     expect(res.statusCode).toBe(200);
     const [resumeData] = resumeStreamMock.mock.calls[0];
     expect(resumeData).toEqual(['Deal A', 'Deal B']);
-    // The persisted message shows the same trimmed values, formatted exactly
-    // as the UI renders the answer bubble (a bare array joins with ' · ').
-    const { messages } = memory.saveMessages.mock.calls[0][0];
-    expect(messages[0].content.parts[0].text).toBe('Deal A · Deal B');
+    // The answer is only resumed into the run — never stored as its own
+    // user message (it survives inside the ask_user tool result).
+    expect(memory.saveMessages).not.toHaveBeenCalled();
   });
 
   it('carries the provider/model/thinking selection onto the resumed run', async () => {

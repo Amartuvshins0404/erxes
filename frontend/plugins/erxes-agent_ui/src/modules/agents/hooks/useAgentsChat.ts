@@ -9,6 +9,8 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 
 import { AGENTS_THREAD_DETAIL } from '../graphql/threads';
 import type { IAgentsThreadDetailData } from '../graphql/threads';
+import { buildAskUserResult, readAskUserQuestionsFromInput } from '../askUserAnswers';
+import type { IAskUserQuestionEntry } from '../components/AskUserPrompt';
 import { mapStoredMessagesToUIMessages } from '../mapStoredMessages';
 import type { IAgentsRequestSelection, IPendingAnswer } from '../transport';
 import { AgentsChatTransport } from '../transport';
@@ -19,11 +21,11 @@ export type IAgentsThinkingLevel = 'off' | 'minimal' | 'low' | 'medium' | 'high'
 /**
  * Finds the suspended ask_user tool call in an assistant message: the
  * `data-tool-call-suspended` data part carries the tool call id that the
- * message's tool part is keyed by.
+ * message's tool part is keyed by, plus the questions being asked.
  */
 const findAskUserSuspension = (
   message: UIMessage | undefined,
-): { toolCallId: string } | null => {
+): { toolCallId: string; questions: IAskUserQuestionEntry[] } | null => {
   if (!message || message.role !== 'assistant') {
     return null;
   }
@@ -31,7 +33,7 @@ const findAskUserSuspension = (
   for (const part of message.parts) {
     const typed = part as {
       type: string;
-      data?: { toolName?: string; toolCallId?: string };
+      data?: { toolName?: string; toolCallId?: string; suspendPayload?: unknown };
     };
 
     if (
@@ -39,7 +41,10 @@ const findAskUserSuspension = (
       typed.data?.toolName === 'askUser' &&
       typed.data.toolCallId
     ) {
-      return { toolCallId: typed.data.toolCallId };
+      return {
+        toolCallId: typed.data.toolCallId,
+        questions: readAskUserQuestionsFromInput(typed.data.suspendPayload),
+      };
     }
   }
 
@@ -187,6 +192,13 @@ export const useAgentsChat = (): IUseAgentsChatResult => {
    * own resume path cannot apply it (it builds an empty streaming state, so
    * the resumed suspension replay finds no matching tool part and the whole
    * stream is discarded).
+   *
+   * The user message only carries the request through the send pipeline: it
+   * is marked with `metadata.agentsAnswer` so the transcript never renders
+   * it as a bubble — the answer displays as the assistant's answered Q&A
+   * card instead. The tool part is patched to the exact result the backend's
+   * ask_user tool persists, so the card renders identically live and after
+   * a reload.
    */
   const submitAnswer = useCallback(
     (answer: string | string[] | (string | string[])[]) => {
@@ -211,6 +223,11 @@ export const useAgentsChat = (): IUseAgentsChatResult => {
       };
 
       if (lastMessage && suspension) {
+        const resolved =
+          suspension.questions.length > 0
+            ? buildAskUserResult(suspension.questions, answer)
+            : { content: `User answered: ${answerText}`, isError: false as const };
+
         // The spread over the tool-part union loses its discriminants, so the
         // patched array needs one explicit narrowing cast.
         const patchedParts = lastMessage.parts.map((part) => {
@@ -221,10 +238,7 @@ export const useAgentsChat = (): IUseAgentsChatResult => {
             return {
               ...part,
               state: 'output-available' as const,
-              output: {
-                content: `User answered: ${answerText}`,
-                isError: false,
-              },
+              output: resolved,
             };
           }
 
@@ -238,7 +252,7 @@ export const useAgentsChat = (): IUseAgentsChatResult => {
       }
 
       void chat
-        .sendMessage({ text: answerText })
+        .sendMessage({ text: answerText, metadata: { agentsAnswer: true } })
         .finally(() => setAnswerBusy(false));
     },
     [chat],

@@ -1,117 +1,49 @@
+import type { IMainContext } from 'erxes-api-shared/core-types';
 import { createGenerateModels } from 'erxes-api-shared/utils';
-import { IMainContext, IUserDocument } from 'erxes-api-shared/core-types';
+
 import mongoose from 'mongoose';
 
-import { IMastraAgentDocument } from '@/agent/@types/agent';
-import { IMastraProviderDocument } from '@/provider/@types/provider';
-import { IMastraSettingsDocument } from '@/settings/@types/settings';
-import { IMastraWorkingMemoryDocument } from '@/memory/@types/workingMemory';
-import { loadAgentClass, IMastraAgentModel } from '@/agent/db/models/Agent';
 import {
-  loadAgentActionLogClass,
-  IMastraAgentActionLogModel,
-} from '@/agent/db/models/AgentActionLog';
-import { IMastraAgentActionLogDocument } from '@/agent/@types/agentActionLog';
-import {
-  loadProviderClass,
-  IMastraProviderModel,
-} from '@/provider/db/models/Provider';
-import {
-  loadSettingsClass,
-  IMastraSettingsModel,
-} from '@/settings/db/models/Settings';
-import { IPluginToolCurationDocument } from '@/plugintools/@types/pluginTools';
-import {
-  loadPluginToolCurationClass,
-  IPluginToolCurationModel,
-} from '@/plugintools/db/models/PluginTools';
-import {
-  loadWorkingMemoryClass,
-  IMastraWorkingMemoryModel,
-} from '@/memory/db/models/WorkingMemory';
-import {
-  loadArtifactClass,
-  IMastraArtifactModel,
-} from '@/artifact/db/models/Artifact';
-import { IMastraArtifactDocument } from '@/artifact/@types/artifact';
-import {
-  IMastraSandboxSessionDocument,
-  IMastraSandboxSessionModel,
-} from '@/sandbox/@types/session';
-import { sandboxSessionSchema } from '@/sandbox/db/definitions/session';
-import {
-  CfOsExchangeResult,
-  ICfOsConnectCodeDocument,
-} from '@/cfos/@types/connectCode';
+  IAgentsConnectionModel,
+  loadAgentsConnectionClass,
+} from '@/agents/db/models/Connection';
+import { IAgentsConnectionsDocument } from '@/agents/@types/connection';
 import {
   ICfOsConnectCodeModel,
   loadCfOsConnectCodeClass,
 } from '@/cfos/db/models/CfOsConnectCode';
+import { ICfOsConnectCodeDocument } from '@/cfos/@types/connectCode';
 
 export interface IModels {
-  MastraAgent: IMastraAgentModel;
-  MastraAgentActionLog: IMastraAgentActionLogModel;
-  MastraProvider: IMastraProviderModel;
-  MastraSettings: IMastraSettingsModel;
-  MastraPluginToolCuration: IPluginToolCurationModel;
-  MastraWorkingMemory: IMastraWorkingMemoryModel;
-  MastraArtifact: IMastraArtifactModel;
-  MastraSandboxSession: IMastraSandboxSessionModel;
+  /** Per-user BYOK agents connection; one document per user per tenant. */
+  AgentsConnection: IAgentsConnectionModel;
+  /** Single-use cf-os passwordless sign-in codes. */
   CfOsConnectCodes: ICfOsConnectCodeModel;
 }
 
-export type { CfOsExchangeResult };
-
 export interface IContext extends IMainContext {
   models: IModels;
-  user: IUserDocument;
+  /**
+   * Tenant slug attached by the shared Apollo context builder
+   * (`generateApolloContext`); declared here because `IMainContext` does not
+   * expose it even though it is present at runtime.
+   */
   subdomain: string;
 }
 
-/** Bind every plugin model class to the tenant's mongoose connection. */
 export const loadClasses = (db: mongoose.Connection): IModels => {
   const models = {} as IModels;
 
-  models.MastraAgent = db.model<IMastraAgentDocument, IMastraAgentModel>(
-    'mastra_agents',
-    loadAgentClass(models),
-  );
+  // One document per user within a tenant; the collection name matches the
+  // two-arg registration convention used by every other plugin connection in
+  // this repository.
+  models.AgentsConnection = db.model<
+    IAgentsConnectionsDocument,
+    IAgentsConnectionModel
+  >('agents_user_connections', loadAgentsConnectionClass(models));
 
-  models.MastraAgentActionLog = db.model<
-    IMastraAgentActionLogDocument,
-    IMastraAgentActionLogModel
-  >('mastra_agent_action_logs', loadAgentActionLogClass(models));
-
-  models.MastraProvider = db.model<
-    IMastraProviderDocument,
-    IMastraProviderModel
-  >('mastra_providers', loadProviderClass(models));
-
-  models.MastraSettings = db.model<
-    IMastraSettingsDocument,
-    IMastraSettingsModel
-  >('mastra_settings', loadSettingsClass(models));
-
-  models.MastraPluginToolCuration = db.model<
-    IPluginToolCurationDocument,
-    IPluginToolCurationModel
-  >('erxes_agent_plugin_tool_curations', loadPluginToolCurationClass(models));
-
-  models.MastraWorkingMemory = db.model<
-    IMastraWorkingMemoryDocument,
-    IMastraWorkingMemoryModel
-  >('mastra_working_memory', loadWorkingMemoryClass(models));
-
-  models.MastraArtifact = db.model<
-    IMastraArtifactDocument,
-    IMastraArtifactModel
-  >('mastra_artifacts', loadArtifactClass(models));
-
-  models.MastraSandboxSession = db.model<
-    IMastraSandboxSessionDocument,
-    IMastraSandboxSessionModel
-  >('mastra_sandbox_sessions', sandboxSessionSchema);
-
+  // cf-os passwordless dashboard sign-in: hashed, single-use, short-lived
+  // connect codes exchanged by the Cloudflare OS gatekeeper worker.
   models.CfOsConnectCodes = db.model<
     ICfOsConnectCodeDocument,
     ICfOsConnectCodeModel

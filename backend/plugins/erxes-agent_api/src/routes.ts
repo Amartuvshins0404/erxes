@@ -1,286 +1,626 @@
-import { Router } from 'express';
-import { createUIMessageStream, pipeUIMessageStreamToResponse } from 'ai';
+import type { UIMessage } from 'ai' with { 'resolution-mode': 'import' };
+import type { MastraMemory } from '@mastra/core/memory' with {
+  'resolution-mode': 'import',
+};
+import type { Agent } from '@mastra/core/agent' with {
+  'resolution-mode': 'import',
+};
+import type { RequestContext } from '@mastra/core/request-context' with {
+  'resolution-mode': 'import',
+};
+import type { IAiAgentConnection } from 'erxes-api-shared/core-modules';
+import { randomUUID } from 'crypto';
+import express, { Router } from 'express';
 import { extractUserFromHeader, getSubdomain } from 'erxes-api-shared/utils';
-import { checkPermissionGroup } from 'erxes-api-shared/core-modules';
-import { generateModels } from './connectionResolvers';
-import { toUserFacingError } from '@/agent/turn';
-import { requireScopedAgent } from '@/agent/authorization';
-import { IMastraChatAttachment } from '@/session/@types/session';
-import { attachmentStorageStatus } from '@/settings/graphql/resolvers/queries/settings';
-import { streamAgentTurn, type ChatStreamRequest } from './mastra/streamTurn';
-import { isReasoningEffort } from './mastra/providers';
-import type { ApprovedOp } from './mastra/requestContext';
-import { makeIpRateLimiter } from './utils/rateLimit';
-import { registerActiveRun } from './mastra/runRegistry';
-import { ERXES_AGENT_ACTIONS } from './meta/permissionActions';
-import { registerAgentLocaleRoutes } from './locales';
-import { registerWebsitePreviewRoutes } from './mastra/websitePreview';
-import { registerPluginToolsRoutes } from '@/plugintools/routes';
+import { buildAgentsAgent, isAgentsThinkingLevel, type IAgentsThinkingLevel } from '@/agents/agent';
+import { getAgentsRuntime } from '@/agents/memory';
+import { publishAgentsThreadsChanged } from '@/agents/threadsEvents';
+import type { IAgentsToolContext } from '@/agents/tools';
 import { registerCfOsRoutes } from '@/cfos/routes';
+import { generateModels, type IModels } from './connectionResolvers';
 
-export const router: Router = Router();
-registerAgentLocaleRoutes(router);
-registerWebsitePreviewRoutes(router);
-registerPluginToolsRoutes(router);
-registerCfOsRoutes(router);
+/**
+ * HTTP surface for the agents chat API.
+ *
+ * The agents module is a single agent built per request from one of the
+ * acting user's BYOK connections (multiple providers may be stored, managed
+ * through the `agentsConnections` GraphQL surface); there are no agent
+ * definition documents. Each turn carries an optional provider/model pick
+ * and a thinking level from the chat UI.
+ *
+ * - `POST /agents/chat` streams an AI SDK v7 UI message stream over SSE
+ *   from that per-request Mastra agent. Only the newest client message is
+ *   forwarded; history is loaded from and persisted to Mastra memory, keyed
+ *   by `threadId` (response header `X-Agents-Thread-Id`) and the acting
+ *   user as resource.
+ * - `POST /agents/approve` decides a run suspended on a destructive (or
+ *   always-confirm) tool call: `{ threadId, approved, reason? }`. It resolves
+ *   the held tool call and calls Mastra's `approveToolCall` (execute it and
+ *   continue the stream) or `declineToolCall` (skip it and tell the model
+ *   why). The suspended run is discovered from persistent snapshot storage
+ *   scoped to the thread and the acting user.
+ * - `POST /agents/answer` answers a run suspended by the built-in `ask_user`
+ *   tool: `{ threadId, answer }`. The suspended run is discovered the same
+ *   way (durable snapshots, ownership-checked) and resumed with
+ *   `agent.resumeStream(answer)`, so the ask_user call returns the user's
+ *   answer inside the model's generation loop and the reply continues from
+ *   there through the same SSE pipeline.
+ *
+ * Thread listing and message reading live in GraphQL (`agentsThreads`,
+ * `agentsThreadDetail`) so the sidebar can react to the
+ * `agentsThreadsChanged` subscription. Whenever a turn is persisted
+ * (Mastra's `onFinish`, fired after memory persistence) or a thread title is
+ * generated (Mastra's `memory.onTitleGenerated`), this module publishes the
+ * event over the shared Redis pubsub.
+ *
+ * Threads and messages are persisted by Mastra Memory backed by MongoDBStore
+ * over this plugin's shared mongoose connection.
+ */
 
-// Generous per-IP throttle on the LLM-backed endpoints — normal chat traffic
-// stays well under it; it only blunts abnormal high-frequency bursts and their
-// associated LLM/API cost.
-const llmRouteLimiter = makeIpRateLimiter();
-
-// ─── Streaming chat (AI SDK UIMessage stream) ────────────────────────────────
-//
-// POST /chat/stream — the in-app chat UI's transport, proxied through the
-// gateway at /pl:erxes-agent/chat/stream. The gateway's userMiddleware has
-// already authenticated the request and forwarded the user as a base64 header.
-//
-// The body is the standard AI SDK v5 UIMessage stream (text / reasoning / tool
-// parts), produced by Mastra's `toUIMessageStream` and bridged to the Express
-// response with `pipeUIMessageStreamToResponse`. On top of the model parts we
-// write three erxes-only transient data parts:
-//   data-activity      — LLM one-liner of what the agent is doing right now
-//   data-thread-title  — the auto-generated conversation title (after the turn)
-//   data-heartbeat     — keeps the gateway proxy socket warm during long tools
-// and stamp `messageId` / `interrupted` onto the assistant message's metadata
-// via the final `finish` chunk.
-//
-// Interrupt: the client aborts the fetch; the closed connection aborts the
-// agent run via AbortSignal. Whatever text already streamed is persisted and
-// marked `interrupted` so the partial reply survives reloads.
-
-// Shared skeleton for the untrusted-array shape guards below: an absent value is
-// an empty list; anything that isn't an array or overflows the cap is malformed
-// (null); otherwise each item is run through `validateItem`, and the first item
-// that fails (returns null) rejects the whole payload. Keeps the per-item
-// validation of each caller intact — this only owns the outer envelope.
-function parseBoundedArray<T>(
-  raw: unknown,
-  max: number,
-  validateItem: (item: unknown) => T | null,
-): T[] | null {
-  if (raw === undefined || raw === null) return [];
-  if (!Array.isArray(raw) || raw.length > max) return null;
-  const out: T[] = [];
-  for (const item of raw) {
-    const parsed = validateItem(item);
-    if (parsed === null) return null;
-    out.push(parsed);
-  }
-  return out;
+interface IRequestIdentity {
+  subdomain: string;
+  userId: string;
 }
 
-// Shape-check the attachments array a chat turn may carry. Returns the
-// sanitized list, or null when the payload is malformed.
-const MAX_ATTACHMENTS_PER_MESSAGE = 10;
-function sanitizeAttachments(raw: unknown): IMastraChatAttachment[] | null {
-  return parseBoundedArray(raw, MAX_ATTACHMENTS_PER_MESSAGE, (item) => {
-    const candidate = item as Record<string, unknown> | null | undefined;
-    if (
-      !candidate ||
-      typeof candidate.url !== 'string' ||
-      typeof candidate.name !== 'string'
-    )
-      return null;
-    const url = candidate.url.trim();
-    const name = candidate.name.trim();
-    if (!url || url.length > 2048 || !name || name.length > 512) return null;
-    return {
-      url,
-      name,
-      type:
-        typeof candidate.type === 'string'
-          ? candidate.type.slice(0, 128)
-          : undefined,
-      size:
-        // skipcq: JS-W1031 — byte size from untrusted input, not a collection length
-        typeof candidate.size === 'number' && candidate.size >= 0
-          ? candidate.size
-          : undefined,
-    };
+/** Error carrying an HTTP status so route handlers map failures to 4xx/5xx. */
+class HttpError extends Error {
+  readonly statusCode: number;
+
+  constructor(statusCode: number, message: string) {
+    super(message);
+    this.statusCode = statusCode;
+  }
+}
+
+const jsonError = (
+  res: express.Response,
+  status: number,
+  error: unknown,
+): void => {
+  res.status(status).json({
+    error: error instanceof Error ? error.message : 'Unexpected error',
   });
-}
+};
 
-// Shape-check the per-turn destructive-op approvals the client echoes back when
-// the user clicks Approve. Returns the sanitized list, or null when malformed.
-const MAX_APPROVED_OPS = 20;
-function sanitizeApprovedOperations(raw: unknown): ApprovedOp[] | null {
-  return parseBoundedArray(raw, MAX_APPROVED_OPS, (item) => {
-    const candidate = item as Record<string, unknown> | null | undefined;
-    if (!candidate || typeof candidate.operation !== 'string') return null;
-    const args =
-      candidate.args && typeof candidate.args === 'object'
-        ? (candidate.args as Record<string, unknown>)
-        : undefined;
-    return { operation: candidate.operation, args };
-  });
-}
+const getIdentity = (req: express.Request): IRequestIdentity | null => {
+  const user = extractUserFromHeader(req.headers);
 
-type ParseResult =
-  | { ok: true; value: ChatStreamRequest }
-  | { ok: false; error: string };
-
-function parseChatStreamBody(raw: unknown): ParseResult {
-  const body = (raw ?? {}) as Record<string, unknown>;
-  const { agentId, message, threadId, reasoningEffort } = body;
-
-  if (
-    typeof agentId !== 'string' ||
-    !agentId ||
-    typeof message !== 'string' ||
-    !message.trim()
-  ) {
-    return { ok: false, error: 'agentId and message are required' };
-  }
-  if (threadId !== undefined && typeof threadId !== 'string') {
-    return { ok: false, error: 'threadId must be a string' };
-  }
-  if (reasoningEffort !== undefined && !isReasoningEffort(reasoningEffort)) {
-    return {
-      ok: false,
-      error: 'reasoningEffort must be off | low | medium | high',
-    };
-  }
-
-  const attachments = sanitizeAttachments(body.attachments);
-  if (attachments === null) {
-    return { ok: false, error: 'Invalid attachments payload' };
-  }
-
-  const approvedOperations = sanitizeApprovedOperations(
-    body.approvedOperations,
-  );
-  if (approvedOperations === null) {
-    return { ok: false, error: 'Invalid approvedOperations payload' };
+  if (!user?._id) {
+    return null;
   }
 
   return {
-    ok: true,
-    value: {
-      agentId,
-      message,
-      threadId,
-      reasoningEffort,
-      attachments,
-      approvedOperations,
-    },
+    subdomain: getSubdomain(req),
+    userId: user._id,
   };
-}
+};
 
-router.post('/chat/stream', llmRouteLimiter, async (req, res) => {
-  const user = extractUserFromHeader(req.headers);
-  if (!user?._id) {
-    return res.status(401).json({ error: 'Login required' });
+/**
+ * Resolves the id a chat turn writes into and enforces ownership:
+ * - a client-supplied id must belong to the acting user (403 otherwise),
+ * - a missing id is auto-generated (Mastra creates the thread during
+ *   `agent.stream` and derives its title from the first message).
+ *
+ * Mastra auto-creates the thread, so no pre-creation happens here.
+ */
+const resolveOwnedThreadId = async ({
+  memory,
+  identity,
+  requestedThreadId,
+}: {
+  memory: MastraMemory;
+  identity: IRequestIdentity;
+  /** Client-provided thread id, or empty/undefined to start a new thread. */
+  requestedThreadId?: string;
+}): Promise<string> => {
+  const threadId = requestedThreadId?.trim() || randomUUID();
+
+  // Only the acting user may continue an existing thread.
+  const existing = await memory.getThreadById({ threadId });
+
+  if (existing && existing.resourceId !== identity.userId) {
+    throw new HttpError(403, 'Thread belongs to another user.');
   }
 
-  const parsed = parseChatStreamBody(req.body);
-  if (!parsed.ok) {
-    return res.status(400).json({ error: parsed.error });
-  }
-  // The validated turn payload (agentId, message, reasoningEffort, attachments,
-  // and approvedOperations) is handed to streamAgentTurn
-  // wholesale; only `attachments` is inspected here for the early storage guard.
-  const { attachments, threadId } = parsed.value;
+  return threadId;
+};
 
-  const subdomain = getSubdomain(req);
+/**
+ * Resolves the acting user's stored BYOK connection, shared by chat and
+ * approve. Without one the user is told exactly what is missing; the key
+ * itself is never echoed into the error.
+ */
+const resolveUserConnections = async (
+  models: IModels,
+  userId: string,
+): Promise<IAiAgentConnection[]> => {
+  const doc = await models.AgentsConnection.getConnections(userId);
 
-  // Streaming chat is the HTTP twin of the mastraAgentChat resolver, so it is
-  // gated by the same chat permission. checkPermissionGroup throws on denial
-  // (FORBIDDEN) — translate that into a 403 for the SSE client.
-  try {
-    await checkPermissionGroup(subdomain, user)(ERXES_AGENT_ACTIONS.agent.chat);
-  } catch {
-    return res.status(403).json({ error: 'Permission required' });
+  if (!doc || doc.connections.length === 0) {
+    throw new HttpError(400, 'Add your API key to start using Agents.');
   }
 
-  const models = await generateModels(subdomain);
-  try {
-    await requireScopedAgent({
-      models,
-      subdomain,
-      user,
-      action: ERXES_AGENT_ACTIONS.agent.chat,
-      agentId: parsed.value.agentId,
-    });
-  } catch {
-    return res.status(404).json({ error: 'AI team member not found' });
+  return doc.connections;
+};
+
+/**
+ * Picks the connection a turn runs on: the body's provider when given
+ * (validated against the user's stored entries), otherwise the first
+ * configured provider. An explicit `model` overrides the stored one for
+ * this turn only and is never persisted.
+ */
+const pickConnection = (
+  connections: IAiAgentConnection[],
+  provider?: string,
+  model?: string,
+): IAiAgentConnection => {
+  const requestedProvider = provider?.trim();
+  const selected = requestedProvider
+    ? connections.find(
+        (connection) => connection.provider === requestedProvider,
+      )
+    : connections[0];
+
+  if (!selected) {
+    throw new HttpError(
+      400,
+      `No connection stored for provider "${requestedProvider}". Add it under Settings → API key.`,
+    );
   }
 
-  // Attachments require the instance's upload storage — reject early (the UI
-  // hides the attach button in this state, so this is defense in depth).
-  if (attachments.length) {
-    const storage = await attachmentStorageStatus(models, subdomain);
-    if (!storage.enabled) {
-      return res.status(400).json({
-        error:
-          'File attachments are not available: no upload storage is configured on this instance. The conversation is text-only.',
-      });
-    }
-  }
+  const requestedModel = model?.trim();
 
-  // The plugin's global cors() stamps `Access-Control-Allow-Origin: *` on
-  // every response, and the gateway proxy pipes upstream headers over its own
-  // whitelist-scoped ones. Browsers reject a wildcard origin on credentialed
-  // requests ("Failed to fetch"), so drop it (pipeUIMessageStreamToResponse sets
-  // the SSE headers below) and let the gateway's CORS headers stand.
-  res.removeHeader('Access-Control-Allow-Origin');
+  return requestedModel ? { ...selected, model: requestedModel } : selected;
+};
 
-  let clientGone = false;
-  let heartbeat: ReturnType<typeof setInterval> | undefined;
-  const controller = new AbortController();
-  const stopHeartbeat = () => {
-    if (heartbeat) clearInterval(heartbeat);
-    heartbeat = undefined;
-  };
-  req.on('close', () => {
-    clientGone = true;
-    controller.abort();
-    stopHeartbeat();
-  });
+const parseThinkingLevel = (value: unknown): IAgentsThinkingLevel =>
+  isAgentsThinkingLevel(value) ? value : 'off';
 
-  // Explicit server-driven cancel: track this run so mastraChatCancel can abort
-  // it even when the gateway proxy swallows the client disconnect (req.on close
-  // never fires upstream). Only tracked when the client sent its own threadId —
-  // the key the cancel mutation carries. Unregistered in the run's finally.
-  const unregisterRun = threadId
-    ? registerActiveRun(subdomain, user._id, threadId, controller)
-    : () => undefined;
+/**
+ * Stamps the acting user into a Mastra RequestContext so the two-tier tools
+ * (searchTools/callTool) can validate and execute as that user. Identity
+ * always comes from the gateway headers, never from the request body.
+ */
+const buildToolRequestContext = async (
+  identity: IRequestIdentity,
+): Promise<RequestContext<IAgentsToolContext>> => {
+  // @mastra/core/request-context is ESM-only; load it dynamically.
+  const { RequestContext: RequestContextCtor } = await import(
+    '@mastra/core/request-context'
+  );
+  const requestContext = new RequestContextCtor<IAgentsToolContext>();
 
-  const stream = createUIMessageStream({
-    onError: (err) => {
-      console.error('[mastra chat stream error]', err);
-      return toUserFacingError(err).message;
-    },
-    execute: async ({ writer }) => {
-      // A transient data part keeps the gateway proxy socket warm during long
-      // tool calls: it streams as bytes but is dropped client-side (never added
-      // to the message). Replaces the old `: ping` SSE comment.
-      heartbeat = setInterval(() => {
-        if (!clientGone)
-          writer.write({ type: 'data-heartbeat', data: {}, transient: true });
-      }, 10000);
+  requestContext.set('subdomain', identity.subdomain);
+  requestContext.set('userId', identity.userId);
 
-      try {
-        await streamAgentTurn({
-          writer,
-          models,
-          subdomain,
-          user,
-          controller,
-          clientGone: () => clientGone,
-          request: parsed.value,
-        });
-      } finally {
-        stopHeartbeat();
-        unregisterRun();
-      }
-    },
-  });
+  return requestContext;
+};
+
+type IAgentStream = Awaited<ReturnType<Agent['stream']>>;
+
+/**
+ * Readable client-facing message for a failed model stream. Provider errors
+ * (rate limits, unsupported parameters, invalid keys) carry actionable text
+ * and no secrets — the API key never appears in an error body — so the
+ * message is forwarded instead of a generic dead end.
+ */
+const describeStreamError = (error: unknown): string => {
+  const message = error instanceof Error ? error.message.trim() : '';
+
+  return message || 'The model failed to generate a response.';
+};
+
+/**
+ * Streams a Mastra model output to the response as an AI SDK v7 UI message
+ * stream, exposing the conversation id before streaming starts so clients
+ * can continue the same thread on their next request.
+ */
+const pipeAgentStream = async (
+  res: express.Response,
+  threadId: string,
+  stream: IAgentStream,
+): Promise<void> => {
+  res.setHeader('X-Agents-Thread-Id', threadId);
+
+  // 'ai' and '@mastra/ai-sdk' are ESM-only; load them dynamically from
+  // CommonJS.
+  const { pipeUIMessageStreamToResponse } = await import('ai');
+  const { toAISdkStream } = await import('@mastra/ai-sdk');
 
   pipeUIMessageStreamToResponse({
     response: res,
-    stream,
-    // Keep the gateway proxy from buffering the streamed SSE body.
-    headers: { 'X-Accel-Buffering': 'no' },
+    stream: toAISdkStream(stream, {
+      from: 'agent',
+      version: 'v7',
+      // Log the underlying failure server-side for diagnosis while the
+      // client receives the provider's readable message.
+      onError: (error) => {
+        console.error('[erxes-agent] chat stream failed:', error);
+
+        return describeStreamError(error);
+      },
+    }),
   });
+};
+
+export const router: Router = Router();
+
+// cf-os passwordless dashboard sign-in (mint + gatekeeper exchange). The
+// cf_os_ui plugin calls `/pl:erxes-agent/cf-os/connect-code`.
+registerCfOsRoutes(router);
+
+router.post('/agents/chat', async (req, res) => {
+  const identity = getIdentity(req);
+
+  if (!identity) {
+    jsonError(res, 401, new Error('Authentication required'));
+    return;
+  }
+
+  const body = (req.body || {}) as {
+    messages?: UIMessage[];
+    threadId?: string;
+    provider?: string;
+    model?: string;
+    thinkingLevel?: string;
+  };
+
+  if (!Array.isArray(body.messages) || body.messages.length === 0) {
+    jsonError(res, 400, new Error('`messages` must be a non-empty array'));
+    return;
+  }
+
+  // Mastra memory loads history from storage itself; forwarding the whole
+  // client transcript would duplicate messages and risks ordering conflicts
+  // with stored timestamps (see Mastra's message-history guidance).
+  const newestMessage = body.messages[body.messages.length - 1];
+
+  if (!newestMessage || newestMessage.role !== 'user') {
+    jsonError(res, 400, new Error('The newest message must be from the user.'));
+    return;
+  }
+
+  try {
+    const models = await generateModels(identity.subdomain);
+    const connections = await resolveUserConnections(models, identity.userId);
+    const connection = pickConnection(
+      connections,
+      body.provider,
+      body.model,
+    );
+    const thinkingLevel = parseThinkingLevel(body.thinkingLevel);
+    const runtime = await getAgentsRuntime(identity.subdomain);
+    const threadId = await resolveOwnedThreadId({
+      memory: runtime.memory,
+      identity,
+      requestedThreadId: body.threadId,
+    });
+
+    const agent = await buildAgentsAgent({
+      connection,
+      memory: runtime.memory,
+      mastra: runtime.mastra,
+      thinkingLevel,
+    });
+
+    const requestContext = await buildToolRequestContext(identity);
+
+    // Mastra fires `onFinish` after the run's messages are persisted, and
+    // `onTitleGenerated` later, once the asynchronous thread title lands —
+    // both are the moments the sidebar must refresh, so each publishes the
+    // per-user `agentsThreadsChanged` event over the shared Redis pubsub.
+    const stream = await agent.stream([newestMessage], {
+      memory: {
+        thread: threadId,
+        resource: identity.userId,
+        onTitleGenerated: () => publishAgentsThreadsChanged(identity.userId),
+      },
+      onFinish: () => publishAgentsThreadsChanged(identity.userId),
+      requestContext,
+    });
+
+    await pipeAgentStream(res, threadId, stream);
+  } catch (error) {
+    const status = error instanceof HttpError ? error.statusCode : 500;
+
+    jsonError(res, status, error);
+  }
+});
+
+router.post('/agents/approve', async (req, res) => {
+  const identity = getIdentity(req);
+
+  if (!identity) {
+    jsonError(res, 401, new Error('Authentication required'));
+    return;
+  }
+
+  const body = (req.body || {}) as {
+    threadId?: string;
+    approved?: boolean;
+    reason?: string;
+    provider?: string;
+    model?: string;
+    thinkingLevel?: string;
+  };
+
+  const threadId =
+    typeof body.threadId === 'string' ? body.threadId.trim() : '';
+
+  if (!threadId) {
+    jsonError(res, 400, new Error('`threadId` is required.'));
+    return;
+  }
+
+  if (typeof body.approved !== 'boolean') {
+    jsonError(res, 400, new Error('`approved` must be true or false.'));
+    return;
+  }
+
+  const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
+
+  try {
+    const models = await generateModels(identity.subdomain);
+    const connections = await resolveUserConnections(models, identity.userId);
+    // The resumed run continues on the same provider/model the UI used for
+    // the suspended turn; the UI resends them with the decision.
+    const connection = pickConnection(
+      connections,
+      body.provider,
+      body.model,
+    );
+    const thinkingLevel = parseThinkingLevel(body.thinkingLevel);
+    const runtime = await getAgentsRuntime(identity.subdomain);
+
+    // Same ownership contract as chat and message reads: only the acting
+    // user may resume a run suspended in their own thread.
+    const thread = await runtime.memory.getThreadById({ threadId });
+
+    if (!thread) {
+      jsonError(res, 404, new Error('Thread not found.'));
+      return;
+    }
+
+    if (thread.resourceId !== identity.userId) {
+      jsonError(res, 403, new Error('Thread belongs to another user.'));
+      return;
+    }
+
+    const agent = await buildAgentsAgent({
+      connection,
+      memory: runtime.memory,
+      mastra: runtime.mastra,
+      thinkingLevel,
+    });
+
+    // Suspended runs live in persistent snapshot storage (the shared
+    // MongoDBStore's workflows domain), so discovery works across requests
+    // and restarts. Results are newest-first; the newest suspended run is
+    // the one awaiting this decision. Scoping by thread + resource means a
+    // user can only ever resume their own runs.
+    const { runs } = await agent.listSuspendedRuns({
+      threadId,
+      resourceId: identity.userId,
+    });
+    const run = runs[0];
+
+    if (!run) {
+      jsonError(
+        res,
+        409,
+        new Error('No pending approval exists for this thread.'),
+      );
+      return;
+    }
+
+    const requestContext = await buildToolRequestContext(identity);
+
+    // Mastra scopes each approval to a specific tool call. The suspended run
+    // reports the held call's `toolCallId`; passing it back approves or
+    // declines exactly that call. A resumed run that later invokes another
+    // approval-gated tool suspends again under its own toolCallId, so one
+    // approval can never execute a different tool.
+    const pendingToolCallId = run.toolCalls?.[0]?.toolCallId;
+    const toolCallScope = pendingToolCallId
+      ? { toolCallId: pendingToolCallId }
+      : {};
+
+    // A resumed first-turn run can still be the one that generates the
+    // thread's title, so the approve path passes the same title event hook.
+    const stream = body.approved
+      ? await agent.approveToolCall({
+          runId: run.runId,
+          ...toolCallScope,
+          memory: {
+            thread: threadId,
+            resource: identity.userId,
+            onTitleGenerated: () =>
+              publishAgentsThreadsChanged(identity.userId),
+          },
+          requestContext,
+        })
+      : await agent.declineToolCall({
+          runId: run.runId,
+          ...toolCallScope,
+          ...(reason ? { reason } : {}),
+          memory: {
+            thread: threadId,
+            resource: identity.userId,
+            onTitleGenerated: () =>
+              publishAgentsThreadsChanged(identity.userId),
+          },
+          requestContext,
+        });
+
+    await pipeAgentStream(res, threadId, stream);
+  } catch (error) {
+    const status = error instanceof HttpError ? error.statusCode : 500;
+
+    jsonError(res, status, error);
+  }
+});
+
+/**
+ * Resolves the newest suspended run and the tool call it is waiting on,
+ * shared by the approve and answer resume routes. Ownership has already been
+ * re-checked by the caller; discovery stays storage-backed so decisions
+ * survive restarts. Throws 409 semantics via HttpError when nothing is
+ * suspended for the thread.
+ */
+const findSuspendedToolCall = async (
+  agent: Agent,
+  identity: IRequestIdentity,
+  threadId: string,
+): Promise<{
+  runId: string;
+  toolCallId?: string;
+  requiresApproval: boolean;
+  suspendPayload?: unknown;
+}> => {
+  // Suspended runs live in persistent snapshot storage (the shared
+  // MongoDBStore's workflows domain), so discovery works across requests
+  // and restarts. Results are newest-first; the newest suspended run is
+  // the one awaiting this decision. Scoping by thread + resource means a
+  // user can only ever resume their own runs.
+  const { runs } = await agent.listSuspendedRuns({
+    threadId,
+    resourceId: identity.userId,
+  });
+  const run = runs[0];
+
+  if (!run) {
+    throw new HttpError(409, 'No pending interaction exists for this thread.');
+  }
+
+  const toolCall = run.toolCalls?.[0];
+
+  return {
+    runId: run.runId,
+    toolCallId: toolCall?.toolCallId,
+    requiresApproval: toolCall?.requiresApproval === true,
+    suspendPayload: toolCall?.suspendPayload,
+  };
+};
+
+router.post('/agents/answer', async (req, res) => {
+  const identity = getIdentity(req);
+
+  if (!identity) {
+    jsonError(res, 401, new Error('Authentication required'));
+    return;
+  }
+
+  const body = (req.body || {}) as {
+    threadId?: string;
+    answer?: unknown;
+    provider?: string;
+    model?: string;
+    thinkingLevel?: string;
+  };
+
+  const threadId =
+    typeof body.threadId === 'string' ? body.threadId.trim() : '';
+
+  if (!threadId) {
+    jsonError(res, 400, new Error('`threadId` is required.'));
+    return;
+  }
+
+  // ask_user accepts free-text and single-select answers (string) and
+  // multi-select answers (string[]). Anything else is a client bug, not an
+  // answer — reject it rather than resuming the run with garbage.
+  const isString = typeof body.answer === 'string' && body.answer.trim() !== '';
+  const isStringArray =
+    Array.isArray(body.answer) &&
+    body.answer.length > 0 &&
+    body.answer.every(
+      (item) => typeof item === 'string' && item.trim() !== '',
+    );
+
+  if (!isString && !isStringArray) {
+    jsonError(
+      res,
+      400,
+      new Error(
+        '`answer` must be a non-empty string or a non-empty string array.',
+      ),
+    );
+    return;
+  }
+
+  const answer = isStringArray
+    ? (body.answer as string[]).map((item) => item.trim())
+    : (body.answer as string).trim();
+
+  try {
+    const models = await generateModels(identity.subdomain);
+    const connections = await resolveUserConnections(models, identity.userId);
+    // The resumed run continues on the same provider/model the UI used for
+    // the suspended turn; the UI resends them with the answer.
+    const connection = pickConnection(
+      connections,
+      body.provider,
+      body.model,
+    );
+    const thinkingLevel = parseThinkingLevel(body.thinkingLevel);
+    const runtime = await getAgentsRuntime(identity.subdomain);
+
+    // Same ownership contract as chat, approve, and message reads: only
+    // the acting user may resume a run suspended in their own thread.
+    const thread = await runtime.memory.getThreadById({ threadId });
+
+    if (!thread) {
+      jsonError(res, 404, new Error('Thread not found.'));
+      return;
+    }
+
+    if (thread.resourceId !== identity.userId) {
+      jsonError(res, 403, new Error('Thread belongs to another user.'));
+      return;
+    }
+
+    const agent = await buildAgentsAgent({
+      connection,
+      memory: runtime.memory,
+      mastra: runtime.mastra,
+      thinkingLevel,
+    });
+
+    const suspended = await findSuspendedToolCall(agent, identity, threadId);
+
+    // An approval suspension must be answered through /agents/approve;
+    // resuming it with an answer would execute the gated tool. An ask_user
+    // suspension (requiresApproval false) is the one this route resumes.
+    if (suspended.requiresApproval) {
+      jsonError(
+        res,
+        409,
+        new Error(
+          'This thread is waiting for an approval decision, not an answer.',
+        ),
+      );
+      return;
+    }
+
+    const requestContext = await buildToolRequestContext(identity);
+
+    // A resumed first-turn run can still be the one that generates the
+    // thread's title, so the answer path passes the same title event hook.
+    const stream = await agent.resumeStream(answer, {
+      runId: suspended.runId,
+      ...(suspended.toolCallId ? { toolCallId: suspended.toolCallId } : {}),
+      memory: {
+        thread: threadId,
+        resource: identity.userId,
+        onTitleGenerated: () => publishAgentsThreadsChanged(identity.userId),
+      },
+      requestContext,
+    });
+
+    await pipeAgentStream(res, threadId, stream);
+  } catch (error) {
+    const status = error instanceof HttpError ? error.statusCode : 500;
+
+    jsonError(res, status, error);
+  }
 });

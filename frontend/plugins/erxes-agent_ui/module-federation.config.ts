@@ -16,29 +16,24 @@ export const config: ModuleFederationConfig = {
   name: 'erxes-agent_ui',
   exposes: {
     './config': './src/config.tsx',
-    './erxes_agent': './src/modules/MastraMain.tsx',
-    './erxes_agentSettings': './src/modules/MastraSettings.tsx',
-    './widgets': './src/widgets/Widgets.tsx',
+    // Expose keys loaded by the host via `${plugin.name}_ui` must use the
+    // underscored remote name (see config.tsx `name`).
+    './erxes_agent': './src/modules/ErxesAgentMain.tsx',
+    // The host's settings router resolves `${CONFIG.name}_ui/erxes_agentSettings`
+    // and mounts it under `/settings/erxes-agent/*`.
+    './erxes_agentSettings': './src/modules/ErxesAgentSettings.tsx',
+    './floatingWidget': './src/widgets/FloatingWidget.tsx',
   },
-  // Keep both router packages in the host's singleton context. Use explicit
-  // configs because this pnpm graph stores version-qualified external-node
-  // names, which makes Nx's string-form additionalShared lookup fail.
-  additionalShared: [
-    [
-      'react-router',
-      { singleton: true, strictVersion: false, requiredVersion: false },
-    ],
-    [
-      'react-router-dom',
-      { singleton: true, strictVersion: false, requiredVersion: false },
-    ],
-  ],
+
   shared: (libraryName, defaultConfig) => {
     if (coreLibraries.has(libraryName)) {
       return defaultConfig;
     }
+
+    // Returning false means the library is not shared.
     return false;
   },
 };
 
+// Default export required by Nx/Rspack tooling - do not remove
 export default config;

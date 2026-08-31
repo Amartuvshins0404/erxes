@@ -6,6 +6,6 @@ const root = ReactDOM.createRoot(
 );
 root.render(
   <StrictMode>
-    <div>erxes Agent</div>
+    <div>App</div>
   </StrictMode>,
 );

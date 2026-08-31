@@ -7,7 +7,9 @@
   "targets": {
     "build": {
       "executor": "@nx/rspack:rspack",
-      "outputs": ["{options.outputPath}"],
+      "outputs": [
+        "{options.outputPath}"
+      ],
       "defaultConfiguration": "production",
       "options": {
         "target": "web",
@@ -18,7 +20,9 @@
         "assets": []
       },
       "configurations": {
-        "development": { "mode": "development" },
+        "development": {
+          "mode": "development"
+        },
         "production": {
           "mode": "production",
           "optimization": true,
@@ -31,20 +35,28 @@
       "executor": "@nx/rspack:module-federation-dev-server",
       "options": {
         "buildTarget": "erxes-agent_ui:build:development",
-        "port": 3012
+        "port": 3016
       },
       "configurations": {
         "development": {},
-        "production": { "buildTarget": "erxes-agent_ui:build:production" }
+        "production": {
+          "buildTarget": "erxes-agent_ui:build:production"
+        }
       }
     },
     "serve-static": {
       "executor": "@nx/rspack:module-federation-static-server",
       "defaultConfiguration": "production",
-      "options": { "serveTarget": "erxes-agent_ui:serve" },
+      "options": {
+        "serveTarget": "erxes-agent_ui:serve"
+      },
       "configurations": {
-        "development": { "serveTarget": "erxes-agent_ui:serve:development" },
-        "production": { "serveTarget": "erxes-agent_ui:serve:production" }
+        "development": {
+          "serveTarget": "erxes-agent_ui:serve:development"
+        },
+        "production": {
+          "serveTarget": "erxes-agent_ui:serve:production"
+        }
       }
     }
   }

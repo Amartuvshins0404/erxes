@@ -24,9 +24,10 @@
   BYOK form at `src/pages/settings/SettingsConnectionPage.tsx` (select
   provider -> paste API key -> save; several providers can be configured
   side by side, each listed with its own entry and removable individually.
-  The chat's model picker lists every configured provider's models (fetched
-  server-side by the backend from each provider's /models endpoint) grouped
-  by provider, with an implicit Auto (server default) entry, and a
+  The chat's model picker is a two-step picker over every configured
+  provider's models (fetched server-side by the backend from each
+  provider's /models endpoint): pick Auto or a provider, then the model
+  (search box filters the list), and a
   per-turn thinking-level picker (off/minimal/low/medium/high) sits next to
   it; both selections ride along with every chat turn. The chat surfaces
   never query or manage keys; they only consume the models listing), and
@@ -111,12 +112,16 @@
   text, choice chips for options, multi-select chip state +
   send counter, and a free-text input revealed by "None of these — type my
   own answer"). The suspension arrives as a `data-tool-call-suspended` data
-  part; answering stages the answer on the transport, resolves the
-  suspended tool part locally, and sends a user message carrying the
-  answer, which the transport reroutes to the backend's `POST /agents/answer`
-  and processes as a normal send (the SDK's own resume path builds an empty
-  streaming state, so the resumed `tool-output-available` chunk would find
-  no matching tool part and the whole stream would be discarded).
+  part; answering stages the answer (with the suspended tool call id) on
+  the transport, resolves the suspended tool part locally, and sends a user
+  message carrying the answer, which the transport reroutes to the backend's
+  `POST /agents/answer` and processes as a normal send (the SDK's own resume
+  path builds an empty streaming state, so the replayed suspension chunks
+  would find no matching tool part and the whole stream would be discarded).
+  The transport's chunk filter drops ONLY chunks tagged with the suspended
+  tool call id; the resumed run's own tool inputs/outputs flow through so
+  code-mode iterations and other tool activity stay visible. The backend
+  persists the answer server-side, so the bubble survives reloads.
 - Loads stored threads and thread messages over GraphQL and maps them to AI
   SDK `UIMessage`s for rendering; the thread list refreshes itself through
   the `agentsThreadsChanged` subscription (debounced refetch).
@@ -155,12 +160,14 @@
   runs (`Auto (gpt-5.6-luna)`). The chat surfaces have no key UI at all:
   chatting starts directly, and a missing key surfaces only as the
   backend's 400 error in the chat error banner.
-- Chat model picker: a grouped list of every configured provider's models
-  (fetched server-side), where the Auto entry and every model row lead
-  with their provider's brand mark or a sparkles icon (Auto) and model ids
-  render in mono; Radix renders the selected item's content in the
-  trigger, so the active provider's mark identifies the choice there too.
-  Per-provider group headers are uppercase micro-labels with the mark.
+- Chat model picker: a two-step `Popover` + `Command` picker. Step one
+  (selection) lists the Auto entry (sparkles, shows the default model) and
+  one row per configured provider — brand mark, provider label, model
+  count, and a check when the active selection belongs to that provider.
+  Step two (a provider) has a back row, a search input (autofocused,
+  cmdk-filtered) and that provider's models in mono with a check on the
+  active one. The trigger renders the active choice itself: sparkles +
+  `Auto (model)` or the provider's mark + the mono model id.
 - Code mode in settings: the tenant-wide toggle page at
   `/settings/erxes-agent/code-mode` (settings sidebar "Agents / Code
   mode"). Every agents user can read the current state
@@ -388,9 +395,9 @@
   transport's `getRequestSelection`) and rides along with EVERY chat body
   and the approve body — the transport must keep sending it on the approval
   resend so the resumed run continues on the same provider/model/thinking.
-  The model picker's "Auto" entry uses the `__auto__` sentinel (Radix
-  Select items reject empty-string values) and maps back to '' before it
-  reaches the hook. Its label shows the actual default model via the
+  The model picker's "Auto" entry reports `''` directly (the `Popover` +
+  `Command` picker has no empty-value sentinel; the old `__auto__` Select
+  sentinel is gone). Its label shows the actual default model via the
   `autoModel` prop (`ChatPanel` passes the first configured connection's
   stored model — what the server default runs); it falls back to
   "Auto (server default)" only while that value is unknown.
@@ -398,11 +405,11 @@
   OpenAI from simple-icons CC0, xAI + Kimi from svgl.app; Kimi Code is the
   Kimi mark plus a code badge — there is no separate Kimi Code logo). A new
   `PROVIDER_OPTIONS` entry needs a matching `provider ===` branch there or
-  it falls back to the sparkles tile. Model-picker items must keep
-  `ProviderIcon` inside their children: Radix renders the selected item's
-  content in the trigger, which is how the active provider's mark appears
-  there — and do not re-add a manual chevron to the trigger, the
-  `erxes-ui` `Select.Trigger` already appends one.
+  it falls back to the sparkles tile. The model picker's trigger renders
+  the active choice manually (mark + mono model id, or sparkles for Auto)
+  — keep that content in sync with the picker rows; the composer pill
+  keeps the manual chevron `Combobox.Trigger` appends, and `ThinkingPicker`
+  stays on `erxes-ui` `Select`, whose trigger appends its own.
 - The `navigationGroup` in `src/config.tsx` must NOT define `content` (or
   `subGroup`): the host renders a secondary plugin panel whenever group
   content exists, and the chat page must fill the width directly with no
@@ -521,9 +528,10 @@
   provider cards show each default model in parentheses
   (`OpenAI (gpt-5.6-luna)`), the configured entry shows the stored model
   in parentheses, the chat model picker's Auto entry shows the actual
-  default model, and opening the picker shows per-provider group headers
-  with marks and mono model rows (the selected choice's mark appears in
-  the trigger) — chatting
+  default model, and opening the picker shows the selection menu (Auto +
+  one row per provider with model counts), stepping into a provider shows
+  a search box filtering its mono model rows, and the trigger shows the
+  active choice's mark and model — chatting
   with no stored key shows only the backend's "Add your API key" error
   banner with no other key UI,
   and the floating bot launcher: shows the calm face cycle, dragging it
@@ -575,6 +583,35 @@
   `Markdown` for `MessageContent`), root `package.json` (mirrored deps).
 - **Contracts changed:** None (pure presentation over existing message
   text; no GraphQL/REST changes).
+
+### `2026-08-31` — Two-step model picker with model search
+
+- **Summary:** Replaced the flat grouped `Select` model picker with a
+  two-step `Popover` + `Command` flow: the menu lists Auto and one row per
+  configured provider (brand mark, model count, active-selection check),
+  stepping into a provider shows a back row plus an autofocus search box
+  filtering that provider's mono model rows, and the trigger renders the
+  active choice itself. Props, the `provider|model` value contract, and
+  the `''`-means-Auto mapping are unchanged; the `__auto__` sentinel is
+  gone.
+- **Affected areas:** `src/modules/agents/components/ModelPicker.tsx`.
+- **Contracts changed:** None (same props and selection values;
+  presentation only).
+
+### `2026-08-31` — Scoped ask_user answer chunk filter
+
+- **Summary:** The transport's answer-resume filter no longer drops ALL
+  `tool-output-available` chunks (which hid every tool the resumed run
+  executed, e.g. code-mode iterations): the staged answer now carries the
+  suspended ask_user tool call id (`IPendingAnswer`), and only chunks
+  tagged with that id — the suspension replay the fresh send-side state
+  cannot match — are dropped, so the resumed run's own tool inputs/outputs
+  reach the UI.
+- **Affected areas:** `src/modules/agents/transport.ts`
+  (`IPendingAnswer`, scoped chunk filter), `src/modules/agents/hooks/useAgentsChat.ts`
+  (`pendingAnswerRef` shape, suspension resolved before staging).
+- **Contracts changed:** None (internal transport/hook seam; answer POST
+  body unchanged).
 
 ### `2026-08-31` — Code mode settings page (tenant-wide admin toggle)
 
@@ -705,40 +742,4 @@
   `src/modules/agents/components/ThreadList.tsx`.
 - **Contracts changed:** None (same queries/mutations; grouping is
   client-side from `updatedAt`).
-
-### `2026-08-30` — Chat redesign: local input, bot-everywhere, draggable launcher
-
-- **Summary:** Redesigned the chat around the plugin-local `ChatInput`
-  (chrome-free auto-growing native textarea replacing `erxes-ui`'s
-  `Textarea`, which forced a focus ring and scrollbar arrows inside the
-  composer card) and used the bloub bot aggressively across every surface,
-  all rendered in the design system primary (`color` defaults to
-  `var(--primary)`):
-  the empty-state hero plays the new curated `CALM_FACE_CYCLE`
-  (size-stable face states from the new `botCycles.ts`),
-  the thread-loading state and "Thinking…" indicator use the three-dots
-  `thinking` bot, the thread list's empty state sleeps, the approval
-  prompt leads with the `alert` bot (decline reason now also uses
-  `ChatInput`), and the side-panel header carries a small bot. The
-  floating launcher is now the bot itself — always animating
-  `LAUNCHER_CYCLE`, draggable anywhere on screen (pointer capture,
-  viewport clamping, localStorage persistence), switching to `orbit` with
-  spinning rings while dragging, and opening the panel on a non-dragged
-  press. Composer card styling: pill pickers, `IconArrowUp` send,
-  docked bar with backdrop blur in conversation view, no bot inside the
-  composer.
-- **Affected areas:** `src/modules/agents/components/{ChatInput (new),
-  Composer,ChatPanel,MessageList,ThreadList,ApprovalPrompt,ModelPicker,
-  ThinkingPicker}.tsx`, `src/modules/agents/botCycles.ts` (new),
-  `src/widgets/FloatingWidget.tsx`.
-- **Contracts changed:** None (self-contained UI; no exposes, `CONFIG`,
-  routes, or GraphQL operations changed).
-
-### `2026-08-30` — Remove "Agents" label from assistant messages
-
-- **Summary:** Removed the `Agents` text label rendered next to the bot avatar
-  above each assistant message in `MessageList` (the small `BloubBot`
-  `frozenAt={0}` avatar remains as the sole sender indicator).
-- **Affected areas:** `src/modules/agents/components/MessageList.tsx`.
-- **Contracts changed:** None.
 

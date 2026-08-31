@@ -13,6 +13,16 @@ export interface IAgentsRequestSelection {
   thinkingLevel?: string;
 }
 
+/**
+ * The ask_user answer staged by the hook, plus the suspended tool call it
+ * resolves. The tool call id scopes the transport's chunk filter to the
+ * suspension replay so the resumed run's own tool results still reach the UI.
+ */
+export interface IPendingAnswer {
+  answer: string | string[] | (string | string[])[];
+  suspendedToolCallId?: string;
+}
+
 export interface IAgentsChatTransportOptions {
   /** Returns the currently active thread id, if any. */
   getThreadId: () => string | undefined;
@@ -28,11 +38,7 @@ export interface IAgentsChatTransportOptions {
    * answers positionally: element i answers question i (a string, or a
    * string array for that question's multi-select).
    */
-  consumePendingAnswer: () =>
-    | string
-    | string[]
-    | (string | string[])[]
-    | undefined;
+  consumePendingAnswer: () => IPendingAnswer | undefined;
 }
 
 const selectionToBody = (
@@ -127,11 +133,7 @@ export class AgentsChatTransport
 
   private readonly getRequestSelection: () => IAgentsRequestSelection;
 
-  private readonly consumePendingAnswer: () =>
-    | string
-    | string[]
-    | (string | string[])[]
-    | undefined;
+  private readonly consumePendingAnswer: () => IPendingAnswer | undefined;
 
   constructor({
     getThreadId,
@@ -178,10 +180,10 @@ export class AgentsChatTransport
     // request to the answer resume endpoint. The send-side stream state keeps
     // the real transcript snapshot, so the resumed chunks apply cleanly —
     // the SDK's resume path would build an empty state and discard them.
-    const answer = this.consumePendingAnswer();
+    const pendingAnswer = this.consumePendingAnswer();
 
-    if (answer !== undefined) {
-      return this.postAnswerResume(answer, options.abortSignal);
+    if (pendingAnswer !== undefined) {
+      return this.postAnswerResume(pendingAnswer, options.abortSignal);
     }
 
     const decision = extractApprovalDecision(options.messages);
@@ -232,13 +234,16 @@ export class AgentsChatTransport
 
   /**
    * POSTs the ask_user answer to the answer resume endpoint and returns the
-   * resumed stream. `tool-output-available` chunks are dropped en route: they
-   * resolve the suspension from the PREVIOUS turn, which the send-side
-   * streaming state cannot match (the hook marks the tool part answered
-   * locally instead) — kept in, the SDK would discard the entire stream.
+   * resumed stream. The resumed run replays the suspension's resolution as
+   * chunks tagged with the PREVIOUS turn's tool call id, which the send-side
+   * streaming state cannot match (the SDK throws "must be preceded by a
+   * tool-input-available" and discards the whole stream; the hook marks the
+   * tool part answered locally instead). Only those replay chunks are
+   * dropped — every other chunk, including the resumed run's own tool
+   * inputs and outputs, flows through to the UI.
    */
   private async postAnswerResume(
-    answer: string | string[] | (string | string[])[],
+    pendingAnswer: IPendingAnswer,
     abortSignal?: AbortSignal,
   ): Promise<ReadableStream<UIMessageChunk>> {
     const threadId = this.getThreadId();
@@ -249,7 +254,7 @@ export class AgentsChatTransport
 
     const body: Record<string, unknown> = {
       threadId,
-      answer,
+      answer: pendingAnswer.answer,
       // The resumed run continues on the same provider/model/thinking the
       // UI used for the suspended turn.
       ...selectionToBody(this.getRequestSelection()),
@@ -272,12 +277,20 @@ export class AgentsChatTransport
       throw new Error('The response body is empty.');
     }
 
+    const suspendedToolCallId = pendingAnswer.suspendedToolCallId;
+
     return this.processResponseStream(response.body).pipeThrough(
       new TransformStream<UIMessageChunk, UIMessageChunk>({
         transform(chunk, controller) {
-          if (chunk.type !== 'tool-output-available') {
-            controller.enqueue(chunk);
+          if (
+            suspendedToolCallId &&
+            'toolCallId' in chunk &&
+            chunk.toolCallId === suspendedToolCallId
+          ) {
+            return;
           }
+
+          controller.enqueue(chunk);
         },
       }),
     );

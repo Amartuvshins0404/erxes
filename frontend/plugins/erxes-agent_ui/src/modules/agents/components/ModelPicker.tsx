@@ -1,5 +1,10 @@
-import { IconSparkles } from '@tabler/icons-react';
-import { Select, Spinner } from 'erxes-ui';
+import {
+  IconArrowLeft,
+  IconChevronRight,
+  IconSparkles,
+} from '@tabler/icons-react';
+import { Button, Combobox, Command, Popover, Spinner } from 'erxes-ui';
+import { useState } from 'react';
 
 import type { IUseAgentsModelsResult } from '../hooks/useAgentsModels';
 import { ProviderIcon } from './ProviderIcon';
@@ -20,18 +25,15 @@ export interface IModelPickerProps {
 }
 
 const VALUE_SEPARATOR = '|';
-/** Radix Select items reject empty values, so "Auto" uses a sentinel. */
-const AUTO_VALUE = '__auto__';
 
 export const modelSelectionValue = (provider: string, model: string) =>
   provider && model ? `${provider}${VALUE_SEPARATOR}${model}` : '';
 
 /**
- * Chat model picker: one grouped list of every configured provider's models
- * (fetched server-side), plus an implicit "Auto" entry that lets the server
- * pick the first configured provider's default. Every entry leads with its
- * provider's brand mark — Radix renders the selected item's content in the
- * trigger, so the mark identifies the active choice there too.
+ * Chat model picker, in two steps: the menu first lists Auto and every
+ * configured provider (brand mark + model count), then a provider view
+ * shows its models behind a search box. Selections report the
+ * `provider|model` contract value; Auto reports ''.
  */
 export const ModelPicker = ({
   models,
@@ -40,17 +42,54 @@ export const ModelPicker = ({
   disabled = false,
   autoModel,
 }: IModelPickerProps) => {
-  const hasGroups = models.providerModels.length > 0;
+  const [open, setOpen] = useState(false);
+  const [view, setView] = useState<'selection' | 'models'>('selection');
+  const [activeProvider, setActiveProvider] = useState('');
+
+  const separatorIndex = value.indexOf(VALUE_SEPARATOR);
+  const selectedProvider =
+    separatorIndex === -1 ? '' : value.slice(0, separatorIndex);
+  const selectedModel =
+    separatorIndex === -1 ? '' : value.slice(separatorIndex + 1);
+
+  const handleOpenChange = (next: boolean) => {
+    setOpen(next);
+    if (next) {
+      setView('selection');
+      setActiveProvider('');
+    }
+  };
+
+  const selectAuto = () => {
+    onChange('');
+    setOpen(false);
+  };
+
+  const openProvider = (provider: string) => {
+    setActiveProvider(provider);
+    setView('models');
+  };
+
+  const selectModel = (provider: string, model: string) => {
+    onChange(modelSelectionValue(provider, model));
+    setOpen(false);
+  };
+
+  const activeGroup = models.providerModels.find(
+    (group) => group.provider === activeProvider,
+  );
+  const activeModels = activeGroup?.models ?? [];
+  const activeLabel = getProviderLabel(activeProvider);
+
   const autoLabel = autoModel ? `Auto (${autoModel})` : 'Auto (server default)';
 
   return (
-    <Select
-      value={value || AUTO_VALUE}
-      onValueChange={(next) => onChange(next === AUTO_VALUE ? '' : next)}
-      disabled={disabled || models.loading || !hasGroups}
-    >
-      <Select.Trigger
+    <Popover open={open} onOpenChange={handleOpenChange}>
+      <Combobox.Trigger
         className="h-8 w-[160px] justify-between rounded-full text-[13px] md:w-[200px]"
+        disabled={
+          disabled || models.loading || models.providerModels.length === 0
+        }
         aria-label="Model"
       >
         {models.loading ? (
@@ -58,44 +97,112 @@ export const ModelPicker = ({
             <Spinner className="size-3.5 shrink-0" />
             Model
           </span>
+        ) : selectedModel ? (
+          <span className="flex min-w-0 items-center gap-1.5">
+            <ProviderIcon
+              provider={selectedProvider}
+              className="size-4 shrink-0"
+            />
+            <span className="truncate font-mono">{selectedModel}</span>
+          </span>
         ) : (
-          <Select.Value placeholder="Model" />
-        )}
-      </Select.Trigger>
-      <Select.Content className="max-h-72">
-        <Select.Item value={AUTO_VALUE} className="text-[13px]">
-          <span className="flex items-center gap-2">
+          <span className="flex min-w-0 items-center gap-1.5">
             <IconSparkles
               className="size-4 shrink-0 text-primary"
               aria-hidden="true"
             />
-            {autoLabel}
+            <span className="truncate">{autoLabel}</span>
           </span>
-        </Select.Item>
-        {models.providerModels.map((group) => (
-          <Select.Group key={group.provider}>
-            <Select.Separator />
-            <Select.Label className="px-2 py-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-              <span className="flex items-center gap-1.5">
-                <ProviderIcon provider={group.provider} className="size-3.5" />
-                {getProviderLabel(group.provider)}
-              </span>
-            </Select.Label>
-            {(group.models ?? []).map((model) => (
-              <Select.Item
-                key={`${group.provider}|${model}`}
-                value={`${group.provider}|${model}`}
+        )}
+      </Combobox.Trigger>
+      <Combobox.Content className="w-72">
+        {view === 'selection' ? (
+          <Command>
+            <Command.List>
+              <Command.Item
+                value="auto"
+                onSelect={selectAuto}
                 className="text-[13px]"
               >
-                <span className="flex items-center gap-2">
-                  <ProviderIcon provider={group.provider} className="size-4" />
-                  <span className="font-mono">{model}</span>
-                </span>
-              </Select.Item>
-            ))}
-          </Select.Group>
-        ))}
-      </Select.Content>
-    </Select>
+                <IconSparkles
+                  className="size-4 shrink-0 text-primary"
+                  aria-hidden="true"
+                />
+                <span className="min-w-0 truncate">{autoLabel}</span>
+                <Combobox.Check checked={!selectedModel} />
+              </Command.Item>
+              {models.providerModels.map((group) => (
+                <Command.Item
+                  key={group.provider}
+                  value={group.provider}
+                  onSelect={() => openProvider(group.provider)}
+                  className="text-[13px]"
+                >
+                  <ProviderIcon
+                    provider={group.provider}
+                    className="size-4 shrink-0"
+                  />
+                  <span className="min-w-0 truncate">
+                    {getProviderLabel(group.provider)}
+                  </span>
+                  <span className="ml-auto shrink-0 text-xs text-muted-foreground">
+                    {(group.models ?? []).length} models
+                  </span>
+                  <Combobox.Check
+                    checked={selectedProvider === group.provider}
+                  />
+                  <IconChevronRight
+                    className="size-3.5 shrink-0 text-muted-foreground"
+                    aria-hidden="true"
+                  />
+                </Command.Item>
+              ))}
+            </Command.List>
+          </Command>
+        ) : (
+          <Command key={`models:${activeProvider}`}>
+            <div className="flex items-center gap-1.5 border-b px-1.5 py-1.5">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-6 shrink-0"
+                onClick={() => setView('selection')}
+                aria-label="Back to provider selection"
+              >
+                <IconArrowLeft className="size-3.5" />
+              </Button>
+              <ProviderIcon
+                provider={activeProvider}
+                className="size-4 shrink-0"
+              />
+              <span className="min-w-0 truncate text-[13px] font-medium">
+                {activeLabel}
+              </span>
+              <span className="ml-auto shrink-0 text-[11px] text-muted-foreground">
+                {activeModels.length}{' '}
+                {activeModels.length === 1 ? 'model' : 'models'}
+              </span>
+            </div>
+            <Command.Input placeholder={`Search ${activeLabel} models…`} focusOnMount />
+            <Command.List>
+              <Command.Empty>No models match</Command.Empty>
+              {activeModels.map((model) => (
+                <Command.Item
+                  key={model}
+                  value={model}
+                  onSelect={() => selectModel(activeProvider, model)}
+                  className="text-[13px]"
+                >
+                  <span className="min-w-0 truncate font-mono">{model}</span>
+                  <Combobox.Check
+                    checked={selectedProvider === activeProvider && selectedModel === model}
+                  />
+                </Command.Item>
+              ))}
+            </Command.List>
+          </Command>
+        )}
+      </Combobox.Content>
+    </Popover>
   );
 };

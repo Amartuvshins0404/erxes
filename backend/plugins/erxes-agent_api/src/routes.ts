@@ -177,6 +177,17 @@ const parseThinkingLevel = (value: unknown): IAgentsThinkingLevel =>
   isAgentsThinkingLevel(value) ? value : 'off';
 
 /**
+ * Step budget for one agent run (a step is one model call plus its tool
+ * executions). Mastra's default is 5, which real turns exhaust silently:
+ * the model burns steps on searchTools discovery and code-mode iterations
+ * (and an ask_user step counts against the resumed run's budget), so a turn
+ * that reached the cap ended right after its last tool result with no final
+ * answer and nothing persisted. 32 keeps headroom for discover → code → fix
+ * loops while still bounding a runaway run.
+ */
+const AGENTS_MAX_STEPS = 32;
+
+/**
  * Reads the tenant's code-mode flag so chat and both resume routes build
  * the agent with (or without) the sandboxed code tool; a resumed run keeps
  * the tool set of the turn that suspended, so the flag rides along here.
@@ -324,6 +335,7 @@ router.post('/agents/chat', async (req, res) => {
     // both are the moments the sidebar must refresh, so each publishes the
     // per-user `agentsThreadsChanged` event over the shared Redis pubsub.
     const stream = await agent.stream([newestMessage], {
+      maxSteps: AGENTS_MAX_STEPS,
       memory: {
         thread: threadId,
         resource: identity.userId,
@@ -446,6 +458,7 @@ router.post('/agents/approve', async (req, res) => {
       ? await agent.approveToolCall({
           runId: run.runId,
           ...toolCallScope,
+          maxSteps: AGENTS_MAX_STEPS,
           memory: {
             thread: threadId,
             resource: identity.userId,
@@ -457,6 +470,7 @@ router.post('/agents/approve', async (req, res) => {
       : await agent.declineToolCall({
           runId: run.runId,
           ...toolCallScope,
+          maxSteps: AGENTS_MAX_STEPS,
           ...(reason ? { reason } : {}),
           memory: {
             thread: threadId,
@@ -517,6 +531,19 @@ const findSuspendedToolCall = async (
   };
 };
 
+/**
+ * Formats an answer exactly as the UI renders it in the answer bubble:
+ * multi-select answers join with ', ', batched multi-question answers with
+ * ' · '. Persisting that same text keeps the stored transcript identical to
+ * what the user saw in the optimistic local bubble.
+ */
+const formatAnswerText = (answer: string | (string | string[])[]): string =>
+  typeof answer === 'string'
+    ? answer
+    : answer
+        .map((part) => (Array.isArray(part) ? part.join(', ') : part))
+        .join(' · ');
+
 router.post('/agents/answer', async (req, res) => {
   const identity = getIdentity(req);
 
@@ -570,14 +597,12 @@ router.post('/agents/answer', async (req, res) => {
     return;
   }
 
-  const answer: unknown = isString
+  // The validation above guarantees the shape: a string, or an array whose
+  // items are all strings or arrays of strings — so this trim is total.
+  const answer: string | (string | string[])[] = isString
     ? (body.answer as string).trim()
-    : (body.answer as unknown[]).map((item) =>
-        Array.isArray(item)
-          ? item.map((part) => (typeof part === 'string' ? part.trim() : part))
-          : typeof item === 'string'
-            ? item.trim()
-            : item,
+    : (body.answer as (string | string[])[]).map((item) =>
+        Array.isArray(item) ? item.map((part) => part.trim()) : item.trim(),
       );
 
   try {
@@ -633,11 +658,38 @@ router.post('/agents/answer', async (req, res) => {
 
     const requestContext = await buildToolRequestContext(identity);
 
+    // The answer is a real turn of the conversation, not just resume fuel:
+    // persist it as a user message before resuming, so it survives reloads
+    // (the UI's answer bubble lives only in its local stream state). The
+    // text matches the UI's rendering of the same answer.
+    await runtime.memory.saveMessages({
+      messages: [
+        {
+          id: randomUUID(),
+          role: 'user',
+          threadId,
+          resourceId: identity.userId,
+          createdAt: new Date(),
+          content: {
+            format: 2,
+            parts: [
+              {
+                type: 'text',
+                text: formatAnswerText(answer),
+                createdAt: Date.now(),
+              },
+            ],
+          },
+        },
+      ],
+    });
+
     // A resumed first-turn run can still be the one that generates the
     // thread's title, so the answer path passes the same title event hook.
     const stream = await agent.resumeStream(answer, {
       runId: suspended.runId,
       ...(suspended.toolCallId ? { toolCallId: suspended.toolCallId } : {}),
+      maxSteps: AGENTS_MAX_STEPS,
       memory: {
         thread: threadId,
         resource: identity.userId,

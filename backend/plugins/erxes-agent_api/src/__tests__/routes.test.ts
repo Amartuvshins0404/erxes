@@ -185,6 +185,11 @@ const connectionModel = {
   removeConnection: jest.fn(),
 };
 
+const settingsModel = {
+  getSettings: jest.fn(),
+  updateSettings: jest.fn(),
+};
+
 const userMessage = (text: string) => ({
   id: `m-${text}`,
   role: 'user',
@@ -306,8 +311,13 @@ beforeEach(() => {
   memory = buildMemory();
   mockedGenerateModels.mockResolvedValue({
     AgentsConnection: connectionModel,
+    AgentsSettings: settingsModel,
   } as unknown as Awaited<ReturnType<typeof generateModels>>);
   connectionModel.getConnections.mockResolvedValue(CONNECTION_DOC);
+  settingsModel.getSettings.mockResolvedValue({
+    codeModeEnabled: false,
+    codeModeEnvironment: 'in-process',
+  });
   mockedGetAgentsRuntime.mockResolvedValue({
     memory,
     mastra: MASTRA_SENTINEL,
@@ -1146,5 +1156,130 @@ describe('POST /agents/answer — ask_user answer resume', () => {
     expect(res.statusCode).toBe(500);
     expect(body(res).error).toBe('snapshot lost');
     expect(mockedPipe).not.toHaveBeenCalled();
+  });
+});
+
+describe('code mode flag resolved from tenant settings', () => {
+  const codeSuspendedRun = (runId: string): ISuspendedRun => ({
+    runId,
+    toolCalls: [
+      {
+        toolCallId: 'call-code',
+        toolName: 'callTool',
+        requiresApproval: true,
+        suspendPayload: {
+          toolId: 'sales.trpc.deal.remove',
+          input: { id: 'deal-1' },
+        },
+      },
+    ],
+  });
+
+  const askSuspendedRun = (runId: string): ISuspendedRun => ({
+    runId,
+    toolCalls: [
+      {
+        toolCallId: 'call-ask',
+        toolName: 'ask_user',
+        requiresApproval: false,
+        suspendPayload: { question: 'Which one?' },
+      },
+    ],
+  });
+
+  const enableCodeMode = () =>
+    settingsModel.getSettings.mockResolvedValue({
+      codeModeEnabled: true,
+      codeModeEnvironment: 'in-process',
+    });
+
+  it('builds the chat agent with the sandboxed code tool when the tenant enables code mode', async () => {
+    enableCodeMode();
+    const res = buildRes();
+    await chatHandler(
+      buildReq({
+        user: ACTING_USER,
+        body: { messages: [userMessage('compute this in code')] },
+      }),
+      res,
+    );
+
+    expect(res.statusCode).toBe(200);
+    expect(mockedBuildAgentsAgent).toHaveBeenCalledWith(
+      expect.objectContaining({ codeMode: { enabled: true } }),
+    );
+  });
+
+  it('keeps the code-mode tool on the approve resume path when enabled', async () => {
+    enableCodeMode();
+    memory.getThreadById.mockResolvedValue({ resourceId: 'user-1' });
+    listSuspendedRunsMock.mockResolvedValue({
+      runs: [codeSuspendedRun('run-code')],
+      total: 1,
+    });
+    const res = buildRes();
+    await approveHandler(
+      buildReq({ user: ACTING_USER, body: { threadId: 't1', approved: true } }),
+      res,
+    );
+
+    expect(mockedBuildAgentsAgent).toHaveBeenCalledWith(
+      expect.objectContaining({ codeMode: { enabled: true } }),
+    );
+  });
+
+  it('keeps the code-mode tool on the answer resume path when enabled', async () => {
+    enableCodeMode();
+    memory.getThreadById.mockResolvedValue({ resourceId: 'user-1' });
+    listSuspendedRunsMock.mockResolvedValue({
+      runs: [askSuspendedRun('run-ask')],
+      total: 1,
+    });
+    const res = buildRes();
+    await answerHandler(
+      buildReq({
+        user: ACTING_USER,
+        body: { threadId: 't1', answer: 'the first one' },
+      }),
+      res,
+    );
+
+    expect(mockedBuildAgentsAgent).toHaveBeenCalledWith(
+      expect.objectContaining({ codeMode: { enabled: true } }),
+    );
+  });
+
+  it('builds every agent without code mode while the flag is off (default)', async () => {
+    // beforeEach already mocks codeModeEnabled: false.
+    memory.getThreadById.mockResolvedValue({ resourceId: 'user-1' });
+    listSuspendedRunsMock.mockResolvedValue({
+      runs: [codeSuspendedRun('run-code')],
+      total: 1,
+    });
+
+    const chatRes = buildRes();
+    await chatHandler(
+      buildReq({
+        user: ACTING_USER,
+        body: { messages: [userMessage('hello')] },
+      }),
+      chatRes,
+    );
+
+    const approveRes = buildRes();
+    await approveHandler(
+      buildReq({ user: ACTING_USER, body: { threadId: 't1', approved: true } }),
+      approveRes,
+    );
+
+    expect(mockedBuildAgentsAgent).toHaveBeenCalledTimes(2);
+    expect(mockedBuildAgentsAgent).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ codeMode: { enabled: false } }),
+    );
+    expect(mockedBuildAgentsAgent).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ codeMode: { enabled: false } }),
+    );
   });
 });

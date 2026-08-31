@@ -1,4 +1,4 @@
-import { buildAgentsTools } from '@/agents/tools';
+import { buildAgentsTools, isGatedAgentToolCall } from '@/agents/tools';
 import {
   callAgentTool,
   listAgentToolManifests,
@@ -488,5 +488,59 @@ describe('tool registration', () => {
     expect(searchTools.description.toLowerCase()).toContain('toolid');
     expect(searchTools.inputSchema).toBeDefined();
     expect(callTool.inputSchema).toBeDefined();
+  });
+});
+
+describe('isGatedAgentToolCall', () => {
+  it('gates a tool the manifest flags destructive', async () => {
+    mockedListAgentToolManifests.mockResolvedValue(
+      manifest([
+        baseDescriptor({
+          id: 'sales.trpc.deal.remove',
+          description: 'Remove a deal',
+          path: 'trpc.deal.remove',
+          method: 'mutation',
+          destructive: true,
+        }),
+      ]),
+    );
+
+    await expect(
+      isGatedAgentToolCall('tenant-helper-d', 'sales.trpc.deal.remove'),
+    ).resolves.toBe(true);
+  });
+
+  it('gates an always-confirm tool even when the manifest does not flag it destructive', async () => {
+    mockedListAgentToolManifests.mockResolvedValue(
+      manifest(
+        [
+          baseDescriptor({
+            id: 'inbox.conversations.changeStatus',
+            plugin: 'inbox',
+            module: 'inbox',
+            description: 'Change conversation status',
+            path: 'conversations.changeStatus',
+            method: 'query',
+            destructive: false,
+          }),
+        ],
+        'inbox',
+      ),
+    );
+
+    await expect(
+      isGatedAgentToolCall('tenant-helper-ac', 'inbox.conversations.changeStatus'),
+    ).resolves.toBe(true);
+  });
+
+  it('does not gate a read tool or an unknown tool id', async () => {
+    mockedListAgentToolManifests.mockResolvedValue(manifest([baseDescriptor()]));
+
+    await expect(
+      isGatedAgentToolCall('tenant-helper-read', 'sales.trpc.deal.count'),
+    ).resolves.toBe(false);
+    await expect(
+      isGatedAgentToolCall('tenant-helper-unknown', 'sales.trpc.does.not.exist'),
+    ).resolves.toBe(false);
   });
 });

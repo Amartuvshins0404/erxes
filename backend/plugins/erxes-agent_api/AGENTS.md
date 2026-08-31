@@ -18,7 +18,10 @@
   multi-provider `AgentsConnection` model, its GraphQL schema and
   resolvers, the server-side per-provider models listing, the thread
   list/detail GraphQL queries, the `agentsThreadRemove` mutation, the
-  `agentsThreadsChanged` subscription surface, and the declarative
+  `agentsThreadsChanged` subscription surface, the tenant-wide
+  `AgentsSettings` model with its `agentsSettings` /
+  `agentsSettingsUpdate` GraphQL surface and the code-mode sandbox tool
+  (`src/modules/agents/codeMode.ts`), and the declarative
   permission config at `src/meta/permissions.ts`.
 - The `cfos` module under `src/modules/cfos` (merged from the legacy
   plugin's lineage): the `CfOsConnectCodes` model (hashed, single-use,
@@ -82,9 +85,29 @@
   whose listing fails is left out of the result instead of failing the
   query, and the key never leaves the server.
 - Publishes declarative permissions through `startPlugin` meta: one `agents`
-  module scoped to `all` with actions `showAgents` (`always`) and
-  `agentsChat`, and default groups
-  `erxes-agent:admin` and `erxes-agent:user` (both actions).
+  module scoped to `all` with actions `showAgents` (`always`),
+  `agentsChat`, and `manageAgentsSettings` (admin-only), and default
+  groups `erxes-agent:admin` (all three actions) and `erxes-agent:user`
+  (`showAgents` + `agentsChat`).
+- Serves the tenant-wide settings surface: GraphQL query `agentsSettings`
+  (gated `showAgents`) returns the tenant's flags and mutation
+  `agentsSettingsUpdate` (gated `manageAgentsSettings`) patches them.
+  Today the flags are `codeModeEnabled` (default `false`) and
+  `codeModeEnvironment` (enum `in-process`, default `in-process`).
+- Code mode: when the tenant flag is on, the chat agent additionally
+  carries the `execute_typescript` tool built by Mastra's `createCodeMode`
+  with the `QuickJsCodeModeTransport` (`@mastra/quickjs`) — model-authored
+  TypeScript runs in an in-process QuickJS (WebAssembly) sandbox with a
+  bare global object (no filesystem, network, process, timer, or module
+  access). The allow-list injected into the sandbox is
+  `{ searchTools, callTool: safeCallTool }` where `safeCallTool` is a
+  wrapped clone of the bridge's `callTool` that refuses approval-gated
+  tool ids with a readable `APPROVAL_REQUIRED` failure — sandboxed
+  programs bypass Mastra's `requireApproval` suspension, so the wrapper is
+  the gate. `askUser` is excluded. Wall-clock cap: 15s
+  (`AGENTS_CODE_MODE_TIMEOUT_MS`); sandbox memory/stack use the transport
+  defaults (128 MiB / 1 MiB). Chat, approve, and answer routes all resolve
+  the flag via `resolveCodeMode(models)` so resumed runs keep the tool.
 - Streams a Mastra-agent chat over SSE: `POST /agents/chat` forwards only the
   newest client message and delegates history to Mastra `Memory`
   (`@mastra/memory` + `@mastra/mongodb` MongoDBStore) keyed by `threadId`
@@ -181,6 +204,9 @@
 | Memory      | `src/modules/agents/memory.ts`             | Per-subdomain runtime bundle: Mastra `Memory` + minimal `Mastra` (`logger: false, workers: false`) sharing one `MongoDBStore` over a `connectorHandler` targeting the dedicated `{db}_agents_memory` sub-db (threads, messages, and workflow snapshots) |
 | ask_user    | `src/modules/agents/askUser.ts`            | Plugin-owned multi-question human-in-the-loop tool (batched `questions` suspension; normalizes legacy string/string[] and positional resume answers) |
 | Tools       | `src/modules/agents/tools.ts`              | Two-tier Mastra tool bridge: `searchTools` (discovery + per-subdomain manifest cache) and `callTool` (execute as the acting user; framework-native `requireApproval` predicate suspends destructive/always-confirm actions before `execute`, which stays a pure runner) |
+| Code mode   | `src/modules/agents/codeMode.ts`           | Builds the `execute_typescript` tool via Mastra `createCodeMode` + `QuickJsCodeModeTransport` (in-process WASM sandbox, 15s timeout); wraps `callTool` with the approval-gate refusal for the sandbox allow-list |
+| Settings model | `src/modules/agents/db/definitions/settings.ts` + `db/models/Settings.ts` | Tenant-wide singleton on `agents_settings` (`codeModeEnabled`, `codeModeEnvironment`) with `getSettings`/`updateSettings` statics |
+| Settings GraphQL | `src/modules/agents/graphql/schemas/settings.ts` + resolvers | `agentsSettings` query (`showAgents`) and `agentsSettingsUpdate` mutation (`manageAgentsSettings`) |
 | Http        | `src/routes.ts`                             | `POST /agents/chat`, `POST /agents/approve`, `POST /agents/answer`, `POST /cf-os/connect-code`, `POST /cf-os/exchange` |
 | cf-os       | `src/modules/cfos`                          | Passwordless Cloudflare OS sign-in: connect-code mint + gatekeeper exchange (`CfOsConnectCodes` model) |
 | Threads GraphQL | `src/modules/agents/graphql`           | Threads schema, read resolvers, and the `agentsThreadRemove` mutation resolver |
@@ -214,9 +240,15 @@
   provider's model ids, fetched server-side from the provider's /models
   endpoint with the stored key; a failing provider is omitted, and the
   result is empty (no fetch) when nothing is configured.
-- Permission actions `showAgents` and `agentsChat`, and default groups
-  `erxes-agent:admin` / `erxes-agent:user`, declared through
-  `startPlugin` meta permissions.
+- Permission actions `showAgents` and `agentsChat`, the admin-only
+  `manageAgentsSettings`, and default groups `erxes-agent:admin` /
+  `erxes-agent:user`, declared through `startPlugin` meta permissions.
+- GraphQL query `agentsSettings` returning the tenant's
+  `AgentsSettings { codeModeEnabled codeModeEnvironment updatedAt }` and
+  mutation `agentsSettingsUpdate(codeModeEnabled: Boolean,
+  codeModeEnvironment: String)` (at least one field required;
+  `codeModeEnvironment` validated against `AGENTS_CODE_MODE_ENVIRONMENTS`,
+  currently `in-process`).
 - tRPC namespace `erxesAgent` exposing a single `hello` query.
 - No tRPC procedure is annotated with `.meta({ agent })`, so this plugin
   currently exposes no agent-callable tools of its own.
@@ -308,6 +340,12 @@
   (hashed single-use cf-os sign-in codes with a TTL index on `expiresAt`),
   backs the `cfos` module's passwordless sign-in routes; it is the only
   non-BYOK write surface this plugin owns.
+- A third Mongo model, `AgentsSettings` on collection `agents_settings`
+  (tenant-wide singleton; `codeModeEnabled` + `codeModeEnvironment` with
+  schema defaults, created on first read/write) backs the admin settings
+  surface and the code-mode flag. This new write surface was explicitly
+  requested and approved by the user when choosing tenant-wide admin
+  control for code mode.
 - Conversation state (threads, messages, indexes) and durable approval
   snapshots (`mastra_workflow_snapshot`) are owned entirely by Mastra
   `Memory`/`MongoDBStore` (store id `erxes-agent-store`) in the dedicated
@@ -440,6 +478,38 @@
   verified control; kimi-code Anthropic `thinking.budgetTokens` capped to
   stay below the output-token budget, whose cap is raised when thinking is
   on). Do not pass raw thinking values to providers.
+- Code mode is security-sensitive. The sandbox allow-list must stay
+  `{ searchTools, callTool: safeCallTool }` and must NEVER include
+  `askUser` (suspending from inside a sandboxed program has unverified
+  semantics). `safeCallTool` must keep refusing gated tool ids
+  (`isGatedAgentToolCall`: manifest-destructive or always-confirm) —
+  Mastra's code-mode dispatcher invokes `tool.execute` directly, so
+  `requireApproval` never runs for `external_*` calls and the wrapper is
+  the only gate. The wrapper fails closed when the request context is
+  missing. Keep the wall-clock cap (`AGENTS_CODE_MODE_TIMEOUT_MS = 15000`)
+  and the QuickJS transport's default memory/stack bounds; the QuickJS WASM
+  boundary is what denies filesystem/network/process access to guest code —
+  never pass host capabilities beyond the allow-listed tools.
+- `agentsSettingsUpdate` stays gated by the admin-only
+  `manageAgentsSettings` action (granted only to the `erxes-agent:admin`
+  default group). The `agentsSettings` read stays gated by `showAgents`
+  because the flag shapes every user's chat. New environments must extend
+  `AGENTS_CODE_MODE_ENVIRONMENTS` (single source shared by the schema enum
+  and resolver validation).
+- The code-mode tool is built once per process
+  (`buildCodeModeAddition` memoizes) wrapping the process-wide bridge
+  tools; the tenant flag is resolved per request by the routes
+  (`resolveCodeMode(models)`) and passed into `buildAgentsAgent`, so
+  chat/approve/answer all keep (or lose) the tool together.
+- In jest, `ts-blank-space` is mapped to a callable CJS stub
+  (`src/modules/agents/__tests__/__stubs__/ts-blank-space.js`):
+  `@mastra/quickjs@0.1.0`'s CJS bundle misuses esbuild's `__toESM(mod, 1)`
+  against the real ESM-only package (`.default` is the namespace, not the
+  function), and loading its ESM entry drags in real-ESM loading plus the
+  WASM loader's dynamic imports. Test programs are plain JS, so identity
+  passthrough is equivalent; production uses the real ESM package. The
+  jest run needs `NODE_OPTIONS=--experimental-vm-modules` for the
+  `@jitl/quickjs-wasmfile-release-sync` variant's dynamic import.
 - Agents memory must stay in the dedicated `{db}_agents_memory` sub-database
   resolved via `mongoose.connection.useDb(...)` — never the shared
   `mastra_threads`/`mastra_messages` collections in the base DB. Those hold
@@ -506,16 +576,22 @@
 
 - `pnpm nx lint erxes-agent_api`
 - `pnpm nx test erxes-agent_api`
-- Focused run without Nx: `pnpm exec jest --config
-  backend/plugins/erxes-agent_api/jest.config.ts --runInBand` (7 suites,
-  133 tests: tool bridge incl. the `requireApproval` predicate and pure
-  executor, agent-tools client, HTTP routes auth/isolation incl. the
-  approve/decline contract, the ask-user answer/resume contract and the
-  BYOK no-connection 400, provider
+- Focused run without Nx (from the repository root; the
+  `NODE_OPTIONS` flag is required by the QuickJS WASM loader):
+  `NODE_OPTIONS=--experimental-vm-modules pnpm exec jest --config
+  backend/plugins/erxes-agent_api/jest.config.ts --runInBand --forceExit`
+  (9 suites, 156 tests: tool bridge incl. the `requireApproval` predicate
+  and pure executor and the shared `isGatedAgentToolCall` gate, agent-tools
+  client, HTTP routes auth/isolation incl. the approve/decline contract and
+  the tenant code-mode flag on chat/approve/answer, the ask-user
+  answer/resume contract and the BYOK no-connection 400, the code-mode
+  sandbox incl. real QuickJS execution, host-capability denial and the
+  gated-tool refusal, provider
   resolution incl. the OpenAI native-path/proxy split, memory/runtime
   lifecycle, BYOK multi-provider connection resolvers incl. the
-  server-side models listing and the stale-model re-save refresh,
-  thread list/detail resolvers, and the `agentsThreadRemove` mutation).
+  server-side models listing and the stale-model re-save refresh, tenant
+  settings resolvers incl. the admin-only gating, thread list/detail
+  resolvers, and the `agentsThreadRemove` mutation).
 - `pnpm nx build erxes-agent_api` remains blocked upstream of this plugin:  `erxes-api-shared:build` fails repo-wide (`@babel/preset-env@7.26.9` linked
   against `@babel/core@8.0.1` breaks preconstruct) and
   `backend/erxes-api-shared/dist` is empty, so its package types/entrypoints
@@ -556,6 +632,39 @@
 ## Recent Changes
 
 <!-- Newest first. Keep at most 10 entries. -->
+
+### `2026-08-31` — Code mode: sandboxed agent code execution behind a tenant-wide admin toggle
+
+- **Summary:** Added code mode: when an admin enables it
+  (`agentsSettingsUpdate` gated by the new admin-only
+  `manageAgentsSettings` action, stored on the new tenant singleton
+  `agents_settings`), the chat agent additionally carries the
+  `execute_typescript` tool — model-authored TypeScript runs in-process in
+  a QuickJS (WASM) sandbox via Mastra's `createCodeMode` +
+  `QuickJsCodeModeTransport` (`@mastra/quickjs`), orchestrating the bridge
+  tools as `external_*` functions. Because the code-mode dispatcher calls
+  `tool.execute` directly (bypassing `requireApproval`), the sandbox
+  allow-list carries a wrapped `callTool` refusing gated tool ids with
+  `APPROVAL_REQUIRED`; `askUser` is excluded; 15s timeout; chat/approve/
+  answer all resolve the flag so resumed runs keep the tool. Also
+  extracted the shared `isGatedAgentToolCall` gate in `tools.ts`.
+- **Affected areas:** `src/modules/agents/codeMode.ts` (new),
+  `db/definitions/settings.ts` + `db/models/Settings.ts` (new),
+  `graphql/schemas/settings.ts` + `graphql/resolvers/{queries,mutations}/settings.ts`
+  (new), `@types/settings.ts` (new), `tools.ts` (gate extraction),
+  `agent.ts` (codeMode input + tool/instructions merge), `routes.ts`
+  (`resolveCodeMode` on all three routes), `connectionResolvers.ts`
+  (`AgentsSettings` registration), `meta/permissions.ts` (new action +
+  admin group), `package.json` (+`@mastra/quickjs`), `jest.config.ts` +
+  `tsconfig.spec.json` + the `ts-blank-space` test stub,
+  `src/__tests__/routes.test.ts`,
+  `src/modules/agents/__tests__/{tools,codeMode,settingsResolvers}.test.ts`.
+- **Contracts changed:** Added GraphQL `agentsSettings` /
+  `agentsSettingsUpdate` and permission action `manageAgentsSettings`
+  (admin default group only); new collection `agents_settings`; chat,
+  approve, and answer agent builds now carry the extra
+  `execute_typescript` tool when the tenant flag is on (no REST wire
+  changes).
 
 ### `2026-08-31` — Multi-question ask_user tool (plugin-owned)
 
@@ -785,22 +894,4 @@
   `copilotConnectionUpdate`; the update mutation's provider whitelist is now
   `openai`, `grok`, `kimi`, `kimi-code` (`cloudflare-ai-gateway` is
   rejected with `Unsupported AI provider`).
-
-### `2026-08-28` — `copilotThreadRemove` mutation
-
-- **Summary:** Added GraphQL mutation `copilotThreadRemove(threadId):
-  Boolean` so users can delete their own copilot threads: gated by
-  `copilotChat`, ownership-checked with the same `getThreadById` →
-  `NOT_FOUND` → `FORBIDDEN` pattern as `copilotThreadDetail`, deletes through
-  Mastra's `deleteThread`, and publishes `copilotThreadsChanged` so the
-  sidebar refetches without a manual refresh.
-- **Affected areas:** `src/modules/copilot/graphql/schemas/threads.ts`
-  (new `mutations` export),
-  `src/modules/copilot/graphql/resolvers/mutations/threads.ts` (new),
-  `src/apollo/schema/schema.ts`, `src/apollo/resolvers/mutations.ts`,
-  `src/modules/copilot/__tests__/threadsResolvers.test.ts` (+4 tests, now
-  107).
-- **Contracts changed:** Added GraphQL mutation
-  `copilotThreadRemove(threadId): Boolean` (`NOT_FOUND` for a missing thread,
-  `FORBIDDEN` "Thread belongs to another user." for a foreign thread).
 

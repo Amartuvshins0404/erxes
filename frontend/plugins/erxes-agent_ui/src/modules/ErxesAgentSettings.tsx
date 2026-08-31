@@ -7,6 +7,12 @@ const SettingsConnectionPage = lazy(() =>
   })),
 );
 
+const SettingsCodeModePage = lazy(() =>
+  import('~/pages/settings/SettingsCodeModePage').then((module) => ({
+    default: module.SettingsCodeModePage,
+  })),
+);
+
 /**
  * Settings router for the plugin, mounted by the host at
  * `/settings/erxes-agent/*` via the `./erxes_agentSettings` expose. Same
@@ -19,6 +25,7 @@ export const ErxesAgentSettings = () => {
       <Routes>
         <Route index element={<Navigate to="connection" replace />} />
         <Route path="connection" element={<SettingsConnectionPage />} />
+        <Route path="code-mode" element={<SettingsCodeModePage />} />
       </Routes>
     </Suspense>
   );

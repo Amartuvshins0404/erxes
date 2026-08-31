@@ -22,6 +22,12 @@ export const permissions: IPermissionConfig = {
           name: 'agentsChat',
           description: 'Use agents chat',
         },
+        {
+          title: 'Manage agents settings',
+          name: 'manageAgentsSettings',
+          description:
+            'Manage tenant-wide agents settings (code mode toggle)',
+        },
       ],
     },
   ],
@@ -35,7 +41,7 @@ export const permissions: IPermissionConfig = {
         {
           plugin: 'erxes-agent',
           module: 'agents',
-          actions: ['showAgents', 'agentsChat'],
+          actions: ['showAgents', 'agentsChat', 'manageAgentsSettings'],
           scope: 'all',
         },
       ],

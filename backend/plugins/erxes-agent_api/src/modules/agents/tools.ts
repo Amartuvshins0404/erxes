@@ -88,6 +88,22 @@ export const findAgentToolDescriptor = async (
   return tools.find((tool) => tool.id === toolId);
 };
 
+/**
+ * Whether a tool id requires human approval — destructive per the manifest,
+ * or on the always-confirm list. Shared by callTool's `requireApproval`
+ * predicate and the code-mode safe-call wrapper: sandboxed programs call
+ * tool `execute` directly, so Mastra's approval suspension never runs there
+ * and the wrapper must refuse gated ids itself.
+ */
+export const isGatedAgentToolCall = async (
+  subdomain: string,
+  toolId: string,
+): Promise<boolean> => {
+  const descriptor = await findAgentToolDescriptor(subdomain, toolId);
+
+  return descriptor ? requiresApproval(descriptor) : false;
+};
+
 const readIdentity = (context: {
   requestContext: { get(key: string): unknown };
 }): { subdomain: string; userId: string } => {
@@ -223,12 +239,7 @@ export const buildAgentsTools =
               return false;
             }
 
-            const descriptor = await findAgentToolDescriptor(
-              subdomain,
-              toolId,
-            );
-
-            return descriptor ? requiresApproval(descriptor) : false;
+            return isGatedAgentToolCall(subdomain, toolId);
           },
           execute: async ({ toolId, input }, context) => {
             const { subdomain, userId } = readIdentity(context);

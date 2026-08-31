@@ -39,8 +39,8 @@ import { generateModels, type IModels } from './connectionResolvers';
  *   continue the stream) or `declineToolCall` (skip it and tell the model
  *   why). The suspended run is discovered from persistent snapshot storage
  *   scoped to the thread and the acting user.
- * - `POST /agents/answer` answers a run suspended by the built-in `ask_user`
- *   tool: `{ threadId, answer }`. The suspended run is discovered the same
+ * - `POST /agents/answer` answers a run suspended by the plugin's
+ *   `ask_user` tool: `{ threadId, answer }`. The suspended run is discovered the same
  *   way (durable snapshots, ownership-checked) and resumed with
  *   `agent.resumeStream(answer)`, so the ask_user call returns the user's
  *   answer inside the model's generation loop and the reply continues from
@@ -177,6 +177,19 @@ const parseThinkingLevel = (value: unknown): IAgentsThinkingLevel =>
   isAgentsThinkingLevel(value) ? value : 'off';
 
 /**
+ * Reads the tenant's code-mode flag so chat and both resume routes build
+ * the agent with (or without) the sandboxed code tool; a resumed run keeps
+ * the tool set of the turn that suspended, so the flag rides along here.
+ */
+const resolveCodeMode = async (
+  models: IModels,
+): Promise<{ enabled: boolean }> => {
+  const settings = await models.AgentsSettings.getSettings();
+
+  return { enabled: settings.codeModeEnabled === true };
+};
+
+/**
  * Stamps the acting user into a Mastra RequestContext so the two-tier tools
  * (searchTools/callTool) can validate and execute as that user. Identity
  * always comes from the gateway headers, never from the request body.
@@ -301,6 +314,7 @@ router.post('/agents/chat', async (req, res) => {
       memory: runtime.memory,
       mastra: runtime.mastra,
       thinkingLevel,
+      codeMode: await resolveCodeMode(models),
     });
 
     const requestContext = await buildToolRequestContext(identity);
@@ -391,6 +405,7 @@ router.post('/agents/approve', async (req, res) => {
       memory: runtime.memory,
       mastra: runtime.mastra,
       thinkingLevel,
+      codeMode: await resolveCodeMode(models),
     });
 
     // Suspended runs live in persistent snapshot storage (the shared
@@ -597,6 +612,7 @@ router.post('/agents/answer', async (req, res) => {
       memory: runtime.memory,
       mastra: runtime.mastra,
       thinkingLevel,
+      codeMode: await resolveCodeMode(models),
     });
 
     const suspended = await findSuspendedToolCall(agent, identity, threadId);

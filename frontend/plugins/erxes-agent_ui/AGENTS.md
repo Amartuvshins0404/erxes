@@ -20,7 +20,7 @@
   global floating widget side panel.
 - The plugin settings surface under `/settings/erxes-agent/*`: the
   settings router (`ErxesAgentSettings`), the settings sidebar
-  navigation (`ErxesAgentSettingsNavigation`), and the opencode-style
+  navigation (`ErxesAgentSettingsNavigation`), the opencode-style
   BYOK form at `src/pages/settings/SettingsConnectionPage.tsx` (select
   provider -> paste API key -> save; several providers can be configured
   side by side, each listed with its own entry and removable individually.
@@ -29,7 +29,11 @@
   by provider, with an implicit Auto (server default) entry, and a
   per-turn thinking-level picker (off/minimal/low/medium/high) sits next to
   it; both selections ride along with every chat turn. The chat surfaces
-  never query or manage keys; they only consume the models listing.
+  never query or manage keys; they only consume the models listing), and
+  the tenant-wide code mode page at
+  `src/pages/settings/SettingsCodeModePage.tsx` (admin-gated switch over
+  the backend's `agentsSettings` flags; every user can read the state,
+  only `manageAgentsSettings` holders can change it).
 - The AI SDK chat transport, stored-history mapping, REST client, and GraphQL
   documents under `src/modules/agents`.
 - The animated bot avatar: the MIT-licensed, framework-free bloub engine
@@ -52,8 +56,8 @@
   contributes a navigation group named `Agents` (icon + `defaultPath`
   `erxes-agent`, no panel `content`) and one module named `agents` at path
   `erxes-agent` (the chat page is the plugin root), plus a
-  `settingsNavigation` sidebar group ("Agents" / "API key") for the host
-  settings area. With no navigationGroup content the host renders no
+  `settingsNavigation` sidebar group ("Agents" / "API key" / "Code mode")
+  for the host settings area. With no navigationGroup content the host renders no
   secondary plugin panel: the rail click lands on the chat page directly.
 - Plugin routes mount the chat page directly at the plugin root
   (`<Route index element={<IndexPage />} />`) with no intermediate route
@@ -154,6 +158,17 @@
   render in mono; Radix renders the selected item's content in the
   trigger, so the active provider's mark identifies the choice there too.
   Per-provider group headers are uppercase micro-labels with the mark.
+- Code mode in settings: the tenant-wide toggle page at
+  `/settings/erxes-agent/code-mode` (settings sidebar "Agents / Code
+  mode"). Every agents user can read the current state
+  (`AgentsSettings` query); the `Switch` is disabled unless
+  `usePermissionCheck().hasActionPermission('manageAgentsSettings',
+  'erxes-agent')` holds, in which case toggling saves immediately through
+  `AgentsSettingsUpdate` (`refetchQueries` + success/error toasts).
+  Non-admins see the live state plus a muted "Managed by your
+  administrators" note. The sandbox environment renders as a fixed
+  "In-process (built-in server)" card marked Default — the backend
+  validates the enum, the UI does not edit it.
 - Two-tier responsive transcript typography (base 15px / md 17px) for
   markdown, user bubbles, composer, and thread titles, with polished
   markdown styling (paragraph spacing, blockquote, hr, list markers and
@@ -168,20 +183,23 @@
 | ------------------- | ---------------------------------------------- | ------------------------------------------------- |
 | Host contract       | `src/config.tsx`                               | Exports `CONFIG` consumed by `core-ui`            |
 | Routing             | `src/modules/ErxesAgentMain.tsx`               | Declares the plugin's main routes (chat at index) |
-| Settings routing    | `src/modules/ErxesAgentSettings.tsx`           | Declares the plugin's settings routes (`connection`) |
-| Settings navigation | `src/modules/ErxesAgentSettingsNavigation.tsx` | Settings sidebar group ("Agents" / "API key")     |
+| Settings routing    | `src/modules/ErxesAgentSettings.tsx`           | Declares the plugin's settings routes (`connection`, `code-mode`) |
+| Settings navigation | `src/modules/ErxesAgentSettingsNavigation.tsx` | Settings sidebar group ("Agents" / "API key" / "Code mode") |
 | Chat page           | `src/pages/agents/IndexPage.tsx`               | Full-page chat with thread sidebar                |
 | Settings page       | `src/pages/settings/SettingsConnectionPage.tsx`| Brand-mark BYOK form (save/remove connection)     |
+| Code mode page      | `src/pages/settings/SettingsCodeModePage.tsx`  | Tenant-wide code mode toggle (admin-gated switch + fixed sandbox environment card) |
 | Floating widget     | `src/widgets/FloatingWidget.tsx`               | Right-edge chevron handle + full-height `Sheet` side panel |
 | Chat hook           | `src/modules/agents/hooks/useAgentsChat.ts`    | `useChat` wrapper: thread tracking, approval resend, ask-user answer resume, history |
 | Threads hook        | `src/modules/agents/hooks/useAgentsThreads.ts` | Loads the user's agents threads                   |
 | Connection hook     | `src/modules/agents/hooks/useAgentsConnection.ts` | Loads the user's BYOK connection               |
 | Provider icons      | `src/modules/agents/components/ProviderIcon.tsx` | Inline brand marks per provider (OpenAI, xAI, Kimi; Kimi Code = Kimi mark + code badge) |
 | Provider picker     | `src/modules/agents/components/ProviderPicker.tsx` | Provider whitelist, brand-mark card grid, and label helpers (settings form) |
+| Settings hook       | `src/modules/agents/hooks/useAgentsSettings.ts` | Loads the tenant-wide agents settings (code mode flag) |
 | Transport           | `src/modules/agents/transport.ts`              | `DefaultChatTransport` subclass; routes approval resends to `/agents/approve` and ask-user answer sends to `/agents/answer` |
 | History mapping     | `src/modules/agents/mapStoredMessages.ts`      | Stored Mastra messages → AI SDK `UIMessage`s      |
 | REST URLs           | `src/modules/agents/api.ts`                    | `/agents/chat`, `/agents/approve`, `/agents/answer` SSE endpoint URLs |
 | GraphQL documents   | `src/modules/agents/graphql/connection.ts`     | `AgentsConnection*` BYOK operations               |
+| GraphQL documents   | `src/modules/agents/graphql/settings.ts`       | `AgentsSettings` query + `AgentsSettingsUpdate` mutation |
 | GraphQL documents   | `src/modules/agents/graphql/threads.ts`        | `Agents*` thread list/detail operations and the `AgentsThreadsChanged` subscription |
 | Components          | `src/modules/agents/components/*`              | Chat panel (transcript + empty state + composer layouts), message list, parts, approval, tool call helpers, composer, `ChatInput`, markdown, thread list (with delete), provider picker, `BloubBot` avatar wrapper |
 | Bot cycles          | `src/modules/agents/botCycles.ts`              | Curated module-level montages (`CALM_FACE_CYCLE`, `LAUNCHER_CYCLE`) with stable references |
@@ -213,8 +231,9 @@
 - Backend GraphQL: `AgentsConnections`, `AgentsModels`,
   `AgentsConnectionUpsert`, `AgentsConnectionRemove` (the former singular
   `AgentsConnection`/`AgentsConnectionUpdate` operations are gone),
-  `AgentsThreads`, `AgentsThreadDetail`, `AgentsThreadRemove`, and the
-  `AgentsThreadsChanged` subscription (refetch signal only).
+  `AgentsThreads`, `AgentsThreadDetail`, `AgentsThreadRemove`, the
+  `AgentsThreadsChanged` subscription (refetch signal only), and the
+  tenant settings pair `AgentsSettings` / `AgentsSettingsUpdate`.
 - `ai` (`DefaultChatTransport`, `UIMessage`, part type guards,
   `lastAssistantMessageIsCompleteWithApprovalResponses`) and
   `@ai-sdk/react` (`useChat`), matched to the backend's AI SDK major.
@@ -222,7 +241,8 @@
   `buttonVariants`, `Sheet`, `AlertDialog`, `Input`, `Label`, `Textarea`,
   `Collapsible`, `Avatar`, `Spinner`, `Badge`, `toast`, and
   `REACT_APP_API_URL`.
-- `ui-modules` for `PageHeader`.
+- `ui-modules` for `PageHeader` and the permission gate
+  (`usePermissionCheck`, `hasActionPermission(action, pluginName)`).
 - `react-markdown` for assistant text, `@tabler/icons-react` for icons, and
   `react-router` / `react-router-dom` for routing.
 
@@ -296,8 +316,14 @@
   inside `setTimeout(0)`); it pauses while the user is scrolled up
   (near-bottom threshold 120px), re-arms when the transcript empties, and
   always jumps to the bottom once thread history finishes loading.
-- The BYOK API keys are write-only in the UI: `agentsConnections` never returns
-  it, the settings form renders it only in a password input (with a local
+- Code mode settings gating mirrors the backend: the switch saves through
+  `AgentsSettingsUpdate` only for `manageAgentsSettings` holders
+  (`usePermissionCheck` with the dashed plugin name `'erxes-agent'`);
+  everyone else gets a read-only view. The environment card is
+  display-only — the backend's `AGENTS_CODE_MODE_ENVIRONMENTS` enum is the
+  single source, and only `in-process` exists.
+- The BYOK API keys are write-only in the UI: `agentsConnections` never
+  returns it, the settings form renders it only in a password input (with a local
   show/hide toggle), and an empty `apiKey` on upsert must be omitted (not
   sent as an empty string, which clears that provider's stored key).
   Omitting `apiKey` keeps that provider's stored key. Each provider entry
@@ -455,10 +481,37 @@
   reload, while a simple click opens the full-height side panel with
   threads and chat on any page, whose empty state matches the full page
   without floating or clipping (also on mobile).
+- Smoke (code mode settings): open `/settings/erxes-agent/code-mode`
+  (settings sidebar "Agents / Code mode") — as an admin the `Switch`
+  reflects the tenant state, toggling saves immediately with a toast and
+  survives a reload; as a non-admin the switch is disabled and the
+  "Managed by your administrators" note shows; the environment card reads
+  "In-process (built-in server)" marked Default.
 
 ## Recent Changes
 
 <!-- Newest first. Keep at most 10 entries. -->
+
+### `2026-08-31` — Code mode settings page (tenant-wide admin toggle)
+
+- **Summary:** Added the tenant-wide code mode settings surface: new
+  `AgentsSettings` / `AgentsSettingsUpdate` GraphQL documents
+  (`graphql/settings.ts`) + `useAgentsSettings` hook, and the
+  `SettingsCodeModePage` at `/settings/erxes-agent/code-mode` (settings
+  sidebar "Agents / Code mode") with an instant-apply `Switch`, toast
+  feedback, and the fixed "In-process (built-in server)" environment card.
+  Edit controls are gated by `usePermissionCheck`
+  (`manageAgentsSettings` on `erxes-agent`); non-admins get a read-only
+  state with a muted note. No chat-surface changes.
+- **Affected areas:**
+  `src/pages/settings/SettingsCodeModePage.tsx` (new),
+  `src/modules/agents/hooks/useAgentsSettings.ts` (new),
+  `src/modules/agents/graphql/settings.ts` (new),
+  `src/modules/ErxesAgentSettings.tsx` (route),
+  `src/modules/ErxesAgentSettingsNavigation.tsx` (nav item).
+- **Contracts changed:** Consumes `AgentsSettings` query and
+  `AgentsSettingsUpdate` mutation; settings navigation gains the
+  "Code mode" item (exposes and `CONFIG` unchanged).
 
 ### `2026-08-31` — ask_user answer fix, writing avatar, question card slimmed
 
@@ -625,23 +678,4 @@
   `src/modules/agents/components/MessageList.tsx`.
 - **Contracts changed:** None (self-contained UI; no exposes, `CONFIG`,
   routes, or GraphQL operations changed).
-
-### `2026-08-30` — Model always visible in parentheses
-
-- **Summary:** The stored/default model is no longer hidden anywhere: the
-  settings page's configured entries show the stored model in parentheses
-  (`OpenAI (gpt-5.6-luna)`), the provider cards show the default model a
-  fresh entry will store (new `PROVIDER_OPTIONS.defaultModel` display
-  copy mirroring the backend `PROVIDER_DEFAULTS`), and the chat model
-  picker's Auto entry shows the model the server default actually runs via
-  the new `autoModel` prop (`ChatPanel` re-added a display-only
-  `useAgentsConnection` query for it — no gating, no key UI). Together
-  with the backend change that refreshes a stale stored model to the
-  current provider default on re-save, an OpenAI entry always visibly
-  reads `gpt-5.6-luna`.
-- **Affected areas:**
-  `src/modules/agents/components/{ProviderPicker,ModelPicker,ChatPanel}.tsx`,
-  `src/pages/settings/SettingsConnectionPage.tsx`.
-- **Contracts changed:** None (all values come from existing
-  `AgentsConnections` query fields).
 

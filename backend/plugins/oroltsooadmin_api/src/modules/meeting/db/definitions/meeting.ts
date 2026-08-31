@@ -8,7 +8,12 @@ export const meetingSchema = new Schema<IMeetingDocument>(
   {
     _id: mongooseStringRandomId,
 
-    entityId: { type: String, required: true, label: 'Admin meeting id' },
+    subdomain: {
+      type: String,
+      required: true,
+      index: true,
+      label: 'Subdomain',
+    },
 
     title: { type: String, required: true, label: 'Title' },
     location: { type: String, label: 'Location' },
@@ -24,6 +29,5 @@ export const meetingSchema = new Schema<IMeetingDocument>(
   { timestamps: true },
 );
 
-meetingSchema.index({ entityId: 1 }, { unique: true, sparse: true });
-meetingSchema.index({ scheduledAt: -1 });
+meetingSchema.index({ subdomain: 1, scheduledAt: -1 });
 meetingSchema.index({ status: 1, scheduledAt: -1 });

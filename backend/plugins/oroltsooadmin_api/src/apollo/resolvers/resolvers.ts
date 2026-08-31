@@ -1,3 +1,4 @@
+import { cpCustomResolvers } from '@/clientportal/graphql/resolvers/customResolvers';
 import {
   OroltsooAdminProfile,
   OroltsooAdminProfileFinance,
@@ -6,4 +7,6 @@ import {
 export const customResolvers = {
   OroltsooAdminProfile,
   OroltsooAdminProfileFinance,
+
+  ...cpCustomResolvers,
 };

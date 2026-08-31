@@ -6,7 +6,7 @@
 - **Project:** `oroltsoo_api`
 - **Layer:** `Backend API`
 - **Path:** `backend/plugins/oroltsoo_api`
-- **Last synchronized:** `2026-08-27`
+- **Last synchronized:** `2026-08-31`
 
 ## Scope
 
@@ -20,8 +20,8 @@
 - The politician's posts (`oroltsoo_posts`): title, excerpt, BlockNote content,
   cover image, tags, status and publish date.
 - The read side of the citizen meeting schedule (`oroltsoo_meetings`): the
-  schema, indexes and query API. Meetings themselves are authored on the public
-  website, not here.
+  schema, indexes and query API. Meetings themselves are authored in
+  `oroltsooadmin` and arrive here over a signed webhook.
 - The `oroltsooProfile` permission module and its two actions.
 - Agent-callable read tools for politician profiles.
 
@@ -33,7 +33,7 @@
 - Committee memberships and multi-term history.
 - Citizen requests and their workflow — not built yet.
 - Creating, editing or deleting meetings. This plugin exposes no meeting
-  mutation; the website owns that write path.
+  mutation; `oroltsooadmin` owns that write path and pushes the result here.
 - The review decision itself. `reviewStatus` is authored in `oroltsooadmin`;
   this plugin only stores what that service sends.
 - CMS articles — only outbound links to news and reports are stored here.
@@ -57,7 +57,9 @@
   (`reviewStatus`, `reviewNote`, `reviewedAt`) so the politician can see whether
   the platform verified them.
 - Meetings: read-only, cursor-paginated listing filtered by search text, status
-  and a scheduled-date range, plus detail by `_id`.
+  and a scheduled-date range, plus detail by `_id`. Rows are mirrored from
+  `oroltsooadmin` and keyed by its meeting id (`entityId`), so a repeated
+  delivery updates the same row.
 - Posts: cursor-paginated listing filtered by search text, status, tag and a
   publish-date range, plus detail, create, edit and bulk remove. Every write is
   pushed to the `oroltsooadmin` mirror.
@@ -83,6 +85,7 @@
 | Posts         | `src/modules/post/**`                                      | Post schema, model, GraphQL API, admin sync         |
 | Admin sync    | `src/utils/adminSync.ts`                                   | HMAC-signed fire-and-forget webhook sender          |
 | Webhook in    | `src/routes/**`, `src/middlewares/**`, `src/modules/profile/routes/webhook.ts` | Signed `syncReviewStatus` receiver |
+| Meeting sync  | `src/modules/meeting/routes/webhook.ts`                    | Signed `syncMeeting` / `removeMeeting` receivers    |
 
 ## Contracts
 
@@ -95,6 +98,9 @@
 - GraphQL mutation: `oroltsooProfileUpdate(input)`.
 - GraphQL queries: `oroltsooMeetings`, `oroltsooMeetingDetail`; type
   `OroltsooMeeting`. No meeting mutation is exposed.
+- HTTP `POST /webhook/syncMeeting` and `POST /webhook/removeMeeting` — same
+  signed envelope as `syncReviewStatus`, with `payload.entityId` carrying the
+  `oroltsooadmin` meeting id. Only `oroltsooadmin` calls them.
 - GraphQL queries: `oroltsooPosts`, `oroltsooPostDetail`; mutations
   `oroltsooPostAdd`, `oroltsooPostEdit`, `oroltsooPostRemove`; type
   `OroltsooPost`.
@@ -131,8 +137,10 @@
   tenant-scoped.
 - Indexes: `{ status, createdAt }` for the default list, `{ firstName, lastName }`
   for name lookups.
-- Promises, meetings, reports and news links are embedded arrays without their
-  own `_id`.
+- Promises, reports and news links are embedded arrays without their own `_id`.
+- `oroltsoo_meetings` rows carry `entityId`, the `oroltsooadmin` meeting id,
+  under a unique sparse index — sparse because rows predating the admin-owned
+  schedule have none.
 - No migrations.
 
 ## Local Invariants
@@ -161,18 +169,18 @@
   later — live in their own collection, never as an embedded array on the
   profile. The profile is rewritten wholesale on every save, so an embedded
   record written by anyone else would be silently erased.
-- Meetings are deliberately **not** mirrored to `oroltsooadmin`; profiles and
-  posts are.
+- Meetings flow the opposite way to profiles and posts: `oroltsooadmin` writes
+  them and this plugin mirrors them. Never push a meeting up to the admin
+  service.
 - `Post.content` holds the serialized BlockNote document produced by the shared
   `Editor`, never HTML. Render it with `BlockEditorReadOnly`.
 - A post update writes the whole document, so `publishedAt` round-trips through
   the editor. The model only stamps the very first publish, and reuses a date
   the post already earned rather than moving it.
-- The meeting module is read-only by design. Never add a create/edit/remove
-  mutation or model static here — meetings are authored on the public website,
-  and a second writer would let this workspace overwrite what the site owns.
-  A write path for the site is still missing; it belongs behind a
-  client-portal-scoped entry point, not an internal mutation.
+- The meeting module is read-only to this workspace by design. `syncMeeting`
+  and `removeSyncedMeeting` are reachable only from the signed webhook route;
+  never expose a meeting mutation in GraphQL, because a second writer would let
+  this workspace overwrite the schedule `oroltsooadmin` owns.
 - Every query and mutation calls `checkPermission` before touching data.
 - Agent-callable procedures stay read-only and bounded; never annotate a
   mutation here.
@@ -198,10 +206,23 @@
 - Smoke: run `oroltsooProfileInfo` twice on a fresh tenant and confirm the same
   `_id` comes back with `status: "draft"`; then `oroltsooProfileUpdate` and
   confirm no second record is created.
+- Smoke: create a meeting in `oroltsooadmin` for this tenant, run
+  `oroltsooMeetings` here and confirm it appears; edit it there and confirm the
+  same row updates instead of a duplicate showing up.
 
 ## Recent Changes
 
 <!-- Newest first. Keep at most 10 entries. -->
+
+### `2026-08-31` — Meeting schedule arrives from the admin service
+
+- **Summary:** `oroltsooadmin` now authors the citizen meeting schedule and
+  pushes it here over the signed webhook channel; meetings are keyed by the
+  admin meeting id so repeated deliveries update one row.
+- **Affected areas:** `src/modules/meeting/{@types,db,routes}/**`,
+  `src/routes/index.ts`
+- **Contracts changed:** Added `POST /webhook/syncMeeting` and
+  `POST /webhook/removeMeeting`; `oroltsoo_meetings` gained `entityId`.
 
 ### `2026-08-27` — Shared normalize helpers
 
@@ -308,36 +329,3 @@
   `OroltsooProfileEducation` and `OroltsooProfileCareer` type/input families.
   The admin sync payload carries these fields, so `oroltsooadmin_api` must ship
   together with this change.
-
-### `2026-08-26` — Admin mirror sync
-
-- **Summary:** Profile create/update/remove now pushes an HMAC-signed webhook to
-  `oroltsooadmin`, mirroring the `block` → `blockadmin` pattern.
-- **Affected areas:** `src/utils/adminSync.ts`,
-  `src/modules/profile/graphql/resolvers/mutations/profile.ts`
-- **Contracts changed:** Added outbound `POST /webhook/syncProfile` and
-  `POST /webhook/removeProfile` calls; added the `OROLTSOO_ADMIN_API_URL` and
-  `OROLTSOO_ADMIN_SECRET` environment variables.
-
-### `2026-08-26` — Default permission groups
-
-- **Summary:** Added `oroltsoo:admin` and `oroltsoo:viewer` default permission
-  groups so administrators can grant profile access in one step.
-- **Affected areas:** `src/meta/permissions.ts`
-- **Contracts changed:** Added two entries to `permissionDefaultGroups`.
-
-### `2026-08-26` — Politician profile module
-
-- **Summary:** Replaced the generated `profile` sample with a full politician
-  profile record: schema, validation, permission-checked CRUD, cursor listing,
-  computed fields and two agent read tools.
-- **Affected areas:** `src/main.ts`, `src/constants.ts`,
-  `src/connectionResolvers.ts`, `src/meta/permissions.ts`, `src/trpc/**`,
-  `src/modules/profile/**`, `src/apollo/resolvers/resolvers.ts`
-- **Contracts changed:** Added `oroltsooProfiles`, `oroltsooProfileDetail`,
-  `oroltsooProfileAdd`, `oroltsooProfileEdit`, `oroltsooProfileRemove`, the
-  `OroltsooProfile` type family, the `oroltsooProfile` permission module and the
-  `oroltsooProfile` agent tools; removed the generated `getProfile`/`getProfiles`
-  /`createProfile`/`updateProfile`/`removeProfile` operations, the `Profile`
-  type and the unused `oroltsoo.hello` tRPC procedure. Port moved from `33010`
-  to `33018`.

@@ -6,7 +6,7 @@
 - **Project:** `oroltsooadmin_api`
 - **Layer:** `Backend API`
 - **Path:** `backend/plugins/oroltsooadmin_api`
-- **Last synchronized:** `2026-08-27`
+- **Last synchronized:** `2026-08-31`
 
 ## Scope
 
@@ -17,9 +17,14 @@
 - Admin-side review state on each mirrored profile (`reviewStatus`,
   `reviewNote`).
 - The central mirror of politician posts (`oroltsoo_admin_posts`).
+- The citizen meeting schedule (`oroltsoo_admin_meetings`). Unlike profiles and
+  posts, meetings are **authored here** and pushed down to the tenant, so this
+  service is their source of truth.
 - The signed webhook receiver that keeps the mirror in sync. Each `oroltsoo`
   tenant owns exactly one profile, so the mirror holds one row per tenant.
 - Read-only admin GraphQL queries over the mirror.
+- The public client-portal read surface over the same mirror: the `cp*`
+  queries a citizen-facing site calls to list politicians and their posts.
 
 ### Does not own
 
@@ -28,6 +33,8 @@
   profile fields; it only stores what a tenant sent.
 - `oroltsoo_api` implementation — never import it; the signed webhook is the
   only link.
+- Any client-portal write path. The `cp*` surface is read-only; a portal
+  write would be erased by the tenant's next sync.
 - Core, shared libraries, or another plugin.
 
 ## Current Capabilities
@@ -46,6 +53,17 @@
   `totalDonations` is computed on `OroltsooAdminProfileFinance`.
 - Mirrors the tenant's mandate type, education, career, bills, attendance and
   finance sub-documents verbatim.
+- Client-portal queries (`forClientPortal`) that expose only published
+  profiles and posts, offset-paginated, with `CpOroltsooProfile` and
+  `CpOroltsooPost` projections that omit mirror bookkeeping and the private
+  `reviewNote`.
+- `cpGetOroltsooPosts` accepts `profileId` and resolves it to the author's
+  `subdomain` through the profile mirror, so a portal can list one
+  politician's posts without knowing tenant keys.
+- Meetings: cursor-paginated admin listing filtered by search text, tenant
+  subdomain, status and a scheduled-date range, plus detail, create, edit and
+  bulk remove. A meeting is created against a tenant that already has a
+  mirrored profile, and every write is pushed to that tenant.
 
 ## Architecture
 
@@ -64,6 +82,8 @@
 | Resolvers     | `src/modules/profile/graphql/resolvers/**`               | Filters, review decisions, computed fields           |
 | Constants     | `src/constants.ts`                                       | Profile, promise and review status enums             |
 | Webhook types | `src/types.ts`                                           | Typed webhook request/response shapes                |
+| Client portal | `src/modules/clientportal/graphql/**`                    | Public `cp*` types, queries and computed fields      |
+| Meetings      | `src/modules/meeting/**`                                 | Admin-authored schedule, model, GraphQL API, push    |
 
 ## Contracts
 
@@ -75,25 +95,39 @@
 - GraphQL queries `oroltsooAdminProfiles`, `oroltsooAdminProfileDetail`,
   `oroltsooAdminPosts`, `oroltsooAdminPostDetail`; type `OroltsooAdminPost`.
 - GraphQL mutations `oroltsooAdminProfileVerify`, `oroltsooAdminProfileReject`.
+- GraphQL queries `oroltsooAdminMeetings`, `oroltsooAdminMeetingDetail`;
+  mutations `oroltsooAdminMeetingAdd`, `oroltsooAdminMeetingEdit`,
+  `oroltsooAdminMeetingRemove`; type `OroltsooAdminMeeting`.
+- Outbound webhooks `POST /webhook/syncMeeting` and
+  `POST /webhook/removeMeeting` to the tenant, signed the same way as the
+  review push, with `payload.entityId` carrying this service's meeting `_id`.
 - GraphQL type `OroltsooAdminProfile` (federated `@key(fields: "_id")`) and
   `OroltsooAdminProfileListResponse`.
+- Client-portal GraphQL queries `cpGetOroltsooProfiles`,
+  `cpGetOroltsooProfile`, `cpGetOroltsooPosts`, `cpGetOroltsooPost`; types
+  `CpOroltsooProfile` and `CpOroltsooPost`. No client-portal mutation.
 
 ### Consumes
 
-- `erxes-api-shared/utils`: `startPlugin`, `cursorPaginate`, `escapeRegExp`,
-  `mongooseStringRandomId`, `ExpectedError`, `GQL_CURSOR_PARAM_DEFS`,
-  `apolloCommonTypes`.
+- `erxes-api-shared/utils`: `startPlugin`, `cursorPaginate`, `paginate`,
+  `escapeRegExp`, `mongooseStringRandomId`, `ExpectedError`, `markResolvers`,
+  `GQL_CURSOR_PARAM_DEFS`, `GQL_OFFSET_PARAM_DEFS`, `apolloCommonTypes`.
 - `erxes-api-shared/core-types`: `IMainContext`, `ICursorPaginateParams`,
-  `Resolver`.
+  `IOffsetPaginateParams`, `Resolver`.
+- The platform's client-portal context: `markResolvers` with
+  `wrapperConfig.forClientPortal` makes a resolver public but requires the
+  gateway-supplied `clientPortal` header context.
 - Env `OROLTSOO_ADMIN_SECRET`, shared with every `oroltsoo` tenant in both
   directions, and `OROLTSOO_API_URL` (supports a `<subdomain>` placeholder) for
   the push back.
 
 ## Data and State
 
-- Collections `oroltsoo_admin_profiles` and `oroltsoo_admin_posts`, generated
-  per `subdomain` through `generateModels`. Both are keyed by
-  `{ subdomain, entityId }` with a unique compound index.
+- Collections `oroltsoo_admin_profiles`, `oroltsoo_admin_posts` and
+  `oroltsoo_admin_meetings`, generated per `subdomain` through
+  `generateModels`. The two mirrors are keyed by `{ subdomain, entityId }` with
+  a unique compound index; a meeting is authored here, so it carries only the
+  owning `subdomain` and its own `_id`.
 - Mirror keys `subdomain` + `entityId` carry a unique compound index; a second
   index covers `{ reviewStatus, syncedAt }` for the default admin list.
 - `syncedAt` records when the last webhook landed.
@@ -106,8 +140,28 @@
   overwrite it on its next sync.
 - `syncProfile` seeds `reviewStatus` with `$setOnInsert` only, so a tenant edit
   never resets an administrator's verify/reject decision.
+- Meetings run the opposite way to profiles and posts: this service writes, the
+  tenant mirrors. Never accept a meeting over the webhook path, and never let a
+  tenant edit reach `oroltsoo_admin_meetings` — a second writer would let a
+  workspace overwrite the schedule the platform owns.
+- A meeting write is only pushed to the tenant at the moment of the change.
+  The push is fire-and-forget, so a delivery lost while the tenant was down
+  stays unsynced until the meeting is saved again.
+- `createMeeting` rejects a subdomain with no mirrored profile, so a typo can
+  never produce a meeting no politician will ever see.
 - The subdomain comes from the signed body, not the request host, because the
   webhook is service-to-service.
+- Every `cp*` resolver is registered through `markResolvers(..., { wrapperConfig:
+  { forClientPortal: true } })` and stays read-only, matching `blockadmin_api`.
+  Never add a `cp*` mutation: the mirror is not the source of truth, so a
+  portal write would be overwritten by the tenant's next `syncProfile`.
+- The `cp*` surface is public. It must return only `status: 'published'`
+  records, and `CpOroltsooProfile` must never carry `reviewNote`, `entityId` or
+  `syncedAt`. Adding a field to `OroltsooAdminProfile` does not add it here —
+  the portal projection is deliberately separate.
+- A `cp*` list resolver returns `[]` for a filter that can never match (an
+  unknown `profileId`, an unpublished author, an unknown `reviewStatus`) rather
+  than dropping the filter and leaking the full list.
 - Schemas are declared with explicit `new Schema(...)` fields. Do not adopt the
   local `schemaWrapper` helper that `blockadmin_api` uses.
 - This plugin registers no `meta.permissions`, matching `blockadmin_api`. Adding
@@ -123,10 +177,40 @@
 - Smoke: create a profile in `oroltsoo`, then run `oroltsooAdminProfiles` here
   and confirm one record appears with `reviewStatus: "pending"`. Re-save the
   profile in `oroltsoo` and confirm no duplicate is created.
+- Smoke: run `oroltsooAdminMeetingAdd` for a mirrored tenant, then
+  `oroltsooMeetings` in that `oroltsoo` tenant and confirm the same meeting
+  appears; edit it here and confirm the tenant row updates rather than
+  duplicating.
+- Smoke: with a `clientPortal` context, run `cpGetOroltsooProfiles` and confirm
+  only published profiles come back and no `reviewNote` is selectable; without
+  that context the query must fail with `Client portal required`.
 
 ## Recent Changes
 
 <!-- Newest first. Keep at most 10 entries. -->
+
+### `2026-08-31` — Admin-owned meeting schedule
+
+- **Summary:** Meetings are now created, edited and removed here and pushed to
+  the owning `oroltsoo` tenant over the signed webhook channel.
+- **Affected areas:** `src/modules/meeting/**`, `src/connectionResolvers.ts`,
+  `src/constants.ts`, `src/apollo/**`
+- **Contracts changed:** Added `oroltsooAdminMeetings`,
+  `oroltsooAdminMeetingDetail`, `oroltsooAdminMeetingAdd`,
+  `oroltsooAdminMeetingEdit`, `oroltsooAdminMeetingRemove`, the
+  `OroltsooAdminMeeting` type and the outbound `POST /webhook/syncMeeting` and
+  `POST /webhook/removeMeeting`.
+
+### `2026-08-31` — Client-portal read surface
+
+- **Summary:** Added a `clientportal` module exposing published mirrored
+  profiles and posts to a citizen-facing site through `forClientPortal`
+  queries, following `blockadmin_api`'s `cp*` pattern.
+- **Affected areas:** `src/modules/clientportal/**`, `src/apollo/schema/schema.ts`,
+  `src/apollo/resolvers/queries.ts`, `src/apollo/resolvers/resolvers.ts`
+- **Contracts changed:** Added `cpGetOroltsooProfiles`, `cpGetOroltsooProfile`,
+  `cpGetOroltsooPosts`, `cpGetOroltsooPost` and the `CpOroltsooProfile` /
+  `CpOroltsooPost` types.
 
 ### `2026-08-27` — Dockerfile and CI pipeline
 
@@ -206,19 +290,3 @@
   `education`, `career`, `bills`, `attendance` and `finance`; added the matching
   `OroltsooAdminProfile*` sub-types. The `/webhook/syncProfile` payload now
   carries these fields.
-
-### `2026-08-26` — Politician profile mirror
-
-- **Summary:** Replaced the generated `profile` sample with a signed-webhook
-  mirror of `oroltsoo` politician profiles, plus admin listing, detail and
-  verify/reject review actions.
-- **Affected areas:** `src/main.ts`, `src/constants.ts`, `src/types.ts`,
-  `src/connectionResolvers.ts`, `src/middlewares/**`, `src/routes/**`,
-  `src/modules/profile/**`, `src/apollo/resolvers/resolvers.ts`
-- **Contracts changed:** Added `POST /webhook/syncProfile`,
-  `POST /webhook/removeProfile`, `oroltsooAdminProfiles`,
-  `oroltsooAdminProfileDetail`, `oroltsooAdminProfileVerify`,
-  `oroltsooAdminProfileReject` and the `OroltsooAdminProfile` type family;
-  removed the generated `getProfile`/`getProfiles`/`createProfile`/
-  `updateProfile`/`removeProfile` operations, the `Profile` type and the unused
-  `oroltsooadmin.hello` tRPC router. Port moved from `33010` to `33019`.

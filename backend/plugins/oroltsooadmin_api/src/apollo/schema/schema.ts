@@ -1,4 +1,13 @@
 import {
+  queries as ClientPortalQueries,
+  types as ClientPortalTypes,
+} from '@/clientportal/graphql/schemas';
+import {
+  mutations as MeetingMutations,
+  queries as MeetingQueries,
+  types as MeetingTypes,
+} from '@/meeting/graphql/schemas/meeting';
+import {
   queries as PostQueries,
   types as PostTypes,
 } from '@/post/graphql/schemas/post';
@@ -11,13 +20,20 @@ import {
 export const types = `
   ${ProfileTypes}
   ${PostTypes}
+  ${MeetingTypes}
+
+  ${ClientPortalTypes}
 `;
 
 export const queries = `
   ${ProfileQueries}
   ${PostQueries}
+  ${MeetingQueries}
+
+  ${ClientPortalQueries}
 `;
 
 export const mutations = `
   ${ProfileMutations}
+  ${MeetingMutations}
 `;

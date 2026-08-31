@@ -48,3 +48,10 @@ export const POST_STATUSES = {
   ARCHIVED: 'archived',
   ALL: ['draft', 'published', 'archived'],
 };
+
+export const MEETING_STATUSES = {
+  PLANNED: 'planned',
+  DONE: 'done',
+  CANCELLED: 'cancelled',
+  ALL: ['planned', 'done', 'cancelled'],
+};

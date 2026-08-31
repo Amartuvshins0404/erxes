@@ -60,7 +60,10 @@ jobs:
       - name: Run security regression tests
         run: |
           pnpm nx test erxes-api-shared
-          pnpm nx test erxes-agent_api -- --runInBand
+          # NODE_OPTIONS is required by the code-mode sandbox suites: the
+          # QuickJS WASM variant loads through a dynamic import that Node
+          # only services for jest vm contexts with --experimental-vm-modules.
+          NODE_OPTIONS=--experimental-vm-modules pnpm nx test erxes-agent_api -- --runInBand
           pnpm nx test core-api -- --testPathPattern="issueRunToken|configsGetCodes|getCodesContract" --runInBand
 
       - name: Set up QEMU

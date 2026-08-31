@@ -25,6 +25,9 @@
 - Read-only admin GraphQL queries over the mirror.
 - The public client-portal read surface over the same mirror: the `cp*`
   queries a citizen-facing site calls to list politicians and their posts.
+- Citizen meeting requests raised from the client portal. They land in
+  `oroltsoo_admin_meetings` with `status: 'requested'` and
+  `source: 'clientPortal'`, and wait for an administrator to schedule them.
 
 ### Does not own
 
@@ -33,8 +36,11 @@
   profile fields; it only stores what a tenant sent.
 - `oroltsoo_api` implementation — never import it; the signed webhook is the
   only link.
-- Any client-portal write path. The `cp*` surface is read-only; a portal
-  write would be erased by the tenant's next sync.
+- Any client-portal write path over mirrored data. A `cp*` write to a profile
+  or a post would be erased by the tenant's next sync. The single client-portal
+  write is a meeting request, and only because meetings are authored here.
+- Approving a meeting request. The portal can only ask; moving a request onto
+  the published schedule stays an administrator action.
 - Core, shared libraries, or another plugin.
 
 ## Current Capabilities
@@ -61,9 +67,17 @@
   `subdomain` through the profile mirror, so a portal can list one
   politician's posts without knowing tenant keys.
 - Meetings: cursor-paginated admin listing filtered by search text, tenant
-  subdomain, status and a scheduled-date range, plus detail, create, edit and
-  bulk remove. A meeting is created against a tenant that already has a
-  mirrored profile, and every write is pushed to that tenant.
+  subdomain, status, source and a scheduled-date range, plus detail, create,
+  edit and bulk remove. A meeting is created against a tenant that already has
+  a mirrored profile, and every write is pushed to that tenant.
+- A signed-in portal user can request a meeting with a published politician
+  (`cpOroltsooMeetingRequestAdd`) and list their own requests with their
+  current status (`cpGetOroltsooMeetingRequests`). A request must carry a
+  future `scheduledAt`, cannot repeat an identical pending slot, and a user may
+  hold at most `MEETING_REQUEST_PENDING_LIMIT` (5) pending requests per tenant.
+- An administrator sees who asked through `OroltsooAdminMeeting.requestedBy`
+  (portal user id plus the contact details supplied with the request) and can
+  filter the list by `source`.
 
 ## Architecture
 
@@ -82,7 +96,7 @@
 | Resolvers     | `src/modules/profile/graphql/resolvers/**`               | Filters, review decisions, computed fields           |
 | Constants     | `src/constants.ts`                                       | Profile, promise and review status enums             |
 | Webhook types | `src/types.ts`                                           | Typed webhook request/response shapes                |
-| Client portal | `src/modules/clientportal/graphql/**`                    | Public `cp*` types, queries and computed fields      |
+| Client portal | `src/modules/clientportal/graphql/**`                    | Public `cp*` types, read queries, computed fields and the meeting-request mutation |
 | Meetings      | `src/modules/meeting/**`                                 | Admin-authored schedule, model, GraphQL API, push    |
 
 ## Contracts
@@ -97,7 +111,8 @@
 - GraphQL mutations `oroltsooAdminProfileVerify`, `oroltsooAdminProfileReject`.
 - GraphQL queries `oroltsooAdminMeetings`, `oroltsooAdminMeetingDetail`;
   mutations `oroltsooAdminMeetingAdd`, `oroltsooAdminMeetingEdit`,
-  `oroltsooAdminMeetingRemove`; type `OroltsooAdminMeeting`.
+  `oroltsooAdminMeetingRemove`; types `OroltsooAdminMeeting` and
+  `OroltsooAdminMeetingRequester`. The list accepts a `source` filter.
 - Outbound webhooks `POST /webhook/syncMeeting` and
   `POST /webhook/removeMeeting` to the tenant, signed the same way as the
   review push, with `payload.entityId` carrying this service's meeting `_id`.
@@ -105,7 +120,11 @@
   `OroltsooAdminProfileListResponse`.
 - Client-portal GraphQL queries `cpGetOroltsooProfiles`,
   `cpGetOroltsooProfile`, `cpGetOroltsooPosts`, `cpGetOroltsooPost`; types
-  `CpOroltsooProfile` and `CpOroltsooPost`. No client-portal mutation.
+  `CpOroltsooProfile` and `CpOroltsooPost`.
+- Client-portal GraphQL query `cpGetOroltsooMeetingRequests` and mutation
+  `cpOroltsooMeetingRequestAdd`; type `CpOroltsooMeeting` and input
+  `CpOroltsooMeetingRequestInput`. Both require a `clientPortal` context and a
+  signed-in `cpUser`, and both see only the caller's own requests.
 
 ### Consumes
 
@@ -127,7 +146,11 @@
   `oroltsoo_admin_meetings`, generated per `subdomain` through
   `generateModels`. The two mirrors are keyed by `{ subdomain, entityId }` with
   a unique compound index; a meeting is authored here, so it carries only the
-  owning `subdomain` and its own `_id`.
+  owning `subdomain` and its own `_id`. A meeting also carries `source`
+  (`admin` or `clientPortal`) and, for a portal request, an embedded
+  `requestedBy` with the portal user id and the contact details given at
+  request time. `{ 'requestedBy.cpUserId': 1, createdAt: -1 }` backs the
+  portal's own-requests list.
 - Mirror keys `subdomain` + `entityId` carry a unique compound index; a second
   index covers `{ reviewStatus, syncedAt }` for the default admin list.
 - `syncedAt` records when the last webhook landed.
@@ -152,9 +175,26 @@
 - The subdomain comes from the signed body, not the request host, because the
   webhook is service-to-service.
 - Every `cp*` resolver is registered through `markResolvers(..., { wrapperConfig:
-  { forClientPortal: true } })` and stays read-only, matching `blockadmin_api`.
-  Never add a `cp*` mutation: the mirror is not the source of truth, so a
-  portal write would be overwritten by the tenant's next `syncProfile`.
+  { forClientPortal: true } })`. Never add a `cp*` write over mirrored data
+  (profiles, posts): the mirror is not the source of truth, so a portal write
+  would be overwritten by the tenant's next `syncProfile`. Meetings are the one
+  exception, because they are authored here.
+- A `cp*` resolver that reads or writes a citizen's own record adds
+  `cpUserRequired: true` and scopes every query by `requestedBy.cpUserId` from
+  the context. Never accept a caller-supplied portal user id.
+- A portal request is created with `status: 'requested'` and
+  `source: 'clientPortal'`; the portal never chooses either value.
+- A `requested` meeting is never pushed to the tenant, so an unapproved request
+  cannot appear on a politician's published schedule. `normalize` accepts only
+  `MEETING_STATUSES.ADMIN_ALL`, so an administrator cannot move a meeting back
+  to `requested` after it has been synced.
+- `updateMeeting` keeps the stored status when the input omits one, so editing
+  a request does not silently schedule it. Approval means explicitly sending
+  `status: 'planned'`, which is also what triggers the first tenant push.
+- A portal request must be for a `published` profile and a future
+  `scheduledAt`, must not duplicate a pending request for the same slot, and is
+  capped at `MEETING_REQUEST_PENDING_LIMIT` pending rows per portal user per
+  tenant. This is the only abuse guard on the public write path.
 - The `cp*` surface is public. It must return only `status: 'published'`
   records, and `CpOroltsooProfile` must never carry `reviewNote`, `entityId` or
   `syncedAt`. Adding a field to `OroltsooAdminProfile` does not add it here —
@@ -184,10 +224,30 @@
 - Smoke: with a `clientPortal` context, run `cpGetOroltsooProfiles` and confirm
   only published profiles come back and no `reviewNote` is selectable; without
   that context the query must fail with `Client portal required`.
+- Smoke: as a signed-in `cpUser`, run `cpOroltsooMeetingRequestAdd` for a
+  published tenant, confirm `cpGetOroltsooMeetingRequests` returns it as
+  `requested` and that `oroltsooMeetings` in the tenant does **not**. Then run
+  `oroltsooAdminMeetingEdit` with `status: "planned"` here and confirm the
+  tenant now lists it. Without a `cpUser` the mutation must fail with
+  `Client portal user required`.
 
 ## Recent Changes
 
 <!-- Newest first. Keep at most 10 entries. -->
+
+### `2026-08-31` — Client-portal meeting requests
+
+- **Summary:** A signed-in portal user can now request a meeting with a
+  published politician and follow their own requests; the request waits at
+  `status: 'requested'` until an administrator schedules it, and only then is
+  it pushed to the tenant.
+- **Affected areas:** `src/modules/clientportal/graphql/**`,
+  `src/modules/meeting/**`, `src/constants.ts`, `src/apollo/**`
+- **Contracts changed:** Added `cpOroltsooMeetingRequestAdd`,
+  `cpGetOroltsooMeetingRequests`, `CpOroltsooMeeting`,
+  `CpOroltsooMeetingRequestInput` and `OroltsooAdminMeetingRequester`; added
+  `source` and `requestedBy` to `OroltsooAdminMeeting` and a `source` filter to
+  `oroltsooAdminMeetings`.
 
 ### `2026-08-31` — Admin-owned meeting schedule
 
@@ -275,18 +335,3 @@
 - **Affected areas:** `src/modules/profile/routes/webhook.ts`,
   `src/modules/profile/db/models/Profile.ts`
 - **Contracts changed:** Removed `POST /webhook/removeProfile`.
-
-### `2026-08-26` — Mirror mandate type, biography, bills, attendance, finance
-
-- **Summary:** Extended the mirror schema and admin GraphQL surface with the
-  fields `oroltsoo_api` now sends: mandate type, education, career, bills,
-  attendance and finance.
-- **Affected areas:** `src/constants.ts`, `src/modules/profile/@types/profile.ts`,
-  `src/modules/profile/db/definitions/profile.ts`,
-  `src/modules/profile/graphql/schemas/profile.ts`,
-  `src/modules/profile/graphql/resolvers/customResolvers/profile.ts`,
-  `src/apollo/resolvers/resolvers.ts`
-- **Contracts changed:** `OroltsooAdminProfile` gained `mandateType`,
-  `education`, `career`, `bills`, `attendance` and `finance`; added the matching
-  `OroltsooAdminProfile*` sub-types. The `/webhook/syncProfile` payload now
-  carries these fields.

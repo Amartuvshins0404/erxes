@@ -25,6 +25,10 @@ const generateFilter = (params: IMeetingListParams) => {
     filter.status = params.status;
   }
 
+  if (params.source) {
+    filter.source = params.source;
+  }
+
   if (params.scheduledFrom || params.scheduledTo) {
     filter.scheduledAt = {
       ...(params.scheduledFrom ? { $gte: new Date(params.scheduledFrom) } : {}),

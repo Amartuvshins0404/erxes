@@ -10,9 +10,18 @@ export const types = `
     scheduledAt: Date
     note: String
     status: String
+    source: String
+    requestedBy: OroltsooAdminMeetingRequester
 
     createdAt: Date
     updatedAt: Date
+  }
+
+  type OroltsooAdminMeetingRequester {
+    cpUserId: String
+    name: String
+    email: String
+    phone: String
   }
 
   type OroltsooAdminMeetingListResponse {
@@ -34,6 +43,7 @@ const listParams = `
   searchValue: String
   subdomain: String
   status: String
+  source: String
   scheduledFrom: Date
   scheduledTo: Date
 

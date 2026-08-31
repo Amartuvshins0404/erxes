@@ -50,8 +50,18 @@ export const POST_STATUSES = {
 };
 
 export const MEETING_STATUSES = {
+  REQUESTED: 'requested',
   PLANNED: 'planned',
   DONE: 'done',
   CANCELLED: 'cancelled',
-  ALL: ['planned', 'done', 'cancelled'],
+  ALL: ['requested', 'planned', 'done', 'cancelled'],
+  ADMIN_ALL: ['planned', 'done', 'cancelled'],
 };
+
+export const MEETING_SOURCES = {
+  ADMIN: 'admin',
+  CLIENT_PORTAL: 'clientPortal',
+  ALL: ['admin', 'clientPortal'],
+};
+
+export const MEETING_REQUEST_PENDING_LIMIT = 5;

@@ -1,4 +1,5 @@
 import {
+  mutations as ClientPortalMutations,
   queries as ClientPortalQueries,
   types as ClientPortalTypes,
 } from '@/clientportal/graphql/schemas';
@@ -36,4 +37,6 @@ export const queries = `
 export const mutations = `
   ${ProfileMutations}
   ${MeetingMutations}
+
+  ${ClientPortalMutations}
 `;

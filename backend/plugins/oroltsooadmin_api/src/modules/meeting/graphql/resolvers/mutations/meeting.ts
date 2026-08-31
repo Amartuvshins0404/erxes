@@ -5,10 +5,11 @@ import {
   IMeetingInput,
 } from '@/meeting/@types/meeting';
 import { IContext } from '~/connectionResolvers';
+import { MEETING_STATUSES } from '~/constants';
 import { sendToTenant } from '~/utils/tenantSync';
 
 const syncMeeting = (meeting: IMeetingDocument | null) => {
-  if (!meeting) {
+  if (!meeting || meeting.status === MEETING_STATUSES.REQUESTED) {
     return;
   }
 

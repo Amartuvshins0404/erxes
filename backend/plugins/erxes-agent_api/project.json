@@ -10,13 +10,38 @@
       "cache": true,
       "options": {
         "cwd": "backend/plugins/erxes-agent_api",
-        "commands": ["pnpm build"]
+        "commands": [
+          "pnpm build"
+        ]
       },
-      "dependsOn": ["^build"]
+      "dependsOn": [
+        "^build",
+        "build:packageJson"
+      ]
+    },
+    "build:packageJson": {
+      "executor": "@nx/js:tsc",
+      "options": {
+        "main": "backend/plugins/erxes-agent_api/dist/src/main.js",
+        "tsConfig": "backend/plugins/erxes-agent_api/tsconfig.build.json",
+        "outputPath": "backend/plugins/erxes-agent_api/dist",
+        "updateBuildableProjectDepsInPackageJson": true,
+        "buildableProjectDepsInPackageJsonType": "dependencies"
+      }
+    },
+    "test": {
+      "executor": "@nx/jest:jest",
+      "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
+      "options": {
+        "jestConfig": "backend/plugins/erxes-agent_api/jest.config.ts"
+      }
     },
     "start": {
       "executor": "nx:run-commands",
-      "dependsOn": ["build"],
+      "dependsOn": [
+        "typecheck",
+        "build"
+      ],
       "options": {
         "cwd": "backend/plugins/erxes-agent_api",
         "command": "NODE_ENV=development node dist/src/main.js"
@@ -29,12 +54,11 @@
         "command": "NODE_ENV=development pnpm dev"
       }
     },
-    "test": {
-      "executor": "@nx/jest:jest",
-      "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
-      "options": {
-        "jestConfig": "backend/plugins/erxes-agent_api/jest.config.ts"
-      }
+    "docker-build": {
+      "dependsOn": [
+        "build"
+      ],
+      "command": "docker build -f backend/plugins/erxes-agent_api/Dockerfile . -t erxes/erxes-next-erxes-agent_api"
     }
   }
 }

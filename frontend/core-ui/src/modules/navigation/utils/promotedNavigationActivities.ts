@@ -1,9 +1,8 @@
 import { INavigationActivity } from '@/navigation/types/NavigationActivity';
 
-/** Rail order under Search: Command, then AI Agent. Matched on plugin defaultPath. */
+/** Rail order under Search: Command. Matched on plugin defaultPath. */
 const PROMOTED_NAVIGATION_RANK: Record<string, number> = {
   'cf-os': 0,
-  'erxes-agent': 1,
 };
 
 const trimPath = (path: string) => path.replace(/^\/+|\/+$/g, '');

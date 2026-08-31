@@ -1,18 +1,13 @@
 # Stage 1: install production deps as flat real directories (no pnpm virtual store)
-# bookworm-slim, NOT alpine: onnxruntime-node (under @imgly/background-removal-node)
-# ships glibc-only binaries that fail to dlopen on musl. Both stages must match —
-# @resvg/resvg-js and sharp pick their platform binary (-gnu vs -musl) at install.
-FROM node:22-bookworm-slim AS installer
+FROM node:22-alpine3.22 AS installer
 WORKDIR /app
 RUN npm install -g pnpm@9
-
-# onnxruntime-node's postinstall downloads the full CUDA GPU tarball on
-# linux/x64 unless told not to — this is a CPU-only image.
-ENV npm_config_onnxruntime_node_install_cuda=skip
 
 COPY pnpm-lock.yaml ./
 COPY backend/plugins/erxes-agent_api/package.json backend/plugins/erxes-agent_api/
 COPY backend/erxes-api-shared/package.json backend/erxes-api-shared/
+# --shamefully-hoist: all deps (tslib, mongoose, etc.) land as real directories
+# in /app/node_modules/ — safe to COPY into the final image without broken symlinks
 RUN node -e "\
 const fs = require('fs'); \
 const shared = require('./backend/erxes-api-shared/package.json'); \
@@ -44,16 +39,15 @@ fs.writeFileSync( \
          -o -name "docs" -o -name "doc" -o -name "examples" -o -name "example" \
          -o -name ".github" -o -name "coverage" \
        \) -prune -exec rm -rf {} \; 2>/dev/null || true
-# onnxruntime-node ships binaries for every platform in one tarball — drop the
-# darwin/win32 ones (~150MB) from this linux image.
-RUN rm -rf node_modules/onnxruntime-node/bin/napi-v3/darwin \
-           node_modules/onnxruntime-node/bin/napi-v3/win32
+
 # Stage 2: minimal runtime
-FROM node:22-bookworm-slim
+FROM node:22-alpine3.22
 WORKDIR /app
 
+# All prod deps as real directories (no .pnpm virtual store)
 COPY --from=installer /app/node_modules ./node_modules
 
+# erxes-api-shared is a workspace symlink — replace it with the actual built package
 RUN rm -rf ./node_modules/erxes-api-shared
 COPY backend/erxes-api-shared/dist ./node_modules/erxes-api-shared/dist
 COPY backend/erxes-api-shared/utils ./node_modules/erxes-api-shared/utils
@@ -61,6 +55,7 @@ COPY backend/erxes-api-shared/core-types ./node_modules/erxes-api-shared/core-ty
 COPY backend/erxes-api-shared/core-modules ./node_modules/erxes-api-shared/core-modules
 COPY backend/erxes-api-shared/package.json ./node_modules/erxes-api-shared/
 
+# Plugin compiled dist (built by CI before docker build)
 COPY backend/plugins/erxes-agent_api/dist ./dist
 
 ENV NODE_ENV=production

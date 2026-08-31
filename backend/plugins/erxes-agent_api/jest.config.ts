@@ -1,35 +1,36 @@
-/* eslint-disable */
+// Default export required by Jest - do not remove
 export default {
-  displayName: 'mastra-api',
+  displayName: 'erxes-agent-api',
   preset: '../../../jest.preset.js',
   testEnvironment: 'node',
   transform: {
-    // isolatedModules = transpile-only: ts-jest's full per-worker type program
-    // OOMs (2GB heap) on files whose import graph reaches @mastra/core +
-    // connectionResolvers. Types are enforced by `pnpm build` (tsc), not here.
+    // Transpile-only: types are enforced by the plugin tsconfig via
+    // `npx tsc --project tsconfig.json --noEmit`, not by ts-jest here.
     '^.+\\.[tj]s$': [
       'ts-jest',
       {
         tsconfig: '<rootDir>/tsconfig.spec.json',
-        isolatedModules: true,
         diagnostics: false,
       },
     ],
   },
-  // Transpile three deps that Jest's CommonJS loader can't take as-shipped:
-  //  - yoga-wasm-web is ESM-only (Satori's layout engine); ts-jest -> CJS.
-  //  - yoga-layout ships raw TS/ESM sources (@react-pdf/layout's engine).
-  //  - pptxgenjs is CJS but uses `import('node:fs')`; transpiling downlevels
-  //    that dynamic import to require() so the deck write works without the
-  //    --experimental-vm-modules flag. All run natively in the prod build.
-  transformIgnorePatterns: [
-    '/node_modules/\\.pnpm/(?!(yoga-wasm-web|yoga-layout|pptxgenjs)@)',
-  ],
-  moduleFileExtensions: ['ts', 'js', 'html'],
+  moduleFileExtensions: ['ts', 'js', 'json'],
+  // @mastra/quickjs's CJS bundle calls `ts_blank_space.default` through
+  // esbuild's `__toESM(mod, 1)` helper; for the real ESM-only ts-blank-space
+  // that yields the namespace, not the function (packaging bug in
+  // @mastra/quickjs@0.1.0 — the ESM entry works, but pulling it into jest
+  // drags in real-ESM loading and the WASM loader's dynamic imports). Tests
+  // therefore map ts-blank-space to a callable CJS stub; the sandboxed
+  // programs under test are plain JavaScript, so identity passthrough is
+  // equivalent. Production strips types via the real ESM package.
   moduleNameMapper: {
+    '^ts-blank-space$':
+      '<rootDir>/src/modules/agents/__tests__/__stubs__/ts-blank-space.js',
     '^~/(.*)$': '<rootDir>/src/$1',
     '^@/(.*)$': '<rootDir>/src/modules/$1',
+    '^erxes-api-shared/(.*)$': '<rootDir>/../../erxes-api-shared/src/$1',
   },
-  testMatch: ['<rootDir>/src/**/*.test.ts'],
+  testMatch: ['<rootDir>/src/**/__tests__/**/*.test.ts'],
   coverageDirectory: '../../../coverage/backend/plugins/erxes-agent_api',
+  modulePathIgnorePatterns: ['<rootDir>/dist/'],
 };

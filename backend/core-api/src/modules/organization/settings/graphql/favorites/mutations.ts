@@ -25,7 +25,6 @@ export const favoriteMutations = {
       return models.Favorites.deleteFavorite({
         path: normalizedPath,
         userId: user._id,
-        label,
       });
     }
 

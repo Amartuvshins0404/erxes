@@ -22,11 +22,17 @@ export interface IAgentsChatTransportOptions {
   onThreadId: (threadId: string) => void;
   /**
    * Returns the ask_user answer awaiting submission, if any. The transport
-   * consumes it exactly once when reconnecting: a pending answer turns the
-   * reconnect into the answer POST, and it is cleared on read so a later
-   * reconnect (page reload) stays a no-op.
+   * consumes it exactly once in `sendMessages` — which the hook triggers
+   * right after staging — turning that one request into the
+   * `POST /agents/answer` resume call. A batched multi-question card
+   * answers positionally: element i answers question i (a string, or a
+   * string array for that question's multi-select).
    */
-  consumePendingAnswer: () => string | string[] | undefined;
+  consumePendingAnswer: () =>
+    | string
+    | string[]
+    | (string | string[])[]
+    | undefined;
 }
 
 const selectionToBody = (
@@ -99,9 +105,12 @@ const extractApprovalDecision = (
  * Extends the AI SDK's `DefaultChatTransport` (the documented extension
  * point) instead of re-implementing SSE parsing or message state:
  *
- * - Normal sends go to `POST /agents/chat`; the response header
- *   `X-Agents-Thread-Id` is captured through the transport's `fetch`
- *   middleware so the UI can pin the conversation to its server thread.
+ * - Normal sends go to `POST /agents/chat`; the hook pins the conversation
+ *   by generating the thread id client-side and including it in the body
+ *   (`threadId`) on every turn. The response header `X-Agents-Thread-Id` is
+ *   captured through the transport's `fetch` middleware as advisory only —
+ *   a cross-origin browser cannot read a custom header unless the gateway
+ *   exposes it, so continuity must never depend on it.
  * - When the framework auto-resends after the user answered a tool approval
  *   (last message is the assistant's approval-responded message), the request
  *   is routed to `POST /agents/approve` with `{ threadId, approved, reason }`
@@ -118,7 +127,11 @@ export class AgentsChatTransport
 
   private readonly getRequestSelection: () => IAgentsRequestSelection;
 
-  private readonly consumePendingAnswer: () => string | string[] | undefined;
+  private readonly consumePendingAnswer: () =>
+    | string
+    | string[]
+    | (string | string[])[]
+    | undefined;
 
   constructor({
     getThreadId,
@@ -160,6 +173,17 @@ export class AgentsChatTransport
   async sendMessages(
     options: Parameters<ChatTransport<UIMessage>['sendMessages']>[0],
   ): Promise<ReadableStream<UIMessageChunk>> {
+    // An ask_user answer travels as a normal send: the hook stages the answer
+    // and sends a user message carrying it, and this branch reroutes that one
+    // request to the answer resume endpoint. The send-side stream state keeps
+    // the real transcript snapshot, so the resumed chunks apply cleanly —
+    // the SDK's resume path would build an empty state and discard them.
+    const answer = this.consumePendingAnswer();
+
+    if (answer !== undefined) {
+      return this.postAnswerResume(answer, options.abortSignal);
+    }
+
     const decision = extractApprovalDecision(options.messages);
 
     if (!decision) {
@@ -207,24 +231,16 @@ export class AgentsChatTransport
   }
 
   /**
-   * The reconnect path doubles as the ask_user answer submission: when the
-   * hook holds a pending answer, the reconnect POSTs to `POST /agents/answer`
-   * and returns the resumed SSE stream, which the chat's resume state machine
-   * consumes exactly like any other streaming response. With no pending
-   * answer a reconnect stays a no-op (the backend has no stream-reconnect
-   * endpoint; a page reload simply starts a fresh request against stored
-   * memory). The pending answer is consumed exactly once so a subsequent
-   * reconnect never replays it.
+   * POSTs the ask_user answer to the answer resume endpoint and returns the
+   * resumed stream. `tool-output-available` chunks are dropped en route: they
+   * resolve the suspension from the PREVIOUS turn, which the send-side
+   * streaming state cannot match (the hook marks the tool part answered
+   * locally instead) — kept in, the SDK would discard the entire stream.
    */
-  async reconnectToStream(options: {
-    abortSignal?: AbortSignal;
-  }): Promise<ReadableStream<UIMessageChunk> | null> {
-    const answer = this.consumePendingAnswer();
-
-    if (answer === undefined) {
-      return null;
-    }
-
+  private async postAnswerResume(
+    answer: string | string[] | (string | string[])[],
+    abortSignal?: AbortSignal,
+  ): Promise<ReadableStream<UIMessageChunk>> {
     const threadId = this.getThreadId();
 
     if (!threadId) {
@@ -244,14 +260,8 @@ export class AgentsChatTransport
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
       body: JSON.stringify(body),
-      signal: options.abortSignal,
+      signal: abortSignal,
     });
-
-    const threadIdHeader = response.headers.get(THREAD_ID_HEADER);
-
-    if (threadIdHeader) {
-      this.onThreadId(threadIdHeader);
-    }
 
     if (!response.ok) {
       const text = await response.text();
@@ -262,6 +272,25 @@ export class AgentsChatTransport
       throw new Error('The response body is empty.');
     }
 
-    return this.processResponseStream(response.body);
+    return this.processResponseStream(response.body).pipeThrough(
+      new TransformStream<UIMessageChunk, UIMessageChunk>({
+        transform(chunk, controller) {
+          if (chunk.type !== 'tool-output-available') {
+            controller.enqueue(chunk);
+          }
+        },
+      }),
+    );
+  }
+
+  /**
+   * True stream reconnects are unsupported: the backend keeps no
+   * reconnectable stream per chat, so a reconnect stays a no-op and a page
+   * reload simply starts a fresh request against stored memory.
+   */
+  async reconnectToStream(_options: {
+    abortSignal?: AbortSignal;
+  }): Promise<ReadableStream<UIMessageChunk> | null> {
+    return null;
   }
 }

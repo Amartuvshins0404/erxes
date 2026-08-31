@@ -1,10 +1,10 @@
-import type { UIMessage } from 'ai';
+import { isToolUIPart, type UIMessage } from 'ai';
 import { ScrollArea } from 'erxes-ui';
 import { Fragment, useEffect, useRef } from 'react';
 
 import { MESSAGE_AVATAR_SHUFFLE_POOL } from '../botCycles';
 import { BloubBot } from './BloubBot';
-import { MessagePartRenderer } from './MessagePart';
+import { hasVisibleParts, MessagePartRenderer } from './MessagePart';
 
 export interface IMessageListProps {
   messages: UIMessage[];
@@ -17,7 +17,7 @@ export interface IMessageListProps {
     reason?: string;
   }) => void;
   answerBusy: boolean;
-  onAnswer: (answer: string | string[]) => void;
+  onAnswer: (answer: string | string[] | (string | string[])[]) => void;
 }
 
 /** Show a timestamp divider only after gaps longer than this. */
@@ -61,7 +61,10 @@ const formatTimestamp = (timestamp: number): string =>
  * unanswered suspension data part) — the message avatar opens its eyes wide
  * while the assistant waits.
  */
-const hasPendingAskUser = (message: UIMessage): boolean =>
+const hasPendingAskUser = (
+  message: UIMessage,
+  answeredToolCallIds: Set<string>,
+): boolean =>
   message.parts.some((part) => {
     if (
       typeof part !== 'object' ||
@@ -74,9 +77,14 @@ const hasPendingAskUser = (message: UIMessage): boolean =>
 
     const data = (part as { data?: unknown }).data as {
       toolName?: string;
+      toolCallId?: string;
     } | null;
 
-    return data?.toolName === 'askUser';
+    return (
+      data?.toolName === 'askUser' &&
+      !!data.toolCallId &&
+      !answeredToolCallIds.has(data.toolCallId)
+    );
   });
 
 /**
@@ -175,21 +183,46 @@ export const MessageList = ({
             createdAt - previousCreatedAt > TIMESTAMP_GAP_MS;
 
           // Contextual message avatar:
-          // - the streaming tail (last message, run in flight) keeps the
-          //   three-dots thinking state so the live reply reads as work;
+          // - the streaming tail (last message, run in flight) plays the
+          //   writing state so the live reply reads as the bot writing it;
           // - a pending ask_user question opens the eyes wide;
           // - every settled message plays the random shuffle walk, the
           //   "lot of relevant variants" transition, sized-stable.
           const isStreamingTail =
             index === messages.length - 1 &&
             (status === 'streaming' || status === 'submitted');
-          const asking = hasPendingAskUser(message);
+          // Tool calls already resolved (e.g. an answered ask_user): their
+          // suspension cards must stop rendering even though the suspension
+          // data part stays in the message.
+          const answeredToolCallIds = new Set(
+            message.parts
+              .filter(isToolUIPart)
+              .filter(
+                (part) =>
+                  part.state === 'output-available' ||
+                  part.state === 'output-error',
+              )
+              .map((part) => part.toolCallId),
+          );
+          const asking = hasPendingAskUser(message, answeredToolCallIds);
           const partProps = {
             approvalBusy,
             onApprovalRespond,
             answerBusy,
             onAnswer,
+            answeredToolCallIds,
           };
+
+          // Fully hide turns with nothing left to show: an assistant message
+          // whose only parts are resolved cards (or other hidden tool state)
+          // must not leave an empty avatar-only row behind.
+          if (
+            message.role === 'assistant' &&
+            !isStreamingTail &&
+            !hasVisibleParts(message.parts, answeredToolCallIds)
+          ) {
+            return null;
+          }
 
           return (
             <Fragment key={message.id}>
@@ -218,7 +251,7 @@ export const MessageList = ({
                   <BloubBot
                     size={28}
                     {...(isStreamingTail
-                      ? { state: 'thinking' as const }
+                      ? { state: 'writing' as const }
                       : asking
                         ? { state: 'wide' as const }
                         : {

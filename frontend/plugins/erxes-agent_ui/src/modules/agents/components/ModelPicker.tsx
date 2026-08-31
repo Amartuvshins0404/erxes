@@ -1,15 +1,9 @@
-import { IconChevronDown } from '@tabler/icons-react';
+import { IconSparkles } from '@tabler/icons-react';
 import { Select, Spinner } from 'erxes-ui';
 
 import type { IUseAgentsModelsResult } from '../hooks/useAgentsModels';
-
-/** Human label for a provider value (`openai` -> `OpenAI`). */
-const PROVIDER_LABELS: Record<string, string> = {
-  openai: 'OpenAI',
-  grok: 'Grok',
-  kimi: 'Kimi',
-  'kimi-code': 'Kimi Code',
-};
+import { ProviderIcon } from './ProviderIcon';
+import { getProviderLabel } from './ProviderPicker';
 
 export interface IModelPickerProps {
   models: IUseAgentsModelsResult;
@@ -35,7 +29,9 @@ export const modelSelectionValue = (provider: string, model: string) =>
 /**
  * Chat model picker: one grouped list of every configured provider's models
  * (fetched server-side), plus an implicit "Auto" entry that lets the server
- * pick the first configured provider's default.
+ * pick the first configured provider's default. Every entry leads with its
+ * provider's brand mark — Radix renders the selected item's content in the
+ * trigger, so the mark identifies the active choice there too.
  */
 export const ModelPicker = ({
   models,
@@ -54,31 +50,47 @@ export const ModelPicker = ({
       disabled={disabled || models.loading || !hasGroups}
     >
       <Select.Trigger
-        className="h-8 w-[150px] justify-between rounded-full text-[13px] md:w-[190px]"
+        className="h-8 w-[160px] justify-between rounded-full text-[13px] md:w-[200px]"
         aria-label="Model"
       >
-        <div className="flex min-w-0 items-center gap-1.5">
-          {models.loading ? (
-            <Spinner className="size-3.5" />
-          ) : (
-            <IconChevronDown className="size-3.5 text-muted-foreground" />
-          )}
+        {models.loading ? (
+          <span className="flex min-w-0 items-center gap-1.5">
+            <Spinner className="size-3.5 shrink-0" />
+            Model
+          </span>
+        ) : (
           <Select.Value placeholder="Model" />
-        </div>
+        )}
       </Select.Trigger>
       <Select.Content className="max-h-72">
-        <Select.Item value={AUTO_VALUE}>{autoLabel}</Select.Item>
+        <Select.Item value={AUTO_VALUE} className="text-[13px]">
+          <span className="flex items-center gap-2">
+            <IconSparkles
+              className="size-4 shrink-0 text-primary"
+              aria-hidden="true"
+            />
+            {autoLabel}
+          </span>
+        </Select.Item>
         {models.providerModels.map((group) => (
           <Select.Group key={group.provider}>
-            <Select.Label>
-              {PROVIDER_LABELS[group.provider] ?? group.provider}
+            <Select.Separator />
+            <Select.Label className="px-2 py-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+              <span className="flex items-center gap-1.5">
+                <ProviderIcon provider={group.provider} className="size-3.5" />
+                {getProviderLabel(group.provider)}
+              </span>
             </Select.Label>
             {(group.models ?? []).map((model) => (
               <Select.Item
                 key={`${group.provider}|${model}`}
                 value={`${group.provider}|${model}`}
+                className="text-[13px]"
               >
-                {model}
+                <span className="flex items-center gap-2">
+                  <ProviderIcon provider={group.provider} className="size-4" />
+                  <span className="font-mono">{model}</span>
+                </span>
               </Select.Item>
             ))}
           </Select.Group>

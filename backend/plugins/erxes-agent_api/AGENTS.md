@@ -106,19 +106,24 @@
   a failed model stream is logged server-side
   (`[erxes-agent] chat stream failed:`) and the client receives the
   provider's readable error message, not a generic dead end.
-- Human-in-the-loop questions through Mastra's built-in `ask_user` tool
-  (injected as `askUser` alongside the two-tier tool bridge): the model
-  asks a question (optionally with 2-4 structured options and a
-  `single_select`/`multi_select` mode), the tool calls `suspend()`, the run
-  suspends durably in the same snapshot storage as approvals, and the
-  suspension surfaces to the UI as a `data-tool-call-suspended` SSE part
-  carrying the question. `POST /agents/answer`
+- Human-in-the-loop questions through the plugin-owned `ask_user` tool
+  (`src/modules/agents/askUser.ts`, injected as `askUser` alongside the
+  two-tier tool bridge; replaces Mastra's built-in single-question tool):
+  the model batches one or more questions (each optionally with 2-4
+  structured options and a `single_select`/`multi_select` mode) into ONE
+  suspension, the tool calls `suspend({ questions })`, the run suspends
+  durably in the same snapshot storage as approvals, and the suspension
+  surfaces to the UI as a `data-tool-call-suspended` SSE part carrying the
+  questions. `POST /agents/answer`
   (`{ threadId, answer, provider?, model?, thinkingLevel? }` → SSE)
   resumes the run via `agent.resumeStream(answer)` scoped to the newest
   suspended non-approval tool call, so the model continues with the user's
-  answer. Ownership is re-checked before any resume, and a run suspended on
-  an approval gate is rejected with 409 (it must go through
-  `/agents/approve`).
+  answers. `answer` is a string (single free-text/single-select), a string
+  array (one multi-select question), or one entry per question
+  positionally (each a string or string array); the tool normalizes every
+  shape into per-question text for the model. Ownership is re-checked
+  before any resume, and a run suspended on an approval gate is rejected
+  with 409 (it must go through `/agents/approve`).
 - Threads and titles are handled entirely by Mastra: the agent auto-creates a
   missing thread during `stream`, and `generateTitle: true` derives a
   descriptive title from the first user message asynchronously (agent model,
@@ -174,6 +179,7 @@
 | Agents     | `src/modules/agents`                       | Provider resolution, Mastra agent builder (per-provider thinking options), Mastra memory (dedicated sub-db), per-user multi-provider BYOK model/GraphQL, HTTP routes in `src/routes.ts` |
 | Models listing | `src/modules/agents/providerModels.ts` | BYOK provider whitelist + server-side /models fetching for the chat's model picker |
 | Memory      | `src/modules/agents/memory.ts`             | Per-subdomain runtime bundle: Mastra `Memory` + minimal `Mastra` (`logger: false, workers: false`) sharing one `MongoDBStore` over a `connectorHandler` targeting the dedicated `{db}_agents_memory` sub-db (threads, messages, and workflow snapshots) |
+| ask_user    | `src/modules/agents/askUser.ts`            | Plugin-owned multi-question human-in-the-loop tool (batched `questions` suspension; normalizes legacy string/string[] and positional resume answers) |
 | Tools       | `src/modules/agents/tools.ts`              | Two-tier Mastra tool bridge: `searchTools` (discovery + per-subdomain manifest cache) and `callTool` (execute as the acting user; framework-native `requireApproval` predicate suspends destructive/always-confirm actions before `execute`, which stays a pure runner) |
 | Http        | `src/routes.ts`                             | `POST /agents/chat`, `POST /agents/approve`, `POST /agents/answer`, `POST /cf-os/connect-code`, `POST /cf-os/exchange` |
 | cf-os       | `src/modules/cfos`                          | Passwordless Cloudflare OS sign-in: connect-code mint + gatekeeper exchange (`CfOsConnectCodes` model) |
@@ -551,6 +557,26 @@
 
 <!-- Newest first. Keep at most 10 entries. -->
 
+### `2026-08-31` — Multi-question ask_user tool (plugin-owned)
+
+- **Summary:** Replaced Mastra's built-in single-question `ask_user` with
+  the plugin-owned tool at `src/modules/agents/askUser.ts`: the model now
+  batches up to 5 questions into ONE suspension (`questions` array, each
+  with its own options/selectionMode), so a multi-question step no longer
+  pauses the run once per question. Suspend payload is `{ questions }`;
+  `POST /agents/answer` validation now also accepts per-question positional
+  answer arrays (each element a string or string array), and the tool
+  normalizes legacy string/string[] and positional resume data into
+  per-question text for the model. Agent instructions teach batching.
+- **Affected areas:** `src/modules/agents/askUser.ts` (new),
+  `src/modules/agents/agent.ts`, `src/routes.ts`,
+  `src/__tests__/routes.test.ts` (+1 positional-answer resume test, updated
+  400 message assertions).
+- **Contracts changed:** `POST /agents/answer` `answer` additionally accepts
+  an array of per-question answers (string or string[] each); the
+  `data-tool-call-suspended` payload is now `{ questions: [...] }` instead
+  of a single `{ question, options, selectionMode }`.
+
 ### `2026-08-31` — cf-os passwordless sign-in kept alive on the BYOK plugin
 
 - **Summary:** The BYOK rewrite replaces the legacy runtime wholesale,
@@ -777,39 +803,4 @@
 - **Contracts changed:** Added GraphQL mutation
   `copilotThreadRemove(threadId): Boolean` (`NOT_FOUND` for a missing thread,
   `FORBIDDEN` "Thread belongs to another user." for a foreign thread).
-
-### `2026-08-28` — BYOK connections replace settings + multi-agent plumbing
-
-- **Summary:** The copilot no longer supports multiple AI agents and never
-  reads agent documents: the settings module (default-agent picker) and the
-  Core AI agent readers were deleted, and each user now brings their own key
-  through a per-user BYOK connection document `{ userId, connection:
-  IAiAgentConnection }` on collection `copilot_user_connections` (statics
-  `getConnection`/`upsertConnection`/`removeConnection`). New GraphQL surface
-  `copilotConnection` / `copilotConnectionUpdate(provider, model, baseUrl,
-  apiKey)` / `copilotConnectionRemove`, all gated by `copilotChat` and
-  scoped to the acting user; the API key never appears in a response
-  (`hasKey` flag only, omitted `apiKey` keeps the stored key, empty string
-  clears it, keyless results are rejected). The single copilot agent is built
-  per request from the acting user's stored connection with fixed
-  instructions and model settings; the chat/approve routes resolve the
-  connection via `generateModels` and return 400 `Add your API key to start
-  using the copilot.` when none is stored. The `copilotManageSettings`
-  permission action was removed.
-- **Affected areas:** deleted `src/modules/copilot/aiAgents.ts`,
-  `@types/settings.ts`, `db/{definitions,models}/settings*`,
-  `graphql/schemas/settings.ts`, settings query/mutation resolvers and their
-  tests, `__tests__/aiAgents.test.ts`; new `@types/connection.ts`,
-  `db/definitions/connection.ts`, `db/models/Connection.ts`,
-  `graphql/schemas/connection.ts`, connection query/mutation resolvers,
-  `__tests__/connectionResolvers.test.ts`; rewrote `src/routes.ts` and
-  `src/modules/copilot/agent.ts`; updated `src/connectionResolvers.ts`,
-  `src/apollo/schema/schema.ts`, `src/apollo/resolvers/{queries,mutations}.ts`,
-  `src/meta/permissions.ts`, `src/__tests__/routes.test.ts`.
-- **Contracts changed:** Removed GraphQL `copilotSettings` /
-  `copilotSettingsUpdate` and permission action `copilotManageSettings`;
-  added GraphQL `copilotConnection`, `copilotConnectionUpdate`,
-  `copilotConnectionRemove`; `POST /copilot/chat` and `POST /copilot/approve`
-  no longer accept `agentId` and now return 400 `Add your API key to start
-  using the copilot.` when the acting user has no stored connection.
 

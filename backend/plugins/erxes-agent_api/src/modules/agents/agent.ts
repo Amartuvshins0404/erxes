@@ -15,6 +15,7 @@ import {
   createModelConfig,
   resolveModelConnection,
 } from '@/agents/providers';
+import { buildAskUserTool } from '@/agents/askUser';
 import { buildAgentsTools } from '@/agents/tools';
 
 /**
@@ -27,12 +28,14 @@ import { buildAgentsTools } from '@/agents/tools';
 
 const DEFAULT_INSTRUCTIONS = `You are a helpful assistant inside the erxes XOS. Answer concisely and accurately.
 
-You can ask the user a question with the ask_user tool when you need
+You can ask the user questions with the ask_user tool when you need
 clarification, must validate an assumption, or need the user to decide
-between options. Provide 2-4 options for structured choices or omit them
-for an open-ended question; the question is shown to the user and the run
-resumes with their answer. Prefer asking over guessing when the request is
-ambiguous or the action would be hard to undo.`;;
+between options. Batch related questions into ONE call via the questions
+array instead of suspending once per question. Provide 2-4 options for
+structured choices or omit them for an open-ended question; the questions
+are shown to the user and the run resumes with their answers. Prefer asking
+over guessing when the request is ambiguous or the action would be hard to
+undo.`;
 
 const TEMPERATURE = 0.2;
 const MAX_OUTPUT_TOKENS = 2000;
@@ -153,9 +156,9 @@ export const buildAgentsAgent = async ({
 
   // @mastra/core/agent is ESM-only; load it dynamically from CommonJS.
   const { Agent } = await import('@mastra/core/agent');
-  const [{ searchTools, callTool }, { askUserTool }] = await Promise.all([
+  const [{ searchTools, callTool }, askUserTool] = await Promise.all([
     buildAgentsTools(),
-    import('@mastra/core/tools'),
+    buildAskUserTool(),
   ]);
 
   // Anthropic thinking consumes the output-token budget, so raise the cap
@@ -181,8 +184,9 @@ export const buildAgentsAgent = async ({
     name: 'agents',
     instructions: DEFAULT_INSTRUCTIONS,
     // The model sees the two-tier tool bridge (discover tools, then execute
-    // one) plus Mastra's built-in ask_user tool for human-in-the-loop
-    // questions. The acting user is provided per-request via RequestContext.
+    // one) plus the plugin's multi-question ask_user tool for
+    // human-in-the-loop questions. The acting user is provided per-request
+    // via RequestContext.
     tools: { searchTools, callTool, askUser: askUserTool },
     // `modelSettings` is not an Agent constructor option — it lives on each
     // entry of a model-fallback array (AgentConfig.model accepts

@@ -526,31 +526,44 @@ router.post('/agents/answer', async (req, res) => {
     return;
   }
 
-  // ask_user accepts free-text and single-select answers (string) and
-  // multi-select answers (string[]). Anything else is a client bug, not an
+  // ask_user accepts free-text and single-select answers (string), a
+  // multi-select answer (string array), or — for multi-question
+  // suspensions — one answer per question positionally (each element a
+  // string or a string array). Anything else is a client bug, not an
   // answer — reject it rather than resuming the run with garbage.
   const isString = typeof body.answer === 'string' && body.answer.trim() !== '';
-  const isStringArray =
+  const isNonEmptyStringArray = (value: unknown[]): boolean =>
+    value.length > 0 &&
+    value.every((item) => typeof item === 'string' && item.trim() !== '');
+  const isAnswerList =
     Array.isArray(body.answer) &&
     body.answer.length > 0 &&
     body.answer.every(
-      (item) => typeof item === 'string' && item.trim() !== '',
+      (item) =>
+        (Array.isArray(item) && isNonEmptyStringArray(item)) ||
+        (typeof item === 'string' && item.trim() !== ''),
     );
 
-  if (!isString && !isStringArray) {
+  if (!isString && !isAnswerList) {
     jsonError(
       res,
       400,
       new Error(
-        '`answer` must be a non-empty string or a non-empty string array.',
+        '`answer` must be a non-empty string, a non-empty string array, or an array of per-question answers.',
       ),
     );
     return;
   }
 
-  const answer = isStringArray
-    ? (body.answer as string[]).map((item) => item.trim())
-    : (body.answer as string).trim();
+  const answer: unknown = isString
+    ? (body.answer as string).trim()
+    : (body.answer as unknown[]).map((item) =>
+        Array.isArray(item)
+          ? item.map((part) => (typeof part === 'string' ? part.trim() : part))
+          : typeof item === 'string'
+            ? item.trim()
+            : item,
+      );
 
   try {
     const models = await generateModels(identity.subdomain);

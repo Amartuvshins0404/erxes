@@ -892,6 +892,7 @@ describe('POST /agents/answer — ask_user answer resume', () => {
     ['empty string', '   '],
     ['empty array', []],
     ['array of blanks', ['  ', '']],
+    ['array with an empty inner array', [['yes'], []]],
     ['non-string object', { text: 'yes' }],
     ['number', 42],
   ])('rejects an answer that is %s', async (_label, answer) => {
@@ -903,9 +904,40 @@ describe('POST /agents/answer — ask_user answer resume', () => {
 
     expect(res.statusCode).toBe(400);
     expect(body(res).error).toBe(
-      '`answer` must be a non-empty string or a non-empty string array.',
+      '`answer` must be a non-empty string, a non-empty string array, or an array of per-question answers.',
     );
     expect(resumeStreamMock).not.toHaveBeenCalled();
+  });
+
+  it('resumes with per-question positional answers untouched', async () => {
+    memory.getThreadById.mockResolvedValue({ resourceId: 'user-1' });
+    listSuspendedRunsMock.mockResolvedValue({
+      runs: [askUserRun('run-1')],
+      total: 1,
+    });
+    const res = buildRes();
+    await answerHandler(
+      buildReq({
+        user: ACTING_USER,
+        body: { threadId: 't1', answer: ['Sales', ['Won deals', 'Pipeline']] },
+      }),
+      res,
+    );
+
+    expect(resumeStreamMock).toHaveBeenCalledTimes(1);
+    const [resumeData, options] = resumeStreamMock.mock.calls[0];
+    expect(resumeData).toEqual(['Sales', ['Won deals', 'Pipeline']]);
+    expect(options).toEqual(
+      expect.objectContaining({
+        runId: 'run-1',
+        toolCallId: 'call-ask-1',
+        memory: {
+          thread: 't1',
+          resource: 'user-1',
+          onTitleGenerated: expect.any(Function),
+        },
+      }),
+    );
   });
 
   it('refuses to resume a run owned by another user', async () => {

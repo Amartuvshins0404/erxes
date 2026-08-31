@@ -2,155 +2,221 @@ import { IconMessageQuestion } from '@tabler/icons-react';
 import { Button } from 'erxes-ui';
 import { useState } from 'react';
 
-import { BloubBot } from './BloubBot';
 import { ChatInput } from './ChatInput';
 
-export interface IAskUserQuestion {
+export interface IAskUserQuestionEntry {
   question: string;
   options?: { label: string; description?: string }[];
   selectionMode?: 'single_select' | 'multi_select';
 }
 
+export interface IAskUserQuestionGroup {
+  questions: IAskUserQuestionEntry[];
+}
+
 export interface IAskUserPromptProps {
-  question: IAskUserQuestion;
+  group: IAskUserQuestionGroup;
   busy: boolean;
-  onAnswer: (answer: string | string[]) => void;
+  onAnswer: (answer: string | string[] | (string | string[])[]) => void;
 }
 
 /**
- * Inline card for a question the assistant asked with the ask_user tool.
- * The run is suspended server-side; answering resumes it with exactly the
- * picked option (single select) or every picked option (multi select) or the
- * typed text (free-form). Deliberately mirrors ApprovalPrompt's layout so
- * both interruptions read as one family.
+ * Inline card for the questions the assistant asked with the ask_user tool.
+ * The run is suspended server-side; answering resumes it with the collected
+ * answers. A single-question card keeps the snappy legacy interaction —
+ * picking a single-select chip answers immediately — while a batched
+ * multi-question card collects one answer per question behind a single
+ * send button (the resume carries them positionally).
  */
 export const AskUserPrompt = ({
-  question,
+  group,
   busy,
   onAnswer,
 }: IAskUserPromptProps) => {
-  const isMulti = question.selectionMode === 'multi_select';
-  const [draft, setDraft] = useState('');
-  const [picked, setPicked] = useState<string[]>([]);
-  const [showInput, setShowInput] = useState(!question.options?.length);
+  const { questions } = group;
+  const isSingle = questions.length === 1;
 
-  const togglePick = (label: string) => {
+  const [picked, setPicked] = useState<string[][]>(() =>
+    questions.map(() => []),
+  );
+  const [drafts, setDrafts] = useState<string[]>(() =>
+    questions.map(() => ''),
+  );
+  const [showInputs, setShowInputs] = useState<boolean[]>(() =>
+    questions.map((question) => !question.options?.length),
+  );
+
+  const answeredCount = questions.reduce((count, _question, index) => {
+    const hasAnswer =
+      picked[index]!.length > 0 || drafts[index]!.trim().length > 0;
+
+    return count + (hasAnswer ? 1 : 0);
+  }, 0);
+
+  const allAnswered = answeredCount === questions.length;
+
+  const togglePick = (index: number, label: string) => {
     if (busy) {
       return;
     }
 
-    if (!isMulti) {
+    const question = questions[index]!;
+    const isMulti = question.selectionMode === 'multi_select';
+
+    // A lone single-select chip answers immediately, like the legacy card.
+    if (isSingle && !isMulti) {
       onAnswer(label);
       return;
     }
 
     setPicked((current) =>
-      current.includes(label)
-        ? current.filter((item) => item !== label)
-        : [...current, label],
+      current.map((selection, i) => {
+        if (i !== index) {
+          return selection;
+        }
+
+        if (!isMulti) {
+          return [label];
+        }
+
+        return selection.includes(label)
+          ? selection.filter((item) => item !== label)
+          : [...selection, label];
+      }),
     );
   };
 
-  const submitMulti = () => {
-    if (picked.length > 0) {
-      onAnswer(picked);
+  const submitSingleMulti = () => {
+    if (picked[0]!.length > 0) {
+      onAnswer(picked[0]!);
     }
   };
 
-  const submitText = () => {
-    const text = draft.trim();
+  const submitSingleText = () => {
+    const text = drafts[0]!.trim();
 
     if (text) {
       onAnswer(text);
     }
   };
 
+  const submitAll = () => {
+    if (!allAnswered || busy) {
+      return;
+    }
+
+    onAnswer(
+      questions.map((question, index) => {
+        if (question.options?.length) {
+          return picked[index]!.length === 1 ? picked[index]![0]! : picked[index]!;
+        }
+
+        return drafts[index]!.trim();
+      }),
+    );
+  };
+
+  const renderQuestion = (question: IAskUserQuestionEntry, index: number) => {
+    const active = (label: string) => picked[index]!.includes(label);
+    const hasOptions = !!question.options?.length;
+
+    return (
+      <div key={index} className={index > 0 ? 'mt-4' : undefined}>
+        <p className="text-[15px] font-medium leading-relaxed md:text-[17px]">
+          {isSingle ? '' : `${index + 1}. `}
+          {question.question}
+        </p>
+
+        {hasOptions && (
+          <div className="mt-2.5 flex flex-wrap gap-2">
+            {question.options!.map((option) => {
+              const isActive = active(option.label);
+
+              return (
+                <button
+                  key={option.label}
+                  type="button"
+                  disabled={busy}
+                  title={option.description}
+                  onClick={() => togglePick(index, option.label)}
+                  className={`rounded-full border px-3.5 py-1.5 text-[13px] transition-colors ${
+                    isActive
+                      ? 'border-primary bg-primary/15 font-medium text-primary'
+                      : 'hover:border-primary/50 hover:bg-primary/5'
+                  } ${busy ? 'cursor-not-allowed opacity-60' : ''}`}
+                >
+                  {option.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {isSingle && showInputs[0] && (
+          <div className="mt-2 space-y-2">
+            <div className="rounded-lg border bg-card px-3 py-2">
+              <ChatInput
+                value={drafts[0]!}
+                onChange={(text) => setDrafts([text])}
+                placeholder="Type your answer…"
+                disabled={busy}
+                maxHeight={96}
+                className="text-xs md:text-xs"
+                ariaLabel="Your answer"
+              />
+            </div>
+            <Button
+              size="sm"
+              disabled={busy || !drafts[0]!.trim()}
+              onClick={submitSingleText}
+            >
+              Send
+            </Button>
+          </div>
+        )}
+
+        {isSingle && hasOptions && !showInputs[0] && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => setShowInputs([true])}
+            className="mt-2 text-xs text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            None of these — type my own answer
+          </button>
+        )}
+
+        {isSingle &&
+          question.selectionMode === 'multi_select' &&
+          picked[0]!.length > 0 && (
+            <div className="mt-2.5">
+              <Button size="sm" disabled={busy} onClick={submitSingleMulti}>
+                {`Send ${picked[0]!.length} choice${picked[0]!.length > 1 ? 's' : ''}`}
+              </Button>
+            </div>
+          )}
+      </div>
+    );
+  };
+
   return (
     <div className="my-1 rounded-xl border bg-primary/5 p-3 text-foreground">
-      <div className="flex items-start gap-2">
-        {/* The bot leans in with wide eyes while it waits for the answer. */}
-        <BloubBot size={32} state="wide" className="-mt-1 shrink-0" />
-        <div className="min-w-0 flex-1">
-          <p className="flex items-center gap-1.5 text-sm font-medium">
-            <IconMessageQuestion className="size-4 shrink-0 text-primary" />
-            Quick question
-          </p>
-          <p className="mt-1 text-[15px] leading-relaxed md:text-[17px] md:leading-7">
-            {question.question}
-          </p>
+      <p className="flex items-center gap-1.5 text-sm font-medium">
+        <IconMessageQuestion className="size-4 shrink-0 text-primary" />
+        {isSingle ? 'Quick question' : `Quick questions (${questions.length})`}
+      </p>
 
-          {question.options?.length ? (
-            <div className="mt-2.5 flex flex-wrap gap-2">
-              {question.options.map((option) => {
-                const active = picked.includes(option.label);
+      {questions.map(renderQuestion)}
 
-                return (
-                  <button
-                    key={option.label}
-                    type="button"
-                    disabled={busy}
-                    title={option.description}
-                    onClick={() => togglePick(option.label)}
-                    className={`rounded-full border px-3.5 py-1.5 text-[13px] transition-colors ${
-                      active
-                        ? 'border-primary bg-primary/15 font-medium text-primary'
-                        : 'hover:border-primary/50 hover:bg-primary/5'
-                    } ${busy ? 'cursor-not-allowed opacity-60' : ''}`}
-                  >
-                    {option.label}
-                  </button>
-                );
-              })}
-            </div>
-          ) : null}
-
-          {isMulti && (
-            <div className="mt-2.5">
-              <Button
-                size="sm"
-                disabled={busy || picked.length === 0}
-                onClick={submitMulti}
-              >
-                {picked.length > 0
-                  ? `Send ${picked.length} choice${picked.length > 1 ? 's' : ''}`
-                  : 'Pick one or more'}
-              </Button>
-            </div>
-          )}
-
-          {showInput ? (
-            <div className="mt-2 space-y-2">
-              <div className="rounded-lg border bg-card px-3 py-2">
-                <ChatInput
-                  value={draft}
-                  onChange={setDraft}
-                  placeholder="Type your answer…"
-                  disabled={busy}
-                  maxHeight={96}
-                  className="text-xs md:text-xs"
-                  ariaLabel="Your answer"
-                />
-              </div>
-              <Button
-                size="sm"
-                disabled={busy || !draft.trim()}
-                onClick={submitText}
-              >
-                Send
-              </Button>
-            </div>
-          ) : (
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => setShowInput(true)}
-              className="mt-2 text-xs text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              None of these — type my own answer
-            </button>
-          )}
+      {!isSingle && (
+        <div className="mt-4">
+          <Button size="sm" disabled={busy || !allAnswered} onClick={submitAll}>
+            {allAnswered
+              ? `Send ${questions.length} answers`
+              : `Answered ${answeredCount}/${questions.length}`}
+          </Button>
         </div>
-      </div>
+      )}
     </div>
   );
 };

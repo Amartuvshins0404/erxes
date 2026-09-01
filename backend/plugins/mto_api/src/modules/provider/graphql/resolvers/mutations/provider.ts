@@ -3,20 +3,22 @@ import { IProvider, ProviderStatus } from '@/provider/@types/provider';
 import { validateProviderOwnershipByProvider } from '~/utils/ownershipValidator';
 
 export const providerMutations = {
-  async mtoProviderCreate(_root: undefined, doc: IProvider, context: IContext) {
+  async mtoProfileCreate(_root: undefined, doc: IProvider, context: IContext) {
     const { models } = context;
 
     const instanceId = context.instanceId;
 
     return await models.Provider.createProvider({
       ...doc,
+      categoryIds: doc.categoryIds ?? [],
+      facilities: doc.facilities ?? [],
       status: ProviderStatus.PENDING,
       isActive: doc.isActive ?? true,
       instanceId,
     });
   },
 
-  async mtoProviderUpdate(
+  async mtoProfileUpdate(
     _root: undefined,
     { _id, ...doc }: { _id: string } & Partial<IProvider>,
     context: IContext,
@@ -25,19 +27,19 @@ export const providerMutations = {
     const provider = await models.Provider.findOne({ _id });
 
     if (!provider) {
-      throw new Error('Provider not found');
+      throw new Error('Profile not found');
     }
 
     validateProviderOwnershipByProvider(context, provider);
 
     if (provider.status === ProviderStatus.REJECTED) {
-      throw new Error('Cannot update a rejected provider');
+      throw new Error('Cannot update a rejected profile');
     }
 
     return await models.Provider.updateProvider(_id, { ...doc });
   },
 
-  async mtoProviderApprove(
+  async mtoProfileApprove(
     _root: undefined,
     { _id, approvedBy }: { _id: string; approvedBy: string },
     context: IContext,
@@ -46,19 +48,19 @@ export const providerMutations = {
     const provider = await models.Provider.findOne({ _id });
 
     if (!provider) {
-      throw new Error('Provider not found');
+      throw new Error('Profile not found');
     }
 
     validateProviderOwnershipByProvider(context, provider);
 
     if (provider.status === ProviderStatus.APPROVED) {
-      throw new Error('Provider is already approved');
+      throw new Error('Profile is already approved');
     }
 
     return await models.Provider.approveProvider(_id, approvedBy);
   },
 
-  async mtoProviderReject(
+  async mtoProfileReject(
     _root: undefined,
     {
       _id,
@@ -71,13 +73,13 @@ export const providerMutations = {
     const provider = await models.Provider.findOne({ _id });
 
     if (!provider) {
-      throw new Error('Provider not found');
+      throw new Error('Profile not found');
     }
 
     validateProviderOwnershipByProvider(context, provider);
 
     if (provider.status === ProviderStatus.REJECTED) {
-      throw new Error('Provider is already rejected');
+      throw new Error('Profile is already rejected');
     }
 
     return await models.Provider.rejectProvider(
@@ -87,7 +89,7 @@ export const providerMutations = {
     );
   },
 
-  async mtoProvidersRemove(
+  async mtoProfilesRemove(
     _root: undefined,
     { ids }: { ids: string[] },
     context: IContext,

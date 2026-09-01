@@ -6,14 +6,14 @@
 - **Project:** `mto_api`
 - **Layer:** `Backend API`
 - **Path:** `backend/plugins/mto_api`
-- **Last synchronized:** `2026-08-20`
+- **Last synchronized:** `2026-09-01`
 
 ## Scope
 
 ### Owns
 
 - MTO tenant data and GraphQL: providers, categories, events, travel associations, registration applications/form schemas, and system config (instance ID, selected payments).
-- Master/slave runtime (`mto` mode), including slave GraphQL proxy for provider operations and registration payment callbacks.
+- Master/slave runtime (`mto` mode), including slave GraphQL proxy for profile operations and registration payment callbacks.
 
 ### Does not own
 
@@ -24,29 +24,31 @@
 ## Current Capabilities
 
 - Plugin starts via `startPlugin` on port **33015**.
-- Category, event, travel association, and provider CRUD.
+- Category, event, travel association, and profile CRUD.
 - Registration applications (submit, list/export, status, archive, payment) and FillForm schema CRUD.
 - System config keys including instance ID and selected payments; `mtoMode` / `mtoMasterUrl` / `mtoInstanceId` queries.
-- Slave mode proxies provider GraphQL to master; other operations run locally.
+- Slave mode proxies profile GraphQL (`mtoProfiles`, `mtoProfile`, `mtoMyProfile`, create/update/remove) to master; other operations run locally.
+- `mtoMyProfile` returns the instance's primary provider (`instanceId`, oldest first) or the local singleton when `instanceId` is absent.
+- `mtoProfiles` / `mtoProfilesCount` / `mtoProfile` scope by `instanceId` in slave mode, and on master only when `x-onefit-instance-id` is present (slave proxy). Master UI lists every profile.
 
 ## Architecture
 
 | Area | Path | Responsibility |
 | -------- | ---------------------------- | -------------------------- |
-| Runtime | `src/main.ts`, `src/connectionResolvers.ts` | Plugin boot, tenant models, Apollo context |
+| Runtime | `src/main.ts`, `src/connectionResolvers.ts` | Plugin boot, tenant models, Apollo context (`instanceId`, `instanceIdFromHeader`) |
 | Provider | `src/modules/provider` | Provider records, filters, export |
 | Category | `src/modules/category` | Hierarchical categories |
 | Event | `src/modules/event` | Events linked to categories |
 | Travel association | `src/modules/travelAssociation` | Travel associations (logo, cover, bilingual title/description, found date) |
 | Registration | `src/modules/registration` | Applications, form schemas, payment |
 | Config | `src/modules/config` | System config keys |
-| Slave proxy | `src/middlewares/graphqlProxyMiddleware.ts` | Provider ops forwarded to master |
+| Slave proxy | `src/middlewares/graphqlProxyMiddleware.ts` | Profile ops forwarded to master |
 
 ## Contracts
 
 ### Provides
 
-- GraphQL operations prefixed `mto*` / `cpMto*`, unique repo-wide: categories, events, travel associations (`mtoTravelAssociations`, `mtoTravelAssociation`, `mtoTravelAssociationCreate`, `mtoTravelAssociationUpdate`, `mtoTravelAssociationsRemove`), providers, registration applications/schemas, system config.
+- GraphQL operations prefixed `mto*` / `cpMto*`, unique repo-wide: categories, events, travel associations (`mtoTravelAssociations`, `mtoTravelAssociation`, `mtoTravelAssociationCreate`, `mtoTravelAssociationUpdate`, `mtoTravelAssociationsRemove`), profiles (`mtoProfiles`, `mtoProfile`, `mtoMyProfile`, `mtoProfileCreate`, `mtoProfileUpdate`, `mtoProfileApprove`, `mtoProfileReject`, `mtoProfilesRemove`), registration applications/schemas, system config.
 - Payment meta `callback` for registration invoices.
 
 ### Consumes
@@ -65,16 +67,36 @@
 - Models are generated from request `subdomain`; do not read or write another plugin's collections.
 - GraphQL operation names stay prefixed `mto` / `cpMto` and unique repository-wide.
 - Travel association `title.en`/`title.mn` and `foundDate` remain required on create.
-- Slave proxy whitelist is provider-only; do not add travel associations unless slave UI is explicitly enabled.
+- Slave proxy whitelist is profile operations; do not add travel associations unless slave UI is explicitly enabled.
+- `mtoMyProfile` must not return another instance's provider; without `instanceId` it only matches records with missing/empty `instanceId`.
+- Master `mtoProfiles` must not filter by SaaS config `instanceId`; slave-proxied requests still filter by header `instanceId`.
 
 ## Validation
 
 - `pnpm nx build mto_api`
-- Smoke: create/update/remove a travel association with logo, cover, bilingual title/description, and found date; list filters by search and found-date range still return matching rows
+- Smoke: `mtoMyProfile` returns the instance profile (or local singleton); first save creates, later saves update; rejected profiles still cannot update; master `mtoProfiles` returns all rows unless `x-onefit-instance-id` is set
 
 ## Recent Changes
 
 <!-- Newest first. Keep at most 10 entries. -->
+
+### `2026-09-01` — Master lists all profiles
+
+- **Summary:** `mtoProfiles` / `mtoProfilesCount` / `mtoProfile` no longer filter by SaaS config `instanceId` on master; they still scope by header `instanceId` for slave-proxied requests.
+- **Affected areas:** `src/modules/provider/graphql/resolvers/queries/provider.ts`, `src/main.ts`, `src/connectionResolvers.ts`
+- **Contracts changed:** Master UI `mtoProfiles` returns every tenant profile; slave proxy still receives only its instance
+
+### `2026-09-01` — Slim profile GraphQL fields
+
+- **Summary:** Removed `facilities`, `categoryIds`/`categories`, and `singleProviderLimit` from `MtoProfile` and profile create/update inputs; slave proxy no longer forwards `mtoCategories`.
+- **Affected areas:** `src/modules/provider/graphql`, `src/modules/provider/db/definitions/provider.ts`, `src/middlewares/graphqlProxyMiddleware.ts`
+- **Contracts changed:** `MtoProfile` and `mtoProfileCreate`/`mtoProfileUpdate` no longer expose facilities, categories, or `singleProviderLimit`
+
+### `2026-09-01` — Profile GraphQL operations
+
+- **Summary:** Renamed provider GraphQL types and operations to profile (`MtoProfile`, `mtoProfiles`, `mtoProfile`, `mtoMyProfile`, `mtoProfileCreate`/`Update`/`Approve`/`Reject`, `mtoProfilesRemove`) and proxied the profile reads/writes with `mtoCategories` in slave mode.
+- **Affected areas:** `src/modules/provider/graphql`, `src/middlewares/graphqlProxyMiddleware.ts`, `src/utils/ownershipValidator.ts`
+- **Contracts changed:** Replaced `MtoProvider`/`mtoProvider*` with `MtoProfile` and `mtoProfile*`; slave proxy whitelist now includes `mtoMyProfile`, `mtoProfiles`, `mtoProfile`, `mtoProfileCreate`, `mtoProfileUpdate`, and `mtoProfilesRemove`
 
 ### `2026-08-20` — Travel Association model
 

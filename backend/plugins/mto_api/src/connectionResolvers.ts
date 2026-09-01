@@ -63,6 +63,7 @@ export interface IContext extends IMainContext {
   subdomain: string;
   mode: MtoMode;
   instanceId?: string;
+  instanceIdFromHeader?: string;
   masterClient?: MasterClient;
   masterUrl?: string;
 }

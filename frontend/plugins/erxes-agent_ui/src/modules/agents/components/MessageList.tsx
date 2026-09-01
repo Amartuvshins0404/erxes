@@ -172,7 +172,7 @@ export const MessageList = ({
   return (
     <ScrollArea.Root className="min-h-0 flex-1">
       <ScrollArea.Viewport ref={viewportRef} onScroll={handleScroll}>
-        <div className="mx-auto w-full max-w-3xl space-y-6 px-4 py-6">
+        <div className="mx-auto w-full max-w-2xl space-y-4 px-3 py-4 sm:space-y-6 sm:px-4 sm:py-6 md:max-w-3xl">
         {messages.map((message, index) => {
           const createdAt = getMessageCreatedAt(message);
           const previousCreatedAt =
@@ -235,7 +235,7 @@ export const MessageList = ({
               )}
               {message.role === 'user' ? (
                 <div className="flex justify-end">
-                  <div className="max-w-[85%] whitespace-pre-wrap break-words rounded-2xl rounded-br-md bg-primary px-4 py-2.5 text-primary-foreground">
+                  <div className="max-w-[90%] whitespace-pre-wrap break-words rounded-2xl rounded-br-md bg-primary px-4 py-2.5 text-primary-foreground sm:max-w-[85%]">
                     {message.parts.map((part, partIndex) => (
                       <MessagePartRenderer
                         key={`${message.id}-${partIndex}`}
@@ -247,7 +247,7 @@ export const MessageList = ({
                   </div>
                 </div>
               ) : (
-                <div className="flex gap-3">
+                <div className="flex gap-2 sm:gap-3">
                   <BloubBot
                     size={28}
                     {...(isStreamingTail
@@ -257,7 +257,7 @@ export const MessageList = ({
                         : {
                             shuffle: MESSAGE_AVATAR_SHUFFLE_POOL,
                           })}
-                    className="shrink-0 mt-0.5"
+                    className="mt-0.5 shrink-0"
                   />
                   <div className="min-w-0 flex-1">
                     {message.parts.map((part, partIndex) => (
@@ -275,7 +275,7 @@ export const MessageList = ({
           );
         })}
           {status === 'submitted' && (
-            <div className="flex gap-3 text-[11px] text-muted-foreground md:text-xs">
+            <div className="flex gap-2 text-[11px] text-muted-foreground sm:gap-3 sm:text-xs">
               <BloubBot
                 size={24}
                 state="thinking"

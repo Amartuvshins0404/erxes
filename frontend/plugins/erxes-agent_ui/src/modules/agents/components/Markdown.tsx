@@ -1,4 +1,21 @@
-import ReactMarkdown from 'react-markdown';
+import { cn } from 'erxes-ui';
+import ReactMarkdown, { type Components } from 'react-markdown';
+
+/**
+ * Wide markdown tables scroll sideways inside the transcript instead of
+ * squashing every column into a phone width; a table narrower than the column
+ * still fills it (`min-w-full`). The horizontal scroll is contained so a
+ * fling at the edge of a table does not start navigating the transcript.
+ */
+const COMPONENTS: Components = {
+  table: ({ children, className }) => (
+    <div className="my-2 overflow-x-auto overscroll-x-contain">
+      <table className={cn('w-max min-w-full text-[13px]', className)}>
+        {children}
+      </table>
+    </div>
+  ),
+};
 
 /**
  * Renders assistant text as markdown. LLM output routinely contains lists,
@@ -24,12 +41,11 @@ export const Markdown = ({ content }: { content: string }) => {
         '[&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_pre_code]:font-mono',
         '[&_code]:rounded-md [&_code]:bg-muted [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:text-[13px] [&_code]:font-mono',
         '[&_a]:text-primary [&_a]:underline-offset-2 hover:[&_a]:underline',
-        '[&_table]:w-full [&_table]:text-[13px]',
         '[&_th]:border-b [&_th]:py-1.5 [&_th]:pr-3 [&_th]:text-left [&_th]:font-medium',
         '[&_td]:border-b [&_td]:py-1.5 [&_td]:pr-3',
       ].join(' ')}
     >
-      <ReactMarkdown>{content}</ReactMarkdown>
+      <ReactMarkdown components={COMPONENTS}>{content}</ReactMarkdown>
     </div>
   );
 };

@@ -86,7 +86,7 @@ export const ModelPicker = ({
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
       <Combobox.Trigger
-        className="h-8 w-[160px] justify-between rounded-full text-[13px] md:w-[200px]"
+        className="h-8 min-w-0 max-w-[200px] flex-1 justify-between rounded-full text-[13px]"
         disabled={
           disabled || models.loading || models.providerModels.length === 0
         }

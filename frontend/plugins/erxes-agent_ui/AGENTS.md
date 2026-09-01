@@ -69,7 +69,10 @@
   through this remote.
 - Full-page agents chat (`/erxes-agent`) with a thread history sidebar,
   streaming transcript with inbox-style auto-scroll, markdown rendering,
-  and a composer. The empty state pairs the hero and the composer as one
+  and a composer. The shell is responsive: the thread sidebar is permanent
+  only from `lg` (1024px) up, and below that every surface — the full page
+  and the floating side panel — opens the same list as a left `Sheet`
+  drawer from a header button. The empty state pairs the hero and the composer as one
   centered, scroll-safe block: an animated bot playing the calm
   `CALM_FACE_CYCLE`, "How can I help you today?", "Ask anything about your
   erxes workspace", the composer itself, then four starter chips
@@ -77,12 +80,17 @@
   tasks", "Search my contacts") that send through the same
   `sendMessage({ text })` path the composer uses. Once a conversation
   exists the transcript fills the panel with the composer docked below.
-  The same layout serves the full page, the floating side panel and mobile.
+  The same layout serves the full page, the floating side panel and mobile;
+  it scales with the viewport — the hero bot shrinks (80 / 96 / 104px), and
+  the block stays scroll-safe so the composer never leaves a short panel.
 - Composer: one card holding the plugin-local `ChatInput` (auto-growing
   native textarea — deliberately not `erxes-ui`'s `Textarea`, which forces a
   focus shadow and scrollbar arrows inside the card), the model/thinking
   pickers as pill triggers, and the send/stop control (`IconArrowUp` /
-  `IconPlayerStop`). No bot inside the composer.
+  `IconPlayerStop`). No bot inside the composer. The toolbar is one row at
+  every width: the pickers share the leftover space and truncate (the
+  thinking pill drops its "Thinking:" prefix first) instead of pushing the
+  send control out of the card on a phone.
 - Bot avatar (`BloubBot`) used across every agents surface, always rendered
   in the design system primary (`color` defaults to `var(--primary)`, an
   indigo that matches `bg-primary` buttons): the empty-state hero
@@ -131,8 +139,10 @@
   hover-revealed delete, skeleton rows while the first page loads, and the
   sleeping bot + "Start one" button on the empty state. Rows are text-only —
   no per-row icons (a repeated message icon down a long list reads as
-  noise); timestamps use `formatDateISOStringToRelativeDateShort`.
-- Thread deletion: each thread row shows a hover-revealed delete button that
+  noise); timestamps use `formatDateISOStringToRelativeDateShort`. The
+  hover-revealed delete is always visible below `lg` (touch has no hover);
+  only the pointer layouts hide it until the row is hovered or focused.
+- Thread deletion: each thread row shows a delete button that
   confirms through an `AlertDialog` and runs `AgentsThreadRemove`; deleting
   the active conversation resets the chat to a new conversation on both the
   full page and the floating widget.
@@ -192,7 +202,11 @@
   a card once the closing fence arrives. Fenced code blocks wrap long lines
   instead of scrolling horizontally.
 - Two-tier responsive transcript typography (base 15px / md 17px) for
-  markdown, user bubbles, composer, and thread titles, with polished
+  markdown, user bubbles, composer, and thread titles, plus responsive
+  transcript spacing and gaps (tighter below `sm`) and horizontally
+  scrollable markdown tables (`w-max min-w-full` inside an
+  `overflow-x-auto overscroll-x-contain` wrapper, so a wide table scrolls
+  instead of squashing its columns), with polished
   markdown styling (paragraph spacing, blockquote, hr, list markers and
   spacing, bordered code blocks with mono resets, styled inline code,
   underlined links, bordered tables), a dashed-border reasoning
@@ -207,7 +221,8 @@
 | Routing             | `src/modules/ErxesAgentMain.tsx`               | Declares the plugin's main routes (chat at index) |
 | Settings routing    | `src/modules/ErxesAgentSettings.tsx`           | Declares the plugin's settings routes (`connection`, `code-mode`) |
 | Settings navigation | `src/modules/ErxesAgentSettingsNavigation.tsx` | Settings sidebar group ("Agents" / "API key" / "Code mode") |
-| Chat page           | `src/pages/agents/IndexPage.tsx`               | Full-page chat with thread sidebar                |
+| Chat page           | `src/pages/agents/IndexPage.tsx`               | Full-page chat with thread sidebar (`lg`+), drawer below |
+| History drawer      | `src/modules/agents/components/ThreadsDrawer.tsx` | Controlled left `Sheet` wrapping `ThreadList` for every width below `lg` |
 | Settings page       | `src/pages/settings/SettingsConnectionPage.tsx`| Brand-mark BYOK form (save/remove connection)     |
 | Code mode page      | `src/pages/settings/SettingsCodeModePage.tsx`  | Tenant-wide code mode toggle (admin-gated switch + fixed sandbox environment card) |
 | Floating widget     | `src/widgets/FloatingWidget.tsx`               | Right-edge chevron handle + full-height `Sheet` side panel |
@@ -440,6 +455,37 @@
   `baseBody` circle), never the full 14-state `defaultCycle()`: in a
   narrow panel the montage's "thinking" three-dots state reads as a
   loading spinner and its size-varying states float awkwardly.
+- Responsive invariants (the chat is used from a 320px phone to an ultrawide
+  desktop; breakpoints are Tailwind's defaults, applied as CSS classes so
+  there is no first-paint jump):
+  - The thread sidebar is permanent only from `lg` (1024px) up. Below that
+    BOTH surfaces that show threads — `IndexPage` and `FloatingWidget` —
+    must mount `ThreadsDrawer` and give it a visible trigger, because a
+    phone has no other route back to a stored conversation. Never reintroduce
+    a hidden sidebar without a drawer fallback (the floating panel's old
+    `hidden md:block` left phones with no history access at all).
+  - The drawer is controlled by the surface that owns the trigger; selecting
+    a thread or starting a new conversation closes it. Keep both surfaces on
+    the same `ThreadsDrawer` component rather than duplicating the sheet.
+  - Layout is CSS-only (`hidden lg:block`, `lg:hidden`, …). Do not add a JS
+    breakpoint hook: `erxes-ui`'s `useIsMobile` is a 1024px `matchMedia`,
+    which would disagree with the CSS classes the moment they diverge.
+  - Anything revealed on hover must have a non-hover fallback below `lg`
+    (see the thread row's delete button): touch devices never hover.
+  - The composer toolbar stays one row at every width. Pickers shrink and
+    truncate; they must never wrap or push the send control out of the card.
+  - Fixed pixel heights (hero avatar, artifact preview) get a smaller value
+    below `sm`; the composer's bottom padding is
+    `pb-[max(0.75rem,env(safe-area-inset-bottom))]` so it clears the iOS home
+    indicator without adding dead space elsewhere.
+  - Wide content scrolls in place: markdown tables inside an
+    `overflow-x-auto` wrapper, code blocks with `whitespace-pre-wrap
+    break-words`. Nothing may widen the transcript horizontally.
+  - `ChatPanel`'s root keeps `flex-1` because both surfaces mount it inside
+    a flex-row wrapper (`main` on the page, the sheet's content row in the
+    floating widget). Without it the panel shrinks to its content's width and
+    pins to the left edge, so the empty state's `mx-auto` block can never
+    center.
 - Every `cycle` array passed to `BloubBot` must be a stable module-level
   constant (`botCycles.ts`) — an unstable reference restarts playback on
   each render. Each block duration must stay above the engine's block
@@ -555,10 +601,51 @@
   survives a reload; as a non-admin the switch is disabled and the
   "Managed by your administrators" note shows; the environment card reads
   "In-process (built-in server)" marked Default.
+- Smoke (responsive): at 320 / 375 / 768 / 1024 / 1440px, and in a short
+  landscape phone, confirm the thread sidebar is inline from `lg` up and a
+  header button opens it as a left drawer below that — on BOTH the full page
+  and the floating side panel — that picking a thread closes the drawer and
+  loads it, the header actions stay on one line with their labels folded
+  away below `sm`, the empty state keeps the composer inside the panel with
+  the hero scaled down, the composer toolbar stays a single row with the
+  pickers truncating rather than the send control escaping the card, a wide
+  markdown table scrolls sideways without widening the transcript, and a
+  thread row's delete button is reachable without hovering.
 
 ## Recent Changes
 
 <!-- Newest first. Keep at most 10 entries. -->
+
+### `2026-08-31` — Responsive chat surface for every device
+
+- **Summary:** The chat was built around a permanent 256px thread sidebar
+  with no alternative on narrow screens, so a phone gave the transcript
+  ~120px and the floating panel's history (`hidden md:block`) was simply
+  unreachable. The sidebar is now permanent only from `lg` up, and both
+  surfaces mount a new controlled `ThreadsDrawer` (left `Sheet` +
+  `ThreadList`) opened from the header; picking a thread closes it. Also:
+  the empty-state hero scales (80/96/104px), the transcript tightens its
+  padding, gaps and user-bubble width below `sm`, the composer toolbar
+  became one shrinkable row (the model picker flexes, the thinking pill
+  drops its "Thinking:" prefix, the send control never leaves the card),
+  the docked composer clears the iOS home indicator, markdown tables scroll
+  sideways inside the transcript instead of squashing their columns, the
+  thread row's delete button is always visible below `lg` (touch never
+  hovers), the floating panel's sheet width no longer overflows the
+  viewport by its own inset, and artifact previews start at 320px on small
+  screens. Page-header actions drop their labels below `sm` so they stop
+  pushing the breadcrumb off a phone-width header. `ChatPanel`'s root
+  carries `flex-1` so the panel fills the new flex-row wrappers on both
+  surfaces — without it the panel shrank to its content and the empty
+  state's centered block pinned to the left edge.
+- **Affected areas:**
+  `src/modules/agents/components/ThreadsDrawer.tsx` (new),
+  `src/pages/agents/IndexPage.tsx`, `src/widgets/FloatingWidget.tsx`,
+  `src/modules/agents/components/{ChatPanel, MessageList, Composer,
+  ModelPicker, ThinkingPicker, Markdown, ThreadList}.tsx`,
+  `src/modules/agents/artifacts/ArtifactCard.tsx`.
+- **Contracts changed:** None (presentation only; no GraphQL/REST, `CONFIG`
+  or federation changes).
 
 ### `2026-08-31` — Hardened artifact guidance and wrapping code blocks
 
@@ -714,27 +801,4 @@
 - **Contracts changed:** None (same queries/mutations; layout and
   presentation only).
 
-### `2026-08-31` — ask-user card, contextual message avatar with shuffle walk
-
-- **Summary:** Added the ask_user human-in-the-loop surface: the
-  `AskUserPrompt` card (wide-eyed bot, question, choice chips, multi-select
-  chip state, "type my own answer" free-text) rendered from the
-  `data-tool-call-suspended` part, answered through the transport's new
-  reconnect-consumer seam (`consumePendingAnswer`) which POSTs to the
-  backend's `POST /agents/answer` and feeds the resumed stream through
-  `chat.resumeStream()`. The assistant message avatar is now bigger (28px)
-  and contextual: `thinking` while its message streams, `wide` while its
-  ask_user question awaits an answer, and a random never-repeating
-  shuffle walk (`MESSAGE_AVATAR_SHUFFLE_POOL`, measured durations, O(1)
-  memory) on settled messages — implemented as the new `shuffle` mode in
-  `BloubBot`.
-- **Affected areas:**
-  `src/modules/agents/components/{AskUserPrompt (new), MessagePart,
-  MessageList, BloubBot}.tsx`,
-  `src/modules/agents/{transport.ts, api.ts, botCycles.ts}`,
-  `src/modules/agents/hooks/useAgentsChat.ts`,
-  `src/modules/agents/components/ChatPanel.tsx`.
-- **Contracts changed:** Consumes `POST /agents/answer`; the transport
-  gained the `consumePendingAnswer` constructor seam and answer-aware
-  `reconnectToStream`; `MessageList` gained `answerBusy`/`onAnswer` props.
 

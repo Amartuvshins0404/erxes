@@ -1422,12 +1422,18 @@ importers:
       erxes-api-shared:
         specifier: workspace:^
         version: link:../../erxes-api-shared
+      formidable:
+        specifier: ^3.5.4
+        version: 3.5.4
       graphql-tag:
         specifier: ^2.12.6
         version: 2.12.6(graphql@16.10.0)
       sharp:
         specifier: ^0.33.0
         version: 0.33.5
+      xss:
+        specifier: ^1.0.15
+        version: 1.0.15
 
   backend/plugins/mto_api/dist:
     dependencies:
@@ -1455,6 +1461,9 @@ importers:
       '@prettier/sync':
         specifier: 0.5.5
         version: 0.5.5(prettier@3.6.2)
+      '@sendgrid/mail':
+        specifier: 8.1.5
+        version: 8.1.5
       '@sentry/node':
         specifier: 10.57.0
         version: 10.57.0(@opentelemetry/exporter-trace-otlp-http@0.219.0(@opentelemetry/api@1.9.1))
@@ -1476,6 +1485,12 @@ importers:
       '@types/ioredis':
         specifier: 5.0.0
         version: 5.0.0
+      '@types/lodash':
+        specifier: 4.17.21
+        version: 4.17.21
+      '@types/nodemailer':
+        specifier: 6.4.24
+        version: 6.4.24
       '@zxing/library':
         specifier: ^0.21.3
         version: 0.21.3
@@ -1525,7 +1540,7 @@ importers:
         specifier: 4.0.2
         version: 4.0.2
       formidable:
-        specifier: 3.5.4
+        specifier: ^3.5.4
         version: 3.5.4
       glob:
         specifier: 11.0.1
@@ -1540,7 +1555,7 @@ importers:
         specifier: 3.0.0
         version: 3.0.0(graphql@16.10.0)
       graphql-tag:
-        specifier: 2.12.6
+        specifier: ^2.12.6
         version: 2.12.6(graphql@16.10.0)
       helmet:
         specifier: 8.1.0
@@ -1566,6 +1581,9 @@ importers:
       node-fetch:
         specifier: 2.7.0
         version: 2.7.0(encoding@0.1.13)
+      nodemailer:
+        specifier: 6.9.10
+        version: 6.9.10
       sharp:
         specifier: ^0.33.0
         version: 0.33.5
@@ -1576,7 +1594,7 @@ importers:
         specifier: 2.8.1
         version: 2.8.1
       xss:
-        specifier: 1.0.15
+        specifier: ^1.0.15
         version: 1.0.15
       zod:
         specifier: 3.23.8

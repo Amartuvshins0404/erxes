@@ -5,6 +5,7 @@ import {
   IconCalendarEvent,
   IconCategory,
   IconBuildingCommunity,
+  IconUser,
 } from '@tabler/icons-react';
 import { useMtoMode } from './config/hooks/useMtoMode';
 
@@ -13,7 +14,12 @@ export const MtoNavigation = () => {
 
   return (
     <>
-
+      <NavigationMenuLinkItem
+        name="Profile"
+        icon={IconUser}
+        pathPrefix="mto"
+        path="profile"
+      />
       {!isSlaveMode && (
         <NavigationMenuLinkItem
           name="Categories"

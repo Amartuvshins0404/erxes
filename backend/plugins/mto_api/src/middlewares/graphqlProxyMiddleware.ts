@@ -7,12 +7,13 @@ import { getSubdomain } from 'erxes-api-shared/utils';
  * Operations that are proxied to master in slave mode (reads + shared writes).
  */
 const PROXY_TO_MASTER_OPERATIONS = [
-  'mtoProviders',
-  'mtoProvidersCount',
-  'mtoProvider',
-  'mtoProviderCreate',
-  'mtoProviderUpdate',
-  'mtoProvidersRemove',
+  'mtoProfiles',
+  'mtoProfilesCount',
+  'mtoProfile',
+  'mtoMyProfile',
+  'mtoProfileCreate',
+  'mtoProfileUpdate',
+  'mtoProfilesRemove',
 ];
 
 /** Operations that must never run locally in slave mode; these return 403. */

@@ -47,6 +47,12 @@ const RegistrationSchemasPage = lazy(() =>
   })),
 );
 
+const ProfilePage = lazy(() =>
+  import('~/pages/ProfilePage').then((module) => ({
+    default: module.ProfilePage,
+  })),
+);
+
 const MtoMain = () => {
   const { isSlaveMode } = useMtoMode();
   const { instanceId, loading } = useMtoInstanceId();
@@ -81,6 +87,7 @@ const MtoMain = () => {
             element={<TravelAssociationsPage />}
           />
         )}
+        <Route path="/profile" element={<ProfilePage />} />
         <Route path="/registration" element={<RegistrationIndexPage />} />
         <Route path="/registrations" element={<RegistrationsPage />} />
         <Route path="/fillform" element={<RegistrationSchemasPage />} />

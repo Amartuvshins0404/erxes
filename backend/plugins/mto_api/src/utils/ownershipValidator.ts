@@ -21,8 +21,8 @@ export const validateProviderOwnership = async (
   }
 
   const query = `
-    query GetProvider($id: String!) {
-      mtoProvider(_id: $id) {
+    query GetProfile($id: String!) {
+      mtoProfile(_id: $id) {
         _id
         instanceId
       }
@@ -31,10 +31,10 @@ export const validateProviderOwnership = async (
 
   try {
     const result = await context.masterClient.query<{
-      mtoProvider: { _id: string; instanceId?: string } | null;
+      mtoProfile: { _id: string; instanceId?: string } | null;
     }>(query, { id: providerId });
 
-    const provider = result.mtoProvider;
+    const provider = result.mtoProfile;
 
     if (!provider) {
       throw new OwnershipError('Provider not found');

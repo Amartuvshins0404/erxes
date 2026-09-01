@@ -75,7 +75,7 @@ const generateFilter = async (
 };
 
 export const providerQueries: Record<string, Resolver> = {
-  async mtoProviders(
+  async mtoProfiles(
     _root: undefined,
     params: IProviderQueryParams,
     context: IContext,
@@ -91,7 +91,7 @@ export const providerQueries: Record<string, Resolver> = {
     });
   },
 
-  async mtoProvidersCount(
+  async mtoProfilesCount(
     _root: undefined,
     params: IProviderQueryParams,
     context: IContext,
@@ -102,7 +102,7 @@ export const providerQueries: Record<string, Resolver> = {
     return models.Provider.find(filter).countDocuments();
   },
 
-  async mtoProvider(
+  async mtoProfile(
     _root: undefined,
     { _id }: { _id: string },
     context: IContext,
@@ -114,6 +114,22 @@ export const providerQueries: Record<string, Resolver> = {
       return null;
     }
     return provider;
+  },
+
+  async mtoMyProfile(_root: undefined, _args: unknown, context: IContext) {
+    const { models, instanceId } = context;
+
+    const filter = instanceId
+      ? { instanceId }
+      : {
+          $or: [
+            { instanceId: { $exists: false } },
+            { instanceId: null },
+            { instanceId: '' },
+          ],
+        };
+
+    return models.Provider.findOne(filter).sort({ createdAt: 1 });
   },
 };
 markResolvers(providerQueries, {

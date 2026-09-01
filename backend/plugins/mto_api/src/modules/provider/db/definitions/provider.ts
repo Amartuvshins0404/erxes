@@ -54,8 +54,8 @@ export const providerSchema = new Schema(
       required: true,
       label: 'Contact Info',
     },
-    facilities: { type: [String], label: 'Facilities' },
-    categoryIds: { type: [String], required: true, label: 'Category IDs' },
+    facilities: { type: [String], label: 'Facilities', default: [] },
+    categoryIds: { type: [String], label: 'Category IDs', default: [] },
     singleProviderLimit: {
       type: Number,
       label: 'Single Provider Limit',

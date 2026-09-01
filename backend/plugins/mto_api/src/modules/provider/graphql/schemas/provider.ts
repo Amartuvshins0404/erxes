@@ -27,17 +27,13 @@ export const types = `
     website: String
   }
 
-  type MtoProvider {
+  type MtoProfile {
     _id: String
     createdAt: Date
     modifiedAt: Date
     businessName: MtoMultilingualString
     description: MtoMultilingualStringOptional
     contactInfo: MtoContactInfo
-    facilities: [String]
-    categoryIds: [String]
-    categories: [MtoCategory]
-    singleProviderLimit: Int
     status: String
     rejectionReason: String
     approvedAt: Date
@@ -49,8 +45,8 @@ export const types = `
     instanceId: String
   }
 
-  type MtoProviderListResponse {
-    list: [MtoProvider]
+  type MtoProfileListResponse {
+    list: [MtoProfile]
     pageInfo: PageInfo
     totalCount: Int
   }
@@ -71,27 +67,25 @@ const queryParams = `
 `;
 
 export const queries = `
-  mtoProviders(${queryParams}, ${GQL_CURSOR_PARAM_DEFS}): MtoProviderListResponse
-  mtoProvidersCount(${queryParams}): Int
-  mtoProvider(_id: String): MtoProvider
+  mtoProfiles(${queryParams}, ${GQL_CURSOR_PARAM_DEFS}): MtoProfileListResponse
+  mtoProfilesCount(${queryParams}): Int
+  mtoProfile(_id: String): MtoProfile
+  mtoMyProfile: MtoProfile
 `;
 
 const mutationParams = `
   businessName: MtoMultilingualStringInput
   description: MtoMultilingualStringOptionalInput
   contactInfo: MtoContactInfoInput
-  facilities: [String]
-  categoryIds: [String]!
-  singleProviderLimit: Int
   isActive: Boolean
   icon: String
   coverImages: [String]
 `;
 
 export const mutations = `
-  mtoProviderCreate(${mutationParams}): MtoProvider
-  mtoProviderUpdate(_id: String!, ${mutationParams}): MtoProvider
-  mtoProviderApprove(_id: String!, approvedBy: String!): MtoProvider
-  mtoProviderReject(_id: String!, rejectionReason: String!, rejectedBy: String!): MtoProvider
-  mtoProvidersRemove(ids: [String]!): JSON
+  mtoProfileCreate(${mutationParams}): MtoProfile
+  mtoProfileUpdate(_id: String!, ${mutationParams}): MtoProfile
+  mtoProfileApprove(_id: String!, approvedBy: String!): MtoProfile
+  mtoProfileReject(_id: String!, rejectionReason: String!, rejectedBy: String!): MtoProfile
+  mtoProfilesRemove(ids: [String]!): JSON
 `;

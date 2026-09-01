@@ -4,7 +4,7 @@ import { generateModels } from '~/connectionResolvers';
 export type MtoMode = 'master' | 'slave';
 
 export const getMtoMode = (): MtoMode => {
-  const mode = getEnv({ name: 'ONEFIT_MODE', defaultValue: 'master' });
+  const mode = getEnv({ name: 'MTO_MODE', defaultValue: 'master' });
   if (mode === 'slave') {
     return 'slave';
   }
@@ -12,7 +12,7 @@ export const getMtoMode = (): MtoMode => {
 };
 
 export const getMtoMasterUrl = (): string | undefined => {
-  return getEnv({ name: 'ONEFIT_MASTER_URL' });
+  return getEnv({ name: 'MTO_MASTER_URL' });
 };
 
 export const getMtoInstanceId = async (
@@ -32,5 +32,5 @@ export const isMasterMode = (): boolean => {
 };
 
 export const getMtoSecret = (): string | undefined => {
-  return getEnv({ name: 'ONEFIT_AUTH_TOKEN' });
+  return getEnv({ name: 'MTO_AUTH_TOKEN' });
 };

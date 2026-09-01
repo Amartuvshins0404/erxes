@@ -252,9 +252,10 @@
 | GraphQL documents   | `src/modules/agents/graphql/settings.ts`       | `AgentsSettings` query + `AgentsSettingsUpdate` mutation |
 | GraphQL documents   | `src/modules/agents/graphql/threads.ts`        | `Agents*` thread list/detail operations and the `AgentsThreadsChanged` subscription |
 | Components          | `src/modules/agents/components/*`              | Chat panel (transcript + empty state + composer layouts), message list, parts, approval, tool call helpers, composer, `ChatInput`, markdown, thread list (with delete), provider picker, `BloubBot` avatar wrapper |
+| Markdown repair     | `src/modules/agents/components/markdownRepair.ts` | `repairTables(text)` pre-pass normalizing malformed pipe tables before `react-markdown`: missing separator row, several rows collapsed onto one line, and a separator row merged onto the header line |
 | Bot cycles          | `src/modules/agents/botCycles.ts`              | Curated module-level montages (`CALM_FACE_CYCLE`, `LAUNCHER_CYCLE`) with stable references |
 | Bot avatar (vendored) | `src/modules/agents/bloub/*`                 | MIT-licensed framework-free bloub engine (upstream, unchanged) + `README.md` credit/license; the pure `engine.sample(t)` the `BloubBot` wrapper renders |
-| Artifacts            | `src/modules/agents/artifacts/*`             | `parseArtifacts` fence splitter, `MessageContent`/`ArtifactCard` rendering, sandboxed `HtmlPreview` + lazy previews (`SpreadsheetEditor`/`DocxPreview`/`PdfPreview`), converters (`csv`, `mdBlocks`, `xlsx`, `docx`, `pdf`), `download` |
+| Artifacts            | `src/modules/agents/artifacts/*`             | `parseArtifacts` fence splitter, `MessageContent`/`ArtifactCard` rendering, sandboxed `HtmlPreview` + lazy previews (`SpreadsheetPreview` / `DocxPreview` / `PdfPreview`), converters (`csv`, `mdBlocks`, `xlsx`, `docx`, `pdf`), `download` |
 | Types               | `src/modules/agents/types.ts`                  | REST and stored-message shapes                    |
 | Federation          | `module-federation.config.ts`                  | Remote name, exposes, and shared library policy   |
 
@@ -289,10 +290,11 @@
   `lastAssistantMessageIsCompleteWithApprovalResponses`) and
   `@ai-sdk/react` (`useChat`), matched to the backend's AI SDK major.
 - Artifact dependencies (root `package.json`, introduced via upstream PR
-  `erxes/erxes#9180`): `@univerjs/presets` + `@univerjs/preset-sheets-core`
-  (editable spreadsheet grid), `docx` (Word generation), plus the
-  already-present `exceljs` (xlsx export), `docx-preview` (Word preview)
-  and `@react-pdf/renderer` (PDF generation).
+  `erxes/erxes#9180`): `docx` (Word generation), `exceljs` (xlsx export),
+  `docx-preview` (Word preview) and `@react-pdf/renderer` (PDF
+  generation). The `@univerjs/presets` + `@univerjs/preset-sheets-core`
+  packages are still installed for back-compat but no longer imported;
+  they can be dropped from `package.json` after a `pnpm install`.
 - `erxes-ui` for `IUIConfig`, navigation items, `Breadcrumb`, `Button`,
   `buttonVariants`, `Sheet`, `AlertDialog`, `Input`, `Label`, `Textarea`,
   `Collapsible`, `Avatar`, `Spinner`, `Badge`, `toast`, and
@@ -822,3 +824,56 @@
   `provider|model` values).
 
 
+
+---
+
+### 2026-09-01 — Spreadsheet preview simplification + minimal artifact chrome
+
+- Replaced the Univer-based `previews/SpreadsheetEditor.tsx` with a
+  read-only `previews/SpreadsheetPreview.tsx` that renders
+  `parseDelimitedTable(content)` as a styled HTML `<table>` (sticky
+  header, 60vh max height, "Empty table" placeholder when the input has
+  no rows). The Univer bundle often rendered as a silent empty grid
+  when its async mount path hiccupped, so a blank card no longer looks
+  like a failure.
+- Simplified `ArtifactCard` chrome: no more outer `bg-muted/20`
+  background, no type icon, no `Spreadsheet`/`Word`/etc. badge, no
+  Expand button. Header is just the artifact title with small Copy /
+  Download icons (`size-7` ghost buttons). HTML/DOCX/PDF previews keep
+  their `320px ⇄ 380px` body height so the iframe still has room; the
+  xlsx preview now sizes to its content.
+- Removed the `ISpreadsheetHandle` / `handleRef` round-trip; the
+  Download path now reads the same parsed rows it always falls back to
+  when the editor never mounted.
+- Dropped the `univer-css.d.ts` shim. `@univerjs/presets` and
+  `@univerjs/preset-sheets-core` are still installed (in `package.json`)
+  for back-compat but no longer imported; remove them from the
+  manifest in a follow-up `pnpm install`.
+
+### 2026-09-01 — Markdown repair: separator row merged onto the header line
+
+- **Summary:** A third pipe-table malformation still rendered as raw `|`
+  text: the assistant merged the separator row onto the END of the header
+  line (`| A | B |---|---|---|`). `isSeparatorLine()` matches only a whole
+  line of dashes/pipes, so the line read as the header and its dashes were
+  counted as extra columns — columnCount became 5 instead of 2 and every
+  data row below was re-chunked into 5-column garbage. `repairTables` now
+  splits a trailing separator run off both header and data lines before the
+  header is measured.
+- **Details:** New `splitTrailingSeparator(line)` returns the real cells
+  plus the separator cells, or `null` when there is no coherent run. The run
+  must be >= 2 cells wide and leave >= 2 real cells, so a single trailing
+  `---` (a literal "no value" cell) is never mistaken for a separator. A
+  merged separator is trusted only when its width matches the header's
+  column count — that preserves alignment markers (`| --- | ---: |`); a
+  mismatched run is discarded and regenerated from the header. `reChunkLine`
+  became `reChunkCells` so header and data lines can both be re-chunked from
+  already-split cells.
+- **Affected areas:**
+  `src/modules/agents/components/markdownRepair.ts` and
+  `src/modules/agents/__tests__/markdownRepair.test.ts` (3 new cases,
+  including the exact screenshot input). `Markdown.tsx` unchanged.
+- **Contracts changed:** None (pure text pre-pass; no GraphQL/REST, `CONFIG`
+  or federation changes, no new dependencies).
+- **Validation:** 64/64 plugin tests pass (was 61), lint clean for the
+  touched files, type-check clean.

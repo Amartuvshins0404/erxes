@@ -1,5 +1,8 @@
 import { cn } from 'erxes-ui';
+import remarkGfm from 'remark-gfm';
 import ReactMarkdown, { type Components } from 'react-markdown';
+
+import { repairTables } from './markdownRepair';
 
 /**
  * Wide markdown tables scroll sideways inside the transcript instead of
@@ -22,8 +25,17 @@ const COMPONENTS: Components = {
  * code, and emphasis; plain text rendering would mangle it. Styled through
  * element selectors because the workspace does not include the Tailwind
  * typography plugin.
+ *
+ * `remark-gfm` is what makes pipe tables render at all — without it the
+ * parser is CommonMark-only and the rows show as literal `|` text. The
+ * `repairTables` pre-pass normalizes the malformed tables the assistant
+ * occasionally emits (missing separator row, several rows collapsed onto
+ * one line); well-formed tables and non-table content pass through
+ * untouched.
  */
 export const Markdown = ({ content }: { content: string }) => {
+  const repaired = repairTables(content);
+
   return (
     <div
       className={[
@@ -45,7 +57,9 @@ export const Markdown = ({ content }: { content: string }) => {
         '[&_td]:border-b [&_td]:py-1.5 [&_td]:pr-3',
       ].join(' ')}
     >
-      <ReactMarkdown components={COMPONENTS}>{content}</ReactMarkdown>
+      <ReactMarkdown components={COMPONENTS} remarkPlugins={[remarkGfm]}>
+        {repaired}
+      </ReactMarkdown>
     </div>
   );
 };

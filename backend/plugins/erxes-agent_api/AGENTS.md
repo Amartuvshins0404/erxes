@@ -6,7 +6,7 @@
 - **Project:** `erxes-agent_api`
 - **Layer:** `Backend API`
 - **Path:** `backend/plugins/erxes-agent_api`
-- **Last synchronized:** `2026-08-31`
+- **Last synchronized:** `2026-09-01`
 
 ## Scope
 
@@ -235,7 +235,7 @@
 | Models      | `src/modules/agents/db`                    | `agentsConnectionSchema` definition and `AgentsConnection` model class |
 | Types       | `src/modules/agents/@types`                | `IAgentsConnectionEntry` and `IAgentsConnectionsDocument`   |
 | tRPC        | `src/trpc`                                  | `appRouter` and outbound plugin clients                   |
-| Container   | `Dockerfile`                                | Two-stage Alpine runtime image for the `docker-build` target |
+| Container   | `Dockerfile`                                | Two-stage Alpine runtime image for the `docker-build` target; installs only the merged shared+plugin production deps, so every runtime import (e.g. `graphql-tag` for `src/apollo/typeDefs.ts`) must be a real dependency in `package.json` |
 
 ## Contracts
 
@@ -649,6 +649,18 @@
 
 <!-- Newest first. Keep at most 10 entries. -->
 
+### `2026-09-01` — Restore `graphql-tag` as a real runtime dependency
+
+- **Summary:** The BYOK rewrite dropped `graphql-tag` from `package.json`
+  while `src/apollo/typeDefs.ts` still imports it; monorepo-wide installs
+  masked the loss via hoisting, but the Docker image installs only the
+  merged shared+plugin production deps, so the `latest` image crashed at
+  boot with `MODULE_NOT_FOUND: graphql-tag` and the Swarm update rolled
+  back. `graphql-tag@^2.12.6` is restored (same fix as oroltsoo in
+  `4700365457`).
+- **Affected areas:** `package.json` (runtime dependency only).
+- **Contracts changed:** None.
+
 ### `2026-08-31` — Serialize `build:packageJson` behind the shared lib build
 
 - **Summary:** The `build:packageJson` target could start compiling the
@@ -818,97 +830,4 @@
 - **Contracts changed:** None (the mutation's signature and types are
   unchanged; only the server-side default resolution for an omitted
   `model`).
-
-### `2026-08-30` — Fix OpenAI chat: native Responses path + real stream errors
-
-- **Summary:** Fixed the OpenAI provider failing every chat turn with the
-  generic "The model failed to generate a response." error.
-  `createModelConfig` had been passing a `url` for every OpenAI-compatible
-  provider, which forced OpenAI through Mastra's generic openai-compatible
-  Chat Completions client — that client maps `maxOutputTokens` to
-  `max_tokens`, a parameter OpenAI's reasoning models (gpt-5 family, e.g.
-  `gpt-5.6-luna`) reject with a 400, and it cannot express
-  `max_completion_tokens`. OpenAI on its default endpoint is now built
-  without `url` so Mastra drives its native OpenAI Responses client (correct
-  `max_output_tokens` mapping, reasoning-model parameter handling,
-  `reasoning.effort` for thinking levels); an explicit custom endpoint
-  keeps the compatible path. Additionally, `pipeAgentStream`'s `onError` no
-  longer swallows the cause: the underlying error is logged server-side and
-  the client receives the provider's readable message (the observed generic
-  text had been this plugin's own mapping, hiding every real failure).
-- **Affected areas:** `src/modules/agents/providers.ts`,
-  `src/routes.ts`, `src/modules/agents/__tests__/providers.test.ts` (+2
-  tests).
-- **Contracts changed:** None (GraphQL/REST contracts unchanged; only the
-  internal Mastra model config for openai and the SSE error-part text on
-  provider failures).
-
-### `2026-08-28` — Multi-provider BYOK, chat model picker source, and thinking levels
-
-- **Summary:** Users can now configure several providers side by side — the
-  connections document holds one `{ provider, model, config: { apiKey } }`
-  entry per provider (legacy single-connection documents are lazily
-  normalized on read and rewritten on write) — managed through the new
-  `agentsConnections` query and `agentsConnectionUpsert(provider, model?,
-  apiKey?)` / `agentsConnectionRemove(provider)` mutations (replacing the
-  singular `agentsConnection`/`agentsConnectionUpdate`/
-  `agentsConnectionRemove`). The chat's model picker is fed by the new
-  `agentsModels` query, which fetches every configured provider's /models
-  endpoint server-side with the stored keys and swallows per-provider
-  failures. `POST /agents/chat` and `POST /agents/approve` accept optional
-  `provider`/`model`/`thinkingLevel` body fields: the provider is validated
-  against the user's stored entries, the model overrides the stored one per
-  turn without persisting it, and the normalized thinking level
-  (`off|minimal|low|medium|high`) maps to per-provider `providerOptions`
-  (openai/xai `reasoningEffort`, kimi-code Anthropic
-  `thinking.budgetTokens` with a raised output-token cap, kimi untouched).
-- **Affected areas:** `src/modules/agents/@types/connection.ts`,
-  `db/definitions/connection.ts`, `db/models/Connection.ts`,
-  `providerModels.ts` (new), `graphql/schemas/connection.ts`,
-  `graphql/resolvers/queries/{connection,models}.ts` (models new),
-  `graphql/resolvers/mutations/connection.ts`, `agent.ts`, `routes.ts`,
-  `src/apollo/resolvers/{queries,mutations}.ts`, `tsconfig.json`
-  (+`@mastra/core/llm/model/provider-options` paths entry for the
-  `ProviderOptions` type),
-  `src/modules/agents/__tests__/connectionResolvers.test.ts`,
-  `src/__tests__/routes.test.ts`.
-- **Contracts changed:** Added GraphQL `agentsConnections`,
-  `agentsModels`, `agentsConnectionUpsert(provider, model?, apiKey?)`,
-  `agentsConnectionRemove(provider)`; removed `agentsConnection`,
-  `agentsConnectionUpdate`, `agentsConnectionRemove` (singular); chat and
-  approve bodies gained optional `provider`/`model`/`thinkingLevel` (approve
-  previously accepted only `threadId`/`approved`/`reason`).
-
-### `2026-08-28` — Renamed plugin `erxes-ai-support` → `erxes-agent`; module `copilot` → `agents`
-
-- **Summary:** Revived the legacy `erxes-agent` plugin name: the plugin
-  directory/project moved to `erxes-agent_api` (port `3306` unchanged), the
-  `copilot` module became `agents` (`src/modules/agents`), and every copilot
-  identifier was renamed — GraphQL types/operations (`AgentsThread*`,
-  `AgentsMessage`, `AgentsConnection`, `agentsThreads`,
-  `agentsThreadDetail`, `agentsThreadRemove`, `agentsConnection{,Update,Remove}`,
-  subscription `agentsThreadsChanged`), REST routes `POST /agents/chat` +
-  `POST /agents/approve`, response header `X-Agents-Thread-Id`, permission
-  actions `showAgents`/`agentsChat` in module `agents`, default groups
-  `erxes-agent:admin`/`erxes-agent:user`, collection
-  `agents_user_connections`, memory sub-db `{db}_agents_memory`, MongoDBStore
-  id `erxes-agent-store`, and tRPC namespace `erxesAgent`. The four GraphQL
-  resolver args interfaces are now exported so `tsc --noEmit` is fully clean
-  (fixed pre-existing TS4023 declaration diagnostics). Renaming the memory
-  sub-db orphans existing dev thread data — accepted, unreleased. The
-  frontend wire contract follows in a separate update.
-- **Affected areas:** entire plugin directory (moved from
-  `backend/plugins/erxes-ai-support_api`), `src/modules/agents/**`,
-  `src/apollo/subscription.ts`, `src/meta/permissions.ts`, `src/routes.ts`,
-  `src/trpc/init-trpc.ts`, project config files, root `.env`
-  `ENABLED_PLUGINS`.
-- **Contracts changed:** All provided GraphQL types/operations renamed
-  `Copilot*`/`copilot*` → `Agents*`/`agents*`; REST `/copilot/chat` →
-  `/agents/chat` and `/copilot/approve` → `/agents/approve`; header
-  `X-Copilot-Thread-Id` → `X-Agents-Thread-Id`; permission actions
-  `showCopilot`/`copilotChat` → `showAgents`/`agentsChat`; groups
-  `erxes-ai-support:{admin,user}` → `erxes-agent:{admin,user}`; collection
-  `copilot_user_connections` → `agents_user_connections`; tRPC namespace
-  `erxesAiSupport` → `erxesAgent`.
-
 

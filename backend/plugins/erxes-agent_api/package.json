@@ -16,6 +16,7 @@
     "@mastra/mongodb": "^1.18.4",
     "@mastra/quickjs": "^0.1.0",
     "ai": "^7.0.83",
-    "erxes-api-shared": "workspace:^"
+    "erxes-api-shared": "workspace:^",
+    "graphql-tag": "^2.12.6"
   }
 }

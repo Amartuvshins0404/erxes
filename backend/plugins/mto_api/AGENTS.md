@@ -29,12 +29,13 @@
 - System config keys including instance ID and selected payments; `mtoMode` / `mtoMasterUrl` / `mtoInstanceId` queries.
 - Slave mode proxies profile GraphQL (`mtoProfiles`, `mtoProfile`, `mtoMyProfile`, create/update/remove) to master; other operations run locally.
 - `mtoMyProfile` returns the instance's primary provider (`instanceId`, oldest first) or the local singleton when `instanceId` is absent.
+- `mtoProfiles` / `mtoProfilesCount` / `mtoProfile` scope by `instanceId` in slave mode, and on master only when `x-onefit-instance-id` is present (slave proxy). Master UI lists every profile.
 
 ## Architecture
 
 | Area | Path | Responsibility |
 | -------- | ---------------------------- | -------------------------- |
-| Runtime | `src/main.ts`, `src/connectionResolvers.ts` | Plugin boot, tenant models, Apollo context |
+| Runtime | `src/main.ts`, `src/connectionResolvers.ts` | Plugin boot, tenant models, Apollo context (`instanceId`, `instanceIdFromHeader`) |
 | Provider | `src/modules/provider` | Provider records, filters, export |
 | Category | `src/modules/category` | Hierarchical categories |
 | Event | `src/modules/event` | Events linked to categories |
@@ -68,15 +69,22 @@
 - Travel association `title.en`/`title.mn` and `foundDate` remain required on create.
 - Slave proxy whitelist is profile operations; do not add travel associations unless slave UI is explicitly enabled.
 - `mtoMyProfile` must not return another instance's provider; without `instanceId` it only matches records with missing/empty `instanceId`.
+- Master `mtoProfiles` must not filter by SaaS config `instanceId`; slave-proxied requests still filter by header `instanceId`.
 
 ## Validation
 
 - `pnpm nx build mto_api`
-- Smoke: `mtoMyProfile` returns the instance profile (or local singleton); first save creates, later saves update; rejected profiles still cannot update
+- Smoke: `mtoMyProfile` returns the instance profile (or local singleton); first save creates, later saves update; rejected profiles still cannot update; master `mtoProfiles` returns all rows unless `x-onefit-instance-id` is set
 
 ## Recent Changes
 
 <!-- Newest first. Keep at most 10 entries. -->
+
+### `2026-09-01` — Master lists all profiles
+
+- **Summary:** `mtoProfiles` / `mtoProfilesCount` / `mtoProfile` no longer filter by SaaS config `instanceId` on master; they still scope by header `instanceId` for slave-proxied requests.
+- **Affected areas:** `src/modules/provider/graphql/resolvers/queries/provider.ts`, `src/main.ts`, `src/connectionResolvers.ts`
+- **Contracts changed:** Master UI `mtoProfiles` returns every tenant profile; slave proxy still receives only its instance
 
 ### `2026-09-01` — Slim profile GraphQL fields
 

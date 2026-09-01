@@ -101,6 +101,7 @@ startPlugin({
     context.models = models;
     context.mode = mode;
     context.instanceId = instanceId; // This will be set from header in master mode
+    context.instanceIdFromHeader = instanceIdFromHeader;
     context.masterClient = masterClient;
     context.masterUrl = masterUrl;
     return context;

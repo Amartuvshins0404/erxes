@@ -24,7 +24,7 @@
 ## Current Capabilities
 
 - Dev port **3008**. Registers with `core-ui` as module `mto`, with navigation group (including registration-type `subGroup`), settings navigation, and relation-widget module `mtocustomer`.
-- Profile page at `/mto/profile` (nav in both modes) loads `mtoMyProfile` and creates or updates the instance profile with RHF + Zod.
+- Profile page at `/mto/profile`: slave mode loads `mtoMyProfile` and creates or updates the instance profile with RHF + Zod; master mode lists all profiles in a `RecordTable` with search/status/active filters, create/edit sheet, and approve/reject/delete.
 - List pages for categories, travel associations, events, and registrations use `PageContainer` + `PageHeader` + `PageSubHeader` with URL-driven `Filter` bars and `RecordTable` (cursor pagination on registrations).
 - Navigation `subGroup` lists FillForm membership types and filters `/mto/registrations?membershipTypeId=...`.
 - Category/travel-association/event create and edit via side `Sheet` forms validated with React Hook Form + Zod.
@@ -42,7 +42,7 @@
 | Category | `src/modules/category` | Category filters, table, form sheet, hooks |
 | Travel association | `src/modules/travelAssociation` | Travel association filters, table, form sheet, hooks |
 | Event | `src/modules/event` | Event filters, table, form sheet, hooks |
-| Profile | `src/modules/profile` | Instance profile form, GraphQL documents, save hooks |
+| Profile | `src/modules/profile` | Slave instance form; master profiles list/table/sheet; GraphQL documents and hooks |
 | Registration | `src/modules/registration` | Filters, cursor table, detail/create sheets, schema builder utils |
 | Config/settings | `src/modules/config`, `src/modules/Settings.tsx` | Instance ID, payments, upload config |
 | Upload | `src/components/MtoUpload.tsx` | Shared image upload primitive |
@@ -56,7 +56,7 @@
 
 ### Consumes
 
-- `mto_api` GraphQL operations prefixed `mto*` / `cpMto*` (categories, travel associations, events, profile `mtoMyProfile` / `mtoProfileCreate` / `mtoProfileUpdate`, registration applications/schemas, config).
+- `mto_api` GraphQL operations prefixed `mto*` / `cpMto*` (categories, travel associations, events, profile `mtoProfiles` / `mtoProfile` / `mtoMyProfile` / `mtoProfileCreate` / `mtoProfileUpdate` / `mtoProfileApprove` / `mtoProfileReject` / `mtoProfilesRemove`, registration applications/schemas, config).
 - Public `erxes-ui` and `ui-modules` UI/hooks only; no direct `@radix-ui/*` imports.
 
 ## Data and State
@@ -64,24 +64,38 @@
 - Apollo Client for server state; list filters live in URL query params (`useMultiQueryState` / `useNonNullMultiQueryState`).
 - Jotai for registration detail sheet open id and registrations total count chip.
 - React Hook Form + Zod for category/travel-association/event sheets and the profile form; registration answer forms use RHF without Zod schemas.
+- Master profile list filters live in URL query params (`searchValue`, `status`, `isActive`) and share `PROFILES_CURSOR_SESSION_KEY` with cursor pagination. `mtoProfiles` limit is 1–100.
 
 ## Local Invariants
 
 - Plugin changes stay inside `frontend/private-plugins/mto_ui/**`.
 - List filters must stay URL-driven and share `REGISTRATIONS_CURSOR_SESSION_KEY` with registrations cursor pagination.
 - Do not reintroduce `MtoPageLayout` / `MtoListPageLayout` / `MtoFilterBase`; compose `PageContainer` + `PageHeader` + `Filter` like Block Offers/Payments.
-- Slave-mode routes must continue to hide events/categories/travel-associations/fillform and require instance ID; Profile remains visible in both modes.
+- Slave-mode routes must continue to hide events/categories/travel-associations/fillform and require instance ID.
+- Profile remains visible in both modes. Slave `/mto/profile` is the instance self-edit form (`mtoMyProfile`). Master `/mto/profile` lists every profile via `mtoProfiles` and must not use `mtoMyProfile` for that list.
 - Profile must create when `mtoMyProfile` is empty and update the existing record otherwise; rejected profiles stay read-only.
 - Relation widget `mtocustomer` remains a stub unless explicitly implemented; do not add relation-widget side tabs without a real widget.
 
 ## Validation
 
 - `pnpm nx build mto_ui`
-- Smoke: open `/mto/profile` → fill bilingual name and contact → save → reload still shows values; rejected profile cannot save
+- Smoke: slave `/mto/profile` create/update; master `/mto/profile` lists all profiles and can edit/approve/delete
 
 ## Recent Changes
 
 <!-- Newest first. Keep at most 10 entries. -->
+
+### `2026-09-01` — Profile list page size
+
+- **Summary:** Master profile list uses `limit: 100` (API max) with RecordTable cursor pagination instead of an invalid 200-row request.
+- **Affected areas:** `src/modules/profile`
+- **Contracts changed:** `MtoProfiles` now requests `pageInfo` and pages with `limit` 1–100
+
+### `2026-09-01` — Master profile list
+
+- **Summary:** Master `/mto/profile` is a RecordTable of all profiles with filters, create/edit sheet, and approve/reject/delete; slave still uses the self-service form.
+- **Affected areas:** `src/modules/profile`, `src/pages/ProfilePage.tsx`
+- **Contracts changed:** Consumes `mtoProfiles`, `mtoProfile`, `mtoProfileApprove`, `mtoProfileReject`, and `mtoProfilesRemove` on master
 
 ### `2026-09-01` — Slim profile form
 

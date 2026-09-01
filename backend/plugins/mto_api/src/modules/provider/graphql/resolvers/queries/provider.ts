@@ -5,6 +5,7 @@ import {
   markResolvers,
 } from 'erxes-api-shared/utils';
 import { IContext } from '~/connectionResolvers';
+import { isSlaveMode } from '~/constants/mode';
 
 export interface IProviderQueryParams extends ICursorPaginateParams {
   searchValue?: string;
@@ -74,15 +75,23 @@ const generateFilter = async (
   return filter;
 };
 
+const scopedInstanceId = (context: IContext): string | undefined => {
+  if (isSlaveMode()) {
+    return context.instanceId;
+  }
+
+  return context.instanceIdFromHeader;
+};
+
 export const providerQueries: Record<string, Resolver> = {
   async mtoProfiles(
     _root: undefined,
     params: IProviderQueryParams,
     context: IContext,
   ) {
-    const { models, instanceId } = context;
+    const { models } = context;
 
-    const filter = await generateFilter(params, instanceId);
+    const filter = await generateFilter(params, scopedInstanceId(context));
 
     return await cursorPaginate({
       model: models.Provider,
@@ -96,9 +105,9 @@ export const providerQueries: Record<string, Resolver> = {
     params: IProviderQueryParams,
     context: IContext,
   ) {
-    const { models, instanceId } = context;
+    const { models } = context;
 
-    const filter = await generateFilter(params, instanceId);
+    const filter = await generateFilter(params, scopedInstanceId(context));
     return models.Provider.find(filter).countDocuments();
   },
 
@@ -107,7 +116,8 @@ export const providerQueries: Record<string, Resolver> = {
     { _id }: { _id: string },
     context: IContext,
   ) {
-    const { models, instanceId } = context;
+    const { models } = context;
+    const instanceId = scopedInstanceId(context);
 
     const provider = await models.Provider.findOne({ _id });
     if (provider && instanceId && provider.instanceId !== instanceId) {

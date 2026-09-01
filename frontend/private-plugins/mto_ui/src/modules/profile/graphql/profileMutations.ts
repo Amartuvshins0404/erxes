@@ -48,3 +48,35 @@ export const MTO_PROFILE_UPDATE = gql`
   }
   ${MTO_PROFILE_FIELDS}
 `;
+
+export const MTO_PROFILE_APPROVE = gql`
+  mutation MtoProfileApprove($_id: String!, $approvedBy: String!) {
+    mtoProfileApprove(_id: $_id, approvedBy: $approvedBy) {
+      ...MtoProfileFields
+    }
+  }
+  ${MTO_PROFILE_FIELDS}
+`;
+
+export const MTO_PROFILE_REJECT = gql`
+  mutation MtoProfileReject(
+    $_id: String!
+    $rejectionReason: String!
+    $rejectedBy: String!
+  ) {
+    mtoProfileReject(
+      _id: $_id
+      rejectionReason: $rejectionReason
+      rejectedBy: $rejectedBy
+    ) {
+      ...MtoProfileFields
+    }
+  }
+  ${MTO_PROFILE_FIELDS}
+`;
+
+export const MTO_PROFILES_REMOVE = gql`
+  mutation MtoProfilesRemove($ids: [String]!) {
+    mtoProfilesRemove(ids: $ids)
+  }
+`;

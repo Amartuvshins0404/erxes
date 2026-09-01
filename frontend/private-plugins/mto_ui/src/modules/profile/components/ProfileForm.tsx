@@ -19,6 +19,7 @@ import {
   profileFormSchema,
 } from '@/profile/constants/profileSchema';
 import { useMyProfile } from '@/profile/hooks/useMyProfile';
+import { useProfile } from '@/profile/hooks/useProfile';
 import { useSaveProfile } from '@/profile/hooks/useSaveProfile';
 import {
   MtoProfile,
@@ -94,8 +95,24 @@ const toMutationVariables = (
   };
 };
 
-export function ProfileForm() {
-  const { profile, loading: profileLoading } = useMyProfile();
+export interface ProfileFormProps {
+  profileId?: string | null;
+  source?: 'my' | 'id';
+  layout?: 'page' | 'sheet';
+  onSaved?: () => void;
+}
+
+export function ProfileForm({
+  profileId,
+  source = 'my',
+  layout = 'page',
+  onSaved,
+}: ProfileFormProps) {
+  const myProfile = useMyProfile(source !== 'my');
+  const byId = useProfile(source === 'id' ? profileId : undefined);
+  const profile = source === 'id' ? byId.profile : myProfile.profile;
+  const profileLoading =
+    source === 'id' ? Boolean(profileId) && byId.loading : myProfile.loading;
   const { saveProfile, loading: saving } = useSaveProfile();
   const { uploadUrl } = useUploadConfig();
 
@@ -120,6 +137,7 @@ export function ProfileForm() {
         title: 'Saved',
         description: profile?._id ? 'Profile updated' : 'Profile created',
       });
+      onSaved?.();
     } catch (err) {
       toast({
         title: 'Error',
@@ -143,9 +161,21 @@ export function ProfileForm() {
   }
 
   return (
-    <div className="flex flex-col gap-6 mx-auto p-6 w-full max-w-6xl">
+    <div
+      className={
+        layout === 'sheet'
+          ? 'flex flex-col gap-6 w-full p-5'
+          : 'flex flex-col gap-6 mx-auto p-6 w-full max-w-6xl'
+      }
+    >
       <div className="flex justify-between items-center">
-        <h1 className="font-bold text-lg">Profile</h1>
+        {layout === 'page' ? (
+          <h1 className="font-bold text-lg">Profile</h1>
+        ) : (
+          <span className="font-medium text-sm text-muted-foreground">
+            {profile?._id ? 'Edit profile' : 'New profile'}
+          </span>
+        )}
         <Badge variant={statusVariant(profile?.status)}>
           {profile?.status || 'new'}
         </Badge>

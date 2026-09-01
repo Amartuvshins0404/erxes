@@ -71,7 +71,7 @@ startPlugin({
     if (mode === 'master') {
       // until app token is implemented
       redis.set(
-        `user_token_s68ZFqvF1hm-FqufRFcFD_${getMtoSecret()}`,
+        `user_token_BMJzRbQHe72awKM7Kb4vO_${getMtoSecret()}`,
         1,
         'EX',
         24 * 60 * 60,

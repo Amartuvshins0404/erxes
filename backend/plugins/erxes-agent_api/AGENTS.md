@@ -649,16 +649,18 @@
 
 <!-- Newest first. Keep at most 10 entries. -->
 
-### `2026-09-01` — Restore `graphql-tag` as a real runtime dependency
+### `2026-09-01` — Restore `graphql-tag` and `jsonwebtoken` as real runtime dependencies
 
-- **Summary:** The BYOK rewrite dropped `graphql-tag` from `package.json`
-  while `src/apollo/typeDefs.ts` still imports it; monorepo-wide installs
-  masked the loss via hoisting, but the Docker image installs only the
-  merged shared+plugin production deps, so the `latest` image crashed at
-  boot with `MODULE_NOT_FOUND: graphql-tag` and the Swarm update rolled
-  back. `graphql-tag@^2.12.6` is restored (same fix as oroltsoo in
+- **Summary:** The BYOK rewrite dropped `graphql-tag` and `jsonwebtoken`
+  from `package.json` while `src/apollo/typeDefs.ts` (graphql-tag) and the
+  cfos `CfOsConnectCode` model (jsonwebtoken) still import them; monorepo
+  installs masked the loss via hoisting, but the Docker image installs
+  only the merged shared+plugin production deps, so the `latest` image
+  crashed at boot with `MODULE_NOT_FOUND` and Swarm updates rolled back.
+  `graphql-tag@^2.12.6` and `jsonwebtoken@^9.0.2` (+ dev-only
+  `@types/jsonwebtoken`) are restored (same fix as oroltsoo in
   `4700365457`).
-- **Affected areas:** `package.json` (runtime dependency only).
+- **Affected areas:** `package.json` (runtime dependencies only).
 - **Contracts changed:** None.
 
 ### `2026-08-31` — Serialize `build:packageJson` behind the shared lib build

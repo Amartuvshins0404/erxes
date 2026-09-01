@@ -147,12 +147,13 @@
   surfaces to the UI as a `data-tool-call-suspended` SSE part carrying the
   questions. `POST /agents/answer`
   (`{ threadId, answer, provider?, model?, thinkingLevel? }` → SSE)
-  persists the answer as a real user message (`memory.saveMessages`,
-  formatted exactly like the UI bubble: ', ' inside a multi-select, ' · '
-  between questions) and then resumes the run via
-  `agent.resumeStream(answer)` scoped to the newest suspended non-approval
-  tool call, so the model continues with the user's answers and the
-  transcript keeps the answer across reloads. `answer` is a string (single
+  resumes the run via `agent.resumeStream(answer)` scoped to the newest
+  suspended non-approval tool call, so the model continues with the user's
+  answers; the answer is persisted ONLY as the ask_user tool result inside
+  the resumed assistant message — never as its own user message — and the
+  UI renders it as the answered Q&A card (questions from the tool input,
+  answers from the tool result, which is exactly what survives reloads).
+  `answer` is a string (single
   free-text/single-select), a string array (one multi-select question), or
   one entry per question positionally (each a string or string array); the
   tool normalizes every shape into per-question text for the model.
@@ -647,6 +648,29 @@
 ## Recent Changes
 
 <!-- Newest first. Keep at most 10 entries. -->
+
+### `2026-08-31` — Serialize `build:packageJson` behind the shared lib build
+
+- **Summary:** The `build:packageJson` target could start compiling the
+  plugin while `erxes-api-shared:build` (preconstruct) was still rewriting
+  the shared dist, racing on the generated declaration chain and failing
+  the build with spurious TS2305/TS2307 errors; the target now depends on
+  `^build`.
+- **Affected areas:** `project.json` (`build:packageJson.dependsOn`).
+- **Contracts changed:** None (build orchestration only).
+
+### `2026-08-31` — Answer resume no longer stores a duplicate user message
+
+- **Summary:** `POST /agents/answer` resumes the suspended ask_user run
+  without first saving the answer as its own user message: the answer
+  already survives inside the ask_user tool result of the resumed assistant
+  message, and the UI now renders it as the answered Q&A card instead of a
+  user bubble — the extra message duplicated model context and the stored
+  transcript.
+- **Affected areas:** `src/routes.ts` (`/agents/answer`),
+  `src/__tests__/routes.test.ts`.
+- **Contracts changed:** None (same endpoint, payload, and resume
+  behavior; only the persisted-message side effect was removed).
 
 ### `2026-08-31` — Artifact fence convention in the fixed agent instructions
 

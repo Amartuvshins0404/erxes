@@ -11,10 +11,16 @@ import { useState } from 'react';
 
 import { ApprovalPrompt } from './ApprovalPrompt';
 import {
+  AskUserAnswered,
   AskUserPrompt,
   type IAskUserQuestionEntry,
   type IAskUserQuestionGroup,
 } from './AskUserPrompt';
+import {
+  readAskUserAnswers,
+  readAskUserQuestionsFromInput,
+  type IAskUserAnswerEntry,
+} from '../askUserAnswers';
 import { MessageContent } from '../artifacts/MessageContent';
 import type { IToolCallView } from './ToolCallCard';
 
@@ -103,51 +109,67 @@ const readAskUserQuestions = (
     return null;
   }
 
-  const payload = data.suspendPayload;
-
-  if (!payload) {
+  if (!data.suspendPayload) {
     return null;
   }
 
-  const raw = (
-    Array.isArray(payload.questions) && payload.questions.length
-      ? payload.questions
-      : [payload]
-  ) as Record<string, unknown>[];
-
-  const questions: IAskUserQuestionEntry[] = [];
-
-  for (const entry of raw) {
-    if (typeof entry.question !== 'string' || !entry.question) {
-      continue;
-    }
-
-    const options = Array.isArray(entry.options)
-      ? entry.options.filter(
-          (option): option is { label: string; description?: string } =>
-            typeof option === 'object' &&
-            option !== null &&
-            typeof (option as { label?: unknown }).label === 'string',
-        )
-      : undefined;
-
-    questions.push({
-      question: entry.question,
-      ...(options?.length ? { options } : {}),
-      ...(entry.selectionMode === 'multi_select'
-        ? { selectionMode: 'multi_select' as const }
-        : {}),
-    });
-  }
+  const questions = readAskUserQuestionsFromInput(data.suspendPayload);
 
   return questions.length ? { questions } : null;
 };
 
 /**
+ * Extracts the answered Q&A pairs from an askUser tool part in its
+ * `output-available` state — the settled card that replaces the suspension
+ * prompt and survives reloads (the questions live in the tool input, the
+ * answers in the tool result). Returns null for every other tool or an
+ * unparseable result.
+ */
+const readAskUserAnswerCard = (part: MessagePart): IAskUserAnswerEntry[] | null => {
+  if (!isToolUIPart(part) || part.state !== 'output-available') {
+    return null;
+  }
+
+  const toolName =
+    'toolName' in part ? part.toolName : part.type.slice('tool-'.length);
+
+  if (!/^ask_?user$/i.test(toolName)) {
+    return null;
+  }
+
+  const questions = readAskUserQuestionsFromInput(part.input);
+
+  if (!questions.length) {
+    return null;
+  }
+
+  return readAskUserAnswers(questions, 'output' in part ? part.output : undefined);
+};
+
+/**
+ * Message-level variant: the answered Q&A pairs of the message's settled
+ * askUser tool part, or null when there is none. The transcript uses this to
+ * detect the ask_user turn a following answer bubble belongs to.
+ */
+export const readMessageAskUserAnswerCard = (
+  message: UIMessage,
+): IAskUserAnswerEntry[] | null => {
+  for (const part of message.parts) {
+    const card = readAskUserAnswerCard(part);
+
+    if (card) {
+      return card;
+    }
+  }
+
+  return null;
+};
+
+/**
  * Whether an assistant message renders anything at all: text, reasoning, an
- * approval prompt, or an unanswered ask_user card. The transcript skips
- * messages without any of these so answered interruptions never leave
- * empty avatar-only rows behind.
+ * approval prompt, an unanswered ask_user card, or an answered ask_user
+ * Q&A card. The transcript skips messages without any of these so answered
+ * interruptions never leave empty avatar-only rows behind.
  */
 export const hasVisibleParts = (
   parts: MessagePart[],
@@ -163,7 +185,10 @@ export const hasVisibleParts = (
     }
 
     if (isToolUIPart(part)) {
-      return part.state === 'approval-requested';
+      return (
+        part.state === 'approval-requested' ||
+        readAskUserAnswerCard(part) !== null
+      );
     }
 
     if (isDataUIPart(part)) {
@@ -184,9 +209,10 @@ export const hasVisibleParts = (
   });
 
 /**
- * Renders one UIMessage part according to its type. Tool parts surface only
- * the destructive-action approval prompt; data parts surface the ask_user
- * question; all other tool states stay hidden in the transcript.
+ * Renders one UIMessage part according to its type. Tool parts surface the
+ * destructive-action approval prompt and the settled ask_user Q&A card;
+ * data parts surface the pending ask_user questions; all other tool states
+ * stay hidden in the transcript.
  */
 export const MessagePartRenderer = ({
   part,
@@ -214,6 +240,14 @@ export const MessagePartRenderer = ({
   }
 
   if (isToolUIPart(part)) {
+    // A resolved ask_user call renders the answered Q&A card — it replaces
+    // the suspension prompt and keeps the answer visible after reloads.
+    const answerCard = readAskUserAnswerCard(part);
+
+    if (answerCard) {
+      return <AskUserAnswered answers={answerCard} />;
+    }
+
     if (part.state !== 'approval-requested') {
       return null;
     }

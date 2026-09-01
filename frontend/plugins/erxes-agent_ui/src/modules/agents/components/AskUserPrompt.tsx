@@ -1,7 +1,8 @@
-import { IconMessageQuestion } from '@tabler/icons-react';
+import { IconCheck, IconMessageQuestion } from '@tabler/icons-react';
 import { Button } from 'erxes-ui';
 import { useState } from 'react';
 
+import type { IAskUserAnswerEntry } from '../askUserAnswers';
 import { ChatInput } from './ChatInput';
 
 export interface IAskUserQuestionEntry {
@@ -220,3 +221,28 @@ export const AskUserPrompt = ({
     </div>
   );
 };
+
+/**
+ * Settled state of the same card: each question with the answer the user
+ * gave, rendered from the askUser tool part so it survives reloads. The
+ * answers themselves never appear as user bubbles.
+ */
+export const AskUserAnswered = ({ answers }: { answers: IAskUserAnswerEntry[] }) => (
+  <div className="my-1 rounded-xl border bg-primary/5 p-3 text-foreground">
+    <p className="flex items-center gap-1.5 text-sm font-medium">
+      <IconCheck className="size-4 shrink-0 text-primary" />
+      {answers.length === 1 ? 'Question answered' : 'Questions answered'}
+    </p>
+
+    {answers.map((entry, index) => (
+      <div key={index} className={index > 0 ? 'mt-3' : 'mt-2'}>
+        <p className="text-[13px] text-muted-foreground md:text-sm">
+          {entry.question}
+        </p>
+        <p className="mt-0.5 whitespace-pre-wrap break-words text-[15px] font-medium leading-relaxed md:text-[17px]">
+          {entry.answer}
+        </p>
+      </div>
+    ))}
+  </div>
+);

@@ -21,6 +21,7 @@
     },
     "build:packageJson": {
       "executor": "@nx/js:tsc",
+      "dependsOn": ["^build"],
       "options": {
         "main": "backend/plugins/erxes-agent_api/dist/src/main.js",
         "tsConfig": "backend/plugins/erxes-agent_api/tsconfig.build.json",

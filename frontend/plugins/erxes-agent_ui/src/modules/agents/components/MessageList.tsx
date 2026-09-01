@@ -1,10 +1,15 @@
-import { isToolUIPart, type UIMessage } from 'ai';
+import { isTextUIPart, isToolUIPart, type UIMessage } from 'ai';
 import { ScrollArea } from 'erxes-ui';
 import { Fragment, useEffect, useRef } from 'react';
 
 import { MESSAGE_AVATAR_SHUFFLE_POOL } from '../botCycles';
+import { formatAskUserAnswers } from '../askUserAnswers';
 import { BloubBot } from './BloubBot';
-import { hasVisibleParts, MessagePartRenderer } from './MessagePart';
+import {
+  hasVisibleParts,
+  MessagePartRenderer,
+  readMessageAskUserAnswerCard,
+} from './MessagePart';
 
 export interface IMessageListProps {
   messages: UIMessage[];
@@ -86,6 +91,29 @@ const hasPendingAskUser = (
       !answeredToolCallIds.has(data.toolCallId)
     );
   });
+
+/**
+ * Ask_user answers travel through the send pipeline as user messages (the
+ * transport reroutes them to the answer endpoint), but they display as the
+ * assistant's answered Q&A card — never as a bubble of their own. The send
+ * marks them with `metadata.agentsAnswer`.
+ */
+const isAgentsAnswerTurn = (message: UIMessage): boolean => {
+  const { metadata } = message;
+
+  return (
+    !!metadata &&
+    typeof metadata === 'object' &&
+    !Array.isArray(metadata) &&
+    (metadata as { agentsAnswer?: unknown }).agentsAnswer === true
+  );
+};
+
+const getMessageText = (message: UIMessage): string =>
+  message.parts
+    .filter(isTextUIPart)
+    .map((part) => part.text)
+    .join('');
 
 /**
  * Scrollable transcript. Follows the inbox ScrollArea viewport pattern:
@@ -174,6 +202,30 @@ export const MessageList = ({
       <ScrollArea.Viewport ref={viewportRef} onScroll={handleScroll}>
         <div className="mx-auto w-full max-w-2xl space-y-4 px-3 py-4 sm:space-y-6 sm:px-4 sm:py-6 md:max-w-3xl">
         {messages.map((message, index) => {
+          if (message.role === 'user' && isAgentsAnswerTurn(message)) {
+            return null;
+          }
+
+          // Answer turns from before the backend stopped storing them as
+          // their own user message have no marker in history. The answered
+          // Q&A card on the ask_user assistant message right above already
+          // carries the answers, so hide a directly following bubble whose
+          // text is exactly what those answers format back to.
+          if (
+            message.role === 'user' &&
+            index > 0 &&
+            messages[index - 1]!.role === 'assistant'
+          ) {
+            const answerCard = readMessageAskUserAnswerCard(messages[index - 1]!);
+
+            if (
+              answerCard &&
+              getMessageText(message) === formatAskUserAnswers(answerCard)
+            ) {
+              return null;
+            }
+          }
+
           const createdAt = getMessageCreatedAt(message);
           const previousCreatedAt =
             index > 0 ? getMessageCreatedAt(messages[index - 1]) : null;

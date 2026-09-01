@@ -128,8 +128,21 @@
   would find no matching tool part and the whole stream would be discarded).
   The transport's chunk filter drops ONLY chunks tagged with the suspended
   tool call id; the resumed run's own tool inputs/outputs flow through so
-  code-mode iterations and other tool activity stay visible. The backend
-  persists the answer server-side, so the bubble survives reloads.
+  code-mode iterations and other tool activity stay visible. Once answered,
+  the askUser tool part (`output-available`) renders an `AskUserAnswered`
+  Q&A card — each question with the answer beneath it — built by
+  `src/modules/agents/askUserAnswers.ts` from the tool input (questions)
+  and the tool result (answers: the structured `answers` array the live
+  patch writes, or the stored `User answered:\n<q>: <a>` content). The
+  card replaces the suspension prompt and survives reloads; answers are
+  never rendered as user bubbles — the send marks its user message with
+  `metadata.agentsAnswer`, which `MessageList` filters out of display
+  (the backend no longer stores the answer as a user message either).
+  Legacy threads that DID store the answer as a user message are covered
+  display-side: `MessageList` hides a user bubble that directly follows
+  the ask_user assistant message when its text exactly equals
+  `formatAskUserAnswers(...)` of the parsed card answers (the ', '- and
+  ' · '-joined legacy format).
 - Loads stored threads and thread messages over GraphQL and maps them to AI
   SDK `UIMessage`s for rendering; the thread list refreshes itself through
   the `agentsThreadsChanged` subscription (debounced refetch).
@@ -616,6 +629,29 @@
 
 <!-- Newest first. Keep at most 10 entries. -->
 
+### `2026-08-31` — ask_user answers as an answered Q&A card
+
+- **Summary:** Answering an ask_user prompt used to surface as a plain user
+  bubble ("Bar chart · HTML preview") while the question card vanished on
+  reload. The settled askUser tool part (`output-available`) now renders an
+  `AskUserAnswered` card — each question with the answer beneath it — via
+  the new `askUserAnswers.ts` parser, which pairs the questions from the
+  tool input with the answers from the tool result (the structured array
+  the live patch writes, or the stored `User answered:\n<q>: <a>` content,
+  so history threads render too). The answer turn is marked
+  `metadata.agentsAnswer` and filtered out of the transcript, and the
+  backend no longer stores the answer as a user message (companion backend
+  change), so nothing renders twice. Answer bubbles that legacy threads
+  DID store are hidden display-side when a user message directly follows
+  the ask_user assistant message and its text exactly matches
+  `formatAskUserAnswers` of the card's parsed answers.
+- **Affected areas:** `src/modules/agents/askUserAnswers.ts` (new) +
+  `__tests__/askUserAnswers.test.ts` (new),
+  `src/modules/agents/components/{AskUserPrompt, MessagePart,
+  MessageList}.tsx`, `src/modules/agents/hooks/useAgentsChat.ts`.
+- **Contracts changed:** None (same `POST /agents/answer` payload; the
+  answer turn now carries `metadata.agentsAnswer`).
+
 ### `2026-08-31` — Responsive chat surface for every device
 
 - **Summary:** The chat was built around a permanent 256px thread sidebar
@@ -784,21 +820,5 @@
   `src/modules/agents/components/{ModelPicker, ProviderPicker}.tsx`.
 - **Contracts changed:** None (same props, `__auto__` sentinel and
   `provider|model` values).
-
-### `2026-08-31` — BYOK settings redesign with provider icons
-
-- **Summary:** Redesigned the settings connection form around the new
-  `ProviderIcon` component (inline brand marks: OpenAI from simple-icons
-  CC0, xAI + Kimi from svgl.app; Kimi Code is the Kimi mark plus a code
-  badge): provider cards lead with a 36px mark and gain a primary check
-  badge when selected, configured-provider rows show the mark, the
-  provider description and the relative updated time, the empty state got
-  an icon-led dashed block, the remove dialog title carries the mark, and
-  the page widened to `max-w-2xl`.
-- **Affected areas:**
-  `src/modules/agents/components/{ProviderIcon (new), ProviderPicker}.tsx`,
-  `src/pages/settings/SettingsConnectionPage.tsx`.
-- **Contracts changed:** None (same queries/mutations; layout and
-  presentation only).
 
 

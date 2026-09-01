@@ -7,7 +7,7 @@ import {
   EMPTY_LISTING_STATS,
   generateFilter,
 } from '@/listing/utils';
-import { resolveAgentKeys } from '@/member/utils';
+import { resolveAgencyKeys, resolveAgentKeys } from '@/member/utils';
 import { EMPTY_CURSOR_LIST } from '~/utils';
 import { FilterQuery } from 'mongoose';
 
@@ -17,38 +17,66 @@ export interface ListingQueryParams {
   searchValue?: string;
   city?: string;
   district?: string;
+  /** Block admin `BlockAdminAgency._id` of the owning agency. */
+  agencyId?: string;
   /** Block admin `BlockAdminAgent._id` of the owning agent. */
   agencyMemberId?: string;
 }
 
-/**
- * Listings store the agency-side member id, so a block admin agent `_id` is
- * translated first. Returns `null` when the agent is unknown, which callers
- * must treat as "no listings" rather than as "no filter".
- */
+
+const resolveListingScope = async (
+  models: IModels,
+  { agencyId, agencyMemberId }: ListingQueryParams,
+): Promise<{ subdomain?: string; memberEntityId?: string } | null> => {
+  const scope: { subdomain?: string; memberEntityId?: string } = {};
+
+  if (agencyId) {
+    const keys = await resolveAgencyKeys(models, agencyId);
+
+    if (!keys) {
+      return null;
+    }
+
+    scope.subdomain = keys.subdomain;
+  }
+
+  if (agencyMemberId) {
+    const keys = await resolveAgentKeys(models, agencyMemberId);
+
+    if (!keys || (scope.subdomain && scope.subdomain !== keys.subdomain)) {
+      return null;
+    }
+
+    scope.subdomain = keys.subdomain;
+    scope.memberEntityId = keys.entityId;
+  }
+
+  return scope;
+};
+
 const buildListingFilter = async (
   models: IModels,
-  { agencyMemberId, ...params }: ListingQueryParams,
+  { agencyId, agencyMemberId, ...params }: ListingQueryParams,
 ): Promise<FilterQuery<IBlockAdminListingDocument> | null> => {
-  if (!agencyMemberId) {
+  if (!agencyId && !agencyMemberId) {
     return generateFilter(params);
   }
 
-  const keys = await resolveAgentKeys(models, agencyMemberId);
+  const scope = await resolveListingScope(models, { agencyId, agencyMemberId });
 
-  if (!keys) {
+  if (!scope) {
     return null;
   }
 
   return generateFilter({
     ...params,
-    subdomain: params.subdomain || keys.subdomain,
-    agencyMemberId: keys.entityId,
+    subdomain: params.subdomain || scope.subdomain,
+    agencyMemberId: scope.memberEntityId,
   });
 };
 
 export const listingQueries = {
-  getBlockAdminListing: async (
+  getBlockAdminAgencyListing: async (
     _root: undefined,
     { _id }: { _id: string },
     { models }: IContext,
@@ -58,7 +86,7 @@ export const listingQueries = {
     return listing;
   },
 
-  getBlockAdminListings: async (
+  getBlockAdminAgencyListings: async (
     _root: undefined,
     params: ListingQueryParams & ICursorPaginateParams,
     { models }: IContext,
@@ -79,13 +107,14 @@ export const listingQueries = {
     return { list, pageInfo, totalCount };
   },
 
-  getBlockAdminListingStats: async (
+  getBlockAdminAgencyListingStats: async (
     _root: undefined,
-    { subdomain, agencyMemberId }: ListingQueryParams,
+    { subdomain, agencyId, agencyMemberId }: ListingQueryParams,
     { models }: IContext,
   ) => {
     const filter = await buildListingFilter(models, {
       subdomain,
+      agencyId,
       agencyMemberId,
     });
 

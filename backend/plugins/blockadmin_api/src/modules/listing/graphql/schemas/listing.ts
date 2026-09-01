@@ -74,6 +74,7 @@ export const types = `
 
 const queryParams = `
   subdomain: String
+  agencyId: String
   agencyMemberId: String
   status: String
   searchValue: String
@@ -84,12 +85,12 @@ const queryParams = `
 `;
 
 export const queries = `
-  getBlockAdminListings(${queryParams}): BlockAdminListingListResponse
-  getBlockAdminListingStats(subdomain: String, agencyMemberId: String): BlockAdminListingStats
-  getBlockAdminListing(_id: String!): BlockAdminListing
+  getBlockAdminAgencyListings(${queryParams}): BlockAdminListingListResponse
+  getBlockAdminAgencyListingStats(subdomain: String, agencyId: String, agencyMemberId: String): BlockAdminListingStats
+  getBlockAdminAgencyListing(_id: String!): BlockAdminListing
 `;
 
 export const mutations = `
-  blockAdminUpdateListingStatus(_id: String!, input: BlockAdminListingStatusInput!): BlockAdminListing
-  blockAdminRemoveListing(_id: String!): BlockAdminListing
+  blockAdminUpdateAgencyListingStatus(_id: String!, input: BlockAdminListingStatusInput!): BlockAdminListing
+  blockAdminRemoveAgencyListing(_id: String!): BlockAdminListing
 `;

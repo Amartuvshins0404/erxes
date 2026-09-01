@@ -58,6 +58,7 @@ export interface AdminListingFilter {
   subdomain?: string;
   searchValue?: string;
   status?: string;
+  agencyId?: string;
   city?: string;
   district?: string;
 }

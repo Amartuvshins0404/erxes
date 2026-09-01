@@ -53,7 +53,7 @@ export const cpAgencyQueries = {
     );
   },
 
-  cpBlockAdminAgentInfo: async (
+  cpBlockAdminAgencyAgentInfo: async (
     _root: undefined,
     { _id }: { _id: string },
     { models }: IContext,
@@ -71,7 +71,7 @@ export const cpAgencyQueries = {
    * `agencyId` is the client-portal agency `_id`; agents are stored against the
    * agency-side ids, so it is translated before filtering.
    */
-  cpBlockAdminAgents: async (
+  cpBlockAdminAgencyAgents: async (
     _root: undefined,
     params: { agencyId?: string } & Omit<AgentQueryParams, 'agencyId'> &
       IOffsetPaginateParams,

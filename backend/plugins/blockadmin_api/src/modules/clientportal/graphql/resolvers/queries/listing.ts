@@ -10,11 +10,7 @@ import { markResolvers, paginate } from 'erxes-api-shared/utils';
 import { FilterQuery } from 'mongoose';
 import { IContext, IModels } from '~/connectionResolvers';
 
-/**
- * The client portal only ever sees published listings; drafts and inactive
- * records stay admin-side. Sold listings stay visible so agent profiles can
- * show their track record.
- */
+
 const PUBLIC_LISTING_STATUS = 'active';
 const PUBLIC_LISTING_STATUSES = ['active', 'sold'];
 
@@ -30,12 +26,7 @@ export interface CpListingQueryParams {
   district?: string;
 }
 
-/**
- * Listings are keyed to their agency by `subdomain` and to their agent by the
- * agency-side member id, so client-portal ids have to be resolved first.
- * Returns `null` when the agency or agent does not exist, which callers must
- * treat as "no listings" rather than as "no filter".
- */
+
 const resolveScope = async (
   models: IModels,
   { agencyId, agencyMemberId }: CpListingQueryParams,
@@ -78,8 +69,7 @@ const buildPublicFilter = async (
     return null;
   }
 
-  // A requested status is honored only when it is publicly visible, so the
-  // portal can never reach drafts or deactivated listings.
+
   if (status && !PUBLIC_LISTING_STATUSES.includes(status)) {
     return null;
   }
@@ -105,7 +95,7 @@ const buildPublicFilter = async (
 };
 
 export const cpListingQueries = {
-  cpGetBlockAdminListing: async (
+  cpGetBlockAdminAgencyListing: async (
     _root: undefined,
     { _id }: { _id: string },
     { models }: IContext,
@@ -122,7 +112,7 @@ export const cpListingQueries = {
     return listing;
   },
 
-  cpGetBlockAdminListings: async (
+  cpGetBlockAdminAgencyListings: async (
     _root: undefined,
     params: CpListingQueryParams & IOffsetPaginateParams,
     { models }: IContext,
@@ -148,7 +138,7 @@ export const cpListingQueries = {
     );
   },
 
-  cpGetBlockAdminListingStats: async (
+  cpGetBlockAdminAgencyListingStats: async (
     _root: undefined,
     params: Pick<CpListingQueryParams, 'agencyId' | 'agencyMemberId'>,
     { models }: IContext,

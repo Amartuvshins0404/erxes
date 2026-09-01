@@ -8,7 +8,7 @@ import { IAdminListing } from '../types/listingTypes';
 import { GET_ADMIN_LISTINGS } from '../graphql';
 
 type GetAdminListingsResponse = {
-  getBlockAdminListings: {
+  getBlockAdminAgencyListings: {
     list: IAdminListing[];
     totalCount?: number;
     pageInfo: {
@@ -32,7 +32,7 @@ export const useAdminListings = (options?: QueryHookOptions) => {
       },
     });
 
-  const { list, pageInfo, totalCount } = data?.getBlockAdminListings || {};
+  const { list, pageInfo, totalCount } = data?.getBlockAdminAgencyListings || {};
 
   const handleFetchMore = ({
     direction,
@@ -53,10 +53,10 @@ export const useAdminListings = (options?: QueryHookOptions) => {
         if (!fetchMoreResult) return prev;
         return {
           ...prev,
-          getBlockAdminListings: mergeCursorData({
+          getBlockAdminAgencyListings: mergeCursorData({
             direction,
-            fetchMoreResult: fetchMoreResult.getBlockAdminListings,
-            prevResult: prev.getBlockAdminListings,
+            fetchMoreResult: fetchMoreResult.getBlockAdminAgencyListings,
+            prevResult: prev.getBlockAdminAgencyListings,
           }),
         };
       },

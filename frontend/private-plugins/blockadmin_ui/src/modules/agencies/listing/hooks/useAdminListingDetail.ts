@@ -7,11 +7,11 @@ export const useAdminListingDetail = () => {
   const { listingId } = useParams();
 
   const { data, loading, refetch } = useQuery<{
-    getBlockAdminListing: IAdminListing;
+    getBlockAdminAgencyListing: IAdminListing;
   }>(GET_ADMIN_LISTING_DETAIL, {
     variables: { _id: listingId },
     skip: !listingId,
   });
 
-  return { listing: data?.getBlockAdminListing, loading, refetch };
+  return { listing: data?.getBlockAdminAgencyListing, loading, refetch };
 };

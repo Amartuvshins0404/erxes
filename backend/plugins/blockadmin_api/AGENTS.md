@@ -6,7 +6,7 @@
 - **Project:** `blockadmin_api`
 - **Layer:** `Backend API`
 - **Path:** `backend/plugins/blockadmin_api`
-- **Last synchronized:** `2026-08-29`
+- **Last synchronized:** `2026-09-01`
 
 ## Scope
 
@@ -33,8 +33,8 @@
 - Mirrors a `block_api` org's signed contracts (create/update/status-change/manual-resync all funnel through one upsert-by-`{subdomain, entityId}` path), their full payment/transaction schedules (bulk-replaced on every sync), and customer identity links (`BlockCustomer`, verified against erxes core by email/phone before linking, keyed by `customerId` = core's customer id).
 - Client-portal GraphQL surface (`clientportal` module) exposing a customer's contracts, per-contract payment schedule, and a computed summary (totals + next payment) — intentionally NOT subdomain-scoped, since a customer may hold contracts across multiple orgs; ownership is instead verified per-request against the authenticated `cpUser`.
 - Mirrors an agency's members (agents) from `blockagency_api` into `block_admin_members`, upserted by `{subdomain, entityId}` on every member create/update/profile-update webhook and deleted on remove. Each record carries the denormalized core user summary (`user`) the agency tenant resolved, because the person behind an agent lives in the agency's own tenant and cannot be resolved here.
-- Admin agent queries (`getBlockAdminAgents`, `getBlockAdminAgentInfo`) and listing queries/stats that can be narrowed to one agent (`agencyMemberId`).
-- Client-portal browse surface for agencies and listings (`cpGetBlockAdmin*`): agency directory/detail, and listing directory/detail/stats scoped to publicly visible (`active`/`sold`) listings, optionally narrowed to one agency or one agent, plus an agent directory/detail (`cpBlockAdminAgents`, `cpBlockAdminAgentInfo`). These require only a client-portal app token, not a `cpUser`.
+- Admin agent queries (`getBlockAdminAgencyAgents`, `getBlockAdminAgencyAgentInfo`) and listing queries/stats that can be narrowed to one agency (`agencyId`) or one agent (`agencyMemberId`).
+- Client-portal browse surface for agencies and listings (`cpGetBlockAdmin*`): agency directory/detail, and listing directory/detail/stats scoped to publicly visible (`active`/`sold`) listings, each listing carrying its owning `agency` inline, optionally narrowed to one agency or one agent, plus an agent directory/detail (`cpBlockAdminAgencyAgents`, `cpBlockAdminAgencyAgentInfo`). These require only a client-portal app token, not a `cpUser`.
 - Mirrors `block_api` offers the same way once their `status` becomes `sent` (create/update/send-email all funnel through `Offer.upsertSentOffer`) — draft offers are never synced. Does not recompute invoices/payment schedules for offers (that stays org-side in `block_api`); this is a pure state mirror, not a business-logic duplicate.
 - Client-portal GraphQL surface (`clientportal` module) exposing a customer's contracts and offers, per-contract payment schedule, and a computed summary (totals + next payment) — intentionally NOT subdomain-scoped, since a customer may hold contracts/offers across multiple orgs. The list queries (`cpBlockAdminGetContracts`/`cpBlockAdminGetOffers`) are scoped to the authenticated `cpUser`'s own `BlockCustomer`, but the single-record detail queries that take an id argument (`cpBlockAdminGetContractPayments`/`cpBlockAdminGetContractSummary`/`cpBlockAdminGetOffer`) currently do **not** verify the requested record belongs to that `cpUser` — see Local Invariants.
 - `CpBlockOffer.paymentSchedule` computes an offer's full barter/down-payment/progress-payment/completion-payment breakdown (rows + total) on the fly from `paymentPlan` — the same computation `block_ui`'s `OfferDetailSheet` does client-side, ported so the client portal doesn't need offer-payment-plan math duplicated on every consumer.
@@ -69,7 +69,8 @@
 - HTTP `POST /webhook/syncProduct` for supplier product create/update/delete sync.
 - HTTP `POST /webhook/syncProductCategory` for supplier category snapshot update/delete sync.
 - HTTP `POST /webhook/{blockAgentCreateMember, blockAgentUpdateMember, blockAgentUpdateMemberProfile, blockAgentRemoveMember}` — agency member mirror receivers consumed only by `blockagency_api`.
-- GraphQL admin agent queries `getBlockAdminAgents(agencyId, role, searchValue, + cursor params): BlockAdminAgentListResponse` and `getBlockAdminAgentInfo(_id!): BlockAdminAgent`.
+- GraphQL admin agent queries `getBlockAdminAgencyAgents(agencyId, role, searchValue, + cursor params): BlockAdminAgentListResponse` and `getBlockAdminAgencyAgentInfo(_id!): BlockAdminAgent`.
+- GraphQL admin listing queries `getBlockAdminAgencyListings(subdomain, agencyId, agencyMemberId, status, searchValue, city, district, + cursor params): BlockAdminListingListResponse`, `getBlockAdminAgencyListing(_id!): BlockAdminListing`, and `getBlockAdminAgencyListingStats(subdomain, agencyId, agencyMemberId): BlockAdminListingStats`.
 - HTTP `POST /webhook/{customerSync, blockCreateContract, blockUpdateContract, blockUpdateContractStatus, contractSigned, blockSyncContractPayments}` — all signed contract/customer mirror receivers consumed only by `block_api`.
 - GraphQL supplier profile queries/mutations with `ba*` operation names.
 - GraphQL supplier product queries/mutations with `ba*` operation names.
@@ -81,9 +82,9 @@
 - GraphQL client-portal mutation `cpBlockAdminCheckPaymentInvoice(contractId, invoiceId): CpBlockPaymentCheck` — same `cpUser` + `BlockCustomer` ownership check as above (on the contract), forwarded to the owning org's `POST /webhook/checkContractPaymentInvoice`; returns `{status, paymentStatus, paidAmount, amount}` where `status` is the invoice's and `paymentStatus` is the scheduled payment's after any crediting.
 - GraphQL client-portal agency/listing browse queries — marked `forClientPortal: true` only, so they need a client-portal app token but no authenticated `cpUser`:
   - `cpGetBlockAdminAgencies(verificationStatus, searchValue, city, district, + offset params): [CpBlockAdminAgency]` / `cpGetBlockAdminAgencyInfo(_id!): CpBlockAdminAgency`.
-  - `cpGetBlockAdminListings(agencyId, agencyMemberId, status, type, propertyType, searchValue, city, district, + offset params): [CpBlockAdminListing]`, `cpGetBlockAdminListing(_id!): CpBlockAdminListing`, `cpGetBlockAdminListingStats(agencyId, agencyMemberId): CpBlockAdminListingStats` (`total`/`active`/`draft`/`sold`/`totalViews`).
-  - `cpBlockAdminAgents(agencyId, role, searchValue, + offset params): [CpBlockAdminAgent]` / `cpBlockAdminAgentInfo(_id!): CpBlockAdminAgent`; `CpBlockAdminAgent` omits the admin-only `subdomain`/`entityId`/`memberId` keys and exposes the agent's own agency as a nested `agency: CpBlockAdminAgency`, resolved through `findAgentAgency`. Its flat `agencyId` field stays the raw agency-side id (`Agency.entityId`), which is **not** the `_id` `cpBlockAdminAgents(agencyId)`/`cpGetBlockAdminAgencyInfo(_id)` expect — read `agency._id` for that.
-  - `CpBlockAdminAgency` deliberately omits the admin-only `documents`, `rejectionReasons`, and `rejectionNotes` fields; `CpBlockAdminListing` omits `subdomain`/`entityId` and resolves `agencyId` through a custom resolver instead.
+  - `cpGetBlockAdminAgencyListings(agencyId, agencyMemberId, status, type, propertyType, searchValue, city, district, + offset params): [CpBlockAdminListing]`, `cpGetBlockAdminAgencyListing(_id!): CpBlockAdminListing`, `cpGetBlockAdminAgencyListingStats(agencyId, agencyMemberId): CpBlockAdminListingStats` (`total`/`active`/`draft`/`sold`/`totalViews`).
+  - `cpBlockAdminAgencyAgents(agencyId, role, searchValue, + offset params): [CpBlockAdminAgent]` / `cpBlockAdminAgencyAgentInfo(_id!): CpBlockAdminAgent`; `CpBlockAdminAgent` omits the admin-only `subdomain`/`entityId`/`memberId` keys and exposes the agent's own agency as a nested `agency: CpBlockAdminAgency`, resolved through `findAgentAgency`. Its flat `agencyId` field stays the raw agency-side id (`Agency.entityId`), which is **not** the `_id` `cpBlockAdminAgencyAgents(agencyId)`/`cpGetBlockAdminAgencyInfo(_id)` expect — read `agency._id` for that.
+  - `CpBlockAdminAgency` deliberately omits the admin-only `documents`, `rejectionReasons`, and `rejectionNotes` fields; `CpBlockAdminListing` omits `subdomain`/`entityId` and resolves both `agencyId` and the nested `agency: CpBlockAdminAgency` from the listing's own `subdomain` through custom resolvers.
 
 ### Consumes
 
@@ -123,10 +124,12 @@
 - `Contract.status` here is a fixed enum (`reserved|draft|signed|lost|cancelled`) mirroring `block_api`'s per-org `ContractStatus.type`, never a raw per-org `ContractStatus._id` reference.
 - `Contract.upsertSignedContract` is the single upsert path for all three of block_api's mirror entry points (create/update/status-change) plus manual re-sync — any of them may be blockadmin's first encounter with a given contract, so it must always upsert, never assume prior existence.
 - `BlockCustomer.resolveBlockCustomer` always re-verifies identity against erxes core by email/phone before linking/upserting; it never trusts a client-supplied `entityId`-only claim.
-- Client-portal listing queries are restricted to the publicly visible statuses `active` and `sold` (`PUBLIC_LISTING_STATUSES`); `draft` and `inactive` listings stay admin-side. The `status` query param may only narrow *within* that set — any other value yields an empty result, never an unfiltered one — and with no `status` the default stays `active`. `cpGetBlockAdminListing` returns "Listing not found" for a draft/inactive `_id`. These queries are `forClientPortal: true` only (no `cpUser`), so anything added here is effectively public per portal.
-- Listings carry no `agencyId` column — they are joined to an agency by `subdomain`. Any client-portal `agencyId` filter must resolve the agency first, and an unknown `agencyId` must yield an empty result, never an unfiltered one.
+- Client-portal listing queries are restricted to the publicly visible statuses `active` and `sold` (`PUBLIC_LISTING_STATUSES`); `draft` and `inactive` listings stay admin-side. The `status` query param may only narrow *within* that set — any other value yields an empty result, never an unfiltered one — and with no `status` the default stays `active`. `cpGetBlockAdminAgencyListing` returns "Listing not found" for a draft/inactive `_id`. These queries are `forClientPortal: true` only (no `cpUser`), so anything added here is effectively public per portal.
+- A field resolver must `await` its mongoose query and return the resolved document, never the `Query` itself. A `Query` is thenable, so graphql accepts it and then re-executes it, failing the field with `MongooseError: Query was already executed`.
+- Agency-owned GraphQL operations name the owning module: listings are `*AgencyListing*` and agency members are `*AgencyAgent*`, on both the admin and the `cp*` surface. Never name a new operation just `*Agent*` — that reads as the platform's AI agent — or just `*Listing*`, which does not say whose listings it returns.
+- Listings carry no `agencyId` column — they are joined to an agency by `subdomain`, and the graphql `BlockAdminListing.agencyId`/`CpBlockAdminListing.agencyId` fields are custom resolvers over that `subdomain`. Any `agencyId` filter, admin or client-portal, must resolve the agency first, and an unknown `agencyId` must yield an empty result, never an unfiltered one.
 - Every id crossing the API boundary is a blockadmin `_id`; every stored cross-tenant link is an agency-side id. `@/member/utils`'s `resolveAgencyKeys`/`resolveAgentKeys` are the only translation path (`Agency._id` / `AgencyMember._id` → `{subdomain, entityId}`), with `findAgentAgency` as the reverse hop (an agent's `{subdomain, agencyId}` → its `Agency` doc), and both key resolvers return `null` for an unknown id, which callers must treat as "no results" rather than as "no filter". An `agencyId` + `agencyMemberId` pair from different tenants must also resolve to no results.
-- An agent mirrored without `agencyId` is invisible to every agency-scoped query here (`getBlockAdminAgents`/`cpBlockAdminAgents` filter on it), so a gap in the agents tab points at the agency side not stamping it, not at this filter. `blockagency_api` resolves it from the tenant's single agency.
+- An agent mirrored without `agencyId` is invisible to every agency-scoped query here (`getBlockAdminAgencyAgents`/`cpBlockAdminAgencyAgents` filter on it), so a gap in the agents tab points at the agency side not stamping it, not at this filter. `blockagency_api` resolves it from the tenant's single agency.
 - The agency side is the source of truth for members and may replay a webhook, so `AgencyMember.saveAgent` always upserts by `{subdomain, entityId}` and never assumes prior existence — `blockAgentUpdateMemberProfile` in particular can be blockadmin's first encounter with a member.
 - Member webhooks carry the full synced snapshot (`data.members` on create, `data.member` on update) because `wrapMutationResolver` only forwards mutation *arguments* plus the result `_id` — the resolver result body never reaches blockadmin. Anything blockadmin needs about a member, including the core `user` summary, must be written onto the mutation arguments agency-side. `blockAgentCreateMember` also arrives outside any mutation, when the agency side seeds its owners as admins on agency creation.
 - A seeded owner's member webhook can arrive before the agency itself has ever synced, since creating an agency in `blockagency_api` does not mirror it. That is fine — agents join to an agency by `{subdomain, agencyId}`, never by a foreign key that must already exist — so never gate `saveAgent` on the agency being present.
@@ -153,8 +156,8 @@
 
 - `pnpm nx lint blockadmin_api`
 - `pnpm nx build blockadmin_api`
-- Agent smoke scenario: add a member to an agency in `blockagency_api`, confirm `block_admin_members` upserts a record with the resolved `user` summary, then confirm `getBlockAdminAgents(agencyId)` returns it for the matching blockadmin agency.
-- Agent image smoke scenario: give an agent an avatar and a certificate photo in `blockagency_ui`, then read `cpBlockAdminAgentInfo` and confirm `user.avatar` and `certificatePhotos[].url` come back as absolute `…/read-file?key=…` urls that open in a browser without a session.
+- Agent smoke scenario: add a member to an agency in `blockagency_api`, confirm `block_admin_members` upserts a record with the resolved `user` summary, then confirm `getBlockAdminAgencyAgents(agencyId)` returns it for the matching blockadmin agency.
+- Agent image smoke scenario: give an agent an avatar and a certificate photo in `blockagency_ui`, then read `cpBlockAdminAgencyAgentInfo` and confirm `user.avatar` and `certificatePhotos[].url` come back as absolute `…/read-file?key=…` urls that open in a browser without a session.
 - Blockadmin smoke scenario: send a signed `POST /webhook/syncProduct` payload with `BLOCK_ADMIN_SECRET`; `block_admin_supplier_products` upserts by source `entityId`.
 - Contract smoke scenario: sign a contract in `block_api`, confirm `block_admin_contracts`/`block_admin_contract_payments` reflect it; call the same sync again (e.g. via `block_api`'s `blockManualSyncContract`) and confirm it upserts cleanly with no immutable-field error and no duplicate payment rows.
 - Online payment reconciliation smoke scenario: create an invoice via `cpBlockAdminCreatePaymentInvoice`, pay it while the org's `block_api` is stopped (so the callback is lost), restart it and call `cpBlockAdminCheckPaymentInvoice(contractId, invoiceId)` — it must return `status: "paid"`, the scheduled payment must be credited exactly once, and a second call must not credit it again.
@@ -164,6 +167,24 @@
 ## Recent Changes
 
 <!-- Newest first. Keep at most 10 entries. -->
+
+### `2026-09-01` — Agency-owned operations renamed
+
+- **Summary:** Every listing and agent operation now carries the owning module in its name — `getBlockAdminAgencyListings`/`getBlockAdminAgencyListing`/`getBlockAdminAgencyListingStats`, `blockAdminUpdateAgencyListingStatus`/`blockAdminRemoveAgencyListing`, `getBlockAdminAgencyAgents`/`getBlockAdminAgencyAgentInfo`, and the client-portal `cpGetBlockAdminAgencyListing*`/`cpBlockAdminAgencyAgent*` counterparts — because bare "agent" collides with the platform's AI-agent vocabulary and bare "listing" did not say whose listings these are. GraphQL type names are unchanged.
+- **Affected areas:** `src/modules/listing/graphql/{schemas,resolvers}`, `src/modules/member/graphql/{schemas,resolvers}`, `src/modules/clientportal/graphql/{schemas,resolvers}/{agency,listing}.ts`
+- **Contracts changed:** Renamed 12 operations (5 admin listing, 2 admin agent, 3 client-portal listing, 2 client-portal agent). Breaking for any out-of-repo client-portal consumer still calling the old `cp*` names.
+
+### `2026-09-01` — Client-portal listings carry their agency inline
+
+- **Summary:** `CpBlockAdminListing` gained a nested `agency: CpBlockAdminAgency`, resolved from the listing's own `subdomain` by the same lookup that backs `agencyId`, so a portal listing feed no longer needs a second round trip per agency. The nested value goes through `CpBlockAdminAgency`'s own field resolvers, so `logo`/`coverImage` arrive normalized.
+- **Affected areas:** `src/modules/clientportal/graphql/resolvers/customResolvers/listing.ts`, `src/modules/clientportal/graphql/schemas/listing.ts`
+- **Contracts changed:** Added field `CpBlockAdminListing.agency: CpBlockAdminAgency`.
+
+### `2026-09-01` — Admin listings filterable by agency
+
+- **Summary:** `getBlockAdminAgencyListings` and `getBlockAdminAgencyListingStats` accept an `agencyId` (blockadmin `Agency._id`), resolved to the agency's `subdomain` through the shared `resolveAgencyKeys`; an unknown agency, or an `agencyId` + `agencyMemberId` pair from different tenants, returns an empty result instead of an unfiltered one.
+- **Affected areas:** `src/modules/listing/graphql/resolvers/queries/listing.ts`, `src/modules/listing/graphql/schemas/listing.ts`
+- **Contracts changed:** Added the optional `agencyId` argument to `getBlockAdminAgencyListings` and `getBlockAdminAgencyListingStats`.
 
 ### `2026-08-29` — Client-portal invoice re-check
 
@@ -185,7 +206,7 @@
 
 ### `2026-08-21` — Client-portal agency images typed as attachments, agent agency resolved
 
-- **Summary:** `CpBlockAdminAgency.logo`/`coverImage` were left as `String` when the agency attachment migration landed, so `cpGetBlockAdminAgencies`/`cpGetBlockAdminAgencyInfo` returned `String cannot represent value: { name: …, url: … }` and nulled both fields; they are now `Attachment` and go through a new `CpBlockAdminAgency` custom resolver that normalizes legacy url strings like the admin side does. `CpBlockAdminAgent` also gained a nested `agency` field so `cpBlockAdminAgents`/`cpBlockAdminAgentInfo` can return the agent's agency (including its normalized logo/cover) without a second round trip.
+- **Summary:** `CpBlockAdminAgency.logo`/`coverImage` were left as `String` when the agency attachment migration landed, so `cpGetBlockAdminAgencies`/`cpGetBlockAdminAgencyInfo` returned `String cannot represent value: { name: …, url: … }` and nulled both fields; they are now `Attachment` and go through a new `CpBlockAdminAgency` custom resolver that normalizes legacy url strings like the admin side does. `CpBlockAdminAgent` also gained a nested `agency` field so `cpBlockAdminAgencyAgents`/`cpBlockAdminAgencyAgentInfo` can return the agent's agency (including its normalized logo/cover) without a second round trip.
 - **Affected areas:** `src/modules/clientportal/graphql/schemas/agency.ts`, `src/modules/clientportal/graphql/resolvers/customResolvers/{agency.ts (new),agent.ts,index.ts}`, `src/modules/member/utils.ts`
 - **Contracts changed:** `CpBlockAdminAgency.logo` and `CpBlockAdminAgency.coverImage` are now `Attachment` (previously `String`); adds `CpBlockAdminAgent.agency: CpBlockAdminAgency`.
 
@@ -197,29 +218,12 @@
 
 ### `2026-08-21` — Agency members mirrored as agents
 
-- **Summary:** Agency members synced from `blockagency_api` are stored in `block_admin_members` with a denormalized core user summary, exposed through admin (`getBlockAdminAgents`/`getBlockAdminAgentInfo`) and client-portal (`cpBlockAdminAgents`/`cpBlockAdminAgentInfo`) queries, and listings now record `agencyMemberId` so listing lists/stats can be narrowed to one agent.
+- **Summary:** Agency members synced from `blockagency_api` are stored in `block_admin_members` with a denormalized core user summary, exposed through admin (`getBlockAdminAgencyAgents`/`getBlockAdminAgencyAgentInfo`) and client-portal (`cpBlockAdminAgencyAgents`/`cpBlockAdminAgencyAgentInfo`) queries, and listings now record `agencyMemberId` so listing lists/stats can be narrowed to one agent.
 - **Affected areas:** `src/modules/member/`, `src/modules/listing/{@types,db/definitions,routes,utils,graphql}`, `src/modules/clientportal/graphql/{schemas,resolvers/queries}/{agency,listing}.ts`, `src/connectionResolvers.ts`, `src/routes/index.ts`, `src/apollo/`, `src/utils.ts`
-- **Contracts changed:** Adds `/webhook/blockAgent{Create,Update,Remove}Member` + `/webhook/blockAgentUpdateMemberProfile`; adds `getBlockAdminAgents`/`getBlockAdminAgentInfo`/`cpBlockAdminAgents`/`cpBlockAdminAgentInfo`; adds `agencyMemberId` to listing queries/type and `status` to `cpGetBlockAdminListings`; adds `sold` to both listing stats types; client-portal listings now also expose `sold` records.
+- **Contracts changed:** Adds `/webhook/blockAgent{Create,Update,Remove}Member` + `/webhook/blockAgentUpdateMemberProfile`; adds `getBlockAdminAgencyAgents`/`getBlockAdminAgencyAgentInfo`/`cpBlockAdminAgencyAgents`/`cpBlockAdminAgencyAgentInfo`; adds `agencyMemberId` to listing queries/type and `status` to `cpGetBlockAdminAgencyListings`; adds `sold` to both listing stats types; client-portal listings now also expose `sold` records.
 
 ### `2026-08-20` — Agency attachments normalized on read
 
 - **Summary:** `BlockAdminAgency.logo`/`coverImage`/`documents` now resolve as `Attachment` values through new custom resolvers that accept both the mirrored attachment shape and the plain url strings stored before `blockagency_api`'s attachment migration, so pre-migration agencies stop failing with `Cannot return null for non-nullable field Attachment.url`.
 - **Affected areas:** `src/modules/agency/graphql/resolvers/customResolvers/agency.ts` (new), `src/modules/agency/utils.ts`, `src/apollo/resolvers/resolvers.ts`, `src/modules/agency/@types/agency.ts`, `src/modules/agency/db/definitions/agency.ts`, `src/modules/agency/graphql/schemas/agency.ts`.
 - **Contracts changed:** `BlockAdminAgency.logo`/`coverImage` are now `Attachment` and `BlockAdminAgency.documents` is `[Attachment]` (previously `String`/`[String]`); the `/webhook/updateAgencyInfo` payload now carries attachment objects for those fields.
-
-### `2026-08-11` — Client-portal agency and listing browse queries
-
-- **Summary:** Added `cpGetBlockAdminAgencies`, `cpGetBlockAdminAgencyInfo`, `cpGetBlockAdminListings`, `cpGetBlockAdminListing`, and `cpGetBlockAdminListingStats` to the `clientportal` module, reusing the admin `Agency`/`Listing` models and filter utilities but exposing public-safe `CpBlockAdminAgency`/`CpBlockAdminListing` projections, forcing `status: 'active'` on every listing read, and resolving the `agencyId` filter through the agency's `subdomain`.
-- **Affected areas:** `src/modules/clientportal/graphql/schemas/{agency,listing,index}.ts`, `src/modules/clientportal/graphql/resolvers/queries/{agency,listing,index}.ts`, `src/modules/clientportal/graphql/resolvers/customResolvers/{listing,index}.ts`.
-- **Contracts changed:** Added the five `cpGetBlockAdmin*` queries and the `CpBlockAdminAgency`, `CpBlockAdminListing`, `CpBlockAdminListingStats` types.
-### `2026-08-11` — Payment-paid notification
-
-- **Summary:** Added a "Таны {label} төлбөр амжилттай хийгдлээ." notification, sent from `blockSyncContractPayments`'s webhook route the moment a payment row transitions into `paid` status (detected by diffing prior schedule statuses, fetched before the bulk replace, against the newly-synced rows by stringified `entityId`). Extracted `paymentLabel`/`notifyPayment` out of the worker into a shared `contract/utils/paymentNotify.ts`, now used by both the worker and this new trigger. Also fixed the "offer sent" notification not firing (see `block_api`'s guide for the actual root cause — `blockUpdateOffer` wasn't reshaping its mirrored payload).
-- **Affected areas:** `src/modules/contract/routes/payment.ts`, `src/modules/contract/utils/paymentNotify.ts` (new), `src/worker/paymentReminders.ts`.
-- **Contracts changed:** None (webhook payload shape unchanged; adds an outbound `cpNotifications.create` call, no new inbound contract).
-
-### `2026-08-11` — Offer payment schedule resolver
-
-- **Summary:** Added `CpBlockOffer.paymentSchedule` (`rows: [CpBlockOfferScheduleRow], total: Float`), a computed field returning an offer's full barter/down-payment/progress-payment/completion-payment breakdown — a line-for-line TypeScript port of `block_ui`'s `OfferDetailSheet.tsx#OfferSchedule` calculation (installment-date generation by frequency, FLAT/REDUCING/default interest, discount/barter/down/completion splits), so client-portal consumers get the same numbers without re-implementing that math.
-- **Affected areas:** `src/modules/clientportal/utils/offerPaymentSchedule.ts` (new), `src/modules/clientportal/graphql/resolvers/customResolvers/offer.ts`, `src/modules/clientportal/graphql/schemas/offer.ts`.
-- **Contracts changed:** Added field `CpBlockOffer.paymentSchedule: CpBlockOfferPaymentSchedule` and types `CpBlockOfferPaymentSchedule`/`CpBlockOfferScheduleRow`.

@@ -7,7 +7,7 @@ export interface ListingStatusInput {
 }
 
 export const listingMutations = {
-  blockAdminRemoveListing: async (
+  blockAdminRemoveAgencyListing: async (
     _root: undefined,
     { _id }: { _id: string },
     { models }: IContext,
@@ -36,7 +36,7 @@ export const listingMutations = {
     }
   },
 
-  blockAdminUpdateListingStatus: async (
+  blockAdminUpdateAgencyListingStatus: async (
     _root: undefined,
     { _id, input }: { _id: string; input: ListingStatusInput },
     { models }: IContext,

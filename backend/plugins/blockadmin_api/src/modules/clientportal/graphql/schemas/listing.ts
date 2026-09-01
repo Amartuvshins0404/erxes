@@ -3,8 +3,6 @@ import { GQL_OFFSET_PARAM_DEFS } from 'erxes-api-shared/utils';
 export const types = `
   type CpBlockAdminListing {
     _id: String
-    agencyId: String
-    agencyMemberId: String
     title: String
     type: String
     propertyType: String
@@ -18,6 +16,7 @@ export const types = `
     viewCount: Float
     isFeatured: Boolean
     agent: BlockAdminListingAgent
+    agency: CpBlockAdminAgency
     createdAt: Date
     updatedAt: Date
   }
@@ -45,7 +44,7 @@ const queryParams = `
 `;
 
 export const queries = `
-  cpGetBlockAdminListings(${queryParams}): [CpBlockAdminListing]
-  cpGetBlockAdminListing(_id: String!): CpBlockAdminListing
-  cpGetBlockAdminListingStats(agencyId: String, agencyMemberId: String): CpBlockAdminListingStats
+  cpGetBlockAdminAgencyListings(${queryParams}): [CpBlockAdminListing]
+  cpGetBlockAdminAgencyListing(_id: String!): CpBlockAdminListing
+  cpGetBlockAdminAgencyListingStats(agencyId: String, agencyMemberId: String): CpBlockAdminListingStats
 `;

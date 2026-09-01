@@ -1,4 +1,5 @@
 import { gql } from '@apollo/client';
+import { GQL_CURSOR_PARAM_DEFS, GQL_CURSOR_PARAMS } from 'erxes-ui';
 
 export const GET_AGENCIES = gql`
   query GetAgencies($searchValue: String, $city: String, $district: String) {
@@ -60,9 +61,34 @@ export const GET_AGENCIES = gql`
   }
 `;
 
+export const GET_AGENCIES_INLINE = gql`
+  query GetBlockAdminAgenciesInline(
+    $searchValue: String
+    ${GQL_CURSOR_PARAM_DEFS}
+  ) {
+    getBlockAdminAgencies(
+      searchValue: $searchValue
+      ${GQL_CURSOR_PARAMS}
+    ) {
+      list {
+        _id
+        name
+        brandName
+      }
+      pageInfo {
+        hasNextPage
+        hasPreviousPage
+        startCursor
+        endCursor
+      }
+      totalCount
+    }
+  }
+`;
+
 export const GET_AGENCY_AGENTS = gql`
   query BlockAdminAgencyAgents($agencyId: String, $searchValue: String) {
-    getBlockAdminAgents(agencyId: $agencyId, searchValue: $searchValue) {
+    getBlockAdminAgencyAgents(agencyId: $agencyId, searchValue: $searchValue) {
       list {
         _id
         agencyId

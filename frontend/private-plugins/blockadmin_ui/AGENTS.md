@@ -6,7 +6,7 @@
 - **Project:** `blockadmin_ui`
 - **Layer:** `Frontend UI`
 - **Path:** `frontend/private-plugins/blockadmin_ui`
-- **Last synchronized:** `2026-08-21`
+- **Last synchronized:** `2026-09-01`
 
 ## Scope
 
@@ -25,6 +25,7 @@
 - Provides module federation entry points for blockadmin routes and settings.
 - Shows admin supplier lists, supplier profile detail sheets, verification actions, and supplier product review screens with editable product categories.
 - Displays supplier profile fields synced from supplier tenants, including industry.
+- Filters the agency listing review screen by search value, status, agency, city, and district, all held in the url query string.
 - Reviews agencies through a read-only detail screen (profile, sidebar tabs, general/activity/operation area/contact/documents/social links panels, plus Agents and Integrations under internal settings) with verify and reject actions.
 - Uses `erxes-ui` and `ui-modules` components for tables, sheets, filters, navigation, and feedback.
 
@@ -51,7 +52,7 @@
 - `baSuppliers`, `baSupplierDetail`, `baUpdateSupplierVerificationStatus`, and `baUpdateSupplierTier` GraphQL operations from `blockadmin_api`.
 - Supplier detail consumes nullable `BaSupplier.industry`.
 - Supplier product `ba*` GraphQL operations from `blockadmin_api`, plus core `productCategories` lookup for category assignment.
-- `GetAgencies`, `GetAgencyInfo`, `BlockAdminAgencyAgents`, `BlockAdminAgencyVerify`, and `BlockAdminAgencyReject` GraphQL operations from `blockadmin_api`; `blockadmin_api` exposes no agency update mutation and no agent mutation — agents are owned by the agency tenant.
+- `GetAgencies`, `GetBlockAdminAgenciesInline`, `GetAgencyInfo`, `BlockAdminAgencyAgents`, `BlockAdminAgencyVerify`, and `BlockAdminAgencyReject` GraphQL operations from `blockadmin_api`; `blockadmin_api` exposes no agency update mutation and no agent mutation — agents are owned by the agency tenant.
 - Public components and hooks from `erxes-ui` and `ui-modules`.
 
 ## Data and State
@@ -62,6 +63,7 @@
 - Supplier product category edits refetch the active detail query and update Apollo mutation results.
 
 ## Local Invariants
+- The admin listing filters live in the url query string (`searchValue`, `status`, `agencyId`, `city`, `district`) and every listings consumer — `AdminListingList`, `AdminListingGrid`, and `AgenciesListingsTotalCount` — must read the same key set through `useMultiQueryState`, or the grid, list, and count fall out of sync. `agencyId` is the blockadmin `Agency._id`, resolved to the agency's subdomain by `blockadmin_api`.
 
 - Supplier profile UI displays supplier-owned synced values for admin review.
 - Agency `logo`, `coverImage`, and `documents` are `Attachment` objects typed as `AgencyAttachment` in `src/modules/agencies/types/agencyTypes.ts`; only `url` and `name` are guaranteed. Read images through `attachment.url`, never by passing the attachment itself to `readImage`, and derive icons/labels through `src/modules/agencies/utils/attachment.ts` plus `components/attachment-type.tsx`.
@@ -78,6 +80,7 @@
 
 - `pnpm nx lint blockadmin_ui`
 - `pnpm nx build blockadmin_ui`
+- Agency listing smoke scenario: open `/blockadmin/agencies/listing`, pick an agency from the Agency filter, and confirm the list, grid, and records-found count all narrow to that agency and reset when the chip is removed.
 - Agency detail smoke scenario: open an agency from the agency grid, switch through the sidebar tabs (the `tab` query param must persist the selection), and confirm the profile badge flips after Verify without a manual refresh.
 - Supplier profile smoke scenario: open a supplier detail sheet and confirm synced Industry renders in the General section.
 - Supplier product smoke scenario: open the product table/detail, assign and clear a category, and confirm the selected category changes without refresh.
@@ -85,6 +88,18 @@
 ## Recent Changes
 
 <!-- Newest first. Keep at most 10 entries. -->
+
+### `2026-09-01` — Agency listing/agent operations renamed
+
+- **Summary:** Followed `blockadmin_api`'s rename of the agency-owned operations: the listing documents now call `getBlockAdminAgencyListings`/`getBlockAdminAgencyListing`/`getBlockAdminAgencyListingStats` and `blockAdminUpdateAgencyListingStatus`/`blockAdminRemoveAgencyListing`, the agents document calls `getBlockAdminAgencyAgents`, and each document's operation name was renamed to match.
+- **Affected areas:** `src/modules/agencies/listing/graphql/{queries,mutations}.ts`, `src/modules/agencies/listing/hooks/{useAdminListings,useAdminListingDetail,useAdminListingStats}.ts`, `src/modules/agencies/graphql/queries.ts`, `src/modules/agencies/hooks/useAgencyAgents.ts`
+- **Contracts changed:** Consumes the renamed operations; the old names no longer exist.
+
+### `2026-09-01` — Agency filter on the listing review screen
+
+- **Summary:** The admin listing filter bar gained an Agency filter (popover item, view, and removable chip) backed by a searchable, cursor-paginated agency combobox, and the `agencyId` query param is now passed to the listings query by the list, grid, and total-count consumers.
+- **Affected areas:** `src/modules/agencies/components/SelectAgency.tsx`, `src/modules/agencies/hooks/useAgencies.ts`, `src/modules/agencies/graphql/queries.ts`, `src/modules/agencies/listing/components/{AdminListingFilter,AdminListingList,AdminListingGrid,AgenciesListingsTotalCount}.tsx`, `src/modules/agencies/listing/graphql/queries.ts`, `src/modules/agencies/listing/types/listingTypes.ts`
+- **Contracts changed:** Consumes the new `GetBlockAdminAgenciesInline` operation and the new `agencyId` argument of `GetBlockAdminAgencyListings`.
 
 ### `2026-08-21` — Favorite toggles in the agencies module carry a breadcrumb
 
@@ -102,7 +117,7 @@
 
 - **Summary:** Internal settings gained an Agents tab listing the agency members synced into block admin, with avatar, name, role, email, and location plus loading, empty, and error states.
 - **Affected areas:** `src/modules/agencies/components/AgencyDetailAgents.tsx`, `src/modules/agencies/components/AgencyDetailTabs.tsx`, `src/modules/agencies/constants/agency-detail.ts`, `src/modules/agencies/hooks/useAgencyAgents.ts`, `src/modules/agencies/graphql/queries.ts`, `src/modules/agencies/types/agencyTypes.ts`
-- **Contracts changed:** Consumes the new `getBlockAdminAgents` query as `BlockAdminAgencyAgents`.
+- **Contracts changed:** Consumes the new `getBlockAdminAgencyAgents` query as `BlockAdminAgencyAgents`.
 
 ### `2026-08-21` — Agency detail rebuilt on the `ProjectDetail` composition
 

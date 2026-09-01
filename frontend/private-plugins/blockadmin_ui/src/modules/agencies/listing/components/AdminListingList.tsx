@@ -6,6 +6,7 @@ import { AdminListingFilter, IAdminListing } from '../types/listingTypes';
 export const AdminListingList = () => {
   const [queries] = useMultiQueryState<AdminListingFilter>([
     'searchValue',
+    'agencyId',
     'city',
     'district',
     'status',

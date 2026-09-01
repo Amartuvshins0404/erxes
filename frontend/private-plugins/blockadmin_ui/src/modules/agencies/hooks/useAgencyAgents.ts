@@ -4,7 +4,7 @@ import { GET_AGENCY_AGENTS } from '../graphql';
 import { IAgencyAgent } from '../types/agencyTypes';
 
 type GetAgencyAgentsResponse = {
-  getBlockAdminAgents: {
+  getBlockAdminAgencyAgents: {
     list: IAgencyAgent[];
     totalCount: number;
   };
@@ -15,11 +15,7 @@ type GetAgencyAgentsVariables = {
   searchValue?: string;
 };
 
-/**
- * Agents of the agency in the current `/blockadmin/agencies/agencies/:id`
- * route. `agencyId` is the block admin agency id; the API resolves it to the
- * agency tenant that owns the members.
- */
+
 export const useAgencyAgents = (
   options?: QueryHookOptions<GetAgencyAgentsResponse, GetAgencyAgentsVariables>,
 ) => {
@@ -36,8 +32,8 @@ export const useAgencyAgents = (
   });
 
   return {
-    agents: data?.getBlockAdminAgents?.list ?? [],
-    totalCount: data?.getBlockAdminAgents?.totalCount ?? 0,
+    agents: data?.getBlockAdminAgencyAgents?.list ?? [],
+    totalCount: data?.getBlockAdminAgencyAgents?.totalCount ?? 0,
     loading,
     error,
   };

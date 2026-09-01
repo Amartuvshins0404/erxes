@@ -7,6 +7,7 @@ export const AgenciesListingsTotalCount = () => {
   const { t } = useTranslation();
   const [queries] = useMultiQueryState<AdminListingFilter>([
     'searchValue',
+    'agencyId',
     'city',
     'district',
     'status',

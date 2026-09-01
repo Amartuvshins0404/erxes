@@ -73,6 +73,6 @@ const agentQueryParams = `
 export const queries = `
   cpGetBlockAdminAgencies(${queryParams}): [CpBlockAdminAgency]
   cpGetBlockAdminAgencyInfo(_id: String!): CpBlockAdminAgency
-  cpBlockAdminAgents(${agentQueryParams}): [CpBlockAdminAgent]
-  cpBlockAdminAgentInfo(_id: String!): CpBlockAdminAgent
+  cpBlockAdminAgencyAgents(${agentQueryParams}): [CpBlockAdminAgent]
+  cpBlockAdminAgencyAgentInfo(_id: String!): CpBlockAdminAgent
 `;

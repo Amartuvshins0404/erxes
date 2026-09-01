@@ -45,6 +45,6 @@ const queryParams = `
 `;
 
 export const queries = `
-  getBlockAdminAgents(${queryParams}): BlockAdminAgentListResponse
-  getBlockAdminAgentInfo(_id: String!): BlockAdminAgent
+  getBlockAdminAgencyAgents(${queryParams}): BlockAdminAgentListResponse
+  getBlockAdminAgencyAgentInfo(_id: String!): BlockAdminAgent
 `;

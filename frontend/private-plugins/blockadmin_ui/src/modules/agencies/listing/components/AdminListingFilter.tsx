@@ -7,6 +7,7 @@ import {
   useQueryState,
   useRemoveQueryStateByKey,
 } from 'erxes-ui';
+import { SelectAgency } from '@/agencies/components/SelectAgency';
 import { SelectArea } from '@/agencies/components/SelectArea';
 import { AgenciesListingsTotalCount } from './AgenciesListingsTotalCount';
 import { useState } from 'react';
@@ -23,9 +24,11 @@ const STATUS_TABS = [
 export const AdminListingFilterBar = () => {
   const [queries] = useMultiQueryState<{
     searchValue: string;
+    status: string;
+    agencyId: string;
     city: string;
     district: string;
-  }>(['searchValue', 'city', 'district']);
+  }>(['searchValue', 'status', 'agencyId', 'city', 'district']);
 
   const hasFilters = Object.values(queries || {}).some(
     (value) => value !== null,
@@ -42,12 +45,14 @@ export const AdminListingFilterBar = () => {
                 <Command.List>
                   <Filter.SearchValueTrigger />
                   <StatusFilterItem />
+                  <SelectAgency.FilterItem />
                   <SelectArea.CityFilterItem />
                   <SelectArea.DistrictFilterItem />
                 </Command.List>
               </Command>
             </Filter.View>
             <StatusFilterView />
+            <SelectAgency.FilterView />
             <SelectArea.CityFilterView />
             <SelectArea.DistrictFilterView />
           </Combobox.Content>
@@ -61,6 +66,7 @@ export const AdminListingFilterBar = () => {
 
         <Filter.SearchValueBarItem />
         <StatusFilterChip />
+        <SelectAgency.FilterChip />
         <SelectArea.CityFilterChip />
         <SelectArea.DistrictFilterChip />
         <AgenciesListingsTotalCount />

@@ -6,16 +6,18 @@ import {
 } from 'erxes-ui';
 
 export const GET_ADMIN_LISTINGS = gql`
-  query GetBlockAdminListings(
+  query GetBlockAdminAgencyListings(
     $subdomain: String
+    $agencyId: String
     $status: String
     $searchValue: String
     $city: String
     $district: String
     ${GQL_CURSOR_PARAM_DEFS}
   ) {
-    getBlockAdminListings(
+    getBlockAdminAgencyListings(
       subdomain: $subdomain
+      agencyId: $agencyId
       status: $status
       searchValue: $searchValue
       city: $city
@@ -65,8 +67,8 @@ export const GET_ADMIN_LISTINGS = gql`
 `;
 
 export const GET_ADMIN_LISTING_DETAIL = gql`
-  query GetBlockAdminListing($_id: String!) {
-    getBlockAdminListing(_id: $_id) {
+  query GetBlockAdminAgencyListing($_id: String!) {
+    getBlockAdminAgencyListing(_id: $_id) {
       _id
       entityId
       subdomain
@@ -104,8 +106,8 @@ export const GET_ADMIN_LISTING_DETAIL = gql`
 `;
 
 export const GET_ADMIN_LISTING_STATS = gql`
-  query GetBlockAdminListingStats($subdomain: String) {
-    getBlockAdminListingStats(subdomain: $subdomain) {
+  query GetBlockAdminAgencyListingStats($subdomain: String) {
+    getBlockAdminAgencyListingStats(subdomain: $subdomain) {
       total
       active
       draft

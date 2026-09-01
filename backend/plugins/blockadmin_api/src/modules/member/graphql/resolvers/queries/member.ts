@@ -9,7 +9,7 @@ import { IContext } from '~/connectionResolvers';
 import { EMPTY_CURSOR_LIST } from '~/utils';
 
 export const agentQueries = {
-  getBlockAdminAgentInfo: async (
+  getBlockAdminAgencyAgentInfo: async (
     _root: undefined,
     { _id }: { _id: string },
     { models }: IContext,
@@ -17,11 +17,8 @@ export const agentQueries = {
     return await models.AgencyMember.findOne({ _id }).lean();
   },
 
-  /**
-   * `agencyId` is the block admin `Agency._id`; agents are stored against the
-   * agency-side ids, so it is translated before filtering.
-   */
-  getBlockAdminAgents: async (
+
+  getBlockAdminAgencyAgents: async (
     _root: undefined,
     params: { agencyId?: string } & Omit<AgentQueryParams, 'agencyId'> &
       ICursorPaginateParams,

@@ -23,7 +23,7 @@ const DeveloperVisibilityControl = () => {
   return (
     <DropdownMenu.Item onClick={handleVisibilityChange}>
       {developerInfo?.visibility === 'public' ? <IconEyeOff /> : <IconEye />}
-      {developerInfo?.visibility === 'public' ? 'Make Private' : 'Make Public'}
+      {developerInfo?.visibility === 'public' ? 'Private' : 'Public'}
     </DropdownMenu.Item>
   );
 };

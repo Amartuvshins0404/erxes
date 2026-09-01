@@ -1,5 +1,6 @@
 import {
   Badge,
+  BlockEditorReadOnly,
   Button,
   FocusSheet,
   InfoCard,
@@ -23,16 +24,18 @@ const verificationVariant = (status?: string) => {
 const Row = ({
   label,
   value,
+  html
 }: {
   label: string;
   value?: string | number | null | React.ReactNode;
+  html?: boolean;
 }) => (
   <Table.Row>
     <Table.Cell className="bg-sidebar p-2 w-40 h-auto min-h-10 text-muted-foreground">
       {label}
     </Table.Cell>
     <Table.Cell className="p-2 h-auto min-h-10 whitespace-normal">
-      {value ?? '-'}
+      {html ? <BlockEditorReadOnly content={value as string} /> : value ?? '-'}
     </Table.Cell>
   </Table.Row>
 );
@@ -161,7 +164,7 @@ const SupplierInfo = ({ supplier }: { supplier: ISupplier }) => {
                 {description && (
                   <Row label={t('Description')} value={description} />
                 )}
-                {about && <Row label={t('About')} value={about} />}
+                {about && <Row label={t('About')} value={about} html/>}
               </Table.Body>
             </Table>
           </InfoCard.Content>

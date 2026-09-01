@@ -49,7 +49,8 @@ export const developerSchema = schemaWrapper(
 
     socialLinks: { type: blockDeveloperSocialLinkSchema },
 
-    tierLevel: { type: Number, default: 0 }
+    tierLevel: { type: Number, default: 0 },
+    visibility: { type: String, default: 'public', enum: ['public', 'private'] },
   }, {
     timestamps: true,
   }),

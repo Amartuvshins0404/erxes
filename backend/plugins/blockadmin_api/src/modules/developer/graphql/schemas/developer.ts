@@ -19,7 +19,7 @@ export const types = `
     verificationStatus: String
     projectsCount: Int
 
-    isFeatured: Boolean
+    visibility: String
   }
 
   type BlockAdminDeveloperListResponse {
@@ -29,7 +29,7 @@ export const types = `
   }
 
   input BlockAdminDeveloperInput {
-    isFeatured: Boolean
+    visibility: String
   }
 `;
 

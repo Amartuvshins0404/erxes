@@ -19,12 +19,6 @@ export const developerMutations = {
 
       const doc = { ...input }
 
-      if ('isFeatured' in input) {
-        const isFeatured = input.isFeatured;
-        
-        doc['tierLevel'] = isFeatured ? 1 : 0;
-      }
-
       const updatedDeveloper = await models.Developer.findOneAndUpdate(
         { _id, subdomain, entityId },
         { ...doc },

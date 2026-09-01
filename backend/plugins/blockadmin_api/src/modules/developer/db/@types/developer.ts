@@ -35,6 +35,8 @@ export interface IBlockDeveloper extends IBlock {
 
   socialLinks: IBlockDeveloperSocialLink;
   tierLevel?: number;
+
+  visibility?: 'public' | 'private';
 }
 
 export interface IBlockDeveloperDocument extends IBlockDeveloper, Document {

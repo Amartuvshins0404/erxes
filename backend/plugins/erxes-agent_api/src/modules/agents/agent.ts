@@ -21,6 +21,7 @@ import {
   buildCodeModeAddition,
   type IAgentsCodeModeAddition,
 } from '@/agents/codeMode';
+import { makeToolInputSchemaMongoCompatible } from '@/agents/toolSchemaCompatibility';
 
 /**
  * Builds the single agents chat agent per request from one of the acting
@@ -189,6 +190,15 @@ export const buildAgentsAgent = async ({
         ? buildCodeModeAddition()
         : Promise.resolve<IAgentsCodeModeAddition | null>(null),
     ]);
+
+  // A suspended ask_user/approval run stores every model-facing tool schema
+  // in MongoDB. The optional dialect marker is illegal on MongoDB 4.4.
+  makeToolInputSchemaMongoCompatible(searchTools);
+  makeToolInputSchemaMongoCompatible(callTool);
+  makeToolInputSchemaMongoCompatible(askUserTool);
+  if (codeModeAddition) {
+    makeToolInputSchemaMongoCompatible(codeModeAddition.tool);
+  }
 
   // Anthropic thinking consumes the output-token budget, so raise the cap
   // when a budget is requested instead of starving the visible response.

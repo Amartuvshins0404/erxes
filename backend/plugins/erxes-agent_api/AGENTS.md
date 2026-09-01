@@ -159,6 +159,12 @@
   tool normalizes every shape into per-question text for the model.
   Ownership is re-checked before any resume, and a run suspended on an
   approval gate is rejected with 409 (it must go through `/agents/approve`).
+  Before agent construction, every model-facing tool input schema (bridge,
+  ask_user, and optional code mode) drops only JSON Schema's optional root
+  `$schema` dialect marker. Mastra persists those definitions inside a
+  suspended workflow snapshot, and omitting the marker keeps the snapshot
+  valid on MongoDB 4.4 while preserving the same parameter validation and
+  current-MongoDB behavior.
 - Every agent run entry point passes `maxSteps: AGENTS_MAX_STEPS` (32) —
   chat `stream`, answer `resumeStream`, and `approveToolCall` /
   `declineToolCall`. Mastra's default of 5 is exhausted silently by real
@@ -222,6 +228,7 @@
 | Memory      | `src/modules/agents/memory.ts`             | Per-subdomain runtime bundle: Mastra `Memory` + minimal `Mastra` (`logger: false, workers: false`) sharing one `MongoDBStore` over a `connectorHandler` targeting the dedicated `{db}_agents_memory` sub-db (threads, messages, and workflow snapshots) |
 | ask_user    | `src/modules/agents/askUser.ts`            | Plugin-owned multi-question human-in-the-loop tool (batched `questions` suspension; normalizes legacy string/string[] and positional resume answers) |
 | Tools       | `src/modules/agents/tools.ts`              | Two-tier Mastra tool bridge: `searchTools` (discovery + per-subdomain manifest cache) and `callTool` (execute as the acting user; framework-native `requireApproval` predicate suspends destructive/always-confirm actions before `execute`, which stays a pure runner) |
+| Tool schema compatibility | `src/modules/agents/toolSchemaCompatibility.ts` | Omits the optional root `$schema` marker from model-facing tool parameters before Mastra can persist them in suspended-run snapshots, preserving MongoDB 4.4+ compatibility |
 | Code mode   | `src/modules/agents/codeMode.ts`           | Builds the `execute_typescript` tool via Mastra `createCodeMode` + `QuickJsCodeModeTransport` (in-process WASM sandbox, 15s timeout); wraps `callTool` with the approval-gate refusal for the sandbox allow-list |
 | Settings model | `src/modules/agents/db/definitions/settings.ts` + `db/models/Settings.ts` | Tenant-wide singleton on `agents_settings` (`codeModeEnabled`, `codeModeEnvironment`) with `getSettings`/`updateSettings` statics |
 | Settings GraphQL | `src/modules/agents/graphql/schemas/settings.ts` + resolvers | `agentsSettings` query (`showAgents`) and `agentsSettingsUpdate` mutation (`manageAgentsSettings`) |
@@ -235,7 +242,7 @@
 | Models      | `src/modules/agents/db`                    | `agentsConnectionSchema` definition and `AgentsConnection` model class |
 | Types       | `src/modules/agents/@types`                | `IAgentsConnectionEntry` and `IAgentsConnectionsDocument`   |
 | tRPC        | `src/trpc`                                  | `appRouter` and outbound plugin clients                   |
-| Container   | `Dockerfile`                                | Two-stage Alpine runtime image for the `docker-build` target; installs only the merged shared+plugin production deps, so every runtime import (e.g. `graphql-tag` for `src/apollo/typeDefs.ts`) must be a real dependency in `package.json` |
+| Container   | `Dockerfile`                                | Two-stage Alpine runtime image for the `docker-build` target; installs only the merged shared+plugin production deps, so every runtime import (`graphql-tag`, `jsonwebtoken`, and Zod 3.25+) must be a real dependency in `package.json` |
 
 ## Contracts
 
@@ -369,7 +376,9 @@
   `Memory`/`MongoDBStore` (store id `erxes-agent-store`) in the dedicated
   `{db}_agents_memory` database
   (derived from `mongoose.connection.db.databaseName`); no custom thread,
-  message, or approval models exist.
+  message, or approval models exist. Model-facing tool schemas omit only the
+  optional root `$schema` marker before a request can enter a snapshot, so the
+  same snapshot shape is accepted by MongoDB 4.4 and current releases.
 - An in-process `Map<subdomain, Promise<IAgentsRuntime>>` caches one runtime
   bundle (`{ memory, mastra }`) per subdomain so store initialization/index
   creation runs at most once; failed creations are evicted so the next request
@@ -455,6 +464,16 @@
   values; load them with `await import(...)` at the point of use. With plain
   `"module": "commonjs"`, TypeScript downlevels `import()` into `require()`,
   which cannot load ESM-only packages — do not narrow the module setting.
+- Every model-facing tool (`searchTools`, `callTool`, `ask_user`, and optional
+  `execute_typescript`) must pass through
+  `makeToolInputSchemaMongoCompatible` exactly once before Agent construction.
+  It may remove only JSON Schema's optional root `$schema` dialect marker:
+  changing validation or stripping structural keywords would alter the tool
+  contract. This keeps Mastra suspension snapshots writable on MongoDB 4.4+
+  without a storage fork.
+- Zod must remain a direct runtime dependency at 3.25+; plugin source imports
+  it directly, and Mastra also requires the `zod/v4` package export. The
+  standalone Docker install does not inherit the root pnpm override.
 - There is no local CJS/ESM interop shim: no namespace-unwrap helper,
   synthetic-default guard, `createRequire`, or hand-written `require()` exists
   for `erxes-api-shared`. Restore direct named imports instead.
@@ -598,7 +617,8 @@
   `NODE_OPTIONS` flag is required by the QuickJS WASM loader):
   `NODE_OPTIONS=--experimental-vm-modules pnpm exec jest --config
   backend/plugins/erxes-agent_api/jest.config.ts --runInBand --forceExit`
-  (9 suites, 156 tests: tool bridge incl. the `requireApproval` predicate
+  (10 suites, 161 tests: tool-schema snapshot compatibility, tool bridge
+  incl. the `requireApproval` predicate
   and pure executor and the shared `isGatedAgentToolCall` gate, agent-tools
   client, HTTP routes auth/isolation incl. the approve/decline contract and
   the tenant code-mode flag on chat/approve/answer, the ask-user
@@ -648,6 +668,18 @@
 ## Recent Changes
 
 <!-- Newest first. Keep at most 10 entries. -->
+
+### `2026-09-01` — Keep suspended tool snapshots compatible with MongoDB 4.4+
+
+- **Summary:** Every model-facing tool input schema now omits only the optional
+  root `$schema` dialect marker before Agent construction, so Mastra can persist
+  ask_user and approval suspension request bodies on MongoDB 4.4 as well as
+  current versions without changing parameter validation; Zod 3.25+ is also an
+  explicit runtime dependency for the standalone container.
+- **Affected areas:** `src/modules/agents/agent.ts`,
+  `src/modules/agents/toolSchemaCompatibility.ts`, compatibility tests,
+  `package.json`, and `pnpm-lock.yaml`.
+- **Contracts changed:** None.
 
 ### `2026-09-01` — Restore `graphql-tag` and `jsonwebtoken` as real runtime dependencies
 
@@ -812,24 +844,4 @@
   set now includes `askUser`; suspension SSE now includes
   `data-tool-call-suspended` parts (ask_user) in addition to
   `data-tool-call-approval`.
-
-### `2026-08-30` — Stored model always tracks the current provider default
-
-- **Summary:** `agentsConnectionUpsert` now resolves a missing `model`
-  argument straight to `getProviderDefaultModel(provider)` instead of first
-  falling back to the previously stored model, so re-saving a connection
-  (e.g. rotating a key) refreshes an entry whose stored model predates a
-  default change — openai re-saves now always store `gpt-5.6-luna`. An
-  explicit `model` argument still overrides, and the chat's per-turn model
-  override remains unpersisted. Complements the frontend's new
-  always-visible model display (stored model in parentheses in the settings
-  entries, default model on provider cards and the chat picker's Auto
-  entry).
-- **Affected areas:**
-  `src/modules/agents/graphql/resolvers/mutations/connection.ts`,
-  `src/modules/agents/__tests__/connectionResolvers.test.ts` (+1 test, now
-  116 total).
-- **Contracts changed:** None (the mutation's signature and types are
-  unchanged; only the server-side default resolution for an omitted
-  `model`).
 

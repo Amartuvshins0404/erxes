@@ -10,7 +10,7 @@ export const cpDeveloperQueries = {
     { _id }: { _id: string },
     { models }: IContext,
   ) => {
-    return await models.Developer.findOne({ _id }).lean();
+    return await models.Developer.findOne({ _id, visibility: 'public' }).lean();
   },
   cpBlockAdminDevelopers: async (
     _root: undefined,
@@ -27,7 +27,7 @@ export const cpDeveloperQueries = {
     const filter = await generateFilter(params);
 
     return await paginate(
-      models.Developer.find(filter).sort({ [sortField]: sortDirection }),
+      models.Developer.find({ ...filter, visibility: 'public' }).sort({ [sortField]: sortDirection }),
       { page, perPage },
     );
   },

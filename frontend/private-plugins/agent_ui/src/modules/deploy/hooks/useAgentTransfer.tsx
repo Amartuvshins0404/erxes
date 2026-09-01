@@ -22,6 +22,9 @@ export const useAgentTransfer = (identifierId?: string) => {
       agentId?: string;
       serverId?: string;
       sourceSubdomain?: string;
+      provider?: string;
+      model?: string;
+      credentialMode?: string;
     },
     options?: OperationVariables,
   ) => {
@@ -42,6 +45,9 @@ export const useAgentTransfer = (identifierId?: string) => {
           agentId: input.agentId?.trim() || undefined,
           serverId: input.serverId?.trim() || undefined,
           sourceSubdomain: input.sourceSubdomain?.trim() || undefined,
+          provider: input.provider?.trim() || undefined,
+          model: input.model?.trim() || undefined,
+          credentialMode: input.credentialMode?.trim() || undefined,
         },
       },
     });

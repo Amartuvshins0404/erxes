@@ -223,4 +223,12 @@ export const contractPaymentQueries = {
       date: -1,
     });
   },
+
+  blockGetContractPaymentSettings: async (
+    _parent: undefined,
+    { projectId }: { projectId?: string },
+    { models }: IContext,
+  ) => {
+    return models.ContractPaymentSettings.getSettings(projectId);
+  },
 };

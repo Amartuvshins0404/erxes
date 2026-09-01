@@ -1,40 +1,33 @@
 import {
-  types as agentTypes,
-  queries as agentQueries,
-  mutations as agentMutations,
-} from '@/agent/graphql/schemas/agent';
+  mutations as AgentsConnectionMutations,
+  queries as AgentsConnectionQueries,
+  types as AgentsConnectionTypes,
+} from '@/agents/graphql/schemas/connection';
 import {
-  types as providerTypes,
-  queries as providerQueries,
-  mutations as providerMutations,
-} from '@/provider/graphql/schemas/provider';
+  mutations as AgentsThreadMutations,
+  queries as AgentsThreadQueries,
+  types as AgentsThreadTypes,
+} from '@/agents/graphql/schemas/threads';
 import {
-  types as settingsTypes,
-  queries as settingsQueries,
-  mutations as settingsMutations,
-} from '@/settings/graphql/schemas/settings';
-import {
-  types as sessionTypes,
-  queries as sessionQueries,
-  mutations as sessionMutations,
-} from '@/session/graphql/schemas/session';
+  mutations as AgentsSettingsMutations,
+  queries as AgentsSettingsQueries,
+  types as AgentsSettingsTypes,
+} from '@/agents/graphql/schemas/settings';
+
 export const types = `
-  ${agentTypes}
-  ${providerTypes}
-  ${settingsTypes}
-  ${sessionTypes}
+  ${AgentsConnectionTypes}
+  ${AgentsThreadTypes}
+  ${AgentsSettingsTypes}
 `;
 
 export const queries = `
-  ${agentQueries}
-  ${providerQueries}
-  ${settingsQueries}
-  ${sessionQueries}
+  ${AgentsConnectionQueries}
+  ${AgentsThreadQueries}
+  ${AgentsSettingsQueries}
 `;
 
 export const mutations = `
-  ${agentMutations}
-  ${providerMutations}
-  ${settingsMutations}
-  ${sessionMutations}
+  ${AgentsConnectionMutations}
+  ${AgentsThreadMutations}
+  ${AgentsSettingsMutations}
 `;

@@ -1,3 +1,5 @@
+import CpBlockAdminAgency from './agency';
+import CpBlockAdminAgent from './agent';
 import CpBlockAdminDeveloper from './developer';
 import CpBlockAdminListing from './listing';
 import CpBlockAdminProject from './project';
@@ -7,6 +9,8 @@ import CpBlockContract from './contract';
 import CpBlockOffer from './offer';
 
 export default {
+  CpBlockAdminAgency,
+  CpBlockAdminAgent,
   CpBlockAdminDeveloper,
   CpBlockAdminListing,
   CpBlockAdminProject,

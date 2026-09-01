@@ -1,6 +1,12 @@
 import { IconRefresh, IconSparkles } from '@tabler/icons-react';
-import { Button, Input, Sheet, Skeleton, useToast } from 'erxes-ui';
+import { Button, Sheet, Skeleton, useToast } from 'erxes-ui';
+import { SecretInput } from '~/modules/components/SecretInput';
 import { useEffect, useState } from 'react';
+import {
+  ASSISTANT_PROVIDER_OPTIONS,
+  getSubscriptionProviderOption,
+  subscriptionProviderNeedsCredential,
+} from '~/modules/company-brain/llmProviders';
 import { SERVER_STATUSES } from '../constants';
 import { useAgent } from '../../main/hooks/useAgent';
 import { AgentDeployForm } from './AgentDeployForm';
@@ -16,22 +22,45 @@ const AgentManagedRetry = () => {
   const { agent, refetch } = useAgent();
   const { deployManagedAgent, loading } = useManagedAgentDeploy();
   const { toast } = useToast();
-  const [apiToken, setApiToken] = useState('');
+  const [credential, setCredential] = useState('');
+
+  // Retry re-runs deployManagedAgent, which overwrites provider and
+  // credentialMode on the record. Sending a hardcoded kimi/api_key here moved
+  // customers off the provider they signed up with, so everything comes from
+  // the agent itself.
+  const isSubscription = agent?.credentialMode === 'subscription';
+  const provider = agent?.provider?.trim() || 'kimi';
+  const subscriptionOption = getSubscriptionProviderOption(provider);
+  const providerLabel = isSubscription
+    ? subscriptionOption.label
+    : ASSISTANT_PROVIDER_OPTIONS.find(({ value }) => value === provider)
+        ?.label || provider;
+  // Device-code subscriptions have nothing to paste; they authorize afterwards.
+  const needsCredential =
+    !isSubscription || subscriptionProviderNeedsCredential(provider);
+  const credentialLabel = isSubscription
+    ? subscriptionOption.credentialLabel || `${providerLabel} credential`
+    : `${providerLabel} API key`;
 
   const retryProvisioning = async () => {
-    if (!apiToken.trim()) {
+    if (needsCredential && !credential.trim()) {
       toast({
         variant: 'destructive',
-        title: 'Kimi API key required',
+        title: `${credentialLabel} required`,
       });
       return;
     }
 
     try {
       await deployManagedAgent({
-        apiToken,
-        provider: 'kimi',
+        provider,
+        model: agent?.model || undefined,
+        credentialMode: isSubscription ? 'subscription' : 'api_key',
+        ...(isSubscription
+          ? { subscriptionToken: credential }
+          : { apiToken: credential }),
       });
+      setCredential('');
       await refetch();
       toast({
         variant: 'success',
@@ -72,19 +101,29 @@ const AgentManagedRetry = () => {
         retrying={loading}
       />
 
-      <div className="space-y-2">
-        <label className="text-xs font-medium" htmlFor="managed-kimi-api-key">
-          Kimi API key
-        </label>
-        <Input
-          id="managed-kimi-api-key"
-          value={apiToken}
-          onChange={(event) => setApiToken(event.target.value)}
-          placeholder="Paste your Kimi API key"
-          autoComplete="off"
-          disabled={loading}
-        />
-      </div>
+      {needsCredential && (
+        <div className="space-y-2">
+          <label
+            className="text-xs font-medium"
+            htmlFor="managed-provider-credential"
+          >
+            {credentialLabel}
+          </label>
+          <SecretInput
+            id="managed-provider-credential"
+            value={credential}
+            onChange={(event) => setCredential(event.target.value)}
+            placeholder={
+              isSubscription
+                ? subscriptionOption.credentialPlaceholder ||
+                  `Paste your ${credentialLabel}`
+                : `Paste your ${credentialLabel}`
+            }
+            autoComplete="off"
+            disabled={loading}
+          />
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-2 sm:flex">
         <Button
@@ -99,7 +138,7 @@ const AgentManagedRetry = () => {
         </Button>
         <Button
           type="button"
-          disabled={loading || !apiToken.trim()}
+          disabled={loading || (needsCredential && !credential.trim())}
           onClick={retryProvisioning}
           className="flex-1 gap-2"
         >

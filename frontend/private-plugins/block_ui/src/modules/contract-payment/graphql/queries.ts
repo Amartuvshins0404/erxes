@@ -109,3 +109,28 @@ export const GET_PAYMENT_TRANSACTIONS = gql`
     }
   }
 `;
+
+export const GET_CONTRACT_PAYMENT_SETTINGS = gql`
+  query BlockGetContractPaymentSettings($projectId: String) {
+    blockGetContractPaymentSettings(projectId: $projectId) {
+      _id
+      projectId
+      paymentIds
+      allowPartial
+      updatedAt
+    }
+  }
+`;
+
+// The payment plugin owns the org's configured methods (QPay and friends); the
+// settings screen only stores which of them contract payments may use.
+export const GET_BLOCK_PAYMENT_METHODS = gql`
+  query BlockGetPaymentMethods($status: String) {
+    payments(status: $status) {
+      _id
+      name
+      kind
+      status
+    }
+  }
+`;

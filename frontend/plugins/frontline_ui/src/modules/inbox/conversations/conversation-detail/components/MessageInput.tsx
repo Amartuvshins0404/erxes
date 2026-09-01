@@ -239,9 +239,17 @@ export const MessageInput = ({
     e.target.value = '';
   };
 
+  // A drop aimed at an open dialog (e.g. the Facebook post composer) still
+  // reaches the editor and bubbles here, attaching the file to the conversation
+  // as well. Ignore drops while any modal is open.
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
+
+    if (document.querySelector('[role="dialog"][data-state="open"]')) {
+      return;
+    }
+
     handleFileUpload(e.dataTransfer.files);
   };
 
@@ -464,9 +472,21 @@ export const MessageInput = ({
 
   if (hideInput) return null;
 
+  // The rich-text editor registers its own drop listener and inserts dropped
+  // images as blocks. Chrome does not reliably honour pointer-events: none for
+  // HTML5 drag-and-drop, so an open dialog does not stop it. Intercept in the
+  // CAPTURE phase, which runs before the editor's own handler.
+  const blockDropWhenModalOpen = (e: React.DragEvent<HTMLDivElement>) => {
+    if (document.querySelector('[role="dialog"][data-state="open"]')) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  };
+
   return (
-    <div className="p-2 h-full">
+    <div className="p-2 h-full" onDropCapture={blockDropWhenModalOpen}>
       <div
+        onDropCapture={blockDropWhenModalOpen}
         onDrop={handleDrop}
         onKeyDown={handleKeyDown}
         onDragOver={(e) => e.preventDefault()}
@@ -569,32 +589,35 @@ export const MessageInput = ({
           </div>
         )}
 
-        <div className="flex px-6 gap-4 items-center mt-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-1 px-2 mt-2 sm:gap-4 sm:px-6">
           <Toggle
             pressed={isInternalNote}
             size="lg"
             variant="outline"
+            className="min-w-20 max-w-full px-2 sm:px-5"
             onPressedChange={() =>
               !onlyInternal && setIsInternalNote(!isInternalNote)
             }
           >
-            {t('internal-note')}
+            <span className="truncate">{t('internal-note')}</span>
           </Toggle>
 
-          <ResponseTemplateSelector onSelect={handleTemplateSelect}>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
-            >
-              <IconMessage2 className="h-4 w-4" />
-            </Button>
-          </ResponseTemplateSelector>
+          {!isInternalNote && (
+            <ResponseTemplateSelector onSelect={handleTemplateSelect}>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+              >
+                <IconMessage2 className="h-4 w-4" />
+              </Button>
+            </ResponseTemplateSelector>
+          )}
 
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+            className="h-8 w-8 flex-none rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
             onClick={() => document.getElementById('file-upload')?.click()}
           >
             <IconPaperclip className="h-4 w-4" />
@@ -613,7 +636,7 @@ export const MessageInput = ({
 
           <Button
             size="lg"
-            className="ml-auto"
+            className="ml-auto flex-none"
             disabled={
               loading ||
               isLoading ||
@@ -623,7 +646,7 @@ export const MessageInput = ({
           >
             {loading || isLoading ? <Spinner size="sm" /> : <IconArrowUp />}
             {t('send')}
-            <Kbd className="ml-1">
+            <Kbd className="ml-1 hidden sm:flex">
               <IconCommand size={12} />
               <IconCornerDownLeft size={12} />
             </Kbd>

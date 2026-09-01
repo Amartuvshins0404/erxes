@@ -98,6 +98,9 @@ export const CREATE_AGENT_TRANSFER_CREDENTIALS = gql`
       gatewayToken
       agentId
       serverId
+      provider
+      model
+      credentialMode
       status
     }
   }

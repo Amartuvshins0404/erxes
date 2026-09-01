@@ -5,16 +5,21 @@ import {
   AgencyViewControl,
 } from '@/agencies/components/AgenciesView';
 import { PageContainer, PageSubHeader, ScrollArea, Separator } from 'erxes-ui';
-import { PageHeader } from 'ui-modules';
+import { PageHeader, createFavoriteBreadcrumb } from 'ui-modules';
 
 export const AgenciesPage = () => {
+  const favoriteBreadcrumb = createFavoriteBreadcrumb('Agencies');
+
   return (
     <PageContainer>
       <PageHeader>
         <PageHeader.Start>
           <AgenciesSubNav />
           <Separator.Inline />
-          <PageHeader.FavoriteToggleButton />
+          <PageHeader.FavoriteToggleButton
+            breadcrumb={favoriteBreadcrumb}
+            icon="IconClipboardTextFilled"
+          />
         </PageHeader.Start>
       </PageHeader>
       <PageSubHeader>

@@ -17,6 +17,8 @@ export const GET_AGENT = gql`
       createdAt
       updatedAt
       status
+      transferredAt
+      transferredFromSubdomain
       provisioning {
         stage
         message
@@ -35,6 +37,14 @@ export const AGENT_LLM_SUBSCRIPTION_AUTH_STATUS = gql`
       status
       message
       records
+    }
+  }
+`;
+
+export const AGENT_RUNTIME_HEALTH = gql`
+  query AgentRuntimeHealth($identifierId: String!) {
+    agentRuntimeHealth(identifierId: $identifierId) {
+      healthy
     }
   }
 `;

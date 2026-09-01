@@ -1,10 +1,12 @@
-import { Form, InfoCard, Textarea } from 'erxes-ui';
-import { useAgencyInfo } from '../hooks/useAgencyInfo';
-import { useForm } from 'react-hook-form';
-import { AgencyIntroductionValues } from '../types/form';
-import { agencyIntroductionSchema } from '../schema/form';
+import { Editor, Form, InfoCard } from 'erxes-ui';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useForm } from 'react-hook-form';
+import { useAgencyInfo } from '../hooks/useAgencyInfo';
 import { useUpdateAgency } from '../hooks/useUpdateAgency';
+import { agencyIntroductionSchema } from '../schema/form';
+import { AgencyIntroductionValues } from '../types/form';
+import { BRIEF_MAX_LENGTH } from '../schema/form';
+import { getBlockPlainText } from '../utils/blockText';
 
 export const AgencyProfileIntroduction = () => {
   const { loading } = useAgencyInfo();
@@ -42,6 +44,8 @@ export const AgencyIntroduction = () => {
     updateAgency({ variables: { input: values } });
   };
 
+  const briefLength = getBlockPlainText(form.watch('brief')).length;
+
   return (
     <Form {...form}>
       <form className="gap-1">
@@ -52,18 +56,16 @@ export const AgencyIntroduction = () => {
             <Form.Item>
               <Form.Label>Brief Info</Form.Label>
               <Form.Control>
-                <Textarea
-                  maxLength={300}
-                  value={field.value}
-                  onChange={(event) => {
-                    field.onChange(event.currentTarget.value);
-                    handleSave({ brief: event.currentTarget.value });
+                <Editor
+                  initialContent={field.value}
+                  onChange={(value) => {
+                    field.onChange(value);
+                    handleSave({ brief: value });
                   }}
-                  placeholder="Max 300 characters…"
                 />
               </Form.Control>
               <Form.Description className="text-right">
-                {(field.value as string)?.length}/300 characters
+                {briefLength}/{BRIEF_MAX_LENGTH} characters
               </Form.Description>
               <Form.Message />
             </Form.Item>
@@ -77,13 +79,13 @@ export const AgencyIntroduction = () => {
             <Form.Item>
               <Form.Label>Full Description</Form.Label>
               <Form.Control>
-                <Textarea
-                  value={field.value}
-                  onChange={(event) => {
-                    field.onChange(event.currentTarget.value);
-                    handleSave({ brief: event.currentTarget.value });
+                <Editor
+                  className="h-64 min-h-64"
+                  initialContent={field.value}
+                  onChange={(value) => {
+                    field.onChange(value);
+                    handleSave({ description: value });
                   }}
-                  placeholder="Full agency description"
                 />
               </Form.Control>
               <Form.Message />

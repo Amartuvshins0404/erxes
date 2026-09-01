@@ -102,3 +102,8 @@ export const DEFAULT_CONTRACT_STATUS_TYPE_VALUES = {
     name: 'Cancelled',
   },
 };
+
+// payment_api routes a paid invoice back to the plugin named in its
+// contentType, so this string is the contract between block_api and payment_api
+// for a scheduled contract payment settled online.
+export const CONTRACT_PAYMENT_CONTENT_TYPE = 'block:contractPayment';

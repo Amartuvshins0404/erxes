@@ -9,6 +9,7 @@ import {
   Spinner,
   Textarea,
   toast,
+  useConfirm,
 } from 'erxes-ui';
 import {
   IconPlus,
@@ -18,6 +19,17 @@ import {
   IconNote,
   IconCreditCard,
 } from '@tabler/icons-react';
+import { useAtom } from 'jotai';
+import { format } from 'date-fns';
+import { useState } from 'react';
+import { useApolloClient } from '@apollo/client';
+import { paymentSheetState } from '@/contract-payment/states/paymentSheetState';
+import {
+  useAddPaymentTransaction,
+  usePaymentTransactions,
+  useRemovePaymentTransaction,
+} from '@/contract-payment/hooks/usePayments';
+import { IContractPayment } from '@/contract-payment/types';
 
 const PAYMENT_METHOD_OPTIONS = [
   { value: 'cash', label: 'Cash' },
@@ -26,40 +38,7 @@ const PAYMENT_METHOD_OPTIONS = [
   { value: 'online', label: 'Online' },
   { value: 'other', label: 'Other' },
 ];
-import { useAtom } from 'jotai';
-import { format } from 'date-fns';
-import { useState } from 'react';
-import { useApolloClient, useQuery } from '@apollo/client';
-import { paymentSheetState } from '@/contract-payment/states/paymentSheetState';
-import {
-  useAddPaymentTransaction,
-  usePaymentTransactions,
-  useRemovePaymentTransaction,
-} from '@/contract-payment/hooks/usePayments';
-import { IContractPayment } from '@/contract-payment/types';
-import { gql } from '@apollo/client';
 
-const GET_PAYMENT = gql`
-  query BlockGetPayment($contractId: String!) {
-    blockGetContractPayments(contractId: $contractId, limit: 1000) {
-      list {
-        _id
-        contractId
-        contractNumber
-        index
-        label
-        dueDate
-        amount
-        currency
-        status
-        paidAmount
-        paidDate
-        penaltyAmount
-        overdueDays
-      }
-    }
-  }
-`;
 
 const formatAmount = (val?: number, currency = 'MNT') => {
   if (val == null) return '-';
@@ -351,21 +330,28 @@ const TransactionRow = ({
   currency: string;
 }) => {
   const { removeTransaction, loading } = useRemovePaymentTransaction();
+  const { confirm } = useConfirm();
   const dateObj = parseDateLike(tx.date);
 
-  const handleRemove = async () => {
-    if (!confirm('Delete this payment?')) return;
-    try {
-      await removeTransaction(tx._id);
-      toast({ title: 'Payment removed', variant: 'success' });
-    } catch (e: any) {
-      toast({
-        title: 'Error',
-        description: e?.message || 'Failed',
-        variant: 'destructive',
-      });
-    }
-  };
+  // Same confirmation primitive the rest of the plugin uses for destructive row
+  // actions, instead of the browser's blocking `confirm`. The promise only
+  // settles when the dialog is confirmed; dismissing it simply does nothing.
+  const handleRemove = () =>
+    confirm({
+      message: 'Are you sure you want to delete this payment?',
+      options: { confirmationValue: '' },
+    }).then(async () => {
+      try {
+        await removeTransaction(tx._id);
+        toast({ title: 'Payment removed', variant: 'success' });
+      } catch (e) {
+        toast({
+          title: 'Error',
+          description: e instanceof Error ? e.message : 'Failed to remove',
+          variant: 'destructive',
+        });
+      }
+    });
 
   return (
     <div className="border rounded-md p-3 flex items-start justify-between gap-3">

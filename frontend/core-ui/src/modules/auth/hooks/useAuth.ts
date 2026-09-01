@@ -9,6 +9,7 @@ import {
   isCurrentUserLoadedState,
 } from 'ui-modules';
 import { Logout } from '@/auth/graphql/mutations/logout';
+import { notifyCfOsLogout } from '@/auth/utils/notifyCfOsLogout';
 import { AppPath } from '@/types/paths/AppPath';
 import { useSetAtom } from 'jotai';
 
@@ -35,6 +36,7 @@ export const useAuth = () => {
     setCurrentOrganization(null);
     setIsCurrentOrganizationLoaded(false);
 
+    notifyCfOsLogout();
     sessionStorage.clear();
     navigate(AppPath.Login);
   }, [

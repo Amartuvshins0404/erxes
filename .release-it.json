@@ -1,19 +1,28 @@
 {
+  "increment": false,
   "npm": {
     "publish": false
   },
   "git": {
     "commitMessage": "release ${version}",
+    "pushRepo": "origin",
+    "requireBranch": "main",
     "tagName": "${version}",
     "tagAnnotation": "Release ${version}",
     "tagMatch": "3.*"
   },
   "github": {
     "release": true,
-    "releaseName": "v${version}"
+    "releaseName": "v${version}",
+    "timeout": 30000
   },
   "plugins": {
     "@release-it/conventional-changelog": {
+      "context": {
+        "host": "https://github.com",
+        "owner": "erxes",
+        "repository": "erxes-private"
+      },
       "preset": {
         "name": "angular"
       },

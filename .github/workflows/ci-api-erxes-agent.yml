@@ -51,14 +51,19 @@ jobs:
       - name: Build erxes-agent_api
         run: pnpm nx build erxes-agent_api
 
-      # Security regression guards (Phase 1–3). Pure/mocked tests — the live
-      # gateway ones skip cleanly when localhost:4000 is absent. Fails CI if the
-      # denylist is re-narrowed, the header strip is reverted, or the run-token
-      # mint regresses.
+      # Security regression guards. The rewritten BYOK plugin carries its
+      # security invariants inside its standard suites (API-key write-only
+      # `hasKey` reads, header-derived identity, thread ownership, agent-tool
+      # auth headers) — run the full plugin suite plus the shared/core-api
+      # pattern guards. Pure/mocked tests — the live gateway ones skip
+      # cleanly when localhost:4000 is absent.
       - name: Run security regression tests
         run: |
           pnpm nx test erxes-api-shared
-          pnpm nx test erxes-agent_api -- --testPathPattern="securityGuard|argScrub|authHeaders|secretRedaction|secretRefGuard|secretHandlingContract|runToken|securityExploit|imageTools" --runInBand
+          # NODE_OPTIONS is required by the code-mode sandbox suites: the
+          # QuickJS WASM variant loads through a dynamic import that Node
+          # only services for jest vm contexts with --experimental-vm-modules.
+          NODE_OPTIONS=--experimental-vm-modules pnpm nx test erxes-agent_api -- --runInBand
           pnpm nx test core-api -- --testPathPattern="issueRunToken|configsGetCodes|getCodesContract" --runInBand
 
       - name: Set up QEMU

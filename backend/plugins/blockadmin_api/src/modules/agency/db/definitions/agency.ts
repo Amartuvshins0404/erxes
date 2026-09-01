@@ -2,6 +2,7 @@ import { Schema } from 'mongoose';
 import { BLOCK_VERIFICATION_STATUS } from '~/constants';
 import { schemaWrapper } from '~/utils';
 import { IBlockAgencyDocument } from '@/agency/@types/agency';
+import { attachmentSchema } from 'erxes-api-shared/core-modules';
 
 export const agencySchema = schemaWrapper(
   new Schema<IBlockAgencyDocument>(
@@ -17,9 +18,9 @@ export const agencySchema = schemaWrapper(
       phones: [{ type: String }],
       primaryPhone: { type: String },
       dateFounded: { type: String },
-      logo: { type: String },
-      coverImage: { type: String },
-      documents: [{ type: String }],
+      logo: { type: attachmentSchema },
+      coverImage: { type: attachmentSchema },
+      documents: [{ type: attachmentSchema }],
       socialLinks: { type: Map, of: String, default: {} },
       operationArea: {
         city: { type: String },

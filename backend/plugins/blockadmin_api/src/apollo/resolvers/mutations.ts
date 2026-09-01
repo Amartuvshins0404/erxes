@@ -8,6 +8,7 @@ import { supplierMutations } from '@/supplier/profile/graphql/resolvers/mutation
 import { productMutations } from '@/supplier/product/graphql/resolvers/mutations/product';
 import { membershipMutations } from '@/membership/graphql/resolvers/mutations/membership';
 import { membershipPlanMutations } from '@/membership/graphql/resolvers/mutations/membershipPlan';
+import { cpBlockMutations } from '~/modules/clientportal/graphql/resolvers/mutations';
 
 export const mutations = {
   ...submissionMutation,
@@ -20,4 +21,5 @@ export const mutations = {
   ...productMutations,
   ...membershipMutations,
   ...membershipPlanMutations,
+  ...cpBlockMutations,
 };

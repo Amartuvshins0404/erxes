@@ -1,0 +1,68 @@
+name: CI plugin-cf_os_ui
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - '[0-9]*'
+    paths:
+      - 'frontend/plugins/cf_os_ui/**'
+      - 'frontend/libs/**'
+      - '.github/workflows/ci-ui-cf-os.yml'
+  pull_request:
+    paths:
+      - 'frontend/plugins/cf_os_ui/**'
+      - 'frontend/libs/**'
+      - '.github/workflows/ci-ui-cf-os.yml'
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+  packages: write
+  id-token: write
+
+jobs:
+  cf_os_ui-ci:
+    runs-on: ubuntu-latest
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      CF_OS_URL: ${{ vars.CF_OS_URL }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@eae0cfeb286e66ffb5155f1a79b90583a127a68b # v2.4.1
+        with:
+          version: 9
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Check configuration
+        run: test -n "$CF_OS_URL"
+
+      - name: Build cf_os UI
+        run: |
+          export NX_DAEMON=false
+          pnpm nx build cf-os_ui
+
+      - name: Sync to Cloudflare R2
+        if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/'))
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            FOLDER="${{ github.ref_name }}"
+          else
+            FOLDER="latest"
+          fi
+          aws s3 sync dist/frontend/plugins/cf_os_ui s3://erxes-next/$FOLDER/cf_os_ui/ \
+            --endpoint-url https://7c8392aff8ac4518aa06dfa4b6337ef2.r2.cloudflarestorage.com

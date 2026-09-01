@@ -1,8 +1,15 @@
 import { ICursorPaginateParams } from 'erxes-api-shared/core-types';
 import { cursorPaginate } from 'erxes-api-shared/utils';
-import { IContext } from '~/connectionResolvers';
+import { IContext, IModels } from '~/connectionResolvers';
 import { IBlockAdminListingDocument } from '@/listing/@types/listing';
-import { generateFilter } from '@/listing/utils';
+import {
+  buildListingStats,
+  EMPTY_LISTING_STATS,
+  generateFilter,
+} from '@/listing/utils';
+import { resolveAgentKeys } from '@/member/utils';
+import { EMPTY_CURSOR_LIST } from '~/utils';
+import { FilterQuery } from 'mongoose';
 
 export interface ListingQueryParams {
   subdomain?: string;
@@ -10,7 +17,35 @@ export interface ListingQueryParams {
   searchValue?: string;
   city?: string;
   district?: string;
+  /** Block admin `BlockAdminAgent._id` of the owning agent. */
+  agencyMemberId?: string;
 }
+
+/**
+ * Listings store the agency-side member id, so a block admin agent `_id` is
+ * translated first. Returns `null` when the agent is unknown, which callers
+ * must treat as "no listings" rather than as "no filter".
+ */
+const buildListingFilter = async (
+  models: IModels,
+  { agencyMemberId, ...params }: ListingQueryParams,
+): Promise<FilterQuery<IBlockAdminListingDocument> | null> => {
+  if (!agencyMemberId) {
+    return generateFilter(params);
+  }
+
+  const keys = await resolveAgentKeys(models, agencyMemberId);
+
+  if (!keys) {
+    return null;
+  }
+
+  return generateFilter({
+    ...params,
+    subdomain: params.subdomain || keys.subdomain,
+    agencyMemberId: keys.entityId,
+  });
+};
 
 export const listingQueries = {
   getBlockAdminListing: async (
@@ -28,7 +63,11 @@ export const listingQueries = {
     params: ListingQueryParams & ICursorPaginateParams,
     { models }: IContext,
   ) => {
-    const filter = generateFilter(params);
+    const filter = await buildListingFilter(models, params);
+
+    if (!filter) {
+      return EMPTY_CURSOR_LIST;
+    }
 
     const { list, pageInfo, totalCount } =
       await cursorPaginate<IBlockAdminListingDocument>({
@@ -42,26 +81,18 @@ export const listingQueries = {
 
   getBlockAdminListingStats: async (
     _root: undefined,
-    { subdomain }: { subdomain?: string },
+    { subdomain, agencyMemberId }: ListingQueryParams,
     { models }: IContext,
   ) => {
-    const baseFilter = subdomain ? { subdomain } : {};
+    const filter = await buildListingFilter(models, {
+      subdomain,
+      agencyMemberId,
+    });
 
-    const [total, active, draft, viewsAgg] = await Promise.all([
-      models.Listing.countDocuments(baseFilter),
-      models.Listing.countDocuments({ ...baseFilter, status: 'active' }),
-      models.Listing.countDocuments({ ...baseFilter, status: 'draft' }),
-      models.Listing.aggregate([
-        ...(subdomain ? [{ $match: { subdomain } }] : []),
-        { $group: { _id: null, totalViews: { $sum: '$viewCount' } } },
-      ]),
-    ]);
+    if (!filter) {
+      return EMPTY_LISTING_STATS;
+    }
 
-    return {
-      total,
-      active,
-      draft,
-      totalViews: viewsAgg[0]?.totalViews ?? 0,
-    };
+    return await buildListingStats(models.Listing, filter);
   },
 };

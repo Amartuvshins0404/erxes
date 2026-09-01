@@ -1,69 +1,55 @@
-import './polyfills'; // must stay first — patches globals Mastra needs on Node 18
-import { redis, startPlugin } from 'erxes-api-shared/utils';
-import { createHash } from 'node:crypto';
+import * as path from 'path';
+import { startPlugin } from 'erxes-api-shared/utils';
 import { typeDefs } from '~/apollo/typeDefs';
+import { appRouter } from '~/trpc/init-trpc';
 import { resolvers } from '~/apollo/resolvers';
 import { generateModels } from './connectionResolvers';
 import { router } from './routes';
-import { appRouter } from '~/trpc/init-trpc';
 import { permissions } from '~/meta/permissions';
-import { migrateAgentAccounts } from '~/migrations/migrateAgentAccounts';
 
 startPlugin({
   name: 'erxes-agent',
-  port: 3312,
-  meta: {
-    // Permission map: every mutation/query and the /chat/stream route is gated
-    // by one of these actions. Surfaces in the core permissions admin UI.
-    permissions,
-  },
+  port: 3306,
+  // Browser calls these REST routes cross-origin (host :3001 → gateway :4000)
+  // with `credentials: 'include'` because auth lives in the httpOnly
+  // `auth-token` cookie. The plugin's proxied response headers win, so with
+  // the default `cors()` options (`Access-Control-Allow-Origin: *`) the
+  // browser rejects every credentialed response with "Failed to fetch".
+  // `origin: true` echoes the request origin, which credentialed CORS allows.
+  corsOptions: { credentials: true, origin: true },
+  expressRouter: router,
+  // Serves the gateway subscription bundle (`src/apollo/subscription.ts` at
+  // `/subscriptionPlugin.js`) so the gateway's graphql-ws server aggregates
+  // this plugin's `agentsThreadsChanged` subscription.
+  hasSubscriptions: true,
+  subscriptionPluginPath: path.resolve(
+    __dirname,
+    'apollo',
+    process.env.NODE_ENV === 'production' ? 'subscription.js' : 'subscription.ts',
+  ),
   graphql: async () => ({
     typeDefs: await typeDefs(),
     resolvers,
   }),
-  expressRouter: router,
   apolloServerContext: async (subdomain, context) => {
     const models = await generateModels(subdomain);
+
     context.models = models;
+
     return context;
   },
   trpcAppRouter: {
     router: appRouter,
     createContext: async (subdomain, context) => {
       const models = await generateModels(subdomain);
+
       context.models = models;
+
       return context;
     },
   },
-  onServerInit: async () => {
-    // Flush the per-user permission action cache when this plugin's permissions
-    // definition has changed since the last startup. Uses SCAN (not KEYS) to
-    // avoid blocking Redis on large keyspaces.
-    {
-      const HASH_KEY = 'erxes-agent:permissions_hash';
-      const current = createHash('sha256')
-        .update(JSON.stringify(permissions))
-        .digest('hex');
-      const stored = await redis.get(HASH_KEY);
-      if (stored !== current) {
-        let cursor = 0;
-        do {
-          const [next, batch] = await redis.scan(
-            cursor,
-            'MATCH',
-            'user_actions_*',
-            'COUNT',
-            100,
-          );
-          cursor = parseInt(next, 10);
-          if (batch.length) await redis.del(...batch);
-        } while (cursor !== 0);
-        await redis.set(HASH_KEY, current);
-      }
-    }
-
-    // Canonicalize every legacy agent/service-user pair before an agent can
-    // execute under an AI team-member identity.
-    await migrateAgentAccounts();
+  meta: {
+    permissions,
   },
 });
+

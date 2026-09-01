@@ -34,6 +34,7 @@ export const types = `
     entityId: String
     subdomain: String
     agencyId: String
+    agencyMemberId: String
     title: String
     type: String
     propertyType: String
@@ -66,12 +67,14 @@ export const types = `
     total: Int!
     active: Int!
     draft: Int!
+    sold: Int!
     totalViews: Float!
   }
 `;
 
 const queryParams = `
   subdomain: String
+  agencyMemberId: String
   status: String
   searchValue: String
   city: String
@@ -82,7 +85,7 @@ const queryParams = `
 
 export const queries = `
   getBlockAdminListings(${queryParams}): BlockAdminListingListResponse
-  getBlockAdminListingStats(subdomain: String): BlockAdminListingStats
+  getBlockAdminListingStats(subdomain: String, agencyMemberId: String): BlockAdminListingStats
   getBlockAdminListing(_id: String!): BlockAdminListing
 `;
 

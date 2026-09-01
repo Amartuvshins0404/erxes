@@ -175,11 +175,7 @@ export const OffersFilter = () => {
               <IconUser />
               Customer
             </Filter.BarName>
-            <SelectCustomer.FilterBar
-              filterKey="customerId"
-              label="Customer"
-              mode="single"
-            />
+            <SelectCustomer.FilterBar filterKey="customerId" mode="single" />
           </Filter.BarItem>
         )}
         <Filter.BarItem queryKey="currency">

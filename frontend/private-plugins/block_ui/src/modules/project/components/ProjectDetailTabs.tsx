@@ -111,6 +111,12 @@ const ProjectDetailContractStatuses = lazy(() =>
   })),
 );
 
+const ProjectDetailPayment = lazy(() =>
+  import('./ProjectDetailPayment').then((module) => ({
+    default: module.ProjectDetailPayment,
+  })),
+);
+
 export const ProjectDetailTabs = () => {
   const [activeTab] = useQueryState('activeTab', {
     defaultValue: 'general',
@@ -141,6 +147,7 @@ export const ProjectDetailTabs = () => {
       {activeTab === PROJECT_TABS.CONTRACT_STATUSES && (
         <ProjectDetailContractStatuses />
       )}
+      {activeTab === PROJECT_TABS.PAYMENT && <ProjectDetailPayment />}
     </Suspense>
   );
 };

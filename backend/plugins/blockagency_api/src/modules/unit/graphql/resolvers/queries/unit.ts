@@ -1,3 +1,4 @@
+import { checkLogin } from 'erxes-api-shared/core-modules';
 import { IContext } from '~/connectionResolvers';
 import { BlockUnitStatus } from '~/modules/unit-assignment/db/unitAssignment';
 
@@ -21,7 +22,6 @@ const buildFilter = ({
   if (projectId) filter.projectId = projectId;
   if (memberId) filter.memberId = memberId;
   if (status) {
-    // Legacy records without a status field are treated as 'available'
     filter.status =
       status === 'vacant' ? { $in: ['vacant', null, undefined] } : status;
   }
@@ -39,8 +39,10 @@ export const blockUnitQueries = {
       page = 1,
       perPage = 20,
     }: UnitQueryParams,
-    { models }: IContext,
+    { models, user }: IContext,
   ) => {
+    checkLogin(user);
+
     return models.BlockUnitAssignment.find(
       buildFilter({ agencyId, projectId, memberId, status }),
     )
@@ -58,8 +60,10 @@ export const blockUnitQueries = {
       memberId,
       status,
     }: Pick<UnitQueryParams, 'agencyId' | 'projectId' | 'memberId' | 'status'>,
-    { models }: IContext,
+    { models, user }: IContext,
   ) => {
+    checkLogin(user);
+
     return models.BlockUnitAssignment.countDocuments(
       buildFilter({ agencyId, projectId, memberId, status }),
     );
@@ -68,8 +72,10 @@ export const blockUnitQueries = {
   blockAgencyGetUnitStatusCounts: async (
     _root: undefined,
     { agencyId, projectId }: Pick<UnitQueryParams, 'agencyId' | 'projectId'>,
-    { models }: IContext,
+    { models, user }: IContext,
   ) => {
+    checkLogin(user);
+
     const base = buildFilter({ agencyId, projectId });
     const [reserved, leased, sold, total] = await Promise.all([
       models.BlockUnitAssignment.countDocuments({
@@ -80,7 +86,6 @@ export const blockUnitQueries = {
       models.BlockUnitAssignment.countDocuments({ ...base, status: 'sold' }),
       models.BlockUnitAssignment.countDocuments(base),
     ]);
-    // Legacy records without a status field count as available
     const available = total - reserved - leased - sold;
     return { available, reserved, leased, sold };
   },

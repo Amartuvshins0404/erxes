@@ -4,6 +4,7 @@ export const types = `
   type CpBlockAdminListing {
     _id: String
     agencyId: String
+    agencyMemberId: String
     title: String
     type: String
     propertyType: String
@@ -25,12 +26,15 @@ export const types = `
     total: Int!
     active: Int!
     draft: Int!
+    sold: Int!
     totalViews: Float!
   }
 `;
 
 const queryParams = `
   agencyId: String
+  agencyMemberId: String
+  status: String
   type: String
   propertyType: String
   searchValue: String
@@ -43,5 +47,5 @@ const queryParams = `
 export const queries = `
   cpGetBlockAdminListings(${queryParams}): [CpBlockAdminListing]
   cpGetBlockAdminListing(_id: String!): CpBlockAdminListing
-  cpGetBlockAdminListingStats(agencyId: String): CpBlockAdminListingStats
+  cpGetBlockAdminListingStats(agencyId: String, agencyMemberId: String): CpBlockAdminListingStats
 `;

@@ -1,8 +1,9 @@
 import { useQuery } from '@apollo/client';
 import { BLOCK_GET_UNIT, BLOCK_UNIT_ATTACHMENTS } from '../graphql/unitQueries';
+import { IUnit } from '../types/unitType';
 
 export const useUnit = (id?: string | null) => {
-  const { data, loading } = useQuery(BLOCK_GET_UNIT, {
+  const { data, loading } = useQuery<{ blockGetUnit: IUnit }>(BLOCK_GET_UNIT, {
     variables: { id },
     skip: !id,
   });

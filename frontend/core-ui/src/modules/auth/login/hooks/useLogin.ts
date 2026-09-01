@@ -7,6 +7,7 @@ import { currentUserState, isCurrentUserLoadedState } from 'ui-modules';
 import { toast } from 'erxes-ui';
 
 import { Logout } from '@/auth/graphql/mutations/logout';
+import { notifyCfOsLogout } from '@/auth/utils/notifyCfOsLogout';
 import { ForgotPassword } from '@/auth/login/grahpql/mutations/forgotPassword';
 import { Login } from '@/auth/login/grahpql/mutations/login';
 import { ResetPassword } from '@/auth/login/grahpql/mutations/resetPassword';
@@ -62,6 +63,7 @@ export const useLogin = () => {
     setIsCurrentUserLoaded(false);
     setCurrentUser(null);
 
+    notifyCfOsLogout();
     sessionStorage.clear();
 
     navigate(AppPath.Login);

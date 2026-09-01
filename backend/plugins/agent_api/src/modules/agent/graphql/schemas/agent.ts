@@ -32,6 +32,7 @@ export const types = `
     provisioning: AgentProvisioningProgress
     transferredFromSubdomain: String
     transferredAt: Date
+    transferCredentialsIssuedAt: Date
 
     createdAt: Date
     updatedAt: Date
@@ -50,6 +51,9 @@ export const types = `
     gatewayToken: String
     agentId: String
     serverId: String
+    provider: String
+    model: String
+    credentialMode: String
     status: String
   }
 
@@ -76,6 +80,9 @@ export const types = `
     agentId: String
     serverId: String
     sourceSubdomain: String
+    provider: String
+    model: String
+    credentialMode: String
   }
 
   input ApproveAgentInput {
@@ -144,6 +151,10 @@ export const types = `
     items: JSON
     records: JSON
   }
+
+  type AgentRuntimeHealth {
+    healthy: Boolean!
+  }
 `;
 
 export const queries = `
@@ -165,6 +176,7 @@ export const queries = `
   agentRuntimePluginInspect(agentId: String!, pluginId: String!): AgentRuntimeResult
   agentRuntimePluginDoctor(agentId: String!): AgentRuntimeResult
   agentLlmSubscriptionAuthStatus(identifierId: String!): AgentRuntimeResult
+  agentRuntimeHealth(identifierId: String!): AgentRuntimeHealth
 `;
 
 export const mutations = `

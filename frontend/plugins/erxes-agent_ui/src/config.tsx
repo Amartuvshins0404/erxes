@@ -1,42 +1,43 @@
-import { IconRobot } from '@tabler/icons-react';
+import { IconSparkles } from '@tabler/icons-react';
 import { lazy, Suspense } from 'react';
-import type { IUIConfig } from 'erxes-ui';
+import { IUIConfig } from 'erxes-ui';
 
-const MastraSettingsNavigation = lazy(() =>
-  import('@/MastraSettingsNavigation').then((module) => ({
-    default: module.MastraSettingsNavigation,
+const ErxesAgentSettingsNavigation = lazy(() =>
+  import('@/ErxesAgentSettingsNavigation').then((module) => ({
+    default: module.ErxesAgentSettingsNavigation,
   })),
 );
 
 export const CONFIG: IUIConfig = {
-  // MF remote name uses underscores (Nx convention); permissionName is the
-  // backend plugin name used for permission checks.
+  // Module-federation remote/container names cannot contain dashes — Nx
+  // normalizes `erxes-agent_ui` to the global `erxes_agent_ui` and the host
+  // loads exposes via `${plugin.name}_ui`. So `name` must be the
+  // underscored remote name, while `permissionName` keeps the dashed backend
+  // plugin name used for permission checks.
   name: 'erxes_agent',
   permissionName: 'erxes-agent',
   path: 'erxes-agent',
-  i18nNamespace: 'mastra',
+  hasFloatingWidget: true,
   settingsNavigation: () => (
     <Suspense fallback={<div />}>
-      <MastraSettingsNavigation />
+      <ErxesAgentSettingsNavigation />
     </Suspense>
   ),
+  // The rail click on "Agents" navigates straight to the chat page (the
+  // activity defaultPath). No navigationGroup content: the host renders a
+  // secondary plugin panel only when content exists, so omitting it keeps
+  // the chat page free of an extra sidebar step.
   navigationGroup: {
-    // Rail label + icon only. No `content` on purpose: core skips the
-    // sub-module panel when a group has no contents, and the plugin renders
-    // its own in-page sidebar (agents + conversations) instead.
-    name: 'erxes AI Agents',
-    icon: IconRobot,
+    name: 'Agents',
+    defaultPath: 'erxes-agent',
+    icon: IconSparkles,
   },
+
   modules: [
     {
-      name: 'erxes AI Agents',
-      icon: IconRobot,
-      path: 'erxes-agent',
-    },
-    {
       name: 'agents',
-      icon: IconRobot,
-      path: 'erxes-agent/agents',
+      icon: IconSparkles,
+      path: 'erxes-agent',
     },
   ],
 };

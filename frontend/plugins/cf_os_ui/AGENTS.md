@@ -1,0 +1,123 @@
+# `cf-os_ui` Plugin Guide
+
+## Identity
+
+- **Plugin:** `cf-os`
+- **Project:** `cf-os_ui`
+- **Layer:** `Frontend UI`
+- **Path:** `frontend/plugins/cf_os_ui`
+- **Last synchronized:** `2026-08-26`
+
+## Scope
+
+### Owns
+
+- The `command` navigation entry (label only) and its Module Federation
+  entry point.
+- The embedded view for the deployed Cloudflare OS application.
+
+### Does not own
+
+- Cloudflare OS backend or deployment.
+- Executor authentication, APIs, or persistence.
+- Erxes authentication, permissions, or core navigation.
+
+## Current Capabilities
+
+- Adds a `command` item to the Erxes plugin navigation.
+- Registers no core sub-module panel, so the Command iframe uses the full content width.
+- Mints a short-lived connect code as the signed-in dashboard user and embeds the Command app from `CF_OS_URL`; Cloudflare OS redeems the code for passwordless sign-in.
+- Builds as the `cf-os_ui` Module Federation remote.
+
+## Architecture
+
+| Area          | Path                                      | Responsibility                         |
+| ------------- | ----------------------------------------- | -------------------------------------- |
+| Configuration | `src/config.tsx`                          | Registers navigation and the route.    |
+| Entry point   | `src/modules/CfOsMain.tsx`                | Embeds the deployed Command app.      |
+| Federation    | `module-federation.config.ts`             | Exposes config and the CF OS page.    |
+| Build config  | `rspack.config.ts`                         | Injects build-time `CF_OS_URL` into the remote bundle. |
+
+## Contracts
+
+### Provides
+
+- `cf_os_ui/config`
+- `cf_os_ui/cf_os`
+- The `/cf-os` route and the `command` navigation entry.
+
+### Consumes
+
+- Public `erxes-ui` types and icons.
+- The Command URL comes from `CF_OS_URL` (runtime `window.env.CF_OS_URL`, falling back to build-time `CF_OS_URL`); nothing is hardcoded.
+
+## Local Invariants
+
+- The Nx project and MF remote name are `cf-os_ui` (mirrors `erxes-agent_ui`);
+  the runtime normalizes the container to `cf_os_ui`. `CONFIG.name` is `cf_os`,
+  with `permissionName: 'cf-os'`.
+- The plugin route is `/cf-os`; the visible sidebar label is `Command`
+  (from `navigationGroup.name = 'command'`).
+- Enable the plugin with `cf_os` in `ENABLED_PLUGINS`; core-api maps it to the
+  `cf_os_ui` remote via `remoteName()`.
+- The embedded page must remain full-height and full-width so the Erxes shell stays visible above it.
+- The embedded app must not receive Erxes credentials through JavaScript or URL parameters.
+- Only the single-use, two-minute connect code may cross through the iframe URL; raw Erxes session credentials never enter the frontend.
+
+## UI Conventions
+
+- Keep the Erxes header and global sidebar owned by `core-ui`.
+- Keep the CF OS application inside the plugin content area.
+- Use the existing `@tabler/icons-react` icon package.
+- Do not add another navigation, routing, or UI library.
+
+## Forbidden
+
+- Do not copy Cloudflare OS or Executor source into this plugin.
+- Do not add OAuth or token handling to the browser.
+- Do not access `document.cookie` or place credentials in the iframe URL.
+- Do not edit `core-ui` to register this plugin. Enable `cf-os` through the existing frontend plugin configuration.
+
+## Validation
+
+- `pnpm nx build cf-os_ui`
+- Confirm `CF_OS_URL` is set and the deployed app loads in the frame.
+- In Erxes, confirm the `command` navigation item opens the embedded app while the Erxes header and global sidebar remain visible.
+
+## Recent Changes
+
+<!-- Newest first. Keep at most 10 entries. -->
+
+### `2026-08-26` — Remove the empty Command navigation panel
+
+- **Summary:** The Command navigation group now carries only its rail label, default path, and icon, so core skips the blank plugin-level sidebar.
+- **Affected areas:** `src/config.tsx` navigation group.
+- **Contracts changed:** None.
+
+### `2026-08-26` — Inject the Command URL into the remote bundle
+
+- **Summary:** The remote's Rspack build now defines `process.env.CF_OS_URL`, matching how other separately built remotes expose build-time environment values.
+- **Affected areas:** `rspack.config.ts`, Command URL configuration.
+- **Contracts changed:** The `cf_os_ui` build requires `CF_OS_URL` to produce a usable deployed remote.
+
+### `2026-08-26` — Passwordless embedded Command sign-in
+
+- **Summary:** The plugin requests a single-use connect code through the authenticated erxes-agent backend and passes it to the embedded Cloudflare OS login flow, removing the second password prompt.
+- **Affected areas:** `src/modules/CfOsMain.tsx`, `src/modules/useCfOsConnect.ts`, runtime `CF_OS_URL` configuration.
+- **Contracts changed:** Consumes `POST /pl:erxes-agent/cf-os/connect-code`; iframe URL receives a short-lived `cfOsCode` query value.
+
+### `2026-08-20` — Rename remote to `cf-os_ui`, keep `command` label
+
+- **Summary:** Renamed the plugin project/remote to `cf-os_ui` with the `/cf-os`
+  route; the sidebar label stays `command`.
+- **Affected areas:** Project config, Module Federation exposes,
+  `src/config.tsx`, `src/modules/CfOsMain.tsx`.
+- **Contracts changed:** Remote is now `cf_os_ui`; route is now `/cf-os`.
+
+### `2026-08-20` — Add Command navigation entry
+
+- **Summary:** Added the Module Federation remote that embeds the deployed
+  Cloudflare OS application in the Erxes content area.
+- **Affected areas:** `src/config.tsx`, `src/modules/CfOsMain.tsx`, and Module
+  Federation configuration.
+- **Contracts changed:** Adds the remote and route.

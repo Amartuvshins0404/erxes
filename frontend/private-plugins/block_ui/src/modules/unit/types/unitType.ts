@@ -1,3 +1,4 @@
+import { IZoning } from '@/building/types/buildingTypes';
 import { IProjectPrice } from '@/project/types/projectTypes';
 
 export interface IUnitRoom {
@@ -38,13 +39,20 @@ export interface IUnitActiveContract {
   customerId?: string;
 }
 
+// `BlockGetUnit` resolves the unit's zoning with its price list attached.
+export interface IUnitZoningData extends IZoning {
+  priceList?: IProjectPrice[];
+}
+
 export interface IUnit {
   _id: string;
   number: string;
   type: string;
   unitType: IUnitType;
   zoning: string;
+  zoningData?: IUnitZoningData | null;
   building: string;
+  buildingData?: { _id: string; name?: string } | null;
   status: string;
   activeContract?: IUnitActiveContract | null;
   blockSubdomain?: string;

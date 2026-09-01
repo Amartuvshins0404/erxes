@@ -61,3 +61,18 @@ export const REMOVE_PAYMENT_TRANSACTION = gql`
     }
   }
 `;
+
+export const UPDATE_CONTRACT_PAYMENT_SETTINGS = gql`
+  mutation BlockUpdateContractPaymentSettings(
+    $input: BlockContractPaymentSettingsInput!
+    $projectId: String
+  ) {
+    blockUpdateContractPaymentSettings(input: $input, projectId: $projectId) {
+      _id
+      projectId
+      paymentIds
+      allowPartial
+      updatedAt
+    }
+  }
+`;

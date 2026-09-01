@@ -27,6 +27,10 @@ import {
   types as cpListingTypes,
 } from './listing';
 import { queries as cpOfferQueries, types as cpOfferTypes } from './offer';
+import {
+  mutations as cpPaymentMutations,
+  types as cpPaymentTypes,
+} from './payment';
 
 export const types = `
     ${cpProjectTypes}
@@ -37,6 +41,7 @@ export const types = `
     ${cpAgencyTypes}
     ${cpListingTypes}
     ${cpOfferTypes}
+    ${cpPaymentTypes}
 `;
 
 export const queries = `
@@ -48,4 +53,8 @@ export const queries = `
     ${cpAgencyQueries}
     ${cpListingQueries}
     ${cpOfferQueries}
+`;
+
+export const mutations = `
+    ${cpPaymentMutations}
 `;

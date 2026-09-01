@@ -16,6 +16,9 @@ import { Slot } from 'radix-ui';
 import { forwardRef, useMemo, useRef, useState } from 'react';
 import { Button, FileTrigger, FileTriggerProps } from 'react-aria-components';
 import { UploadContext, useUploadContext } from '../context/UploadContext';
+import { AgencyAttachment } from '../types/form';
+import { formatFileSize, getAttachmentType } from '../utils/attachment';
+import { getAttachmentIcon } from './attachment-type';
 
 export const UploadProvider = ({
   children,
@@ -23,6 +26,7 @@ export const UploadProvider = ({
   mode = 'single',
   onValueChange,
   onUploadsFinished,
+  onFileUploaded,
   acceptedFileTypes = ['image/*'],
 }: {
   children: React.ReactNode;
@@ -30,6 +34,8 @@ export const UploadProvider = ({
   mode?: 'single' | 'multiple';
   onValueChange: (value?: string | string[]) => void;
   onUploadsFinished?: (value?: string | string[]) => void;
+  /** Fires per uploaded file with the file info needed by `Attachment` fields */
+  onFileUploaded?: (attachment: AgencyAttachment) => void;
   acceptedFileTypes?: string[];
 }) => {
   const [previewUrls, setPreviewUrls] = useState<string[] | undefined>();
@@ -54,8 +60,16 @@ export const UploadProvider = ({
 
     upload({
       files,
-      afterUpload: ({ response }) => {
+      afterUpload: ({ response, fileInfo }) => {
         const checked = typeof response === 'string' ? response : response.url;
+
+        onFileUploaded?.({
+          url: checked,
+          name: fileInfo.name,
+          type: fileInfo.type,
+          size: fileInfo.size,
+          duration: fileInfo.duration,
+        });
 
         if (mode === 'single') {
           onValueChange(checked);
@@ -97,7 +111,7 @@ export const UploadProvider = ({
     });
   };
 
-  const existingUrls = typeof value === 'string' ? [value] : (value ?? []);
+  const existingUrls = typeof value === 'string' ? [value] : value ?? [];
   const displayUrls = isLoading
     ? [...existingUrls, ...(previewUrls ?? [])]
     : existingUrls;
@@ -193,18 +207,23 @@ export const UploadImage = ({
   uploaderClassName,
   disabled = false,
 }: {
-  value?: string;
-  onValueChange: (value: string) => void;
+  value?: AgencyAttachment | null;
+  onValueChange: (value?: AgencyAttachment) => void;
   className?: string;
   uploaderClassName?: string;
   disabled?: boolean;
 }) => {
   return (
     <UploadProvider
-      value={value}
-      onValueChange={(value) => onValueChange(value as string)}
+      value={value?.url}
+      onValueChange={(nextValue) => {
+        if (!nextValue) {
+          onValueChange(undefined);
+        }
+      }}
+      onFileUploaded={onValueChange}
     >
-      <Upload className={uploaderClassName} disabled={disabled}>
+      <Upload className={cn('relative', uploaderClassName)} disabled={disabled}>
         <div
           className={cn(
             'aspect-square relative flex items-center justify-center',
@@ -213,7 +232,7 @@ export const UploadImage = ({
         >
           {value ? (
             <img
-              src={readImage(value)}
+              src={readImage(value.url)}
               className="w-full h-full object-cover rounded"
               alt="cover"
             />
@@ -255,11 +274,14 @@ const UploadAttachmentsContent = ({
       {urls.map((url) => {
         const isFeatured = featured === url;
         return (
-          <div key={url} className="relative group w-20 h-20">
+          <div
+            key={url}
+            className="relative group bg-muted rounded-sm space-y-1 max-w-40 h-40 p-2"
+          >
             <img
               src={readImage(url)}
               className={cn(
-                'w-full h-full object-cover rounded bg-accent',
+                'w-full object-contain bg-background rounded aspect-square',
                 isFeatured && 'ring-2 ring-primary',
               )}
               alt="attachment"
@@ -308,15 +330,16 @@ const UploadAttachmentsContent = ({
           </div>
         );
       })}
-      <Upload>
-        <div className="w-20 h-20 flex items-center justify-center border border-dashed border-foreground/20 rounded">
-          <IconPhotoCirclePlus className="size-6 text-scroll" />
+      <Upload className="w-40 h-40 flex items-center justify-center border border-dashed border-foreground/20 rounded">
+        <div>
+          <IconPhotoCirclePlus size={32} className="text-scroll" />
         </div>
       </Upload>
     </div>
   );
 };
 
+/** Photo grid for fields that still store plain url strings. */
 export const UploadAttachments = ({
   values = [],
   className,
@@ -344,3 +367,68 @@ export const UploadAttachments = ({
     </UploadProvider>
   );
 };
+
+/**
+ * `UploadProvider` for `Attachment` fields: the file info collected while
+ * uploading is kept instead of only the url. The provider underneath works on
+ * urls, so removals are mirrored back onto the attachment list.
+ */
+export const AttachmentUploadProvider = ({
+  values = [],
+  onValueChange,
+  acceptedFileTypes,
+  children,
+}: {
+  values?: AgencyAttachment[];
+  onValueChange: (values: AgencyAttachment[]) => void;
+  acceptedFileTypes?: string[];
+  children: React.ReactNode;
+}) => {
+  const latestValuesRef = useRef(values);
+  latestValuesRef.current = values;
+
+  const handleChange = (next: AgencyAttachment[]) => {
+    latestValuesRef.current = next;
+    onValueChange(next);
+  };
+
+  return (
+    <UploadProvider
+      value={values.map((attachment) => attachment.url)}
+      mode="multiple"
+      acceptedFileTypes={acceptedFileTypes}
+      onValueChange={(urls) => {
+        const keptUrls = (urls as string[] | undefined) ?? [];
+        const kept = latestValuesRef.current.filter((attachment) =>
+          keptUrls.includes(attachment.url),
+        );
+
+        // Uploads arrive through `onFileUploaded`; only removals shorten the
+        // list and need to be applied here.
+        if (kept.length !== latestValuesRef.current.length) {
+          handleChange(kept);
+        }
+      }}
+      onFileUploaded={(attachment) =>
+        handleChange([...latestValuesRef.current, attachment])
+      }
+    >
+      {children}
+    </UploadProvider>
+  );
+};
+
+/** Same photo grid as `UploadAttachments`, for `Attachment` fields. */
+export const MultipleImageUpload = ({
+  values = [],
+  className,
+  onValueChange,
+}: {
+  values?: AgencyAttachment[];
+  onValueChange: (values: AgencyAttachment[]) => void;
+  className?: string;
+}) => (
+  <AttachmentUploadProvider values={values} onValueChange={onValueChange}>
+    <UploadAttachmentsContent className={className} />
+  </AttachmentUploadProvider>
+);

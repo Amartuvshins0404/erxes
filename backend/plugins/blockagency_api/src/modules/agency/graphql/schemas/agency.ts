@@ -28,9 +28,9 @@ export const types = `
     primaryEmail: String
     phones: [String]
     primaryPhone: String
-    logo: String
-    coverImage: String
-    documents: [String]
+    logo: Attachment
+    coverImage: Attachment
+    documents: [Attachment]
     socialLinks: JSON
     dateFounded: String
     operationArea: AgencyOperationArea
@@ -77,9 +77,9 @@ export const types = `
     primaryEmail: String
     phones: [String]
     primaryPhone: String
-    logo: String
-    coverImage: String
-    documents: [String]
+    logo: AttachmentInput
+    coverImage: AttachmentInput
+    documents: [AttachmentInput]
     socialLinks: JSON
     dateFounded: String
     operationArea: AgencyOperationAreaInput

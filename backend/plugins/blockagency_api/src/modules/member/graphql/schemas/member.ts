@@ -11,7 +11,7 @@ export const types = `
     facebookUrl: String
     instagramUrl: String
     linkedUrl: String
-    certificatePhotos: [String]
+    certificatePhotos: [Attachment]
     role: String
 
     createdAt: Date
@@ -28,7 +28,7 @@ export const types = `
     facebookUrl: String
     instagramUrl: String
     linkedUrl: String
-    certificatePhotos: [String]
+    certificatePhotos: [AttachmentInput]
     role: String
   }
 `;

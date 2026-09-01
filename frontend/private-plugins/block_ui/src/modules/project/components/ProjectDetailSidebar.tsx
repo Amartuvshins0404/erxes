@@ -29,6 +29,7 @@ export const ProjectDetailSidebar = () => {
     PROJECT_TABS.INSIDER,
     PROJECT_TABS.OPPTY_STATUSES,
     PROJECT_TABS.CONTRACT_STATUSES,
+    PROJECT_TABS.PAYMENT,
   ];
 
   return (

@@ -7,9 +7,12 @@ import {
   IconUserHexagon,
 } from '@tabler/icons-react';
 import { AgencyPaths } from './types/AgencyPaths';
-import { Can } from 'ui-modules';
+import { Can, usePermissionCheck } from 'ui-modules';
 
 export const BlockagencyNavigation = () => {
+  const { hasModulePermission } = usePermissionCheck();
+  const isBlockagencyAdmin = hasModulePermission('agency', 'blockagency');
+
   return (
     <>
       <Can module="agency">
@@ -19,8 +22,6 @@ export const BlockagencyNavigation = () => {
           pathPrefix="blockagency"
           path={AgencyPaths.AGENCY_PROFILE}
         />
-      </Can>
-      <Can module="agency">
         <NavigationMenuLinkItem
           name="dashboard"
           icon={IconChartArcs}
@@ -28,14 +29,16 @@ export const BlockagencyNavigation = () => {
           path={AgencyPaths.AGENCY_DASHBOARD}
         />
       </Can>
-      <Can module="member">
-        <NavigationMenuLinkItem
-          name="profile"
-          icon={IconUserHexagon}
-          pathPrefix="blockagency"
-          path={AgencyPaths.PROFILE}
-        />
-      </Can>
+      {!isBlockagencyAdmin && (
+        <Can module="member">
+          <NavigationMenuLinkItem
+            name="profile"
+            icon={IconUserHexagon}
+            pathPrefix="blockagency"
+            path={AgencyPaths.PROFILE}
+          />
+        </Can>
+      )}
       <NavigationMenuLinkItem
         name="listing"
         icon={IconHomeSearch}

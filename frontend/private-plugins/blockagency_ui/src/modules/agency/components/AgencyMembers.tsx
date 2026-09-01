@@ -1,8 +1,11 @@
-import { IconTrash } from '@tabler/icons-react';
+import { IconDots, IconTrash } from '@tabler/icons-react';
 import {
   Button,
+  Combobox,
+  Command,
   InfoCard,
   Label,
+  PopoverScoped,
   Select,
   SkeletonArray,
   toast,
@@ -15,6 +18,8 @@ import { useAgencyInfo } from '../hooks/useAgencyInfo';
 import { useRemoveMember } from '../hooks/useRemoveMember';
 import { GET_AGENCY_MEMBERS } from '../graphql';
 import { useUpdateMember } from '../hooks/useUpdateMember';
+import { useIsAgencyAdmin } from '@/member/hooks/useIsAgencyAdmin';
+import { useState } from 'react';
 
 export const AgencyMembers = () => {
   const { agencyInfo } = useAgencyInfo();
@@ -22,98 +27,127 @@ export const AgencyMembers = () => {
     variables: { agencyId: agencyInfo?._id, page: 1, perPage: 10 },
     skip: !agencyInfo?._id,
   });
+  // Only agency admins manage members. The API rejects the mutations either
+  // way; hiding the controls keeps the table honest about what is allowed.
+  const { isAgencyAdmin } = useIsAgencyAdmin();
+
   return (
     <div className="p-4">
       <InfoCard title="Agency Members" description="v" className="mt-4">
         <InfoCard.Content>
-          <div className="grid grid-cols-6 gap-3">
-            <Label className="col-span-3" asChild>
+          <div className="inline-flex items-center gap-3">
+            <Label className="w-8 flex-none">
+              <span className="sr-only">Actions</span>
+            </Label>
+            <Label className="flex-1" asChild>
               <span>Name</span>
             </Label>
-            <Label className="col-span-2" asChild>
+            <Label className="w-32 flex-none" asChild>
               <span>Role</span>
             </Label>
-            <Label className="col-span-1" asChild>
+            {/* <Label className="col-span-1" asChild>
               <span>Actions</span>
-            </Label>
+            </Label> */}
           </div>
           {loading ? (
-            <div className="grid grid-cols-3 gap-3">
-              <SkeletonArray count={3} />
+            <div className="grid grid-cols-2 gap-3">
+              <SkeletonArray count={2} />
             </div>
           ) : (
             agencyMembers?.map((member) => (
-              <div key={member._id} className="grid grid-cols-6 gap-3">
-                <div className="col-span-3 flex gap-2 items-center font-medium">
+              <div key={member._id} className="inline-flex items-center gap-3">
+                <div className="flex-none w-8 flex gap-2 items-center font-medium">
+                  {isAgencyAdmin && (
+                    <AgencyMemberInlineMore
+                      memberId={member._id}
+                      agencyId={agencyInfo?._id}
+                    />
+                  )}
+                </div>
+                <div className="flex-1 flex gap-2 items-center font-medium">
                   <MembersInline memberIds={[member.memberId]} />
                 </div>
-                <div className="col-span-2 inline-flex gap-2 items-center font-medium">
+                <div className="flex-none inline-flex gap-2 items-center font-medium">
                   <AgencyMemberRole
                     role={member?.role as string}
                     id={member._id}
                     agencyId={agencyInfo?._id}
-                  />
-                </div>
-                <div className="col-span-1 flex gap-2 items-center font-medium">
-                  <AgencyMemberDelete
-                    memberId={member._id}
-                    id={agencyInfo?._id}
+                    disabled={!isAgencyAdmin}
                   />
                 </div>
               </div>
             ))
           )}
-          <AddAgencyMember
-            members={agencyMembers?.map((member) => member.memberId)}
-          />
+          {isAgencyAdmin && (
+            <AddAgencyMember
+              members={agencyMembers?.map((member) => member.memberId)}
+            />
+          )}
         </InfoCard.Content>
       </InfoCard>
     </div>
   );
 };
 
-export const AgencyMemberDelete = ({
+export const AgencyMemberInlineMore = ({
   memberId,
-  id,
+  agencyId,
 }: {
   memberId: string;
-  id: string;
+  agencyId: string;
 }) => {
+  const [open, setOpen] = useState<boolean>(false);
   const { removeMember } = useRemoveMember();
   const { confirm } = useConfirm();
 
-  return (
-    <Button
-      variant="secondary"
-      size="icon"
-      onClick={() => {
-        confirm({
-          message: 'Are you sure you want to delete this member?',
-          options: {
-            okLabel: 'Delete',
+  function handleDelete(id: string) {
+    confirm({
+      message: 'Are you sure you want to delete this member?',
+      options: {
+        okLabel: 'Delete',
+      },
+    }).then(() => {
+      removeMember({
+        variables: { id },
+        refetchQueries: [
+          {
+            query: GET_AGENCY_MEMBERS,
+            variables: { agencyId, page: 1, perPage: 10 },
           },
-        }).then(() => {
-          removeMember({
-            variables: { id: memberId },
-            refetchQueries: [
-              {
-                query: GET_AGENCY_MEMBERS,
-                variables: { agencyId: id, page: 1, perPage: 10 },
-              },
-            ],
-            onError: (error) =>
-              toast({
-                variant: 'destructive',
-                title: 'Error occurred',
-                description: error.message,
-              }),
-          });
-        });
-      }}
-      className="bg-destructive/10 text-destructive hover:bg-destructive/20"
-    >
-      <IconTrash />
-    </Button>
+        ],
+        onError: (error) =>
+          toast({
+            variant: 'destructive',
+            title: 'Error occurred',
+            description: error.message,
+          }),
+      });
+    });
+  }
+  return (
+    <PopoverScoped open={open} onOpenChange={setOpen}>
+      <Combobox.TriggerBase
+        className="p-0 items-center justify-center"
+        size="icon"
+        variant={'ghost'}
+      >
+        <IconDots size={16} />
+      </Combobox.TriggerBase>
+      <Combobox.Content>
+        <Command>
+          <Command.List>
+            <Command.Item
+              onSelect={handleDelete}
+              value={memberId}
+              className="text-destructive bg-secondary/20 cursor-pointer"
+            >
+              <IconTrash />
+              Delete
+            </Command.Item>
+          </Command.List>
+        </Command>
+      </Combobox.Content>
+    </PopoverScoped>
   );
 };
 
@@ -121,10 +155,12 @@ export const AgencyMemberRole = ({
   role,
   id,
   agencyId,
+  disabled,
 }: {
   role: string;
   id: string;
   agencyId?: string;
+  disabled?: boolean;
 }) => {
   const { updateMember } = useUpdateMember();
   const handleUpdateRole: ((value: string) => void) | undefined = (
@@ -151,7 +187,7 @@ export const AgencyMemberRole = ({
     });
   };
   return (
-    <Select value={role} onValueChange={handleUpdateRole}>
+    <Select value={role} onValueChange={handleUpdateRole} disabled={disabled}>
       <Select.Trigger className="h-8 w-auto min-w-32">
         <Select.Value placeholder="Select role" />
       </Select.Trigger>

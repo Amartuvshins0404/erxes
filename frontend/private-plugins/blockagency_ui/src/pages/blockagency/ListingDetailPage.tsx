@@ -13,7 +13,7 @@ import {
   toast,
   useToast,
 } from 'erxes-ui';
-import { PageHeader } from 'ui-modules';
+import { PageHeader, createFavoriteBreadcrumb } from 'ui-modules';
 import {
   IconCheck,
   IconCloudUpload,
@@ -64,6 +64,8 @@ export const ListingDetailPage = () => {
   const { reset } = form;
   const { updateListing } = useUpdateListing();
 
+  const favoriteBreadcrumb = createFavoriteBreadcrumb('Listing', listing?.title);
+
   const resetListingIdRef = useRef<string | undefined>(undefined);
 
   useEffect(() => {
@@ -106,7 +108,10 @@ export const ListingDetailPage = () => {
             </Breadcrumb.List>
           </Breadcrumb>
           <Separator.Inline />
-          <PageHeader.FavoriteToggleButton />
+          <PageHeader.FavoriteToggleButton
+            breadcrumb={favoriteBreadcrumb}
+            icon="IconHomeSearch"
+          />
         </PageHeader.Start>
       </PageHeader>
 

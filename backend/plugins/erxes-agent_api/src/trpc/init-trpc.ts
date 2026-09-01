@@ -1,11 +1,14 @@
 import { initTRPC } from '@trpc/server';
-import { ITRPCContext } from 'erxes-api-shared/utils';
+
+import type { ITRPCContext } from 'erxes-api-shared/utils';
 
 const t = initTRPC.context<ITRPCContext>().create();
 
 export const appRouter = t.router({
-  mastra: {
-    hello: t.procedure.query(() => 'Hello from erxes-agent_api'),
+  erxesAgent: {
+    hello: t.procedure.query(() => {
+      return 'Hello erxes-agent';
+    }),
   },
 });
 

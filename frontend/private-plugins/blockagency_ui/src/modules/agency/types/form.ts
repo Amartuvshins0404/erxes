@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {
   // Agency
+  agencyAttachmentSchema,
   agencyIdentitySchema,
   agencyIntroductionSchema,
   agencyDocuments,
@@ -16,6 +17,8 @@ import { socialPlatforms } from '../constants/social-platforms';
 // ─── Agency profile ───────────────────────────────────────────────────────────
 
 export type SocialPlatform = (typeof socialPlatforms)[number];
+
+export type AgencyAttachment = z.infer<typeof agencyAttachmentSchema>;
 
 export type AgencyGeneralInfoValues = z.infer<typeof agencyGeneralInfoSchema>;
 export type AgencyIdentityValues = z.infer<typeof agencyIdentitySchema>;

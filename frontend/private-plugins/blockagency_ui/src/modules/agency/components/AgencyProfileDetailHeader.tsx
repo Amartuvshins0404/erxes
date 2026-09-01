@@ -9,7 +9,6 @@ import {
 import { useAgencyInfo } from '../hooks/useAgencyInfo';
 import { useEffect, useState } from 'react';
 import { useUpdateAgency } from '../hooks/useUpdateAgency';
-import { useGeneralForm } from '../hooks/useGeneralForm';
 
 export const AgencyProfileDetailHeader = () => {
   const { agencyInfo, loading } = useAgencyInfo();
@@ -28,39 +27,53 @@ export const AgencyProfileDetailHeader = () => {
 };
 
 export const AgencyDetailName = ({ name }: { name: string }) => {
+  const [open, setOpen] = useState(false);
   const [nameValue, setNameValue] = useState(name);
 
-  const { form } = useGeneralForm({});
   const { updateAgency } = useUpdateAgency();
 
+  // While the popover is open the input owns the value. Syncing from the query
+  // mid-edit would drop every character typed since the request went out.
   useEffect(() => {
-    if (name) {
+    if (!open) {
       setNameValue(name);
     }
-  }, [name]);
+  }, [name, open]);
+
+  const handleOpenChange = (nextOpen: boolean) => {
+    setOpen(nextOpen);
+
+    if (nextOpen) {
+      return;
+    }
+
+    const nextName = nameValue.trim();
+
+    if (!nextName || nextName === name) {
+      setNameValue(name);
+      return;
+    }
+
+    updateAgency({ variables: { input: { name: nextName } } });
+  };
 
   return (
     <PopoverScoped
       closeOnEnter
-      onOpenChange={(open) => {
-        if (!open && nameValue !== name) {
-          updateAgency({
-            variables: { input: { name: nameValue } },
-            onCompleted: (data) => {
-              form.reset({
-                name: data.updateAgency.name,
-              });
-            },
-          });
-        }
-      }}
+      open={open}
+      onOpenChange={handleOpenChange}
+      dependencies={[nameValue, name]}
     >
       <Tooltip.Provider delayDuration={0}>
         <Tooltip>
           <Tooltip.Trigger asChild>
             <Popover.Trigger asChild>
               <h1 className="text-xl font-medium leading-none hover:bg-accent">
-                {name}
+                {name || (
+                  <span className="text-accent-foreground/70">
+                    Нэр оруулаагүй
+                  </span>
+                )}
               </h1>
             </Popover.Trigger>
           </Tooltip.Trigger>

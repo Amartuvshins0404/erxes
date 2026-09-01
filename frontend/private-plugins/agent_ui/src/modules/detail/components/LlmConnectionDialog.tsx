@@ -11,13 +11,13 @@ import {
   AlertDialog,
   Button,
   Form,
-  Input,
   Select,
   useToast,
 } from 'erxes-ui';
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
+import { SecretInput } from '~/modules/components/SecretInput';
 import { LlmProviderApiKeyFields } from '~/modules/company-brain/components/LlmProviderApiKeyFields';
 import { SubscriptionProviderGuide } from '~/modules/company-brain/components/SubscriptionProviderGuide';
 import {
@@ -272,7 +272,14 @@ export const LlmConnectionDialog = ({
   };
 
   return (
-    <AlertDialog open={open}>
+    <AlertDialog
+      open={open}
+      onOpenChange={(next) => {
+        // Without this, Escape had nothing to call and the dialog was a trap.
+        // Never dismiss mid-apply: the key is already being written.
+        if (!next && !busy) onCancel?.();
+      }}
+    >
       <AlertDialog.Content className="sm:max-w-2xl">
         <AlertDialog.Header className="flex flex-row gap-3 sm:flex-row">
           <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/10">
@@ -480,9 +487,8 @@ export const LlmConnectionDialog = ({
                               {subscriptionOption.credentialLabel}
                             </Form.Label>
                             <Form.Control>
-                              <Input
+                              <SecretInput
                                 {...field}
-                                type="password"
                                 autoComplete="off"
                                 placeholder={
                                   subscriptionOption.credentialPlaceholder

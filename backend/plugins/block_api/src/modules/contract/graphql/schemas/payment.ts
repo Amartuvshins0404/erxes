@@ -27,6 +27,27 @@ export const types = `
     totalCount: Int
   }
 
+  type BlockContractPaymentSettings {
+    _id: String
+    projectId: String
+    paymentIds: [String]
+    allowPartial: Boolean
+    createdAt: Date
+    updatedAt: Date
+  }
+
+  input BlockContractPaymentSettingsInput {
+    paymentIds: [String]
+    allowPartial: Boolean
+  }
+
+  type BlockContractPaymentInvoice {
+    invoiceId: String!
+    url: String!
+    amount: Float!
+    currency: String!
+  }
+
   type BlockContractPaymentTransaction {
     _id: String!
     paymentId: String!
@@ -36,6 +57,7 @@ export const types = `
     note: String
     createdBy: String
     paymentMethod: String
+    invoiceId: String
     createdAt: Date
     updatedAt: Date
   }
@@ -63,10 +85,13 @@ export const queries = `
   blockGetProjectPaymentPlanData(projectId: String!): [BlockContractPayment]
   blockGetUnitPaymentTransactions(unitId: String!): [BlockContractPaymentTransaction]
   blockGetProjectPaymentTransactions(projectId: String!): [BlockContractPaymentTransaction]
+  blockGetContractPaymentSettings(projectId: String): BlockContractPaymentSettings
 `;
 
 export const mutations = `
   blockAddPaymentTransaction(paymentId: String!, amount: Float!, date: Date, note: String, paymentMethod: String): BlockContractPaymentTransaction
   blockUpdatePaymentTransaction(_id: String!, amount: Float, date: Date, note: String, paymentMethod: String): BlockContractPaymentTransaction
   blockRemovePaymentTransaction(_id: String!): BlockContractPaymentTransaction
+  blockUpdateContractPaymentSettings(input: BlockContractPaymentSettingsInput!, projectId: String): BlockContractPaymentSettings
+  blockCreateContractPaymentInvoice(paymentId: String!, amount: Float): BlockContractPaymentInvoice
 `;

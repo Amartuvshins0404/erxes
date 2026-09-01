@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "images": [
+    "erxes/erxes-next-agent_api",
+    "erxes/erxes-next-block_api",
+    "erxes/erxes-next-blockadmin_api",
+    "erxes/erxes-next-blockagency_api",
+    "erxes/erxes-next-btk_api",
+    "erxes/erxes-next-btkadmin_api",
+    "erxes/erxes-next-car_api",
+    "erxes/erxes-next-erxes-agent_api",
+    "erxes/erxes-next-event_api",
+    "erxes/erxes-next-migrations",
+    "erxes/erxes-next-mto_api",
+    "erxes/erxes-next-mushop_api",
+    "erxes/erxes-next-onefit_api",
+    "erxes/erxes-next-supplier_api"
+  ]
+}

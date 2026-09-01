@@ -1,9 +1,24 @@
 import { Form, InfoCard, Input, Select } from 'erxes-ui';
+import { useEffect } from 'react';
 import { useAgencyInfo } from '../hooks/useAgencyInfo';
 import { useUpdateAgency } from '../hooks/useUpdateAgency';
 import { AgencyGeneralInfoValues } from '../types/form';
 import { useGeneralForm } from '../hooks/useGeneralForm';
-import React from 'react';
+
+type AgencyGeneralInfoField = keyof AgencyGeneralInfoValues;
+
+type AgencyGeneralInfoSource = {
+  [key in AgencyGeneralInfoField]?: string | null;
+};
+
+const toGeneralInfoValues = (
+  agencyInfo?: AgencyGeneralInfoSource,
+): AgencyGeneralInfoValues => ({
+  name: agencyInfo?.name || '',
+  brandName: agencyInfo?.brandName || '',
+  dateFounded: agencyInfo?.dateFounded || '',
+  website: agencyInfo?.website || '',
+});
 
 export const AgencyProfileGeneral = () => {
   const { loading } = useAgencyInfo();
@@ -23,27 +38,43 @@ export const AgencyProfileGeneral = () => {
 
 export const AgencyGeneralInfo = () => {
   const { agencyInfo } = useAgencyInfo();
-  const { form } = useGeneralForm({
-    defaultValues: {
-      name: agencyInfo?.name || '',
-      brandName: agencyInfo?.brandName || '',
-      dateFounded: agencyInfo?.dateFounded || '',
-      website: agencyInfo?.website || '',
-    },
-  });
-  React.useEffect(() => {
-    form.reset({
-      name: agencyInfo?.name || '',
-      brandName: agencyInfo?.brandName || '',
-      dateFounded: agencyInfo?.dateFounded || '',
-      website: agencyInfo?.website || '',
-    });
-  }, [agencyInfo]);
+  const serverValues = toGeneralInfoValues(agencyInfo);
+  const { form } = useGeneralForm({ defaultValues: serverValues });
   const { updateAgency } = useUpdateAgency();
 
-  const handleSave = (patch: Partial<AgencyGeneralInfoValues>) => {
-    const values = { ...form.getValues(), ...patch };
-    updateAgency({ variables: { input: values } });
+  // The agency can change while this card is mounted (verification
+  // subscription, another card saving). `keepDirtyValues` refreshes only the
+  // fields the user has not edited, so a response that lands mid-typing can
+  // never overwrite the value being typed.
+  useEffect(() => {
+    form.reset(toGeneralInfoValues(agencyInfo), { keepDirtyValues: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [agencyInfo]);
+
+  // Values are committed on blur, never per keystroke. One mutation per
+  // keystroke races with its own responses: the last response to arrive is not
+  // the last one sent, which drops and reorders characters.
+  const saveField = async (name: AgencyGeneralInfoField) => {
+    const value = form.getValues(name) || '';
+
+    if (value === serverValues[name]) {
+      return;
+    }
+
+    if (!(await form.trigger(name))) {
+      return;
+    }
+
+    updateAgency({
+      variables: { input: { [name]: value } },
+      onCompleted: () => {
+        // Only the saved field becomes pristine again, and only if it was not
+        // edited again while the request was in flight.
+        if (form.getValues(name) === value) {
+          form.resetField(name, { defaultValue: value });
+        }
+      },
+    });
   };
 
   return (
@@ -57,10 +88,13 @@ export const AgencyGeneralInfo = () => {
               <Form.Label>Official Name</Form.Label>
               <Form.Control>
                 <Input
+                  name={field.name}
+                  ref={field.ref}
                   value={field.value}
-                  onChange={(event) => {
-                    field.onChange(event.currentTarget.value);
-                    handleSave({ name: event.currentTarget.value });
+                  onChange={field.onChange}
+                  onBlur={() => {
+                    field.onBlur();
+                    saveField('name');
                   }}
                   placeholder="Official company name"
                 />
@@ -78,10 +112,13 @@ export const AgencyGeneralInfo = () => {
               <Form.Label>Brand Name</Form.Label>
               <Form.Control>
                 <Input
+                  name={field.name}
+                  ref={field.ref}
                   value={field.value}
-                  onChange={(event) => {
-                    field.onChange(event.currentTarget.value);
-                    handleSave({ brandName: event.currentTarget.value });
+                  onChange={field.onChange}
+                  onBlur={() => {
+                    field.onBlur();
+                    saveField('brandName');
                   }}
                   placeholder="Brand name"
                 />
@@ -102,7 +139,7 @@ export const AgencyGeneralInfo = () => {
                   value={field.value}
                   onValueChange={(value) => {
                     field.onChange(value);
-                    handleSave({ dateFounded: value });
+                    saveField('dateFounded');
                   }}
                 >
                   <Select.Trigger>
@@ -132,14 +169,18 @@ export const AgencyGeneralInfo = () => {
               <Form.Label>Website</Form.Label>
               <Form.Control>
                 <Input
-                  placeholder="https://www.example.com"
+                  name={field.name}
+                  ref={field.ref}
                   value={field.value}
-                  onChange={(event) => {
-                    field.onChange(event.currentTarget.value);
-                    handleSave({ website: event.currentTarget.value });
+                  onChange={field.onChange}
+                  onBlur={() => {
+                    field.onBlur();
+                    saveField('website');
                   }}
+                  placeholder="https://www.example.com"
                 />
               </Form.Control>
+              <Form.Message />
             </Form.Item>
           )}
         />

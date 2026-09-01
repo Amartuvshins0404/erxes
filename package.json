@@ -1,13 +1,15 @@
 {
   "name": "erxes-next",
-  "version": "3.0.70",
+  "version": "3.0.92",
   "license": "MIT",
   "scripts": {
     "dev:core-api": "npx nx run-many -t serve -p core-api gateway",
     "dev:apis": "dotenv -e .env -- node scripts/start-api-dev.js",
     "dev:uis": "dotenv -e .env -- node scripts/start-ui-dev.js",
     "create-plugin": "node scripts/create-plugin.js",
-    "release": "release-it"
+    "release": "node scripts/release/release-private.mjs",
+    "release:test": "node --test scripts/release/release-contract.test.mjs",
+    "release:validate": "node scripts/release/release-contract.mjs validate-repository"
   },
   "engines": {
     "pnpm": ">=8",
@@ -16,9 +18,7 @@
   },
   "private": true,
   "dependencies": {
-    "@ai-sdk/react": "2.0.206",
-    "@assistant-ui/react": "0.11.58",
-    "@assistant-ui/react-ai-sdk": "1.1.21",
+    "@ai-sdk/react": "^4.0.86",
     "@aiden0z/pptx-renderer": "1.2.1",
     "@apollo/client": "^3.11.8",
     "@apollo/server": "^4.11.3",
@@ -66,10 +66,12 @@
     "@trpc/client": "^11.0.0",
     "@trpc/server": "^11.0.0",
     "@uiw/react-codemirror": "^4.25.3",
+    "@univerjs/preset-sheets-core": "^0.25.1",
+    "@univerjs/presets": "^0.25.1",
     "@vis.gl/react-google-maps": "^1.7.1",
     "@workos-inc/node": "^7.65.0",
     "@xyflow/react": "^12.8.3",
-    "ai": "5.0.204",
+    "ai": "^7.0.83",
     "aws-sdk": "^2.1692.0",
     "axios": "^1.6.0",
     "bcryptjs": "^3.0.2",
@@ -87,6 +89,7 @@
     "date-fns-tz": "^3.2.0",
     "dayjs": "^1.11.13",
     "deep-equal": "^2.2.3",
+    "docx": "^9.7.1",
     "docx-preview": "^0.3.7",
     "dompurify": "^3.2.4",
     "dotenv": "^16.4.7",
@@ -181,8 +184,7 @@
     "xss": "^1.0.15",
     "yaml": "^2.7.0",
     "zod": "^3.25.0",
-    "zustand": "^5.0.2",
-    "@assistant-ui/react-markdown": "0.11.10"
+    "zustand": "^5.0.2"
   },
   "devDependencies": {
     "@apollo/rover": "^0.26.3",
@@ -285,7 +287,8 @@
       "ioredis": "^5.6.1",
       "@mastra/core>zod": "^3.25.0",
       "@mastra/memory>zod": "^3.25.0",
-      "@mastra/libsql>zod": "^3.25.0"
+      "@mastra/libsql>zod": "^3.25.0",
+      "shell-quote": "1.10.0"
     }
   }
 }

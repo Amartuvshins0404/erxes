@@ -55,7 +55,7 @@ jobs:
           export NX_DAEMON=false
           pnpm nx build erxes-agent_ui
 
-      - name: Sync to Cloudflare R2
+      - name: Sync immutable assets to Cloudflare R2
         if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/'))
         run: |
           if [[ "${{ github.ref }}" == refs/tags/* ]]; then
@@ -63,5 +63,27 @@ jobs:
           else
             FOLDER="latest"
           fi
+          # Hashed, content-addressed assets first, and prune chunks from
+          # previous builds so the bucket never accumulates stale files.
           aws s3 sync dist/frontend/plugins/erxes-agent_ui s3://erxes-next/$FOLDER/erxes-agent_ui/ \
+            --exclude 'remoteEntry.js' --exclude 'mf-manifest.json' --exclude 'mf-stats.json' --exclude 'index.html' \
+            --delete \
+            --cache-control 'public, max-age=31536000, immutable' \
+            --endpoint-url https://7c8392aff8ac4518aa06dfa4b6337ef2.r2.cloudflarestorage.com
+
+      - name: Publish remote entry with no-store
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/'))
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            FOLDER="${{ github.ref_name }}"
+          else
+            FOLDER="latest"
+          fi
+          # The remote entry must be published last (its chunk references are
+          # only valid once the assets above exist) and must never be cached:
+          # a cached stale entry pointing at pruned chunks is exactly the
+          # ChunkLoadError this pipeline previously produced.
+          aws s3 sync dist/frontend/plugins/erxes-agent_ui s3://erxes-next/$FOLDER/erxes-agent_ui/ \
+            --exclude '*' --include 'remoteEntry.js' --include 'mf-manifest.json' --include 'mf-stats.json' --include 'index.html' \
+            --cache-control 'no-store' \
             --endpoint-url https://7c8392aff8ac4518aa06dfa4b6337ef2.r2.cloudflarestorage.com

@@ -2,6 +2,8 @@ import { IconSparkles } from '@tabler/icons-react';
 import { lazy, Suspense } from 'react';
 import { IUIConfig } from 'erxes-ui';
 
+import './styles.css';
+
 const ErxesAgentSettingsNavigation = lazy(() =>
   import('@/ErxesAgentSettingsNavigation').then((module) => ({
     default: module.ErxesAgentSettingsNavigation,

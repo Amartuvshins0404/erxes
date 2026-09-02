@@ -1,6 +1,8 @@
 import { lazy, Suspense } from 'react';
 import { Route, Routes } from 'react-router';
 
+import '../styles.css';
+
 const IndexPage = lazy(() =>
   import('~/pages/agents/IndexPage').then((module) => ({
     default: module.IndexPage,

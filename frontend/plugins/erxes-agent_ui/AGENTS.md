@@ -6,7 +6,7 @@
 - **Project:** `erxes-agent_ui`
 - **Layer:** `Frontend UI`
 - **Path:** `frontend/plugins/erxes-agent_ui`
-- **Last synchronized:** `2026-08-31`
+- **Last synchronized:** `2026-09-02`
 
 
 ## Scope
@@ -37,6 +37,9 @@
   only `manageAgentsSettings` holders can change it).
 - The AI SDK chat transport, stored-history mapping, REST client, and GraphQL
   documents under `src/modules/agents`.
+- The plugin-owned Tailwind stylesheet (`src/styles.css` + `postcss.config.mjs`)
+  compiled into the remote bundle so the plugin renders correctly against any
+  host build (see Local Invariants).
 - The animated bot avatar: the MIT-licensed, framework-free bloub engine
   vendored under `src/modules/agents/bloub/` (unchanged upstream code) plus
   the React wrapper `src/modules/agents/components/BloubBot.tsx`.
@@ -258,6 +261,8 @@
 | Artifacts            | `src/modules/agents/artifacts/*`             | `parseArtifacts` fence splitter, `MessageContent`/`ArtifactCard` rendering, sandboxed `HtmlPreview` + lazy previews (`SpreadsheetPreview` / `DocxPreview` / `PdfPreview`), converters (`csv`, `mdBlocks`, `xlsx`, `docx`, `pdf`), `download` |
 | Types               | `src/modules/agents/types.ts`                  | REST and stored-message shapes                    |
 | Federation          | `module-federation.config.ts`                  | Remote name, exposes, and shared library policy   |
+| Plugin stylesheet   | `src/styles.css` + `postcss.config.mjs`        | Plugin-owned Tailwind v4 build shipped with the remote (loaded by every expose) |
+| Federation CSS rule | `rspack.config.ts`                             | `postcss-loader` + `type: 'css'` rule so the stylesheet compiles and emits as an MF css chunk |
 
 ## Contracts
 
@@ -266,7 +271,10 @@
 - Module Federation remote with container name `erxes_agent_ui`
   (underscores — MF container names cannot contain dashes), exposing
   `./config`, `./erxes_agent`, `./erxes_agentSettings`, and
-  `./floatingWidget`.
+  `./floatingWidget`. Every expose lists `src_styles_css.css` in its
+  manifest `css.sync` assets, so the MF runtime fetches the stylesheet
+  together with whichever expose it loads — the remote is style-independent
+  of the host build.
 - `CONFIG` with `name: 'erxes_agent'` (the underscored MF remote name the
   host uses to build `${name}_ui` for `loadRemote`),
   `permissionName: 'erxes-agent'` (the dashed backend plugin name used
@@ -321,6 +329,27 @@
 - No Jotai atoms and no persisted client state.
 
 ## Local Invariants
+
+- The plugin ships its own Tailwind stylesheet (`src/styles.css`) and EVERY
+  expose entry (`config.tsx`, `ErxesAgentMain.tsx`, `ErxesAgentSettings.tsx`,
+  `FloatingWidget.tsx`) imports it. The host compiles plugin classes only at
+  HOST build time (`core-ui`'s `@source '../../plugins/'`), so a remote
+  deployed against a stale host renders unstyled without this stylesheet.
+  Removing any expose import re-opens that gap for that surface.
+- `src/styles.css` scope rules: `@source './'` scans ONLY this plugin's
+  sources; shared `erxes-ui`/`ui-modules` component classes stay owned by the
+  host stylesheet. The `@theme` block mirrors the host's token MAPPINGS
+  (`--color-primary: var(--primary)`, text-size/radius/shadow overrides) so
+  generated utilities resolve identically — but token VALUES (oklch colors,
+  fonts) are never redeclared: the host `:root` remains the single source of
+  truth and per-token value overrides here would fight host theming. Keep the
+  two `@theme` blocks in sync when the host's changes, and keep the
+  default-border-color compat `@layer base` rule: this stylesheet loads after
+  the host's, and without it the preflight reset would turn plugin borders
+  `currentColor`.
+- `rspack.config.ts` must keep the `test: /\.css$/` → `postcss-loader` +
+  `type: 'css'` rule (mirrors `core-ui`); without it the stylesheet does not
+  compile through Tailwind or emit as an MF css chunk.
 
 - `core-ui` discovers this remote from the `ENABLED_PLUGINS` environment
   variable and maps each entry to `<name>_ui`, so the enabled entry must be
@@ -631,6 +660,30 @@
 
 <!-- Newest first. Keep at most 10 entries. -->
 
+### `2026-09-02` — Self-owned stylesheet: remote no longer depends on host CSS freshness
+
+- **Summary:** The remote previously rendered unstyled on any host built
+  before the plugin's newest Tailwind classes (the prod breakage: the host
+  stylesheet compiles plugin classes only at host build time, and `latest`
+  host predated the Aug-31 redesign). The plugin now ships its own Tailwind
+  v4 stylesheet (`src/styles.css` + `postcss.config.mjs`, compiled via a
+  `postcss-loader`/`type: 'css'` rule in `rspack.config.ts`) imported by all
+  four exposes, so the MF runtime loads `src_styles_css.css` with whichever
+  expose it mounts. The stylesheet scans only plugin sources and mirrors the
+  host's token mappings without redeclaring token values. Deploy-pipeline
+  side (`ci-ui-erxes-agent.yml`): the R2 sync now uploads hashed assets first
+  (`--delete` prunes legacy chunks), then publishes `remoteEntry.js` with
+  `no-store` last, eliminating the stale-entry → missing-chunk ChunkLoadError
+  state observed in prod.
+- **Affected areas:** `src/styles.css` (new), `postcss.config.mjs` (new),
+  `rspack.config.ts`, `src/config.tsx`, `src/modules/ErxesAgent{Main,
+  Settings}.tsx`, `src/widgets/FloatingWidget.tsx`, `.github/workflows/
+  ci-ui-erxes-agent.yml`.
+- **Contracts changed:** The remote now serves an additional css asset
+  (`src_styles_css.css`) referenced by every expose's manifest; the deploy
+  bucket layout and cache headers changed as described above. No GraphQL,
+  REST, `CONFIG`, or expose-key changes.
+
 ### `2026-08-31` — ask_user answers as an answered Q&A card
 
 - **Summary:** Answering an ask_user prompt used to surface as a plain user
@@ -768,64 +821,6 @@
 - **Contracts changed:** Consumes `AgentsSettings` query and
   `AgentsSettingsUpdate` mutation; settings navigation gains the
   "Code mode" item (exposes and `CONFIG` unchanged).
-
-### `2026-08-31` — ask_user answer fix, writing avatar, question card slimmed
-
-- **Summary:** Fixed answering an ask_user question producing nothing: the
-  answer went through `chat.resumeStream()`, whose resume path builds an
-  empty streaming state, so the resumed `tool-output-available` chunk found
-  no tool part and the SDK discarded the whole stream (200 SSE, nothing
-  rendered or stored). Answers now travel as a normal send — `submitAnswer`
-  stages the answer, marks the suspended tool part answered locally, and
-  sends a user message carrying the answer; `sendMessages` reroutes it to
-  `POST /agents/answer` and drops `tool-output-available` chunks en route;
-  `MessageList` hides an answered suspension card by toolCallId. Also: the
-  streaming message avatar now plays a plugin-added `writing` bloub state
-  (pen strokes + fading ink trail, registered in the vendored engine) and
-  the bot avatar was removed from the question card.
-- **Affected areas:**
-  `src/modules/agents/{transport.ts, hooks/useAgentsChat.ts, botCycles.ts
-  (docs), bloub/bot/states.ts}`,
-  `src/modules/agents/components/{MessageList, MessagePart, AskUserPrompt}.tsx`.
-- **Contracts changed:** None (same `POST /agents/answer` contract; only the
-  client-side routing of the request changed).
-
-### `2026-08-31` — Fix fresh-thread-per-turn: client-generated thread ids
-
-- **Summary:** Every chat turn had been creating a new server thread with no
-  memory of the previous ones: the transport learned the thread id only from
-  the `X-Agents-Thread-Id` response header, which a cross-origin browser
-  cannot read because the gateway's CORS never lists it under
-  `Access-Control-Expose-Headers`. Thread continuity is now client-owned —
-  `useAgentsChat` generates the id on the first send (`crypto.randomUUID()`)
-  via `ensureThreadId` and the wrapped `sendMessage`, and the transport pins
-  it in every request body (chat, approve, answer); header capture stays
-  advisory only. The backend already accepted client-supplied ids
-  (auto-create unknown, 403 foreign).
-- **Affected areas:**
-  `src/modules/agents/hooks/useAgentsChat.ts`,
-  `src/modules/agents/transport.ts` (doc comment only).
-- **Contracts changed:** None (the backend contract already documented
-  client-supplied thread ids).
-
-### `2026-08-31` — Model picker redesign with provider brand marks
-
-- **Summary:** Reworked the chat `ModelPicker`: the Auto entry and every
-  model row lead with their provider's brand mark (`IconSparkles` for
-  Auto), per-provider group headers became uppercase micro-labels with the
-  mark, model ids render in mono, and the duplicate manual chevron was
-  removed (the `erxes-ui` trigger appends its own). Radix renders the
-  selected item's content in the trigger, so the active provider's mark
-  identifies the choice there too. The provider label helper moved to
-  `ProviderPicker` exports (shared with the settings page).
-- **Affected areas:**
-  `src/modules/agents/components/{ModelPicker, ProviderPicker}.tsx`.
-- **Contracts changed:** None (same props, `__auto__` sentinel and
-  `provider|model` values).
-
-
-
----
 
 ### 2026-09-01 — Spreadsheet preview simplification + minimal artifact chrome
 

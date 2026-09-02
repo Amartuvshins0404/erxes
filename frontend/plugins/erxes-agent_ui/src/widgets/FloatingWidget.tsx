@@ -8,6 +8,7 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from 'react';
 
+import '../styles.css';
 import { LAUNCHER_CYCLE } from '@/agents/botCycles';
 import { BloubBot } from '@/agents/components/BloubBot';
 import { ChatPanel } from '@/agents/components/ChatPanel';

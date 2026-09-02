@@ -1,6 +1,8 @@
 import { lazy, Suspense } from 'react';
 import { Navigate, Route, Routes } from 'react-router';
 
+import '../styles.css';
+
 const SettingsConnectionPage = lazy(() =>
   import('~/pages/settings/SettingsConnectionPage').then((module) => ({
     default: module.SettingsConnectionPage,

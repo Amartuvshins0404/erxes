@@ -22,7 +22,7 @@ export const MessageContent = ({ content }: IMessageContentProps) => {
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="ea:flex ea:flex-col ea:gap-3">
       {segments.map((segment, index) =>
         segment.kind === 'text' ? (
           segment.text ? (

@@ -86,49 +86,49 @@ export const ModelPicker = ({
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
       <Combobox.Trigger
-        className="h-8 min-w-0 max-w-[200px] flex-1 justify-between rounded-full text-[13px]"
+        className="ea:h-8 ea:min-w-0 ea:max-w-[200px] ea:flex-1 ea:justify-between ea:rounded-full ea:text-[13px]"
         disabled={
           disabled || models.loading || models.providerModels.length === 0
         }
         aria-label="Model"
       >
         {models.loading ? (
-          <span className="flex min-w-0 items-center gap-1.5">
-            <Spinner className="size-3.5 shrink-0" />
+          <span className="ea:flex ea:min-w-0 ea:items-center ea:gap-1.5">
+            <Spinner className="ea:size-3.5 ea:shrink-0" />
             Model
           </span>
         ) : selectedModel ? (
-          <span className="flex min-w-0 items-center gap-1.5">
+          <span className="ea:flex ea:min-w-0 ea:items-center ea:gap-1.5">
             <ProviderIcon
               provider={selectedProvider}
-              className="size-4 shrink-0"
+              className="ea:size-4 ea:shrink-0"
             />
-            <span className="truncate font-mono">{selectedModel}</span>
+            <span className="ea:truncate ea:font-mono">{selectedModel}</span>
           </span>
         ) : (
-          <span className="flex min-w-0 items-center gap-1.5">
+          <span className="ea:flex ea:min-w-0 ea:items-center ea:gap-1.5">
             <IconSparkles
-              className="size-4 shrink-0 text-primary"
+              className="ea:size-4 ea:shrink-0 ea:text-primary"
               aria-hidden="true"
             />
-            <span className="truncate">{autoLabel}</span>
+            <span className="ea:truncate">{autoLabel}</span>
           </span>
         )}
       </Combobox.Trigger>
-      <Combobox.Content className="w-72">
+      <Combobox.Content className="ea:w-72">
         {view === 'selection' ? (
           <Command>
             <Command.List>
               <Command.Item
                 value="auto"
                 onSelect={selectAuto}
-                className="text-[13px]"
+                className="ea:text-[13px]"
               >
                 <IconSparkles
-                  className="size-4 shrink-0 text-primary"
+                  className="ea:size-4 ea:shrink-0 ea:text-primary"
                   aria-hidden="true"
                 />
-                <span className="min-w-0 truncate">{autoLabel}</span>
+                <span className="ea:min-w-0 ea:truncate">{autoLabel}</span>
                 <Combobox.Check checked={!selectedModel} />
               </Command.Item>
               {models.providerModels.map((group) => (
@@ -136,23 +136,23 @@ export const ModelPicker = ({
                   key={group.provider}
                   value={group.provider}
                   onSelect={() => openProvider(group.provider)}
-                  className="text-[13px]"
+                  className="ea:text-[13px]"
                 >
                   <ProviderIcon
                     provider={group.provider}
-                    className="size-4 shrink-0"
+                    className="ea:size-4 ea:shrink-0"
                   />
-                  <span className="min-w-0 truncate">
+                  <span className="ea:min-w-0 ea:truncate">
                     {getProviderLabel(group.provider)}
                   </span>
-                  <span className="ml-auto shrink-0 text-xs text-muted-foreground">
+                  <span className="ea:ml-auto ea:shrink-0 ea:text-xs ea:text-muted-foreground">
                     {(group.models ?? []).length} models
                   </span>
                   <Combobox.Check
                     checked={selectedProvider === group.provider}
                   />
                   <IconChevronRight
-                    className="size-3.5 shrink-0 text-muted-foreground"
+                    className="ea:size-3.5 ea:shrink-0 ea:text-muted-foreground"
                     aria-hidden="true"
                   />
                 </Command.Item>
@@ -161,24 +161,24 @@ export const ModelPicker = ({
           </Command>
         ) : (
           <Command key={`models:${activeProvider}`}>
-            <div className="flex items-center gap-1.5 border-b px-1.5 py-1.5">
+            <div className="ea:flex ea:items-center ea:gap-1.5 ea:border-b ea:px-1.5 ea:py-1.5">
               <Button
                 variant="ghost"
                 size="icon"
-                className="size-6 shrink-0"
+                className="ea:size-6 ea:shrink-0"
                 onClick={() => setView('selection')}
                 aria-label="Back to provider selection"
               >
-                <IconArrowLeft className="size-3.5" />
+                <IconArrowLeft className="ea:size-3.5" />
               </Button>
               <ProviderIcon
                 provider={activeProvider}
-                className="size-4 shrink-0"
+                className="ea:size-4 ea:shrink-0"
               />
-              <span className="min-w-0 truncate text-[13px] font-medium">
+              <span className="ea:min-w-0 ea:truncate ea:text-[13px] ea:font-medium">
                 {activeLabel}
               </span>
-              <span className="ml-auto shrink-0 text-[11px] text-muted-foreground">
+              <span className="ea:ml-auto ea:shrink-0 ea:text-[11px] ea:text-muted-foreground">
                 {activeModels.length}{' '}
                 {activeModels.length === 1 ? 'model' : 'models'}
               </span>
@@ -191,9 +191,11 @@ export const ModelPicker = ({
                   key={model}
                   value={model}
                   onSelect={() => selectModel(activeProvider, model)}
-                  className="text-[13px]"
+                  className="ea:text-[13px]"
                 >
-                  <span className="min-w-0 truncate font-mono">{model}</span>
+                  <span className="ea:min-w-0 ea:truncate ea:font-mono">
+                    {model}
+                  </span>
                   <Combobox.Check
                     checked={selectedProvider === activeProvider && selectedModel === model}
                   />

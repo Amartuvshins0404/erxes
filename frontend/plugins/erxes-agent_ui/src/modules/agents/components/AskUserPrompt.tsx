@@ -122,14 +122,14 @@ export const AskUserPrompt = ({
     const hasOptions = !!question.options?.length;
 
     return (
-      <div key={index} className={index > 0 ? 'mt-4' : undefined}>
-        <p className="text-[15px] font-medium leading-relaxed md:text-[17px]">
+      <div key={index} className={index > 0 ? 'ea:mt-4' : undefined}>
+        <p className="ea:text-[15px] ea:font-medium ea:leading-relaxed ea:md:text-[17px]">
           {isSingle ? '' : `${index + 1}. `}
           {question.question}
         </p>
 
         {hasOptions && (
-          <div className="mt-2.5 flex flex-wrap gap-2">
+          <div className="ea:mt-2.5 ea:flex ea:flex-wrap ea:gap-2">
             {question.options!.map((option) => {
               const isActive = active(option.label);
 
@@ -140,11 +140,11 @@ export const AskUserPrompt = ({
                   disabled={busy}
                   title={option.description}
                   onClick={() => togglePick(index, option.label)}
-                  className={`rounded-full border px-3.5 py-1.5 text-[13px] transition-colors ${
+                  className={`ea:rounded-full ea:border ea:px-3.5 ea:py-1.5 ea:text-[13px] ea:transition-colors ${
                     isActive
-                      ? 'border-primary bg-primary/15 font-medium text-primary'
-                      : 'hover:border-primary/50 hover:bg-primary/5'
-                  } ${busy ? 'cursor-not-allowed opacity-60' : ''}`}
+                      ? 'ea:border-primary ea:bg-primary/15 ea:font-medium ea:text-primary'
+                      : 'ea:hover:border-primary/50 ea:hover:bg-primary/5'
+                  } ${busy ? 'ea:cursor-not-allowed ea:opacity-60' : ''}`}
                 >
                   {option.label}
                 </button>
@@ -154,15 +154,15 @@ export const AskUserPrompt = ({
         )}
 
         {isSingle && showInputs[0] && (
-          <div className="mt-2 space-y-2">
-            <div className="rounded-lg border bg-card px-3 py-2">
+          <div className="ea:mt-2 ea:space-y-2">
+            <div className="ea:rounded-lg ea:border ea:bg-card ea:px-3 ea:py-2">
               <ChatInput
                 value={drafts[0]!}
                 onChange={(text) => setDrafts([text])}
                 placeholder="Type your answer…"
                 disabled={busy}
                 maxHeight={96}
-                className="text-xs md:text-xs"
+                className="ea:text-xs ea:md:text-xs"
                 ariaLabel="Your answer"
               />
             </div>
@@ -181,7 +181,7 @@ export const AskUserPrompt = ({
             type="button"
             disabled={busy}
             onClick={() => setShowInputs([true])}
-            className="mt-2 text-xs text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline disabled:cursor-not-allowed disabled:opacity-60"
+            className="ea:mt-2 ea:text-xs ea:text-muted-foreground ea:underline-offset-2 ea:transition-colors ea:hover:text-foreground ea:hover:underline ea:disabled:cursor-not-allowed ea:disabled:opacity-60"
           >
             None of these — type my own answer
           </button>
@@ -190,7 +190,7 @@ export const AskUserPrompt = ({
         {isSingle &&
           question.selectionMode === 'multi_select' &&
           picked[0]!.length > 0 && (
-            <div className="mt-2.5">
+            <div className="ea:mt-2.5">
               <Button size="sm" disabled={busy} onClick={submitSingleMulti}>
                 {`Send ${picked[0]!.length} choice${picked[0]!.length > 1 ? 's' : ''}`}
               </Button>
@@ -201,16 +201,16 @@ export const AskUserPrompt = ({
   };
 
   return (
-    <div className="my-1 rounded-xl border bg-primary/5 p-3 text-foreground">
-      <p className="flex items-center gap-1.5 text-sm font-medium">
-        <IconMessageQuestion className="size-4 shrink-0 text-primary" />
+    <div className="ea:my-1 ea:rounded-xl ea:border ea:bg-primary/5 ea:p-3 ea:text-foreground">
+      <p className="ea:flex ea:items-center ea:gap-1.5 ea:text-sm ea:font-medium">
+        <IconMessageQuestion className="ea:size-4 ea:shrink-0 ea:text-primary" />
         {isSingle ? 'Quick question' : `Quick questions (${questions.length})`}
       </p>
 
       {questions.map(renderQuestion)}
 
       {!isSingle && (
-        <div className="mt-4">
+        <div className="ea:mt-4">
           <Button size="sm" disabled={busy || !allAnswered} onClick={submitAll}>
             {allAnswered
               ? `Send ${questions.length} answers`
@@ -228,18 +228,18 @@ export const AskUserPrompt = ({
  * answers themselves never appear as user bubbles.
  */
 export const AskUserAnswered = ({ answers }: { answers: IAskUserAnswerEntry[] }) => (
-  <div className="my-1 rounded-xl border bg-primary/5 p-3 text-foreground">
-    <p className="flex items-center gap-1.5 text-sm font-medium">
-      <IconCheck className="size-4 shrink-0 text-primary" />
+  <div className="ea:my-1 ea:rounded-xl ea:border ea:bg-primary/5 ea:p-3 ea:text-foreground">
+    <p className="ea:flex ea:items-center ea:gap-1.5 ea:text-sm ea:font-medium">
+      <IconCheck className="ea:size-4 ea:shrink-0 ea:text-primary" />
       {answers.length === 1 ? 'Question answered' : 'Questions answered'}
     </p>
 
     {answers.map((entry, index) => (
-      <div key={index} className={index > 0 ? 'mt-3' : 'mt-2'}>
-        <p className="text-[13px] text-muted-foreground md:text-sm">
+      <div key={index} className={index > 0 ? 'ea:mt-3' : 'ea:mt-2'}>
+        <p className="ea:text-[13px] ea:text-muted-foreground ea:md:text-sm">
           {entry.question}
         </p>
-        <p className="mt-0.5 whitespace-pre-wrap break-words text-[15px] font-medium leading-relaxed md:text-[17px]">
+        <p className="ea:mt-0.5 ea:whitespace-pre-wrap ea:break-words ea:text-[15px] ea:font-medium ea:leading-relaxed ea:md:text-[17px]">
           {entry.answer}
         </p>
       </div>

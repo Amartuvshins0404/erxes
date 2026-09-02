@@ -21,7 +21,7 @@ export const SpreadsheetPreview = ({ content }: ISpreadsheetPreviewProps) => {
 
   if (rows.length === 0) {
     return (
-      <div className="flex h-full min-h-[120px] items-center justify-center text-sm text-muted-foreground">
+      <div className="ea:flex ea:h-full ea:min-h-[120px] ea:items-center ea:justify-center ea:text-sm ea:text-muted-foreground">
         Empty table
       </div>
     );
@@ -30,15 +30,15 @@ export const SpreadsheetPreview = ({ content }: ISpreadsheetPreviewProps) => {
   const [header, ...body] = rows;
 
   return (
-    <div className="max-h-[60vh] w-full overflow-auto rounded-md border bg-card">
-      <table className="w-full text-[13px]">
-        <thead className="sticky top-0 bg-muted/40">
+    <div className="ea:max-h-[60vh] ea:w-full ea:overflow-auto ea:rounded-md ea:border ea:bg-card">
+      <table className="ea:w-full ea:text-[13px]">
+        <thead className="ea:sticky ea:top-0 ea:bg-muted/40">
           <tr>
             {header.map((cell, columnIndex) => (
               <th
                 key={columnIndex}
                 scope="col"
-                className="border-b px-3 py-1.5 text-left font-medium"
+                className="ea:border-b ea:px-3 ea:py-1.5 ea:text-left ea:font-medium"
               >
                 {cell}
               </th>
@@ -47,9 +47,12 @@ export const SpreadsheetPreview = ({ content }: ISpreadsheetPreviewProps) => {
         </thead>
         <tbody>
           {body.map((row, rowIndex) => (
-            <tr key={rowIndex} className="hover:bg-muted/20">
+            <tr key={rowIndex} className="ea:hover:bg-muted/20">
               {row.map((cell, columnIndex) => (
-                <td key={columnIndex} className="border-b px-3 py-1.5 align-top">
+                <td
+                  key={columnIndex}
+                  className="ea:border-b ea:px-3 ea:py-1.5 ea:align-top"
+                >
                   {cell}
                 </td>
               ))}

@@ -31,6 +31,6 @@ export const HtmlPreview = ({ html }: { html: string }) => (
     sandbox="allow-scripts"
     srcDoc={buildSandboxedSrcDoc(html)}
     referrerPolicy="no-referrer"
-    className="h-full w-full rounded-lg border bg-white"
+    className="ea:h-full ea:w-full ea:rounded-lg ea:border ea:bg-white"
   />
 );

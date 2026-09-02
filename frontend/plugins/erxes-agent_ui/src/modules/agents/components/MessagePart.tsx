@@ -38,18 +38,18 @@ const ReasoningPart = ({ text }: { text: string }) => {
       <Collapsible.Trigger asChild>
         <button
           type="button"
-          className="inline-flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
+          className="ea:inline-flex ea:items-center ea:gap-1.5 ea:text-xs ea:text-muted-foreground ea:transition-colors ea:hover:text-foreground"
         >
           <IconChevronDown
-            className={`size-3.5 transition-transform ${
-              open ? 'rotate-180' : ''
+            className={`ea:size-3.5 ea:transition-transform ${
+              open ? 'ea:rotate-180' : ''
             }`}
           />
           {open ? 'Hide reasoning' : 'Show reasoning'}
         </button>
       </Collapsible.Trigger>
       <Collapsible.Content>
-        <p className="mt-1.5 whitespace-pre-wrap rounded-lg border border-dashed bg-muted/30 p-2.5 text-[13px] text-muted-foreground">
+        <p className="ea:mt-1.5 ea:whitespace-pre-wrap ea:rounded-lg ea:border ea:border-dashed ea:bg-muted/30 ea:p-2.5 ea:text-[13px] ea:text-muted-foreground">
           {text}
         </p>
       </Collapsible.Content>
@@ -226,7 +226,7 @@ export const MessagePartRenderer = ({
   if (isTextUIPart(part)) {
     if (role === 'user') {
       return (
-        <p className="whitespace-pre-wrap break-words text-[15px] leading-relaxed md:text-[17px] md:leading-7">
+        <p className="ea:whitespace-pre-wrap ea:break-words ea:text-[15px] ea:leading-relaxed ea:md:text-[17px] ea:md:leading-7">
           {part.text}
         </p>
       );

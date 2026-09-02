@@ -37,13 +37,13 @@ export const IndexPage = () => {
   };
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="ea:flex ea:h-full ea:flex-col">
       <PageHeader>
         <PageHeader.Start>
           <Button
             variant="ghost"
             size="icon"
-            className="lg:hidden"
+            className="ea:lg:hidden"
             onClick={() => setThreadsOpen(true)}
             aria-label="Open conversations"
             title="Conversations"
@@ -51,7 +51,7 @@ export const IndexPage = () => {
             <IconHistory />
           </Button>
           <Breadcrumb>
-            <Breadcrumb.List className="gap-1">
+            <Breadcrumb.List className="ea:gap-1">
               <Breadcrumb.Item>
                 <Button variant="ghost" asChild>
                   <Link to="/erxes-agent">
@@ -68,13 +68,13 @@ export const IndexPage = () => {
             icon="IconSparkles"
           />
         </PageHeader.Start>
-        <PageHeader.End className="gap-1.5 sm:gap-3">
+        <PageHeader.End className="ea:gap-1.5 ea:sm:gap-3">
           {/* Labels fold away first, so the actions never push the breadcrumb
               off a phone-width header. */}
           <Button variant="outline" asChild aria-label="Settings">
             <Link to="/settings/erxes-agent/connection">
               <IconSettings />
-              <span className="hidden sm:inline">Settings</span>
+              <span className="ea:hidden ea:sm:inline">Settings</span>
             </Link>
           </Button>
           <Button
@@ -83,13 +83,13 @@ export const IndexPage = () => {
             aria-label="New conversation"
           >
             <IconPlus />
-            <span className="hidden sm:inline">New conversation</span>
+            <span className="ea:hidden ea:sm:inline">New conversation</span>
           </Button>
         </PageHeader.End>
       </PageHeader>
 
-      <div className="flex min-h-0 flex-1 overflow-hidden">
-        <aside className="hidden w-64 flex-none border-r lg:block xl:w-72">
+      <div className="ea:flex ea:min-h-0 ea:flex-1 ea:overflow-hidden">
+        <aside className="ea:hidden ea:w-64 ea:flex-none ea:border-r ea:lg:block ea:xl:w-72">
           <ThreadList
             threadsState={threadsState}
             activeThreadId={chat.threadId}
@@ -98,7 +98,7 @@ export const IndexPage = () => {
             onThreadDeleted={handleThreadDeleted}
           />
         </aside>
-        <main className="flex min-w-0 flex-1">
+        <main className="ea:flex ea:min-w-0 ea:flex-1">
           <ChatPanel chat={chat} />
         </main>
       </div>

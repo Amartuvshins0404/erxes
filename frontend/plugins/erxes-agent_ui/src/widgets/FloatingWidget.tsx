@@ -202,10 +202,10 @@ export const FloatingWidget = () => {
       <Sheet open={open} onOpenChange={setOpen}>
         <Sheet.View
           side="right"
-          className="flex w-[calc(100vw-1rem)] flex-col p-0 sm:max-w-4xl"
+          className="ea:flex ea:w-[calc(100vw-1rem)] ea:flex-col ea:p-0 ea:sm:max-w-4xl"
         >
-          <Sheet.Header className="gap-2">
-            <Sheet.Title className="flex items-center gap-2 text-base font-semibold">
+          <Sheet.Header className="ea:gap-2">
+            <Sheet.Title className="ea:flex ea:items-center ea:gap-2 ea:text-base ea:font-semibold">
               <BloubBot size={24} state="idle" />
               Agents
             </Sheet.Title>
@@ -214,7 +214,7 @@ export const FloatingWidget = () => {
             <Button
               variant="ghost"
               size="icon"
-              className="ml-auto lg:hidden"
+              className="ea:ml-auto ea:lg:hidden"
               onClick={() => setThreadsOpen(true)}
               aria-label="Open conversations"
               title="Conversations"
@@ -223,8 +223,8 @@ export const FloatingWidget = () => {
             </Button>
             <Sheet.Close aria-label="Close Agents" />
           </Sheet.Header>
-          <Sheet.Content className="flex min-h-0 flex-1">
-            <aside className="hidden w-60 flex-none border-r lg:block xl:w-64">
+          <Sheet.Content className="ea:flex ea:min-h-0 ea:flex-1">
+            <aside className="ea:hidden ea:w-60 ea:flex-none ea:border-r ea:lg:block ea:xl:w-64">
               <ThreadList
                 threadsState={threadsState}
                 activeThreadId={chat.threadId}
@@ -233,7 +233,7 @@ export const FloatingWidget = () => {
                 onThreadDeleted={handleThreadDeleted}
               />
             </aside>
-            <div className="flex min-w-0 flex-1">
+            <div className="ea:flex ea:min-w-0 ea:flex-1">
               <ChatPanel chat={chat} />
             </div>
           </Sheet.Content>
@@ -276,10 +276,10 @@ export const FloatingWidget = () => {
             // Without this, dragging on touch scrolls the page instead.
             touchAction: 'none',
           }}
-          className={`fixed z-50 flex items-center justify-center rounded-full border bg-background transition-transform duration-150 ${
+          className={`ea:fixed ea:z-50 ea:flex ea:items-center ea:justify-center ea:rounded-full ea:border ea:bg-background ea:transition-transform ea:duration-150 ${
             dragging
-              ? 'scale-110 cursor-grabbing shadow-xl'
-              : 'cursor-grab shadow-lg hover:scale-105'
+              ? 'ea:scale-110 ea:cursor-grabbing ea:shadow-xl'
+              : 'ea:cursor-grab ea:shadow-lg ea:hover:scale-105'
           }`}
         >
           {dragging ? (

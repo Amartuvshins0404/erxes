@@ -25,8 +25,8 @@ const PdfPreview = lazy(() =>
 );
 
 const PreviewFallback = () => (
-  <div className="flex h-full min-h-[120px] items-center justify-center">
-    <IconLoader2 className="size-5 animate-spin text-muted-foreground" />
+  <div className="ea:flex ea:h-full ea:min-h-[120px] ea:items-center ea:justify-center">
+    <IconLoader2 className="ea:size-5 ea:animate-spin ea:text-muted-foreground" />
   </div>
 );
 
@@ -136,8 +136,8 @@ export const ArtifactCard = ({ artifact }: IArtifactCardProps) => {
 
     if (documentFailed) {
       return (
-        <div className="flex h-full min-h-[120px] flex-col items-center justify-center gap-2 rounded-md border border-dashed p-6">
-          <p className="text-sm text-muted-foreground">
+        <div className="ea:flex ea:h-full ea:min-h-[120px] ea:flex-col ea:items-center ea:justify-center ea:gap-2 ea:rounded-md ea:border ea:border-dashed ea:p-6">
+          <p className="ea:text-sm ea:text-muted-foreground">
             Preview could not be generated.
           </p>
           <Button
@@ -167,21 +167,23 @@ export const ArtifactCard = ({ artifact }: IArtifactCardProps) => {
   };
 
   return (
-    <div className="overflow-hidden rounded-lg border">
-      <div className="flex items-center justify-between gap-2 px-3 py-1.5">
-        <span className="truncate text-sm font-medium">{artifact.title}</span>
-        <div className="flex shrink-0 items-center">
+    <div className="ea:overflow-hidden ea:rounded-lg ea:border">
+      <div className="ea:flex ea:items-center ea:justify-between ea:gap-2 ea:px-3 ea:py-1.5">
+        <span className="ea:truncate ea:text-sm ea:font-medium">
+          {artifact.title}
+        </span>
+        <div className="ea:flex ea:shrink-0 ea:items-center">
           <Button
             variant="ghost"
             size="icon"
             onClick={handleCopy}
             title="Copy source"
-            className="size-7"
+            className="ea:size-7"
           >
             {copied ? (
-              <IconCheck className="size-3.5 text-emerald-600" />
+              <IconCheck className="ea:size-3.5 ea:text-emerald-600" />
             ) : (
-              <IconCopy className="size-3.5" />
+              <IconCopy className="ea:size-3.5" />
             )}
           </Button>
           <Button
@@ -190,12 +192,12 @@ export const ArtifactCard = ({ artifact }: IArtifactCardProps) => {
             onClick={handleDownload}
             disabled={downloadBusy}
             title="Download"
-            className="size-7"
+            className="ea:size-7"
           >
             {downloadBusy ? (
-              <IconLoader2 className="size-3.5 animate-spin" />
+              <IconLoader2 className="ea:size-3.5 ea:animate-spin" />
             ) : (
-              <IconDownload className="size-3.5" />
+              <IconDownload className="ea:size-3.5" />
             )}
           </Button>
         </div>
@@ -204,13 +206,13 @@ export const ArtifactCard = ({ artifact }: IArtifactCardProps) => {
         className={
           artifact.type === 'xlsx'
             ? ''
-            : 'h-[320px] sm:h-[380px]'
+            : 'ea:h-[320px] ea:sm:h-[380px]'
         }
       >
         {renderPreview()}
       </div>
       {downloadFailed && (
-        <p className="px-3 pb-2 text-xs text-destructive">
+        <p className="ea:px-3 ea:pb-2 ea:text-xs ea:text-destructive">
           Download failed — please try again.
         </p>
       )}

@@ -60,7 +60,11 @@ export const getProviderLabel = (value: string): string =>
  * which model a fresh entry will run.
  */
 export const ProviderPicker = ({ value, onChange }: IProviderPickerProps) => (
-  <div className="grid grid-cols-2 gap-2" role="group" aria-label="Provider">
+  <div
+    className="ea:grid ea:grid-cols-2 ea:gap-2"
+    role="group"
+    aria-label="Provider"
+  >
     {PROVIDER_OPTIONS.map((option) => {
       const selected = option.value === value;
 
@@ -70,27 +74,27 @@ export const ProviderPicker = ({ value, onChange }: IProviderPickerProps) => (
           type="button"
           onClick={() => onChange(option.value)}
           aria-pressed={selected}
-          className={`relative flex items-center gap-3 rounded-lg border p-3 text-left transition-colors ${
+          className={`ea:relative ea:flex ea:items-center ea:gap-3 ea:rounded-lg ea:border ea:p-3 ea:text-left ea:transition-colors ${
             selected
-              ? 'border-primary bg-primary/5'
-              : 'hover:bg-accent/50'
+              ? 'ea:border-primary ea:bg-primary/5'
+              : 'ea:hover:bg-accent/50'
           }`}
         >
-          <ProviderIcon provider={option.value} className="size-9" />
-          <span className="min-w-0">
-            <span className="block truncate text-[13px] font-medium">
+          <ProviderIcon provider={option.value} className="ea:size-9" />
+          <span className="ea:min-w-0">
+            <span className="ea:block ea:truncate ea:text-[13px] ea:font-medium">
               {option.label}{' '}
-              <span className="font-normal text-muted-foreground">
+              <span className="ea:font-normal ea:text-muted-foreground">
                 ({option.defaultModel})
               </span>
             </span>
-            <span className="block truncate text-xs text-muted-foreground">
+            <span className="ea:block ea:truncate ea:text-xs ea:text-muted-foreground">
               {option.description}
             </span>
           </span>
           {selected && (
             <IconCheck
-              className="absolute right-2.5 top-2.5 size-4 text-primary"
+              className="ea:absolute ea:right-2.5 ea:top-2.5 ea:size-4 ea:text-primary"
               aria-hidden="true"
             />
           )}

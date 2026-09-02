@@ -38,8 +38,9 @@
 - The AI SDK chat transport, stored-history mapping, REST client, and GraphQL
   documents under `src/modules/agents`.
 - The plugin-owned Tailwind stylesheet (`src/styles.css` + `postcss.config.mjs`)
-  compiled into the remote bundle so the plugin renders correctly against any
-  host build (see Local Invariants).
+  compiled into the remote bundle with `ea:`-prefixed utilities and no
+  Preflight, so the plugin renders against any host build without changing
+  host utility or base rules (see Local Invariants).
 - The animated bot avatar: the MIT-licensed, framework-free bloub engine
   vendored under `src/modules/agents/bloub/` (unchanged upstream code) plus
   the React wrapper `src/modules/agents/components/BloubBot.tsx`.
@@ -261,7 +262,7 @@
 | Artifacts            | `src/modules/agents/artifacts/*`             | `parseArtifacts` fence splitter, `MessageContent`/`ArtifactCard` rendering, sandboxed `HtmlPreview` + lazy previews (`SpreadsheetPreview` / `DocxPreview` / `PdfPreview`), converters (`csv`, `mdBlocks`, `xlsx`, `docx`, `pdf`), `download` |
 | Types               | `src/modules/agents/types.ts`                  | REST and stored-message shapes                    |
 | Federation          | `module-federation.config.ts`                  | Remote name, exposes, and shared library policy   |
-| Plugin stylesheet   | `src/styles.css` + `postcss.config.mjs`        | Plugin-owned Tailwind v4 build shipped with the remote (loaded by every expose) |
+| Plugin stylesheet   | `src/styles.css` + `postcss.config.mjs`        | `ea:`-prefixed Tailwind v4 theme/utilities build with no Preflight, loaded by every expose |
 | Federation CSS rule | `rspack.config.ts`                             | `postcss-loader` + `type: 'css'` rule so the stylesheet compiles and emits as an MF css chunk |
 
 ## Contracts
@@ -274,7 +275,7 @@
   `./floatingWidget`. Every expose lists `src_styles_css.css` in its
   manifest `css.sync` assets, so the MF runtime fetches the stylesheet
   together with whichever expose it loads — the remote is style-independent
-  of the host build.
+  of the host build and its prefixed selectors cannot override host utilities.
 - `CONFIG` with `name: 'erxes_agent'` (the underscored MF remote name the
   host uses to build `${name}_ui` for `loadRemote`),
   `permissionName: 'erxes-agent'` (the dashed backend plugin name used
@@ -337,16 +338,17 @@
   deployed against a stale host renders unstyled without this stylesheet.
   Removing any expose import re-opens that gap for that surface.
 - `src/styles.css` scope rules: `@source './'` scans ONLY this plugin's
-  sources; shared `erxes-ui`/`ui-modules` component classes stay owned by the
-  host stylesheet. The `@theme` block mirrors the host's token MAPPINGS
+  sources, and every plugin-owned Tailwind literal in TS/TSX uses the `ea:`
+  prefix-first syntax. The stylesheet imports only Tailwind's theme and
+  utilities layers with `prefix(ea)`; it MUST NOT import Preflight or add a
+  global base/reset selector because every expose can load it on any host page.
+  Shared `erxes-ui`/`ui-modules` component classes stay owned by the host
+  stylesheet. The `@theme` block mirrors the host's token MAPPINGS
   (`--color-primary: var(--primary)`, text-size/radius/shadow overrides) so
   generated utilities resolve identically — but token VALUES (oklch colors,
   fonts) are never redeclared: the host `:root` remains the single source of
   truth and per-token value overrides here would fight host theming. Keep the
-  two `@theme` blocks in sync when the host's changes, and keep the
-  default-border-color compat `@layer base` rule: this stylesheet loads after
-  the host's, and without it the preflight reset would turn plugin borders
-  `currentColor`.
+  two `@theme` blocks in sync when the host's changes.
 - `rspack.config.ts` must keep the `test: /\.css$/` → `postcss-loader` +
   `type: 'css'` rule (mirrors `core-ui`); without it the stylesheet does not
   compile through Tailwind or emit as an MF css chunk.
@@ -655,10 +657,25 @@
   pickers truncating rather than the send control escaping the card, a wide
   markdown table scrolls sideways without widening the transcript, and a
   thread row's delete button is reachable without hovering.
+- Smoke (style isolation): load the floating widget on `/my-inbox` and another
+  non-agent host route, then confirm host responsive combinations such as
+  `hidden sm:flex` still switch at the host breakpoint and browser styles show
+  no plugin-provided global reset.
 
 ## Recent Changes
 
 <!-- Newest first. Keep at most 10 entries. -->
+
+### `2026-09-02` — Isolate remote Tailwind CSS from host pages
+
+- **Summary:** Prefixed every plugin-owned utility with `ea:` and changed the
+  remote stylesheet to import only prefixed Tailwind theme/utilities layers,
+  omitting Preflight so loading the floating widget cannot override host
+  utilities such as `hidden sm:flex` or host base styles.
+- **Affected areas:** `src/styles.css`, plugin TS/TSX utility literals, and
+  stylesheet isolation guidance.
+- **Contracts changed:** None (CSS selector namespace only; no GraphQL, REST,
+  `CONFIG`, route, or federation expose changes).
 
 ### `2026-09-02` — Self-owned stylesheet: remote no longer depends on host CSS freshness
 
@@ -683,6 +700,29 @@
   (`src_styles_css.css`) referenced by every expose's manifest; the deploy
   bucket layout and cache headers changed as described above. No GraphQL,
   REST, `CONFIG`, or expose-key changes.
+
+### 2026-09-01 — Spreadsheet preview simplification + minimal artifact chrome
+
+- Replaced the Univer-based `previews/SpreadsheetEditor.tsx` with a
+  read-only `previews/SpreadsheetPreview.tsx` that renders
+  `parseDelimitedTable(content)` as a styled HTML `<table>` (sticky
+  header, 60vh max height, "Empty table" placeholder when the input has
+  no rows). The Univer bundle often rendered as a silent empty grid
+  when its async mount path hiccupped, so a blank card no longer looks
+  like a failure.
+- Simplified `ArtifactCard` chrome: no more outer `bg-muted/20`
+  background, no type icon, no `Spreadsheet`/`Word`/etc. badge, no
+  Expand button. Header is just the artifact title with small Copy /
+  Download icons (`size-7` ghost buttons). HTML/DOCX/PDF previews keep
+  their `320px ⇄ 380px` body height so the iframe still has room; the
+  xlsx preview now sizes to its content.
+- Removed the `ISpreadsheetHandle` / `handleRef` round-trip; the
+  Download path now reads the same parsed rows it always falls back to
+  when the editor never mounted.
+- Dropped the `univer-css.d.ts` shim. `@univerjs/presets` and
+  `@univerjs/preset-sheets-core` are still installed (in `package.json`)
+  for back-compat but no longer imported; remove them from the
+  manifest in a follow-up `pnpm install`.
 
 ### `2026-08-31` — ask_user answers as an answered Q&A card
 
@@ -821,54 +861,3 @@
 - **Contracts changed:** Consumes `AgentsSettings` query and
   `AgentsSettingsUpdate` mutation; settings navigation gains the
   "Code mode" item (exposes and `CONFIG` unchanged).
-
-### 2026-09-01 — Spreadsheet preview simplification + minimal artifact chrome
-
-- Replaced the Univer-based `previews/SpreadsheetEditor.tsx` with a
-  read-only `previews/SpreadsheetPreview.tsx` that renders
-  `parseDelimitedTable(content)` as a styled HTML `<table>` (sticky
-  header, 60vh max height, "Empty table" placeholder when the input has
-  no rows). The Univer bundle often rendered as a silent empty grid
-  when its async mount path hiccupped, so a blank card no longer looks
-  like a failure.
-- Simplified `ArtifactCard` chrome: no more outer `bg-muted/20`
-  background, no type icon, no `Spreadsheet`/`Word`/etc. badge, no
-  Expand button. Header is just the artifact title with small Copy /
-  Download icons (`size-7` ghost buttons). HTML/DOCX/PDF previews keep
-  their `320px ⇄ 380px` body height so the iframe still has room; the
-  xlsx preview now sizes to its content.
-- Removed the `ISpreadsheetHandle` / `handleRef` round-trip; the
-  Download path now reads the same parsed rows it always falls back to
-  when the editor never mounted.
-- Dropped the `univer-css.d.ts` shim. `@univerjs/presets` and
-  `@univerjs/preset-sheets-core` are still installed (in `package.json`)
-  for back-compat but no longer imported; remove them from the
-  manifest in a follow-up `pnpm install`.
-
-### 2026-09-01 — Markdown repair: separator row merged onto the header line
-
-- **Summary:** A third pipe-table malformation still rendered as raw `|`
-  text: the assistant merged the separator row onto the END of the header
-  line (`| A | B |---|---|---|`). `isSeparatorLine()` matches only a whole
-  line of dashes/pipes, so the line read as the header and its dashes were
-  counted as extra columns — columnCount became 5 instead of 2 and every
-  data row below was re-chunked into 5-column garbage. `repairTables` now
-  splits a trailing separator run off both header and data lines before the
-  header is measured.
-- **Details:** New `splitTrailingSeparator(line)` returns the real cells
-  plus the separator cells, or `null` when there is no coherent run. The run
-  must be >= 2 cells wide and leave >= 2 real cells, so a single trailing
-  `---` (a literal "no value" cell) is never mistaken for a separator. A
-  merged separator is trusted only when its width matches the header's
-  column count — that preserves alignment markers (`| --- | ---: |`); a
-  mismatched run is discarded and regenerated from the header. `reChunkLine`
-  became `reChunkCells` so header and data lines can both be re-chunked from
-  already-split cells.
-- **Affected areas:**
-  `src/modules/agents/components/markdownRepair.ts` and
-  `src/modules/agents/__tests__/markdownRepair.test.ts` (3 new cases,
-  including the exact screenshot input). `Markdown.tsx` unchanged.
-- **Contracts changed:** None (pure text pre-pass; no GraphQL/REST, `CONFIG`
-  or federation changes, no new dependencies).
-- **Validation:** 64/64 plugin tests pass (was 61), lint clean for the
-  touched files, type-check clean.

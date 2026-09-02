@@ -32,15 +32,15 @@ export const ThreadsDrawer = ({
   <Sheet open={open} onOpenChange={onOpenChange}>
     <Sheet.View
       side="left"
-      className="flex w-[86vw] max-w-xs flex-col bg-background p-0 sm:max-w-xs"
+      className="ea:flex ea:w-[86vw] ea:max-w-xs ea:flex-col ea:bg-background ea:p-0 ea:sm:max-w-xs"
     >
-      <Sheet.Header className="px-4">
-        <Sheet.Title className="text-base font-semibold">
+      <Sheet.Header className="ea:px-4">
+        <Sheet.Title className="ea:text-base ea:font-semibold">
           Conversations
         </Sheet.Title>
         <Sheet.Close aria-label="Close conversations" />
       </Sheet.Header>
-      <Sheet.Content className="flex min-h-0 flex-1 flex-col p-0">
+      <Sheet.Content className="ea:flex ea:min-h-0 ea:flex-1 ea:flex-col ea:p-0">
         <ThreadList {...listProps} />
       </Sheet.Content>
     </Sheet.View>

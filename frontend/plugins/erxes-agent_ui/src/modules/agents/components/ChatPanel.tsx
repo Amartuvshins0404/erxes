@@ -79,17 +79,19 @@ export const ChatPanel = ({ chat, className }: IChatPanelProps) => {
   const isEmpty = messages.length === 0 && !loadingThread;
 
   const errorBanner = error ? (
-    <div className="flex items-start gap-2 border-b border-destructive/30 bg-destructive/10 px-3 py-2 text-[13px] text-destructive sm:text-sm">
-      <IconAlertCircle className="mt-0.5 size-4 shrink-0" />
-      <p className="min-w-0 flex-1 break-words">{describeError(error)}</p>
+    <div className="ea:flex ea:items-start ea:gap-2 ea:border-b ea:border-destructive/30 ea:bg-destructive/10 ea:px-3 ea:py-2 ea:text-[13px] ea:text-destructive ea:sm:text-sm">
+      <IconAlertCircle className="ea:mt-0.5 ea:size-4 ea:shrink-0" />
+      <p className="ea:min-w-0 ea:flex-1 ea:break-words">
+        {describeError(error)}
+      </p>
       <Button
         variant="ghost"
         size="icon"
-        className="size-6 shrink-0"
+        className="ea:size-6 ea:shrink-0"
         onClick={clearError}
         aria-label="Dismiss error"
       >
-        <IconX className="size-3.5" />
+        <IconX className="ea:size-3.5" />
       </Button>
     </div>
   ) : null;
@@ -137,37 +139,39 @@ export const ChatPanel = ({ chat, className }: IChatPanelProps) => {
 
   if (isEmpty) {
     return (
-      <div className={`flex h-full min-h-0 flex-1 flex-col ${className ?? ''}`}>
+      <div
+        className={`ea:flex ea:h-full ea:min-h-0 ea:flex-1 ea:flex-col ${className ?? ''}`}
+      >
         {errorBanner}
         {/* Scroll-safe centering: centers when there is room, scrolls when the
             container is short (narrow side panel, mobile, split screens). */}
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          <div className="mx-auto flex min-h-full w-full max-w-xl flex-col items-center justify-center gap-5 px-4 py-6 sm:gap-6 sm:py-8 sm:max-w-2xl">
-            <div className="flex flex-col items-center gap-3 text-center sm:gap-4">
+        <div className="ea:min-h-0 ea:flex-1 ea:overflow-y-auto">
+          <div className="ea:mx-auto ea:flex ea:min-h-full ea:w-full ea:max-w-xl ea:flex-col ea:items-center ea:justify-center ea:gap-5 ea:px-4 ea:py-6 ea:sm:gap-6 ea:sm:py-8 ea:sm:max-w-2xl">
+            <div className="ea:flex ea:flex-col ea:items-center ea:gap-3 ea:text-center ea:sm:gap-4">
               {/* Scaled down on short/narrow viewports so the hero never
                   pushes the composer out of the panel. */}
               <BloubBot
                 size={104}
                 cycle={CALM_FACE_CYCLE}
-                className="size-20 sm:size-24 md:size-[104px]"
+                className="ea:size-20 ea:sm:size-24 ea:md:size-[104px]"
               />
-              <div className="space-y-1">
-                <h2 className="text-lg font-semibold md:text-xl">
+              <div className="ea:space-y-1">
+                <h2 className="ea:text-lg ea:font-semibold ea:md:text-xl">
                   How can I help you today?
                 </h2>
-                <p className="text-sm text-muted-foreground">
+                <p className="ea:text-sm ea:text-muted-foreground">
                   Ask anything about your erxes workspace
                 </p>
               </div>
             </div>
-            <div className="w-full">{composer}</div>
-            <div className="flex flex-wrap justify-center gap-2">
+            <div className="ea:w-full">{composer}</div>
+            <div className="ea:flex ea:flex-wrap ea:justify-center ea:gap-2">
               {SUGGESTIONS.map((suggestion) => (
                 <button
                   key={suggestion}
                   type="button"
                   onClick={() => sendMessage({ text: suggestion })}
-                  className="rounded-full border bg-card px-3 py-1.5 text-xs text-muted-foreground shadow-sm transition-colors hover:border-foreground/20 hover:text-foreground sm:text-[13px]"
+                  className="ea:rounded-full ea:border ea:bg-card ea:px-3 ea:py-1.5 ea:text-xs ea:text-muted-foreground ea:shadow-sm ea:transition-colors ea:hover:border-foreground/20 ea:hover:text-foreground ea:sm:text-[13px]"
                 >
                   {suggestion}
                 </button>
@@ -180,7 +184,9 @@ export const ChatPanel = ({ chat, className }: IChatPanelProps) => {
   }
 
   return (
-    <div className={`flex h-full min-h-0 flex-1 flex-col ${className ?? ''}`}>
+    <div
+      className={`ea:flex ea:h-full ea:min-h-0 ea:flex-1 ea:flex-col ${className ?? ''}`}
+    >
       {errorBanner}
       <MessageList
         messages={messages}
@@ -195,8 +201,10 @@ export const ChatPanel = ({ chat, className }: IChatPanelProps) => {
       />
       {/* `pb` keeps the composer clear of the iOS home indicator without
           adding dead space on every other device. */}
-      <div className="bg-background/80 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-1 backdrop-blur sm:px-4">
-        <div className="mx-auto w-full max-w-2xl md:max-w-3xl">{composer}</div>
+      <div className="ea:bg-background/80 ea:px-3 ea:pb-[max(0.75rem,env(safe-area-inset-bottom))] ea:pt-1 ea:backdrop-blur ea:sm:px-4">
+        <div className="ea:mx-auto ea:w-full ea:max-w-2xl ea:md:max-w-3xl">
+          {composer}
+        </div>
       </div>
     </div>
   );

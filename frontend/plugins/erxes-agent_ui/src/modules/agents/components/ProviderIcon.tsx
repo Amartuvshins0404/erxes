@@ -28,7 +28,12 @@ const MonoMark = ({
   viewBox: string;
   path: string;
 }) => (
-  <svg viewBox={viewBox} className="size-[58%]" fill="currentColor" aria-hidden="true">
+  <svg
+    viewBox={viewBox}
+    className="ea:size-[58%]"
+    fill="currentColor"
+    aria-hidden="true"
+  >
     <path d={path} />
   </svg>
 );
@@ -48,12 +53,12 @@ const KimiMark = ({ className }: { className?: string }) => (
  */
 export const ProviderIcon = ({
   provider,
-  className = 'size-8',
+  className = 'ea:size-8',
 }: IProviderIconProps) => {
   if (provider === 'openai' || provider === 'grok') {
     return (
       <span
-        className={`flex shrink-0 items-center justify-center rounded-md border bg-muted/60 text-foreground ${className}`}
+        className={`ea:flex ea:shrink-0 ea:items-center ea:justify-center ea:rounded-md ea:border ea:bg-muted/60 ea:text-foreground ${className}`}
       >
         <MonoMark
           viewBox={provider === 'openai' ? '0 0 24 24' : '0 0 841.89 595.28'}
@@ -65,11 +70,11 @@ export const ProviderIcon = ({
 
   if (provider === 'kimi' || provider === 'kimi-code') {
     return (
-      <span className={`relative block shrink-0 ${className}`}>
-        <KimiMark className="size-full" />
+      <span className={`ea:relative ea:block ea:shrink-0 ${className}`}>
+        <KimiMark className="ea:size-full" />
         {provider === 'kimi-code' && (
-          <span className="absolute -bottom-1 -right-1 flex h-1/2 w-1/2 items-center justify-center rounded-full bg-foreground text-background">
-            <IconCode className="size-[70%]" aria-hidden="true" />
+          <span className="ea:absolute ea:-bottom-1 ea:-right-1 ea:flex ea:h-1/2 ea:w-1/2 ea:items-center ea:justify-center ea:rounded-full ea:bg-foreground ea:text-background">
+            <IconCode className="ea:size-[70%]" aria-hidden="true" />
           </span>
         )}
       </span>
@@ -78,9 +83,9 @@ export const ProviderIcon = ({
 
   return (
     <span
-      className={`flex shrink-0 items-center justify-center rounded-md border bg-muted/60 text-muted-foreground ${className}`}
+      className={`ea:flex ea:shrink-0 ea:items-center ea:justify-center ea:rounded-md ea:border ea:bg-muted/60 ea:text-muted-foreground ${className}`}
     >
-      <IconSparkles className="size-[55%]" aria-hidden="true" />
+      <IconSparkles className="ea:size-[55%]" aria-hidden="true" />
     </span>
   );
 };

@@ -39,10 +39,10 @@ export const DocxPreview = ({ blob }: IDocxPreviewProps) => {
   }, [blob]);
 
   return (
-    <div className="h-full overflow-auto rounded-lg border bg-white">
-      <div className="p-6">
+    <div className="ea:h-full ea:overflow-auto ea:rounded-lg ea:border ea:bg-white">
+      <div className="ea:p-6">
         {failed ? (
-          <p className="py-10 text-center text-sm text-muted-foreground">
+          <p className="ea:py-10 ea:text-center ea:text-sm ea:text-muted-foreground">
             Preview unavailable — use Download to open the file.
           </p>
         ) : (

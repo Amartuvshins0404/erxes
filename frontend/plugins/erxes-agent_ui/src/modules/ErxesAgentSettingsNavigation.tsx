@@ -11,8 +11,8 @@ import { SettingsNavigationMenuLinkItem, Sidebar } from 'erxes-ui';
 export const ErxesAgentSettingsNavigation = () => {
   return (
     <Sidebar.Group>
-      <Sidebar.GroupLabel className="h-4">Agents</Sidebar.GroupLabel>
-      <Sidebar.GroupContent className="pt-1">
+      <Sidebar.GroupLabel className="ea:h-4">Agents</Sidebar.GroupLabel>
+      <Sidebar.GroupContent className="ea:pt-1">
         <Sidebar.Menu>
           <SettingsNavigationMenuLinkItem
             pathPrefix="erxes-agent"

@@ -47,8 +47,8 @@ export const Composer = ({
   };
 
   return (
-    <div className="rounded-[22px] border bg-card shadow-sm transition-colors hover:border-foreground/20">
-      <div className="px-3.5 pt-3 sm:px-4">
+    <div className="ea:rounded-[22px] ea:border ea:bg-card ea:shadow-sm ea:transition-colors ea:hover:border-foreground/20">
+      <div className="ea:px-3.5 ea:pt-3 ea:sm:px-4">
         <ChatInput
           value={text}
           onChange={setText}
@@ -60,9 +60,9 @@ export const Composer = ({
       </div>
       {/* One row at every width: the pickers shrink (and truncate) instead of
           pushing the send control out of the card on a phone. */}
-      <div className="flex items-center gap-2 px-2.5 pb-2.5 pt-1.5">
+      <div className="ea:flex ea:items-center ea:gap-2 ea:px-2.5 ea:pb-2.5 ea:pt-1.5">
         {pickers && (
-          <div className="flex min-w-0 flex-1 items-center gap-2">
+          <div className="ea:flex ea:min-w-0 ea:flex-1 ea:items-center ea:gap-2">
             {pickers}
           </div>
         )}
@@ -70,21 +70,21 @@ export const Composer = ({
           <Button
             variant="outline"
             size="icon"
-            className={`size-8 shrink-0 rounded-full ${pickers ? '' : 'ml-auto'}`}
+            className={`ea:size-8 ea:shrink-0 ea:rounded-full ${pickers ? '' : 'ea:ml-auto'}`}
             onClick={onStop}
             aria-label="Stop generating"
           >
-            <IconPlayerStop className="size-4" />
+            <IconPlayerStop className="ea:size-4" />
           </Button>
         ) : (
           <Button
             size="icon"
-            className={`size-8 shrink-0 rounded-full ${pickers ? '' : 'ml-auto'}`}
+            className={`ea:size-8 ea:shrink-0 ea:rounded-full ${pickers ? '' : 'ea:ml-auto'}`}
             onClick={send}
             disabled={!canSend}
             aria-label="Send message"
           >
-            <IconArrowUp className="size-4" />
+            <IconArrowUp className="ea:size-4" />
           </Button>
         )}
       </div>

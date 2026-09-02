@@ -67,11 +67,11 @@ export const SettingsCodeModePage = () => {
   };
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="ea:flex ea:h-full ea:flex-col">
       <PageHeader>
         <PageHeader.Start>
           <Breadcrumb>
-            <Breadcrumb.List className="gap-1">
+            <Breadcrumb.List className="ea:gap-1">
               <Breadcrumb.Item>
                 <Button variant="ghost" asChild>
                   <Link to="/erxes-agent">
@@ -88,7 +88,7 @@ export const SettingsCodeModePage = () => {
               </Breadcrumb.Item>
               <Breadcrumb.Separator />
               <Breadcrumb.Item>
-                <span className="text-muted-foreground">Code mode</span>
+                <span className="ea:text-muted-foreground">Code mode</span>
               </Breadcrumb.Item>
             </Breadcrumb.List>
           </Breadcrumb>
@@ -100,24 +100,24 @@ export const SettingsCodeModePage = () => {
         </PageHeader.Start>
       </PageHeader>
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="ea:flex-1 ea:overflow-y-auto">
         {loading ? (
-          <div className="flex justify-center p-8">
-            <Spinner className="size-5" />
+          <div className="ea:flex ea:justify-center ea:p-8">
+            <Spinner className="ea:size-5" />
           </div>
         ) : error ? (
-          <p className="mx-auto max-w-xl p-6 text-sm text-destructive">
+          <p className="ea:mx-auto ea:max-w-xl ea:p-6 ea:text-sm ea:text-destructive">
             {error}
           </p>
         ) : (
-          <div className="mx-auto max-w-xl space-y-4 p-6">
-            <div className="rounded-xl border p-6">
-              <div className="flex items-start justify-between gap-4">
-                <div className="space-y-1.5">
-                  <Label className="font-sans text-sm font-medium normal-case">
+          <div className="ea:mx-auto ea:max-w-xl ea:space-y-4 ea:p-6">
+            <div className="ea:rounded-xl ea:border ea:p-6">
+              <div className="ea:flex ea:items-start ea:justify-between ea:gap-4">
+                <div className="ea:space-y-1.5">
+                  <Label className="ea:font-sans ea:text-sm ea:font-medium ea:normal-case">
                     Code mode
                   </Label>
-                  <p className="max-w-sm text-xs text-muted-foreground">
+                  <p className="ea:max-w-sm ea:text-xs ea:text-muted-foreground">
                     Lets the agent write and run TypeScript in a sandbox to
                     search, aggregate, and compute across your workspace
                     tools, then answer with one result.
@@ -131,28 +131,28 @@ export const SettingsCodeModePage = () => {
                 />
               </div>
               {!canManage && (
-                <p className="mt-4 rounded-lg border border-dashed p-3 text-xs text-muted-foreground">
+                <p className="ea:mt-4 ea:rounded-lg ea:border ea:border-dashed ea:p-3 ea:text-xs ea:text-muted-foreground">
                   Managed by your administrators.
                 </p>
               )}
             </div>
 
-            <div className="rounded-xl border p-6">
-              <Label className="font-sans text-sm font-medium normal-case">
+            <div className="ea:rounded-xl ea:border ea:p-6">
+              <Label className="ea:font-sans ea:text-sm ea:font-medium ea:normal-case">
                 Sandbox environment
               </Label>
-              <div className="mt-3 flex items-start gap-3 rounded-lg border p-3">
-                <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-md bg-muted">
-                  <IconServer className="size-4 text-muted-foreground" />
+              <div className="ea:mt-3 ea:flex ea:items-start ea:gap-3 ea:rounded-lg ea:border ea:p-3">
+                <span className="ea:mt-0.5 ea:flex ea:size-8 ea:shrink-0 ea:items-center ea:justify-center ea:rounded-md ea:bg-muted">
+                  <IconServer className="ea:size-4 ea:text-muted-foreground" />
                 </span>
-                <div className="min-w-0">
-                  <p className="text-sm font-medium">
+                <div className="ea:min-w-0">
+                  <p className="ea:text-sm ea:font-medium">
                     In-process (built-in server)
-                    <span className="ml-2 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-primary">
+                    <span className="ea:ml-2 ea:rounded-full ea:bg-primary/10 ea:px-2 ea:py-0.5 ea:text-[10px] ea:font-medium ea:uppercase ea:tracking-wide ea:text-primary">
                       Default
                     </span>
                   </p>
-                  <p className="mt-1 text-xs text-muted-foreground">
+                  <p className="ea:mt-1 ea:text-xs ea:text-muted-foreground">
                     Code runs inside this server in an isolated WebAssembly
                     interpreter — no filesystem, network, or process access.
                     Destructive tool calls always stay behind the normal

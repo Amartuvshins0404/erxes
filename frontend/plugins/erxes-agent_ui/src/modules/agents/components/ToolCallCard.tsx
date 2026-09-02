@@ -54,7 +54,7 @@ const JsonBlock = ({ value }: { value: unknown }) => {
   }
 
   return (
-    <pre className="mt-1 max-h-48 overflow-auto rounded-md bg-muted p-2 text-xs">
+    <pre className="ea:mt-1 ea:max-h-48 ea:overflow-auto ea:rounded-md ea:bg-muted ea:p-2 ea:text-xs">
       {text}
     </pre>
   );
@@ -77,41 +77,41 @@ export const ToolCallCard = ({ tool }: { tool: IToolCallView }) => {
 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
-      <div className="my-1 rounded-md border bg-muted/40 text-foreground">
+      <div className="ea:my-1 ea:rounded-md ea:border ea:bg-muted/40 ea:text-foreground">
         <Collapsible.Trigger asChild>
           <button
             type="button"
-            className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs"
+            className="ea:flex ea:w-full ea:items-center ea:gap-2 ea:px-3 ea:py-2 ea:text-left ea:text-xs"
           >
             {isRunning ? (
-              <Spinner className="size-3.5" />
+              <Spinner className="ea:size-3.5" />
             ) : isError || isDenied ? (
-              <IconX className="size-3.5 shrink-0 text-destructive" />
+              <IconX className="ea:size-3.5 ea:shrink-0 ea:text-destructive" />
             ) : isDone || isApproved ? (
-              <IconCheck className="size-3.5 shrink-0 text-emerald-600" />
+              <IconCheck className="ea:size-3.5 ea:shrink-0 ea:text-emerald-600" />
             ) : (
-              <IconTool className="size-3.5 shrink-0 text-muted-foreground" />
+              <IconTool className="ea:size-3.5 ea:shrink-0 ea:text-muted-foreground" />
             )}
-            <span className="truncate font-medium">{label}</span>
+            <span className="ea:truncate ea:font-medium">{label}</span>
             {isRunning && (
-              <span className="ml-auto flex items-center gap-1 text-muted-foreground">
-                <IconLoader2 className="size-3 animate-spin" />
+              <span className="ea:ml-auto ea:flex ea:items-center ea:gap-1 ea:text-muted-foreground">
+                <IconLoader2 className="ea:size-3 ea:animate-spin" />
               </span>
             )}
             {isDenied && <Badge variant="destructive">Declined</Badge>}
             {isError && <Badge variant="destructive">Failed</Badge>}
           </button>
         </Collapsible.Trigger>
-        <Collapsible.Content className="px-3 pb-2">
+        <Collapsible.Content className="ea:px-3 ea:pb-2">
           <JsonBlock value={args} />
           {isDone && <JsonBlock value={tool.output} />}
           {isError && (
-            <p className="mt-1 text-xs text-destructive">
+            <p className="ea:mt-1 ea:text-xs ea:text-destructive">
               {tool.errorText ?? 'Tool execution failed.'}
             </p>
           )}
           {isDenied && tool.approval?.reason && (
-            <p className="mt-1 text-xs text-muted-foreground">
+            <p className="ea:mt-1 ea:text-xs ea:text-muted-foreground">
               {tool.approval.reason}
             </p>
           )}

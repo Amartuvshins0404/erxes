@@ -116,11 +116,11 @@ export const SettingsConnectionPage = () => {
   );
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="ea:flex ea:h-full ea:flex-col">
       <PageHeader>
         <PageHeader.Start>
           <Breadcrumb>
-            <Breadcrumb.List className="gap-1">
+            <Breadcrumb.List className="ea:gap-1">
               <Breadcrumb.Item>
                 <Button variant="ghost" asChild>
                   <Link to="/erxes-agent">
@@ -137,7 +137,7 @@ export const SettingsConnectionPage = () => {
               </Breadcrumb.Item>
               <Breadcrumb.Separator />
               <Breadcrumb.Item>
-                <span className="text-muted-foreground">API key</span>
+                <span className="ea:text-muted-foreground">API key</span>
               </Breadcrumb.Item>
             </Breadcrumb.List>
           </Breadcrumb>
@@ -149,68 +149,68 @@ export const SettingsConnectionPage = () => {
         </PageHeader.Start>
       </PageHeader>
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="ea:flex-1 ea:overflow-y-auto">
         {loading ? (
-          <div className="flex justify-center p-8">
-            <Spinner className="size-5" />
+          <div className="ea:flex ea:justify-center ea:p-8">
+            <Spinner className="ea:size-5" />
           </div>
         ) : error ? (
-          <p className="mx-auto max-w-xl p-6 text-sm text-destructive">
+          <p className="ea:mx-auto ea:max-w-xl ea:p-6 ea:text-sm ea:text-destructive">
             {error}
           </p>
         ) : (
-          <div className="mx-auto max-w-2xl space-y-4 p-6">
-            <div className="rounded-xl border p-6">
-              <div className="mb-4">
-                <Label className="font-sans text-sm font-medium normal-case">
+          <div className="ea:mx-auto ea:max-w-2xl ea:space-y-4 ea:p-6">
+            <div className="ea:rounded-xl ea:border ea:p-6">
+              <div className="ea:mb-4">
+                <Label className="ea:font-sans ea:text-sm ea:font-medium ea:normal-case">
                   Configured providers
                 </Label>
-                <p className="mt-1 text-xs text-muted-foreground">
+                <p className="ea:mt-1 ea:text-xs ea:text-muted-foreground">
                   Each provider keeps its own key; the chat's model picker
                   lists models from every configured provider.
                 </p>
               </div>
 
               {connections.length === 0 ? (
-                <div className="flex flex-col items-center gap-1.5 rounded-lg border border-dashed p-6 text-center">
+                <div className="ea:flex ea:flex-col ea:items-center ea:gap-1.5 ea:rounded-lg ea:border ea:border-dashed ea:p-6 ea:text-center">
                   <IconSparkles
-                    className="size-5 text-muted-foreground"
+                    className="ea:size-5 ea:text-muted-foreground"
                     aria-hidden="true"
                   />
-                  <p className="text-sm text-muted-foreground">
+                  <p className="ea:text-sm ea:text-muted-foreground">
                     No provider configured yet. Add one below.
                   </p>
                 </div>
               ) : (
-                <ul className="space-y-2">
+                <ul className="ea:space-y-2">
                   {connections.map((connection) => {
                     const option = getProviderOption(connection.provider);
 
                     return (
                       <li
                         key={connection.provider}
-                        className="flex items-center gap-3 rounded-lg border px-3 py-2.5"
+                        className="ea:flex ea:items-center ea:gap-3 ea:rounded-lg ea:border ea:px-3 ea:py-2.5"
                       >
                         <ProviderIcon
                           provider={connection.provider}
-                          className="size-8"
+                          className="ea:size-8"
                         />
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-medium">
+                        <div className="ea:min-w-0 ea:flex-1">
+                          <p className="ea:truncate ea:text-sm ea:font-medium">
                             {getProviderLabel(connection.provider)}{' '}
-                            <span className="font-normal text-muted-foreground">
+                            <span className="ea:font-normal ea:text-muted-foreground">
                               ({connection.model})
                             </span>
                           </p>
                           {option && (
-                            <p className="truncate text-xs text-muted-foreground">
+                            <p className="ea:truncate ea:text-xs ea:text-muted-foreground">
                               {option.description}
                             </p>
                           )}
                         </div>
-                        <span className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
+                        <span className="ea:flex ea:shrink-0 ea:items-center ea:gap-1.5 ea:text-xs ea:text-muted-foreground">
                           <span
-                            className="size-1.5 shrink-0 rounded-full bg-emerald-500"
+                            className="ea:size-1.5 ea:shrink-0 ea:rounded-full ea:bg-emerald-500"
                             aria-hidden="true"
                           />
                           {connection.updatedAt
@@ -222,13 +222,13 @@ export const SettingsConnectionPage = () => {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="size-7 shrink-0 text-muted-foreground hover:text-destructive"
+                          className="ea:size-7 ea:shrink-0 ea:text-muted-foreground ea:hover:text-destructive"
                           aria-label={`Remove ${getProviderLabel(connection.provider)} key`}
                           onClick={() =>
                             setRemovingProvider(connection.provider)
                           }
                         >
-                          <IconTrash className="size-3.5" />
+                          <IconTrash className="ea:size-3.5" />
                         </Button>
                       </li>
                     );
@@ -237,10 +237,10 @@ export const SettingsConnectionPage = () => {
               )}
             </div>
 
-            <div className="rounded-xl border p-6">
-              <div className="space-y-4">
-                <div className="space-y-1.5">
-                  <Label className="font-sans text-sm font-medium normal-case">
+            <div className="ea:rounded-xl ea:border ea:p-6">
+              <div className="ea:space-y-4">
+                <div className="ea:space-y-1.5">
+                  <Label className="ea:font-sans ea:text-sm ea:font-medium ea:normal-case">
                     Add or update a provider
                   </Label>
                   <ProviderPicker
@@ -254,59 +254,59 @@ export const SettingsConnectionPage = () => {
                 </div>
 
                 {selectedProvider && (
-                  <div className="space-y-1.5">
+                  <div className="ea:space-y-1.5">
                     <Label
                       htmlFor="agents-settings-api-key"
-                      className="font-sans text-sm font-medium normal-case"
+                      className="ea:font-sans ea:text-sm ea:font-medium ea:normal-case"
                     >
                       API key
                     </Label>
-                    <div className="relative">
+                    <div className="ea:relative">
                       <Input
                         id="agents-settings-api-key"
                         type={showKey ? 'text' : 'password'}
                         value={apiKey}
                         onChange={(event) => setApiKey(event.target.value)}
                         autoComplete="off"
-                        className="pr-10"
+                        className="ea:pr-10"
                         placeholder={
                           storedProvider?.hasKey
                             ? 'Saved — leave empty to keep your current key'
                             : 'Paste your API key'
                         }
                       />
-                      <div className="absolute inset-y-0 right-1 flex items-center">
+                      <div className="ea:absolute ea:inset-y-0 ea:right-1 ea:flex ea:items-center">
                         <Button
                           type="button"
                           variant="ghost"
                           size="icon"
-                          className="size-6 text-muted-foreground hover:text-foreground"
+                          className="ea:size-6 ea:text-muted-foreground ea:hover:text-foreground"
                           onClick={() => setShowKey((visible) => !visible)}
                           aria-label={showKey ? 'Hide API key' : 'Show API key'}
                           aria-pressed={showKey}
                         >
                           {showKey ? (
-                            <IconEyeOff className="size-3.5" />
+                            <IconEyeOff className="ea:size-3.5" />
                           ) : (
-                            <IconEye className="size-3.5" />
+                            <IconEye className="ea:size-3.5" />
                           )}
                         </Button>
                       </div>
                     </div>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="ea:text-xs ea:text-muted-foreground">
                       Your key is stored securely and never displayed again.
                     </p>
                   </div>
                 )}
               </div>
 
-              <div className="mt-6 flex justify-end">
+              <div className="ea:mt-6 ea:flex ea:justify-end">
                 <Button
                   onClick={handleSave}
                   disabled={!selectedProvider || saving}
                 >
                   {saving ? (
-                    <Spinner className="size-4" />
+                    <Spinner className="ea:size-4" />
                   ) : (
                     <IconDeviceFloppy />
                   )}
@@ -328,9 +328,9 @@ export const SettingsConnectionPage = () => {
       >
         <AlertDialog.Content>
           <AlertDialog.Header>
-            <AlertDialog.Title className="flex items-center gap-2">
+            <AlertDialog.Title className="ea:flex ea:items-center ea:gap-2">
               {removingProvider && (
-                <ProviderIcon provider={removingProvider} className="size-5" />
+                <ProviderIcon provider={removingProvider} className="ea:size-5" />
               )}
               Remove {removingProvider ? getProviderLabel(removingProvider) : ''}{' '}
               key
@@ -355,7 +355,7 @@ export const SettingsConnectionPage = () => {
                 }
               }}
             >
-              {removing ? <Spinner className="size-4" /> : 'Remove'}
+              {removing ? <Spinner className="ea:size-4" /> : 'Remove'}
             </AlertDialog.Action>
           </AlertDialog.Footer>
         </AlertDialog.Content>

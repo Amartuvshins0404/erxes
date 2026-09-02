@@ -58,7 +58,7 @@ export const ChatInput = ({
       disabled={disabled}
       rows={1}
       aria-label={ariaLabel}
-      className={`w-full resize-none border-0 bg-transparent text-[15px] leading-6 text-foreground shadow-none outline-none ring-0 placeholder:text-muted-foreground/70 focus:outline-none focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60 md:text-base ${
+      className={`ea:w-full ea:resize-none ea:border-0 ea:bg-transparent ea:text-[15px] ea:leading-6 ea:text-foreground ea:shadow-none ea:outline-none ea:ring-0 ea:placeholder:text-muted-foreground/70 ea:focus:outline-none ea:focus-visible:outline-none ea:disabled:cursor-not-allowed ea:disabled:opacity-60 ea:md:text-base ${
         className ?? ''
       }`}
     />

@@ -2,8 +2,9 @@
   Plugin-owned stylesheet. The core-ui host compiles Tailwind classes for the
   plugin sources that exist at HOST build time (`@source '../../plugins/'`),
   so a remote deployed against a stale host renders without its newer classes.
-  Shipping this stylesheet with the remote makes the plugin self-sufficient:
-  the Module Federation runtime loads it together with the exposed modules.
+  Shipping this stylesheet with the remote makes the plugin self-sufficient,
+  while the `ea` prefix isolates every generated utility from host classes.
+  Preflight is deliberately omitted so this remote cannot reset host elements.
 
   Scope notes:
   - `@source './'` scans only this plugin's sources. Shared erxes-ui and
@@ -13,28 +14,14 @@
     (oklch colors, fonts, radii) stay host-owned on `:root` and are
     deliberately NOT redeclared here.
 */
-@import 'tailwindcss' source(none);
+@layer theme, base, components, utilities;
+
+@import 'tailwindcss/theme.css' layer(theme) prefix(ea);
+@import 'tailwindcss/utilities.css' layer(utilities) prefix(ea) source(none);
 
 @source './';
 
 @custom-variant dark (&:is(.dark *));
-
-/*
-  Same default-border-color compatibility layer as the host stylesheet. This
-  plugin stylesheet loads after the host's, so without it the preflight
-  `border: 0 solid` reset would win the cascade and borders inside plugin
-  surfaces would fall back to `currentColor` instead of the design-system
-  gray.
-*/
-@layer base {
-  *,
-  ::after,
-  ::before,
-  ::backdrop,
-  ::file-selector-button {
-    border-color: var(--color-gray-200, currentcolor);
-  }
-}
 
 @theme {
   --font-*: initial;

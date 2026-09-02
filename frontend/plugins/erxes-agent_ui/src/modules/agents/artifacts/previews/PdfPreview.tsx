@@ -22,7 +22,7 @@ export const PdfPreview = ({ blob }: IPdfPreviewProps) => {
     <iframe
       title="PDF artifact preview"
       src={objectUrl}
-      className="h-full w-full rounded-lg border"
+      className="ea:h-full ea:w-full ea:rounded-lg ea:border"
     />
   );
 };

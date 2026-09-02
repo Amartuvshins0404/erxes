@@ -35,15 +35,15 @@ export const ThinkingPicker = ({
   return (
     <Select value={value} onValueChange={onChange} disabled={disabled}>
       <Select.Trigger
-        className="h-8 w-[104px] shrink-0 justify-between rounded-full text-[13px] sm:w-[124px] md:w-[150px]"
+        className="ea:h-8 ea:w-[104px] ea:shrink-0 ea:justify-between ea:rounded-full ea:text-[13px] ea:sm:w-[124px] ea:md:w-[150px]"
         aria-label="Thinking level"
       >
-        <div className="flex min-w-0 items-center gap-1.5">
-          <IconBulb className="size-3.5 shrink-0 text-muted-foreground" />
+        <div className="ea:flex ea:min-w-0 ea:items-center ea:gap-1.5">
+          <IconBulb className="ea:size-3.5 ea:shrink-0 ea:text-muted-foreground" />
           {/* The "Thinking:" prefix is the first thing to go on a narrow
               composer; the level alone still reads. */}
-          <span className="truncate sm:hidden">{shortLabel}</span>
-          <span className="hidden truncate sm:inline">{label}</span>
+          <span className="ea:truncate ea:sm:hidden">{shortLabel}</span>
+          <span className="ea:hidden ea:truncate ea:sm:inline">{label}</span>
         </div>
       </Select.Trigger>
       <Select.Content>

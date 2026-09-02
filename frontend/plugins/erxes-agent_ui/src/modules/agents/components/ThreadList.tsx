@@ -129,61 +129,61 @@ export const ThreadList = ({
   };
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <div className="flex items-center justify-between gap-2 px-3 pb-1 pt-3">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+    <div className="ea:flex ea:h-full ea:min-h-0 ea:flex-col">
+      <div className="ea:flex ea:items-center ea:justify-between ea:gap-2 ea:px-3 ea:pb-1 ea:pt-3">
+        <p className="ea:text-[11px] ea:font-semibold ea:uppercase ea:tracking-wider ea:text-muted-foreground">
           Conversations
         </p>
         <Button
           variant="ghost"
           size="sm"
-          className="h-7 gap-1 px-2 text-xs text-muted-foreground hover:text-foreground"
+          className="ea:h-7 ea:gap-1 ea:px-2 ea:text-xs ea:text-muted-foreground ea:hover:text-foreground"
           onClick={onNewConversation}
           aria-label="New conversation"
         >
-          <IconPlus className="size-3.5" />
+          <IconPlus className="ea:size-3.5" />
           New
         </Button>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-2 pt-1">
+      <div className="ea:min-h-0 ea:flex-1 ea:overflow-y-auto ea:px-2 ea:pb-2 ea:pt-1">
         {loading && threads.length === 0 && (
-          <div className="space-y-1.5" aria-hidden="true">
+          <div className="ea:space-y-1.5" aria-hidden="true">
             {Array.from({ length: SKELETON_ROWS }).map((_, index) => (
               <div
                 key={index}
-                className="space-y-1.5 rounded-xl px-3 py-2.5"
+                className="ea:space-y-1.5 ea:rounded-xl ea:px-3 ea:py-2.5"
               >
                 <span
-                  className="block h-3 animate-pulse rounded bg-accent"
+                  className="ea:block ea:h-3 ea:animate-pulse ea:rounded ea:bg-accent"
                   style={{ width: `${60 + ((index * 13) % 35)}%` }}
                 />
-                <span className="block h-2 w-1/4 animate-pulse rounded bg-accent/70" />
+                <span className="ea:block ea:h-2 ea:w-1/4 ea:animate-pulse ea:rounded ea:bg-accent/70" />
               </div>
             ))}
           </div>
         )}
 
         {error && (
-          <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+          <div className="ea:rounded-lg ea:border ea:border-destructive/30 ea:bg-destructive/5 ea:px-3 ea:py-2 ea:text-xs ea:text-destructive">
             {error}
           </div>
         )}
 
         {!loading && !error && threads.length === 0 && (
-          <div className="flex flex-col items-center gap-1.5 px-3 py-8 text-center">
+          <div className="ea:flex ea:flex-col ea:items-center ea:gap-1.5 ea:px-3 ea:py-8 ea:text-center">
             {/* The bot naps while there is nothing to show. */}
             <BloubBot size={56} state="sleep" />
-            <p className="text-xs text-muted-foreground">
+            <p className="ea:text-xs ea:text-muted-foreground">
               No conversations yet.
             </p>
             <Button
               variant="outline"
               size="sm"
-              className="mt-1 h-7 gap-1 rounded-full px-3 text-xs"
+              className="ea:mt-1 ea:h-7 ea:gap-1 ea:rounded-full ea:px-3 ea:text-xs"
               onClick={onNewConversation}
             >
-              <IconPlus className="size-3.5" />
+              <IconPlus className="ea:size-3.5" />
               Start one
             </Button>
           </div>
@@ -191,44 +191,44 @@ export const ThreadList = ({
 
         {groups.map((group) => (
           <Fragment key={group.key}>
-            <p className="px-2.5 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 first:pt-1">
+            <p className="ea:px-2.5 ea:pb-1 ea:pt-3 ea:text-[10px] ea:font-semibold ea:uppercase ea:tracking-wider ea:text-muted-foreground/70 ea:first:pt-1">
               {group.label}
             </p>
-            <ul className="space-y-0.5">
+            <ul className="ea:space-y-0.5">
               {group.threads.map((thread) => {
                 const isActive = thread.id === activeThreadId;
 
                 return (
                   <li key={thread.id}>
                     <div
-                      className={`group relative flex items-center rounded-xl py-2 pl-3.5 pr-1 transition-colors ${
+                      className={`ea:group ea:relative ea:flex ea:items-center ea:rounded-xl ea:py-2 ea:pl-3.5 ea:pr-1 ea:transition-colors ${
                         isActive
-                          ? 'bg-primary/10'
-                          : 'hover:bg-accent/60'
+                          ? 'ea:bg-primary/10'
+                          : 'ea:hover:bg-accent/60'
                       }`}
                     >
                       {isActive && (
                         <span
-                          className="absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full bg-primary"
+                          className="ea:absolute ea:left-0 ea:top-1/2 ea:h-5 ea:w-1 ea:-translate-y-1/2 ea:rounded-r-full ea:bg-primary"
                           aria-hidden="true"
                         />
                       )}
                       <button
                         type="button"
                         onClick={() => onSelectThread(thread.id)}
-                        className="min-w-0 flex-1 py-0.5 text-left"
+                        className="ea:min-w-0 ea:flex-1 ea:py-0.5 ea:text-left"
                       >
                         <span
-                          className={`block truncate text-[13px] leading-tight md:text-[13.5px] ${
+                          className={`ea:block ea:truncate ea:text-[13px] ea:leading-tight ea:md:text-[13.5px] ${
                             isActive
-                              ? 'font-medium text-foreground'
-                              : 'font-normal text-foreground/90'
+                              ? 'ea:font-medium ea:text-foreground'
+                              : 'ea:font-normal ea:text-foreground/90'
                           }`}
                         >
                           {thread.title || 'Untitled conversation'}
                         </span>
                         {thread.updatedAt && (
-                          <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">
+                          <span className="ea:mt-0.5 ea:block ea:truncate ea:text-[11px] ea:text-muted-foreground">
                             {formatDateISOStringToRelativeDateShort(
                               thread.updatedAt,
                             )}
@@ -241,11 +241,11 @@ export const ThreadList = ({
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="size-6 shrink-0 text-muted-foreground transition-opacity lg:opacity-0 lg:group-hover:opacity-100 lg:focus-visible:opacity-100 hover:text-destructive"
+                        className="ea:size-6 ea:shrink-0 ea:text-muted-foreground ea:transition-opacity ea:lg:opacity-0 ea:lg:group-hover:opacity-100 ea:lg:focus-visible:opacity-100 ea:hover:text-destructive"
                         aria-label="Delete conversation"
                         onClick={() => setThreadToDelete(thread.id)}
                       >
-                        <IconTrash className="size-3.5" />
+                        <IconTrash className="ea:size-3.5" />
                       </Button>
                     </div>
                   </li>

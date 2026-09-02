@@ -27,6 +27,8 @@ export const MTO_PROFILE_FIELDS = gql`
     isActive
     icon
     coverImages
+    address
+    certificateNo
     instanceId
   }
 `;

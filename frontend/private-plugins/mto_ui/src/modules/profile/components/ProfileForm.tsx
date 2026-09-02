@@ -36,6 +36,8 @@ const DEFAULT_VALUES: ProfileFormData = {
   phone: '',
   email: '',
   website: '',
+  address: '',
+  certificateNo: '',
   isActive: true,
   icon: '',
   coverImages: [],
@@ -58,6 +60,8 @@ const toFormValues = (profile: MtoProfile | null): ProfileFormData => {
     phone: profile.contactInfo?.phone ?? '',
     email: profile.contactInfo?.email ?? '',
     website: profile.contactInfo?.website ?? '',
+    address: profile.address ?? '',
+    certificateNo: profile.certificateNo ?? '',
     isActive: profile.isActive ?? true,
     icon: profile.icon ?? '',
     coverImages: profile.coverImages ?? [],
@@ -71,6 +75,8 @@ const toMutationVariables = (
   const descriptionMn = data.descriptionMn?.trim();
   const website = data.website?.trim();
   const icon = data.icon?.trim();
+  const address = data.address?.trim();
+  const certificateNo = data.certificateNo?.trim();
 
   return {
     businessName: {
@@ -92,6 +98,8 @@ const toMutationVariables = (
     isActive: data.isActive,
     icon: icon || undefined,
     coverImages: data.coverImages,
+    address: address || '',
+    certificateNo: certificateNo || '',
   };
 };
 
@@ -348,6 +356,23 @@ export function ProfileForm({
                 />
                 <Form.Field
                   control={form.control}
+                  name="address"
+                  render={({ field }) => (
+                    <Form.Item>
+                      <Form.Label>Address</Form.Label>
+                      <Form.Control>
+                        <Textarea
+                          {...field}
+                          placeholder="Street, city"
+                          rows={2}
+                        />
+                      </Form.Control>
+                      <Form.Message />
+                    </Form.Item>
+                  )}
+                />
+                <Form.Field
+                  control={form.control}
                   name="isActive"
                   render={({ field }) => (
                     <Form.Item className="flex items-center gap-3">
@@ -388,6 +413,19 @@ export function ProfileForm({
                         <Form.Label>Business name (MN) *</Form.Label>
                         <Form.Control>
                           <Input {...field} placeholder="Монгол нэр" />
+                        </Form.Control>
+                        <Form.Message />
+                      </Form.Item>
+                    )}
+                  />
+                  <Form.Field
+                    control={form.control}
+                    name="certificateNo"
+                    render={({ field }) => (
+                      <Form.Item className="md:col-span-2">
+                        <Form.Label>Certificate No</Form.Label>
+                        <Form.Control>
+                          <Input {...field} placeholder="Certificate number" />
                         </Form.Control>
                         <Form.Message />
                       </Form.Item>

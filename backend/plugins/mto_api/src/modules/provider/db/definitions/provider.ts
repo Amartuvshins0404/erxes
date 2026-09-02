@@ -76,6 +76,8 @@ export const providerSchema = new Schema(
     isActive: { type: Boolean, default: true, label: 'Is Active' },
     icon: { type: String, label: 'Icon URL', optional: true },
     coverImages: { type: [String], label: 'Cover Images', optional: true },
+    address: { type: String, label: 'Address' },
+    certificateNo: { type: String, label: 'Certificate No', index: true },
     instanceId: { type: String, label: 'Instance ID', index: true },
   },
   {

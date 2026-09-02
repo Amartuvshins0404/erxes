@@ -9,6 +9,8 @@ export const MTO_PROFILE_CREATE = gql`
     $isActive: Boolean
     $icon: String
     $coverImages: [String]
+    $address: String
+    $certificateNo: String
   ) {
     mtoProfileCreate(
       businessName: $businessName
@@ -17,6 +19,8 @@ export const MTO_PROFILE_CREATE = gql`
       isActive: $isActive
       icon: $icon
       coverImages: $coverImages
+      address: $address
+      certificateNo: $certificateNo
     ) {
       ...MtoProfileFields
     }
@@ -33,6 +37,8 @@ export const MTO_PROFILE_UPDATE = gql`
     $isActive: Boolean
     $icon: String
     $coverImages: [String]
+    $address: String
+    $certificateNo: String
   ) {
     mtoProfileUpdate(
       _id: $_id
@@ -42,6 +48,8 @@ export const MTO_PROFILE_UPDATE = gql`
       isActive: $isActive
       icon: $icon
       coverImages: $coverImages
+      address: $address
+      certificateNo: $certificateNo
     ) {
       ...MtoProfileFields
     }

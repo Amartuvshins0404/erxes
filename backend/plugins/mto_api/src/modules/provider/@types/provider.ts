@@ -37,6 +37,8 @@ export interface IProvider {
   isActive?: boolean;
   icon?: string;
   coverImages?: string[];
+  address?: string;
+  certificateNo?: string;
   instanceId?: string;
   createdAt?: Date;
   modifiedAt?: Date;

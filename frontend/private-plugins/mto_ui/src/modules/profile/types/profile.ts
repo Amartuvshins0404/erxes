@@ -31,6 +31,8 @@ export interface MtoProfile {
   isActive?: boolean;
   icon?: string;
   coverImages?: string[];
+  address?: string;
+  certificateNo?: string;
   instanceId?: string;
 }
 
@@ -45,4 +47,6 @@ export interface ProfileMutationVariables {
   isActive: boolean;
   icon?: string;
   coverImages: string[];
+  address?: string;
+  certificateNo?: string;
 }

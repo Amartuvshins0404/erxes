@@ -59,6 +59,7 @@
 ## Data and State
 
 - Tenant-scoped Mongo collections: `mto_providers`, `mto_categories`, `mto_events`, `mto_travel_associations`, `mto_registration_applications`, `mto_registration_form_schemas`, `mto_system_configs`.
+- Profile (`mto_providers`) stores bilingual business name, optional description, contact info, optional `address` and `certificateNo`, branding (`icon`, `coverImages`), status, and `instanceId`.
 - Travel association documents store bilingual `title` (required), optional bilingual `description`, `logo`, `cover`, and required `foundDate`.
 
 ## Local Invariants
@@ -74,11 +75,17 @@
 ## Validation
 
 - `pnpm nx build mto_api`
-- Smoke: `mtoMyProfile` returns the instance profile (or local singleton); first save creates, later saves update; rejected profiles still cannot update; master `mtoProfiles` returns all rows unless `x-onefit-instance-id` is set
+- Smoke: `mtoMyProfile` returns the instance profile (or local singleton); first save creates, later saves update; rejected profiles still cannot update; master `mtoProfiles` returns all rows unless `x-onefit-instance-id` is set; profile create/update persists `address` and `certificateNo`
 
 ## Recent Changes
 
 <!-- Newest first. Keep at most 10 entries. -->
+
+### `2026-09-01` — Profile address and certificate number
+
+- **Summary:** Profiles now store optional `address` and `certificateNo`; list search matches both fields.
+- **Affected areas:** `src/modules/provider`
+- **Contracts changed:** `MtoProfile` and `mtoProfileCreate`/`mtoProfileUpdate` include `address` and `certificateNo`
 
 ### `2026-09-01` — Master lists all profiles
 

@@ -24,7 +24,7 @@
 ## Current Capabilities
 
 - Dev port **3008**. Registers with `core-ui` as module `mto`, with navigation group (including registration-type `subGroup`), settings navigation, and relation-widget module `mtocustomer`.
-- Profile page at `/mto/profile`: slave mode loads `mtoMyProfile` and creates or updates the instance profile with RHF + Zod; master mode lists all profiles in a `RecordTable` with search/status/active filters, create/edit sheet, and approve/reject/delete.
+- Profile page at `/mto/profile`: slave mode loads `mtoMyProfile` and creates or updates the instance profile with RHF + Zod; master mode lists all profiles in a `RecordTable` with search/status/active filters, create/edit sheet, and approve/reject/delete. Profile form includes address and certificate number.
 - List pages for categories, travel associations, events, and registrations use `PageContainer` + `PageHeader` + `PageSubHeader` with URL-driven `Filter` bars and `RecordTable` (cursor pagination on registrations).
 - Navigation `subGroup` lists FillForm membership types and filters `/mto/registrations?membershipTypeId=...`.
 - Category/travel-association/event create and edit via side `Sheet` forms validated with React Hook Form + Zod.
@@ -79,11 +79,17 @@
 ## Validation
 
 - `pnpm nx build mto_ui`
-- Smoke: slave `/mto/profile` create/update; master `/mto/profile` lists all profiles and can edit/approve/delete
+- Smoke: slave `/mto/profile` create/update including address and certificate number; master `/mto/profile` lists all profiles and can edit/approve/delete
 
 ## Recent Changes
 
 <!-- Newest first. Keep at most 10 entries. -->
+
+### `2026-09-01` — Profile address and certificate number
+
+- **Summary:** Profile form and master list now include optional address and certificate number, saved through `mtoProfileCreate`/`mtoProfileUpdate`.
+- **Affected areas:** `src/modules/profile`
+- **Contracts changed:** Consumes `address` and `certificateNo` on `MtoProfile` and profile create/update
 
 ### `2026-09-01` — Profile list page size
 

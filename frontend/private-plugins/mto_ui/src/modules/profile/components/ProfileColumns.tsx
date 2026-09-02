@@ -1,11 +1,13 @@
 /* eslint-disable react-hooks/rules-of-hooks */
 import {
   IconCalendar,
+  IconCertificate,
   IconCircleCheck,
   IconCircleX,
   IconDots,
   IconEdit,
   IconMail,
+  IconMapPin,
   IconPhone,
   IconPhoto,
   IconServer,
@@ -118,6 +120,46 @@ export const profileColumns = ({
       );
     },
     size: 140,
+  },
+  {
+    id: 'certificateNo',
+    accessorKey: 'certificateNo',
+    header: () => (
+      <RecordTable.InlineHead label="Certificate No" icon={IconCertificate} />
+    ),
+    cell: ({ cell }) => {
+      const certificateNo = cell.getValue() as string | undefined;
+      return (
+        <RecordTableInlineCell className="min-w-0">
+          {certificateNo ? (
+            <span className="truncate">{certificateNo}</span>
+          ) : (
+            <span className="text-muted-foreground">—</span>
+          )}
+        </RecordTableInlineCell>
+      );
+    },
+    size: 160,
+  },
+  {
+    id: 'address',
+    accessorKey: 'address',
+    header: () => (
+      <RecordTable.InlineHead label="Address" icon={IconMapPin} />
+    ),
+    cell: ({ cell }) => {
+      const address = cell.getValue() as string | undefined;
+      return (
+        <RecordTableInlineCell className="min-w-0">
+          {address ? (
+            <span className="truncate">{address}</span>
+          ) : (
+            <span className="text-muted-foreground">—</span>
+          )}
+        </RecordTableInlineCell>
+      );
+    },
+    size: 180,
   },
   {
     id: 'status',

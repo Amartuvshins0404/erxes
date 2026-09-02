@@ -53,6 +53,18 @@ const generateFilter = async (
           $options: 'i',
         },
       },
+      {
+        address: {
+          $regex: `.*${escaped}.*`,
+          $options: 'i',
+        },
+      },
+      {
+        certificateNo: {
+          $regex: `.*${escaped}.*`,
+          $options: 'i',
+        },
+      },
     ];
   }
 

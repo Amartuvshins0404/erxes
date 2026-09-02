@@ -8,6 +8,8 @@ export const profileFormSchema = z.object({
   phone: z.string().min(1, { message: 'Phone is required' }),
   email: z.string().email({ message: 'Enter a valid email' }),
   website: z.string().optional(),
+  address: z.string().optional(),
+  certificateNo: z.string().optional(),
   isActive: z.boolean(),
   icon: z.string().optional(),
   coverImages: z.array(z.string()),

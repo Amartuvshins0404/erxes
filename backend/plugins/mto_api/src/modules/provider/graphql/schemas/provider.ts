@@ -42,6 +42,8 @@ export const types = `
     isActive: Boolean
     icon: String
     coverImages: [String]
+    address: String
+    certificateNo: String
     instanceId: String
   }
 
@@ -80,6 +82,8 @@ const mutationParams = `
   isActive: Boolean
   icon: String
   coverImages: [String]
+  address: String
+  certificateNo: String
 `;
 
 export const mutations = `

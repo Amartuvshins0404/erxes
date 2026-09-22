@@ -82,6 +82,12 @@
 
 <!-- Newest first. Keep at most 10 entries. -->
 
+### `2026-09-22` — `Dependency security upgrades`
+
+- **Summary:** Bumped vulnerable dependencies within semver-safe ranges: jsonwebtoken `^9.0.2` -> `^9.0.3`, ws `^8.18.2` -> `^8.21.3`.
+- **Affected areas:** `package.json`
+- **Contracts changed:** `None`
+
 ### `2026-09-13` — `Discount info type cleanup`
 
 - **Summary:** POS discount info types now use a plain string with documented known values to avoid redundant literal-union Sonar warnings.

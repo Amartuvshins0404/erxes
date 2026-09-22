@@ -214,6 +214,19 @@
   Properties. A `code` must name a real field on the record; core-api reads
   this meta once per process, so a changed list shows after core-api restarts.
 
+## Recent Changes
+
+<!-- Newest first. Keep at most 10 entries. -->
+
+### `2026-09-22` — `Dependency security upgrades`
+
+- **Summary:** Bumped vulnerable dependencies within semver-safe ranges:
+  fast-xml-parser `5.2.5` -> `^5.3.5`, jsonwebtoken `^9.0.2` -> `^9.0.3`,
+  nanoid `^3.3.6` -> `^3.3.19`, underscore `^1.13.7` -> `^1.13.8`,
+  validator `^13.15.0` -> `^13.15.35`, ws `^8.18.2` -> `^8.21.3`.
+- **Affected areas:** `package.json`
+- **Contracts changed:** `None`
+
 ### `2026-09-17` — Property types declare system fields
 
 - **Summary:** The `conversation` and `ticket` property types now declare

@@ -147,6 +147,12 @@
 
 <!-- Newest first. Keep at most 10 entries. -->
 
+### `2026-09-22` — `Dependency security upgrades`
+
+- **Summary:** Bumped vulnerable dependencies within semver-safe ranges: widget: react-router-dom `^6.15.0` -> `^6.30.6`, postcss `8.4.38` -> `^8.5.23`, vite `^7.0.4` -> `^7.3.6`.
+- **Affected areas:** `package.json`
+- **Contracts changed:** `None`
+
 ### `2026-08-12` — `Event-scoped ticket redemption`
 
 - **Summary:** Added an optional expected event slug to barcode redemption so

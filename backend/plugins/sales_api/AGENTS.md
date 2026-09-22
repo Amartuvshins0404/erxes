@@ -331,6 +331,12 @@
 
 <!-- Newest first. Keep at most 10 entries. -->
 
+### `2026-09-22` — `Dependency security upgrades`
+
+- **Summary:** Bumped vulnerable dependencies within semver-safe ranges: underscore `^1.13.7` -> `^1.13.8`.
+- **Affected areas:** `package.json`
+- **Contracts changed:** `None`
+
 ### `2026-09-17` — Property types declare system fields
 
 - **Summary:** The `deal` property types now declare `systemFields`, shown

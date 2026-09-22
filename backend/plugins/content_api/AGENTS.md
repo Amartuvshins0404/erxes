@@ -84,6 +84,12 @@
 
 <!-- Newest first. Keep at most 10 entries. -->
 
+### `2026-09-22` — `Dependency security upgrades`
+
+- **Summary:** Bumped vulnerable dependencies within semver-safe ranges: simple-git `^3.26.0` -> `^3.36.0`, tmp `^0.2.3` -> `^0.2.7`.
+- **Affected areas:** `package.json`
+- **Contracts changed:** `None`
+
 ### `2026-09-16` - Include Postiz sharing in CMS authoring roles
 
 - **Summary:** Grant Postiz sharing to the four existing CMS authoring/editor/admin groups without creating a custom group or changing approval rules.

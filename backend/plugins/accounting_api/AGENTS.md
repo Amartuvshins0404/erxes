@@ -184,6 +184,12 @@
 
 <!-- Newest first. Keep at most 10 entries. -->
 
+### `2026-09-22` — `Dependency security upgrades`
+
+- **Summary:** Bumped vulnerable dependencies within semver-safe ranges: underscore `^1.13.7` -> `^1.13.8`.
+- **Affected areas:** `package.json`
+- **Contracts changed:** `None`
+
 ### `2026-09-19` — `Erkhet Inventory Weight Sync`
 
 - **Summary:** Erkhet reference sync now imports product short name, weight, and sub-unit ratios, while inventory income sync preserves detail weight and resolves attached-expense account codes for amount, count, or weight allocation.

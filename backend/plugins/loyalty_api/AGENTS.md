@@ -79,6 +79,12 @@
 
 <!-- Newest first. Keep at most 10 entries. -->
 
+### `2026-09-22` — `Dependency security upgrades`
+
+- **Summary:** Bumped vulnerable dependencies within semver-safe ranges: mathjs `^15.1.1` -> `^15.2.0`.
+- **Affected areas:** `package.json`
+- **Contracts changed:** `None`
+
 ### `2026-08-12` — `Campaign-specific product totals`
 
 - **Summary:** Deal and POS order score campaign totals now apply product/category/tag restrictions, with deal-only `tickUsed` and discount-check handling preserved.

@@ -20,9 +20,9 @@
     "fbgraph": "^1.4.4",
     "graphql-tag": "^2.12.6",
     "graphql-ws": "^5.16.0",
-    "jsonwebtoken": "^9.0.2",
+    "jsonwebtoken": "^9.0.3",
     "moment-timezone": "^0.5.48",
     "sha256": "^0.2.0",
-    "ws": "^8.18.2"
+    "ws": "^8.21.3"
   }
 }

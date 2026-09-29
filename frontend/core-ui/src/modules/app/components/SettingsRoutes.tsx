@@ -143,6 +143,12 @@ const StructureSettings = lazy(() =>
   ),
 );
 
+const MarketplaceSettings = lazy(() =>
+  import('~/pages/settings/workspace/MarketplacePage').then((module) => ({
+    default: module.MarketplacePage,
+  })),
+);
+
 export function SettingsRoutes() {
   const isOs = useVersion();
 
@@ -246,6 +252,10 @@ export function SettingsRoutes() {
         <Route
           path={SettingsWorkspacePath.Broadcast}
           element={<BroadcastSettings />}
+        />
+        <Route
+          path={SettingsWorkspacePath.Marketplace}
+          element={<MarketplaceSettings />}
         />
         {getPluginsSettingsRoutes()}
       </Routes>

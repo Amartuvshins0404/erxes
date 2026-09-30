@@ -555,6 +555,28 @@ export const permissions: IPermissionConfig = {
       ],
     },
     {
+      name: 'marketplace',
+      description: 'Plugin marketplace',
+      scopeField: null,
+      ownerFields: [],
+
+      scopes: [{ name: 'all', description: 'All records' }],
+
+      actions: [
+        {
+          title: 'View marketplace',
+          name: 'marketplaceRead',
+          description: 'Browse the plugin catalog and installed plugins',
+          always: true,
+        },
+        {
+          title: 'Manage plugins',
+          name: 'marketplaceManage',
+          description: 'Install, enable, disable and uninstall plugins',
+        },
+      ],
+    },
+    {
       name: 'clientPortal',
       description: 'Client portal management',
       scopeField: null,
@@ -823,6 +845,12 @@ export const permissions: IPermissionConfig = {
         },
         {
           plugin: 'core',
+          module: 'marketplace',
+          actions: ['marketplaceRead', 'marketplaceManage'],
+          scope: 'all',
+        },
+        {
+          plugin: 'core',
           module: 'clientPortal',
           actions: ['clientPortalManage'],
           scope: 'all',
@@ -1003,6 +1031,12 @@ export const permissions: IPermissionConfig = {
           plugin: 'core',
           module: 'apps',
           actions: ['appsRead'],
+          scope: 'all',
+        },
+        {
+          plugin: 'core',
+          module: 'marketplace',
+          actions: ['marketplaceRead'],
           scope: 'all',
         },
         {

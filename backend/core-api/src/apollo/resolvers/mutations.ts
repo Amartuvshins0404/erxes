@@ -30,6 +30,7 @@ import { commentMutations } from '@/clientportal/graphql/resolvers/mutations/com
 import { cpNotificationMutations } from '@/clientportal/graphql/resolvers/mutations/cpNotification';
 import { bundleMutations } from '@/bundle/graphql/resolvers/mutations';
 import { templateMutations } from '@/template/graphql/mutations';
+import { marketplaceMutations } from '~/modules/marketplace/graphql/resolvers/mutations';
 
 export const mutations = {
   ...contactMutations,
@@ -62,4 +63,5 @@ export const mutations = {
   ...cpNotificationMutations,
   ...bundleMutations,
   ...templateMutations,
+  ...marketplaceMutations,
 };

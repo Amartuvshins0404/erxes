@@ -13,7 +13,7 @@ import {
   calculatePriceAdjust,
 } from '~/modules/pricing/utils/rule';
 import { getAllowedProducts } from '~/modules/pricing/utils/product';
-import { getPlacePathIds } from '~/modules/pricing/utils/place';
+import { getPlacePaths } from '~/modules/pricing/utils/place';
 import { getOwnerSummary } from '~/utils/ownerSummary';
 import { TScoreSkip } from '@/score/@types/earnTable';
 import { applyOwnerTier, tierForPurchase } from '@/score/services/purchaseTier';
@@ -130,6 +130,7 @@ export const checkPricingInput = z.object({
   prioritizeRule: z.string(),
   totalAmount: z.number().nonnegative(),
   placeEntityId: z.string().optional(),
+  responsibleEntityId: z.string().optional(),
   products: z.array(pricingProductSchema),
   pipelineId: z.string().nullish(),
   customerType: participantKindSchema,
@@ -146,6 +147,7 @@ const quantityRulesInput = z.object({
     }),
   ),
   placeEntityId: z.string().optional(),
+  responsibleEntityId: z.string().optional(),
 });
 
 const checkCouponInput = z.object({
@@ -335,6 +337,7 @@ export const appRouter = t.router({
           prioritizeRule,
           totalAmount,
           placeEntityId,
+          responsibleEntityId,
           products,
           pipelineId,
           customerType,
@@ -359,6 +362,7 @@ export const appRouter = t.router({
           prioritizeRule,
           totalAmount,
           placeEntityId,
+          responsibleEntityId,
           pipelineId: pipelineId || '',
           orderItems,
           customerType,
@@ -373,7 +377,7 @@ export const appRouter = t.router({
       .query(async ({ ctx, input }) => {
         const { subdomain } = ctx;
         const models = await ctx.models;
-        const { products, placeEntityId } = input;
+        const { products, placeEntityId, responsibleEntityId } = input;
 
         const productsById = {};
         for (const product of products) {
@@ -384,7 +388,10 @@ export const appRouter = t.router({
         const rulesByProductId = {};
 
         const conditions = getMainConditions({
-          placePathIds: await getPlacePathIds(subdomain, placeEntityId),
+          placePaths: await getPlacePaths(subdomain, [
+            placeEntityId,
+            responsibleEntityId,
+          ]),
         });
         conditions.$and = [
           ...(conditions.$and || []),

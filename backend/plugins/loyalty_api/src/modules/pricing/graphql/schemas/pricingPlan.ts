@@ -423,6 +423,7 @@ const checkDiscountParams = `
   prioritizeRule: String
   totalAmount: Float
   placeEntityId: String
+  responsibleEntityId: String
   pipelineId: String
   customerType: String
   customerId: String

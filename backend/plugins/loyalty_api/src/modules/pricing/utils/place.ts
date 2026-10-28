@@ -1,13 +1,9 @@
 import { sendTRPCMessage } from 'erxes-api-shared/utils';
 
-export const getPlacePathIds = async (
+const getPlacePathIds = async (
   subdomain: string,
-  placeEntityId?: string,
+  placeEntityId: string,
 ): Promise<string[]> => {
-  if (!placeEntityId) {
-    return [];
-  }
-
   const place: { order?: string } | null = await sendTRPCMessage({
     subdomain,
     pluginName: 'core',
@@ -22,18 +18,35 @@ export const getPlacePathIds = async (
     : [placeEntityId];
 };
 
-export const getPlaceDepth = (
-  placeEntityIds: string[] = [],
-  placePathIds: string[] = [],
-) =>
-  placePathIds.reduce(
-    (depth, placeId, index) =>
-      placeEntityIds.includes(placeId) ? index : depth,
-    0,
+export const getPlacePaths = (
+  subdomain: string,
+  entityIds: Array<string | undefined>,
+): Promise<string[][]> =>
+  Promise.all(
+    entityIds
+      .filter((entityId): entityId is string => !!entityId)
+      .map((entityId) => getPlacePathIds(subdomain, entityId)),
   );
 
-export const getPlaceFilter = (placePathIds: string[] = []) =>
-  placePathIds.length
+export const getPlaceDepth = (
+  placeEntityIds: string[] = [],
+  placePaths: string[][] = [],
+) =>
+  Math.max(
+    0,
+    ...placePaths.map((pathIds) =>
+      pathIds.reduce(
+        (depth, placeId, index) =>
+          placeEntityIds.includes(placeId) ? index : depth,
+        0,
+      ),
+    ),
+  );
+
+export const getPlaceFilter = (placePaths: string[][] = []) => {
+  const placePathIds = [...new Set(placePaths.flat())];
+
+  return placePathIds.length
     ? {
         $or: [
           { placeEntityIds: { $in: placePathIds } },
@@ -41,6 +54,7 @@ export const getPlaceFilter = (placePathIds: string[] = []) =>
         ],
       }
     : { 'placeEntityIds.0': { $exists: false } };
+};
 
 export const getPlaceWithDescendantIds = async (
   subdomain: string,

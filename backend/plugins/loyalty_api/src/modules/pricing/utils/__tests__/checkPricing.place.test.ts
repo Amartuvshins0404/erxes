@@ -22,6 +22,8 @@ const NODES: Record<string, { _id: string; order: string }> = {
   store1: { _id: 'store1', order: 'root/north/store1/' },
   south: { _id: 'south', order: 'root/south/' },
   store2: { _id: 'store2', order: 'root/south/store2/' },
+  sales: { _id: 'sales', order: 'root/sales/' },
+  salesTeam: { _id: 'salesTeam', order: 'root/sales/salesTeam/' },
 };
 
 const plan = (
@@ -54,13 +56,18 @@ const makeModels = (plans: IPricingPlanDocument[]): IModels =>
     },
   } as unknown as IModels);
 
-const priceAt = (plans: IPricingPlanDocument[], placeEntityId?: string) =>
+const priceAt = (
+  plans: IPricingPlanDocument[],
+  placeEntityId?: string,
+  responsibleEntityId?: string,
+) =>
   checkPricing({
     models: makeModels(plans),
     subdomain: 'test',
     prioritizeRule: 'exclude',
     totalAmount: 100,
     placeEntityId,
+    responsibleEntityId,
     orderItems: [{ itemId: 'i1', productId: 'p1', quantity: 1, price: 100 }],
   });
 
@@ -160,5 +167,48 @@ describe('checkPricing — place-node conditions', () => {
     );
 
     expect(result?.i1?.value).toBe(25);
+  });
+
+  it('applies a plan placed above the responsible node', async () => {
+    const result = await priceAt(
+      [plan('sales', 10, { placeEntityIds: ['sales'] })],
+      'store1',
+      'salesTeam',
+    );
+
+    expect(result?.i1?.value).toBe(10);
+  });
+
+  it('applies a plan at the responsible node when the sale has no place', async () => {
+    const result = await priceAt(
+      [plan('salesTeam', 10, { placeEntityIds: ['salesTeam'] })],
+      undefined,
+      'salesTeam',
+    );
+
+    expect(result?.i1?.value).toBe(10);
+  });
+
+  it('skips a plan placed outside both the place and the responsible node', async () => {
+    const result = await priceAt(
+      [plan('south', 10, { placeEntityIds: ['south'] })],
+      'store1',
+      'salesTeam',
+    );
+
+    expect(result).toBeUndefined();
+  });
+
+  it('lets the closest node win across the place and the responsible node', async () => {
+    const result = await priceAt(
+      [
+        plan('north', 30, { placeEntityIds: ['north'] }),
+        plan('salesTeam', 10, { placeEntityIds: ['salesTeam'] }),
+      ],
+      'store1',
+      'salesTeam',
+    );
+
+    expect(result?.i1?.value).toBe(10);
   });
 });

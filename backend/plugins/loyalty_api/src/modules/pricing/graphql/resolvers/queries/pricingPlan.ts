@@ -329,6 +329,7 @@ export const pricingPlanQueries = {
       prioritizeRule?: string;
       totalAmount: number;
       placeEntityId?: string;
+      responsibleEntityId?: string;
       pipelineId: string;
       customerType?: 'customer' | 'company' | 'user';
       customerId?: string;
@@ -348,6 +349,7 @@ export const pricingPlanQueries = {
       prioritizeRule = 'exclude',
       totalAmount,
       placeEntityId,
+      responsibleEntityId,
       products,
       pipelineId,
       customerType,
@@ -362,6 +364,7 @@ export const pricingPlanQueries = {
       prioritizeRule,
       totalAmount,
       placeEntityId,
+      responsibleEntityId,
       pipelineId,
       orderItems: products || [],
       customerType,

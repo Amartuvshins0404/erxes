@@ -12,17 +12,17 @@ import {
 } from './rule';
 import { getAllowedProducts } from './product';
 import { planMatchesContext, EligibilityCache } from './eligibility';
-import { getPlaceDepth, getPlaceFilter, getPlacePathIds } from './place';
+import { getPlaceDepth, getPlaceFilter, getPlacePaths } from './place';
 import { CalculatedRule, OrderItem } from '../types';
 
 type ParticipantKind = 'customer' | 'company' | 'user';
 
 export const getMainConditions = ({
-  placePathIds,
+  placePaths,
   pipelineId,
   date,
 }: {
-  placePathIds?: string[];
+  placePaths?: string[][];
   pipelineId?: string;
   date?: Date;
 }): Record<string, any> => {
@@ -68,7 +68,7 @@ export const getMainConditions = ({
 
   return {
     status: 'active',
-    $and: [dateFilter, pipelineFilter, getPlaceFilter(placePathIds)],
+    $and: [dateFilter, pipelineFilter, getPlaceFilter(placePaths)],
   };
 };
 
@@ -401,6 +401,7 @@ export const checkPricing = async (params: {
   prioritizeRule: string;
   totalAmount: number;
   placeEntityId?: string;
+  responsibleEntityId?: string;
   pipelineId?: string;
   orderItems: OrderItem[];
   customerType?: ParticipantKind;
@@ -414,6 +415,7 @@ export const checkPricing = async (params: {
     prioritizeRule,
     totalAmount,
     placeEntityId,
+    responsibleEntityId,
     pipelineId,
     orderItems,
     customerType,
@@ -440,8 +442,11 @@ export const checkPricing = async (params: {
   });
 
   // Prepare query conditions
-  const placePathIds = await getPlacePathIds(subdomain, placeEntityId);
-  const conditions = getMainConditions({ placePathIds, pipelineId });
+  const placePaths = await getPlacePaths(subdomain, [
+    placeEntityId,
+    responsibleEntityId,
+  ]);
+  const conditions = getMainConditions({ placePaths, pipelineId });
   applyPriorityConditions(
     conditions,
     prioritizeRule,
@@ -516,7 +521,7 @@ export const checkPricing = async (params: {
     // discount is left, measured against what the line costs now.
     const bakedAtSync =
       prioritizeRule === 'exclude' && plan.priority === 'posBase';
-    const placeDepth = getPlaceDepth(plan.placeEntityIds, placePathIds);
+    const placeDepth = getPlaceDepth(plan.placeEntityIds, placePaths);
 
     let appliedBundleCounts = Number.POSITIVE_INFINITY;
     const appliedBundleItems: any[] = [];

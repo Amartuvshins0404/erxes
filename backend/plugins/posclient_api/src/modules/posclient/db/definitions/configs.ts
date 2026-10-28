@@ -112,12 +112,16 @@ export const configSchema = new Schema({
   posId: field({ type: String, label: 'Pos id' }),
   isOnline: field({ type: Boolean, optional: true }),
   onServer: field({ type: Boolean, optional: true }),
-  branchId: field({ type: String, optional: true, label: 'Branch' }),
-  departmentId: field({ type: String, optional: true, label: 'Department' }),
-  allowBranchIds: field({
+  placeEntityId: field({ type: String, optional: true, label: 'Place' }),
+  responsibleEntityId: field({
+    type: String,
+    optional: true,
+    label: 'Responsible entity',
+  }),
+  allowPlaceEntityIds: field({
     type: [String],
     optional: true,
-    label: 'Allow branches',
+    label: 'Allowed places',
   }),
   permissionConfig: field({ type: Object, optional: true }),
   customerCreateConfig: field({ type: Object, optional: true }),

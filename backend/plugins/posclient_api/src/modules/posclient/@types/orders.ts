@@ -42,9 +42,9 @@ export interface IOrder {
   registerNumber?: string;
   oldBillId?: string;
   type?: string;
-  branchId?: string;
-  departmentId?: string;
-  subBranchId?: string;
+  placeEntityId?: string;
+  responsibleEntityId?: string;
+  subPlaceEntityId?: string;
   synced?: boolean;
   origin?: string;
   posToken?: string;

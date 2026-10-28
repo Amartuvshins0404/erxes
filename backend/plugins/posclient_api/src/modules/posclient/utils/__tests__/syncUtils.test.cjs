@@ -19,7 +19,7 @@ vm.runInNewContext(outputText, {
   process: { env: {} },
   require: () => ({}),
 });
-const { importProducts } = sourceModule.exports;
+const { extractConfig, importProducts } = sourceModule.exports;
 
 function fixture(products = [], categories = []) {
   let failImport = false;
@@ -219,4 +219,24 @@ test('matches whole order prefixes without confusing similar codes or repeated c
     categories.map(({ tokens }) => tokens),
     [['pos'], ['pos'], [], []],
   );
+});
+
+test('syncs the POS place and responsible structure entities into its config', async () => {
+  const config = await extractConfig('tenant', {
+    _id: 'pos',
+    name: 'POS',
+    placeEntityId: 'store',
+    responsibleEntityId: 'sales-team',
+    allowPlaceEntityIds: ['store', 'warehouse'],
+    branchId: 'legacy-branch',
+    departmentId: 'legacy-department',
+    allowBranchIds: ['legacy-branch'],
+  });
+
+  assert.equal(config.placeEntityId, 'store');
+  assert.equal(config.responsibleEntityId, 'sales-team');
+  assert.deepEqual(config.allowPlaceEntityIds, ['store', 'warehouse']);
+  for (const field of ['branchId', 'departmentId', 'allowBranchIds']) {
+    assert.equal(field in config, false);
+  }
 });

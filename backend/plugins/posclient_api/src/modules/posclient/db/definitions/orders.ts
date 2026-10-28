@@ -161,9 +161,17 @@ export const orderSchema = schemaHooksWrapper(
       enum: ORDER_TYPES.ALL,
       default: ORDER_TYPES.EAT,
     }),
-    branchId: field({ type: String, optional: true, label: 'Branch' }),
-    departmentId: field({ type: String, optional: true, label: 'Branch' }),
-    subBranchId: field({ type: String, optional: true, label: 'Sub Branch' }),
+    placeEntityId: field({ type: String, optional: true, label: 'Place' }),
+    responsibleEntityId: field({
+      type: String,
+      optional: true,
+      label: 'Responsible entity',
+    }),
+    subPlaceEntityId: field({
+      type: String,
+      optional: true,
+      label: 'Sub place',
+    }),
     userId: field({
       type: String,
       optional: true,

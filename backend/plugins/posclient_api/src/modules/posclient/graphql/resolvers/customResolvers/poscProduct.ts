@@ -3,7 +3,7 @@ import { IContext } from '@/posclient/@types/types';
 import { sendTRPCMessage } from 'erxes-api-shared/utils';
 import {
   getDiscount,
-  getRemBranchId,
+  getRemPlaceEntityId,
 } from '~/modules/posclient/utils/products';
 
 const propertyToCustomFieldData = (field: string, value: any) => {
@@ -107,8 +107,8 @@ export default {
     return Number(((mainPrice / totalPercent) * 100).toFixed(2));
   },
   savedRemainder(product: IProductDocument, args, { config }: IContext) {
-    const remBranchId = getRemBranchId(config, args.branchId);
-    return product.remainderByToken?.[config.token]?.[remBranchId] || 0;
+    const remPlaceEntityId = getRemPlaceEntityId(config, args.placeEntityId);
+    return product.remainderByToken?.[config.token]?.[remPlaceEntityId] || 0;
   },
   discount(product: IProductDocument, args, { config }: IContext, info: any) {
     const variables = info?.variableValues || {};
@@ -116,11 +116,12 @@ export default {
     return getDiscount(
       product.discounts,
       config,
-      args.branchId || variables.branchId,
+      args.placeEntityId || variables.placeEntityId,
       {
         ...variables.discountConditions,
         ...args.discountConditions,
-        departmentId: args.departmentId || variables.departmentId,
+        departmentId:
+          args.responsibleEntityId || variables.responsibleEntityId,
         pipelineId: args.pipelineId || variables.pipelineId,
       },
     );

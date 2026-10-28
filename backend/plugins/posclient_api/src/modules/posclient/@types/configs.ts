@@ -99,9 +99,9 @@ export interface IConfig {
   posId: string;
   isOnline?: boolean;
   onServer?: boolean;
-  branchId?: string;
-  departmentId?: string;
-  allowBranchIds?: string[];
+  placeEntityId?: string;
+  responsibleEntityId?: string;
+  allowPlaceEntityIds?: string[];
   permissionConfig?: any;
   customerCreateConfig?: IPosCustomerCreateConfig;
   allowTypes: string[];

@@ -48,8 +48,8 @@ export const types = `
     remainders: [JSON]
     discounts: JSON
     discount(
-      branchId: String
-      departmentId: String
+      placeEntityId: String
+      responsibleEntityId: String
       pipelineId: String
       discountConditions: JSON
     ): JSON
@@ -87,7 +87,7 @@ const productsQueryParams = `
   type: String,
   categoryId: String,
   searchValue: String,
-  branchId: String,
+  placeEntityId: String,
   vendorId: String,
   tag: String,
   tags: [String]
@@ -146,8 +146,8 @@ export const queries = `
   poscProductsTotalCount(
     ${productsQueryParams}
   ): Int
-  poscProductDetail(_id: String, branchId: String): PoscProduct
+  poscProductDetail(_id: String, placeEntityId: String): PoscProduct
   getPriceInfo(productId: String!): String
-  poscProductSimilarities(_id: String!, groupedSimilarity: String, branchId: String): PoscProductSimilarity
-  poscProductBulkSimilarity(_id: String!, branchId: String): PoscProductBulkSimilarity
+  poscProductSimilarities(_id: String!, groupedSimilarity: String, placeEntityId: String): PoscProductSimilarity
+  poscProductBulkSimilarity(_id: String!, placeEntityId: String): PoscProductBulkSimilarity
 `;

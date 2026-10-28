@@ -5,42 +5,47 @@ import { IConfigDocument } from '~/modules/posclient/@types/configs';
 import { IProductDocument } from '~/modules/posclient/@types/products';
 import { debugError } from '~/modules/posclient/debugError';
 
-export const getRemBranchId = (
+export const getRemPlaceEntityId = (
   config: IConfigDocument,
-  paramBranchId?: string,
+  paramPlaceEntityId?: string,
 ) => {
-  if (!paramBranchId) {
+  if (!paramPlaceEntityId) {
     return 'default';
   }
 
-  if (config.branchId === paramBranchId) {
+  if (config.placeEntityId === paramPlaceEntityId) {
     return 'default';
   }
 
-  if (!(config.allowBranchIds || []).includes(paramBranchId)) {
+  if (!(config.allowPlaceEntityIds || []).includes(paramPlaceEntityId)) {
     return 'default';
   }
 
-  return paramBranchId;
+  return paramPlaceEntityId;
 };
 
-const getRemainderScope = (config: IConfigDocument, paramBranchId?: string) => {
-  const branchIds = paramBranchId
-    ? [paramBranchId]
+const getRemainderScope = (
+  config: IConfigDocument,
+  paramPlaceEntityId?: string,
+) => {
+  const placeEntityIds = paramPlaceEntityId
+    ? [paramPlaceEntityId]
     : config.isOnline
-      ? config.allowBranchIds || []
-      : (config.branchId && [config.branchId]) || [];
+      ? config.allowPlaceEntityIds || []
+      : (config.placeEntityId && [config.placeEntityId]) || [];
 
   return {
-    branchIds,
-    departmentIds: config.departmentId ? [config.departmentId] : [],
+    placeEntityIds,
+    responsibleEntityIds: config.responsibleEntityId
+      ? [config.responsibleEntityId]
+      : [],
   };
 };
 
 const calcRemainderFromInventories = (
   inventories: any = {},
-  branchIds: string[] = [],
-  departmentIds: string[] = [],
+  placeEntityIds: string[] = [],
+  responsibleEntityIds: string[] = [],
 ) => {
   const result = {
     remainder: 0,
@@ -49,17 +54,22 @@ const calcRemainderFromInventories = (
     remainders: [] as any[],
   };
 
-  for (const branchId of Object.keys(inventories || {})) {
-    if (branchIds.length && !branchIds.includes(branchId)) {
+  for (const placeEntityId of Object.keys(inventories || {})) {
+    if (placeEntityIds.length && !placeEntityIds.includes(placeEntityId)) {
       continue;
     }
 
-    for (const departmentId of Object.keys(inventories[branchId] || {})) {
-      if (departmentIds.length && !departmentIds.includes(departmentId)) {
+    for (const responsibleEntityId of Object.keys(
+      inventories[placeEntityId] || {},
+    )) {
+      if (
+        responsibleEntityIds.length &&
+        !responsibleEntityIds.includes(responsibleEntityId)
+      ) {
         continue;
       }
 
-      const info = inventories[branchId][departmentId] || {};
+      const info = inventories[placeEntityId][responsibleEntityId] || {};
       const count = Number(info.remainder) || 0;
       const soonIn = Number(info.soonIn) || 0;
       const soonOut = Number(info.soonOut) || 0;
@@ -68,8 +78,8 @@ const calcRemainderFromInventories = (
       result.soonIn += soonIn;
       result.soonOut += soonOut;
       result.remainders.push({
-        branchId,
-        departmentId,
+        placeEntityId,
+        responsibleEntityId,
         count,
         soonIn,
         soonOut,
@@ -165,7 +175,7 @@ const applyErkhetRemainders = async (
   models: IModels,
   config: IConfigDocument,
   products: ProductWithRemainder[],
-  paramBranchId?: string,
+  paramPlaceEntityId?: string,
 ) => {
   try {
     const jsonRes = await fetchErkhetRemainders(config, products);
@@ -213,7 +223,7 @@ const applyErkhetRemainders = async (
       }
     }
 
-    const remBranchId = getRemBranchId(config, paramBranchId);
+    const remPlaceEntityId = getRemPlaceEntityId(config, paramPlaceEntityId);
     const bulkOps: RemainderBulkOperation[] | undefined = config.saveRemainder
       ? []
       : undefined;
@@ -236,14 +246,14 @@ const applyErkhetRemainders = async (
       product.remainderByToken ??= {};
       product.remainderByToken[config.token] ??= {};
 
-      product.remainderByToken[config.token][remBranchId] =
+      product.remainderByToken[config.token][remPlaceEntityId] =
         product.remainder ?? 0;
       bulkOps?.push({
         updateOne: {
           filter: { _id: product._id },
           update: {
             $set: {
-              [`remainderByToken.${config.token}.${remBranchId}`]:
+              [`remainderByToken.${config.token}.${remPlaceEntityId}`]:
                 product.remainder ?? 0,
             },
           },
@@ -269,18 +279,18 @@ type DiscountConditions = Record<string, unknown>;
 
 export const getDiscountScope = (
   config: IConfigDocument,
-  paramBranchId?: string,
+  paramPlaceEntityId?: string,
 ) => {
-  const branchId =
-    paramBranchId &&
-    (config.branchId === paramBranchId ||
-      (config.allowBranchIds || []).includes(paramBranchId))
-      ? paramBranchId
-      : config.branchId;
+  const placeEntityId =
+    paramPlaceEntityId &&
+    (config.placeEntityId === paramPlaceEntityId ||
+      (config.allowPlaceEntityIds || []).includes(paramPlaceEntityId))
+      ? paramPlaceEntityId
+      : config.placeEntityId;
 
   return {
-    branchId: branchId || DISCOUNT_DEFAULT_KEY,
-    departmentId: config.departmentId || DISCOUNT_DEFAULT_KEY,
+    branchId: placeEntityId || DISCOUNT_DEFAULT_KEY,
+    departmentId: config.responsibleEntityId || DISCOUNT_DEFAULT_KEY,
   };
 };
 
@@ -299,10 +309,13 @@ const compactDiscountConditions = (conditions: DiscountConditions = {}) =>
 
 export const getDiscountConditions = (
   config: IConfigDocument,
-  paramBranchId?: string,
+  paramPlaceEntityId?: string,
   conditions: DiscountConditions = {},
 ) => {
-  const { branchId, departmentId } = getDiscountScope(config, paramBranchId);
+  const { branchId, departmentId } = getDiscountScope(
+    config,
+    paramPlaceEntityId,
+  );
 
   return compactDiscountConditions({
     ...conditions,
@@ -350,12 +363,12 @@ const conditionMatches = (expected: unknown, actual: unknown) => {
 export const getDiscount = (
   discounts: IProductDocument['discounts'],
   config: IConfigDocument,
-  paramBranchId?: string,
+  paramPlaceEntityId?: string,
   discountConditions?: DiscountConditions,
 ) => {
   const conditions = getDiscountConditions(
     config,
-    paramBranchId,
+    paramPlaceEntityId,
     discountConditions,
   );
 
@@ -508,7 +521,7 @@ const buildDiscountRangeFilter = (
 export const pushDiscountRangeFilters = (
   filters: ProductFilter[],
   config: IConfigDocument,
-  branchId: string | undefined,
+  placeEntityId: string | undefined,
   params: {
     minDiscountValue?: number | null;
     maxDiscountValue?: number | null;
@@ -519,7 +532,7 @@ export const pushDiscountRangeFilters = (
 ) => {
   const conditions = getDiscountConditions(
     config,
-    branchId,
+    placeEntityId,
     params.discountConditions,
   );
 
@@ -551,7 +564,7 @@ export const getDiscountSortedProducts = async ({
   filter: ProductFilter;
   config: IConfigDocument;
   params: {
-    branchId?: string;
+    placeEntityId?: string;
     sortField?: string;
     sortDirection?: number;
     page?: number;
@@ -566,7 +579,7 @@ export const getDiscountSortedProducts = async ({
   const perPage = Math.max(1, Number(params.perPage) || 20);
   const conditions = getDiscountConditions(
     config,
-    params.branchId,
+    params.placeEntityId,
     params.discountConditions,
   );
 
@@ -591,7 +604,7 @@ export const checkRemainders = async (
   models: IModels,
   config: IConfigDocument,
   checkProducts: IProductDocument[],
-  paramBranchId?: string,
+  paramPlaceEntityId?: string,
   forValidation = false,
 ) => {
   const products: ProductWithRemainder[] = checkProducts;
@@ -601,7 +614,7 @@ export const checkRemainders = async (
   }
 
   if (config.isShowRemainder && config.erkhetConfig?.useRemainder) {
-    return applyErkhetRemainders(models, config, products, paramBranchId);
+    return applyErkhetRemainders(models, config, products, paramPlaceEntityId);
   }
 
   if (
@@ -612,7 +625,10 @@ export const checkRemainders = async (
     return products;
   }
 
-  const { branchIds, departmentIds } = getRemainderScope(config, paramBranchId);
+  const { placeEntityIds, responsibleEntityIds } = getRemainderScope(
+    config,
+    paramPlaceEntityId,
+  );
   const productIds = products.map((p) => p._id);
 
   const coreProducts = await sendTRPCMessage({
@@ -641,15 +657,15 @@ export const checkRemainders = async (
         };
       }>
     | undefined = config.saveRemainder ? [] : undefined;
-  const remBranchId = config.saveRemainder
-    ? getRemBranchId(config, paramBranchId)
+  const remPlaceEntityId = config.saveRemainder
+    ? getRemPlaceEntityId(config, paramPlaceEntityId)
     : '';
 
   for (const product of products) {
     const remainderInfo = calcRemainderFromInventories(
       coreProductsById[product._id]?.inventories,
-      branchIds,
-      departmentIds,
+      placeEntityIds,
+      responsibleEntityIds,
     );
 
     product.remainders = remainderInfo.remainders;
@@ -664,14 +680,14 @@ export const checkRemainders = async (
     product.remainderByToken ??= {};
     product.remainderByToken[config.token] ??= {};
 
-    product.remainderByToken[config.token][remBranchId] =
+    product.remainderByToken[config.token][remPlaceEntityId] =
       product.remainder ?? 0;
     bulkOps?.push({
       updateOne: {
         filter: { _id: product._id },
         update: {
           $set: {
-            [`remainderByToken.${config.token}.${remBranchId}`]:
+            [`remainderByToken.${config.token}.${remPlaceEntityId}`]:
               product.remainder ?? 0,
           },
         },
@@ -696,13 +712,13 @@ export const syncRemainders = async (
 
   for (let i = 0; i < products.length; i += batchSize) {
     const checkProducts = products.slice(i, i + batchSize);
-    for (const paramBranchId of config.allowBranchIds || []) {
+    for (const paramPlaceEntityId of config.allowPlaceEntityIds || []) {
       await checkRemainders(
         subdomain,
         models,
         config,
         checkProducts,
-        paramBranchId,
+        paramPlaceEntityId,
       );
     }
     await checkRemainders(subdomain, models, config, checkProducts);

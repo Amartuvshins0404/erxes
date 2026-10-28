@@ -89,8 +89,8 @@ export const types = `
     kioskExcludeCategoryIds: [String]
     kioskExcludeProductIds: [String]
     deliveryConfig: JSON
-    branchId: String
-    departmentId: String
+    placeEntityId: String
+    responsibleEntityId: String
     permissionConfig: JSON
     customerCreateConfig: JSON
     allowTypes: [String]

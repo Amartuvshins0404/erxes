@@ -71,7 +71,7 @@ export interface IOrderInput {
   customerType?: string;
   brokerId?: string;
   brokerType?: string;
-  branchId?: string;
+  placeEntityId?: string;
   deliveryInfo?: any;
   origin?: string;
   slotCode?: string;

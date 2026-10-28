@@ -122,6 +122,8 @@ export const checkPricing = async (
     }
   }
 
+  const [placeId = ''] = deal.entityIds || [];
+
   const pricing = await sendTRPCMessage({
     subdomain,
     pluginName: 'loyalty',
@@ -130,8 +132,8 @@ export const checkPricing = async (
     input: {
       prioritizeRule: 'exclude',
       totalAmount,
-      branchId: deal.branchIds?.[0] || '',
-      departmentId: deal.departmentIds?.[0] || '',
+      placeEntityId: placeId,
+      responsibleEntityId: placeId,
       pipelineId: stage.pipelineId,
       customerType,
       customerId: pricingCustomerId,

@@ -69,12 +69,12 @@ export const POS_ORDER_RECORDS_QUERY = gql(`
       items
       posToken
       posName
-      branchId
-      departmentId
-      subBranchId
-      branch
-      department
-      subBranch
+      placeEntityId
+      responsibleEntityId
+      subPlaceEntityId
+      placeEntity
+      responsibleEntity
+      subPlaceEntity
       user {
         _id
         email

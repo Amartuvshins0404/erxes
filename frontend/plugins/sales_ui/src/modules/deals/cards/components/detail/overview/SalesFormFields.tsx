@@ -1,10 +1,9 @@
 import {
   DealAssigneeChip,
-  DealBranchesChip,
   DealBrokerTypeChip,
   DealCompanyChip,
   DealCustomerChip,
-  DealDepartmentsChip,
+  DealStructureEntitiesChip,
   DealTagsChip,
 } from '@/deals/components/deal-selects/DealDetailChips';
 import {
@@ -28,12 +27,7 @@ import { Attachments } from './attachments/Attachments';
 import { ChecklistOverview } from './checklist/ChecklistOverview';
 import { Checklists } from './checklist/Checklists';
 
-const ARRAY_KEYS = new Set([
-  'assignedUserIds',
-  'tagIds',
-  'branchIds',
-  'departmentIds',
-]);
+const ARRAY_KEYS = new Set(['assignedUserIds', 'tagIds', 'entityIds']);
 
 type BrokerType = NonNullable<IDealDetail['brokerType']> | '';
 
@@ -78,8 +72,7 @@ export const SalesFormFields = ({ deal }: { deal: IDealDetail }) => {
     labels,
     priority,
     tagIds,
-    branchIds,
-    departmentIds,
+    entityIds,
     brokerType,
     brokerId,
   } = deal;
@@ -109,19 +102,12 @@ export const SalesFormFields = ({ deal }: { deal: IDealDetail }) => {
     isEqual: areIdListsEqual,
     onCommit: (value) => rejectOnMutationError(handleChange('tagIds', value)),
   });
-  const optimisticBranches = useOptimisticField({
-    value: branchIds?.filter(isDefined) || [],
+  const optimisticEntities = useOptimisticField({
+    value: entityIds?.filter(isDefined) || [],
     resetKey: _id,
     isEqual: areIdListsEqual,
     onCommit: (value) =>
-      rejectOnMutationError(handleChange('branchIds', value)),
-  });
-  const optimisticDepartments = useOptimisticField({
-    value: departmentIds?.filter(isDefined) || [],
-    resetKey: _id,
-    isEqual: areIdListsEqual,
-    onCommit: (value) =>
-      rejectOnMutationError(handleChange('departmentIds', value)),
+      rejectOnMutationError(handleChange('entityIds', value)),
   });
   const optimisticBroker = useOptimisticField<BrokerSelection>({
     value: {
@@ -230,16 +216,10 @@ export const SalesFormFields = ({ deal }: { deal: IDealDetail }) => {
               })
             }
           />
-          <DealBranchesChip
-            value={optimisticBranches.value}
+          <DealStructureEntitiesChip
+            value={optimisticEntities.value}
             onValueChange={(value) =>
-              optimisticBranches.setValue(normalizeMultiValue(value))
-            }
-          />
-          <DealDepartmentsChip
-            value={optimisticDepartments.value}
-            onValueChange={(value) =>
-              optimisticDepartments.setValue(normalizeMultiValue(value))
+              optimisticEntities.setValue(normalizeMultiValue(value))
             }
           />
           <SelectLabels.FilterBar

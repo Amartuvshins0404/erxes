@@ -16,16 +16,16 @@ export const GET_PIPELINE_DETAIL = gql(`
       paymentTypes
       visibility
       memberIds
-      departmentIds
-      branchIds
+      sharedEntityIds
       boardId
       numberConfig
       numberSize
       nameConfig
       isCheckDate
-      isCheckUser
-      isCheckDepartment
-      excludeCheckUserIds
+      accessRule {
+        scope
+        exemptUserIds
+      }
       propertyIds
       isPropertySelectionConfigured
     }

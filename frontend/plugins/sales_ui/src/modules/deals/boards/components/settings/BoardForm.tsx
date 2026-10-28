@@ -18,6 +18,7 @@ import {
 } from 'erxes-ui';
 import React from 'react';
 import { SubmitHandler } from 'react-hook-form';
+import { SelectStructureEntities } from 'ui-modules';
 
 export const BoardForm = () => {
   const [boardId, setBoardId] = useQueryState<string>('boardId');
@@ -33,6 +34,17 @@ export const BoardForm = () => {
     setOpen(!!boardId);
     if (!boardId) reset();
   }, [boardId, reset]);
+
+  React.useEffect(() => {
+    if (boardId && boardDetail) {
+      reset({
+        name: boardDetail.name,
+        sharedEntityIds: boardDetail.sharedEntityIds?.filter(
+          (id): id is string => !!id,
+        ),
+      });
+    }
+  }, [boardId, boardDetail, reset]);
 
   const handleClose = React.useCallback(() => {
     setOpen(false);
@@ -113,6 +125,27 @@ export const BoardForm = () => {
                   )}
                 />
               )}
+              <Form.Field
+                control={methods.control}
+                name="sharedEntityIds"
+                render={({ field }) => (
+                  <Form.Item>
+                    <Form.Label>Shared with</Form.Label>
+                    <Form.Description>
+                      Only members of these nodes and the nodes below them can
+                      use this board. Leave empty to share with everyone.
+                    </Form.Description>
+                    <SelectStructureEntities.FormItem
+                      mode="multiple"
+                      value={field.value || []}
+                      onValueChange={(value) =>
+                        field.onChange(Array.isArray(value) ? value : [])
+                      }
+                    />
+                    <Form.Message />
+                  </Form.Item>
+                )}
+              />
             </div>
             <Dialog.Footer className="pt-2">
               <Button type="button" variant="ghost" onClick={handleClose}>

@@ -1,6 +1,9 @@
-import { sendTRPCMessage } from 'erxes-api-shared/utils';
 import { IContext } from '~/connectionResolvers';
 import { IBoardDocument } from '~/modules/sales/@types';
+import {
+  getContainerAccessFilter,
+  PIPELINE_MEMBER_FIELDS,
+} from '~/modules/sales/utils/structureAccess';
 
 export default {
   async pipelines(
@@ -27,75 +30,18 @@ export default {
       }).lean();
     }
 
-    const userDetail = await sendTRPCMessage({
+    const accessFilter = await getContainerAccessFilter(
       subdomain,
+      user,
+      PIPELINE_MEMBER_FIELDS,
+    );
 
-      pluginName: 'core',
-      method: 'query',
-      module: 'users',
-      action: 'findOne',
-      input: {
-        _id: user._id,
-      },
-      defaultValue: {},
-    });
-
-    const userDepartmentIds = userDetail?.departmentIds || [];
-    const branchIds = userDetail?.branchIds || [];
-
-    const supervisorDepartmentIds = await sendTRPCMessage({
-      subdomain,
-
-      pluginName: 'core',
-      method: 'query',
-      module: 'departments',
-      action: 'findWithChild',
-      input: {
-        query: {
-          supervisorId: user._id,
-        },
-        fields: {
-          _id: 1,
-        },
-      },
-      defaultValue: [],
-    });
-
-    const departmentIds = [
-      ...userDepartmentIds,
-      ...(supervisorDepartmentIds.map((x) => x._id) || []),
-    ];
-
-    const query: any = {
+    return models.Pipelines.find({
       $and: [
         { status: { $ne: 'archived' } },
         { boardId: board._id },
-        {
-          $or: [
-            { visibility: 'public' },
-            {
-              visibility: 'private',
-              $or: [{ memberIds: { $in: [user._id] } }, { userId: user._id }],
-            },
-          ],
-        },
+        accessFilter,
       ],
-    };
-
-    if (departmentIds.length > 0) {
-      query.$and[2].$or.push({
-        $and: [
-          { visibility: 'private' },
-          { departmentIds: { $in: departmentIds } },
-        ],
-      });
-    }
-    if (branchIds.length > 0) {
-      query.$and[2].$or.push({
-        $and: [{ visibility: 'private' }, { branchIds: { $in: branchIds } }],
-      });
-    }
-
-    return await models.Pipelines.find(query).lean();
+    }).lean();
   },
 };

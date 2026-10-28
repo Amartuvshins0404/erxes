@@ -38,30 +38,32 @@ export const filterProducts = (
     });
   }
 
-  if (filters.branchIds?.length) {
-    const hasBranchIds = result.some(
-      (product) => typeof product.branchId === 'string',
+  if (filters.placeEntityIds?.length) {
+    const hasPlaceEntityIds = result.some(
+      (product) => typeof product.placeEntityId === 'string',
     );
 
-    if (hasBranchIds) {
+    if (hasPlaceEntityIds) {
       result = result.filter(
         (product) =>
-          !!product.branchId &&
-          filters.branchIds?.includes(product.branchId) === true,
+          !!product.placeEntityId &&
+          filters.placeEntityIds?.includes(product.placeEntityId) === true,
       );
     }
   }
 
-  if (filters.departmentIds?.length) {
-    const hasDepartmentIds = result.some(
-      (product) => typeof product.departmentId === 'string',
+  if (filters.responsibleEntityIds?.length) {
+    const hasResponsibleEntityIds = result.some(
+      (product) => typeof product.responsibleEntityId === 'string',
     );
 
-    if (hasDepartmentIds) {
+    if (hasResponsibleEntityIds) {
       result = result.filter(
         (product) =>
-          !!product.departmentId &&
-          filters.departmentIds?.includes(product.departmentId) === true,
+          !!product.responsibleEntityId &&
+          filters.responsibleEntityIds?.includes(
+            product.responsibleEntityId,
+          ) === true,
       );
     }
   }

@@ -173,8 +173,8 @@ export const useDealProductActions = ({
         isVatApplied: productData.isVatApplied,
         assignUserId: productData.assignUserId,
         maxQuantity: productData.maxQuantity,
-        branchId: productData.branchId,
-        departmentId: productData.departmentId,
+        placeEntityId: productData.placeEntityId,
+        responsibleEntityId: productData.responsibleEntityId,
       };
 
       createProductsData([doc], [{ ...doc, product: productData.product }]);

@@ -18,7 +18,7 @@ import {
 import { TFunction } from 'i18next';
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { SelectBranches, SelectDepartments } from 'ui-modules';
+import { SelectStructureEntities } from 'ui-modules';
 
 import { SelectAssigneeDeal } from '@/deals/components/deal-selects/SelectAssigneeDeal';
 import { ColumnDef } from '@tanstack/table-core';
@@ -34,6 +34,7 @@ import {
   getProductUomRatio,
   normalizeProductUom,
 } from '../../utils/productUom';
+import { STOCK_PLACE_CAPABILITY } from '@/constants/structure';
 
 type ProductNumberFieldProps = Omit<INumberFieldContainerProps, '_id'> & {
   _id: DealProductData['_id'];
@@ -395,7 +396,7 @@ export const ProductUomField = ({
   );
 };
 
-export const ProductBranchField = ({
+export const ProductPlaceEntityField = ({
   value,
   field,
   product,
@@ -407,8 +408,9 @@ export const ProductBranchField = ({
   const { updateRecord } = useUpdateProductRecord();
 
   return (
-    <SelectBranches.InlineCell
+    <SelectStructureEntities.InlineCell
       mode="single"
+      capability={STOCK_PLACE_CAPABILITY}
       value={value}
       onValueChange={(value) => {
         updateRecord(product, { [field]: value });
@@ -417,7 +419,7 @@ export const ProductBranchField = ({
   );
 };
 
-export const ProductDepartmentField = ({
+export const ProductResponsibleEntityField = ({
   value,
   field,
   product,
@@ -429,7 +431,7 @@ export const ProductDepartmentField = ({
   const { updateRecord } = useUpdateProductRecord();
 
   return (
-    <SelectDepartments.InlineCell
+    <SelectStructureEntities.InlineCell
       mode="single"
       value={value}
       onValueChange={(value) => {
@@ -560,38 +562,40 @@ export const uomInfoQuantity = (t: TFunction): ColumnDef<DealProductData> => ({
   size: 150,
 });
 
-export const branch = (t: TFunction): ColumnDef<DealProductData> => ({
-  id: 'branchId',
-  accessorKey: 'branchId',
+export const placeEntity = (t: TFunction): ColumnDef<DealProductData> => ({
+  id: 'placeEntityId',
+  accessorKey: 'placeEntityId',
   header: () => (
-    <RecordTable.InlineHead icon={IconGitBranch} label={t('branch')} />
+    <RecordTable.InlineHead icon={IconGitBranch} label={t('place', 'Place')} />
   ),
   cell: ({ cell }) => {
     return (
-      <ProductBranchField
+      <ProductPlaceEntityField
         value={cell.getValue() as string}
-        field="branchId"
+        field="placeEntityId"
         product={cell.row.original}
       />
     );
   },
 });
 
-export const department = (t: TFunction): ColumnDef<DealProductData> => ({
-  id: 'departmentId',
-  accessorKey: 'departmentId',
+export const responsibleEntity = (
+  t: TFunction,
+): ColumnDef<DealProductData> => ({
+  id: 'responsibleEntityId',
+  accessorKey: 'responsibleEntityId',
   header: () => (
     <RecordTable.InlineHead
       icon={IconBuildingSkyscraper}
-      label={t('department')}
+      label={t('responsible', 'Responsible')}
     />
   ),
   cell: ({ cell }) => {
     return (
       <RecordTableInlineCell>
-        <ProductDepartmentField
+        <ProductResponsibleEntityField
           value={cell.getValue() as string}
-          field="departmentId"
+          field="responsibleEntityId"
           product={cell.row.original}
         />
       </RecordTableInlineCell>

@@ -1,15 +1,15 @@
 import { Resolver } from 'erxes-api-shared/core-types';
-import {
-  defaultPaginate,
-  regexSearchText,
-  sendTRPCMessage,
-} from 'erxes-api-shared/utils';
+import { defaultPaginate, regexSearchText } from 'erxes-api-shared/utils';
 
 import type { FilterQuery } from 'mongoose';
 
 import { IContext } from '~/connectionResolvers';
 import { IStageDocument } from '~/modules/sales/@types';
 import { SALES_STATUSES } from '~/modules/sales/constants';
+import {
+  getContainerAccessFilter,
+  STAGE_MEMBER_FIELDS,
+} from '~/modules/sales/utils/structureAccess';
 
 export const stageQueries: Record<string, Resolver> = {
   /**
@@ -45,41 +45,10 @@ export const stageQueries: Record<string, Resolver> = {
     }
 
     if (!isAll && !user.isOwner) {
-      filter.$or = [
-        { visibility: { $in: ['public', null] } },
-        {
-          $and: [
-            { visibility: 'private' },
-            {
-              $or: [
-                { memberIds: { $in: [user._id] } },
-                { canMoveMemberIds: { $in: [user._id] } },
-                { canEditMemberIds: { $in: [user._id] } },
-              ],
-            },
-          ],
-        },
-      ];
-
-      const userDetail = await sendTRPCMessage({
-        subdomain,
-        pluginName: 'core',
-        method: 'query',
-        module: 'users',
-        action: 'findOne',
-        input: { query: { _id: user._id } },
-        defaultValue: {},
-      });
-
-      const departmentIds = userDetail?.departmentIds || [];
-      if (departmentIds.length > 0) {
-        filter.$or?.push({
-          $and: [
-            { visibility: 'private' },
-            { departmentIds: { $in: departmentIds } },
-          ],
-        });
-      }
+      Object.assign(
+        filter,
+        await getContainerAccessFilter(subdomain, user, STAGE_MEMBER_FIELDS),
+      );
     }
 
     return models.Stages.find(filter).sort({ order: 1, createdAt: -1 }).lean();
@@ -116,41 +85,10 @@ export const stageQueries: Record<string, Resolver> = {
       filter.status = { $ne: SALES_STATUSES.ARCHIVED };
 
       if (user?._id) {
-        filter.$or = [
-          { visibility: { $in: ['public', null] } },
-          {
-            $and: [
-              { visibility: 'private' },
-              {
-                $or: [
-                  { memberIds: { $in: [user._id] } },
-                  { canMoveMemberIds: { $in: [user._id] } },
-                  { canEditMemberIds: { $in: [user._id] } },
-                ],
-              },
-            ],
-          },
-        ];
-
-        const userDetail = await sendTRPCMessage({
-          subdomain,
-          pluginName: 'core',
-          method: 'query',
-          module: 'users',
-          action: 'findOne',
-          input: { query: { _id: user._id } },
-          defaultValue: {},
-        });
-
-        const departmentIds = userDetail?.departmentIds || [];
-        if (departmentIds.length > 0) {
-          filter.$or.push({
-            $and: [
-              { visibility: 'private' },
-              { departmentIds: { $in: departmentIds } },
-            ],
-          });
-        }
+        Object.assign(
+          filter,
+          await getContainerAccessFilter(subdomain, user, STAGE_MEMBER_FIELDS),
+        );
       } else {
         filter.visibility = { $in: ['public', null] };
       }

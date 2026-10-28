@@ -22,8 +22,8 @@ export const usePosList = (
       name: pos.name,
       isOnline: pos.isOnline || false,
       onServer: pos.onServer || false,
-      branchTitle: pos.branchTitle || '',
-      departmentTitle: pos.departmentTitle || '',
+      placeEntityTitle: pos.placeEntityTitle || '',
+      responsibleEntityTitle: pos.responsibleEntityTitle || '',
       createdAt: pos.createdAt,
       createdBy: pos?.user?.details?.fullName || 'Admin',
       logo:

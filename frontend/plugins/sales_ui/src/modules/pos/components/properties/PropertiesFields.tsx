@@ -5,10 +5,11 @@ import {
   MultipleSelector,
   Textarea,
 } from 'erxes-ui';
-import { SelectBranches, SelectBrand, SelectDepartments } from 'ui-modules';
+import { SelectBrand, SelectStructureEntities } from 'ui-modules';
 import { Control } from 'react-hook-form';
 import { ALLOW_TYPES } from '@/pos/constants';
 import { useTranslation } from 'react-i18next';
+import { STOCK_PLACE_CAPABILITY } from '@/constants/structure';
 
 export interface FormData {
   name: string;
@@ -16,9 +17,9 @@ export interface FormData {
   type: string;
   maxSkipNumber: string;
   orderPassword: string;
-  branchId: string;
-  departmentId: string;
-  allowBranchIds: string[];
+  placeEntityId: string;
+  responsibleEntityId: string;
+  allowPlaceEntityIds: string[];
   brandId: string;
   allowTypes: string[];
   isOnline: boolean;
@@ -103,20 +104,23 @@ export const OrderPasswordField = ({ control }: FieldProps) => {
   );
 };
 
-export const BranchField = ({ control }: FieldProps) => {
+export const PlaceEntityField = ({ control }: FieldProps) => {
   const { t } = useTranslation('sales');
   return (
     <Form.Field
       control={control}
-      name="branchId"
+      name="placeEntityId"
       render={({ field }) => (
         <Form.Item>
-          <Form.Label>{t('branch')}</Form.Label>
+          <Form.Label>{t('place', 'Place')}</Form.Label>
           <Form.Control>
-            <SelectBranches.FormItem
+            <SelectStructureEntities.FormItem
               mode="single"
+              capability={STOCK_PLACE_CAPABILITY}
               value={field.value ?? ''}
-              onValueChange={(branch) => field.onChange(branch)}
+              onValueChange={(placeEntityId) =>
+                field.onChange(typeof placeEntityId === 'string' ? placeEntityId : '')
+              }
             />
           </Form.Control>
           <Form.Message />
@@ -126,20 +130,26 @@ export const BranchField = ({ control }: FieldProps) => {
   );
 };
 
-export const DepartmentField = ({ control }: FieldProps) => {
+export const ResponsibleEntityField = ({ control }: FieldProps) => {
   const { t } = useTranslation('sales');
   return (
     <Form.Field
       control={control}
-      name="departmentId"
+      name="responsibleEntityId"
       render={({ field }) => (
         <Form.Item>
-          <Form.Label>{t('department')}</Form.Label>
+          <Form.Label>{t('responsible', 'Responsible')}</Form.Label>
           <Form.Control>
-            <SelectDepartments.FormItem
+            <SelectStructureEntities.FormItem
               mode="single"
               value={field.value ?? ''}
-              onValueChange={(department) => field.onChange(department)}
+              onValueChange={(responsibleEntityId) =>
+                field.onChange(
+                  typeof responsibleEntityId === 'string'
+                    ? responsibleEntityId
+                    : '',
+                )
+              }
             />
           </Form.Control>
           <Form.Message />
@@ -214,23 +224,26 @@ export const IsOnlineField = ({ control }: FieldProps) => {
   );
 };
 
-export const AllowBranchesField = ({ control }: FieldProps) => {
+export const AllowPlaceEntitiesField = ({ control }: FieldProps) => {
   const { t } = useTranslation('sales');
   return (
     <Form.Field
       control={control}
-      name="allowBranchIds"
+      name="allowPlaceEntityIds"
       render={({ field }) => (
         <Form.Item>
-          <Form.Label>{t('allow-branches')}</Form.Label>
+          <Form.Label>{t('allow-places', 'Allowed places')}</Form.Label>
           <Form.Description>
-            {t('allow-branches-description')}
+            {t('allow-places-description', 'Places whose stock this POS may use')}
           </Form.Description>
           <Form.Control>
-            <SelectBranches.FormItem
+            <SelectStructureEntities.FormItem
               mode="multiple"
+              capability={STOCK_PLACE_CAPABILITY}
               value={field.value ?? []}
-              onValueChange={(branches) => field.onChange(branches)}
+              onValueChange={(placeEntityIds) =>
+                field.onChange(Array.isArray(placeEntityIds) ? placeEntityIds : [])
+              }
             />
           </Form.Control>
           <Form.Message />

@@ -52,12 +52,16 @@ export const posSchema = schemaWrapper(
       optional: true,
       label: 'On cloud server',
     },
-    branchId: { type: String, optional: true, label: 'Branch' },
-    departmentId: { type: String, optional: true, label: 'Branch' },
-    allowBranchIds: {
+    placeEntityId: { type: String, optional: true, label: 'Place' },
+    responsibleEntityId: {
+      type: String,
+      optional: true,
+      label: 'Responsible structure node',
+    },
+    allowPlaceEntityIds: {
       type: [String],
       optional: true,
-      label: 'Allow branches',
+      label: 'Allowed places',
     },
     beginNumber: { type: String, optional: true, label: 'Begin number' },
     maxSkipNumber: {

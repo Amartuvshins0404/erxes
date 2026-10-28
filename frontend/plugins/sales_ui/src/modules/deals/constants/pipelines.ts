@@ -47,3 +47,6 @@ export const BOARD_NAMES_CONFIGS = [
     value: 'company.name',
   },
 ];
+export const PIPELINE_ACCESS_SCOPES = ['self', 'entity'] as const;
+
+export const PIPELINE_ACCESS_ALL = 'all';

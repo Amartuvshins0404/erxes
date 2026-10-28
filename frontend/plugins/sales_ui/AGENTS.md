@@ -99,12 +99,25 @@ onlyUpgrade}`, clearable to `null`; saving refuses a wallet without bands). Both
   Automations tab is listed last, beside the Loyalty tab.
 - In a deal's Payments tab a payment type with a score campaign asks loyalty's `loyaltyScoreSpendLimit` (`DealPointPaymentLimit` / `useDealPointLimit`) and shows the customer's points and the most it may pay; the row stays disabled without a customer, while loading, or when loyalty blocks spending, and typed amounts are capped at the limit. There is no hand refund: refunds follow stages.
 - The deals filter bar filters by one customer and one company (`customerId` / `companyId` URL keys, single-select pickers), passed straight to `deals` / stage queries.
+- Deals belong to structure nodes (`entityIds`, chip `DealStructureEntitiesChip`,
+  ui-modules `SelectStructureEntities`); the deals filter bar's `entityIds` URL
+  key is passed straight to the `deals` / stage queries, which include the
+  selected nodes' descendants. Boards, pipelines and stages edit
+  `sharedEntityIds` (who may use them) and pipelines edit `accessRule`
+  (`scope` `self` / `entity` / none, `exemptUserIds`). Deal product rows use
+  `placeEntityId` / `responsibleEntityId`; POS uses `placeEntityId`,
+  `responsibleEntityId`, `allowPlaceEntityIds` and `placeEntityTitle` /
+  `responsibleEntityTitle`; POS orders use `placeEntityId`,
+  `responsibleEntityId`, `subPlaceEntityId` and `placeEntity` /
+  `responsibleEntity` / `subPlaceEntity`. POS `cardsConfig` is keyed by its
+  entries' `placeEntityId`, one entry per place. Place pickers use
+  `STOCK_PLACE_CAPABILITY` (`@/constants/structure`).
 - The deals filter bar filters by deal tags (`tagIds` URL key, multi-select `SelectTags` picker scoped to `sales:deal`), passed straight to the `deals` query.
 - Deal detail renders only the properties selected on the deal's pipeline;
   legacy pipelines continue showing all deal properties until their selection is
   saved for the first time.
-- Deal detail chips (priority, assignee, dates, labels, tags, branch,
-  department, broker) render as a field group: a muted label segment, then the
+- Deal detail chips (priority, assignee, dates, labels, tags, structure,
+  broker) render as a field group: a muted label segment, then the
   value and a chevron, e.g. `Broker | None ⌄`; the stage chip has no label.
   The broker entity selector that follows is
   labelled by its type (`Customer`, `Company`, `User`) with a `Select broker`
@@ -127,8 +140,7 @@ onlyUpgrade}`, clearable to `null`; saving refuses a wallet without bands). Both
   `PrintDocument` sheet), archive/unarchive, and remove for archived deals.
   These actions appear only there, not in the detail overview body.
 - Deal detail overview lays fields out in three rows: stage, start date, close
-  date, assignee and priority; then labels, tags, branch, department and
-  broker; then checklist and attachment upload.
+  date, assignee and priority; then labels, tags, structure and broker; then checklist and attachment upload.
 - Deal product management supports filtering, advanced product fields, tax
   fields, row editing, duplication, deletion, product bulk add, footer totals,
   save feedback, and an expanded dialog view for working with dense product

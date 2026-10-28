@@ -15,6 +15,11 @@ export const boardSchema = new Schema(
     },
     userId: { type: String, label: 'Created by' },
     archiveInProgress: { type: Boolean, default: false },
+    sharedEntityIds: {
+      type: [String],
+      optional: true,
+      label: 'Shared structure nodes',
+    },
     order: { type: Number, label: 'Order' },
     type: {
       type: String,

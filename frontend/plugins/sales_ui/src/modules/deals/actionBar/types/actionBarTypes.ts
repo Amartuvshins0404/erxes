@@ -11,8 +11,7 @@ export type SalesFilterState = {
   companyId?: string | null;
   customerId?: string | null;
   userIds?: string[] | null;
-  branchIds?: string[] | null;
-  departmentIds?: string[] | null;
+  entityIds?: string[] | null;
   assignedUserIds?: string[] | null;
   createdStartDate?: string | null;
   createdEndDate?: string | null;
@@ -35,6 +34,6 @@ export type ProductFilterState = {
   productCategoryIds?: string[] | null;
   productVendorIds?: string[] | null;
   productTagIds?: string[] | null;
-  branchIds?: string[] | null;
-  departmentIds?: string[] | null;
+  placeEntityIds?: string[] | null;
+  responsibleEntityIds?: string[] | null;
 };

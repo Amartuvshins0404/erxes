@@ -53,7 +53,7 @@ const deliverySchema = z
   .passthrough();
 const cardSchema = z
   .object({
-    branchId: text,
+    placeEntityId: text,
     boardId: text,
     pipelineId: text,
     stageId: text,

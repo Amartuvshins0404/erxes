@@ -66,8 +66,7 @@ subscription salesDealChanged($_id: String!) {
         name
         colorCode
       }
-      branchIds
-      departmentIds
+      entityIds
       description
       extraData
       attachments {
@@ -77,16 +76,10 @@ subscription salesDealChanged($_id: String!) {
         size
         type
       }
-      departments {
+      entities {
         _id
         title
       }
-      departmentIds
-      branches {
-        _id
-        title
-      }
-      branchIds
       companies {
         _id
         primaryName

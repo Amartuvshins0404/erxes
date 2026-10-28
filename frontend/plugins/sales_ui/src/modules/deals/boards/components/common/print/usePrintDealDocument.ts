@@ -33,8 +33,14 @@ export const usePrintDealDocument = ({
   );
 
   const print = async () => {
-    const { copies, width, brandId, branchId, departmentId, documentId } =
-      form.getValues();
+    const {
+      copies,
+      width,
+      brandId,
+      placeEntityId,
+      responsibleEntityId,
+      documentId,
+    } = form.getValues();
 
     if (!documentId) {
       toast({
@@ -81,8 +87,8 @@ export const usePrintDealDocument = ({
             height: getPageHeight(pageWidth),
             type: PRINT_PAPER_TYPE,
             brandId,
-            branchId,
-            departmentId,
+            placeEntityId,
+            responsibleEntityId,
           },
         },
       });

@@ -1,8 +1,8 @@
 import type { DealProductData } from '@/deals/utils/dealJson';
 import {
-  branch,
+  placeEntity,
   currency,
-  department,
+  responsibleEntity,
   tax,
   taxPercent,
   uomRatio,
@@ -94,7 +94,12 @@ export const ProductsRecordTable = ({
         (col) => col.id === 'assignUserId',
       );
       if (assignedIndex !== -1)
-        newColumns.splice(assignedIndex + 1, 0, branch(t), department(t));
+        newColumns.splice(
+          assignedIndex + 1,
+          0,
+          placeEntity(t),
+          responsibleEntity(t),
+        );
     }
 
     return newColumns;

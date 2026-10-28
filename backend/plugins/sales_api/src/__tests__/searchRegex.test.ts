@@ -6,6 +6,7 @@ import { addressQueries } from '../modules/ecommerce/graphql/resolvers/queries/a
 import orderQueries from '../modules/pos/graphql/resolvers/queries/orders';
 import { generateFilter } from '../modules/sales/graphql/resolvers/queries/deals';
 
+jest.mock('../modules/sales/utils/structureAccess', () => ({}));
 jest.mock('erxes-api-shared/utils', () => ({
   escapeRegExp:
     jest.requireActual<typeof import('lodash')>('lodash').escapeRegExp,

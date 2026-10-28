@@ -10,13 +10,17 @@ import { IUserDocument } from 'erxes-api-shared/core-types';
 import { getCloseDateByType } from '~/modules/sales/utils';
 import { sendTRPCMessage } from 'erxes-api-shared/utils';
 import { assertBoardArchivePermissions } from '../../../utils/boardArchive';
+import { getBoardAccessFilter } from '../../../utils/structureAccess';
 
 export const boardQueries = {
   /**
    *  Boards list
    */
-  async salesBoards(_root: undefined, { includeArchived }: { includeArchived?: boolean }, { models }: IContext) {
-    return models.Boards.find(includeArchived ? {} : { status: { $ne: SALES_STATUSES.ARCHIVED } }).lean();
+  async salesBoards(_root: undefined, { includeArchived }: { includeArchived?: boolean }, { models, subdomain, user }: IContext) {
+    return models.Boards.find({
+      ...(includeArchived ? {} : { status: { $ne: SALES_STATUSES.ARCHIVED } }),
+      ...(await getBoardAccessFilter(subdomain, user)),
+    }).lean();
   },
 
   async salesBoardArchivePreview(_root: undefined, { _id }: { _id: string }, { models, user, checkPermission }: IContext) {
@@ -38,9 +42,12 @@ export const boardQueries = {
   async salesBoardCounts(
     _root: undefined,
     _args: undefined,
-    { models }: IContext,
+    { models, subdomain, user }: IContext,
   ) {
-    const boards = await models.Boards.find({ status: { $ne: SALES_STATUSES.ARCHIVED } })
+    const boards = await models.Boards.find({
+      status: { $ne: SALES_STATUSES.ARCHIVED },
+      ...(await getBoardAccessFilter(subdomain, user)),
+    })
       .sort({
         name: 1,
       })
@@ -75,9 +82,12 @@ export const boardQueries = {
   async salesBoardDetail(
     _root: undefined,
     { _id }: { _id: string },
-    { models }: IContext,
+    { models, subdomain, user }: IContext,
   ) {
-    return models.Boards.findOne({ _id }).lean();
+    return models.Boards.findOne({
+      _id,
+      ...(await getBoardAccessFilter(subdomain, user)),
+    }).lean();
   },
 
   async cpSalesBoardDetail(
@@ -94,9 +104,12 @@ export const boardQueries = {
   async salesBoardGetLast(
     _root: undefined,
     _args: undefined,
-    { models }: IContext,
+    { models, subdomain, user }: IContext,
   ) {
-    return models.Boards.findOne({ status: { $ne: SALES_STATUSES.ARCHIVED } })
+    return models.Boards.findOne({
+      status: { $ne: SALES_STATUSES.ARCHIVED },
+      ...(await getBoardAccessFilter(subdomain, user)),
+    })
       .sort({
         createdAt: -1,
       })

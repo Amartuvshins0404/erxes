@@ -1,4 +1,4 @@
-import { IconBuildingSkyscraper, IconMapPin } from '@tabler/icons-react';
+import { IconHierarchy } from '@tabler/icons-react';
 import { Badge, Card, isDefined, Separator, Tooltip } from 'erxes-ui';
 import { useTranslation } from 'react-i18next';
 
@@ -63,20 +63,15 @@ export const DealWidgetCard = ({ deal }: { deal: IDealDetail }) => {
     boardId,
     pipeline,
     pipelineId,
-    departments,
-    branches,
+    entities,
   } = deal || {};
 
   const priorityNum = PRIORITY_MAP[priority || ''] ?? 0;
   const isArchived = status === 'archived';
-  const departmentItems = (departments ?? [])
+  const entityItems = (entities ?? [])
     .filter(isDefined)
     .map(({ title }) => ({ title: title ?? '' }));
-  const branchItems = (branches ?? [])
-    .filter(isDefined)
-    .map(({ title }) => ({ title: title ?? '' }));
-  const hasDepartments = departmentItems.length > 0;
-  const hasBranches = branchItems.length > 0;
+  const hasEntities = entityItems.length > 0;
 
   const onCardClick = () => {
     const searchParams = new URLSearchParams({ salesItemId: _id });
@@ -124,11 +119,7 @@ export const DealWidgetCard = ({ deal }: { deal: IDealDetail }) => {
         )}
         <div className="flex flex-col gap-1 min-w-0">
           <h5 className="font-semibold">{name}</h5>
-          {(priorityNum > 0 ||
-            stage?.name ||
-            isArchived ||
-            hasDepartments ||
-            hasBranches) && (
+          {(priorityNum > 0 || stage?.name || isArchived || hasEntities) && (
             <div className="mt-1.5 grid grid-cols-[auto_1fr] items-center gap-x-3 gap-y-1.5 text-xs overflow-hidden">
               {stage?.name && (
                 <>
@@ -147,22 +138,13 @@ export const DealWidgetCard = ({ deal }: { deal: IDealDetail }) => {
                   />
                 </>
               )}
-              {hasDepartments && (
+              {hasEntities && (
                 <>
                   <span className="flex items-center gap-1 text-muted-foreground shrink-0">
-                    <IconBuildingSkyscraper className="size-3.5 shrink-0" />
-                    {t('dept')}
+                    <IconHierarchy className="size-3.5 shrink-0" />
+                    {t('structure')}
                   </span>
-                  <OverflowItems items={departmentItems} />
-                </>
-              )}
-              {hasBranches && (
-                <>
-                  <span className="flex items-center gap-1 text-muted-foreground shrink-0">
-                    <IconMapPin className="size-3.5 shrink-0" />
-                    {t('branch')}
-                  </span>
-                  <OverflowItems items={branchItems} />
+                  <OverflowItems items={entityItems} />
                 </>
               )}
               {isArchived && (

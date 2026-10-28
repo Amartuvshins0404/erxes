@@ -33,7 +33,7 @@ export const stageSchema = new Schema(
     memberIds: { type: [String], label: 'Members' },
     canMoveMemberIds: { type: [String], label: 'Can move members' },
     canEditMemberIds: { type: [String], label: 'Can edit members' },
-    departmentIds: { type: [String], label: 'Departments' },
+    sharedEntityIds: { type: [String], label: 'Shared structure nodes' },
     defaultTick: {
       type: Boolean,
       label: 'Default tick used',

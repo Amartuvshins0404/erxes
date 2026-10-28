@@ -43,7 +43,7 @@ export const boardMutations = {
     { user, models, checkPermission }: IContext,
   ) {
     await checkPermission('boardsAdd');
-    return await models.Boards.createBoard({ userId: user._id, ...doc });
+    return await models.Boards.createBoard(doc, user._id);
   },
 
   /**

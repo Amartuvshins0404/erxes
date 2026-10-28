@@ -7,6 +7,7 @@ export const types = `
     createdAt: Date
     type: String
     status: String
+    sharedEntityIds: [String]
     pipelines: [SalesPipeline]
   }
 
@@ -55,6 +56,7 @@ export const queries = `
 
 const mutationParams = `
   name: String!
+  sharedEntityIds: [String]
 `;
 
 export const mutations = `

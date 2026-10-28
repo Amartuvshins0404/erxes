@@ -1,3 +1,4 @@
+import { PERMISSION_SCOPES } from 'erxes-api-shared/core-modules';
 import { mongooseStringRandomId } from 'erxes-api-shared/utils';
 import { Schema } from 'mongoose';
 import {
@@ -5,6 +6,23 @@ import {
   SALES_STATUSES,
   VISIBILITIES,
 } from '../../constants';
+
+const accessRuleSchema = new Schema(
+  {
+    scope: {
+      type: String,
+      enum: Object.values(PERMISSION_SCOPES),
+      optional: true,
+      label: 'Scope',
+    },
+    exemptUserIds: {
+      type: [String],
+      optional: true,
+      label: 'Users eligible to see all deals',
+    },
+  },
+  { _id: false },
+);
 
 export const pipelineSchema = new Schema(
   {
@@ -46,20 +64,10 @@ export const pipelineSchema = new Schema(
       optional: true,
       label: 'Select the day after the card created date',
     },
-    isCheckUser: {
-      type: Boolean,
+    accessRule: {
+      type: accessRuleSchema,
       optional: true,
-      label: 'Show only the users created or assigned cards',
-    },
-    isCheckDepartment: {
-      type: Boolean,
-      optional: true,
-      label: 'Show only the departments created or assigned cards',
-    },
-    excludeCheckUserIds: {
-      type: [String],
-      optional: true,
-      label: 'Users elligible to see all cards',
+      label: 'Deal access rule',
     },
     numberConfig: { type: String, optional: true, label: 'Number config' },
     numberSize: { type: String, optional: true, label: 'Number count' },
@@ -70,15 +78,10 @@ export const pipelineSchema = new Schema(
       optional: true,
       label: 'Last generated number',
     },
-    departmentIds: {
+    sharedEntityIds: {
       type: [String],
       optional: true,
-      label: 'Related departments',
-    },
-    branchIds: {
-      type: [String],
-      optional: true,
-      label: 'Related branches',
+      label: 'Shared structure nodes',
     },
     initialCategoryIds: {
       type: [String],

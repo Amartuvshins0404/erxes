@@ -8,7 +8,7 @@ export type PrintFormValues = {
   copies: number;
   width: number;
   brandId: string;
-  branchId: string;
-  departmentId: string;
+  placeEntityId: string;
+  responsibleEntityId: string;
   documentId: string;
 };

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { PIPELINE_ACCESS_SCOPES } from '@/deals/constants/pipelines';
 import {
   BOARD_STATUSES_OPTIONS,
   PROBABILITY_DEAL,
@@ -77,16 +78,18 @@ export const createPipelineFormSchema = (
         ),
       boardId: z.string().trim().min(1, messages.boardRequired),
       tagId: z.string().optional(),
-      departmentIds: z.array(z.string()).optional(),
-      branchIds: z.array(z.string()).optional(),
+      sharedEntityIds: z.array(z.string()).optional(),
       memberIds: z.array(z.string()).optional(),
       numberConfig: z.string().optional(),
       numberSize: z.string().trim().optional(),
       nameConfig: z.string().optional(),
       isCheckDate: z.boolean().optional(),
-      isCheckUser: z.boolean().optional(),
-      isCheckDepartment: z.boolean().optional(),
-      excludeCheckUserIds: z.array(z.string()).optional(),
+      accessRule: z
+        .object({
+          scope: z.enum(PIPELINE_ACCESS_SCOPES).nullable().optional(),
+          exemptUserIds: z.array(z.string()).optional(),
+        })
+        .optional(),
       initialCategoryIds: z.array(z.string()).optional(),
       excludeCategoryIds: z.array(z.string()).optional(),
       excludeProductIds: z.array(z.string()).optional(),
@@ -103,7 +106,7 @@ export const createPipelineFormSchema = (
             canMoveMemberIds: z.array(z.string()).optional(),
             canEditMemberIds: z.array(z.string()).optional(),
             memberIds: z.array(z.string()).optional(),
-            departmentIds: z.array(z.string()).optional(),
+            sharedEntityIds: z.array(z.string()).optional(),
             name: z.string().trim().min(1, messages.stageNameRequired),
             probability: z
               .string()

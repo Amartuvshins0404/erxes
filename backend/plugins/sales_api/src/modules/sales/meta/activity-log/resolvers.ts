@@ -8,7 +8,7 @@ import {
   buildDealFieldChangedActivity,
   buildDealStageMovedActivity,
 } from './builders';
-import { ITag } from 'erxes-api-shared/core-types';
+import { IStructureEntity, ITag } from 'erxes-api-shared/core-types';
 
 type DealActivityContext = {
   deal: any;
@@ -135,88 +135,35 @@ export const dealActivityResolvers: Record<
     });
   },
 
-  branchIds: async ({ added = [], removed = [] }, ctx: DealActivityContext) => {
-    const [addedBranches, removedBranches] = await Promise.all([
-      added.length
-        ? sendTRPCMessage({
-            subdomain: ctx.subdomain,
-            pluginName: 'core',
-            method: 'query',
-            module: 'branches',
-            action: 'find',
-            input: { query: { _id: { $in: added } } },
-            defaultValue: [],
-          })
-        : Promise.resolve([]),
-      removed.length
-        ? sendTRPCMessage({
-            subdomain: ctx.subdomain,
-            pluginName: 'core',
-            method: 'query',
-            module: 'branches',
-            action: 'find',
-            input: { query: { _id: { $in: removed } } },
-            defaultValue: [],
-          })
-        : Promise.resolve([]),
-    ]);
+  entityIds: async ({ added = [], removed = [] }, ctx: DealActivityContext) => {
+    const [addedEntities, removedEntities]: IStructureEntity[][] =
+      await Promise.all(
+        [added, removed].map((ids: string[]) =>
+          ids.length
+            ? sendTRPCMessage({
+                subdomain: ctx.subdomain,
+                pluginName: 'core',
+                method: 'query',
+                module: 'structureEntities',
+                action: 'find',
+                input: { query: { _id: { $in: ids } }, fields: { title: 1 } },
+                defaultValue: [],
+              })
+            : Promise.resolve([]),
+        ),
+      );
 
     return buildDealAssignmentActivities({
       deal: ctx.deal,
-      activityTypeAdded: 'deal.branch_assigned',
-      activityTypeRemoved: 'deal.branch_unassigned',
-      actionAdded: 'deal.branch_assigned',
-      actionRemoved: 'deal.branch_unassigned',
+      activityTypeAdded: 'deal.structure_entity_assigned',
+      activityTypeRemoved: 'deal.structure_entity_unassigned',
+      actionAdded: 'deal.structure_entity_assigned',
+      actionRemoved: 'deal.structure_entity_unassigned',
       added,
       removed,
-      addedLabels: addedBranches.map((branch: any) => branch.title),
-      removedLabels: removedBranches.map((branch: any) => branch.title),
-      entityLabel: 'branch',
-    });
-  },
-
-  departmentIds: async (
-    { added = [], removed = [] },
-    ctx: DealActivityContext,
-  ) => {
-    const [addedDepartments, removedDepartments] = await Promise.all([
-      added.length
-        ? sendTRPCMessage({
-            subdomain: ctx.subdomain,
-            pluginName: 'core',
-            method: 'query',
-            module: 'departments',
-            action: 'find',
-            input: { query: { _id: { $in: added } } },
-            defaultValue: [],
-          })
-        : Promise.resolve([]),
-      removed.length
-        ? sendTRPCMessage({
-            subdomain: ctx.subdomain,
-            pluginName: 'core',
-            method: 'query',
-            module: 'departments',
-            action: 'find',
-            input: { query: { _id: { $in: removed } } },
-            defaultValue: [],
-          })
-        : Promise.resolve([]),
-    ]);
-
-    return buildDealAssignmentActivities({
-      deal: ctx.deal,
-      activityTypeAdded: 'deal.department_assigned',
-      activityTypeRemoved: 'deal.department_unassigned',
-      actionAdded: 'deal.department_assigned',
-      actionRemoved: 'deal.department_unassigned',
-      added,
-      removed,
-      addedLabels: addedDepartments.map((department: any) => department.title),
-      removedLabels: removedDepartments.map(
-        (department: any) => department.title,
-      ),
-      entityLabel: 'department',
+      addedLabels: addedEntities.map((entity) => entity.title),
+      removedLabels: removedEntities.map((entity) => entity.title),
+      entityLabel: 'structure node',
     });
   },
 };

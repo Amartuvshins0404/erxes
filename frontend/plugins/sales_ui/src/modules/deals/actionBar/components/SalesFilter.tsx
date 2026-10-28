@@ -14,13 +14,12 @@ import {
   useQueryState,
 } from 'erxes-ui';
 import {
-  SelectBranches,
   SelectCompany,
   SelectCustomer,
-  SelectDepartments,
   SelectMember,
   SelectProduct,
   SelectStage,
+  SelectStructureEntities,
   SelectTags,
 } from 'ui-modules';
 
@@ -42,8 +41,7 @@ export const SalesFilter = () => {
     'companyId',
     'productId',
     'userIds',
-    'branchIds',
-    'departmentIds',
+    'entityIds',
     'customerId',
     'assignedUserIds',
     'createdStartDate',
@@ -163,8 +161,7 @@ const SalesFilterBar = ({
   const {
     search,
     assignedUserIds,
-    branchIds,
-    departmentIds,
+    entityIds,
     companyId,
     customerId,
     userIds,
@@ -255,18 +252,11 @@ const SalesFilterBar = ({
           label={t('by-user', 'By User')}
         />
       )}
-      {branchIds && (
-        <SelectBranches.FilterBar
+      {entityIds && (
+        <SelectStructureEntities.FilterBar
           mode="multiple"
-          filterKey="branchIds"
-          label={t('by-branch', 'By Branch')}
-        />
-      )}
-      {departmentIds && (
-        <SelectDepartments.FilterBar
-          mode="multiple"
-          filterKey="departmentIds"
-          label={t('by-department', 'By Department')}
+          filterKey="entityIds"
+          label={t('by-structure', 'By Structure')}
         />
       )}
       {priority && <SelectPriority.FilterBar />}
@@ -334,13 +324,9 @@ const SalesFilterView = ({
               label={t('created-by-user', 'Created By')}
             />
             <Command.Separator className="my-1" />
-            <SelectBranches.FilterItem
-              value="branchIds"
-              label={t('by-branch', 'By Branch')}
-            />
-            <SelectDepartments.FilterItem
-              value="departmentIds"
-              label={t('by-department', 'By Department')}
+            <SelectStructureEntities.FilterItem
+              value="entityIds"
+              label={t('by-structure', 'By Structure')}
             />
             <SelectProduct.FilterItem
               value="productId"
@@ -388,8 +374,10 @@ const SalesFilterView = ({
       <SelectMember.FilterView mode="multiple" queryKey="userIds" />
       <SelectCompany.FilterView mode="single" filterKey="companyId" />
       <SelectCustomer.FilterView mode="single" filterKey="customerId" />
-      <SelectBranches.FilterView mode="multiple" filterKey="branchIds" />
-      <SelectDepartments.FilterView mode="multiple" filterKey="departmentIds" />
+      <SelectStructureEntities.FilterView
+        mode="multiple"
+        filterKey="entityIds"
+      />
       <SelectProduct.FilterView filterKey="productId" mode="multiple" />
       <SelectPriority.FilterView />
       <SelectLabels.FilterView filterKey="labelIds" mode="multiple" />

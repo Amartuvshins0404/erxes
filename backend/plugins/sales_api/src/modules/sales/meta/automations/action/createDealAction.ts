@@ -129,8 +129,7 @@ const normalizeDealActionData = (data: Record<string, any>) => {
     'assignedUserIds',
     'labelIds',
     'tagIds',
-    'branchIds',
-    'departmentIds',
+    'entityIds',
   ].forEach((key) => {
     if (hasOwn(newData, key)) {
       newData[key] = toIds(newData[key]);

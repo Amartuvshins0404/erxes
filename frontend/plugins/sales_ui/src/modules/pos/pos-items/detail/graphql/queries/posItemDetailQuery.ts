@@ -14,8 +14,8 @@ export const POS_ITEM_DETAIL_QUERY = gql(`
       _id
       billId
       billType
-      branch
-      branchId
+      placeEntity
+      placeEntityId
       cashAmount
       convertDealId
       createdAt
@@ -24,8 +24,8 @@ export const POS_ITEM_DETAIL_QUERY = gql(`
       deal
       dealLink
       deliveryInfo
-      department
-      departmentId
+      responsibleEntity
+      responsibleEntityId
       description
       dueDate
       finalAmount
@@ -45,8 +45,8 @@ export const POS_ITEM_DETAIL_QUERY = gql(`
       returnInfo
       shouldPrintEbarimt
       status
-      subBranch
-      subBranchId
+      subPlaceEntity
+      subPlaceEntityId
       syncErkhetInfo
       syncedErkhet
       totalAmount

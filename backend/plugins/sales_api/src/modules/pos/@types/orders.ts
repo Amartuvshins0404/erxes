@@ -64,9 +64,9 @@ export interface IPosOrder {
   type: string;
   userId?: string;
   items?: IPosOrderItem[];
-  branchId: string;
-  subBranchId: string;
-  departmentId: string;
+  placeEntityId: string;
+  subPlaceEntityId: string;
+  responsibleEntityId: string;
   posToken: string;
   posId?: string;
   syncedErkhet?: boolean;

@@ -140,7 +140,7 @@ export function DealsBoardColumn({
           customers: deal.customers ?? prev.items[deal._id]?.customers,
           startDate: deal.startDate ?? prev.items[deal._id]?.startDate,
           closeDate: deal.closeDate ?? prev.items[deal._id]?.closeDate,
-          departments: deal.departments ?? prev.items[deal._id]?.departments,
+          entities: deal.entities ?? prev.items[deal._id]?.entities,
           customProperties:
             deal.customProperties ?? prev.items[deal._id]?.customProperties,
         };
@@ -191,7 +191,7 @@ export function DealsBoardColumn({
             customers: item.customers ?? prev[item._id]?.customers,
             startDate: item.startDate ?? prev[item._id]?.startDate,
             closeDate: item.closeDate ?? prev[item._id]?.closeDate,
-            departments: item.departments ?? prev[item._id]?.departments,
+            entities: item.entities ?? prev[item._id]?.entities,
             customProperties:
               item.customProperties ?? prev[item._id]?.customProperties,
           };

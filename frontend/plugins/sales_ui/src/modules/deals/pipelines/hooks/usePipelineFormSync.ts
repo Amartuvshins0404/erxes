@@ -1,3 +1,4 @@
+import { PIPELINE_ACCESS_SCOPES } from '@/deals/constants/pipelines';
 import { paymentTypesSchema } from '@/deals/utils/dealJson';
 import { isDefined } from 'erxes-ui';
 import { useEffect, useMemo } from 'react';
@@ -14,6 +15,9 @@ const formatPaymentConfig = (config: unknown): string => {
   return typeof config === 'string' ? config : JSON.stringify(config) || '';
 };
 
+const toPipelineAccessScope = (scope?: string | null) =>
+  PIPELINE_ACCESS_SCOPES.find((value) => value === scope) ?? null;
+
 const mapPipelineStages = (
   stages: IStage[],
 ): NonNullable<TPipelineForm['stages']> =>
@@ -29,7 +33,7 @@ const mapPipelineStages = (
     canEditMemberIds: stage.canEditMemberIds?.filter(isDefined) ?? [],
     probability: stage.probability || '',
     memberIds: stage.memberIds?.filter(isDefined) ?? [],
-    departmentIds: stage.departmentIds?.filter(isDefined) ?? [],
+    sharedEntityIds: stage.sharedEntityIds?.filter(isDefined) ?? [],
     defaultTick: stage.defaultTick ?? true,
     // Left unset, the stage's probability decides.
   }));
@@ -45,20 +49,17 @@ const getPipelineFormValues = (
       visibility: 'public',
       boardId: boardId || '',
       tagId: '',
-      departmentIds: [],
-      branchIds: [],
+      sharedEntityIds: [],
       memberIds: [],
       stages: [],
       numberConfig: '',
       numberSize: '',
       nameConfig: '',
       isCheckDate: false,
-      isCheckUser: false,
-      isCheckDepartment: false,
+      accessRule: { scope: null, exemptUserIds: [] },
       initialCategoryIds: [],
       excludeCategoryIds: [],
       excludeProductIds: [],
-      excludeCheckUserIds: [],
       paymentIds: [],
       paymentTypes: [],
       propertyIds: [],
@@ -70,8 +71,7 @@ const getPipelineFormValues = (
     visibility: pipelineDetail.visibility || 'public',
     boardId: pipelineDetail.boardId || boardId || '',
     tagId: pipelineDetail.tagId || '',
-    departmentIds: pipelineDetail.departmentIds?.filter(isDefined) || [],
-    branchIds: pipelineDetail.branchIds?.filter(isDefined) || [],
+    sharedEntityIds: pipelineDetail.sharedEntityIds?.filter(isDefined) || [],
     memberIds: pipelineDetail.memberIds?.filter(isDefined) || [],
     stages: stages || [],
     numberConfig: pipelineDetail.numberConfig || '',
@@ -81,16 +81,17 @@ const getPipelineFormValues = (
         : String(pipelineDetail.numberSize),
     nameConfig: pipelineDetail.nameConfig || '',
     isCheckDate: pipelineDetail.isCheckDate || false,
-    isCheckUser: pipelineDetail.isCheckUser || false,
-    isCheckDepartment: pipelineDetail.isCheckDepartment || false,
+    accessRule: {
+      scope: toPipelineAccessScope(pipelineDetail.accessRule?.scope),
+      exemptUserIds:
+        pipelineDetail.accessRule?.exemptUserIds?.filter(isDefined) || [],
+    },
     initialCategoryIds:
       pipelineDetail.initialCategoryIds?.filter(isDefined) || [],
     excludeCategoryIds:
       pipelineDetail.excludeCategoryIds?.filter(isDefined) || [],
     excludeProductIds:
       pipelineDetail.excludeProductIds?.filter(isDefined) || [],
-    excludeCheckUserIds:
-      pipelineDetail.excludeCheckUserIds?.filter(isDefined) || [],
     paymentIds: pipelineDetail.paymentIds?.filter(isDefined) || [],
     paymentTypes: paymentTypesSchema
       .parse(pipelineDetail.paymentTypes ?? [])

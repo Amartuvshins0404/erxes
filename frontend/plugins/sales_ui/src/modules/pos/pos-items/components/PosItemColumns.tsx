@@ -21,6 +21,10 @@ import { ClickableBillNumber } from './ClickableBillNumber';
 const fmt = (val: number | string | null | undefined) =>
   val != null ? val.toLocaleString() : '0';
 
+const formatStructureEntity = (
+  entity?: { code?: string | null; title?: string | null } | null,
+) => [entity?.code, entity?.title].filter(Boolean).join(' - ');
+
 export const PosItemColumns: (t: TFunction) => ColumnDef<IPosItem>[] = (t) => [
   PosItemMoreColumn,
   {
@@ -83,35 +87,36 @@ export const PosItemColumns: (t: TFunction) => ColumnDef<IPosItem>[] = (t) => [
     size: 150,
   },
   {
-    id: 'branch',
-    accessorKey: 'branch',
+    id: 'placeEntity',
+    accessorKey: 'placeEntity',
     header: () => (
-      <RecordTable.InlineHead icon={IconChartBar} label={t('branch')} />
+      <RecordTable.InlineHead icon={IconChartBar} label={t('place', 'Place')} />
     ),
-    cell: ({ row }) => {
-      const b = row.original.branch;
-      return (
-        <RecordTableInlineCell>
-          <TextOverflowTooltip value={b ? `${b.order} - ${b.title}` : ''} />
-        </RecordTableInlineCell>
-      );
-    },
+    cell: ({ row }) => (
+      <RecordTableInlineCell>
+        <TextOverflowTooltip
+          value={formatStructureEntity(row.original.placeEntity)}
+        />
+      </RecordTableInlineCell>
+    ),
     size: 200,
   },
   {
-    id: 'department',
-    accessorKey: 'department',
+    id: 'responsibleEntity',
+    accessorKey: 'responsibleEntity',
     header: () => (
-      <RecordTable.InlineHead icon={IconClock} label={t('department')} />
+      <RecordTable.InlineHead
+        icon={IconClock}
+        label={t('responsible', 'Responsible')}
+      />
     ),
-    cell: ({ row }) => {
-      const d = row.original.department;
-      return (
-        <RecordTableInlineCell>
-          <TextOverflowTooltip value={d ? `${d.order} - ${d.title}` : ''} />
-        </RecordTableInlineCell>
-      );
-    },
+    cell: ({ row }) => (
+      <RecordTableInlineCell>
+        <TextOverflowTooltip
+          value={formatStructureEntity(row.original.responsibleEntity)}
+        />
+      </RecordTableInlineCell>
+    ),
     size: 200,
   },
   {

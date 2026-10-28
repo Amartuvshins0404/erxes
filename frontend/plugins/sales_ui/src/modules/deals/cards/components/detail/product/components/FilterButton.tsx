@@ -9,10 +9,9 @@ import {
 } from 'erxes-ui';
 import { useMemo } from 'react';
 import {
-  SelectBranches,
   SelectCategory,
   SelectCompany,
-  SelectDepartments,
+  SelectStructureEntities,
   SelectTags,
 } from 'ui-modules';
 
@@ -20,6 +19,7 @@ import { ProductFilterState } from '@/deals/actionBar/types/actionBarTypes';
 import { useTranslation } from 'react-i18next';
 import { useProductCategories } from 'ui-modules/modules/products/categories/hooks/useCategories';
 import { useTags } from 'ui-modules/modules/tags/hooks/useTags';
+import { STOCK_PLACE_CAPABILITY } from '@/constants/structure';
 
 interface Props {
   filters: ProductFilterState;
@@ -88,8 +88,8 @@ export const ProductFilterBar = ({
     productCategoryIds,
     productTagIds,
     productVendorIds,
-    branchIds,
-    departmentIds,
+    placeEntityIds,
+    responsibleEntityIds,
   } = filters;
 
   const { t } = useTranslation('sales');
@@ -166,42 +166,46 @@ export const ProductFilterBar = ({
         </SelectCompany.Provider>
       )}
 
-      {branchIds && branchIds.length > 0 && (
-        <SelectBranches
+      {placeEntityIds && placeEntityIds.length > 0 && (
+        <SelectStructureEntities.Provider
           mode="multiple"
-          value={branchIds}
+          capability={STOCK_PLACE_CAPABILITY}
+          value={placeEntityIds}
           onValueChange={(value) =>
-            updateFilter('branchIds', normalizeMultiSelectValue(value))
+            updateFilter('placeEntityIds', normalizeMultiSelectValue(value))
           }
         >
           <CustomFilterItem
-            onClear={() => updateFilter('branchIds', undefined)}
+            onClear={() => updateFilter('placeEntityIds', undefined)}
           >
-            <Filter.BarName>{t('branch')}</Filter.BarName>
+            <Filter.BarName>{t('place', 'Place')}</Filter.BarName>
             <Filter.BarButton>
-              <SelectBranches.Value />
+              <SelectStructureEntities.Value />
             </Filter.BarButton>
           </CustomFilterItem>
-        </SelectBranches>
+        </SelectStructureEntities.Provider>
       )}
 
-      {departmentIds && departmentIds.length > 0 && (
-        <SelectDepartments
+      {responsibleEntityIds && responsibleEntityIds.length > 0 && (
+        <SelectStructureEntities.Provider
           mode="multiple"
-          value={departmentIds}
+          value={responsibleEntityIds}
           onValueChange={(value) =>
-            updateFilter('departmentIds', normalizeMultiSelectValue(value))
+            updateFilter(
+              'responsibleEntityIds',
+              normalizeMultiSelectValue(value),
+            )
           }
         >
           <CustomFilterItem
-            onClear={() => updateFilter('departmentIds', undefined)}
+            onClear={() => updateFilter('responsibleEntityIds', undefined)}
           >
-            <Filter.BarName>{t('department')}</Filter.BarName>
+            <Filter.BarName>{t('responsible', 'Responsible')}</Filter.BarName>
             <Filter.BarButton>
-              <SelectDepartments.Value />
+              <SelectStructureEntities.Value />
             </Filter.BarButton>
           </CustomFilterItem>
-        </SelectDepartments>
+        </SelectStructureEntities.Provider>
       )}
     </>
   );
@@ -248,13 +252,13 @@ const ProductFilterView = ({
               <IconTag />
               {t('by-tag')}
             </Filter.Item>
-            <SelectBranches.FilterItem
-              value="branchIds"
-              label={t('by-branch')}
+            <SelectStructureEntities.FilterItem
+              value="placeEntityIds"
+              label={t('by-place', 'By place')}
             />
-            <SelectDepartments.FilterItem
-              value="departmentIds"
-              label={t('by-department')}
+            <SelectStructureEntities.FilterItem
+              value="responsibleEntityIds"
+              label={t('by-responsible', 'By responsible')}
             />
           </Command.List>
         </Command>
@@ -297,28 +301,32 @@ const ProductFilterView = ({
         </SelectTags.Provider>
       </Filter.View>
 
-      <Filter.View filterKey="branchIds">
-        <SelectBranches
+      <Filter.View filterKey="placeEntityIds">
+        <SelectStructureEntities.Provider
           mode="multiple"
-          value={filters.branchIds || []}
+          capability={STOCK_PLACE_CAPABILITY}
+          value={filters.placeEntityIds || []}
           onValueChange={(value) => {
-            updateFilter('branchIds', normalizeMultiSelectValue(value));
+            updateFilter('placeEntityIds', normalizeMultiSelectValue(value));
           }}
         >
-          <SelectBranches.Content />
-        </SelectBranches>
+          <SelectStructureEntities.Content />
+        </SelectStructureEntities.Provider>
       </Filter.View>
 
-      <Filter.View filterKey="departmentIds">
-        <SelectDepartments
+      <Filter.View filterKey="responsibleEntityIds">
+        <SelectStructureEntities.Provider
           mode="multiple"
-          value={filters.departmentIds || []}
+          value={filters.responsibleEntityIds || []}
           onValueChange={(value) => {
-            updateFilter('departmentIds', normalizeMultiSelectValue(value));
+            updateFilter(
+              'responsibleEntityIds',
+              normalizeMultiSelectValue(value),
+            );
           }}
         >
-          <SelectDepartments.Content />
-        </SelectDepartments>
+          <SelectStructureEntities.Content />
+        </SelectStructureEntities.Provider>
       </Filter.View>
     </>
   );

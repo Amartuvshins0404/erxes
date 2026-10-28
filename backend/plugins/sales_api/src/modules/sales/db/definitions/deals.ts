@@ -73,8 +73,8 @@ export const productDataSchema = new Schema(
     tickUsed: { type: Boolean, label: 'Tick used' }, // TickUsed
     isVatApplied: { type: Boolean, label: 'Is vat applied' }, // isVatApplied
     assignUserId: { type: String, optional: true }, // AssignUserId
-    branchId: { type: String, optional: true },
-    departmentId: { type: String, optional: true },
+    placeEntityId: { type: String, optional: true },
+    responsibleEntityId: { type: String, optional: true },
     startDate: { type: Date, optional: true, label: 'Start date' }, //pms
     endDate: { type: Date, optional: true, label: 'End date' }, //pms
     information: { type: Object, optional: true, label: 'information' }, //pms
@@ -203,17 +203,11 @@ export const dealSchema = schemaWrapper(
         index: true,
         label: 'Tags',
       },
-      branchIds: {
+      entityIds: {
         type: [String],
         optional: true,
         index: true,
-        label: 'Branches',
-      },
-      departmentIds: {
-        type: [String],
-        optional: true,
-        index: true,
-        label: 'Departments',
+        label: 'Structure nodes',
       },
 
       productsData: { type: [productDataSchema], label: 'Products' },

@@ -53,14 +53,14 @@ const PosCard: React.FC<PosCardProps> = ({ pos }) => {
             {pos.adminIds?.length} / {pos.cashierIds?.length}
           </Badge>
 
-          {pos.branchTitle && (
+          {pos.placeEntityTitle && (
             <div className="flex gap-2 items-center text-accent-foreground">
-              <p className="text-sm">{pos.branchTitle}</p>
+              <p className="text-sm">{pos.placeEntityTitle}</p>
             </div>
           )}
-          {pos.departmentTitle && (
+          {pos.responsibleEntityTitle && (
             <div className="flex gap-2 items-center text-accent-foreground">
-              <p className="text-sm">{pos.departmentTitle}</p>
+              <p className="text-sm">{pos.responsibleEntityTitle}</p>
             </div>
           )}
         </div>

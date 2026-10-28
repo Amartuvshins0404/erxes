@@ -26,7 +26,7 @@ interface PosCreateDialogProps {
 export interface PosFormData {
   name: string;
   description: string;
-  branchId?: string;
+  placeEntityId?: string;
   paymentIds?: string[];
   adminIds?: string[];
   cashierIds?: string[];
@@ -52,7 +52,7 @@ export const PosCreate = ({
     defaultValues: {
       name: '',
       description: '',
-      branchId: '',
+      placeEntityId: '',
       paymentIds: [],
       adminIds: [],
       cashierIds: [],
@@ -80,7 +80,7 @@ export const PosCreate = ({
         variables: {
           name: data.name,
           description: data.description,
-          branchId: data.branchId || undefined,
+          placeEntityId: data.placeEntityId || undefined,
           paymentIds:
             data.paymentIds && data.paymentIds.length > 0
               ? data.paymentIds

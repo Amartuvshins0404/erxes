@@ -2,12 +2,11 @@ import { useState } from 'react';
 import { Combobox, Command, Popover } from 'erxes-ui';
 import { useTranslation } from 'react-i18next';
 import {
-  SelectBranches,
   SelectCompany,
   SelectCustomer,
-  SelectDepartments,
   SelectMember,
   SelectStage,
+  SelectStructureEntities,
   TagsSelect,
 } from 'ui-modules';
 
@@ -103,7 +102,7 @@ export const DealTagsChip = ({
   );
 };
 
-export const DealBranchesChip = ({
+export const DealStructureEntitiesChip = ({
   value,
   onValueChange,
   label,
@@ -112,7 +111,7 @@ export const DealBranchesChip = ({
   const [open, setOpen] = useState(false);
 
   return (
-    <SelectBranches
+    <SelectStructureEntities.Provider
       mode="multiple"
       value={value}
       onValueChange={(next) => {
@@ -123,41 +122,12 @@ export const DealBranchesChip = ({
       <ChipPopover
         open={open}
         onOpenChange={setOpen}
-        label={label || t('branch')}
-        value={<SelectBranches.Value />}
+        label={label || t('structure')}
+        value={<SelectStructureEntities.Value />}
       >
-        <SelectBranches.Content />
+        <SelectStructureEntities.Content />
       </ChipPopover>
-    </SelectBranches>
-  );
-};
-
-export const DealDepartmentsChip = ({
-  value,
-  onValueChange,
-  label,
-}: ChipProps) => {
-  const { t } = useTranslation('sales');
-  const [open, setOpen] = useState(false);
-
-  return (
-    <SelectDepartments
-      mode="multiple"
-      value={value}
-      onValueChange={(next) => {
-        if (next == null) return;
-        onValueChange(next);
-      }}
-    >
-      <ChipPopover
-        open={open}
-        onOpenChange={setOpen}
-        label={label || t('department')}
-        value={<SelectDepartments.Value />}
-      >
-        <SelectDepartments.Content />
-      </ChipPopover>
-    </SelectDepartments>
+    </SelectStructureEntities.Provider>
   );
 };
 

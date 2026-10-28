@@ -3,6 +3,7 @@ import {
   isEnabled,
   sendTRPCMessage,
 } from 'erxes-api-shared/utils';
+import { IStructureEntityDocument } from 'erxes-api-shared/core-types';
 import * as _ from 'underscore';
 import { IModels } from '~/connectionResolvers';
 import { sendPosclientHealthCheck, sendPosclientMessage } from '~/initWorker';
@@ -73,18 +74,18 @@ export const getBranchesUtil = async (
 
   const allowsPos = await models.Pos.find({
     isOnline: { $ne: true },
-    branchId: { $in: pos.allowBranchIds },
+    placeEntityId: { $in: pos.allowPlaceEntityIds },
   })
     .sort({ onServer: -1, name: 1 })
     .lean();
 
-  let healthyBranchIds = [] as any;
+  let healthyPlaceEntityIds: string[] = [];
 
   const { ALLOW_OFFLINE_POS } = process.env;
 
   if ([true, 'true', 'True', '1'].includes(ALLOW_OFFLINE_POS || '')) {
     for (const allowPos of allowsPos) {
-      if (healthyBranchIds.includes(allowPos.branchId)) {
+      if (healthyPlaceEntityIds.includes(allowPos.placeEntityId || '')) {
         continue;
       }
 
@@ -94,38 +95,48 @@ export const getBranchesUtil = async (
       });
 
       if (response?.healthy === 'ok') {
-        healthyBranchIds.push(allowPos.branchId);
+        healthyPlaceEntityIds.push(allowPos.placeEntityId || '');
       }
     }
   } else {
-    healthyBranchIds = allowsPos.map((p) => p.branchId);
+    healthyPlaceEntityIds = allowsPos.map((p) => p.placeEntityId || '');
   }
 
-  return await sendTRPCMessage({
+  const entities: IStructureEntityDocument[] = await sendTRPCMessage({
     subdomain,
     method: 'query',
     pluginName: 'core',
-    module: 'branches',
+    module: 'structureEntities',
     action: 'find',
     input: {
-      query: { _id: { $in: healthyBranchIds } },
+      query: { _id: { $in: healthyPlaceEntityIds } },
       fields: {
         _id: 1,
         title: 1,
-        address: 1,
-        radius: 1,
-        phoneNumber: 1,
-        email: 1,
-        coordinate: 1,
-        image: 1,
         code: 1,
         order: 1,
         status: 1,
-        links: 1,
+        location: 1,
+        contact: 1,
       },
     },
     defaultValue: [],
   });
+
+  return entities.map(({ _id, title, code, order, status, location, contact }) => ({
+    _id,
+    title,
+    code,
+    order,
+    status,
+    address: location?.address,
+    coordinate: location?.coordinate,
+    radius: location?.radius,
+    phoneNumber: contact?.phoneNumber,
+    email: contact?.email,
+    links: contact?.links,
+    image: contact?.image,
+  }));
 };
 
 // The record loyalty ties these points to.
@@ -561,9 +572,9 @@ export const statusToDone = async ({
 
   await updateCustomer({ subdomain, doneOrder });
 
-  if (pos.isOnline && doneOrder.subBranchId) {
+  if (pos.isOnline && doneOrder.subPlaceEntityId) {
     const toPos = await models.Pos.findOne({
-      branchId: doneOrder.subBranchId,
+      placeEntityId: doneOrder.subPlaceEntityId,
       _id: { $ne: pos._id },
     })
       .sort({ onServer: -1, name: 1 })
@@ -608,7 +619,7 @@ const createDealPerOrder = async ({
   const { cardsConfig } = pos;
 
   type CardsConfig = {
-    branchId?: string;
+    placeEntityId?: string;
     stageId?: string;
     pipelineId?: string;
     assignedUserIds?: string[];
@@ -616,7 +627,7 @@ const createDealPerOrder = async ({
 
   const currentCardsConfig = (
     Object.values(cardsConfig || {}) as CardsConfig[]
-  ).find((config) => config?.branchId === newOrder.branchId);
+  ).find((config) => config?.placeEntityId === newOrder.placeEntityId);
 
   if (currentCardsConfig?.stageId) {
     const paymentsData: NonNullable<IDeal['paymentsData']> = {};
@@ -742,8 +753,8 @@ export const syncOrderFromClient = async ({
     posId: pos._id,
     items,
     scopeBrandIds: pos.scopeBrandIds,
-    branchId: order.branchId || pos.branchId,
-    departmentId: order.departmentId || pos.departmentId,
+    placeEntityId: order.placeEntityId || pos.placeEntityId,
+    responsibleEntityId: order.responsibleEntityId || pos.responsibleEntityId,
   });
 
   if (enabledMN) {
@@ -813,9 +824,9 @@ export const syncOrderFromClient = async ({
     }
   }
 
-  if (pos.isOnline && newOrder.subBranchId) {
+  if (pos.isOnline && newOrder.subPlaceEntityId) {
     const toPos = await models.Pos.findOne({
-      branchId: newOrder.subBranchId,
+      placeEntityId: newOrder.subPlaceEntityId,
       _id: { $ne: pos._id },
     })
       .sort({ onServer: -1, name: 1 })
@@ -841,11 +852,11 @@ export const syncOrderFromClient = async ({
 
     // change branch and before another pos synced then remove from befort sync
     if (
-      oldOrder?.subBranchId &&
-      newOrder.subBranchId !== oldOrder?.subBranchId
+      oldOrder?.subPlaceEntityId &&
+      newOrder.subPlaceEntityId !== oldOrder?.subPlaceEntityId
     ) {
       const toCancelPos = await models.Pos.findOne({
-        branchId: oldOrder.subBranchId,
+        placeEntityId: oldOrder.subPlaceEntityId,
         _id: { $ne: pos._id },
       }).lean();
 

@@ -1,3 +1,4 @@
+import { IContainerAccessRule } from 'erxes-api-shared/core-modules';
 import { Document } from 'mongoose';
 
 export interface IPipeline {
@@ -14,15 +15,12 @@ export interface IPipeline {
   hackScoringType?: string;
   templateId?: string;
   isCheckDate?: boolean;
-  isCheckUser?: boolean;
-  isCheckDepartment?: boolean;
-  excludeCheckUserIds?: string[];
+  accessRule?: IContainerAccessRule;
   numberConfig?: string;
   numberSize?: string;
   nameConfig?: string;
   lastNum?: string;
-  departmentIds?: string[];
-  branchIds?: string[];
+  sharedEntityIds?: string[];
   tagId?: string;
   initialCategoryIds?: string[];
   excludeCategoryIds?: string[];

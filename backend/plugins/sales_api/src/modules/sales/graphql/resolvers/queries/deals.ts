@@ -23,7 +23,11 @@ import {
 import { FilterQuery } from 'mongoose';
 import dealResolvers from '@/sales/graphql/resolvers/customResolvers/deal';
 import moment from 'moment';
-import { Resolver } from 'erxes-api-shared/core-types';
+import { IUserDocument, Resolver } from 'erxes-api-shared/core-types';
+import {
+  getEntityIdsWithDescendants,
+  getPipelineDealFilter,
+} from '~/modules/sales/utils/structureAccess';
 
 const contains = (values: string[]) => {
   return { $in: values };
@@ -44,92 +48,29 @@ const getPipelineVisibilityFilter = async ({
   userId: string;
   pipelineId: string;
 }): Promise<FilterQuery<IDealDocument> | null> => {
-  const pipeline = await models.Pipelines.getPipeline(pipelineId);
-  const isCheckEnabled = pipeline.isCheckUser || pipeline.isCheckDepartment;
+  const { accessRule } = await models.Pipelines.getPipeline(pipelineId);
 
-  if (!isCheckEnabled) {
+  if (!accessRule?.scope || accessRule.exemptUserIds?.includes(userId)) {
     return null;
   }
 
-  if ((pipeline.excludeCheckUserIds || []).includes(userId)) {
-    return null;
-  }
-
-  const pipelineDepartmentIds = pipeline.departmentIds || [];
-  const includeCheckUserIds: string[] = [];
-
-  if (pipelineDepartmentIds.length > 0) {
-    const user = await sendTRPCMessage({
-      subdomain,
-      pluginName: 'core',
-      method: 'query',
-      module: 'users',
-      action: 'findOne',
-      input: {
-        _id: userId,
-      },
-    });
-
-    const supervisorDepartments = await sendTRPCMessage({
-      subdomain,
-      pluginName: 'core',
-      method: 'query',
-      module: 'departments',
-      action: 'findWithChild',
-      input: {
-        query: {
-          supervisorId: userId,
-        },
-        fields: {
-          _id: 1,
-        },
-      },
-      defaultValue: [],
-    });
-
-    const supervisorDepartmentIds =
-      supervisorDepartments?.map((department) => department._id) || [];
-    const supervisorPipelineDepartmentIds = supervisorDepartmentIds.filter(
-      (departmentId) => pipelineDepartmentIds.includes(departmentId),
-    );
-    const userDepartmentIds = user?.departmentIds || [];
-    const userPipelineDepartmentIds = userDepartmentIds.filter((departmentId) =>
-      pipelineDepartmentIds.includes(departmentId),
-    );
-    let checkDepartmentIds = supervisorPipelineDepartmentIds;
-
-    if (!checkDepartmentIds.length && pipeline.isCheckDepartment) {
-      checkDepartmentIds = userPipelineDepartmentIds;
-    }
-
-    if (checkDepartmentIds.length > 0) {
-      const departmentUsers = await sendTRPCMessage({
+  const user: IUserDocument | null = userId
+    ? await sendTRPCMessage({
         subdomain,
         pluginName: 'core',
         method: 'query',
         module: 'users',
-        action: 'find',
-        input: {
-          query: { departmentIds: { $in: checkDepartmentIds } },
-        },
-        defaultValue: [],
-      });
+        action: 'findOne',
+        input: { query: { _id: userId } },
+        defaultValue: null,
+      })
+    : null;
 
-      includeCheckUserIds.push(
-        ...departmentUsers.map((departmentUser) => departmentUser._id),
-        user?._id || userId,
-      );
-    }
+  if (!user) {
+    return { _id: { $in: [] } };
   }
 
-  const uniqueCheckUserIds = [...new Set([...includeCheckUserIds, userId])];
-
-  return {
-    $or: [
-      { assignedUserIds: { $in: uniqueCheckUserIds } },
-      { userId: { $in: uniqueCheckUserIds } },
-    ],
-  };
+  return getPipelineDealFilter(subdomain, user, { accessRule });
 };
 
 const getCustomerPhoneCondition = async (
@@ -221,8 +162,7 @@ export const generateFilter = async (
     noSkipArchive,
     status,
     number,
-    branchIds,
-    departmentIds,
+    entityIds,
     dateRangeFilters,
     resolvedDayBetween,
     productIds,
@@ -261,40 +201,10 @@ export const generateFilter = async (
     filter.assignedUserIds = notAssigned ? [] : { $in: assignedUserIds };
   }
 
-  if (branchIds) {
-    const branches = await sendTRPCMessage({
-      subdomain,
-
-      pluginName: 'core',
-      method: 'query',
-      module: 'branches',
-      action: 'findWithChild',
-      input: {
-        query: { _id: { $in: branchIds } },
-        fields: { _id: 1 },
-      },
-      defaultValue: [],
-    });
-
-    filter.branchIds = { $in: branches.map((item) => item._id) };
-  }
-
-  if (departmentIds) {
-    const departments = await sendTRPCMessage({
-      subdomain,
-
-      pluginName: 'core',
-      method: 'query',
-      module: 'departments',
-      action: 'findWithChild',
-      input: {
-        query: { _id: { $in: departmentIds } },
-        fields: { _id: 1 },
-      },
-      defaultValue: [],
-    });
-
-    filter.departmentIds = { $in: departments.map((item) => item._id) };
+  if (entityIds?.length) {
+    filter.entityIds = {
+      $in: await getEntityIdsWithDescendants(subdomain, entityIds),
+    };
   }
 
   // Deals keep their customer and company themselves.

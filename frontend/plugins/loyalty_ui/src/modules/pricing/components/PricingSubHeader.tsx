@@ -15,8 +15,7 @@ import {
 type PricingFilterState = {
   searchValue?: string | null;
   status?: string | null;
-  branchId?: string | null;
-  departmentId?: string | null;
+  placeEntityId?: string | null;
   productId?: string | null;
   priority?: string | null;
   date?: string | null;
@@ -33,8 +32,7 @@ export function PricingSubHeader() {
   const [queries] = useMultiQueryState<PricingFilterState>([
     'searchValue',
     'status',
-    'branchId',
-    'departmentId',
+    'placeEntityId',
     'productId',
     'priority',
     'date',

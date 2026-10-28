@@ -31,8 +31,7 @@ interface PricingFilterVariables {
   perPage?: number;
   status?: string;
   priority?: string;
-  branchId?: string;
-  departmentId?: string;
+  placeEntityId?: string;
   productId?: string;
   date?: string;
   isQuantityEnabled?: boolean;
@@ -49,8 +48,7 @@ export const usePricing = () => {
   const [queries] = useMultiQueryState<{
     status?: string | null;
     priority?: string | null;
-    branchId?: string | null;
-    departmentId?: string | null;
+    placeEntityId?: string | null;
     productId?: string | null;
     date?: string | null;
     isQuantityEnabled?: boolean | null;
@@ -61,8 +59,7 @@ export const usePricing = () => {
   }>([
     'status',
     'priority',
-    'branchId',
-    'departmentId',
+    'placeEntityId',
     'productId',
     'date',
     'isQuantityEnabled',
@@ -82,19 +79,16 @@ export const usePricing = () => {
       nextVariables.priority =
         queries.priority === 'none' ? '' : queries.priority;
     }
-    if (queries?.branchId) nextVariables.branchId = queries.branchId;
-    if (queries?.departmentId)
-      nextVariables.departmentId = queries.departmentId;
+    if (queries?.placeEntityId)
+      nextVariables.placeEntityId = queries.placeEntityId;
     if (queries?.productId) nextVariables.productId = queries.productId;
     if (queries?.date) nextVariables.date = queries.date;
     if (queries?.isQuantityEnabled === true) {
       nextVariables.isQuantityEnabled = true;
     }
     if (queries?.isPriceEnabled === true) nextVariables.isPriceEnabled = true;
-    if (queries?.isExpiryEnabled === true)
-      nextVariables.isExpiryEnabled = true;
-    if (queries?.isRepeatEnabled === true)
-      nextVariables.isRepeatEnabled = true;
+    if (queries?.isExpiryEnabled === true) nextVariables.isExpiryEnabled = true;
+    if (queries?.isRepeatEnabled === true) nextVariables.isRepeatEnabled = true;
 
     return nextVariables;
   }, [queries]);

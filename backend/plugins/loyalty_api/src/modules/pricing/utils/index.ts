@@ -12,18 +12,17 @@ import {
 } from './rule';
 import { getAllowedProducts } from './product';
 import { planMatchesContext, EligibilityCache } from './eligibility';
+import { getPlaceDepth, getPlaceFilter, getPlacePaths } from './place';
 import { CalculatedRule, OrderItem } from '../types';
 
 type ParticipantKind = 'customer' | 'company' | 'user';
 
 export const getMainConditions = ({
-  branchId,
-  departmentId,
+  placePaths,
   pipelineId,
   date,
 }: {
-  branchId?: string;
-  departmentId?: string;
+  placePaths?: string[][];
   pipelineId?: string;
   date?: Date;
 }): Record<string, any> => {
@@ -67,22 +66,9 @@ export const getMainConditions = ({
     ? { $or: [{ pipelineId }, { pipelineId: { $in: [null, ''] } }] }
     : { pipelineId: { $in: [null, ''] } };
 
-  const branchFilter = branchId
-    ? { $or: [{ branchIds: { $in: [branchId] } }, { branchIds: { $size: 0 } }] }
-    : { branchIds: { $size: 0 } };
-
-  const departmentFilter = departmentId
-    ? {
-        $or: [
-          { departmentIds: { $in: [departmentId] } },
-          { departmentIds: { $size: 0 } },
-        ],
-      }
-    : { departmentIds: { $size: 0 } };
-
   return {
     status: 'active',
-    $and: [dateFilter, pipelineFilter, branchFilter, departmentFilter],
+    $and: [dateFilter, pipelineFilter, getPlaceFilter(placePaths)],
   };
 };
 
@@ -414,8 +400,8 @@ export const checkPricing = async (params: {
   subdomain: string;
   prioritizeRule: string;
   totalAmount: number;
-  departmentId?: string;
-  branchId?: string;
+  placeEntityId?: string;
+  responsibleEntityId?: string;
   pipelineId?: string;
   orderItems: OrderItem[];
   customerType?: ParticipantKind;
@@ -428,8 +414,8 @@ export const checkPricing = async (params: {
     subdomain,
     prioritizeRule,
     totalAmount,
-    departmentId,
-    branchId,
+    placeEntityId,
+    responsibleEntityId,
     pipelineId,
     orderItems,
     customerType,
@@ -456,7 +442,11 @@ export const checkPricing = async (params: {
   });
 
   // Prepare query conditions
-  const conditions = getMainConditions({ branchId, departmentId, pipelineId });
+  const placePaths = await getPlacePaths(subdomain, [
+    placeEntityId,
+    responsibleEntityId,
+  ]);
+  const conditions = getMainConditions({ placePaths, pipelineId });
   applyPriorityConditions(
     conditions,
     prioritizeRule,
@@ -489,6 +479,7 @@ export const checkPricing = async (params: {
 
   // Memoize segment + entity-fact lookups across every plan in this request.
   const eligibilityCache: EligibilityCache = new Map();
+  const placeDepths: Record<string, number> = {};
   const customerContext = typedParticipantContext({
     type: customerType,
     id: customerId,
@@ -530,6 +521,7 @@ export const checkPricing = async (params: {
     // discount is left, measured against what the line costs now.
     const bakedAtSync =
       prioritizeRule === 'exclude' && plan.priority === 'posBase';
+    const placeDepth = getPlaceDepth(plan.placeEntityIds, placePaths);
 
     let appliedBundleCounts = Number.POSITIVE_INFINITY;
     const appliedBundleItems: any[] = [];
@@ -606,6 +598,20 @@ export const checkPricing = async (params: {
       }
 
       if (shouldApply) {
+        const closestDepth = placeDepths[item.itemId] ?? 0;
+
+        if (plan.priority !== 'posBase') {
+          if (placeDepth < closestDepth) {
+            continue;
+          }
+
+          if (placeDepth > closestDepth) {
+            result[item.itemId] = { type: '', value: 0, bonusProducts: [] };
+          }
+
+          placeDepths[item.itemId] = placeDepth;
+        }
+
         // Update result with calculated values
         updateResultWithCalculations(
           item.itemId,

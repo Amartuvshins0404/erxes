@@ -13,6 +13,7 @@ import {
   calculatePriceAdjust,
 } from '~/modules/pricing/utils/rule';
 import { getAllowedProducts } from '~/modules/pricing/utils/product';
+import { getPlacePaths } from '~/modules/pricing/utils/place';
 import { getOwnerSummary } from '~/utils/ownerSummary';
 import { TScoreSkip } from '@/score/@types/earnTable';
 import { applyOwnerTier, tierForPurchase } from '@/score/services/purchaseTier';
@@ -128,8 +129,8 @@ const participantKindSchema = z.preprocess(
 export const checkPricingInput = z.object({
   prioritizeRule: z.string(),
   totalAmount: z.number().nonnegative(),
-  departmentId: z.string().optional().default(''),
-  branchId: z.string().optional().default(''),
+  placeEntityId: z.string().optional(),
+  responsibleEntityId: z.string().optional(),
   products: z.array(pricingProductSchema),
   pipelineId: z.string().nullish(),
   customerType: participantKindSchema,
@@ -145,8 +146,8 @@ const quantityRulesInput = z.object({
       unitPrice: z.number().nonnegative(),
     }),
   ),
-  branchId: z.string(),
-  departmentId: z.string(),
+  placeEntityId: z.string().optional(),
+  responsibleEntityId: z.string().optional(),
 });
 
 const checkCouponInput = z.object({
@@ -335,8 +336,8 @@ export const appRouter = t.router({
         const {
           prioritizeRule,
           totalAmount,
-          departmentId,
-          branchId,
+          placeEntityId,
+          responsibleEntityId,
           products,
           pipelineId,
           customerType,
@@ -360,8 +361,8 @@ export const appRouter = t.router({
           subdomain,
           prioritizeRule,
           totalAmount,
-          departmentId,
-          branchId,
+          placeEntityId,
+          responsibleEntityId,
           pipelineId: pipelineId || '',
           orderItems,
           customerType,
@@ -376,7 +377,7 @@ export const appRouter = t.router({
       .query(async ({ ctx, input }) => {
         const { subdomain } = ctx;
         const models = await ctx.models;
-        const { products, branchId, departmentId } = input;
+        const { products, placeEntityId, responsibleEntityId } = input;
 
         const productsById = {};
         for (const product of products) {
@@ -386,7 +387,12 @@ export const appRouter = t.router({
         const productIds = products.map((pr) => pr._id);
         const rulesByProductId = {};
 
-        const conditions = getMainConditions({ branchId, departmentId });
+        const conditions = getMainConditions({
+          placePaths: await getPlacePaths(subdomain, [
+            placeEntityId,
+            responsibleEntityId,
+          ]),
+        });
         conditions.$and = [
           ...(conditions.$and || []),
           {

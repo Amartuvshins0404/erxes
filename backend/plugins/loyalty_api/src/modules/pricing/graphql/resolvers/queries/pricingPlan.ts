@@ -7,6 +7,7 @@ import {
 } from '../../../utils/product';
 import { IPricingPlanDocument } from '@/pricing/@types/pricingPlan';
 import { checkPricing } from '../../../utils';
+import { getPlaceWithDescendantIds } from '../../../utils/place';
 
 const buildDateFilter = (date: string | Date) => {
   const now = dayjs(date);
@@ -102,8 +103,7 @@ const generateFilter = async (
   params: {
     status?: string;
     priority?: string;
-    branchId?: string;
-    departmentId?: string;
+    placeEntityId?: string;
     date?: string | Date;
     productId?: string;
     isQuantityEnabled?: boolean;
@@ -112,7 +112,7 @@ const generateFilter = async (
     isRepeatEnabled?: boolean;
   },
 ): Promise<Record<string, any>> => {
-  const { status, priority, branchId, departmentId, date, productId } = params;
+  const { status, priority, placeEntityId, date, productId } = params;
 
   let filter: Record<string, any> = {};
 
@@ -124,12 +124,10 @@ const generateFilter = async (
     filter.priority = priority;
   }
 
-  if (branchId) {
-    filter.branchIds = { $in: [branchId] };
-  }
-
-  if (departmentId) {
-    filter.departmentIds = { $in: [departmentId] };
+  if (placeEntityId) {
+    filter.placeEntityIds = {
+      $in: await getPlaceWithDescendantIds(subdomain, placeEntityId),
+    };
   }
 
   filter = applyBooleanFilters(filter, params);
@@ -163,10 +161,7 @@ export const pricingPlanQueries = {
       return docs || [];
     }
 
-    return defaultPaginate(
-      models.PricingPlans.find(filter).sort(sort),
-      params,
-    );
+    return defaultPaginate(models.PricingPlans.find(filter).sort(sort), params);
   },
 
   cpPricingPlans: async (
@@ -186,10 +181,7 @@ export const pricingPlanQueries = {
       return docs || [];
     }
 
-    return defaultPaginate(
-      models.PricingPlans.find(filter).sort(sort),
-      params,
-    );
+    return defaultPaginate(models.PricingPlans.find(filter).sort(sort), params);
   },
 
   pricingPlansCount: async (
@@ -336,8 +328,8 @@ export const pricingPlanQueries = {
     params: {
       prioritizeRule?: string;
       totalAmount: number;
-      departmentId: string;
-      branchId: string;
+      placeEntityId?: string;
+      responsibleEntityId?: string;
       pipelineId: string;
       customerType?: 'customer' | 'company' | 'user';
       customerId?: string;
@@ -356,8 +348,8 @@ export const pricingPlanQueries = {
     const {
       prioritizeRule = 'exclude',
       totalAmount,
-      departmentId,
-      branchId,
+      placeEntityId,
+      responsibleEntityId,
       products,
       pipelineId,
       customerType,
@@ -371,8 +363,8 @@ export const pricingPlanQueries = {
       subdomain,
       prioritizeRule,
       totalAmount,
-      departmentId,
-      branchId,
+      placeEntityId,
+      responsibleEntityId,
       pipelineId,
       orderItems: products || [],
       customerType,

@@ -14,7 +14,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { Time } from '@internationalized/date';
 import dayjs from 'dayjs';
-import { SelectBranches, SelectDepartments, SelectProduct } from 'ui-modules';
+import { SelectProduct, SelectStructureEntities } from 'ui-modules';
 import {
   IconCalendar,
   IconFilter,
@@ -34,8 +34,7 @@ const formatDateTime = (dateString: string) => {
 type PricingFilterState = {
   searchValue?: string | null;
   status?: string | null;
-  branchId?: string | null;
-  departmentId?: string | null;
+  placeEntityId?: string | null;
   productId?: string | null;
   priority?: string | null;
   date?: string | null;
@@ -54,8 +53,7 @@ export const PricingFilterBar = ({
   const { t } = useTranslation('loyalty');
   const {
     status,
-    branchId,
-    departmentId,
+    placeEntityId,
     productId,
     priority,
     date,
@@ -77,19 +75,11 @@ export const PricingFilterBar = ({
         <Filter.BarButton filterKey="status">{displayStatus}</Filter.BarButton>
       </Filter.BarItem>
 
-      {branchId && (
-        <SelectBranches.FilterBar
+      {placeEntityId && (
+        <SelectStructureEntities.FilterBar
           mode="single"
-          filterKey="branchId"
-          label={t('branch')}
-        />
-      )}
-
-      {departmentId && (
-        <SelectDepartments.FilterBar
-          mode="single"
-          filterKey="departmentId"
-          label={t('department')}
+          filterKey="placeEntityId"
+          label={t('location')}
         />
       )}
 
@@ -200,10 +190,9 @@ export const PricingFilterView = () => {
               <IconHierarchy size={16} />
               {t('status')}
             </Filter.Item>
-            <SelectBranches.FilterItem value="branchId" label={t('branch')} />
-            <SelectDepartments.FilterItem
-              value="departmentId"
-              label={t('department')}
+            <SelectStructureEntities.FilterItem
+              value="placeEntityId"
+              label={t('location')}
             />
             <Filter.Item value="productId">
               <IconShoppingCart size={16} />
@@ -238,8 +227,10 @@ export const PricingFilterView = () => {
           </Command.List>
         </Command>
       </Filter.View>
-      <SelectBranches.FilterView mode="single" filterKey="branchId" />
-      <SelectDepartments.FilterView mode="single" filterKey="departmentId" />
+      <SelectStructureEntities.FilterView
+        mode="single"
+        filterKey="placeEntityId"
+      />
       <SelectProduct.FilterView filterKey="productId" />
       <Filter.View filterKey="status">
         <StatusFilterContent />

@@ -6,7 +6,7 @@
 - **Project:** `loyalty_api`
 - **Layer:** `Backend API`
 - **Path:** `backend/plugins/loyalty_api`
-- **Last synchronized:** `2026-10-25`
+- **Last synchronized:** `2026-10-28`
 
 ## Scope
 
@@ -40,6 +40,8 @@
 - `loyaltyAccountTypesAdoptCampaignFields` turns the custom fields legacy campaigns write into account types in place (same field id, values recast to numbers); `loyaltyAccountTypeLegacyFieldCount` reports how many remain.
 - With purchase `items`, a campaign's total counts only items that pass its product/category/tag restrictions; discounted items are skipped only when `additionalConfig.discountCheck === true`. Without items the purchase `totalAmount` is used as is.
 - Pricing plans calculate product discounts through the loyalty pricing module and tRPC `pricing.checkPricing`.
+- A plan's place condition is `placeEntityIds` (structure nodes). `pricing.checkPricing`, `pricing.getQuantityRules` and `pricingCheckDiscount` take `placeEntityId` and `responsibleEntityId`; a plan applies when one of its nodes is either node or an ancestor of it (resolved from each node's core `order` path, `utils/place.ts`), and plans without a place apply everywhere. Among competing non-POS-base plans for a line the deepest matching node on either path wins, a plan on the root counts as no place, and plans at the same depth keep the larger discount. The `pricingPlans` `placeEntityId` filter lists plans placed at that node or below it.
+- User and broker position targeting (`userPositions`, `brokerUserPositions`) is not evaluated against structure positions: core exposes no tRPC for a user's held positions, so these conditions never match until it does.
 - Sale-side `loyalty.checkLoyalties`, `pricing.checkPricing`, and
   `loyalty.confirmLoyalties` accept fractional product quantities/counts for
   weighted POS items and deal rows; quantity-rule logic decides eligibility
@@ -54,7 +56,7 @@
 - Pricing plan updates remove persisted start and end dates when their enabled flags are disabled.
 - Pricing plan lists honor `page` and `perPage`, with deterministic `_id`
   tie-breaking after the requested or default sort field.
-- Public and base pricing plans write scoped product discount metadata to core products; public entries use `base: null`, while base entries use `base: true` and may be scoped by branch, department, and pipeline.
+- Public and base pricing plans write scoped product discount metadata to core products; public entries use `base: null`, while base entries use `base: true` and may be scoped by place node and pipeline; both write the core product discount condition `placeEntityId`.
 - Core product create and update events recalculate that product's active public and base pricing discounts, clearing stale discounts when it leaves every plan filter.
 - Voucher, coupon, lottery, spin, and agent modules provide their plugin-owned loyalty behaviors.
 - A voucher campaign may cap what one owner receives (`perOwnerLimit {count, period: campaign|year|month}`, calendar periods in the organization's time zone via `loyaltyTimeZone`). Every issue path enforces it in `modules/voucher/services/ownerLimit.ts`: `createVoucher` throws `VoucherOwnerLimitError`, `createVouchers` leaves those owners out, and the Issue voucher automation action reports them as `skipped` (all refused) or `refusedOwnerIds` (some refused). Vouchers, spins and lotteries issued from the campaign all count; a `score` voucher cannot be limited.
@@ -106,6 +108,7 @@
 
 - `erxes-api-shared` core types, utilities, and core module extension points.
 - Core service tRPC contracts for products, tags, categories, customers, companies, users, segments, and client portal users, including product discount replacement.
+- Core `structureEntities.findOne` (node `order` path) and `structureEntities.findWithDescendants` for place-node conditions.
 - Core `segment.fetchSegment` (`{ segmentId, cursor?, limit? }` → `{ ids, nextCursor? }`) and `segment.isInSegment`. The router is `segment`, not `segments`; a wrong path silently returns `defaultValue`. Segment member lists are read only through `fetchSegmentIds` (`utils/utils.ts`), which pages until `nextCursor` is empty.
 - Core featured field contracts `fields.ensureFeatured`, `fields.setFeaturedValues`, `fields.setFeaturedArchived`, `fields.adoptFeatured`, and `fields.releaseFeatured`, owned as `{ plugin: 'loyalty', module: 'accountType', refId: accountTypeId }` with keys `balance` and `tier`.
 - Automation action `inputs` resolved by the automations engine from the trigger plugin's `actionInputs`.
@@ -129,7 +132,7 @@
 - Every automation action declares a `configSchema` (`src/meta/automations/configSchemas.ts`) with exactly what its handler reads or refuses: issue voucher and award spin (campaign; owner defaults to the run's record), adjust score (`attribution`; wallet for fixed, campaign otherwise, a campaign never subtracts) and set tier (`attribution`, wallet, bands for amount mode). Write each field in the shape the builder form writes (text, not numbers or lists, where the form writes text). Change the schema with the handler; core publishes it to authors as `configJsonSchema` and enforces it when a flow goes live.
 - Users see an account type as a "wallet" (en) / "хэтэвч" (mn) inside the owner's loyalty account; user-facing errors say wallet. Code, models, GraphQL (`LoyaltyAccountType`, `accountTypeId`) keep the `accountType` name.
 - Preserve tenant isolation by using the request `subdomain` for every model and service access.
-- Base pricing synchronization must skip plans without any branch, department, or pipeline scope; queries match the supplied location fields without requiring omitted fields, then use the greatest matching base discount so overlapping plans return the cheapest final price.
+- Base pricing synchronization must skip plans without any place node or pipeline scope; queries match the supplied location fields without requiring omitted fields, then use the greatest matching base discount so overlapping plans return the cheapest final price.
 - Public, base, and POS-base pricing adjustments may be negative; base pricing may therefore return a price above the product's original unit price.
 - Loyalty never interprets another plugin's records (stages, `tickUsed`, payment types): purchases arrive as action `inputs` or `score.earn`, spending and refunds as `score.spend` / `score.refund`.
 - Score changes must keep owner score caches and score logs consistent; a purchase recalculated to zero refunds its standing entry.

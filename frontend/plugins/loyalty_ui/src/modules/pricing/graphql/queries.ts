@@ -43,8 +43,7 @@ export const PRICING_PLANS = gql`
     $perPage: Int
     $status: String
     $priority: String
-    $branchId: String
-    $departmentId: String
+    $placeEntityId: String
     $productId: String
     $date: Date
     $isQuantityEnabled: Boolean
@@ -57,8 +56,7 @@ export const PRICING_PLANS = gql`
       perPage: $perPage
       status: $status
       priority: $priority
-      branchId: $branchId
-      departmentId: $departmentId
+      placeEntityId: $placeEntityId
       productId: $productId
       date: $date
       isQuantityEnabled: $isQuantityEnabled
@@ -98,8 +96,7 @@ export const PRICING_PLANS = gql`
     pricingPlansCount(
       status: $status
       priority: $priority
-      branchId: $branchId
-      departmentId: $departmentId
+      placeEntityId: $placeEntityId
       productId: $productId
       date: $date
       isQuantityEnabled: $isQuantityEnabled
@@ -158,8 +155,7 @@ export const PRICING_PLAN_DETAIL = gql`
       isEndDateEnabled
       startDate
       endDate
-      branchIds
-      departmentIds
+      placeEntityIds
       boardId
       pipelineId
       stageId

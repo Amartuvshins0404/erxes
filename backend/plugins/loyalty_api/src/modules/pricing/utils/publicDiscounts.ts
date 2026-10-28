@@ -86,7 +86,7 @@ const mergeConditions = (...conditionList: DiscountConditions[]) =>
 const getBaseConditions = (
   conditions: DiscountConditions,
 ): DiscountConditions => {
-  return ['branchId', 'departmentId', 'pipelineId'].reduce<DiscountConditions>(
+  return ['placeEntityId', 'pipelineId'].reduce<DiscountConditions>(
     (result, key) => {
       if (conditions[key] !== undefined) {
         result[key] = conditions[key];
@@ -321,8 +321,7 @@ const calculateRuleDiscount = (
 const getPlanConditions = (plan: IPricingPlanDocument): DiscountConditions => {
   const conditions: DiscountConditions = {};
 
-  addCondition(conditions, 'branchId', plan.branchIds || []);
-  addCondition(conditions, 'departmentId', plan.departmentIds || []);
+  addCondition(conditions, 'placeEntityId', plan.placeEntityIds || []);
   addCondition(conditions, 'boardId', plan.boardId);
   addCondition(conditions, 'pipelineId', plan.pipelineId);
   addCondition(conditions, 'stageId', plan.stageId);
@@ -564,10 +563,7 @@ export const recalculatePublicPricingPlanDiscounts = async ({
   for (const plan of plans) {
     const isBase = plan.priority === PRIORITY_TYPES.PIPELINE_BASE;
 
-    if (
-      isBase &&
-      !hasValues(plan.branchIds, plan.departmentIds, plan.pipelineId)
-    ) {
+    if (isBase && !hasValues(plan.placeEntityIds, plan.pipelineId)) {
       continue;
     }
 
@@ -632,10 +628,7 @@ export const recalculateProductPricingPlanDiscounts = async ({
   for (const plan of plans) {
     const isBase = plan.priority === PRIORITY_TYPES.PIPELINE_BASE;
 
-    if (
-      isBase &&
-      !hasValues(plan.branchIds, plan.departmentIds, plan.pipelineId)
-    ) {
+    if (isBase && !hasValues(plan.placeEntityIds, plan.pipelineId)) {
       continue;
     }
 

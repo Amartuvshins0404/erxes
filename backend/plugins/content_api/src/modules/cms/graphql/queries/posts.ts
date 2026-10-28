@@ -17,13 +17,19 @@ import {
 import { CMS_POST_ACTIONS } from '~/meta/permissions';
 import { assertCmsAccessByClientPortal } from '@/cms/utils/cms-access';
 
-const applyFieldConstraint = (query: any, field: string, value: any) => {
+const applyFieldConstraint = (
+  query: Record<string, unknown>,
+  field: string,
+  value: unknown,
+) => {
   if (query[field] === undefined || query[field] === value) {
     query[field] = value;
     return;
   }
 
-  query._id = { $in: [] };
+  const conditions = Array.isArray(query.$and) ? query.$and : [];
+
+  query.$and = [...conditions, { [field]: value }];
 };
 
 const applyIdConstraint = (query: any, ids: string[]) => {

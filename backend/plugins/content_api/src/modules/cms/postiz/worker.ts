@@ -63,13 +63,7 @@ export async function runCmsDeliveries(subdomain?: string, models?: IModels) {
           action: 'find',
           input: {
             query: { _id: job.userId, isActive: true },
-            fields: {
-              _id: 1,
-              isActive: 1,
-              isOwner: 1,
-              permissionGroupIds: 1,
-              customPermissions: 1,
-            },
+            fields: { _id: 1, isActive: 1, isOwner: 1 },
           },
           defaultValue: [],
           options: { signal: AbortSignal.timeout(10000) },

@@ -1,7 +1,7 @@
 module.exports = {
   displayName: 'content-postiz',
   testEnvironment: 'node',
-  testMatch: ['<rootDir>/src/modules/cms/postiz/__tests__/*.spec.ts'],
+  testMatch: ['<rootDir>/src/modules/cms/**/__tests__/*.spec.ts'],
   modulePathIgnorePatterns: ['<rootDir>/dist/'],
   transform: {
     '^.+\\.tsx?$': [

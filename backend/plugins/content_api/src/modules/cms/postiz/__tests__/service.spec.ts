@@ -110,7 +110,11 @@ beforeEach(() => {
     assertCmsLanguageAccess,
   ])
     jest.mocked(guard).mockResolvedValue(undefined);
-  jest.mocked(requireCmsPermission).mockResolvedValue('all');
+  jest.mocked(requireCmsPermission).mockResolvedValue({
+    all: true,
+    userIds: [],
+    entityIds: [],
+  });
   jest.mocked(postizBridge).mockImplementation(async (_tenant, _user, action) =>
     action === 'channels'
       ? {

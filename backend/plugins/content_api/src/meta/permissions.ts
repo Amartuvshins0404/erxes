@@ -1,3 +1,4 @@
+import { STRUCTURE_PERMISSION_SCOPES } from 'erxes-api-shared/core-modules';
 import { IPermissionConfig } from 'erxes-api-shared/core-types';
 
 export const CMS_POST_ACTIONS = {
@@ -51,16 +52,7 @@ export const permissions: IPermissionConfig = {
       name: 'cmsPost',
       description: 'CMS news and post management',
       ownerFields: ['authorId'],
-      scopes: [
-        {
-          name: 'own',
-          description: 'Posts authored by the user',
-        },
-        {
-          name: 'all',
-          description: 'All CMS posts',
-        },
-      ],
+      scopes: STRUCTURE_PERMISSION_SCOPES,
       actions: [
         {
           title: 'Share CMS posts to Postiz',

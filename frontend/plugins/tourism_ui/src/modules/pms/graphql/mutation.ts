@@ -11,7 +11,6 @@ export const pmsBranchAdd = gql`
     $user5Ids: [String]
     $paymentIds: [String]
     $paymentTypes: [JSON]
-    $departmentId: String
     $token: String
     $erxesAppToken: String
     $permissionConfig: JSON
@@ -45,7 +44,6 @@ export const pmsBranchAdd = gql`
       user5Ids: $user5Ids
       paymentIds: $paymentIds
       paymentTypes: $paymentTypes
-      departmentId: $departmentId
       token: $token
       erxesAppToken: $erxesAppToken
       permissionConfig: $permissionConfig
@@ -82,7 +80,6 @@ export const pmsBranchAdd = gql`
       user5Ids
       paymentIds
       paymentTypes
-      departmentId
       token
       permissionConfig
       uiOptions

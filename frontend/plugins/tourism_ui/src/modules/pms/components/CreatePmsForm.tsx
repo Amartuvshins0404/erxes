@@ -68,7 +68,6 @@ const CreatePmsForm = ({
       user3Ids: [],
       user4Ids: [],
       user5Ids: [],
-      departmentId: '',
       permissionConfig: {},
       uiOptions: {},
       pipelineConfig: {},

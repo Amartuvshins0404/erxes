@@ -22,7 +22,6 @@ export interface IBranch {
   paymentTypes: string[];
   prepaid?: boolean;
   prepaidPercent?: number | null;
-  departmentId: string;
   token: string;
   erxesAppToken: string;
   permissionConfig: any;

@@ -13,7 +13,6 @@ export interface IUpdateBranchVariables {
   paymentTypes?: any[];
   prepaid?: boolean;
   prepaidPercent?: number | null;
-  departmentId?: string;
   token?: string;
   erxesAppToken?: string;
   permissionConfig?: {

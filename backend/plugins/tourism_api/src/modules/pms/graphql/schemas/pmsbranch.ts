@@ -9,7 +9,6 @@ const commonFields = `
 
   paymentIds: [String]
   paymentTypes: [JSON]
-  departmentId: String
   token: String
   erxesAppToken: String
   permissionConfig: JSON

@@ -9,7 +9,6 @@ const commonFields = `
   paymentTypes: [JSON]
   prepaid: Boolean
   prepaidPercent: Float
-  departmentId: String
   token: String
   erxesAppToken: String
   permissionConfig: JSON

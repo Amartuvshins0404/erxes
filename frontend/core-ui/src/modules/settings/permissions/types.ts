@@ -52,6 +52,8 @@ export interface IPermissionGroup {
   _id: string;
   name: string;
   description?: string;
+  plugin?: string;
+  templateId?: string;
   permissions: IPermissionGroupPermission[];
   members?: IPermissionGroupMember[];
   createdAt?: Date;

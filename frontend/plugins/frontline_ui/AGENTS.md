@@ -876,8 +876,8 @@ awaitingResponse?)` — a JSON map. `only: "byChannels"` keys by channel id,
   shown only when the conversation has a customer and the plugin is enabled;
   and the conversation Properties tab. No other relation widgets are rendered
   beside a conversation.
-- `ui-modules`: `SelectBrand`, `MembersInline`, `CustomersInline`, contacts and
-  structure selects,
+- `ui-modules`: `SelectBrand`, `MembersInline`, `CustomersInline`, contacts,
+  `SelectStructureEntities` and `StructureEntitiesInline`,
   `AutomationRemoteEntryWrapper`, `AutomationRemoteEntryTypes`,
   `AutomationActionFormProps` (which carries `trigger` and `targetType`),
   `splitAutomationNodeType`, `generateAutomationElementId`,
@@ -1073,6 +1073,7 @@ to, bouncedRecipients, retryable, canRetry }` for its delivery state;
 
 ## Local Invariants
 
+- Tickets, the ticket filter, ticket reports and conversation convert carry structure nodes as `entityIds` through `SelectStructureEntities` (`SelectStructureTicket` for ticket fields); pipelines and statuses carry `sharedEntityIds`. There are no branch or department pickers. Structure labels come from the `common` namespace's `structure-entities` keys.
 - `useIntegrationTypeColumns` returns memoized columns. A fresh `cell` function is a new component type to `flexRender`, so unstable columns remount every cell on any URL change; the bot Sheet inside the Bot cell then remounts while Radix's body `pointer-events: none` is set and records `none` as the original, locking the next page.
 - Integration create and remove stay visible until the list has caught up: the Facebook setup sheet closes only after `addIntegration` succeeds (with `awaitRefetchQueries`), and `useIntegrationRemove` puts the id in `removingIntegrationIdsAtom`, which `IntegrationRecordRow` dims and locks and `NameField` marks with a spinner until the refetch lands or the mutation fails.
 - The integration list's Bot cell resolves its page from `FacebookGetIntegrations`, not `Integrations`; every Facebook integration create or repair refetches both, or a new row shows "No single page" until reload.

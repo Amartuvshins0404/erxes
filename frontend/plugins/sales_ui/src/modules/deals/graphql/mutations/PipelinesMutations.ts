@@ -60,14 +60,11 @@ export const ADD_PIPELINE = gql(`
     $hackScoringType: String
     $templateId: String
     $isCheckDate: Boolean
-    $isCheckUser: Boolean
-    $isCheckDepartment: Boolean
-    $excludeCheckUserIds: [String]
+    $accessRule: SalesPipelineAccessRuleInput
     $numberConfig: String
     $numberSize: String
     $nameConfig: String
-    $departmentIds: [String]
-    $branchIds: [String]
+    $sharedEntityIds: [String]
     $tagId: String
     $initialCategoryIds: [String]
     $excludeCategoryIds: [String]
@@ -89,14 +86,11 @@ export const ADD_PIPELINE = gql(`
       metric: $metric
       templateId: $templateId
       isCheckDate: $isCheckDate
-      isCheckUser: $isCheckUser
-      isCheckDepartment: $isCheckDepartment
-      excludeCheckUserIds: $excludeCheckUserIds
+      accessRule: $accessRule
       numberConfig: $numberConfig
       numberSize: $numberSize
       nameConfig: $nameConfig
-      branchIds: $branchIds
-      departmentIds: $departmentIds
+      sharedEntityIds: $sharedEntityIds
       tagId: $tagId
       initialCategoryIds: $initialCategoryIds
       excludeCategoryIds: $excludeCategoryIds
@@ -126,14 +120,11 @@ export const EDIT_PIPELINE = gql(`
     $hackScoringType: String
     $templateId: String
     $isCheckDate: Boolean
-    $isCheckUser: Boolean
-    $isCheckDepartment: Boolean
-    $excludeCheckUserIds: [String]
+    $accessRule: SalesPipelineAccessRuleInput
     $numberConfig: String
     $numberSize: String
     $nameConfig: String
-    $departmentIds: [String]
-    $branchIds: [String]
+    $sharedEntityIds: [String]
     $tagId: String
     $initialCategoryIds: [String]
     $excludeCategoryIds: [String]
@@ -156,14 +147,11 @@ export const EDIT_PIPELINE = gql(`
       metric: $metric
       templateId: $templateId
       isCheckDate: $isCheckDate
-      isCheckUser: $isCheckUser
-      isCheckDepartment: $isCheckDepartment
-      excludeCheckUserIds: $excludeCheckUserIds
+      accessRule: $accessRule
       numberConfig: $numberConfig
       numberSize: $numberSize
       nameConfig: $nameConfig
-      branchIds: $branchIds
-      departmentIds: $departmentIds
+      sharedEntityIds: $sharedEntityIds
       tagId: $tagId
       initialCategoryIds: $initialCategoryIds
       excludeCategoryIds: $excludeCategoryIds

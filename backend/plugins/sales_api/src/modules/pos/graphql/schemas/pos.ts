@@ -16,9 +16,9 @@ const posCommonFields = `
   acceptCoupons: Boolean
   isOnline: Boolean
   onServer: Boolean
-  branchId: String
-  departmentId: String
-  allowBranchIds: [String]
+  placeEntityId: String
+  responsibleEntityId: String
+  allowPlaceEntityIds: [String]
   beginNumber: String
   maxSkipNumber: Int
   waitingScreen: JSON
@@ -62,8 +62,8 @@ export const types = () => `
     ${posCommonFields}
     catProdMappings: [CatProd]
 
-    branchTitle: String
-    departmentTitle: String
+    placeEntityTitle: String
+    responsibleEntityTitle: String
   }
 
   type PosSlot {

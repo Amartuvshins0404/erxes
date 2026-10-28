@@ -10,7 +10,7 @@ jest.mock('erxes-api-shared/utils', () => ({
 }));
 
 const sendMessage = jest.mocked(sendTRPCMessage);
-const pos = { branchId: 'branch', departmentId: 'department' };
+const pos = { placeEntityId: 'store', responsibleEntityId: 'sales' };
 const makeProducts = (count: number) =>
   Array.from({ length: count }, (_, index) => ({
     _id: `product-${index}`,

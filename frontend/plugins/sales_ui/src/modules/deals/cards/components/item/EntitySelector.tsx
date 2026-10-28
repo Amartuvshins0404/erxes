@@ -3,10 +3,9 @@ import {
   IconBuilding,
   IconCirclesRelation,
   IconFlag,
-  IconGitBranch,
+  IconHierarchy,
   IconTag,
   IconUser,
-  IconUsers,
 } from '@tabler/icons-react';
 
 import { Button } from 'erxes-ui';
@@ -40,19 +39,18 @@ export const EntitySelector = ({ card = {} as IDeal }: Props) => {
     companies,
     customers,
     relations,
-    departments = [],
-    branches = [],
+    entities = [],
   } = card;
 
   const { t } = useTranslation('sales');
 
   return (
     <div className="flex flex-wrap gap-1">
-      {(branches || []).length > 0 && (
+      {(entities || []).length > 0 && (
         <EntityItem
-          Icon={IconGitBranch}
-          text={t('branch')}
-          totalCount={branches?.length || 0}
+          Icon={IconHierarchy}
+          text={t('structure')}
+          totalCount={entities?.length || 0}
         />
       )}
       {companies && (
@@ -67,13 +65,6 @@ export const EntitySelector = ({ card = {} as IDeal }: Props) => {
           Icon={IconUser}
           text={t('customer')}
           totalCount={customers?.length || 0}
-        />
-      )}
-      {(departments || []).length > 0 && (
-        <EntityItem
-          Icon={IconUsers}
-          text={t('department')}
-          totalCount={departments?.length || 0}
         />
       )}
       {priority && (

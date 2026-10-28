@@ -50,6 +50,7 @@ export const GET_BOARD_DETAIL = gql(`
       _id
       name
       status
+      sharedEntityIds
       pipelines {
         _id
         name

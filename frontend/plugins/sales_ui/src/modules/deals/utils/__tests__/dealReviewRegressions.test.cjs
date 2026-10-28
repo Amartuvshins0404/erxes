@@ -118,7 +118,7 @@ const Tooltip = Object.assign(Container, {
 const { DealWidgetCard } = load(
   '../../../../widgets/relation/modules/DealWidgetCard.tsx',
   {
-    '@tabler/icons-react': { IconBuildingSkyscraper: Empty, IconMapPin: Empty },
+    '@tabler/icons-react': { IconHierarchy: Empty },
     'erxes-ui': {
       Badge: Container,
       Card: Container,
@@ -133,27 +133,24 @@ const { DealWidgetCard } = load(
     '@/deals/components/deal-selects/PriorityInline': { PriorityBadge: Empty },
   },
 );
-test('relation cards omit all-null collections and retain valid department/branch entries', () => {
+test('relation cards omit all-null structure collections and retain valid structure entries', () => {
   const deal = {
     _id: 'deal',
     name: 'Related deal',
-    departments: [null],
-    branches: [null],
+    entities: [null],
   };
   const view = render(element(DealWidgetCard, { deal }));
-  assert.equal(view.queryByText('dept'), null);
-  assert.equal(view.queryByText('branch'), null);
+  assert.equal(view.queryByText('structure'), null);
   view.rerender(
     element(DealWidgetCard, {
       deal: {
         ...deal,
-        departments: [null, { title: 'Engineering' }],
-        branches: [{ title: 'HQ' }, null],
+        entities: [null, { title: 'Engineering' }],
       },
     }),
   );
+  assert.ok(view.getByText('structure'));
   assert.ok(view.getByText('Engineering'));
-  assert.ok(view.getByText('HQ'));
 });
 
 const Form = Object.assign(Container, { Field: Empty });

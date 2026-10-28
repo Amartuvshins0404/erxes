@@ -1,10 +1,10 @@
 import {
-  AllowBranchesField,
+  AllowPlaceEntitiesField,
   AllowTypesField,
   BeginNumberField,
-  BranchField,
+  PlaceEntityField,
   BrandField,
-  DepartmentField,
+  ResponsibleEntityField,
   DescriptionField,
   FormData,
   IsOnlineField,
@@ -71,9 +71,9 @@ const DEFAULT_FORM_VALUES: FormData = {
   type: '',
   maxSkipNumber: '',
   orderPassword: '',
-  branchId: '',
-  departmentId: '',
-  allowBranchIds: [],
+  placeEntityId: '',
+  responsibleEntityId: '',
+  allowPlaceEntityIds: [],
   brandId: '',
   allowTypes: [],
   isOnline: false,
@@ -107,9 +107,11 @@ const Properties: FC<PropertiesProps> = ({
         description: posDetail.description || '',
         maxSkipNumber: posDetail.maxSkipNumber?.toString() || '',
         orderPassword: posDetail.orderPassword || '',
-        branchId: posDetail.branchId || '',
-        departmentId: posDetail.departmentId || '',
-        allowBranchIds: (posDetail.allowBranchIds ?? []).filter(isDefined),
+        placeEntityId: posDetail.placeEntityId || '',
+        responsibleEntityId: posDetail.responsibleEntityId || '',
+        allowPlaceEntityIds: (posDetail.allowPlaceEntityIds ?? []).filter(
+          isDefined,
+        ),
         brandId: posDetail.scopeBrandIds?.[0] || '',
         allowTypes: (posDetail.allowTypes ?? []).filter(isDefined),
         isOnline: posDetail.isOnline || false,
@@ -144,9 +146,9 @@ const Properties: FC<PropertiesProps> = ({
             description: data.description,
             maxSkipNumber: parseMaxSkipNumber(data.maxSkipNumber),
             orderPassword: data.orderPassword,
-            branchId: data.branchId,
-            departmentId: data.departmentId,
-            allowBranchIds: data.allowBranchIds,
+            placeEntityId: data.placeEntityId,
+            responsibleEntityId: data.responsibleEntityId,
+            allowPlaceEntityIds: data.allowPlaceEntityIds,
             scopeBrandIds: data.brandId ? [data.brandId] : [],
             allowTypes: data.allowTypes,
             isOnline: data.isOnline,
@@ -218,13 +220,13 @@ const Properties: FC<PropertiesProps> = ({
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <NameField control={control} />
                 <IsOnlineField control={control} />
-                <BranchField control={control} />
-                <DepartmentField control={control} />
+                <PlaceEntityField control={control} />
+                <ResponsibleEntityField control={control} />
               </div>
 
               {isOnline ? (
                 <>
-                  <AllowBranchesField control={control} />
+                  <AllowPlaceEntitiesField control={control} />
                   <PosDomainField control={control} />
                 </>
               ) : (

@@ -1,17 +1,23 @@
 import { gql } from '~/gql';
 
 export const ADD_BOARD = gql(`
-  mutation salesBoardsAdd($name: String!) {
-    salesBoardsAdd(name: $name) {
+  mutation salesBoardsAdd($name: String!, $sharedEntityIds: [String]) {
+    salesBoardsAdd(name: $name, sharedEntityIds: $sharedEntityIds) {
       _id
     }
   }
 `);
 
 export const EDIT_BOARD = gql(`
-  mutation salesBoardsEdit($_id: String!, $name: String!) {
-    salesBoardsEdit(_id: $_id, name: $name) {
+  mutation salesBoardsEdit(
+    $_id: String!
+    $name: String!
+    $sharedEntityIds: [String]
+  ) {
+    salesBoardsEdit(_id: $_id, name: $name, sharedEntityIds: $sharedEntityIds) {
       _id
+      name
+      sharedEntityIds
     }
   }
 `);

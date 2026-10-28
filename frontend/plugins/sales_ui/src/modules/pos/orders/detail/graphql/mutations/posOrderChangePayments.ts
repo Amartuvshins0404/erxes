@@ -39,12 +39,12 @@ export const POS_ORDER_CHANGE_PAYMENTS = gql(`
       items
       posToken
       posName
-      branchId
-      departmentId
-      subBranchId
-      branch
-      department
-      subBranch
+      placeEntityId
+      responsibleEntityId
+      subPlaceEntityId
+      placeEntity
+      responsibleEntity
+      subPlaceEntity
       syncedErkhet
       description
       isPre

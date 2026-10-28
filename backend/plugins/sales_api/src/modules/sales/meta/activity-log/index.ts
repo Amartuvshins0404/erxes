@@ -18,8 +18,7 @@ const DEAL_ACTIVITY_CONFIG: Config<ActivityLogInput> = {
     'assignedUserIds',
     'labelIds',
     'tagIds',
-    'branchIds',
-    'departmentIds',
+    'entityIds',
   ],
   commonFields: [
     ...DEAL_ACTIVITY_FIELDS.map(({ field }) => field),

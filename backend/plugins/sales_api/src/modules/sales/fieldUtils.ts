@@ -277,18 +277,11 @@ export const generateSalesFields = async (
     },
   );
 
-  const branchesOptions = await generateStructuresOptions(
-    'branchIds',
-    'Branches',
+  const structureEntitiesOptions = await generateStructuresOptions(
+    'entityIds',
+    'Structure nodes',
     'structure',
-    { queryName: 'branches' },
-  );
-
-  const departmentsOptions = await generateStructuresOptions(
-    'departmentIds',
-    'Departments',
-    'structure',
-    { queryName: 'branches' },
+    { queryName: 'structureEntities' },
   );
 
   const tagsOptions = await generateTagOptions(
@@ -309,8 +302,7 @@ export const generateSalesFields = async (
       customersPrimaryEmailOptions,
       customersPrimaryPhoneOptions,
       companiesOptions,
-      branchesOptions,
-      departmentsOptions,
+      structureEntitiesOptions,
       tagsOptions,
     ],
   ];
@@ -328,18 +320,6 @@ export const generateSalesFields = async (
         _id: Math.random(),
         name: 'createdBy.phone',
         label: 'Created by Phone',
-        type: 'String',
-      },
-      {
-        _id: Math.random(),
-        name: 'createdBy.branch',
-        label: 'Created by Branch',
-        type: 'String',
-      },
-      {
-        _id: Math.random(),
-        name: 'createdBy.department',
-        label: 'Created by Department',
         type: 'String',
       },
       {

@@ -47,7 +47,7 @@ export const POS_ORDERS_QUERY = gql(`
     ) {
       _id
       billType
-      branchId
+      placeEntityId
       cashAmount
       createdAt
       customerType

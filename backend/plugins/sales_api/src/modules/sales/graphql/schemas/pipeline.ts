@@ -11,8 +11,7 @@ export const types = `
     tag: Tag
     visibility: String!
     memberIds: [String]
-    departmentIds: [String]
-    branchIds: [String]
+    sharedEntityIds: [String]
     members: [User]
     bgColor: String
     isWatched: Boolean
@@ -26,9 +25,7 @@ export const types = `
     templateId: String
     state: String
     isCheckDate: Boolean
-    isCheckUser: Boolean
-    isCheckDepartment: Boolean
-    excludeCheckUserIds: [String]
+    accessRule: SalesPipelineAccessRule
     numberConfig: String
     numberSize: String
     nameConfig: String
@@ -50,6 +47,16 @@ export const types = `
     list: [SalesPipeline],
     pageInfo: PageInfo
     totalCount: Int,
+  }
+
+  type SalesPipelineAccessRule {
+    scope: String
+    exemptUserIds: [String]
+  }
+
+  input SalesPipelineAccessRuleInput {
+    scope: String
+    exemptUserIds: [String]
   }
 
   input SalesOrderItem {
@@ -87,14 +94,11 @@ const mutationParams = `
   hackScoringType: String,
   templateId: String,
   isCheckDate: Boolean
-  isCheckUser: Boolean
-  isCheckDepartment: Boolean
-  excludeCheckUserIds: [String],
+  accessRule: SalesPipelineAccessRuleInput,
   numberConfig: String,
   numberSize: String,
   nameConfig: String,
-  departmentIds: [String],
-  branchIds: [String],
+  sharedEntityIds: [String],
   initialCategoryIds: [String]
   excludeCategoryIds: [String]
   excludeProductIds: [String]

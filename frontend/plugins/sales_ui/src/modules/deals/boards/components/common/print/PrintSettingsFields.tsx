@@ -2,10 +2,9 @@ import { Form, Input } from 'erxes-ui';
 import type { UseFormReturn } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import {
-  SelectBranches,
   SelectBrand,
-  SelectDepartments,
   SelectDocument,
+  SelectStructureEntities,
 } from 'ui-modules';
 
 import {
@@ -13,6 +12,7 @@ import {
   DEFAULT_PAPER_SIZE,
 } from '@/deals/boards/components/common/print/constants';
 import type { PrintFormValues } from '@/deals/boards/components/common/print/types';
+import { STOCK_PLACE_CAPABILITY } from '@/constants/structure';
 
 type PrintSettingsFieldsProps = {
   form: UseFormReturn<PrintFormValues>;
@@ -86,14 +86,17 @@ export const PrintSettingsFields = ({ form }: PrintSettingsFieldsProps) => {
 
       <Form.Field
         control={form.control}
-        name="branchId"
+        name="placeEntityId"
         render={({ field }) => (
           <Form.Item>
-            <Form.Label>{t('branches')}</Form.Label>
-            <SelectBranches.FormItem
-              onValueChange={field.onChange}
+            <Form.Label>{t('place', 'Place')}</Form.Label>
+            <SelectStructureEntities.FormItem
+              onValueChange={(value) =>
+                field.onChange(typeof value === 'string' ? value : '')
+              }
               value={field.value}
               mode="single"
+              capability={STOCK_PLACE_CAPABILITY}
               className="focus-visible:relative focus-visible:z-10"
             />
             <Form.Message />
@@ -103,14 +106,16 @@ export const PrintSettingsFields = ({ form }: PrintSettingsFieldsProps) => {
 
       <Form.Field
         control={form.control}
-        name="departmentId"
+        name="responsibleEntityId"
         render={({ field }) => (
           <Form.Item>
-            <Form.Label>{t('department')}</Form.Label>
-            <SelectDepartments.FormItem
+            <Form.Label>{t('responsible', 'Responsible')}</Form.Label>
+            <SelectStructureEntities.FormItem
               mode="single"
               value={field.value}
-              onValueChange={field.onChange}
+              onValueChange={(value) =>
+                field.onChange(typeof value === 'string' ? value : '')
+              }
               className="focus-visible:relative focus-visible:z-10"
             />
             <Form.Message />

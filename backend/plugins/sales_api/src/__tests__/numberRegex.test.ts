@@ -6,6 +6,7 @@ jest.mock('erxes-api-shared/utils', () => ({
     jest.requireActual<typeof import('lodash')>('lodash').escapeRegExp,
 }));
 jest.mock('../modules/sales/graphql/resolvers/queries/deals', () => ({}));
+jest.mock('../modules/sales/utils/structureAccess', () => ({}));
 
 type PipelineNumber = { lastNum: string; type: string };
 

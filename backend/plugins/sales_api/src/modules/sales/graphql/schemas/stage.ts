@@ -27,7 +27,7 @@ export const types = `
     canMoveMemberIds: [String]
     canEditMemberIds: [String]
     members: [User]
-    departmentIds: [String]
+    sharedEntityIds: [String]
     probability: String
     status: String
     unUsedAmount: JSON
@@ -58,8 +58,7 @@ const queryParams = `
   closeDateType: String,
   assignedToMe: String,
   age: Int,
-  branchIds: [String]
-  departmentIds: [String]
+  entityIds: [String]
   segment: String
   createdStartDate: Date
   createdEndDate: Date

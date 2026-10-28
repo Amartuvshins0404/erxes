@@ -73,13 +73,8 @@ subscription salesDealListChanged($pipelineId: String!, $userId: String, $filter
         name
         colorCode
       }
-      branchIds
-      departmentIds
-      departments {
-        _id
-        title
-      }
-      branches {
+      entityIds
+      entities {
         _id
         title
       }

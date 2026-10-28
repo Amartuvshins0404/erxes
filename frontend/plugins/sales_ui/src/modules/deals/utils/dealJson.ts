@@ -42,8 +42,8 @@ export const dealProductSchema = z
       .array(z.string().nullable())
       .transform((ids) => ids.filter((id) => id !== null))
       .nullish(),
-    branchId: optionalString,
-    departmentId: optionalString,
+    placeEntityId: optionalString,
+    responsibleEntityId: optionalString,
   })
   .passthrough();
 
@@ -81,8 +81,8 @@ export const dealProductDataSchema = z
     isVatApplied: z.boolean().nullish(),
     assignUserId: optionalString,
     assignedUserId: optionalString,
-    branchId: optionalString,
-    departmentId: optionalString,
+    placeEntityId: optionalString,
+    responsibleEntityId: optionalString,
     discountInfos: z
       .array(
         z

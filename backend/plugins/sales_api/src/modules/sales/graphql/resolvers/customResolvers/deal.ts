@@ -25,29 +25,10 @@ export default {
     return await loaders.deal.companiesByDealId.load(deal._id);
   },
 
-  async branches(
-    deal: IDealDocument,
-    _args: undefined,
-    { subdomain }: IContext,
-  ) {
-    if (!deal.branchIds?.length) {
-      return [];
-    }
-
-    return deal.branchIds.map((branchId) => ({
-      __typename: 'Branch',
-      _id: branchId,
-    }));
-  },
-
-  async departments(deal: IDealDocument) {
-    if (!deal.departmentIds?.length) {
-      return [];
-    }
-
-    return deal.departmentIds.map((departmentId) => ({
-      __typename: 'Department',
-      _id: departmentId,
+  entities(deal: IDealDocument) {
+    return (deal.entityIds || []).map((_id) => ({
+      __typename: 'StructureEntity',
+      _id,
     }));
   },
 

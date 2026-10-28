@@ -250,7 +250,7 @@
   deletion when that optional plugin is enabled; failed/unconfirmed reads
   block deletion. Loyalty `score.refund` reverses cancelled POS order points.
 - Core public contracts for fields, products, customers, companies, users,
-  branches, departments, and related records.
+  structure entities, and related records.
 - Public `erxes-api-shared` utilities, types, and extension points.
 - `erxes-api-shared/core-modules` `sendNotification` with `event`
   (`TSalesNotificationEvent`) for deal notifications; core sends email and
@@ -376,7 +376,7 @@
 - Default missing product-row currencies before calculating deal totals; read
   Core `configs.getConfig` with the current tenant's `subdomain`.
 - Catalog pricing batches preserve `prioritizeRule: 'only'`, `totalAmount: 0`,
-  quantity 1, and the request's tenant, branch, and department. Failed pricing
+  quantity 1, and the request's tenant, place, and responsible node. Failed pricing
   calls abort sync instead of returning a partially discounted catalog.
 - Catalog pricing may have at most eight requests in flight; never launch all
   catalog batches at once. Product-group sync opts into `throwOnError` when
@@ -490,7 +490,10 @@
 - Core `fields.find` over tRPC for `sales:deal` property validation.
 - `erxes-api-shared` core types, utilities, and core module extension points.
 - Public platform contracts for products, customers, companies, users,
-  branches, departments, and related records.
+  structure entities, and related records.
+- Core `structureEntities.find`/`findOne`/`findWithDescendants`,
+  `permissions.resolveScope`, and the shared `getSharedWithFilter` /
+  `getContainerScopeFilter` helpers for structure-based access.
 - Loyalty tRPC `score.spend` / `score.earn` / `score.refund` with
   loyalty-owned inputs; sales never sends whole deals or orders to loyalty.
 - Mongolian `mnConfigs` values for `EBARIMT` and POS-specific
@@ -521,10 +524,26 @@
 - Preserve tenant isolation by using the request `subdomain` for every model,
   service, resolver, worker, and route access.
 - Pipeline stage updates and property selections remain one pipeline mutation.
-- Checked pipeline deal queries preserve master branch department-user
-  visibility and compose with existing filters through `$and`.
-- Do not fetch department visibility data when the pipeline has no
-  `departmentIds`.
+- Deals belong to structure nodes through `entityIds`, registered as the
+  `deals` record scope (`entityField`); new deals default to the creator's
+  primary node. Deal edits keep stored nodes the editor cannot see.
+- Boards, pipelines, and stages narrow access through `sharedEntityIds`
+  (shared node and everything below; empty means everyone). Creators and
+  members keep access; a private container needs members or shared nodes.
+  Pipelines also require their board to be visible.
+- A pipeline `accessRule` (`scope` `self` or `entity`, `exemptUserIds`)
+  narrows its deals through the shared container scope filter and composes
+  with other deal filters through `$and`.
+- Deal entity filters include descendants of the selected nodes.
+- Deal product rows store `placeEntityId`/`responsibleEntityId`. POS
+  documents store `placeEntityId`, `responsibleEntityId`, and
+  `allowPlaceEntityIds`; posclient orders carry `placeEntityId`,
+  `subPlaceEntityId`, and `responsibleEntityId`, and `cardsConfig` entries
+  match orders by `placeEntityId`. No fallback reads the removed branch or
+  department keys.
+- Loyalty `checkPricing` receives `placeEntityId`/`responsibleEntityId`; a
+  deal sends its first `entityIds` node as both. Deal `entityIds` are never
+  filled from product-row places.
 - `excludeLoyaltyAmount` must calculate from the deal total minus
   score-campaign payment amounts, so missing or empty `paymentsData` returns
   the full total amount.

@@ -35,9 +35,9 @@ export interface IPos {
   acceptCoupons?: boolean;
   isOnline?: boolean;
   onServer?: boolean;
-  branchId?: string;
-  departmentId?: string;
-  allowBranchIds?: string[];
+  placeEntityId?: string;
+  responsibleEntityId?: string;
+  allowPlaceEntityIds?: string[];
   beginNumber?: string;
   maxSkipNumber?: number;
   waitingScreen?: any;

@@ -3,12 +3,8 @@ export const TypeExtensions = `
     _id: String @external
   }
 
-  extend type Branch @key(fields: "_id") {
-    _id: String @external
-  }
-
-  extend type Department @key(fields: "_id") {
-    _id: String @external
+  extend type StructureEntity @key(fields: "_id") {
+    _id: String! @external
   }
 
   extend type Company @key(fields: "_id") {

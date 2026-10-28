@@ -3,6 +3,7 @@ import { watchItem } from '../modules/sales/utils';
 
 jest.mock('erxes-api-shared/utils', () => ({}));
 jest.mock('../modules/sales/graphql/resolvers/queries/deals', () => ({}));
+jest.mock('../modules/sales/utils/structureAccess', () => ({}));
 
 type WatchedRecord = { _id: string; watchedUserIds?: string[] | null };
 type WatchFilter = { _id: string; watchedUserIds?: null };

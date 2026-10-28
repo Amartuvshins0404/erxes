@@ -4,7 +4,7 @@ const posAdd = gql(`
   mutation PosAdd(
     $name: String
     $description: String
-    $branchId: String
+    $placeEntityId: String
     $paymentIds: [String]
     $adminIds: [String]
     $cashierIds: [String]
@@ -13,7 +13,7 @@ const posAdd = gql(`
     posAdd(
       name: $name
       description: $description
-      branchId: $branchId
+      placeEntityId: $placeEntityId
       paymentIds: $paymentIds
       adminIds: $adminIds
       cashierIds: $cashierIds
@@ -44,9 +44,9 @@ const posEdit = gql(`
     $acceptCoupons: Boolean
     $isOnline: Boolean
     $onServer: Boolean
-    $branchId: String
-    $departmentId: String
-    $allowBranchIds: [String]
+    $placeEntityId: String
+    $responsibleEntityId: String
+    $allowPlaceEntityIds: [String]
     $beginNumber: String
     $maxSkipNumber: Int
     $kitchenScreen: JSON
@@ -87,9 +87,9 @@ const posEdit = gql(`
       acceptCoupons: $acceptCoupons
       isOnline: $isOnline
       onServer: $onServer
-      branchId: $branchId
-      departmentId: $departmentId
-      allowBranchIds: $allowBranchIds
+      placeEntityId: $placeEntityId
+      responsibleEntityId: $responsibleEntityId
+      allowPlaceEntityIds: $allowPlaceEntityIds
       beginNumber: $beginNumber
       maxSkipNumber: $maxSkipNumber
       kitchenScreen: $kitchenScreen
@@ -137,9 +137,9 @@ const posEdit = gql(`
       }
       isOnline
       onServer
-      branchId
-      departmentId
-      allowBranchIds
+      placeEntityId
+      responsibleEntityId
+      allowPlaceEntityIds
       beginNumber
       maxSkipNumber
       waitingScreen
@@ -166,8 +166,8 @@ const posEdit = gql(`
       checkExcludeCategoryIds
       saveRemainder
       banFractions
-      branchTitle
-      departmentTitle
+      placeEntityTitle
+      responsibleEntityTitle
     }
   }
 `);

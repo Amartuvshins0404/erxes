@@ -1,3 +1,7 @@
+import {
+  PERMISSION_SCOPES,
+  STRUCTURE_PERMISSION_SCOPES,
+} from 'erxes-api-shared/core-modules';
 import { IPermissionConfig } from 'erxes-api-shared/core-types';
 
 export const permissions: IPermissionConfig = {
@@ -9,11 +13,9 @@ export const permissions: IPermissionConfig = {
       description: 'Deals management',
       scopeField: null,
       ownerFields: ['userId', 'assignedUserIds'],
-      scopes: [
-        { name: 'own', description: 'Deals created by or assigned to user' },
-        { name: 'group', description: 'Deals in user departments' },
-        { name: 'all', description: 'All deals' },
-      ],
+      scopeCollections: ['deals'],
+      entityField: 'entityIds',
+      scopes: STRUCTURE_PERMISSION_SCOPES,
       actions: [
         {
           title: 'View deals',
@@ -283,7 +285,7 @@ export const permissions: IPermissionConfig = {
             'dealsWatch',
             'dealsArchive',
           ],
-          scope: 'all',
+          scope: PERMISSION_SCOPES.ENTITY,
         },
         {
           plugin: 'sales',
@@ -372,7 +374,7 @@ export const permissions: IPermissionConfig = {
             'dealsWatch',
             'dealsArchive',
           ],
-          scope: 'group',
+          scope: PERMISSION_SCOPES.ENTITY,
         },
         {
           plugin: 'sales',
@@ -403,7 +405,7 @@ export const permissions: IPermissionConfig = {
           plugin: 'sales',
           module: 'deal',
           actions: ['showDeals'],
-          scope: 'group',
+          scope: PERMISSION_SCOPES.ENTITY,
         },
         {
           plugin: 'sales',

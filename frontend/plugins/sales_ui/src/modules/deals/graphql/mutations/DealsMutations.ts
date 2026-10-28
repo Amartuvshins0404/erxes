@@ -29,8 +29,7 @@ export const ADD_DEALS = gql(`
     $priority: String
     $propertiesData: JSON
     $tagIds: [String]
-    $branchIds: [String]
-    $departmentIds: [String]
+    $entityIds: [String]
   ) {
     dealsAdd(
       name: $name
@@ -60,8 +59,7 @@ export const ADD_DEALS = gql(`
       priority: $priority
       propertiesData: $propertiesData
       tagIds: $tagIds
-      branchIds: $branchIds
-      departmentIds: $departmentIds
+      entityIds: $entityIds
     ) {
       _id
       name
@@ -96,8 +94,7 @@ export const EDIT_DEALS = gql(`
     $priority: String
     $propertiesData: JSON
     $tagIds: [String]
-    $branchIds: [String]
-    $departmentIds: [String]
+    $entityIds: [String]
     $customerId: String
     $companyId: String
   ) {
@@ -127,8 +124,7 @@ export const EDIT_DEALS = gql(`
       priority: $priority
       propertiesData: $propertiesData
       tagIds: $tagIds
-      branchIds: $branchIds
-      departmentIds: $departmentIds
+      entityIds: $entityIds
       customerId: $customerId
       companyId: $companyId
     ) {
@@ -226,8 +222,7 @@ export const EDIT_DEALS = gql(`
       }
       number
       customProperties
-      branchIds
-      departmentIds
+      entityIds
       products {
         _id
         name
@@ -363,8 +358,7 @@ export const DEALS_CHANGE = gql(`
       }
       number
       customProperties
-      branchIds
-      departmentIds
+      entityIds
       products {
         _id
         name
@@ -496,8 +490,7 @@ export const DEALS_COPY = gql(`
       }
       number
       customProperties
-      branchIds
-      departmentIds
+      entityIds
       products {
         _id
         name

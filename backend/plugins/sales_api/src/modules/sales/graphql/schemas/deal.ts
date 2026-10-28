@@ -53,8 +53,7 @@ const queryParams = `
   status: String
   tagIds: [String]
   number: String
-  branchIds: [String]
-  departmentIds: [String]
+  entityIds: [String]
   boardIds: [String]
   stageCodes: [String]
   dateRangeFilters:JSON,
@@ -85,10 +84,8 @@ export const types = `
     createdAt: Date
     hasNotified: Boolean
     assignedUserIds: [String]
-    branchIds: [String]
-    departmentIds:[String]
-    branches: [Branch]
-    departments: [Department]
+    entityIds: [String]
+    entities: [StructureEntity]
     labelIds: [String]
     startDate: Date
     closeDate: Date
@@ -222,8 +219,7 @@ const mutationParams = `
   status: String,
   propertiesData: JSON,
   tagIds: [String],
-  branchIds: [String],
-  departmentIds: [String],
+  entityIds: [String],
 
   paymentsData: JSON,
   mobileAmount: Float,

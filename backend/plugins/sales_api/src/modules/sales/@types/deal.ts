@@ -39,8 +39,8 @@ export interface IProductData {
   tickUsed?: boolean;
   isVatApplied?: boolean;
   assignUserId?: string;
-  branchId?: string;
-  departmentId?: string;
+  placeEntityId?: string;
+  responsibleEntityId?: string;
   startDate?: Date;
   endDate?: Date;
   parentId?: string;
@@ -95,8 +95,7 @@ export interface IDeal {
   number?: string;
   data?: any;
   tagIds?: string[];
-  branchIds?: string[];
-  departmentIds?: string[];
+  entityIds?: string[];
   parentId?: string;
 
   productsData?: IProductData[];

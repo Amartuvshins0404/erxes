@@ -55,7 +55,6 @@ export const posCovers = gql(`
 
         onboardedPlugins
         groupIds
-        permissionGroupIds
 
         isSubscribed
         isShowNotification
@@ -64,11 +63,7 @@ export const posCovers = gql(`
         configs
         configsConstants
 
-        departmentIds
         brandIds
-        branchIds
-
-        positionIds
 
         score
         leaderBoardPosition

@@ -1,5 +1,26 @@
 import { sendTRPCMessage } from 'erxes-api-shared/utils';
+import { IStructureEntity } from 'erxes-api-shared/core-types';
 import { IContext } from '~/connectionResolvers';
+
+const getStructureEntityTitle = async (
+  subdomain: string,
+  entityId?: string,
+): Promise<string> => {
+  if (!entityId) {
+    return '';
+  }
+
+  const entity: IStructureEntity | null = await sendTRPCMessage({
+    subdomain,
+    pluginName: 'core',
+    module: 'structureEntities',
+    action: 'findOne',
+    input: { query: { _id: entityId } },
+    defaultValue: null,
+  });
+
+  return entity?.title || '';
+};
 
 const resolvers = {
   user: async (pos, _, { subdomain }: IContext) => {
@@ -15,37 +36,11 @@ const resolvers = {
     });
   },
 
-  branchTitle: async (pos, _, { subdomain }: IContext) => {
-    if (!pos.branchId) {
-      return '';
-    }
+  placeEntityTitle: (pos, _, { subdomain }: IContext) =>
+    getStructureEntityTitle(subdomain, pos.placeEntityId),
 
-    const branch = await sendTRPCMessage({
-      subdomain,
-      pluginName: 'core',
-      module: 'branches',
-      action: 'findOne',
-      input: { _id: pos.branchId },
-    });
-
-    return branch?.title || '';
-  },
-
-  departmentTitle: async (pos, _, { subdomain }: IContext) => {
-    if (!pos.departmentId) {
-      return '';
-    }
-
-    const department = await sendTRPCMessage({
-      subdomain,
-      pluginName: 'core',
-      module: 'departments',
-      action: 'findOne',
-      input: { _id: pos.departmentId },
-    });
-
-    return department?.title || '';
-  },
+  responsibleEntityTitle: (pos, _, { subdomain }: IContext) =>
+    getStructureEntityTitle(subdomain, pos.responsibleEntityId),
 };
 
 export default resolvers;

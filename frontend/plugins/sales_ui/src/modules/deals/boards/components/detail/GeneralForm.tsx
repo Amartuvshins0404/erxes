@@ -1,12 +1,13 @@
 import { Combobox, Form, Input, Popover, Select } from 'erxes-ui';
 import {
   SelectBoard,
-  SelectBranches,
-  SelectDepartments,
   SelectMember,
+  SelectStructureEntities,
   SelectTags,
 } from 'ui-modules';
 import { useRef, useState } from 'react';
+import type { UseFormReturn } from 'react-hook-form';
+import type { TPipelineForm } from '@/deals/types/pipelines';
 
 import PipelineConfig from '@/deals/pipelines/components/PipelineConfig';
 
@@ -17,7 +18,7 @@ const VISIBILITY_TYPES = [
   { value: 'private', label: 'private' },
 ];
 
-const GeneralForm = ({ form }: { form: any }) => {
+const GeneralForm = ({ form }: { form: UseFormReturn<TPipelineForm> }) => {
   const { control, watch } = form;
 
   const [open, setOpen] = useState(false);
@@ -118,27 +119,17 @@ const GeneralForm = ({ form }: { form: any }) => {
 
         <Form.Field
           control={control}
-          name="branchIds"
+          name="sharedEntityIds"
           render={({ field }) => (
-            <Form.Item>
-              <Form.Label>{t('branches')}</Form.Label>
-              <SelectBranches.FormItem
-                onValueChange={field.onChange}
-                value={field.value}
-                mode="multiple"
-                className="focus-visible:relative focus-visible:z-10"
-              />
-            </Form.Item>
-          )}
-        />
-        <Form.Field
-          control={control}
-          name="departmentIds"
-          render={({ field }) => (
-            <Form.Item>
-              <Form.Label>{t('departments')}</Form.Label>
-              <SelectDepartments.FormItem
-                onValueChange={field.onChange}
+            <Form.Item className="col-span-2">
+              <Form.Label>{t('shared-with')}</Form.Label>
+              <Form.Description>
+                {t('pipeline-shared-with-description')}
+              </Form.Description>
+              <SelectStructureEntities.FormItem
+                onValueChange={(value) =>
+                  field.onChange(Array.isArray(value) ? value : [])
+                }
                 value={field.value}
                 mode="multiple"
                 className="focus-visible:relative focus-visible:z-10"

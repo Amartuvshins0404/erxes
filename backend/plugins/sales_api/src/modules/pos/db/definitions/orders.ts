@@ -133,9 +133,9 @@ export const posOrderSchema = schemaWrapper(
     userId: { type: String, label: 'Created user' },
 
     items: { type: [posOrderItemSchema], label: 'items' },
-    branchId: { type: String, label: 'Branch' },
-    departmentId: { type: String, label: 'Department' },
-    subBranchId: { type: String, label: 'Sub Branch' },
+    placeEntityId: { type: String, label: 'Place' },
+    responsibleEntityId: { type: String, label: 'Responsible structure node' },
+    subPlaceEntityId: { type: String, label: 'Sub place' },
     posToken: { type: String, optional: true, label: 'Token' },
     posId: { type: String, optional: true, label: 'POS' },
 

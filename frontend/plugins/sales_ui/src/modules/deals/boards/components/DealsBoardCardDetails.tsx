@@ -1,7 +1,6 @@
 import {
   IconBuilding,
-  IconBuildingSkyscraper,
-  IconGitBranch,
+  IconHierarchy,
   IconPackage,
   IconUsers,
 } from '@tabler/icons-react';
@@ -31,7 +30,7 @@ type DealCardProductsProps = {
 
 type DealCardRelationDetailsProps = {
   items: DealCardRelationItem[];
-  type: 'customer' | 'company' | 'department' | 'branch';
+  type: 'customer' | 'company' | 'entity';
 };
 
 const MAX_VISIBLE_PRODUCTS = 3;
@@ -40,8 +39,7 @@ const MAX_VISIBLE_AVATARS = 3;
 const RELATION_ICONS = {
   customer: IconUsers,
   company: IconBuilding,
-  department: IconBuildingSkyscraper,
-  branch: IconGitBranch,
+  entity: IconHierarchy,
 };
 
 const formatAmount = (value: number, currency?: string) => {

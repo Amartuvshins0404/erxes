@@ -39,9 +39,9 @@ const posList = gql(`
       }
       isOnline
       onServer
-      branchId
-      departmentId
-      allowBranchIds
+      placeEntityId
+      responsibleEntityId
+      allowPlaceEntityIds
       beginNumber
       maxSkipNumber
       waitingScreen
@@ -68,8 +68,8 @@ const posList = gql(`
       checkExcludeCategoryIds
       saveRemainder
       banFractions
-      branchTitle
-      departmentTitle
+      placeEntityTitle
+      responsibleEntityTitle
     }
   }
 `);
@@ -127,9 +127,9 @@ const posDetail = gql(`
       }
       isOnline
       onServer
-      branchId
-      departmentId
-      allowBranchIds
+      placeEntityId
+      responsibleEntityId
+      allowPlaceEntityIds
       beginNumber
       maxSkipNumber
       waitingScreen
@@ -156,8 +156,8 @@ const posDetail = gql(`
       checkExcludeCategoryIds
       saveRemainder
       banFractions
-      branchTitle
-      departmentTitle
+      placeEntityTitle
+      responsibleEntityTitle
       productDetails
     }
   }

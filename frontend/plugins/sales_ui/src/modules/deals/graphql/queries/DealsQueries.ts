@@ -27,8 +27,7 @@ export const GET_DEALS_SEARCH_DROPDOWN = gql(`
     $tagIds: [String]
     $noSkipArchive: Boolean
     $status: String
-    $branchIds: [String]
-    $departmentIds: [String]
+    $entityIds: [String]
     $createdStartDate: Date
     $createdEndDate: Date
     $stageChangedStartDate: Date
@@ -64,8 +63,7 @@ export const GET_DEALS_SEARCH_DROPDOWN = gql(`
       tagIds: $tagIds
       noSkipArchive: $noSkipArchive
       status: $status
-      branchIds: $branchIds
-      departmentIds: $departmentIds
+      entityIds: $entityIds
       createdStartDate: $createdStartDate
       createdEndDate: $createdEndDate
       stageChangedStartDate: $stageChangedStartDate
@@ -129,8 +127,7 @@ export const GET_DEALS = gql(`
     $tagIds: [String]
     $noSkipArchive: Boolean
     $status: String
-    $branchIds: [String]
-    $departmentIds: [String]
+    $entityIds: [String]
     $createdStartDate: Date
     $createdEndDate: Date
     $stageChangedStartDate: Date
@@ -169,8 +166,7 @@ export const GET_DEALS = gql(`
       tagIds: $tagIds
       noSkipArchive: $noSkipArchive
       status: $status
-      branchIds: $branchIds
-      departmentIds: $departmentIds
+      entityIds: $entityIds
       createdStartDate: $createdStartDate
       createdEndDate: $createdEndDate
       stageChangedStartDate: $stageChangedStartDate
@@ -249,13 +245,8 @@ export const GET_DEALS = gql(`
           name
           colorCode
         }
-        branchIds
-        departmentIds
-        departments {
-          _id
-          title
-        }
-        branches {
+        entityIds
+        entities {
           _id
           title
         }
@@ -342,8 +333,7 @@ export const GET_DEAL_DETAIL = gql(`
         name
         colorCode
       }
-      branchIds
-      departmentIds
+      entityIds
       description
       extraData
       attachments {
@@ -353,16 +343,10 @@ export const GET_DEAL_DETAIL = gql(`
         size
         type
       }
-      departments {
+      entities {
         _id
         title
       }
-      departmentIds
-      branches {
-        _id
-        title
-      }
-      branchIds
       companies {
         _id
         primaryName

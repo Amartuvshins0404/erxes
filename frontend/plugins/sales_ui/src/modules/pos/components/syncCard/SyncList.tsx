@@ -47,7 +47,7 @@ export const SyncList: React.FC<SyncListProps> = ({
         <div className="space-y-2">
           {fields.map((field, index) => (
             <div
-              key={field.id || `${field.branchId}_${index}`}
+              key={field.id || `${field.placeEntityId}_${index}`}
               className="flex justify-between items-center p-4 rounded-lg border"
             >
               <div>

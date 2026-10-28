@@ -15,6 +15,7 @@ import {
   getTotalAmounts,
 } from '~/modules/sales/utils';
 import { sendNotifications } from '~/modules/sales/utils/notifications';
+import { keepHiddenEntityIds } from '~/modules/sales/utils/structureAccess';
 import {
   changeItemStatus,
   checkAssignedUserFromPData,
@@ -169,6 +170,15 @@ export const editDeal = async ({
   await assertDealUpdatesAllowed(models, [oldDeal], doc, {
     allowRestore: true,
   });
+
+  if (doc.entityIds) {
+    doc.entityIds = await keepHiddenEntityIds(
+      subdomain,
+      user._id,
+      oldDeal.entityIds || [],
+      doc.entityIds,
+    );
+  }
 
   if (doc.assignedUserIds) {
     const { removedUserIds } = checkUserIds(

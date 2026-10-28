@@ -332,6 +332,8 @@ const DEAL_ASSIGNMENT_TYPES = [
   'deal.branch_unassigned',
   'deal.department_assigned',
   'deal.department_unassigned',
+  'deal.structure_entity_assigned',
+  'deal.structure_entity_unassigned',
 ];
 
 export const dealCustomActivities: ActivityLogCustomActivity[] = [

@@ -255,7 +255,8 @@ const buildPosOrderInput = ({
     type: getString(config, 'type') || 'take',
     customerId,
     customerType,
-    branchId: getString(config, 'branchId') || pos.branchId || '',
+    placeEntityId:
+      getString(config, 'placeEntityId') || pos.placeEntityId || '',
     posToken: pos.token,
     description: getString(config, 'description'),
     origin: getString(config, 'origin') || 'automation',

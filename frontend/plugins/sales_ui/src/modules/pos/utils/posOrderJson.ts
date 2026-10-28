@@ -70,8 +70,8 @@ export const preserveUntypedPosPayments = (
   ...(original ?? []).filter(({ type }) => !type),
 ];
 
-const locationSchema = z
-  .object({ order: text, title: text })
+const structureEntitySchema = z
+  .object({ code: text, title: text })
   .passthrough()
   .nullish();
 const putResponsesSchema = z.array(
@@ -94,8 +94,8 @@ export const toPosItemRow = (
 ) => ({
   ...order,
   items: posOrderItemSchema.nullish().parse(order.items),
-  branch: locationSchema.parse(order.branch),
-  department: locationSchema.parse(order.department),
+  placeEntity: structureEntitySchema.parse(order.placeEntity),
+  responsibleEntity: structureEntitySchema.parse(order.responsibleEntity),
   paidAmounts: parsePosPaidAmounts(order.paidAmounts),
 });
 

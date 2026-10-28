@@ -68,14 +68,7 @@ const normalizeCustomProperty = (
 
 const CardDetails = ({ deal }: { deal: IDeal }) => {
   const { t } = useTranslation('sales');
-  const {
-    branches,
-    companies,
-    customers,
-    departments,
-    tags,
-    customProperties,
-  } = deal;
+  const { entities, companies, customers, tags, customProperties } = deal;
   const propertiesData = isRecord(deal.propertiesData)
     ? deal.propertiesData
     : {};
@@ -151,19 +144,12 @@ const CardDetails = ({ deal }: { deal: IDeal }) => {
         company.primaryPhone ||
         t('unknown'),
     }));
-  const departmentItems = (departments || [])
+  const entityItems = (entities || [])
     .filter(isDefined)
     .filter((item) => item._id !== null)
-    .map((department) => ({
-      _id: department._id || '',
-      name: department.title || t('unknown'),
-    }));
-  const branchItems = (branches || [])
-    .filter(isDefined)
-    .filter((item) => item._id !== null)
-    .map((branch) => ({
-      _id: branch._id || '',
-      name: branch.title || t('unknown'),
+    .map((entity) => ({
+      _id: entity._id || '',
+      name: entity.title || t('unknown'),
     }));
   const customPropertyItems = Array.isArray(customProperties)
     ? customProperties
@@ -174,10 +160,9 @@ const CardDetails = ({ deal }: { deal: IDeal }) => {
   if (
     parsedProducts.success &&
     !hasProducts &&
-    !branches?.length &&
     !companies?.length &&
     !customers?.length &&
-    !departments?.length &&
+    !entities?.length &&
     !tags?.length &&
     !customPropertyItems.length &&
     !cardPropertyItems.length
@@ -205,8 +190,7 @@ const CardDetails = ({ deal }: { deal: IDeal }) => {
       />
       <DealCardRelationDetails items={customerItems} type="customer" />
       <DealCardRelationDetails items={companyItems} type="company" />
-      <DealCardRelationDetails items={departmentItems} type="department" />
-      <DealCardRelationDetails items={branchItems} type="branch" />
+      <DealCardRelationDetails items={entityItems} type="entity" />
       {Boolean(
         tags?.length || customPropertyItems.length || cardPropertyItems.length,
       ) && (

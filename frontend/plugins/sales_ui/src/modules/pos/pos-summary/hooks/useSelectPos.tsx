@@ -37,8 +37,8 @@ export const usePosByIds = (
               avatar
             }
           }
-          branchTitle
-          departmentTitle
+          placeEntityTitle
+          responsibleEntityTitle
           isOnline
           onServer
         }

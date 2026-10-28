@@ -43,7 +43,6 @@ export const POS_COVER_DETAIL_QUERY = gql(`
 
         onboardedPlugins
         groupIds
-        permissionGroupIds
 
         isSubscribed
         isShowNotification
@@ -52,12 +51,7 @@ export const POS_COVER_DETAIL_QUERY = gql(`
         configs
         configsConstants
 
-        departmentIds
         brandIds
-
-        branchIds
-
-        positionIds
 
         score
         leaderBoardPosition

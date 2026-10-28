@@ -19,8 +19,7 @@ export const GET_STAGES = gql(`
     $extraParams: JSON
     $closeDateType: String
     $assignedToMe: String
-    $branchIds: [String]
-    $departmentIds: [String]
+    $entityIds: [String]
     $segment: String
     $createdStartDate: Date
     $createdEndDate: Date
@@ -43,8 +42,7 @@ export const GET_STAGES = gql(`
       extraParams: $extraParams
       closeDateType: $closeDateType
       assignedToMe: $assignedToMe
-      branchIds: $branchIds
-      departmentIds: $departmentIds
+      entityIds: $entityIds
       segment: $segment
       createdStartDate: $createdStartDate
       createdEndDate: $createdEndDate
@@ -72,7 +70,7 @@ export const GET_STAGES = gql(`
       canMoveMemberIds
       canEditMemberIds
       memberIds
-      departmentIds
+      sharedEntityIds
     }
   }
 `);
@@ -90,8 +88,7 @@ export const GET_CONVERSION_STAGES = gql(`
     $extraParams: JSON
     $closeDateType: String
     $assignedToMe: String
-    $branchIds: [String]
-    $departmentIds: [String]
+    $entityIds: [String]
     $segment: String
     $createdStartDate: Date
     $createdEndDate: Date
@@ -114,8 +111,7 @@ export const GET_CONVERSION_STAGES = gql(`
       extraParams: $extraParams
       closeDateType: $closeDateType
       assignedToMe: $assignedToMe
-      branchIds: $branchIds
-      departmentIds: $departmentIds
+      entityIds: $entityIds
       segment: $segment
       createdStartDate: $createdStartDate
       createdEndDate: $createdEndDate
@@ -143,7 +139,7 @@ export const GET_CONVERSION_STAGES = gql(`
       canMoveMemberIds
       canEditMemberIds
       memberIds
-      departmentIds
+      sharedEntityIds
       compareNextStage
       initialDealsTotalCount
       stayedDealsTotalCount
@@ -172,7 +168,7 @@ export const GET_STAGE_DETAIL = gql(`
       canMoveMemberIds
       canEditMemberIds
       memberIds
-      departmentIds
+      sharedEntityIds
     }
   }
 `);

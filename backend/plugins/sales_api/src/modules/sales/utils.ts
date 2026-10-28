@@ -23,6 +23,7 @@ import {
 } from '@/sales/@types';
 import { CLOSE_DATE_TYPES, SALES_STATUSES } from '@/sales/constants';
 import { generateFilter } from '@/sales/graphql/resolvers/queries/deals';
+import { getPipelineDealFilter } from '@/sales/utils/structureAccess';
 
 export const getCreatedAtSearchFilter = (
   search: string,
@@ -447,78 +448,16 @@ export const archivedItemsCount = async (
 export const checkItemPermByUser = async (
   models: IModels,
   subdomain: string,
-  user: any,
-  deal: IDeal,
+  user: IUserDocument,
+  deal: IDealDocument,
 ) => {
   const stage = await models.Stages.getStage(deal.stageId);
+  const { accessRule } = await models.Pipelines.getPipeline(stage.pipelineId);
+  const filter = await getPipelineDealFilter(subdomain, user, { accessRule });
 
-  const {
-    visibility,
-    memberIds,
-    departmentIds = [],
-    branchIds = [],
-    isCheckUser,
-    excludeCheckUserIds,
-  } = await models.Pipelines.getPipeline(stage.pipelineId);
-
-  const supervisorDepartments = await sendTRPCMessage({
-    subdomain,
-
-    pluginName: 'core',
-    method: 'query',
-    module: 'departments',
-    action: 'findWithChild',
-    input: {
-      query: {
-        supervisorId: user?._id,
-      },
-      fields: {
-        _id: 1,
-      },
-    },
-    defaultValue: [],
-  });
-
-  const supervisorDepartmentIds =
-    supervisorDepartments?.map((x) => x._id) || [];
-  const userDepartmentIds = user.departmentIds || [];
-  const userBranchIds = user?.branchIds || [];
-
-  // check permission on department
-  const hasUserInDepartment = compareDepartmentIds(departmentIds, [
-    ...userDepartmentIds,
-    ...supervisorDepartmentIds,
-  ]);
-  const isUserInBranch = compareDepartmentIds(branchIds, userBranchIds);
-
-  // if (
-  //   visibility === 'private' &&
-  //   !(memberIds || []).includes(user._id) &&
-  //   !hasUserInDepartment &&
-  //   !isUserInBranch &&
-  //   user?.role !== USER_ROLES.SYSTEM
-  // ) {
-  //   throw new Error('You do not have permission to view.');
-  // }
-
-  const isSuperVisorInDepartment = compareDepartmentIds(
-    departmentIds,
-    supervisorDepartmentIds,
-  );
-  if (isSuperVisorInDepartment) {
-    return deal;
-  }
-
-  // pipeline is Show only the users assigned(created) cards checked
-  // and current user nothing dominant users
-  // current user hans't this carts assigned and created
   if (
-    isCheckUser &&
-    !(excludeCheckUserIds || []).includes(user._id) &&
-    !(
-      (deal.assignedUserIds || []).includes(user._id) ||
-      deal.userId === user._id
-    )
+    Object.keys(filter).length &&
+    !(await models.Deals.exists({ $and: [{ _id: deal._id }, filter] }))
   ) {
     throw new Error('You do not have permission to view.');
   }
@@ -592,24 +531,6 @@ export const getItemList = async (
   }
 
   return { list: updatedList, pageInfo, totalCount };
-};
-
-// comparing pipelines departmentIds and current user departmentIds
-const compareDepartmentIds = (
-  pipelineDepartmentIds: string[],
-  userDepartmentIds: string[],
-): boolean => {
-  if (!pipelineDepartmentIds?.length || !userDepartmentIds?.length) {
-    return false;
-  }
-
-  for (const uDepartmentId of userDepartmentIds) {
-    if (pipelineDepartmentIds.includes(uDepartmentId)) {
-      return true;
-    }
-  }
-
-  return false;
 };
 
 export const generateProducts = async (

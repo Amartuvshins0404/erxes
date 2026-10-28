@@ -33,8 +33,8 @@ export const PrintDialog = ({ open, onClose, stageId }: PrintDialogProps) => {
       copies: 1,
       width: DEFAULT_PAPER_SIZE.width,
       brandId: '',
-      branchId: '',
-      departmentId: '',
+      placeEntityId: '',
+      responsibleEntityId: '',
       documentId: '',
     },
   });

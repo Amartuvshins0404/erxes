@@ -73,14 +73,9 @@ export const SALES_DEAL_SEGMENT_FIELDS: SegmentFieldMeta[] = [
   }),
 
   SegmentField.lookup({
-    key: 'branchIds',
-    label: 'Branches',
-    query: { name: 'branchesMain', labelField: 'title' },
-  }),
-  SegmentField.lookup({
-    key: 'departmentIds',
-    label: 'Departments',
-    query: { name: 'departmentsMain', labelField: 'title' },
+    key: 'entityIds',
+    label: 'Structure nodes',
+    query: { name: 'structureEntities', labelField: 'title' },
   }),
   SegmentField.text({ key: 'labelIds', label: 'Labels' }),
 

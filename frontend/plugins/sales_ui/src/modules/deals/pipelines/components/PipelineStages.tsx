@@ -47,7 +47,7 @@ export const PipelineStages = ({ form, stagesLoading }: Props) => {
         probability: '10%',
         status: 'active',
         memberIds: [],
-        departmentIds: [],
+        sharedEntityIds: [],
         defaultTick: true,
       },
       { shouldFocus: false },

@@ -8,7 +8,7 @@ export interface IStage {
   memberIds?: string[];
   canMoveMemberIds?: string[];
   canEditMemberIds?: string[];
-  departmentIds?: string[];
+  sharedEntityIds?: string[];
   formId?: string;
   status?: string;
   code?: string;

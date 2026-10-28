@@ -31,9 +31,9 @@ const POS_DETAIL_QUERY = gql(`
       }
       isOnline
       onServer
-      branchId
-      departmentId
-      allowBranchIds
+      placeEntityId
+      responsibleEntityId
+      allowPlaceEntityIds
       beginNumber
       maxSkipNumber
       waitingScreen
@@ -59,8 +59,8 @@ const POS_DETAIL_QUERY = gql(`
       checkExcludeCategoryIds
       saveRemainder
       banFractions
-      branchTitle
-      departmentTitle
+      placeEntityTitle
+      responsibleEntityTitle
     }
   }
 `);

@@ -2,13 +2,13 @@ import { ICursorPaginateParams, Resolver } from 'erxes-api-shared/core-types';
 import {
   cursorPaginate,
   cursorPaginateAggregation,
-  sendTRPCMessage,
 } from 'erxes-api-shared/utils';
 import type { FilterQuery, PipelineStage } from 'mongoose';
 
 import { IContext } from '~/connectionResolvers';
 import { IPipelineDocument } from '~/modules/sales/@types';
-import { SALES_STATUSES } from '~/modules/sales/constants';
+import { SALES_STATUSES, VISIBILITIES } from '~/modules/sales/constants';
+import { getPipelineAccessFilter } from '~/modules/sales/utils/structureAccess';
 
 // Keep legacy pipelines without a status in the active group and cursor.
 const PIPELINE_STATUS_RANK_STAGE: PipelineStage = {
@@ -42,50 +42,11 @@ export const pipelineQueries: Record<string, Resolver> = {
     const query: FilterQuery<IPipelineDocument> =
       user.isOwner || isAll
         ? {}
-        : {
-            $or: [
-              { visibility: 'public' },
-              {
-                $and: [
-                  { visibility: 'private' },
-                  {
-                    $or: [
-                      { memberIds: { $in: [user._id] } },
-                      { userId: user._id },
-                    ],
-                  },
-                ],
-              },
-            ],
-          };
+        : await getPipelineAccessFilter(models, subdomain, user);
 
     // Owners may see private pipelines; only management callers see archived ones.
     if (!isAll) {
       query.status = { $ne: SALES_STATUSES.ARCHIVED };
-    }
-
-    if (!user.isOwner && !isAll) {
-      const userDetail = await sendTRPCMessage({
-        subdomain,
-
-        pluginName: 'core',
-        method: 'query',
-        module: 'users',
-        action: 'findOne',
-        input: { query: { _id: user._id } },
-        defaultValue: {},
-      });
-
-      const departmentIds = userDetail?.departmentIds || [];
-
-      if (Object.keys(query) && departmentIds.length > 0) {
-        query.$or?.push({
-          $and: [
-            { visibility: 'private' },
-            { departmentIds: { $in: departmentIds } },
-          ],
-        });
-      }
     }
 
     if (boardId) {
@@ -118,49 +79,16 @@ export const pipelineQueries: Record<string, Resolver> = {
   ) {
     const { boardId, isAll } = params;
 
-    const query: any =
-      user?.isOwner || isAll
-        ? {}
-        : {
-            status: { $ne: 'archived' },
-            $or: [
-              { visibility: 'public' },
-              {
-                $and: [
-                  { visibility: 'private' },
-                  {
-                    $or: [
-                      { memberIds: { $in: [user?._id] } },
-                      { userId: user?._id },
-                    ],
-                  },
-                ],
-              },
-            ],
-          };
+    const query: FilterQuery<IPipelineDocument> = {};
 
-    if (user?._id && !user.isOwner && !isAll) {
-      const userDetail = await sendTRPCMessage({
-        subdomain,
-
-        pluginName: 'core',
-        method: 'query',
-        module: 'users',
-        action: 'findOne',
-        input: { query: { _id: user._id } },
-        defaultValue: {},
-      });
-
-      const departmentIds = userDetail?.departmentIds || [];
-
-      if (Object.keys(query) && departmentIds.length > 0) {
-        query.$or.push({
-          $and: [
-            { visibility: 'private' },
-            { departmentIds: { $in: departmentIds } },
-          ],
-        });
-      }
+    if (!user?.isOwner && !isAll) {
+      query.status = { $ne: SALES_STATUSES.ARCHIVED };
+      Object.assign(
+        query,
+        user?._id
+          ? await getPipelineAccessFilter(models, subdomain, user)
+          : { visibility: VISIBILITIES.PUBLIC },
+      );
     }
 
     if (boardId) {

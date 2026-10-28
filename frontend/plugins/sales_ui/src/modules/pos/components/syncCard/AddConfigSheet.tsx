@@ -12,16 +12,17 @@ import {
   PopoverScoped,
 } from 'erxes-ui';
 import { IconPlus } from '@tabler/icons-react';
-import { SelectBranches, SelectMember } from 'ui-modules';
+import { SelectMember, SelectStructureEntities } from 'ui-modules';
 import { SelectBoardFormItem } from '@/pos/hooks/useSelectBoard';
 import { SelectPipelineFormItem } from '@/pos/hooks/useSelectPipeline';
 import { SelectStageFormItem } from '@/pos/hooks/useSelectStage';
 import { useFieldsCombined } from '@/pos/hooks/useFieldsCombined';
 import { nanoid } from 'nanoid';
+import { STOCK_PLACE_CAPABILITY } from '@/constants/structure';
 
 export interface CardConfig {
   _id?: string;
-  branchId: string;
+  placeEntityId: string;
   boardId: string;
   pipelineId: string;
   stageId: string;
@@ -52,7 +53,7 @@ export const AddConfigSheet: React.FC<AddConfigSheetProps> = ({
 
   const form = useForm<CardConfig>({
     defaultValues: {
-      branchId: '',
+      placeEntityId: '',
       boardId: '',
       pipelineId: '',
       stageId: '',
@@ -69,7 +70,7 @@ export const AddConfigSheet: React.FC<AddConfigSheetProps> = ({
     if (editingConfig) {
       setOpen(true);
       form.reset({
-        branchId: editingConfig.branchId || '',
+        placeEntityId: editingConfig.placeEntityId || '',
         boardId: editingConfig.boardId || '',
         pipelineId: editingConfig.pipelineId || '',
         stageId: editingConfig.stageId || '',
@@ -82,7 +83,7 @@ export const AddConfigSheet: React.FC<AddConfigSheetProps> = ({
 
   const handleClose = () => {
     form.reset({
-      branchId: '',
+      placeEntityId: '',
       boardId: '',
       pipelineId: '',
       stageId: '',
@@ -112,7 +113,7 @@ export const AddConfigSheet: React.FC<AddConfigSheetProps> = ({
   const onSubmit = (data: CardConfig) => {
     const configData: CardConfig = {
       _id: editingConfig?._id || `temporaryId${generateId()}`,
-      branchId: data.branchId,
+      placeEntityId: data.placeEntityId,
       boardId: data.boardId,
       pipelineId: data.pipelineId,
       stageId: data.stageId,
@@ -182,20 +183,30 @@ export const AddConfigSheet: React.FC<AddConfigSheetProps> = ({
                 )}
               </div>
 
-              <div className="space-y-2">
-                <Label>{t('CHOOSE-BRANCH')}</Label>
-                <Form.Field
-                  control={form.control}
-                  name="branchId"
-                  render={({ field }) => (
-                    <SelectBranches.FormItem
+              <Form.Field
+                control={form.control}
+                name="placeEntityId"
+                rules={{
+                  required: t('place-required', 'Place is required'),
+                }}
+                render={({ field }) => (
+                  <Form.Item>
+                    <Form.Label>
+                      {t('choose-place', 'Choose place')}{' '}
+                      <span className="text-red-500">*</span>
+                    </Form.Label>
+                    <SelectStructureEntities.FormItem
                       mode="single"
+                      capability={STOCK_PLACE_CAPABILITY}
                       value={field.value}
-                      onValueChange={field.onChange}
+                      onValueChange={(value) =>
+                        field.onChange(typeof value === 'string' ? value : '')
+                      }
                     />
-                  )}
-                />
-              </div>
+                    <Form.Message />
+                  </Form.Item>
+                )}
+              />
 
               <div className="space-y-4">
                 <div className="space-y-2">

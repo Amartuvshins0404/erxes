@@ -8,6 +8,7 @@ export interface IBoard {
   type?: string;
   status?: 'active' | 'archived';
   archiveInProgress?: boolean;
+  sharedEntityIds?: string[];
 }
 
 export interface IBoardDocument extends IBoard, Document {

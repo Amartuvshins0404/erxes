@@ -9,7 +9,7 @@ type ProductPricing = Record<string, { value: number }>;
 
 export const getProductPricing = async (
   subdomain: string,
-  pos: { departmentId?: string; branchId?: string },
+  pos: { placeEntityId?: string; responsibleEntityId?: string },
   products: PricingProduct[],
 ): Promise<ProductPricing> => {
   const pricing: ProductPricing = {};
@@ -27,8 +27,8 @@ export const getProductPricing = async (
           input: {
             prioritizeRule: 'only',
             totalAmount: 0,
-            branchId: pos.branchId || '',
-            departmentId: pos.departmentId || '',
+            placeEntityId: pos.placeEntityId || '',
+            responsibleEntityId: pos.responsibleEntityId || '',
             products: batch.map((product) => ({
               itemId: product._id,
               productId: product._id,

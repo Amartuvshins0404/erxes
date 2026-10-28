@@ -8,6 +8,7 @@ import {
   sendTRPCMessage,
   shortStrToDate,
 } from 'erxes-api-shared/utils';
+import { IStructureEntityDocument } from 'erxes-api-shared/core-types';
 import { IContext, IModels } from '~/connectionResolvers';
 
 export const paginate = (
@@ -202,37 +203,28 @@ export const posOrderRecordsQuery = async (
     { $limit: perPage },
   ]);
 
-  const branchIds = orders.map((item) => item.branchId);
-  const branches = await sendTRPCMessage({
+  const structureEntities: IStructureEntityDocument[] = await sendTRPCMessage({
     subdomain,
-
     method: 'query',
     pluginName: 'core',
-    module: 'branches',
+    module: 'structureEntities',
     action: 'find',
-    input: { query: { _id: { $in: branchIds } } },
+    input: {
+      query: {
+        _id: {
+          $in: orders.flatMap((item) => [
+            item.placeEntityId,
+            item.responsibleEntityId,
+          ]),
+        },
+      },
+    },
+    defaultValue: [],
   });
 
-  const branchById = {};
-  for (const branch of branches) {
-    branchById[branch._id] = branch;
-  }
-
-  const departmentIds = orders.map((item) => item.departmentId);
-  const departments = await sendTRPCMessage({
-    subdomain,
-
-    method: 'query',
-    pluginName: 'core',
-    module: 'departments',
-    action: 'find',
-    input: { query: { _id: { $in: departmentIds } } },
-  });
-
-  const departmentById = {};
-  for (const department of departments) {
-    departmentById[department._id] = department;
-  }
+  const structureEntityById = Object.fromEntries(
+    structureEntities.map((entity) => [entity._id, entity]),
+  );
 
   const productsIds = orders.map((order) => order.items.productId);
   const products = await sendTRPCMessage({
@@ -345,8 +337,9 @@ export const posOrderRecordsQuery = async (
 
   for (const order of orders) {
     order._id = `${order._id}_${order.items._id}`;
-    order.branch = branchById[order.branchId || ''];
-    order.department = departmentById[order.departmentId || ''];
+    order.placeEntity = structureEntityById[order.placeEntityId || ''];
+    order.responsibleEntity =
+      structureEntityById[order.responsibleEntityId || ''];
     const perProduct = productById[order.items.productId || ''] || {};
     order.items.product = perProduct;
     order.items.productCategory =

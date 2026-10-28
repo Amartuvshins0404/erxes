@@ -54,13 +54,13 @@ const SyncCard: React.FC<SyncCardProps> = ({
     const configList: CardConfig[] = Object.entries(cardsConfig).map(
       ([key, value]) => ({
         _id: key,
-        branchId: value.branchId || '',
+        placeEntityId: value.placeEntityId || '',
         boardId: value.boardId || '',
         pipelineId: value.pipelineId || '',
         stageId: value.stageId || '',
         assignedUserIds: (value.assignedUserIds ?? []).filter(isDefined),
         deliveryMapField: value.deliveryMapField || '',
-        title: value.title || key,
+        title: value.title || '',
       }),
     );
 
@@ -78,15 +78,30 @@ const SyncCard: React.FC<SyncCardProps> = ({
         return;
       }
 
+      const placeEntityIds = data.configs.map(
+        ({ placeEntityId }) => placeEntityId,
+      );
+
+      if (
+        placeEntityIds.some((placeEntityId) => !placeEntityId) ||
+        new Set(placeEntityIds).size !== placeEntityIds.length
+      ) {
+        toast({
+          title: t('error'),
+          description: t(
+            'cards-config-place-unique',
+            'Each config needs its own place',
+          ),
+          variant: 'destructive',
+        });
+        return;
+      }
+
       try {
         const cardsConfig: Record<string, Omit<CardConfig, '_id'>> = {};
         data.configs.forEach((config) => {
-          const key =
-            config.title ||
-            config._id ||
-            `config_${data.configs.indexOf(config)}`;
-          cardsConfig[key] = {
-            branchId: config.branchId,
+          cardsConfig[config.placeEntityId] = {
+            placeEntityId: config.placeEntityId,
             boardId: config.boardId,
             pipelineId: config.pipelineId,
             stageId: config.stageId,

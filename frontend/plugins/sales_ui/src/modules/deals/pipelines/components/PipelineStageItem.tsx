@@ -25,7 +25,7 @@ import type { TPipelineForm } from '@/deals/types/pipelines';
 import { IStage } from '@/deals/types/stages';
 import { Controller, useFormState, type Control } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { SelectDepartments, SelectMember } from 'ui-modules';
+import { SelectMember, SelectStructureEntities } from 'ui-modules';
 
 import { useEffect, useRef, useState } from 'react';
 
@@ -388,19 +388,21 @@ export const PipelineStageItem = (props: Props) => {
                 </Form.Item>
 
                 <Form.Item className="col-span-2">
-                  <Form.Label>{t('departments')}</Form.Label>
+                  <Form.Label>{t('shared-with')}</Form.Label>
                   <Form.Control>
                     <Controller
-                      name={`stages.${index}.departmentIds`}
+                      name={`stages.${index}.sharedEntityIds`}
                       control={control}
                       defaultValue={
-                        stage?.departmentIds?.filter(isDefined) || []
+                        stage?.sharedEntityIds?.filter(isDefined) || []
                       }
                       render={({ field }) => (
-                        <SelectDepartments.FormItem
+                        <SelectStructureEntities.FormItem
                           mode="multiple"
                           value={field.value}
-                          onValueChange={field.onChange}
+                          onValueChange={(value) =>
+                            field.onChange(Array.isArray(value) ? value : [])
+                          }
                         />
                       )}
                     />

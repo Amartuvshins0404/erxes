@@ -97,22 +97,12 @@ export const SALES_REFERENCE_TYPES: TRecordReferencesConfig['types'] = [
       },
 
       {
-        key: 'branches',
-        label: 'Branches',
+        key: 'structureEntities',
+        label: 'Structure nodes',
         reference: {
-          type: 'core:branch',
+          type: 'core:structureEntity',
           kind: 'field',
-          path: 'branchIds',
-        },
-      },
-
-      {
-        key: 'departments',
-        label: 'Departments',
-        reference: {
-          type: 'core:department',
-          kind: 'field',
-          path: 'departmentIds',
+          path: 'entityIds',
         },
       },
 

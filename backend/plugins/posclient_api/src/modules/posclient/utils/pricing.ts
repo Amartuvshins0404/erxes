@@ -31,8 +31,8 @@ export const checkPricing = async (
       input: {
         prioritizeRule: 'exclude',
         totalAmount: doc.totalAmount,
-        branchId: config.branchId || '',
-        departmentId: config.departmentId || '',
+        branchId: config.placeEntityId || '',
+        departmentId: config.responsibleEntityId || '',
         customerType: doc.customerType,
         customerId: doc.customerId,
         brokerType: doc.brokerType || '',

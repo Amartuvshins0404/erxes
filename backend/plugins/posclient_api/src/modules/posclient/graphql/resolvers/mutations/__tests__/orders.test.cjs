@@ -27,6 +27,8 @@ const dependencies = {
   },
   'erxes-api-shared/utils': {
     ExpectedError,
+    getPureDate: (date) => date,
+    graphqlPubsub: { publish: async () => {} },
     markResolvers: (resolvers, { wrapperConfig }) => {
       for (const resolver of Object.values(resolvers)) {
         resolver.wrapperConfig = wrapperConfig;
@@ -102,4 +104,86 @@ test('regular POS visitor creation still requires a POS user', async () => {
     mutations.ordersAdd(null, { customerType: 'visitor' }, context),
     { message: 'POS user required' },
   );
+});
+
+function placeChangeContext(config, order) {
+  const result = { logs: [] };
+  return {
+    result,
+    context: {
+      ...context,
+      posUser: { _id: 'cashier' },
+      config: { token: 'pos', isOnline: true, ...config },
+      models: {
+        Orders: {
+          getOrder: async () => ({
+            _id: 'order',
+            paidDate: new Date(),
+            ...order,
+          }),
+          updateOrder: async (_id, doc) => {
+            result.updated = doc;
+            return doc;
+          },
+        },
+        OrderChangeLogs: {
+          createLog: async (log) => {
+            result.logs.push(log);
+          },
+        },
+      },
+    },
+  };
+}
+
+test('ordersChange moves a paid order to an allowed sub place of the POS place', async () => {
+  const { result, context: changeContext } = placeChangeContext(
+    { placeEntityId: 'store', allowPlaceEntityIds: ['warehouse'] },
+    { placeEntityId: 'store', subPlaceEntityId: 'store' },
+  );
+
+  await mutations.ordersChange(
+    null,
+    { _id: 'order', placeEntityId: 'warehouse' },
+    changeContext,
+  );
+
+  assert.equal(result.updated.placeEntityId, 'store');
+  assert.equal(result.updated.subPlaceEntityId, 'warehouse');
+  assert.deepEqual(JSON.parse(JSON.stringify(result.logs[0].changes)), [
+    { field: 'placeEntityId', oldValue: 'store', newValue: 'warehouse' },
+  ]);
+});
+
+test('ordersChange sets both places when the POS has no own place', async () => {
+  const { result, context: changeContext } = placeChangeContext(
+    { allowPlaceEntityIds: ['warehouse'] },
+    {},
+  );
+
+  await mutations.ordersChange(
+    null,
+    { _id: 'order', placeEntityId: 'warehouse' },
+    changeContext,
+  );
+
+  assert.equal(result.updated.placeEntityId, 'warehouse');
+  assert.equal(result.updated.subPlaceEntityId, 'warehouse');
+});
+
+test('ordersChange rejects a place outside the POS allowed places', async () => {
+  const { result, context: changeContext } = placeChangeContext(
+    { placeEntityId: 'store', allowPlaceEntityIds: ['warehouse'] },
+    {},
+  );
+
+  await assert.rejects(
+    mutations.ordersChange(
+      null,
+      { _id: 'order', placeEntityId: 'elsewhere' },
+      changeContext,
+    ),
+    { message: 'not allowed place' },
+  );
+  assert.equal(result.updated, undefined);
 });

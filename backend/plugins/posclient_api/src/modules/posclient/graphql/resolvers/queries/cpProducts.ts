@@ -26,7 +26,7 @@ import {
 import {
   checkRemainders,
   getDiscountSortedProducts,
-  getRemBranchId,
+  getRemPlaceEntityId,
   isDiscountSortField,
   pushDiscountRangeFilters,
   type ProductWithRemainder,
@@ -51,7 +51,7 @@ export interface IProductParams extends ICommonParams {
   categoryId?: string;
   searchValue?: string;
   vendorId?: string;
-  branchId?: string;
+  placeEntityId?: string;
   tag?: string;
   tags?: string[];
   excludeTags?: string[];
@@ -93,7 +93,7 @@ const generateFilter = async (
   config: IConfigDocument,
   {
     type,
-    branchId,
+    placeEntityId,
     categoryId,
     searchValue,
     vendorId,
@@ -293,19 +293,19 @@ const generateFilter = async (
     $and.push({ [`prices.${token}`]: { $lte: maxPrice } });
   }
 
-  const remBranchId = getRemBranchId(config, branchId);
+  const remPlaceEntityId = getRemPlaceEntityId(config, placeEntityId);
   if (minRemainder || minRemainder === 0) {
     $and.push({
-      [`remainderByToken.${token}.${remBranchId}`]: { $gte: minRemainder },
+      [`remainderByToken.${token}.${remPlaceEntityId}`]: { $gte: minRemainder },
     });
   }
   if (maxRemainder || maxRemainder === 0) {
     $and.push({
-      [`remainderByToken.${token}.${remBranchId}`]: { $lte: maxRemainder },
+      [`remainderByToken.${token}.${remPlaceEntityId}`]: { $lte: maxRemainder },
     });
   }
 
-  pushDiscountRangeFilters($and, config, branchId, {
+  pushDiscountRangeFilters($and, config, placeEntityId, {
     minDiscountValue,
     maxDiscountValue,
     minDiscountPercent,
@@ -399,7 +399,8 @@ const cpProductQueries: Record<string, Resolver> = {
     params: IProductParams,
     { models, subdomain, config }: IContext,
   ) {
-    const { branchId, groupedSimilarity, sortField, sortDirection } = params;
+    const { placeEntityId, groupedSimilarity, sortField, sortDirection } =
+      params;
     const paginationArgs = {
       perPage: params?.perPage ?? 20,
       page: params?.page ?? 1,
@@ -413,9 +414,9 @@ const cpProductQueries: Record<string, Resolver> = {
       if (sortField === 'unitPrice') {
         sortParams = { [`prices.${config.token}`]: sortDirection || 1 };
       } else if (sortField === 'remainder') {
-        const remBranchId = getRemBranchId(config, branchId);
+        const remPlaceEntityId = getRemPlaceEntityId(config, placeEntityId);
         sortParams = {
-          [`remainderByToken.${config.token}.${remBranchId}`]:
+          [`remainderByToken.${config.token}.${remPlaceEntityId}`]:
             sortDirection || 1,
         };
       } else {
@@ -443,7 +444,7 @@ const cpProductQueries: Record<string, Resolver> = {
         models,
         config,
         products,
-        branchId || '',
+        placeEntityId || '',
       );
     }
 
@@ -457,7 +458,7 @@ const cpProductQueries: Record<string, Resolver> = {
       models,
       config,
       paginatedProducts,
-      branchId || '',
+      placeEntityId || '',
     );
   },
 
@@ -483,8 +484,8 @@ const cpProductQueries: Record<string, Resolver> = {
     {
       _id,
       groupedSimilarity,
-      branchId,
-    }: { _id: string; groupedSimilarity: string; branchId?: string },
+      placeEntityId,
+    }: { _id: string; groupedSimilarity: string; placeEntityId?: string },
     { models, subdomain, config }: IContext,
   ) {
     const product = await models.Products.getProduct({ _id });
@@ -544,7 +545,7 @@ const cpProductQueries: Record<string, Resolver> = {
             models,
             config,
             await models.Products.find({ _id }),
-            branchId || '',
+            placeEntityId || '',
           ),
         };
       }
@@ -596,7 +597,7 @@ const cpProductQueries: Record<string, Resolver> = {
           models,
           config,
           [product],
-          branchId || '',
+          placeEntityId || '',
         );
       }
       return {
@@ -615,7 +616,7 @@ const cpProductQueries: Record<string, Resolver> = {
           models,
           config,
           await models.Products.find({ _id }),
-          branchId || '',
+          placeEntityId || '',
         ),
       };
     }
@@ -641,7 +642,7 @@ const cpProductQueries: Record<string, Resolver> = {
         models,
         config,
         await models.Products.find(filters).sort({ code: 1 }),
-        branchId || '',
+        placeEntityId || '',
       ),
       groups,
     };
@@ -747,7 +748,7 @@ const cpProductQueries: Record<string, Resolver> = {
 
   async cpPoscProductDetail(
     _root,
-    { _id, branchId }: { _id: string; branchId?: string },
+    { _id, placeEntityId }: { _id: string; placeEntityId?: string },
     { subdomain, models, config }: IContext,
   ) {
     const product = await models.Products.getProduct({ _id });
@@ -757,7 +758,7 @@ const cpProductQueries: Record<string, Resolver> = {
       models,
       config,
       [product],
-      branchId,
+      placeEntityId,
     );
 
     return result[0];

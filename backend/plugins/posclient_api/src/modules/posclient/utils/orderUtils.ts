@@ -161,8 +161,8 @@ export const validateOrder = async (
 
   if (
     config.isCheckRemainder &&
-    (doc.branchId || config.branchId) &&
-    config.departmentId
+    (doc.placeEntityId || config.placeEntityId) &&
+    config.responsibleEntityId
   ) {
     const checkProducts = products.filter(
       (p) => p.isCheckRems?.[config.token || ''] || false,
@@ -174,7 +174,7 @@ export const validateOrder = async (
         models,
         config,
         checkProducts,
-        doc.branchId || config.branchId,
+        doc.placeEntityId || config.placeEntityId,
         true,
       );
 

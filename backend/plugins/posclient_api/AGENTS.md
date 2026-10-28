@@ -6,7 +6,7 @@
 - **Project:** `posclient_api`
 - **Layer:** `Backend API`
 - **Path:** `backend/plugins/posclient_api`
-- **Last synchronized:** `2026-10-23`
+- **Last synchronized:** `2026-10-28`
 
 ## Scope
 
@@ -39,6 +39,11 @@
   a failed fiscal return never marks the order returned. Cancellation and
   return changes are recorded in POS-local audit logs.
 - Syncs and exposes `isShowRemainder` independently from stock validation.
+- Places a POS in the core organization structure: its place node
+  (`placeEntityId`, a stock-place structure entity), responsible entity
+  (`responsibleEntityId`), and the other places online orders may move to
+  (`allowPlaceEntityIds`). Orders record `placeEntityId`, `subPlaceEntityId`
+  (the allowed place chosen on the order), and `responsibleEntityId`.
 - Authenticates POS users against POS client context.
 - Serves POS client config, order, cover, user, and daily report GraphQL operations.
 - Stores order and order-item change logs inside POS client data and exposes
@@ -122,6 +127,13 @@
   `{cancelled: true}` only after token-scoped cancellation; failures propagate.
 - Synced `isShowRemainder`, `isCheckRemainder`, and `checkExcludeCategoryIds`
   from sales POS configuration.
+- Synced POS config `placeEntityId`, `responsibleEntityId`, and
+  `allowPlaceEntityIds` from the sales POS document; synced orders return
+  `placeEntityId`, `subPlaceEntityId`, and `responsibleEntityId` to sales.
+- Interfaces not yet on structure entities keep their keys and receive entity
+  ids: loyalty `pricing.checkPricing` / `getQuantityRules` `branchId` /
+  `departmentId`, product discount condition prefixes `branchId` /
+  `departmentId`, and core product `inventories[place][responsible]`.
 - Loyalty `score.checkSpend` validates point payment amounts against the order
   total and the owner's balance before payment completion. It is called with
   `throwOnError`, so a refusal stops the payment instead of being swallowed.
@@ -170,6 +182,8 @@
   back to the cancellation snapshot for deleted orders, including their earlier
   events. Missing numbers remain null; IDs are never presented as numbers.
 - `Configs.permissionConfig.cashiers.seeReport` controls cashier access to `dailyReport`.
+- Saved remainders are keyed `remainderByToken.<token>.<place>`, where the
+  place is `default` for the POS's own place and otherwise an allowed place id.
 - Order item discounts store the aggregate `discountAmount`/`discountPercent` plus per-source `discountInfos`.
 - Product `propertiesData` filters are encoded as `fieldId:operator:value` conditions separated by semicolons and are parsed by the shared property filter util; a `g:<groupId>/<fieldId>` key targets one row of a repeating group through `$elemMatch`.
 - The remainder scheduler runs daily at 20:00 UTC (`0 20 * * *`, timezone `UTC`), which is 04:00 the following day in Ulaanbaatar, on `posclient-hourly-sync-remainder`; it dispatches tenant-scoped `posclient-sync-remainder` jobs that must include `subdomain` (SaaS organizations or `os` for self-hosted deployments). Organizations with missing, non-string, or blank subdomains are skipped before enqueueing, with an organization-ID warning.

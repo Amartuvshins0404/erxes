@@ -38,7 +38,7 @@ export const orderTypeFields = `
   billId: String
   oldBillId: String
   type: String
-  branchId: String
+  placeEntityId: String
   deliveryInfo: JSON
   description: String
   isPre: Boolean
@@ -63,7 +63,7 @@ const addEditParams = `
   directDiscount: Float,
   directIsAmount: Boolean,
   type: String,
-  branchId: String,
+  placeEntityId: String,
   customerId: String,
   customerType: String,
   brokerId: String,
@@ -272,7 +272,7 @@ export const mutations = `
   ordersMakePayment(_id: String!, doc: OrderPaymentInput): PosPutResponse
   orderChangeStatus(_id: String!, status: String): Order
   orderChangeSaleStatus(_id: String!, saleStatus: String): Order
-  ordersChange(_id: String!, dueDate: Date, branchId: String, deliveryInfo: JSON, description: String): Order
+  ordersChange(_id: String!, dueDate: Date, placeEntityId: String, deliveryInfo: JSON, description: String): Order
   ordersAddPayment(_id: String!, cashAmount: Float, mobileAmount: Float, paidAmounts: [PaidAmountInput] ): Order
   ordersCancel(_id: String!): JSON
   ordersSettlePayment(_id: String!, billType: String!, registerNumber: String): PosPutResponse

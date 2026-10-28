@@ -93,14 +93,14 @@ interface IOrderEditParams extends IOrderInput {
 export interface IOrderChangeParams {
   _id: string;
   dueDate?: Date;
-  branchId?: string;
+  placeEntityId?: string;
   deliveryInfo?: unknown;
   description?: string;
 }
 
 type EditableOrderChangeField =
   | 'dueDate'
-  | 'branchId'
+  | 'placeEntityId'
   | 'deliveryInfo'
   | 'description';
 
@@ -135,8 +135,8 @@ const getOrderChangeValue = (
   field: EditableOrderChangeField,
   config: IConfigDocument,
 ) => {
-  if (field === 'branchId') {
-    return config.branchId ? order.subBranchId : order.branchId;
+  if (field === 'placeEntityId') {
+    return config.placeEntityId ? order.subPlaceEntityId : order.placeEntityId;
   }
 
   return order[field];
@@ -149,7 +149,7 @@ const buildOrderChangeEntries = (
 ): IOrderChangeEntry[] => {
   const fields: EditableOrderChangeField[] = [
     'dueDate',
-    'branchId',
+    'placeEntityId',
     'deliveryInfo',
     'description',
   ];
@@ -293,7 +293,8 @@ export const ordersAdd = async (
     subdomain: string;
   },
 ) => {
-  const { totalAmount, type, customerId, customerType, branchId, isPre } = doc;
+  const { totalAmount, type, customerId, customerType, placeEntityId, isPre } =
+    doc;
 
   await validateOrder(subdomain, models, config, doc);
 
@@ -316,7 +317,7 @@ export const ordersAdd = async (
   const orderDoc = {
     totalAmount,
     type,
-    branchId,
+    placeEntityId,
     customerId,
     customerType,
     userId: posUser ? posUser._id : '',
@@ -339,10 +340,10 @@ export const ordersAdd = async (
       ...doc,
       ...orderDoc,
       totalAmount: getTotalAmount(preparedDoc.items),
-      branchId: config.branchId || doc.branchId,
-      subBranchId: doc.branchId,
+      placeEntityId: config.placeEntityId || doc.placeEntityId,
+      subPlaceEntityId: doc.placeEntityId,
       posToken: config.token,
-      departmentId: config.departmentId,
+      responsibleEntityId: config.responsibleEntityId,
       taxInfo: getTaxInfo(config),
       status,
       saleStatus,
@@ -481,8 +482,8 @@ export const ordersEdit = async (
   // don't change isPre
   const updatedOrder = await models.Orders.updateOrder(doc._id, {
     deliveryInfo: doc.deliveryInfo,
-    branchId: config.branchId || doc.branchId,
-    subBranchId: doc.branchId,
+    placeEntityId: config.placeEntityId || doc.placeEntityId,
+    subPlaceEntityId: doc.placeEntityId,
     customerId: doc.customerId,
     customerType: doc.customerType,
     brokerId: doc.brokerId,
@@ -496,7 +497,7 @@ export const ordersEdit = async (
     registerNumber: doc.registerNumber || '',
     slotCode: doc.slotCode,
     posToken: config.token,
-    departmentId: config.departmentId,
+    responsibleEntityId: config.responsibleEntityId,
     taxInfo: getTaxInfo(config),
     dueDate: doc.dueDate,
     description: doc.description,
@@ -862,7 +863,7 @@ const orderMutations: Record<string, Resolver> = {
     assertPosUser(posUser);
 
     // after paid then edit order some field
-    // if online, update branch
+    // if online, update place
     // update dueDate
     // update deliveryInfo
     const order = await models.Orders.getOrder(params._id);
@@ -875,13 +876,13 @@ const orderMutations: Record<string, Resolver> = {
       throw new Error('due date must be in future');
     }
 
-    if (params.branchId) {
+    if (params.placeEntityId) {
       if (!config.isOnline) {
-        throw new Error('Can edit branch at only online pos');
+        throw new Error('Can edit place at only online pos');
       }
 
-      if (!(config.allowBranchIds || []).includes(params.branchId)) {
-        throw new Error('not allowed branch');
+      if (!(config.allowPlaceEntityIds || []).includes(params.placeEntityId)) {
+        throw new Error('not allowed place');
       }
     }
 
@@ -891,12 +892,12 @@ const orderMutations: Record<string, Resolver> = {
 
     if (params.dueDate !== undefined) doc.dueDate = params.dueDate;
 
-    if (params.branchId !== undefined) {
-      if (config.branchId) {
-        doc.subBranchId = params.branchId;
+    if (params.placeEntityId !== undefined) {
+      if (config.placeEntityId) {
+        doc.subPlaceEntityId = params.placeEntityId;
       } else {
-        doc.branchId = params.branchId;
-        doc.subBranchId = params.branchId;
+        doc.placeEntityId = params.placeEntityId;
+        doc.subPlaceEntityId = params.placeEntityId;
       }
     }
 
@@ -1285,17 +1286,17 @@ const orderMutations: Record<string, Resolver> = {
     assertPosUser(posUser);
 
     const order = await models.Orders.getOrder(params._id);
-    if (!order.branchId) {
-      throw new Error(`First choose orders branch`);
+    if (!order.placeEntityId) {
+      throw new Error(`First choose orders place`);
     }
 
     if (!config.cardsConfig || config.cardsConfig.length) {
       throw new Error(`No matching cards settings found`);
     }
 
-    const cardConfig = config.cardsConfig[order.branchId];
+    const cardConfig = config.cardsConfig[order.placeEntityId];
     if (!cardConfig) {
-      throw new Error(`No matching cards settings found in orders branch`);
+      throw new Error(`No matching cards settings found in orders place`);
     }
 
     if (order.convertDealId) {

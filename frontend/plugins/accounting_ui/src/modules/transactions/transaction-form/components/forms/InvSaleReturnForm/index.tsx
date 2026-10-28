@@ -1,3 +1,4 @@
+import { STOCK_PLACE_CAPABILITY } from '@/utils/structure';
 import { useTranslation } from 'react-i18next';
 import { SelectAccount } from '@/settings/account/components/SelectAccount';
 import {
@@ -25,8 +26,8 @@ import {
 import {
   AccountField,
   AssignToField,
-  BranchField,
-  DepartmentField,
+  PlaceField,
+  ResponsibleField,
   DescriptionField,
 } from '../../GeneralFormFields';
 import { CtaxForm } from '../../helpers/CtaxForm';
@@ -105,8 +106,8 @@ export const InvSaleReturnForm = ({
             ...sale.followInfos,
             saleTransactionId: saleTrId,
           },
-          branchId: sale.branchId,
-          departmentId: sale.departmentId,
+          placeEntityId: sale.placeEntityId,
+          responsibleEntityId: sale.responsibleEntityId,
           hasVat: sale.hasVat,
           hasCtax: sale.hasCtax,
           details,
@@ -152,8 +153,12 @@ export const InvSaleReturnForm = ({
           allDetails={true}
           labelTxt="sales-account"
         />
-        <BranchField form={form} index={index} />
-        <DepartmentField form={form} index={index} />
+        <PlaceField
+          form={form}
+          index={index}
+          capability={STOCK_PLACE_CAPABILITY}
+        />
+        <ResponsibleField form={form} index={index} />
         <Form.Field
           control={form.control}
           name={`trDocs.${index}.followInfos.saleOutAccountId`}

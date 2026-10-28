@@ -27,8 +27,8 @@ export const types = () => `
     journal: String
     description: String
     categoryId: String
-    branchId: String
-    departmentId: String
+    placeEntityId: String
+    responsibleEntityId: String
     isTemp: Boolean
     isOutBalance: Boolean
     parentId: String
@@ -87,8 +87,8 @@ const accountParams = `
   kind: String,
   journal: String,
   description: String,
-  branchId: String,
-  departmentId: String,
+  placeEntityId: String,
+  responsibleEntityId: String,
   isTemp: Boolean,
   isOutBalance: Boolean,
   scopeBrandIds: [String],
@@ -124,8 +124,8 @@ const accountsQueryParams = `
   excludeIds: Boolean,
   isTemp: Boolean,
   isOutBalance: Boolean,
-  branchId: String
-  departmentId: String
+  placeEntityId: String
+  responsibleEntityId: String
   currency: String
   journal: String
   journals: [String]

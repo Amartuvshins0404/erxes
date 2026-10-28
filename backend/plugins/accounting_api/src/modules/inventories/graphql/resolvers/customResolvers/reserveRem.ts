@@ -6,25 +6,14 @@ export default {
     return models.ReserveRems.findOne({ _id });
   },
 
-  async branch(reserveRem: IReserveRemDocument) {
-    if (!reserveRem.branchId) {
+  async placeEntity(reserveRem: IReserveRemDocument) {
+    if (!reserveRem.placeEntityId) {
       return;
     }
 
     return {
-      __typename: 'Branch',
-      _id: reserveRem.branchId,
-    };
-  },
-
-  async department(reserveRem: IReserveRemDocument) {
-    if (!reserveRem.departmentId) {
-      return;
-    }
-
-    return {
-      __typename: 'Department',
-      _id: reserveRem.departmentId,
+      __typename: 'StructureEntity',
+      _id: reserveRem.placeEntityId,
     };
   },
 

@@ -4,8 +4,7 @@ export const safeRemainderSchema = z.object({
   date: z.date(),
   description: z.string(),
 
-  branchId: z.string().optional(),
-  departmentId: z.string().optional(),
+  placeEntityId: z.string().optional(),
   productCategoryId: z.string().optional(),
 });
 

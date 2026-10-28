@@ -11,8 +11,7 @@ import { parseDateRangeFromString, useMultiQueryState } from 'erxes-ui';
 
 type SafeRemainderQueryParams = {
   searchValue: string;
-  branchId: string;
-  departmentId: string;
+  placeEntityId: string;
   date: string;
   createdUserId: string;
   modifiedUserId: string;
@@ -24,8 +23,7 @@ type SafeRemainderVariables = AccountingSafeRemaindersQueryVariables;
 
 const SAFE_REMAINDER_FILTER_KEYS: (keyof SafeRemainderQueryParams)[] = [
   'searchValue',
-  'branchId',
-  'departmentId',
+  'placeEntityId',
   'date',
   'createdUserId',
   'modifiedUserId',
@@ -45,9 +43,8 @@ export const useSafeRemainderVariables = () => {
   const variables: SafeRemainderVariables = {};
 
   if (queryParams.searchValue) variables.searchValue = queryParams.searchValue;
-  if (queryParams.branchId) variables.branchId = queryParams.branchId;
-  if (queryParams.departmentId)
-    variables.departmentId = queryParams.departmentId;
+  if (queryParams.placeEntityId)
+    variables.placeEntityId = queryParams.placeEntityId;
   if (queryParams.createdUserId)
     variables.createdUserId = queryParams.createdUserId;
   if (queryParams.modifiedUserId)

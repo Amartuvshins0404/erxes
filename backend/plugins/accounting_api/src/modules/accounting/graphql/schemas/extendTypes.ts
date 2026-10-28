@@ -7,12 +7,8 @@ const extendTypes = `
     _id: String! @external
   }
 
-  extend type Branch @key(fields: "_id") {
-    _id: String @external
-  }
-
-  extend type Department @key(fields: "_id") {
-    _id: String @external
+  extend type StructureEntity @key(fields: "_id") {
+    _id: String! @external
   }
 
   extend type User @key(fields: "_id") {

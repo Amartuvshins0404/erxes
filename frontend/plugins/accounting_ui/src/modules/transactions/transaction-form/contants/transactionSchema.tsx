@@ -26,16 +26,16 @@ const accountSchema = z.object({
   name: z.string().optional(),
   currency: z.string().optional(),
   kind: z.string().optional(),
-  branchId: undefed(z.string()),
-  departmentId: undefed(z.string()),
+  placeEntityId: undefed(z.string()),
+  responsibleEntityId: undefed(z.string()),
   journal: z.string().optional(),
 });
 
 export const transactionDetailFollowInfoSchema = z
   .object({
     currencyDiffAccountId: undefed(z.string()),
-    moveInBranchId: undefed(z.string()),
-    moveInDepartmentId: undefed(z.string()),
+    moveInPlaceEntityId: undefed(z.string()),
+    moveInResponsibleEntityId: undefed(z.string()),
     preDeprecation: undefed(z.number().nonnegative()),
     salvageValue: undefed(z.number()),
   })
@@ -54,8 +54,8 @@ export const baseTrDetailSchema = z.object({
       }),
     }),
   ),
-  branchId: undefed(z.string()),
-  departmentId: undefed(z.string()),
+  placeEntityId: undefed(z.string()),
+  responsibleEntityId: undefed(z.string()),
   amount: z.number().min(0),
 
   followInfos: undefed(z.object({})), // rel backend
@@ -103,8 +103,8 @@ export const baseTransactionSchema = z.object({
   description: undefed(z.string()),
   customerType: z.nativeEnum(CustomerType),
   customerId: undefed(z.string()),
-  branchId: undefed(z.string()),
-  departmentId: undefed(z.string()),
+  placeEntityId: undefed(z.string()),
+  responsibleEntityId: undefed(z.string()),
   assignedUserIds: undefed(z.array(z.string())),
   details: z.array(baseTrDetailSchema).min(1),
   side: z.string().refine(
@@ -237,8 +237,8 @@ export const invDetailSchema = z
     followInfos: undefed(
       z.object({
         invSplit: undefed(invSplitInfoSchema),
-        moveInBranchId: undefed(z.string()),
-        moveInDepartmentId: undefed(z.string()),
+        moveInPlaceEntityId: undefed(z.string()),
+        moveInResponsibleEntityId: undefed(z.string()),
       }),
     ),
   });
@@ -250,8 +250,8 @@ export const transactionInvIncomeSchema = z
   })
   .extend({
     customerId: z.string(),
-    branchId: undefed(z.string()),
-    departmentId: undefed(z.string()),
+    placeEntityId: undefed(z.string()),
+    responsibleEntityId: undefed(z.string()),
     hasVat: z.boolean(),
     hasCtax: z.boolean(),
     details: z.array(
@@ -284,8 +284,8 @@ export const transactionInvOutSchema = z
   })
   .extend({
     customerId: undefed(z.string()),
-    branchId: undefed(z.string()),
-    departmentId: undefed(z.string()),
+    placeEntityId: undefed(z.string()),
+    responsibleEntityId: undefed(z.string()),
     details: z.array(
       z.object({
         ...invDetailSchema.shape,
@@ -305,8 +305,8 @@ export const transactionInvJustifySchema = z
   })
   .extend({
     customerId: undefed(z.string()),
-    branchId: undefed(z.string()),
-    departmentId: undefed(z.string()),
+    placeEntityId: undefed(z.string()),
+    responsibleEntityId: undefed(z.string()),
     details: z.array(
       z.object({
         ...invJustifyDetailSchema.shape,
@@ -322,12 +322,12 @@ export const transactionInvMoveSchema = z
   })
   .extend({
     customerId: undefed(z.string()),
-    branchId: undefed(z.string()),
-    departmentId: undefed(z.string()),
+    placeEntityId: undefed(z.string()),
+    responsibleEntityId: undefed(z.string()),
     followInfos: z.object({
       moveInAccountId: z.string(),
-      moveInBranchId: undefed(z.string()),
-      moveInDepartmentId: undefed(z.string()),
+      moveInPlaceEntityId: undefed(z.string()),
+      moveInResponsibleEntityId: undefed(z.string()),
     }),
     followExtras: undefed(
       z.object({
@@ -349,8 +349,8 @@ export const transactionInvSaleSchema = z
   })
   .extend({
     customerId: undefed(z.string()),
-    branchId: undefed(z.string()),
-    departmentId: undefed(z.string()),
+    placeEntityId: undefed(z.string()),
+    responsibleEntityId: undefed(z.string()),
     followInfos: z.object({
       saleOutAccountId: z.string(),
       saleCostAccountId: z.string(),
@@ -376,8 +376,8 @@ export const transactionInvSaleReturnSchema = z
   })
   .extend({
     customerId: undefed(z.string()),
-    branchId: undefed(z.string()),
-    departmentId: undefed(z.string()),
+    placeEntityId: undefed(z.string()),
+    responsibleEntityId: undefed(z.string()),
     followInfos: z.object({
       saleTransactionId: undefed(z.string()),
       saleOutAccountId: z.string(),
@@ -467,8 +467,8 @@ export const fxaFollowInfosSchema = z.object({
   deferredTaxAssetAccountId: undefed(z.string()),
   deferredTaxLiabilityAccountId: undefed(z.string()),
   incomeTaxExpenseAccountId: undefed(z.string()),
-  moveInBranchId: undefed(z.string()),
-  moveInDepartmentId: undefed(z.string()),
+  moveInPlaceEntityId: undefed(z.string()),
+  moveInResponsibleEntityId: undefed(z.string()),
   ownerId: undefed(z.string()),
 });
 
@@ -506,16 +506,16 @@ export const fxaSaleFollowInfosSchema = fxaOutFollowInfosSchema.extend({
 });
 
 export const fxaMoveFollowInfosSchema = fxaOutFollowInfosSchema.extend({
-  moveInBranchId: z.string().refine(
+  moveInPlaceEntityId: z.string().refine(
     (val) => val?.length,
     () => ({
-      message: getI18n().t('Must fill destination branch', {
+      message: getI18n().t('Must fill destination place', {
         ns: 'accounting',
         nsSeparator: false,
       }),
     }),
   ),
-  moveInDepartmentId: undefed(z.string()),
+  moveInResponsibleEntityId: undefed(z.string()),
 });
 
 export const fxaFollowExtrasSchema = z.object({
@@ -552,8 +552,8 @@ export const transactionFxaIncomeSchema = z
   })
   .extend({
     customerId: undefed(z.string()),
-    branchId: undefed(z.string()),
-    departmentId: undefed(z.string()),
+    placeEntityId: undefed(z.string()),
+    responsibleEntityId: undefed(z.string()),
     hasVat: z.boolean(),
     hasCtax: z.boolean(),
     followInfos: fxaFollowInfosSchema,
@@ -573,8 +573,8 @@ export const transactionFxaOutSchema = z
   })
   .extend({
     customerId: undefed(z.string()),
-    branchId: undefed(z.string()),
-    departmentId: undefed(z.string()),
+    placeEntityId: undefed(z.string()),
+    responsibleEntityId: undefed(z.string()),
     followInfos: fxaOutFollowInfosSchema,
     followExtras: undefed(fxaFollowExtrasSchema),
     extraData: undefed(fxaExtraDataSchema),
@@ -592,8 +592,8 @@ export const transactionFxaMoveSchema = z
   })
   .extend({
     customerId: undefed(z.string()),
-    branchId: undefed(z.string()),
-    departmentId: undefed(z.string()),
+    placeEntityId: undefed(z.string()),
+    responsibleEntityId: undefed(z.string()),
     followInfos: fxaMoveFollowInfosSchema,
     followExtras: undefed(fxaFollowExtrasSchema),
     extraData: undefed(fxaExtraDataSchema),
@@ -611,8 +611,8 @@ export const transactionFxaSaleSchema = z
   })
   .extend({
     customerId: undefed(z.string()),
-    branchId: undefed(z.string()),
-    departmentId: undefed(z.string()),
+    placeEntityId: undefed(z.string()),
+    responsibleEntityId: undefed(z.string()),
     hasVat: z.boolean(),
     hasCtax: z.boolean(),
     followInfos: fxaSaleFollowInfosSchema,

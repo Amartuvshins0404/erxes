@@ -1,16 +1,14 @@
 import { Document } from 'mongoose';
 
 export interface IReserveRemsAddParams {
-  departmentIds?: string[];
-  branchIds?: string[];
+  placeEntityIds?: string[];
   productCategoryId: string;
   productId: string;
   remainder: number;
 }
 
 export interface IReserveRem {
-  departmentId: string;
-  branchId: string;
+  placeEntityId: string;
   productId: string;
   uom: string;
   remainder: number;

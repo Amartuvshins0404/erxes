@@ -23,11 +23,10 @@ import {
   CustomerType,
   MembersInline,
   ProductsInline,
-  SelectBranchesInlineCell,
   SelectCompany,
   SelectCustomer,
-  SelectDepartmentsInlineCell,
   SelectMember,
+  StructureEntitiesInline,
 } from 'ui-modules';
 import { useDebounce } from 'use-debounce';
 import { useTransactions } from '~/modules/transactions/hooks/useTransactions';
@@ -362,16 +361,25 @@ const SelectedTrDetail = ({
         )}
 
         <div className="px-3 mb-1 text-xs text-accent-foreground">
-          {t('branch-label', { nsSeparator: false })}{' '}
+          {t('place-label', { nsSeparator: false, defaultValue: 'Place:' })}{' '}
           <span>
-            <SelectBranchesInlineCell branchIds={[trDetail.branchId || '']} />
+            <StructureEntitiesInline
+              entityIds={trDetail.placeEntityId ? [trDetail.placeEntityId] : []}
+            />
           </span>
         </div>
         <div className="px-3 mb-1 text-xs text-accent-foreground">
-          {t('department-label', { nsSeparator: false })}{' '}
+          {t('responsible-label', {
+            nsSeparator: false,
+            defaultValue: 'Responsible:',
+          })}{' '}
           <span>
-            <SelectDepartmentsInlineCell
-              departmentIds={[trDetail.departmentId || '']}
+            <StructureEntitiesInline
+              entityIds={
+                trDetail.responsibleEntityId
+                  ? [trDetail.responsibleEntityId]
+                  : []
+              }
             />
           </span>
         </div>

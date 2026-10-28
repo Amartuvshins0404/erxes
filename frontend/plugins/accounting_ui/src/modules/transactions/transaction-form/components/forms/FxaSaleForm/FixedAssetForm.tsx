@@ -159,8 +159,8 @@ const FixedAssetTableHeader = ({
         <Table.Head>{t('amount')}</Table.Head>
         {showAdvancedView && (
           <>
-            <Table.Head>{t('branch')}</Table.Head>
-            <Table.Head>{t('department')}</Table.Head>
+            <Table.Head>{t('place', 'Place')}</Table.Head>
+            <Table.Head>{t('responsible', 'Responsible')}</Table.Head>
           </>
         )}
       </Table.Row>

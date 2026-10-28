@@ -43,8 +43,8 @@ const source = (counts = [5]): ITransaction => ({
   date: new Date('2026-10-22T04:00:00Z'),
   status: 'complete',
   journal: 'invOut',
-  branchId: 'branch',
-  departmentId: 'department',
+  placeEntityId: 'branch',
+  responsibleEntityId: 'department',
   details: counts.map((count, index) => ({
     _id: `detail-${index}`,
     accountId: 'inventory',
@@ -105,16 +105,15 @@ const setup = (
   };
   jest
     .mocked(activeCost)
-    .mockImplementation(
-      async (_models, _account, _branch, _department, ids = []) =>
-        Object.fromEntries(
-          ids.map((id) => [
-            id,
-            id === 'output'
-              ? { remainder: 2, totalCost: 20, unitCost: 10 }
-              : { remainder: 100, totalCost: 300, unitCost: 3 },
-          ]),
-        ),
+    .mockImplementation(async (_models, _account, _place, ids = []) =>
+      Object.fromEntries(
+        ids.map((id) => [
+          id,
+          id === 'output'
+            ? { remainder: 2, totalCost: 20, unitCost: 10 }
+            : { remainder: 100, totalCost: 300, unitCost: 3 },
+        ]),
+      ),
     );
   jest.mocked(getExecutionProductUnits).mockResolvedValue({
     products: [
@@ -180,8 +179,8 @@ describe('real job shortage production', () => {
         saleCostAccountId: 'sale-cost',
       },
     };
-    doc.details[1].branchId = 'other-branch';
-    doc.details[1].departmentId = 'other-department';
+    doc.details[1].placeEntityId = 'other-branch';
+    doc.details[1].responsibleEntityId = 'other-department';
     jest
       .mocked(activeCost)
       .mockImplementation(async (_models, _account, branch) => ({
@@ -201,14 +200,14 @@ describe('real job shortage production', () => {
       expect.objectContaining({
         count: 2,
         amount: 20,
-        branchId: 'branch',
-        departmentId: 'department',
+        placeEntityId: 'branch',
+        responsibleEntityId: 'department',
       }),
       expect.objectContaining({
         count: 3,
         amount: 21,
-        branchId: 'other-branch',
-        departmentId: 'other-department',
+        placeEntityId: 'other-branch',
+        responsibleEntityId: 'other-department',
       }),
     ]);
     expect(models.Jobs.findOne).not.toHaveBeenCalled();
@@ -267,7 +266,9 @@ describe('real job shortage production', () => {
     ).toEqual([6, 3]);
     expect(
       result.docs.every(
-        (row) => row.branchId === 'branch' && row.departmentId === 'department',
+        (row) =>
+          row.placeEntityId === 'branch' &&
+          row.responsibleEntityId === 'department',
       ),
     ).toBe(true);
     expect(
@@ -385,8 +386,8 @@ describe('real job shortage production', () => {
   it('keeps distinct detail-level locations in separate production groups', async () => {
     const { models } = setup();
     const doc = source([5, 5]);
-    doc.details[1].branchId = 'other-branch';
-    doc.details[1].departmentId = 'other-department';
+    doc.details[1].placeEntityId = 'other-branch';
+    doc.details[1].responsibleEntityId = 'other-department';
     const result = await prepareRealJobProduction(
       'tenant',
       models,
@@ -396,16 +397,12 @@ describe('real job shortage production', () => {
     expect(
       result.docs
         .filter((row) => row.journal === 'invIncome')
-        .map((row) => [row.branchId, row.departmentId]),
-    ).toEqual([
-      ['branch', 'department'],
-      ['other-branch', 'other-department'],
-    ]);
+        .map((row) => row.placeEntityId),
+    ).toEqual(['branch', 'other-branch']);
     expect(activeCost).toHaveBeenCalledWith(
       models,
       'inventory',
       'other-branch',
-      'other-department',
       ['output'],
       [],
     );
@@ -436,7 +433,6 @@ describe('real job shortage production', () => {
       models,
       'inventory',
       'branch',
-      'department',
       ['output'],
       excluded,
     );

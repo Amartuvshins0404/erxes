@@ -7,8 +7,8 @@ export const adjustDebtRateDetailsSchema = new Schema({
   accountId: { type: String, label: 'Account' },
   customerType: { type: String, optional: true, label: 'Customer type' },
   customerId: { type: String, optional: true, label: 'Customer' },
-  branchId: { type: String, optional: true, label: 'Branch' },
-  departmentId: { type: String, optional: true, label: 'Department' },
+  placeEntityId: { type: String, optional: true, label: 'Place' },
+  responsibleEntityId: { type: String, optional: true, label: 'Responsible' },
   mainBalance: { type: Number, label: 'Main Currency Balance' }, // Төгрөгийн буюу үндсэн валютын үлдэгдэл
   currencyBalance: { type: Number, label: 'Currency Balance' }, // Гадаад валютын үлдэгдэл
   transactionId: { type: String, optional: true, label: 'Transaction' }, // Хадгалах үед зөрүү дүнтэй бол TR үүснэ
@@ -45,8 +45,8 @@ export const adjustDebtRatesSchema = new Schema({
     label: 'description',
   }, // Төгрөгийн эсвэл валютын үлдэгдэлтэй дансдад харгалзаж үүснэ
 
-  branchId: { type: String, optional: true, label: 'Branch' }, // салбар сонгож болно. Сонгосон бол баримтууд уг салбараар, сонгоогүй бол дансныхаараа
-  departmentId: { type: String, optional: true, label: 'Department' }, // хэлтэс сонгож болно. Сонгосон бол баримтууд уг хэлтэсээр, сонгоогүй бол дансныхаараа
+  placeEntityId: { type: String, optional: true, label: 'Place' }, // салбар сонгож болно. Сонгосон бол баримтууд уг салбараар, сонгоогүй бол дансныхаараа
+  responsibleEntityId: { type: String, optional: true, label: 'Responsible' }, // хэлтэс сонгож болно. Сонгосон бол баримтууд уг хэлтэсээр, сонгоогүй бол дансныхаараа
   createdBy: { type: String, label: 'Created user' },
   modifiedBy: { type: String, optional: true, label: 'Modified user' },
   createdAt: { type: Date, default: Date.now, label: 'Created at' }, // үүссэн огноо

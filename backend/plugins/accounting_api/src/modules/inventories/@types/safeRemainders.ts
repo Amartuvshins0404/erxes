@@ -2,8 +2,7 @@ import { IAttachment } from 'erxes-api-shared/core-types';
 import { Document } from 'mongoose';
 
 export interface IUpdateRemaindersParams {
-  departmentId?: string;
-  branchId?: string;
+  placeEntityId?: string;
   productCategoryId?: string;
   productIds?: string[];
 }
@@ -31,8 +30,7 @@ export interface ISafeRemEditFields {
 }
 
 export interface ISafeRemainder {
-  branchId?: string;
-  departmentId?: string;
+  placeEntityId?: string;
   productCategoryId?: string;
   attachment?: IAttachment;
   filterField?: string;

@@ -12,8 +12,8 @@ export const adjustDebtRateSchema = z.object({
   description: z.string().optional(),
   gainAccountId: z.string().min(1, 'Gain Account is required'),
   lossAccountId: z.string().min(1, 'Loss Account is required'),
-  branchId: z.string().optional(),
-  departmentId: z.string().optional(),
+  placeEntityId: z.string().optional(),
+  responsibleEntityId: z.string().optional(),
 });
 
 export type TAdjustDebtRateForm = z.infer<typeof adjustDebtRateSchema>;

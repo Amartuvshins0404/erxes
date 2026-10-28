@@ -14,10 +14,8 @@ import {
 import { Fragment, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ACCTRANSACTIONS_CURSOR_SESSION_KEY } from '@/accountsSessionKeys';
-import {
-  useReceiptsBranches,
-  useReceiptsDepartments,
-} from '@/transactions/hooks/useReceiptsStructure';
+import { useReceiptsStructureEntities } from '@/transactions/hooks/useReceiptsStructure';
+import { STOCK_PLACE_CAPABILITY } from '@/utils/structure';
 import { TR_JOURNAL_GROUPS } from '@/transactions/types/constants';
 
 type ReceiptsNavigationOption = {
@@ -84,8 +82,8 @@ const sortAsTree = (options: ReceiptsNavigationOption[]) => {
   const visited = new Set<string>();
 
   const visit = (parentKey: string) => {
-    const children = [...(childrenByParent.get(parentKey) || [])].sort(
-      (a, b) => (a.order || '').localeCompare(b.order || ''),
+    const children = [...(childrenByParent.get(parentKey) || [])].sort((a, b) =>
+      (a.order || '').localeCompare(b.order || ''),
     );
 
     for (const child of children) {
@@ -109,7 +107,7 @@ const ReceiptsNavigationItems = ({
   options,
   loading,
 }: {
-  queryKey: 'branchId' | 'departmentId' | 'journal';
+  queryKey: 'placeEntityId' | 'responsibleEntityId' | 'journal';
   icon: Icon;
   options: ReceiptsNavigationOption[];
   loading?: boolean;
@@ -220,47 +218,35 @@ const ReceiptsNavigationItems = ({
   );
 };
 
-const ReceiptsBranchesNavigation = () => {
-  const { t } = useTranslation('accounting');
-  const { branches, loading } = useReceiptsBranches();
+const ReceiptsStructureNavigation = ({
+  name,
+  queryKey,
+  icon,
+  capability,
+  separate,
+}: {
+  name: string;
+  queryKey: 'placeEntityId' | 'responsibleEntityId';
+  icon: Icon;
+  capability?: string;
+  separate?: boolean;
+}) => {
+  const { structureEntities, loading } =
+    useReceiptsStructureEntities(capability);
 
   return (
-    <NavigationMenuGroup name={t('branch')} separate={false}>
+    <NavigationMenuGroup name={name} separate={separate}>
       <ReceiptsNavigationItems
-        queryKey="branchId"
-        icon={IconBuilding}
+        queryKey={queryKey}
+        icon={icon}
         loading={loading}
         options={sortAsTree(
-          branches.map((branch) => ({
-            _id: branch._id,
-            label: branch.title || '',
-            code: branch.code,
-            parentId: branch.parentId,
-            order: branch.order,
-          })),
-        )}
-      />
-    </NavigationMenuGroup>
-  );
-};
-
-const ReceiptsDepartmentsNavigation = () => {
-  const { t } = useTranslation('accounting');
-  const { departments, loading } = useReceiptsDepartments();
-
-  return (
-    <NavigationMenuGroup name={t('department')}>
-      <ReceiptsNavigationItems
-        queryKey="departmentId"
-        icon={IconSitemap}
-        loading={loading}
-        options={sortAsTree(
-          departments.map((department) => ({
-            _id: department._id,
-            label: department.title || '',
-            code: department.code,
-            parentId: department.parentId,
-            order: department.order,
+          structureEntities.map((entity) => ({
+            _id: entity._id,
+            label: entity.title || '',
+            code: entity.code,
+            parentId: entity.parentId,
+            order: entity.order,
           })),
         )}
       />
@@ -276,8 +262,18 @@ export const ReceiptsNavigation = () => {
       className="w-56 flex-none border-r lg:w-64"
       label={t('receipts')}
     >
-      <ReceiptsBranchesNavigation />
-      <ReceiptsDepartmentsNavigation />
+      <ReceiptsStructureNavigation
+        name={t('place', 'Place')}
+        queryKey="placeEntityId"
+        icon={IconBuilding}
+        capability={STOCK_PLACE_CAPABILITY}
+        separate={false}
+      />
+      <ReceiptsStructureNavigation
+        name={t('responsible', 'Responsible')}
+        queryKey="responsibleEntityId"
+        icon={IconSitemap}
+      />
       <NavigationMenuGroup name={t('journal')}>
         {TR_JOURNAL_GROUPS.map((group, index) => (
           <Fragment key={group.label}>

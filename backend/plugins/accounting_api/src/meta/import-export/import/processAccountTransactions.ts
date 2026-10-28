@@ -1,6 +1,7 @@
 import { IModels } from '~/connectionResolvers';
 import { JOURNALS, TR_SIDES } from '~/modules/accounting/@types/constants';
 import { ITransaction } from '~/modules/accounting/@types/transaction';
+import { findStructureEntities } from '~/modules/accounting/utils/structureEntities';
 import { nanoid } from 'nanoid';
 import { fixNum, sendTRPCMessage } from 'erxes-api-shared/utils';
 
@@ -74,7 +75,7 @@ const getBooleanVal = (value) => {
 };
 
 const getFollowInfos = async (models: IModels, row: any, relatedData) => {
-  const { accounts, branches, departments } = relatedData;
+  const { accounts, structureEntities } = relatedData;
   if (JOURNALS.ALL_WITH_CURRENCIES.includes(row.journal)) {
     if (row.follow1) {
       return {
@@ -86,20 +87,21 @@ const getFollowInfos = async (models: IModels, row: any, relatedData) => {
   if (JOURNALS.INV_MOVE === row.journal) {
     return {
       moveInAccountId: accounts?.find((acc) => acc.code === row.follow1)?._id,
-      moveInBranchId: branches?.find((branch) => branch.code === row.follow2)
-        ?._id,
-      moveInDepartmentId: departments?.find(
-        (department) => department.code === row.follow3,
+      moveInPlaceEntityId: structureEntities?.find(
+        (entity) => entity.code === row.follow2,
+      )?._id,
+      moveInResponsibleEntityId: structureEntities?.find(
+        (entity) => entity.code === row.follow3,
       )?._id,
     };
   }
   if (JOURNALS.FXA_MOVE === row.journal) {
     return {
-      moveInBranchId: branches?.find((branch) =>
-        [row.follow1, row.follow2].includes(branch.code),
+      moveInPlaceEntityId: structureEntities?.find((entity) =>
+        [row.follow1, row.follow2].includes(entity.code),
       )?._id,
-      moveInDepartmentId: departments?.find((department) =>
-        [row.follow2, row.follow3].includes(department.code),
+      moveInResponsibleEntityId: structureEntities?.find((entity) =>
+        [row.follow2, row.follow3].includes(entity.code),
       )?._id,
       accumulatedDepreciationAccountId: accounts?.find(
         (acc) => acc.code === row.follow4,
@@ -220,8 +222,7 @@ const getTrDoc = async (models: IModels, row: any, ptrInfo, relatedData) => {
 const getDetailDoc = async (row, currentTr, relatedData) => {
   const {
     accounts,
-    branches,
-    departments,
+    structureEntities,
     users,
     products,
     fixedAssets,
@@ -239,9 +240,11 @@ const getDetailDoc = async (row, currentTr, relatedData) => {
   return {
     _id: nanoid(),
     accountId: accounts?.find((acc) => acc.code === row.accountCode)?._id,
-    branchId: branches?.find((branch) => branch.code === row.branchId)?._id,
-    departmentId: departments?.find(
-      (department) => department.code === row.departmentId,
+    placeEntityId: structureEntities?.find(
+      (entity) => entity.code === row.placeEntityId,
+    )?._id,
+    responsibleEntityId: structureEntities?.find(
+      (entity) => entity.code === row.responsibleEntityId,
     )?._id,
     amount,
     currencyAmount: fixNum(row.currencyAmount, 6),
@@ -291,8 +294,7 @@ const extractFollowInfos = (row) => {
   if (JOURNALS.INV_MOVE === row.journal) {
     return {
       accounts: [row.follow1].filter(Boolean),
-      branches: [row.follow2].filter(Boolean),
-      departments: [row.follow3].filter(Boolean),
+      structureEntities: [row.follow2, row.follow3].filter(Boolean),
     };
   }
   if (JOURNALS.INV_SALE === row.journal) {
@@ -302,8 +304,9 @@ const extractFollowInfos = (row) => {
   }
   if (JOURNALS.FXA_MOVE === row.journal) {
     return {
-      branches: [row.follow1, row.follow2].filter(Boolean),
-      departments: [row.follow2, row.follow3].filter(Boolean),
+      structureEntities: [row.follow1, row.follow2, row.follow3].filter(
+        Boolean,
+      ),
       accounts: [row.follow4].filter(Boolean),
     };
   }
@@ -330,8 +333,7 @@ const getRelatedDatas = async (
   models: IModels,
   rows: any[],
 ) => {
-  const branchIds: string[] = [];
-  const departmentIds: string[] = [];
+  const entityRefs: string[] = [];
   const userEmails: string[] = [];
   const customerInfos: string[] = [];
   const companyInfos: string[] = [];
@@ -346,11 +348,9 @@ const getRelatedDatas = async (
       currentJournal = row.journal;
     }
 
-    if (row.branchId && !branchIds.includes(row.branchId))
-      branchIds.push(row.branchId);
-
-    if (row.departmentId && !departmentIds.includes(row.departmentId))
-      departmentIds.push(row.departmentId);
+    for (const ref of [row.placeEntityId, row.responsibleEntityId]) {
+      if (ref && !entityRefs.includes(ref)) entityRefs.push(ref);
+    }
 
     if (row.assignedUserEmails) {
       row.assignedUserEmails
@@ -404,50 +404,16 @@ const getRelatedDatas = async (
         if (!accountCodes.includes(acc)) accountCodes.push(acc);
       });
     }
-    if (extracted?.branches?.length) {
-      extracted.branches.forEach((branch) => {
-        if (!branchIds.includes(branch)) branchIds.push(branch);
-      });
-    }
-    if (extracted?.departments?.length) {
-      extracted.departments.forEach((department) => {
-        if (!departmentIds.includes(department)) departmentIds.push(department);
+    if (extracted?.structureEntities?.length) {
+      extracted.structureEntities.forEach((ref) => {
+        if (!entityRefs.includes(ref)) entityRefs.push(ref);
       });
     }
   }
 
-  const branches = branchIds.length
-    ? await sendTRPCMessage({
-        subdomain,
-        pluginName: 'core',
-        module: 'branches',
-        action: 'find',
-        defaultValue: [],
-        input: {
-          query: {
-            $or: [{ _id: { $in: branchIds } }, { code: { $in: branchIds } }],
-          },
-          fields: { _id: 1, code: 1 },
-        },
-      })
-    : [];
-
-  const departments = departmentIds.length
-    ? await sendTRPCMessage({
-        subdomain,
-        pluginName: 'core',
-        module: 'departments',
-        action: 'find',
-        defaultValue: [],
-        input: {
-          query: {
-            $or: [
-              { _id: { $in: departmentIds } },
-              { code: { $in: departmentIds } },
-            ],
-          },
-          fields: { _id: 1, code: 1 },
-        },
+  const structureEntities = entityRefs.length
+    ? await findStructureEntities(subdomain, {
+        $or: [{ _id: { $in: entityRefs } }, { code: { $in: entityRefs } }],
       })
     : [];
 
@@ -535,8 +501,7 @@ const getRelatedDatas = async (
     : [];
 
   return {
-    branches,
-    departments,
+    structureEntities,
     users,
     customers,
     companies,

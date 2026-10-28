@@ -118,8 +118,8 @@ test.each([TrJournalEnum.INV_SALE, TrJournalEnum.INV_SALE_RETURN])(
 test('inventory destination survives editing', () => {
   const followInfos = {
     moveInAccountId: 'destination',
-    moveInBranchId: 'branch',
-    moveInDepartmentId: 'department',
+    moveInPlaceEntityId: 'place',
+    moveInResponsibleEntityId: 'responsible',
   };
   expect(
     JOURNALS_BY_JOURNAL(

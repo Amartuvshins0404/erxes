@@ -242,11 +242,11 @@ export const TransactionsTabsList = ({
     const fakeTrDoc = {
       ptrId: likeTrDoc.ptrId,
       parentId: likeTrDoc.parentId,
-      branchId: likeTrDoc.branchId,
+      placeEntityId: likeTrDoc.placeEntityId,
       description: likeTrDoc.description,
       customerType: likeTrDoc.customerType,
       customerId: likeTrDoc.customerId,
-      departmentId: likeTrDoc.departmentId,
+      responsibleEntityId: likeTrDoc.responsibleEntityId,
       journal: selectedJournal,
       side: diff > 0 ? TR_SIDES.CREDIT : TR_SIDES.DEBIT,
       details: [

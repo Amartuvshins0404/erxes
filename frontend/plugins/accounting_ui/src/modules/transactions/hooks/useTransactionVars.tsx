@@ -56,14 +56,14 @@ export const useTransactionsQueryParams = () => {
     accountSearchValue: string;
     accountBrand: string;
     accountIsOutBalance: string;
-    accountBranchId: string;
-    accountDepartmentId: string;
+    accountPlaceEntityId: string;
+    accountResponsibleEntityId: string;
     accountCurrency: string;
     accountJournal: string;
     brandId: string;
     isOutBalance: string;
-    branchId: string;
-    departmentId: string;
+    placeEntityId: string;
+    responsibleEntityId: string;
     currency: string;
     journal: string;
     statuses: string;
@@ -88,14 +88,14 @@ export const useTransactionsQueryParams = () => {
     'accountSearchValue',
     'accountBrand',
     'accountIsOutBalance',
-    'accountBranchId',
-    'accountDepartmentId',
+    'accountPlaceEntityId',
+    'accountResponsibleEntityId',
     'accountCurrency',
     'accountJournal',
     'brandId',
     'isOutBalance',
-    'branchId',
-    'departmentId',
+    'placeEntityId',
+    'responsibleEntityId',
     'currency',
     'journal',
     'statuses',

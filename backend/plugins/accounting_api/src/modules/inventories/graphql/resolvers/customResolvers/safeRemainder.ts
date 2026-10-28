@@ -8,25 +8,14 @@ export default {
     };
   },
 
-  async branch(reserveRem: ISafeRemainderDocument) {
-    if (!reserveRem.branchId) {
+  async placeEntity(reserveRem: ISafeRemainderDocument) {
+    if (!reserveRem.placeEntityId) {
       return;
     }
 
     return {
-      __typename: 'Branch',
-      _id: reserveRem.branchId,
-    };
-  },
-
-  async department(reserveRem: ISafeRemainderDocument) {
-    if (!reserveRem.departmentId) {
-      return;
-    }
-
-    return {
-      __typename: 'Department',
-      _id: reserveRem.departmentId,
+      __typename: 'StructureEntity',
+      _id: reserveRem.placeEntityId,
     };
   },
 

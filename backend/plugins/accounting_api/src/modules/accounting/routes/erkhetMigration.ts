@@ -6,6 +6,7 @@ import {
   FXA_OWNER_RECORD_STATUSES,
 } from '@/fixedAssets/@types/constants';
 import { JOURNALS } from '../@types/constants';
+import { findStructureEntities } from '../utils/structureEntities';
 import {
   IInvSplitDetailInfo,
   ITransaction,
@@ -32,8 +33,7 @@ type TReferenceMaps = {
   accountsByCode: TCodeMap;
   vatRowsByNumber: TCodeMap;
   ctaxRowsByNumber: TCodeMap;
-  branchesByCode: TCodeMap;
-  departmentsByCode: TCodeMap;
+  entitiesByCode: TCodeMap;
   customersByCode: TCodeMap;
   productsByCode: TCodeMap;
   fixedAssetCategoriesByCode: TCodeMap;
@@ -147,8 +147,8 @@ const uniq = (values: string[]) => [
 
 const getCodeMap = (docs: ITransaction[]) => {
   const accountCodes: string[] = [];
-  const branchCodes: string[] = [];
-  const departmentCodes: string[] = [];
+  const placeCodes: string[] = [];
+  const responsibleCodes: string[] = [];
   const customerCodes: string[] = [];
   const productCodes: string[] = [];
   const fixedAssetCategoryCodes: string[] = [];
@@ -166,11 +166,11 @@ const getCodeMap = (docs: ITransaction[]) => {
     if (doc.hasCtax && doc.ctaxRowId) {
       ctaxRowNumbers.push(normalizeSourceCode(doc.ctaxRowId));
     }
-    if (doc.branchId) {
-      branchCodes.push(normalizeSourceCode(doc.branchId));
+    if (doc.placeEntityId) {
+      placeCodes.push(normalizeSourceCode(doc.placeEntityId));
     }
-    if (doc.departmentId) {
-      departmentCodes.push(normalizeSourceCode(doc.departmentId));
+    if (doc.responsibleEntityId) {
+      responsibleCodes.push(normalizeSourceCode(doc.responsibleEntityId));
     }
     if (doc.customerId) {
       customerCodes.push(normalizeSourceCode(doc.customerId));
@@ -184,8 +184,9 @@ const getCodeMap = (docs: ITransaction[]) => {
       }
     }
 
-    const moveInBranchId = doc.followInfos?.moveInBranchId;
-    const moveInDepartmentId = doc.followInfos?.moveInDepartmentId;
+    const moveInPlaceEntityId = doc.followInfos?.moveInPlaceEntityId;
+    const moveInResponsibleEntityId =
+      doc.followInfos?.moveInResponsibleEntityId;
     const moveInAccountId = doc.followInfos?.moveInAccountId;
     const accumulatedDepreciationAccountId =
       doc.followInfos?.accumulatedDepreciationAccountId;
@@ -202,11 +203,11 @@ const getCodeMap = (docs: ITransaction[]) => {
       JOURNALS.INV_SALE_RETURN,
     ].includes(doc.journal);
 
-    if (moveInBranchId) {
-      branchCodes.push(normalizeSourceCode(moveInBranchId));
+    if (moveInPlaceEntityId) {
+      placeCodes.push(normalizeSourceCode(moveInPlaceEntityId));
     }
-    if (moveInDepartmentId) {
-      departmentCodes.push(normalizeSourceCode(moveInDepartmentId));
+    if (moveInResponsibleEntityId) {
+      responsibleCodes.push(normalizeSourceCode(moveInResponsibleEntityId));
     }
     if (moveInAccountId) {
       accountCodes.push(normalizeSourceCode(moveInAccountId));
@@ -262,11 +263,11 @@ const getCodeMap = (docs: ITransaction[]) => {
           normalizeSourceCode(detail.fixedAssetCategoryId),
         );
       }
-      if (detail.branchId) {
-        branchCodes.push(normalizeSourceCode(detail.branchId));
+      if (detail.placeEntityId) {
+        placeCodes.push(normalizeSourceCode(detail.placeEntityId));
       }
-      if (detail.departmentId) {
-        departmentCodes.push(normalizeSourceCode(detail.departmentId));
+      if (detail.responsibleEntityId) {
+        responsibleCodes.push(normalizeSourceCode(detail.responsibleEntityId));
       }
       if (detail.productId) {
         productCodes.push(normalizeIdentifierCode(detail.productId));
@@ -289,8 +290,8 @@ const getCodeMap = (docs: ITransaction[]) => {
 
   return {
     accountCodes: uniq(accountCodes),
-    branchCodes: uniq(branchCodes),
-    departmentCodes: uniq(departmentCodes),
+    placeCodes: uniq(placeCodes),
+    responsibleCodes: uniq(responsibleCodes),
     customerCodes: uniq(customerCodes),
     productCodes: uniq(productCodes),
     fixedAssetCategoryCodes: uniq(fixedAssetCategoryCodes),
@@ -403,8 +404,8 @@ const fetchReferenceMaps = async (
 ) => {
   const {
     accountCodes,
-    branchCodes,
-    departmentCodes,
+    placeCodes,
+    responsibleCodes,
     customerCodes,
     productCodes,
     fixedAssetCategoryCodes,
@@ -511,32 +512,9 @@ const fetchReferenceMaps = async (
     }
   }
 
-  const departments = departmentCodes.length
-    ? await sendTRPCMessage({
-        subdomain,
-        pluginName: 'core',
-        module: 'departments',
-        action: 'find',
-        defaultValue: [],
-        input: {
-          query: { code: { $in: departmentCodes } },
-          fields: { _id: 1, code: 1 },
-        },
-      })
-    : [];
-
-  const branches = branchCodes.length
-    ? await sendTRPCMessage({
-        subdomain,
-        pluginName: 'core',
-        module: 'branches',
-        action: 'find',
-        defaultValue: [],
-        input: {
-          query: { code: { $in: branchCodes } },
-          fields: { _id: 1, code: 1 },
-        },
-      })
+  const entityCodes = [...new Set([...placeCodes, ...responsibleCodes])];
+  const structureEntities = entityCodes.length
+    ? await findStructureEntities(subdomain, { code: { $in: entityCodes } })
     : [];
 
   const customers = customerCodes.length
@@ -619,8 +597,7 @@ const fetchReferenceMaps = async (
     accountsByCode: indexByCode(accounts),
     vatRowsByNumber,
     ctaxRowsByNumber,
-    branchesByCode: indexByCode(branches),
-    departmentsByCode: indexByCode(departments),
+    entitiesByCode: indexByCode(structureEntities),
     customersByCode: indexByCode(customers),
     productsByCode,
     fixedAssetCategoriesByCode: indexByCode(fixedAssetCategories),
@@ -780,9 +757,9 @@ export const findOrCreateErkhetContact = async ({
 
 const resolveDetail = (detail: ITrDetail, maps: TReferenceMaps) => {
   const accountCode = normalizeSourceCode(detail.accountId);
-  const branchCode = normalizeSourceCode(detail.branchId);
+  const placeCode = normalizeSourceCode(detail.placeEntityId);
   const productCode = normalizeIdentifierCode(detail.productId);
-  const departmentCode = normalizeSourceCode(detail.departmentId);
+  const responsibleCode = normalizeSourceCode(detail.responsibleEntityId);
   const fixedAssetCode = normalizeSourceCode(detail.fixedAssetId);
   const fixedAssetCategoryCode = normalizeSourceCode(
     detail.fixedAssetCategoryId,
@@ -811,11 +788,11 @@ const resolveDetail = (detail: ITrDetail, maps: TReferenceMaps) => {
   if (productCode && !maps.productsByCode[productCode]) {
     throw new Error(`Product not found: ${productCode}`);
   }
-  if (branchCode && !maps.branchesByCode[branchCode]) {
-    throw new Error(`Branch not found: ${branchCode}`);
+  if (placeCode && !maps.entitiesByCode[placeCode]) {
+    throw new Error(`Place not found: ${placeCode}`);
   }
-  if (departmentCode && !maps.departmentsByCode[departmentCode]) {
-    throw new Error(`Department not found: ${departmentCode}`);
+  if (responsibleCode && !maps.entitiesByCode[responsibleCode]) {
+    throw new Error(`Responsible entity not found: ${responsibleCode}`);
   }
   if (
     currencyDiffAccountCode &&
@@ -836,15 +813,15 @@ const resolveDetail = (detail: ITrDetail, maps: TReferenceMaps) => {
       : detail.fixedAssetCategoryId,
     fixedAssetCode: normalizeSourceCode(detail.fixedAssetCode),
     fixedAssetName: normalizeSourceCode(detail.fixedAssetName),
-    branchId: branchCode
-      ? maps.branchesByCode[branchCode] || detail.branchId
-      : detail.branchId,
+    placeEntityId: placeCode
+      ? maps.entitiesByCode[placeCode] || detail.placeEntityId
+      : detail.placeEntityId,
     productId: productCode
       ? maps.productsByCode[productCode] || detail.productId
       : detail.productId,
-    departmentId: departmentCode
-      ? maps.departmentsByCode[departmentCode] || detail.departmentId
-      : detail.departmentId,
+    responsibleEntityId: responsibleCode
+      ? maps.entitiesByCode[responsibleCode] || detail.responsibleEntityId
+      : detail.responsibleEntityId,
     followInfos: {
       ...cleanDetailFollowInfos(detail.followInfos),
       currencyDiffAccountId: currencyDiffAccountCode
@@ -852,9 +829,9 @@ const resolveDetail = (detail: ITrDetail, maps: TReferenceMaps) => {
         : detail.followInfos?.currencyDiffAccountId,
       invSplit,
       accountCode,
-      branchCode,
+      placeCode,
       productCode,
-      departmentCode,
+      responsibleCode,
       fixedAssetCode,
       fixedAssetCategoryCode,
       currencyDiffAccountCode,
@@ -913,13 +890,13 @@ const resolveFxaOwnerRecords = (
         ownerId: ownerRef
           ? maps.usersByRef[ownerRef]
           : responsibleUserRef
-            ? maps.usersByRef[responsibleUserRef]
-            : ownerRecord.ownerId || ownerRecord.responsibleUserId,
+          ? maps.usersByRef[responsibleUserRef]
+          : ownerRecord.ownerId || ownerRecord.responsibleUserId,
         sourceOwnerId: sourceOwnerRef
           ? maps.usersByRef[sourceOwnerRef]
           : sourceResponsibleUserRef
-            ? maps.usersByRef[sourceResponsibleUserRef]
-            : ownerRecord.sourceOwnerId || ownerRecord.sourceResponsibleUserId,
+          ? maps.usersByRef[sourceResponsibleUserRef]
+          : ownerRecord.sourceOwnerId || ownerRecord.sourceResponsibleUserId,
         sourceResponsibleUserId: sourceResponsibleUserRef
           ? maps.usersByRef[sourceResponsibleUserRef]
           : undefined,
@@ -994,8 +971,8 @@ const resolveOwnerRecordSources = async (
             candidate.action === FXA_OWNER_RECORD_ACTIONS.RECEIVED
               ? 1
               : candidate.action === FXA_OWNER_RECORD_ACTIONS.HANDED_OVER
-                ? -1
-                : 0;
+              ? -1
+              : 0;
 
           result[candidateOwnerId] =
             (result[candidateOwnerId] || 0) +
@@ -1046,9 +1023,11 @@ const resolveTransactionFollowInfos = (
   doc: ITransaction,
   maps: TReferenceMaps,
 ) => {
-  const moveInBranchCode = normalizeSourceCode(doc.followInfos?.moveInBranchId);
-  const moveInDepartmentCode = normalizeSourceCode(
-    doc.followInfos?.moveInDepartmentId,
+  const moveInPlaceCode = normalizeSourceCode(
+    doc.followInfos?.moveInPlaceEntityId,
+  );
+  const moveInResponsibleCode = normalizeSourceCode(
+    doc.followInfos?.moveInResponsibleEntityId,
   );
   const moveInAccountCode = normalizeSourceCode(
     doc.followInfos?.moveInAccountId,
@@ -1076,11 +1055,11 @@ const resolveTransactionFollowInfos = (
   // fxa болон inventory sale-ийн дагалдах данс, шилжих салбар/хэлтэс нь
   // transaction root биш followInfos дотор ирдэг. Тэдгээрийг мөн _id-р сольж
   // journal handler-т өгнө.
-  if (moveInBranchCode && !maps.branchesByCode[moveInBranchCode]) {
-    throw new Error(`Branch not found: ${moveInBranchCode}`);
+  if (moveInPlaceCode && !maps.entitiesByCode[moveInPlaceCode]) {
+    throw new Error(`Place not found: ${moveInPlaceCode}`);
   }
-  if (moveInDepartmentCode && !maps.departmentsByCode[moveInDepartmentCode]) {
-    throw new Error(`Department not found: ${moveInDepartmentCode}`);
+  if (moveInResponsibleCode && !maps.entitiesByCode[moveInResponsibleCode]) {
+    throw new Error(`Responsible entity not found: ${moveInResponsibleCode}`);
   }
   if (moveInAccountCode && !maps.accountsByCode[moveInAccountCode]) {
     throw new Error(`Account not found: ${moveInAccountCode}`);
@@ -1121,17 +1100,17 @@ const resolveTransactionFollowInfos = (
   const resolveAccountId = (code: string, fallback?: string) =>
     code ? maps.accountsByCode[code] : fallback;
 
-  resolvedFollowInfos.moveInBranchId = moveInBranchCode
-    ? maps.branchesByCode[moveInBranchCode]
-    : doc.followInfos?.moveInBranchId;
-  resolvedFollowInfos.moveInDepartmentId = moveInDepartmentCode
-    ? maps.departmentsByCode[moveInDepartmentCode]
-    : doc.followInfos?.moveInDepartmentId;
+  resolvedFollowInfos.moveInPlaceEntityId = moveInPlaceCode
+    ? maps.entitiesByCode[moveInPlaceCode]
+    : doc.followInfos?.moveInPlaceEntityId;
+  resolvedFollowInfos.moveInResponsibleEntityId = moveInResponsibleCode
+    ? maps.entitiesByCode[moveInResponsibleCode]
+    : doc.followInfos?.moveInResponsibleEntityId;
   resolvedFollowInfos.moveInAccountId = moveInAccountCode
     ? maps.accountsByCode[moveInAccountCode]
     : doc.followInfos?.moveInAccountId;
-  resolvedFollowInfos.moveInBranchCode = moveInBranchCode;
-  resolvedFollowInfos.moveInDepartmentCode = moveInDepartmentCode;
+  resolvedFollowInfos.moveInPlaceCode = moveInPlaceCode;
+  resolvedFollowInfos.moveInResponsibleCode = moveInResponsibleCode;
   resolvedFollowInfos.moveInAccountCode = moveInAccountCode;
 
   const accumulatedDepreciationAccountId = resolveAccountId(
@@ -1141,10 +1120,10 @@ const resolveTransactionFollowInfos = (
 
   if (doc.journal === JOURNALS.FXA_MOVE) {
     return {
-      moveInBranchId: resolvedFollowInfos.moveInBranchId,
-      moveInDepartmentId: resolvedFollowInfos.moveInDepartmentId,
-      moveInBranchCode,
-      moveInDepartmentCode,
+      moveInPlaceEntityId: resolvedFollowInfos.moveInPlaceEntityId,
+      moveInResponsibleEntityId: resolvedFollowInfos.moveInResponsibleEntityId,
+      moveInPlaceCode,
+      moveInResponsibleCode,
       accumulatedDepreciationAccountId,
       accumulatedDepreciationAccountCode,
     };
@@ -1247,8 +1226,8 @@ const getNumericFollowInfo = (
     typeof value === 'number'
       ? value
       : typeof value === 'string'
-        ? Number(value)
-        : NaN;
+      ? Number(value)
+      : NaN;
 
   return Number.isFinite(numberValue) ? numberValue : undefined;
 };
@@ -1266,14 +1245,14 @@ const getOpeningDepreciationTotal = (detail: ITrDetail) => {
 const getOpeningBalanceKey = (
   contentId: string | undefined,
   accountCode: string,
-  branchCode?: string,
-  departmentCode?: string,
+  placeCode?: string,
+  responsibleCode?: string,
 ) =>
   [
     contentId || '',
     normalizeSourceCode(accountCode),
-    normalizeSourceCode(branchCode),
-    normalizeSourceCode(departmentCode),
+    normalizeSourceCode(placeCode),
+    normalizeSourceCode(responsibleCode),
   ].join(':');
 
 export const normalizeOpeningFixedAssetBalances = (
@@ -1300,8 +1279,8 @@ export const normalizeOpeningFixedAssetBalances = (
       const key = getOpeningBalanceKey(
         doc.contentId,
         accountCode,
-        detail.followInfos?.branchCode || doc.followInfos?.branchCode,
-        detail.followInfos?.departmentCode || doc.followInfos?.departmentCode,
+        detail.followInfos?.placeCode || doc.followInfos?.placeCode,
+        detail.followInfos?.responsibleCode || doc.followInfos?.responsibleCode,
       );
 
       openingDepByKey.set(key, (openingDepByKey.get(key) || 0) + amount);
@@ -1327,8 +1306,8 @@ export const normalizeOpeningFixedAssetBalances = (
       const key = getOpeningBalanceKey(
         doc.contentId,
         accountCode,
-        detail.followInfos?.branchCode || doc.followInfos?.branchCode,
-        detail.followInfos?.departmentCode || doc.followInfos?.departmentCode,
+        detail.followInfos?.placeCode || doc.followInfos?.placeCode,
+        detail.followInfos?.responsibleCode || doc.followInfos?.responsibleCode,
       );
       const openingDepreciation = openingDepByKey.get(key) || 0;
 
@@ -1353,7 +1332,12 @@ const normalizeBatchDocs = async (
   userId: string,
   dryRun: boolean,
 ) => {
-  const maps = await fetchReferenceMaps(subdomain, models, batch.trDocs, dryRun);
+  const maps = await fetchReferenceMaps(
+    subdomain,
+    models,
+    batch.trDocs,
+    dryRun,
+  );
   const contactByCode: Record<string, TContactResolution> = {};
 
   // Нэг batch дотор ижил customer олон transaction дээр давтагддаг тул
@@ -1374,8 +1358,8 @@ const normalizeBatchDocs = async (
   const resolvedDocs = await Promise.all(
     batch.trDocs.map(async (doc) => {
       const customerCode = normalizeSourceCode(doc.customerId);
-      const branchCode = normalizeSourceCode(doc.branchId);
-      const departmentCode = normalizeSourceCode(doc.departmentId);
+      const placeCode = normalizeSourceCode(doc.placeEntityId);
+      const responsibleCode = normalizeSourceCode(doc.responsibleEntityId);
 
       const contact = customerCode ? contactByCode[customerCode] : undefined;
       const fxaOwnerRecords =
@@ -1392,11 +1376,11 @@ const normalizeBatchDocs = async (
       ) {
         throw new Error(`Customer not found: ${customerCode}`);
       }
-      if (branchCode && !maps.branchesByCode[branchCode]) {
-        throw new Error(`Branch not found: ${branchCode}`);
+      if (placeCode && !maps.entitiesByCode[placeCode]) {
+        throw new Error(`Place not found: ${placeCode}`);
       }
-      if (departmentCode && !maps.departmentsByCode[departmentCode]) {
-        throw new Error(`Department not found: ${departmentCode}`);
+      if (responsibleCode && !maps.entitiesByCode[responsibleCode]) {
+        throw new Error(`Responsible entity not found: ${responsibleCode}`);
       }
       const resolvedDoc = {
         ...doc,
@@ -1407,12 +1391,12 @@ const normalizeBatchDocs = async (
           (customerCode
             ? maps.customersByCode[customerCode] || doc.customerId
             : doc.customerId),
-        branchId: branchCode
-          ? maps.branchesByCode[branchCode] || doc.branchId
-          : doc.branchId,
-        departmentId: departmentCode
-          ? maps.departmentsByCode[departmentCode] || doc.departmentId
-          : doc.departmentId,
+        placeEntityId: placeCode
+          ? maps.entitiesByCode[placeCode] || doc.placeEntityId
+          : doc.placeEntityId,
+        responsibleEntityId: responsibleCode
+          ? maps.entitiesByCode[responsibleCode] || doc.responsibleEntityId
+          : doc.responsibleEntityId,
         vatRowId: resolveTransactionVatRowId(doc, maps),
         ctaxRowId: resolveTransactionCtaxRowId(doc, maps),
         details: (doc.details || []).map((detail) =>
@@ -1428,8 +1412,8 @@ const normalizeBatchDocs = async (
           migrationSource: 'erkhet',
           externalPtrId: batch.externalPtrId,
           customerCode,
-          branchCode,
-          departmentCode,
+          placeCode,
+          responsibleCode,
         },
       };
 

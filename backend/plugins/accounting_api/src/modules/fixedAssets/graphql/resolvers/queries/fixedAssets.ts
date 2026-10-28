@@ -44,27 +44,27 @@ type TFixedAssetLocationRemainderParams = {
   searchValue?: string;
   fixedAssetId?: string;
   categoryId?: string;
-  branchId?: string;
-  departmentId?: string;
+  placeEntityId?: string;
+  responsibleEntityId?: string;
   date?: Date;
   limit?: number;
 };
 
 type TFixedAssetLocationRemainderRow = {
   fixedAssetId: string;
-  branchId: string;
-  departmentId: string;
+  placeEntityId: string;
+  responsibleEntityId: string;
   remainder: number;
 };
 
 type TFixedAssetMovementTransaction = {
   journal?: string;
-  branchId?: string;
-  departmentId?: string;
+  placeEntityId?: string;
+  responsibleEntityId?: string;
   details?: {
     fixedAssetId?: string;
-    branchId?: string;
-    departmentId?: string;
+    placeEntityId?: string;
+    responsibleEntityId?: string;
     count?: number;
   }[];
 };
@@ -85,31 +85,32 @@ export const getFixedAssetRemainderExclusionFilter = (
 };
 
 const getFxaLocationRemainderKey = ({
-  branchId,
-  departmentId,
+  placeEntityId,
+  responsibleEntityId,
   fixedAssetId,
 }: {
-  branchId: string;
-  departmentId: string;
+  placeEntityId: string;
+  responsibleEntityId: string;
   fixedAssetId: string;
-}) => `${fixedAssetId}:${branchId}:${departmentId}`;
+}) => `${fixedAssetId}:${placeEntityId}:${responsibleEntityId}`;
 
 export const buildFixedAssetLocationRemainderRows = ({
-  branchId,
-  departmentId,
+  placeEntityId,
+  responsibleEntityId,
   fixedAssetIds,
   transactions,
 }: {
-  branchId?: string;
-  departmentId?: string;
+  placeEntityId?: string;
+  responsibleEntityId?: string;
   fixedAssetIds: string[];
   transactions: TFixedAssetMovementTransaction[];
 }) => {
   const fixedAssetIdSet = new Set(fixedAssetIds);
-  const normalizedBranchId = normalizeLocationId(branchId);
-  const normalizedDepartmentId = normalizeLocationId(departmentId);
-  const shouldFilterBranch = typeof branchId === 'string';
-  const shouldFilterDepartment = typeof departmentId === 'string';
+  const normalizedPlaceEntityId = normalizeLocationId(placeEntityId);
+  const normalizedResponsibleEntityId =
+    normalizeLocationId(responsibleEntityId);
+  const shouldFilterPlace = typeof placeEntityId === 'string';
+  const shouldFilterResponsible = typeof responsibleEntityId === 'string';
   const remainders = new Map<string, TFixedAssetLocationRemainderRow>();
 
   for (const transaction of transactions) {
@@ -124,33 +125,36 @@ export const buildFixedAssetLocationRemainderRows = ({
         continue;
       }
 
-      const detailBranchId = normalizeLocationId(
-        detail.branchId || transaction.branchId,
+      const detailPlaceEntityId = normalizeLocationId(
+        detail.placeEntityId || transaction.placeEntityId,
       );
-      const detailDepartmentId = normalizeLocationId(
-        detail.departmentId || transaction.departmentId,
+      const detailResponsibleEntityId = normalizeLocationId(
+        detail.responsibleEntityId || transaction.responsibleEntityId,
       );
 
-      if (shouldFilterBranch && detailBranchId !== normalizedBranchId) {
+      if (
+        shouldFilterPlace &&
+        detailPlaceEntityId !== normalizedPlaceEntityId
+      ) {
         continue;
       }
 
       if (
-        shouldFilterDepartment &&
-        detailDepartmentId !== normalizedDepartmentId
+        shouldFilterResponsible &&
+        detailResponsibleEntityId !== normalizedResponsibleEntityId
       ) {
         continue;
       }
 
       const key = getFxaLocationRemainderKey({
         fixedAssetId: detail.fixedAssetId,
-        branchId: detailBranchId,
-        departmentId: detailDepartmentId,
+        placeEntityId: detailPlaceEntityId,
+        responsibleEntityId: detailResponsibleEntityId,
       });
       const current = remainders.get(key) || {
         fixedAssetId: detail.fixedAssetId,
-        branchId: detailBranchId,
-        departmentId: detailDepartmentId,
+        placeEntityId: detailPlaceEntityId,
+        responsibleEntityId: detailResponsibleEntityId,
         remainder: 0,
       };
 
@@ -221,8 +225,8 @@ const buildFxaOwnerRecordFilter = async (
             params.fixedAssetId
               ? fixedAssetId === params.fixedAssetId
               : params.fixedAssetIds?.length
-                ? params.fixedAssetIds.includes(fixedAssetId)
-                : true,
+              ? params.fixedAssetIds.includes(fixedAssetId)
+              : true,
           ),
         }
       : { $in: fixedAssetIds };
@@ -407,14 +411,14 @@ const fixedAssets = {
     _root: undefined,
     {
       fixedAssetId,
-      branchId,
-      departmentId,
+      placeEntityId,
+      responsibleEntityId,
       date,
       excludeTransactionId,
     }: {
       fixedAssetId: string;
-      branchId?: string;
-      departmentId?: string;
+      placeEntityId?: string;
+      responsibleEntityId?: string;
       date?: Date;
       excludeTransactionId?: string;
     },
@@ -446,20 +450,21 @@ const fixedAssets = {
     );
 
     const transactions = await models.Transactions.find(filter).lean();
-    const normalizedBranchId = normalizeLocationId(branchId);
-    const normalizedDepartmentId = normalizeLocationId(departmentId);
+    const normalizedPlaceEntityId = normalizeLocationId(placeEntityId);
+    const normalizedResponsibleEntityId =
+      normalizeLocationId(responsibleEntityId);
     const remainder =
       buildFixedAssetLocationRemainderRows({
-        branchId: normalizedBranchId,
-        departmentId: normalizedDepartmentId,
+        placeEntityId: normalizedPlaceEntityId,
+        responsibleEntityId: normalizedResponsibleEntityId,
         fixedAssetIds: [fixedAssetId],
         transactions,
       })[0]?.remainder || 0;
 
     return {
       fixedAssetId,
-      branchId: normalizedBranchId,
-      departmentId: normalizedDepartmentId,
+      placeEntityId: normalizedPlaceEntityId,
+      responsibleEntityId: normalizedResponsibleEntityId,
       remainder,
     };
   },
@@ -470,8 +475,8 @@ const fixedAssets = {
       searchValue,
       fixedAssetId,
       categoryId,
-      branchId,
-      departmentId,
+      placeEntityId,
+      responsibleEntityId,
       date,
       limit,
     }: TFixedAssetLocationRemainderParams,
@@ -516,8 +521,8 @@ const fixedAssets = {
     const transactions = await models.Transactions.find(filter).lean();
 
     return buildFixedAssetLocationRemainderRows({
-      branchId,
-      departmentId,
+      placeEntityId,
+      responsibleEntityId,
       fixedAssetIds,
       transactions,
     }).slice(0, limit || 200);

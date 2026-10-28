@@ -277,8 +277,7 @@ const safeRemainderItemMutations = {
       const setOnInsert = {
         remainderId: safeRemainderId,
         productId: product._id,
-        branchId: safeRemainder.branchId,
-        departmentId: safeRemainder.departmentId,
+        placeEntityId: safeRemainder.placeEntityId,
         uom: product.uom,
         preCount: 0,
         'trInfo.activeCost': 0,

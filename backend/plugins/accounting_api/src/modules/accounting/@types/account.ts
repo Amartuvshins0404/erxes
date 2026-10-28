@@ -9,8 +9,8 @@ export interface IAccount {
   kind: string;
   journal: string;
   description?: string;
-  branchId?: string;
-  departmentId?: string;
+  placeEntityId?: string;
+  responsibleEntityId?: string;
   scopeBrandIds?: string[];
   status: string;
   isTemp?: boolean;

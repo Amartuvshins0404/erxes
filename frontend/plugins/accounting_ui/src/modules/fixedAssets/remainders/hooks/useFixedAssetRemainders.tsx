@@ -9,8 +9,8 @@ type TFixedAssetRemainderQueryParams = {
   searchValue?: string;
   fixedAssetId?: string;
   categoryId?: string;
-  branchId?: string;
-  departmentId?: string;
+  placeEntityId?: string;
+  responsibleEntityId?: string;
   date?: string;
 };
 
@@ -18,8 +18,8 @@ const FILTER_KEYS: (keyof TFixedAssetRemainderQueryParams)[] = [
   'searchValue',
   'fixedAssetId',
   'categoryId',
-  'branchId',
-  'departmentId',
+  'placeEntityId',
+  'responsibleEntityId',
   'date',
 ];
 

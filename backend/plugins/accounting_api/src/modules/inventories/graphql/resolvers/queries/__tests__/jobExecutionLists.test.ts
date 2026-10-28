@@ -27,7 +27,7 @@ test('list and count share all filters before paging and normalize the returned 
     laborCostName: 'work',
     overheadCostName: 'power',
     inputAccountId: 'ia',
-    outputBranchId: 'ob',
+    outputPlaceEntityId: 'ob',
     page: 2,
     perPage: 20,
   };

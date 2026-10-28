@@ -105,13 +105,15 @@ export const TransactionListPage = () => {
                   <span className="font-mono text-xs rounded bg-muted px-1.5 py-0.5 mr-2">
                     CF2
                   </span>
-                  <span>{t('transfer-branch')}</span>
+                  <span>{t('transfer-place', 'Transfer place')}</span>
                 </li>
                 <li>
                   <span className="font-mono text-xs rounded bg-muted px-1.5 py-0.5 mr-2">
                     CF3
                   </span>
-                  <span>{t('transfer-department')}</span>
+                  <span>
+                    {t('transfer-responsible', 'Transfer responsible')}
+                  </span>
                 </li>
               </ul>
             </div>

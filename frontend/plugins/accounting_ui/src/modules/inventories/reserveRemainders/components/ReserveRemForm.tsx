@@ -1,12 +1,12 @@
+import { STOCK_PLACE_CAPABILITY } from '@/utils/structure';
 import { Button, Form, Sheet } from 'erxes-ui';
 import {
   RemainderFormField,
   ReserveRemFormFooter,
 } from './ReserveRemFormParts';
 import {
-  SelectBranches,
+  SelectStructureEntities,
   SelectCategory,
-  SelectDepartments,
   SelectProduct,
 } from 'ui-modules';
 import { TReserveRemForm, reserveRemSchema } from '../types/reserveRemForm';
@@ -28,8 +28,7 @@ const AddReserveRemForm = ({
   const form = useForm<TReserveRemForm>({
     resolver: zodResolver(reserveRemSchema),
     defaultValues: {
-      branchIds: [],
-      departmentIds: [],
+      placeEntityIds: [],
       remainder: 0,
     },
   });
@@ -56,26 +55,12 @@ const AddReserveRemForm = ({
           <div className="grid grid-cols-2 gap-4">
             <Form.Field
               control={form.control}
-              name="branchIds"
+              name="placeEntityIds"
               render={({ field }) => (
                 <Form.Item>
-                  <Form.Label>{t('branch')}</Form.Label>
-                  <SelectBranches.FormItem
-                    mode="multiple"
-                    value={field.value}
-                    onValueChange={field.onChange}
-                  />
-                  <Form.Message />
-                </Form.Item>
-              )}
-            />
-            <Form.Field
-              control={form.control}
-              name="departmentIds"
-              render={({ field }) => (
-                <Form.Item>
-                  <Form.Label>{t('department')}</Form.Label>
-                  <SelectDepartments.FormItem
+                  <Form.Label>{t('place', 'Place')}</Form.Label>
+                  <SelectStructureEntities.FormItem
+                    capability={STOCK_PLACE_CAPABILITY}
                     mode="multiple"
                     value={field.value}
                     onValueChange={field.onChange}

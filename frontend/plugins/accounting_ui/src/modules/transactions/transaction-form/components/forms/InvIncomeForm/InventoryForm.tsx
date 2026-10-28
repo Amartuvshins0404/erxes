@@ -150,8 +150,7 @@ const InventoryTableHeader = ({
         {showAdvancedView && (
           <>
             <Table.Head>{t('weight')}</Table.Head>
-            <Table.Head>{t('branch')}</Table.Head>
-            <Table.Head>{t('department')}</Table.Head>
+            <Table.Head>{t('place', 'Place')}</Table.Head>
           </>
         )}
       </Table.Row>

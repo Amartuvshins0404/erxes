@@ -79,8 +79,7 @@ query accountingAdjustInventoryDetails($_id: String!, $page: Int, $perPage: Int)
     updatedAt
     productId
     accountId
-    departmentId
-    branchId
+    placeEntityId
     remainder
     cost
     unitCost
@@ -97,12 +96,7 @@ query accountingAdjustInventoryDetails($_id: String!, $page: Int, $perPage: Int)
       kind
       journal
     }
-    branch {
-      _id
-      code
-      title
-    }
-    department {
+    placeEntity {
       _id
       code
       title

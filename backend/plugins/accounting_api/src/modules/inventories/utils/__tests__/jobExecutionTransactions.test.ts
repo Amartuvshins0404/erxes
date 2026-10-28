@@ -30,11 +30,9 @@ const execution: SingleJobFixture = {
   jobId: 'card',
   quantity: 1,
   inputAccountId: 'raw',
-  inputBranchId: 'source',
-  inputDepartmentId: 'source-dept',
+  inputPlaceEntityId: 'source',
   outputAccountId: 'finished',
-  outputBranchId: 'target',
-  outputDepartmentId: 'target-dept',
+  outputPlaceEntityId: 'target',
   inputs: [{ productId: 'raw-product', uom: 'box', quantity: 2 }],
   outputs: [
     { productId: 'a', quantity: 1, costRatio: 1 },
@@ -70,14 +68,12 @@ test('allocates material, labor and overhead by raw output ratios and balances t
   ]);
   expect(docs[0]).toMatchObject({
     side: 'ct',
-    branchId: 'source',
-    departmentId: 'source-dept',
+    placeEntityId: 'source',
     details: [{ accountId: 'raw', count: 10, unitPrice: 6, amount: 60 }],
   });
   expect(docs[1]).toMatchObject({
     side: 'dt',
-    branchId: 'target',
-    departmentId: 'target-dept',
+    placeEntityId: 'target',
   });
   expect(docs[1].details.map((row) => row.amount)).toEqual([25, 25, 50]);
   expect(docs[1].details.map((row) => row.unitPrice)).toEqual([25, 25, 25]);

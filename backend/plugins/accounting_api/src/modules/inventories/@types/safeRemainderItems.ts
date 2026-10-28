@@ -1,8 +1,7 @@
 import { Document } from 'mongoose';
 
 export interface IRemainderParams {
-  departmentId?: string;
-  branchId?: string;
+  placeEntityId?: string;
   productId: string;
   uom?: string;
 }
@@ -38,7 +37,8 @@ export interface ISafeRemainderItem {
 }
 
 export interface ISafeRemainderItemDocument
-  extends ISafeRemainderItem, Document {
+  extends ISafeRemainderItem,
+    Document {
   _id: string;
   createdAt: Date;
   createdBy: string;

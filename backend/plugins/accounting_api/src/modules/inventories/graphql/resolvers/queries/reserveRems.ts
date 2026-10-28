@@ -12,8 +12,7 @@ interface IListArgs {
   sortDirection: number;
   _ids: string[];
   searchValue;
-  departmentId: string;
-  branchId: string;
+  placeEntityId: string;
   productId: string;
   productCategoryId: string;
   dateType: string;
@@ -22,23 +21,13 @@ interface IListArgs {
 }
 
 const getGenerateFilter = async (subdomain: string, params: IListArgs) => {
-  const {
-    _ids,
-    searchValue,
-    branchId,
-    departmentId,
-    productId,
-    productCategoryId,
-  } = params;
+  const { _ids, searchValue, placeEntityId, productId, productCategoryId } =
+    params;
 
   const filter: any = {};
 
-  if (branchId) {
-    filter.branchId = branchId;
-  }
-
-  if (departmentId) {
-    filter.departmentId = departmentId;
+  if (placeEntityId) {
+    filter.placeEntityId = placeEntityId;
   }
 
   if (productId) {

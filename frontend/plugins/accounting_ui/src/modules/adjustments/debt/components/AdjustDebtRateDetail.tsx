@@ -23,7 +23,7 @@ import { useState } from 'react';
 import { EditAdjustDebtRate } from './AdjustDebtRateForm';
 import { useAdjustDebtRateRun } from '../hooks/useAdjustDebtRateRun';
 import type { IAdjustDebtRateDetail } from '../types/AdjustDebtRate';
-import { SelectBranches, SelectDepartments } from 'ui-modules';
+import { StructureEntitiesInline } from 'ui-modules';
 import { ColumnDef } from '@tanstack/react-table';
 
 const DetailField = ({ label, value }: { label: string; value?: string }) => (
@@ -60,16 +60,24 @@ const AmountCell = ({ amount }: { amount?: number }) => (
   </RecordTableInlineCell>
 );
 
-const BranchCell = ({ branchId }: { branchId?: string }) => (
+const PlaceCell = ({ placeEntityId }: { placeEntityId?: string }) => (
   <RecordTableInlineCell>
-    {branchId ? <SelectBranches.InlineCell branchIds={[branchId]} /> : '-'}
+    {placeEntityId ? (
+      <StructureEntitiesInline entityIds={[placeEntityId]} />
+    ) : (
+      '-'
+    )}
   </RecordTableInlineCell>
 );
 
-const DepartmentCell = ({ departmentId }: { departmentId?: string }) => (
+const ResponsibleCell = ({
+  responsibleEntityId,
+}: {
+  responsibleEntityId?: string;
+}) => (
   <RecordTableInlineCell>
-    {departmentId ? (
-      <SelectDepartments.InlineCell departmentIds={[departmentId]} />
+    {responsibleEntityId ? (
+      <StructureEntitiesInline entityIds={[responsibleEntityId]} />
     ) : (
       '-'
     )}
@@ -102,20 +110,23 @@ const adjustDebtRateDetailColumns = (
     size: 220,
   },
   {
-    id: 'branch',
+    id: 'placeEntity',
     header: () => (
-      <RecordTable.InlineHead icon={IconBuilding} label={t('branch')} />
+      <RecordTable.InlineHead icon={IconBuilding} label={t('place', 'Place')} />
     ),
-    cell: ({ row }) => <BranchCell branchId={row.original.branchId} />,
+    cell: ({ row }) => <PlaceCell placeEntityId={row.original.placeEntityId} />,
     size: 180,
   },
   {
-    id: 'department',
+    id: 'responsibleEntity',
     header: () => (
-      <RecordTable.InlineHead icon={IconBuilding} label={t('department')} />
+      <RecordTable.InlineHead
+        icon={IconBuilding}
+        label={t('responsible', 'Responsible')}
+      />
     ),
     cell: ({ row }) => (
-      <DepartmentCell departmentId={row.original.departmentId} />
+      <ResponsibleCell responsibleEntityId={row.original.responsibleEntityId} />
     ),
     size: 180,
   },
@@ -274,13 +285,16 @@ export const AdjustDebtRateDetail = () => {
               value={adjustDebtRate.customerId}
             />
           )}
-          {adjustDebtRate.branchId && (
-            <DetailField label={t('branch')} value={adjustDebtRate.branchId} />
-          )}
-          {adjustDebtRate.departmentId && (
+          {adjustDebtRate.placeEntityId && (
             <DetailField
-              label={t('department')}
-              value={adjustDebtRate.departmentId}
+              label={t('place', 'Place')}
+              value={adjustDebtRate.placeEntityId}
+            />
+          )}
+          {adjustDebtRate.responsibleEntityId && (
+            <DetailField
+              label={t('responsible', 'Responsible')}
+              value={adjustDebtRate.responsibleEntityId}
             />
           )}
           <DetailField

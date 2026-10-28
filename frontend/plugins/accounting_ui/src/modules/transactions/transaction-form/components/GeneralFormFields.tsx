@@ -3,7 +3,7 @@ import { SelectAccount } from '@/settings/account/components/SelectAccount';
 import { IAccount } from '@/settings/account/types/Account';
 import { CurrencyField, Form, Input, Select } from 'erxes-ui';
 import { useWatch } from 'react-hook-form';
-import { SelectBranches, SelectDepartments, SelectMember } from 'ui-modules';
+import { SelectMember, SelectStructureEntities } from 'ui-modules';
 import { ICommonFieldProps } from '../types/JournalForms';
 
 export const AccountField = ({
@@ -40,12 +40,15 @@ export const AccountField = ({
       );
     }
 
-    if (account?.branchId) {
-      form.setValue(`trDocs.${index}.branchId`, account.branchId);
+    if (account?.placeEntityId) {
+      form.setValue(`trDocs.${index}.placeEntityId`, account.placeEntityId);
     }
 
-    if (account?.departmentId) {
-      form.setValue(`trDocs.${index}.departmentId`, account.departmentId);
+    if (account?.responsibleEntityId) {
+      form.setValue(
+        `trDocs.${index}.responsibleEntityId`,
+        account.responsibleEntityId,
+      );
     }
 
     onAccountChange?.(account);
@@ -167,19 +170,24 @@ export const AssignToField = ({ form, index, labelTxt }: ICommonFieldProps) => {
   );
 };
 
-export const BranchField = ({ form, index, labelTxt }: ICommonFieldProps) => {
+export const PlaceField = ({
+  form,
+  index,
+  labelTxt,
+  capability,
+}: ICommonFieldProps & { capability?: string }) => {
   const { t } = useTranslation('accounting');
   const details = useWatch({
     control: form.control,
     name: `trDocs.${index}.details`,
   }) as unknown[];
 
-  const onChangeBranch = (branchId: string[] | string | undefined) => {
-    form.setValue(`trDocs.${index}.branchId`, branchId as string);
+  const onChangePlace = (placeEntityId: string[] | string | undefined) => {
+    form.setValue(`trDocs.${index}.placeEntityId`, placeEntityId as string);
     details.forEach((_d, ind) => {
       form.setValue(
-        `trDocs.${index}.details.${ind}.branchId`,
-        branchId as string,
+        `trDocs.${index}.details.${ind}.placeEntityId`,
+        placeEntityId as string,
       );
     });
   };
@@ -187,15 +195,18 @@ export const BranchField = ({ form, index, labelTxt }: ICommonFieldProps) => {
   return (
     <Form.Field
       control={form.control}
-      name={`trDocs.${index}.branchId`}
+      name={`trDocs.${index}.placeEntityId`}
       render={({ field }) => (
         <Form.Item>
-          <Form.Label>{labelTxt ? t(labelTxt) : t('branch')}</Form.Label>
+          <Form.Label>
+            {labelTxt ? t(labelTxt) : t('place', 'Place')}
+          </Form.Label>
           <Form.Control>
-            <SelectBranches.FormItem
+            <SelectStructureEntities.FormItem
               mode="single"
+              capability={capability}
               value={field.value ?? ''}
-              onValueChange={onChangeBranch}
+              onValueChange={onChangePlace}
             />
           </Form.Control>
           <Form.Message />
@@ -205,7 +216,7 @@ export const BranchField = ({ form, index, labelTxt }: ICommonFieldProps) => {
   );
 };
 
-export const DepartmentField = ({
+export const ResponsibleField = ({
   form,
   index,
   labelTxt,
@@ -216,12 +227,17 @@ export const DepartmentField = ({
     name: `trDocs.${index}.details`,
   }) as unknown[];
 
-  const onChangeDepartment = (departmentId: string[] | string | undefined) => {
-    form.setValue(`trDocs.${index}.departmentId`, departmentId as string);
+  const onChangeResponsible = (
+    responsibleEntityId: string[] | string | undefined,
+  ) => {
+    form.setValue(
+      `trDocs.${index}.responsibleEntityId`,
+      responsibleEntityId as string,
+    );
     details.forEach((_d, ind) => {
       form.setValue(
-        `trDocs.${index}.details.${ind}.departmentId`,
-        departmentId as string,
+        `trDocs.${index}.details.${ind}.responsibleEntityId`,
+        responsibleEntityId as string,
       );
     });
   };
@@ -229,15 +245,17 @@ export const DepartmentField = ({
   return (
     <Form.Field
       control={form.control}
-      name={`trDocs.${index}.departmentId`}
+      name={`trDocs.${index}.responsibleEntityId`}
       render={({ field }) => (
         <Form.Item>
-          <Form.Label>{labelTxt ? t(labelTxt) : t('department')}</Form.Label>
+          <Form.Label>
+            {labelTxt ? t(labelTxt) : t('responsible', 'Responsible')}
+          </Form.Label>
           <Form.Control>
-            <SelectDepartments.FormItem
+            <SelectStructureEntities.FormItem
               mode="single"
               value={field.value ?? ''}
-              onValueChange={onChangeDepartment}
+              onValueChange={onChangeResponsible}
             />
           </Form.Control>
           <Form.Message />

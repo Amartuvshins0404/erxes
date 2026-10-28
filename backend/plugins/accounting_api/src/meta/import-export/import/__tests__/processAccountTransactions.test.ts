@@ -49,12 +49,11 @@ const mockRelatedData = () => {
   >;
 
   mockedSendTRPCMessage.mockImplementation(async ({ module }) => {
-    if (module === 'branches') {
-      return [{ _id: 'branch-1', code: 'BR01' }];
-    }
-
-    if (module === 'departments') {
-      return [{ _id: 'department-1', code: 'DP01' }];
+    if (module === 'structureEntities') {
+      return [
+        { _id: 'branch-1', code: 'BR01' },
+        { _id: 'department-1', code: 'DP01' },
+      ];
     }
 
     return [];
@@ -81,8 +80,8 @@ describe('account transaction import fixed assets', () => {
           description: 'Fixed asset import',
           side: 'dt',
           accountCode: '1010',
-          branchId: 'BR01',
-          departmentId: 'DP01',
+          placeEntityId: 'BR01',
+          responsibleEntityId: 'DP01',
           productCode: 'LAPTOP',
           count: 2,
           unitPrice: 500,
@@ -105,8 +104,8 @@ describe('account transaction import fixed assets', () => {
     expect(trDocs[0].details[0]).toEqual(
       expect.objectContaining({
         accountId: 'asset-account',
-        branchId: 'branch-1',
-        departmentId: 'department-1',
+        placeEntityId: 'branch-1',
+        responsibleEntityId: 'department-1',
         productId: '',
         fixedAssetId: '',
         fixedAssetCode: 'LAPTOP',
@@ -248,8 +247,8 @@ describe('account transaction import fixed assets', () => {
           description: 'Fixed asset move import',
           side: 'ct',
           accountCode: '1010',
-          branchId: 'BR01',
-          departmentId: 'DP01',
+          placeEntityId: 'BR01',
+          responsibleEntityId: 'DP01',
           fixedAssetCode: 'LAPTOP',
           count: 1,
           unitPrice: 500,
@@ -264,8 +263,8 @@ describe('account transaction import fixed assets', () => {
     const trDocs = models.Transactions.createPTransaction.mock.calls[0][0];
     expect(trDocs[0].followInfos).toEqual(
       expect.objectContaining({
-        moveInBranchId: 'branch-1',
-        moveInDepartmentId: 'department-1',
+        moveInPlaceEntityId: 'branch-1',
+        moveInResponsibleEntityId: 'department-1',
         accumulatedDepreciationAccountId: 'accumulated-account',
       }),
     );

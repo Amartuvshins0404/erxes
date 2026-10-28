@@ -1,10 +1,11 @@
+import { STOCK_PLACE_CAPABILITY } from '@/utils/structure';
 import { JournalEnum } from '@/settings/account/types/Account';
 import { ITransactionGroupForm } from '../../../types/JournalForms';
 import {
   AccountField,
   AssignToField,
-  BranchField,
-  DepartmentField,
+  PlaceField,
+  ResponsibleField,
   DescriptionField,
   SideField,
 } from '../../GeneralFormFields';
@@ -36,8 +37,12 @@ export const InvJustifyForm = ({
           labelTxt="cost-change"
         />
         <CustomerFields form={form} index={index} />
-        <BranchField form={form} index={index} />
-        <DepartmentField form={form} index={index} />
+        <PlaceField
+          form={form}
+          index={index}
+          capability={STOCK_PLACE_CAPABILITY}
+        />
+        <ResponsibleField form={form} index={index} />
         <AssignToField form={form} index={index} />
         <DescriptionField form={form} index={index} />
       </div>

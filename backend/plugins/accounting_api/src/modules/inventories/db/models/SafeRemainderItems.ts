@@ -8,7 +8,8 @@ import {
 } from '../../@types/safeRemainderItems';
 import { safeRemainderItemSchema } from '../definitions/safeRemainderItems';
 
-export interface ISafeRemainderItemModel extends Model<ISafeRemainderItemDocument> {
+export interface ISafeRemainderItemModel
+  extends Model<ISafeRemainderItemDocument> {
   getItem(_id: string): Promise<ISafeRemainderItemDocument>;
   getItemCount(params: IRemainderParams): Promise<number>;
   createItem(
@@ -46,11 +47,10 @@ export const loadSafeRemainderItemClass = (models: IModels) => {
      * @returns Count number
      */
     public static async getItemCount(params: IRemainderParams) {
-      const { productId, departmentId, branchId } = params;
+      const { productId, placeEntityId } = params;
       const filter: FilterQuery<ISafeRemainderItemDocument> = { productId };
 
-      if (departmentId) filter.departmentId = departmentId;
-      if (branchId) filter.branchId = branchId;
+      if (placeEntityId) filter.placeEntityId = placeEntityId;
 
       const safeRemainderItems = await models.SafeRemainderItems.find(filter);
 

@@ -22,8 +22,8 @@ export const types = `
     fixedAssetId: String
     categoryId: String
     accountId: String
-    branchId: String
-    departmentId: String
+    placeEntityId: String
+    responsibleEntityId: String
 
     originalCost: Float
     salvageValue: Float

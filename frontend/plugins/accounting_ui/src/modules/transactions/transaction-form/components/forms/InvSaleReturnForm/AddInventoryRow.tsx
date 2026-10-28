@@ -66,8 +66,8 @@ export const AddDetailRowButton = ({
               variables: {
                 productIds,
                 accountId: trDoc.followInfos.saleOutAccountId,
-                branchId: trDoc.branchId,
-                departmentId: trDoc.departmentId,
+                placeEntityId: trDoc.placeEntityId,
+                responsibleEntityId: trDoc.responsibleEntityId,
               },
               fetchPolicy: 'network-only',
             });

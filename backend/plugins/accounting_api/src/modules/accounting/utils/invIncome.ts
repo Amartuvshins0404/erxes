@@ -38,8 +38,8 @@ export const InvIncomeExpenseTrs = async (
       description: transaction.description,
       journal: getSingleJournalByAccount(account.journal, account.kind),
       side: TR_SIDES.CREDIT,
-      branchId: transaction.branchId,
-      departmentId: transaction.departmentId,
+      placeEntityId: transaction.placeEntityId,
+      responsibleEntityId: transaction.responsibleEntityId,
       customerType: transaction.customerType,
       customerId: transaction.customerId,
       details: [
@@ -54,9 +54,11 @@ export const InvIncomeExpenseTrs = async (
     const oldTr = oldFollowTrs.find(
       (oftr) => oftr.originSubId === expenseInfo._id,
     );
-    if (oldTr) { matchedIds.push(oldTr._id); }
+    if (oldTr) {
+      matchedIds.push(oldTr._id);
+    }
 
-    await createOrUpdateTr(models, userId, followTrDoc, oldTr)
+    await createOrUpdateTr(models, userId, followTrDoc, oldTr);
   }
 
   const removeTrIds = oldFollowTrs

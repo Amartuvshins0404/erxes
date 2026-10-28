@@ -1,10 +1,10 @@
+import { STOCK_PLACE_CAPABILITY } from '@/utils/structure';
 import { Combobox, Command, Filter } from 'erxes-ui';
 import {
-  SelectBranches,
   SelectBrands,
   SelectCategory,
   SelectCompany,
-  SelectDepartments,
+  SelectStructureEntities,
   TagsFilter,
 } from 'ui-modules';
 import {
@@ -48,10 +48,9 @@ export const ProductsFilterPopover = () => {
               <Filter.SearchValueTrigger />
               <SelectCategory.FilterItem value="categoryIds" label={t('category')} />
               <SelectProductTypeFilterItem />
-              <SelectBranches.FilterItem value="branchId" label={t('branch')} />
-              <SelectDepartments.FilterItem
-                value="departmentId"
-                label={t('department')}
+              <SelectStructureEntities.FilterItem
+                value="placeEntityId"
+                label={t('place', 'Place')}
               />
               <SelectBrands.FilterItem value="brandIds" label={t('brand')} />
               <SelectCompany.FilterItem value="vendorId" label={t('vendor')} />
@@ -78,8 +77,11 @@ export const ProductsFilterPopover = () => {
         </Filter.View>
         <SelectCategory.FilterView filterKey="categoryIds" mode="multiple" />
         <SelectProductTypeFilterView />
-        <SelectBranches.FilterView mode="single" filterKey="branchId" />
-        <SelectDepartments.FilterView mode="single" filterKey="departmentId" />
+        <SelectStructureEntities.FilterView
+          capability={STOCK_PLACE_CAPABILITY}
+          mode="single"
+          filterKey="placeEntityId"
+        />
         <SelectBrands.FilterView mode="multiple" filterKey="brandIds" />
         <SelectCompany.FilterView mode="single" filterKey="vendorId" />
         <TagsFilter.View tagType={PRODUCT_TAG_TYPE} />
@@ -136,15 +138,11 @@ export const ProductsFilter = () => {
           mode="multiple"
         />
         <SelectProductTypeFilterBar />
-        <SelectBranches.FilterBar
+        <SelectStructureEntities.FilterBar
+          capability={STOCK_PLACE_CAPABILITY}
           mode="single"
-          filterKey="branchId"
-          label={t('branch')}
-        />
-        <SelectDepartments.FilterBar
-          mode="single"
-          filterKey="departmentId"
-          label={t('department')}
+          filterKey="placeEntityId"
+          label={t('place', 'Place')}
         />
         <SelectBrands.FilterBar
           mode="multiple"

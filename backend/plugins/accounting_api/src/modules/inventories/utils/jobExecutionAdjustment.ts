@@ -119,15 +119,13 @@ export const reallocateJobExecutionIncome = async (
   await changes.reduce<Promise<void>>(
     (previous, { detail, amount }) =>
       previous.then(async () => {
-        const branchId = detail.branchId || income.branchId;
-        const departmentId = detail.departmentId || income.departmentId;
-        if (!branchId || !departmentId || !detail.productId) return;
+        const placeEntityId = detail.placeEntityId || income.placeEntityId;
+        if (!placeEntityId || !detail.productId) return;
         await models.AdjustInvDetails.increaseAdjustInvDetail({
           adjustId,
           accountId: detail.accountId,
           productId: detail.productId,
-          branchId,
-          departmentId,
+          placeEntityId,
           count: 0,
           amount,
           multiplier: 1,

@@ -32,8 +32,8 @@ subscription AccountingAdjustFundRateChanged($adjustId: String!) {
       currencyBalance
       diff
       transactionId
-      branchId
-      departmentId
+      placeEntityId
+      responsibleEntityId
       createdAt
       updatedAt
     }

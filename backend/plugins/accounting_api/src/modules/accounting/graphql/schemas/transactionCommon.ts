@@ -8,8 +8,8 @@ const trDetailFields = `
   originType: String
   originSubId: String
   followInfos: JSON
-  branchId: String
-  departmentId: String
+  placeEntityId: String
+  responsibleEntityId: String
 
   amount: Float
   currencyAmount: Float
@@ -45,8 +45,8 @@ const transactionFields = `
   followInfos: JSON
   relAccounts: JSON
 
-  branchId: String
-  departmentId: String
+  placeEntityId: String
+  responsibleEntityId: String
   customerType: String
   customerId: String
   assignedUserIds: [String]
@@ -72,8 +72,8 @@ export const types = () => `
     ${trDetailFields}
 
     account: Account
-    branch: Branch
-    department: Department
+    placeEntity: StructureEntity
+    responsibleEntity: StructureEntity
     product: Product
   }
 
@@ -103,8 +103,8 @@ export const types = () => `
     ctaxRow: CtaxRow
     followTrs: [AccCommonTransaction]
 
-    branch: Branch
-    department: Department
+    placeEntity: StructureEntity
+    responsibleEntity: StructureEntity
     customer: AccCustomer
 
     ptrInfo: JSON
@@ -138,8 +138,8 @@ export const types = () => `
     ctaxRow: CtaxRow
     followTrs: [AccCommonTransaction]
 
-    branch: Branch
-    department: Department
+    placeEntity: StructureEntity
+    responsibleEntity: StructureEntity
     customer: AccCustomer
   }
 
@@ -195,16 +195,16 @@ const trsQueryParams = `
   accountBrand: String,
   accountIsTemp: Boolean,
   accountIsOutBalance: Boolean,
-  accountBranchId: String,
-  accountDepartmentId: String,
+  accountPlaceEntityId: String,
+  accountResponsibleEntityId: String,
   accountCurrency: String,
   accountJournal: String,
 
   brandId: String,
   isTemp: Boolean,
   isOutBalance: Boolean,
-  branchId: String,
-  departmentId: String,
+  placeEntityId: String,
+  responsibleEntityId: String,
   currency: String,
   journal: String,
   journals: [String],

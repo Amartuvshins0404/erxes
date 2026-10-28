@@ -32,8 +32,8 @@ mutation AccountingAdjustFundRateCalculate($_id: String!) {
       currencyBalance
       diff
       transactionId
-      branchId
-      departmentId
+      placeEntityId
+      responsibleEntityId
       createdAt
       updatedAt
     }
@@ -73,8 +73,8 @@ mutation AccountingAdjustFundRateDoTransaction($_id: String!) {
       currencyBalance
       diff
       transactionId
-      branchId
-      departmentId
+      placeEntityId
+      responsibleEntityId
       createdAt
       updatedAt
     }

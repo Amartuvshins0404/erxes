@@ -20,8 +20,8 @@ mutation AccountingAdjustDebtRateCalculate($_id: String!) {
     checkedAt
     error
     warning
-    branchId
-    departmentId
+    placeEntityId
+    responsibleEntityId
     createdBy
     modifiedBy
     createdAt
@@ -35,8 +35,8 @@ mutation AccountingAdjustDebtRateCalculate($_id: String!) {
       accountCurrency
       customerType
       customerId
-      branchId
-      departmentId
+      placeEntityId
+      responsibleEntityId
       mainBalance
       currencyBalance
       diff
@@ -68,8 +68,8 @@ mutation AccountingAdjustDebtRateDoTransaction($_id: String!) {
     checkedAt
     error
     warning
-    branchId
-    departmentId
+    placeEntityId
+    responsibleEntityId
     createdBy
     modifiedBy
     createdAt
@@ -83,8 +83,8 @@ mutation AccountingAdjustDebtRateDoTransaction($_id: String!) {
       accountCurrency
       customerType
       customerId
-      branchId
-      departmentId
+      placeEntityId
+      responsibleEntityId
       mainBalance
       currencyBalance
       diff

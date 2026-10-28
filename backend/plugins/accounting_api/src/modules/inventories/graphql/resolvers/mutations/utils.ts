@@ -38,12 +38,12 @@ const EMPTY_LOCATION_VALUES = [null, ''];
 
 const inventoryKey = (id?: string) => id || '_';
 
-const locationFilter = (field: 'branchId' | 'departmentId', id?: string) => {
+const locationFilter = (id?: string) => {
   if (id && id !== '_') {
-    return { [field]: id };
+    return { placeEntityId: id };
   }
 
-  return { [field]: { $in: EMPTY_LOCATION_VALUES } };
+  return { placeEntityId: { $in: EMPTY_LOCATION_VALUES } };
 };
 
 const emptyInventoryInfo = (): TInventoryInfo => ({
@@ -116,9 +116,8 @@ export const setSafeRemItems = async (
   safeRemainder: ISafeRemainderDocument,
   userId: string,
 ) => {
-  const { productCategoryId, branchId, departmentId } = safeRemainder;
-  const branchKey = inventoryKey(branchId);
-  const departmentKey = inventoryKey(departmentId);
+  const { productCategoryId, placeEntityId } = safeRemainder;
+  const placeKey = inventoryKey(placeEntityId);
   const existingProductIds: string[] = await models.SafeRemainderItems.distinct(
     'productId',
     { remainderId: safeRemainder._id },
@@ -127,7 +126,7 @@ export const setSafeRemItems = async (
     _id: 1,
     uom: 1,
     code: 1,
-    [`inventories.${branchKey}.${departmentKey}`]: 1,
+    [`inventories.${placeKey}`]: 1,
   };
   const products: TSafeRemainderProduct[] = await sendTRPCMessage({
     subdomain,
@@ -165,8 +164,7 @@ export const setSafeRemItems = async (
   ).map((acc) => acc._id);
 
   const trFilter: any = {
-    ...locationFilter('branchId', branchId),
-    ...locationFilter('departmentId', departmentId),
+    ...locationFilter(placeEntityId),
     'details.accountId': { $in: invAccountIds },
     'details.productId': { $in: allProductIds },
     date: { $lte: safeRemainder.date },
@@ -183,8 +181,7 @@ export const setSafeRemItems = async (
     trFilter.date.$gt = lastAdjInv.date;
     const lastConfigedDetails = await models.AdjustInvDetails.find({
       adjustId: lastAdjInv._id,
-      ...locationFilter('branchId', branchId),
-      ...locationFilter('departmentId', departmentId),
+      ...locationFilter(placeEntityId),
       productId: { $in: allProductIds },
     }).lean();
 
@@ -373,8 +370,7 @@ export const safeRemainderDoTrs = async (
     date: safeRemainder.date,
     journal,
     status: TR_STATUSES.COMPLETE,
-    branchId: safeRemainder.branchId,
-    departmentId: safeRemainder.departmentId,
+    placeEntityId: safeRemainder.placeEntityId,
     description: 'Census',
     contentType: 'safeRem',
     contentId: safeRemainder._id,
@@ -417,14 +413,12 @@ export const safeRemainderUndoTrs = async (models: IModels, trId?: string) => {
 export const updateLiveRemainders = async ({
   subdomain,
   models,
-  departmentId,
-  branchId,
+  placeEntityId,
   productCategoryId,
   productIds,
 }: IUpdateRemaindersParams & { subdomain: string; models: IModels }) => {
   const productFilter: any = { status: { $ne: 'deleted' } };
-  const branchKey = inventoryKey(branchId);
-  const departmentKey = inventoryKey(departmentId);
+  const placeKey = inventoryKey(placeEntityId);
 
   if (productIds?.length) {
     productFilter._id = { $in: productIds };
@@ -439,7 +433,7 @@ export const updateLiveRemainders = async ({
     input: {
       query: productFilter,
       categoryId: productCategoryId,
-      fields: { _id: 1, [`inventories.${branchKey}.${departmentKey}`]: 1 },
+      fields: { _id: 1, [`inventories.${placeKey}`]: 1 },
       sort: { code: 1 },
     },
     defaultValue: [],
@@ -455,8 +449,7 @@ export const updateLiveRemainders = async ({
   ).map((acc) => acc._id);
 
   const trFilter: any = {
-    ...locationFilter('branchId', branchId),
-    ...locationFilter('departmentId', departmentId),
+    ...locationFilter(placeEntityId),
     'details.accountId': { $in: invAccountIds },
     'details.productId': { $in: allProductIds },
     status: {
@@ -477,8 +470,7 @@ export const updateLiveRemainders = async ({
     trFilter.date = { $gt: lastAdjInv.date };
     const lastConfigedDetails = await models.AdjustInvDetails.find({
       adjustId: lastAdjInv._id,
-      ...locationFilter('branchId', branchId),
-      ...locationFilter('departmentId', departmentId),
+      ...locationFilter(placeEntityId),
       productId: { $in: allProductIds },
     }).lean();
 
@@ -522,14 +514,10 @@ export const updateLiveRemainders = async ({
 
   for (const product of products) {
     const productId = product._id;
-    const productRemainder =
-      product.inventories?.[branchKey]?.[departmentKey]?.remainder ?? 0;
-    const productCost =
-      product.inventories?.[branchKey]?.[departmentKey]?.cost ?? 0;
-    const productSoonIn =
-      product.inventories?.[branchKey]?.[departmentKey]?.soonIn ?? 0;
-    const productSoonOut =
-      product.inventories?.[branchKey]?.[departmentKey]?.soonOut ?? 0;
+    const productRemainder = product.inventories?.[placeKey]?.remainder ?? 0;
+    const productCost = product.inventories?.[placeKey]?.cost ?? 0;
+    const productSoonIn = product.inventories?.[placeKey]?.soonIn ?? 0;
+    const productSoonOut = product.inventories?.[placeKey]?.soonOut ?? 0;
     const newInfo = inventoryByProductId[productId] ?? {
       remainder: 0,
       cost: 0,
@@ -562,8 +550,7 @@ export const updateLiveRemainders = async ({
         module: 'products',
         action: 'setInventories',
         input: {
-          branchId,
-          departmentId,
+          placeEntityId,
           productsInfo: bulkOps,
         },
       });
@@ -580,8 +567,7 @@ export const updateLiveRemainders = async ({
       module: 'products',
       action: 'setInventories',
       input: {
-        branchId,
-        departmentId,
+        placeEntityId,
         productsInfo: bulkOps,
       },
     });

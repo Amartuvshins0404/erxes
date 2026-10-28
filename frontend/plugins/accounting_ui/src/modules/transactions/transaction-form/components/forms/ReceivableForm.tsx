@@ -5,8 +5,8 @@ import {
   AccountField,
   AmountField,
   AssignToField,
-  BranchField,
-  DepartmentField,
+  PlaceField,
+  ResponsibleField,
   DescriptionField,
   SideField,
 } from '../GeneralFormFields';
@@ -45,8 +45,8 @@ export const ReceivableTransaction = ({
         />
         <CustomerFields form={form} index={index} />
         <AssignToField form={form} index={index} />
-        <BranchField form={form} index={index} />
-        <DepartmentField form={form} index={index} />
+        <PlaceField form={form} index={index} />
+        <ResponsibleField form={form} index={index} />
         <DescriptionField form={form} index={index} />
         <CurrencyForm
           form={form}

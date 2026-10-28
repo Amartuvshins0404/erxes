@@ -16,13 +16,7 @@ const reserveRemsMutations = {
     doc: IReserveRemsAddParams,
     { user, models, subdomain }: IContext,
   ) => {
-    const {
-      departmentIds,
-      branchIds,
-      remainder,
-      productCategoryId,
-      productId,
-    } = doc;
+    const { placeEntityIds, remainder, productCategoryId, productId } = doc;
     if (!productCategoryId && !productId) {
       throw new Error('Must fill product category or product');
     }
@@ -32,19 +26,19 @@ const reserveRemsMutations = {
       productId,
       productCategoryId,
     );
-    const targetBranchIds = branchIds?.length ? branchIds : ['_'];
-    const targetDepartmentIds = departmentIds?.length ? departmentIds : ['_'];
+    const targetPlaceEntityIds = placeEntityIds?.length
+      ? placeEntityIds
+      : ['_'];
 
     const oldReserveRems = await models.ReserveRems.find({
-      departmentId: { $in: targetDepartmentIds },
-      branchId: { $in: targetBranchIds },
+      placeEntityId: { $in: targetPlaceEntityIds },
       productId: { $in: productIds },
     });
 
     const oldReserveRemsByKey: Record<string, IReserveRemDocument> = {};
     for (const reserveRem of oldReserveRems) {
       oldReserveRemsByKey[
-        `${reserveRem.branchId}_${reserveRem.departmentId}_${reserveRem.productId}`
+        `${reserveRem.placeEntityId}_${reserveRem.productId}`
       ] = reserveRem;
     }
 
@@ -64,56 +58,51 @@ const reserveRemsMutations = {
     let updateCounter = 0;
     let insertCounter = 0;
 
-    for (const branchId of targetBranchIds) {
-      for (const departmentId of targetDepartmentIds) {
-        for (const product of products) {
-          const key = `${branchId}_${departmentId}_${product._id}`;
+    for (const placeEntityId of targetPlaceEntityIds) {
+      for (const product of products) {
+        const key = `${placeEntityId}_${product._id}`;
 
-          const oldReserveRem = oldReserveRemsByKey[key];
+        const oldReserveRem = oldReserveRemsByKey[key];
 
-          if (oldReserveRem) {
-            bulkUpdateOps.push({
-              updateOne: {
-                filter: {
-                  _id: oldReserveRem._id,
-                },
-                update: {
-                  $set: {
-                    remainder,
-                    modifiedAt: now,
-                    modifiedBy: user._id,
-                  },
+        if (oldReserveRem) {
+          bulkUpdateOps.push({
+            updateOne: {
+              filter: {
+                _id: oldReserveRem._id,
+              },
+              update: {
+                $set: {
+                  remainder,
+                  modifiedAt: now,
+                  modifiedBy: user._id,
                 },
               },
-            });
+            },
+          });
 
-            updatedIds.push(oldReserveRem._id);
-            updateCounter += 1;
+          updatedIds.push(oldReserveRem._id);
+          updateCounter += 1;
 
-            if (updateCounter > 100) {
-              await models.ReserveRems.bulkWrite(bulkUpdateOps);
-              bulkUpdateOps = [];
-            }
-          } else {
-            bulkCreateOps.push({
-              branchId,
-              departmentId,
-              productId: product._id,
-              uom: product.uom,
-              remainder,
-              createdAt: now,
-              createdBy: user._id,
-            });
+          if (updateCounter > 100) {
+            await models.ReserveRems.bulkWrite(bulkUpdateOps);
+            bulkUpdateOps = [];
+          }
+        } else {
+          bulkCreateOps.push({
+            placeEntityId,
+            productId: product._id,
+            uom: product.uom,
+            remainder,
+            createdAt: now,
+            createdBy: user._id,
+          });
 
-            insertCounter += 1;
+          insertCounter += 1;
 
-            if (insertCounter > 100) {
-              const inserted = await models.ReserveRems.insertMany(
-                bulkCreateOps,
-              );
-              inserteds.push(...inserted);
-              bulkCreateOps = [];
-            }
+          if (insertCounter > 100) {
+            const inserted = await models.ReserveRems.insertMany(bulkCreateOps);
+            inserteds.push(...inserted);
+            bulkCreateOps = [];
           }
         }
       }

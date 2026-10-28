@@ -225,11 +225,9 @@ export const loadJobExecutionClass = (
           jobs,
           description: input.description?.trim(),
           inputAccountId: input.inputAccountId,
-          inputBranchId: input.inputBranchId || undefined,
-          inputDepartmentId: input.inputDepartmentId || undefined,
+          inputPlaceEntityId: input.inputPlaceEntityId || undefined,
           outputAccountId: input.outputAccountId,
-          outputBranchId: input.outputBranchId || undefined,
-          outputDepartmentId: input.outputDepartmentId || undefined,
+          outputPlaceEntityId: input.outputPlaceEntityId || undefined,
         },
       };
     }
@@ -257,8 +255,7 @@ export const loadJobExecutionClass = (
       const costs = await activeCost(
         models,
         execution.inputAccountId,
-        execution.inputBranchId,
-        execution.inputDepartmentId,
+        execution.inputPlaceEntityId,
         productIds,
         excludedTransactionIds,
       );

@@ -1,10 +1,8 @@
 export const types = `
   type SafeRemainder @key(fields: "_id") {
     _id: String!
-    branch: Branch
-    branchId: String
-    department: Department
-    departmentId: String
+    placeEntity: StructureEntity
+    placeEntityId: String
     productCategory: ProductCategory
     attachment: Attachment
     filterField: String
@@ -49,8 +47,7 @@ export const types = `
 
 export const queries = `
   safeRemainders(
-    branchId: String,
-    departmentId: String,
+    placeEntityId: String,
     productId: String,
     searchValue: String,
     beginDate: Date,
@@ -71,8 +68,7 @@ export const queries = `
 
 export const mutations = `
   safeRemainderAdd(
-    branchId: String,
-    departmentId: String,
+    placeEntityId: String,
     date: Date,
     description: String,
     productCategoryId: String,

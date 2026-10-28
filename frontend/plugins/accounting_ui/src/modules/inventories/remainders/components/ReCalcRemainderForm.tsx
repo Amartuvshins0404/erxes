@@ -1,5 +1,6 @@
+import { STOCK_PLACE_CAPABILITY } from '@/utils/structure';
 import { Button, Form, Sheet, Spinner, useMultiQueryState } from 'erxes-ui';
-import { SelectBranches, SelectCategory, SelectDepartments } from 'ui-modules';
+import { SelectStructureEntities, SelectCategory } from 'ui-modules';
 
 import { AccountingSheet } from '~/modules/layout/components/Sheet';
 import { IconRefresh } from '@tabler/icons-react';
@@ -22,16 +23,14 @@ const ReCalcRemaindersForm = ({
 }) => {
   const { t } = useTranslation('accounting');
   const [queries] = useMultiQueryState<{
-    branchId?: string;
-    departmentId?: string;
+    placeEntityId?: string;
     categoryIds?: string[];
-  }>(['branchId', 'departmentId', 'categoryIds']);
+  }>(['placeEntityId', 'categoryIds']);
 
   const form = useForm<TReCalcRemainderForm>({
     resolver: zodResolver(reCalcRemainderSchema),
     defaultValues: {
-      branchId: queries.branchId ?? '',
-      departmentId: queries.departmentId ?? '',
+      placeEntityId: queries.placeEntityId ?? '',
     },
   });
 
@@ -64,26 +63,12 @@ const ReCalcRemaindersForm = ({
           <div className="grid grid-cols-1 gap-4">
             <Form.Field
               control={form.control}
-              name="branchId"
+              name="placeEntityId"
               render={({ field }) => (
                 <Form.Item>
-                  <Form.Label>{t('branch')}</Form.Label>
-                  <SelectBranches.FormItem
-                    mode="single"
-                    value={field.value}
-                    onValueChange={field.onChange}
-                  />
-                  <Form.Message />
-                </Form.Item>
-              )}
-            />
-            <Form.Field
-              control={form.control}
-              name="departmentId"
-              render={({ field }) => (
-                <Form.Item>
-                  <Form.Label>{t('department')}</Form.Label>
-                  <SelectDepartments.FormItem
+                  <Form.Label>{t('place', 'Place')}</Form.Label>
+                  <SelectStructureEntities.FormItem
+                    capability={STOCK_PLACE_CAPABILITY}
                     mode="single"
                     value={field.value}
                     onValueChange={field.onChange}

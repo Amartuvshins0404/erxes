@@ -12,11 +12,9 @@ export const getJobExecutionFilter = (
   for (const key of [
     'status',
     'inputAccountId',
-    'inputBranchId',
-    'inputDepartmentId',
+    'inputPlaceEntityId',
     'outputAccountId',
-    'outputBranchId',
-    'outputDepartmentId',
+    'outputPlaceEntityId',
   ] as const) {
     if (params[key]?.trim()) filter[key] = params[key]?.trim();
   }

@@ -118,8 +118,8 @@ class InvSaleOutCostTrs {
       status: transaction.status,
       mentionOwnerId: transaction.mentionOwnerId,
       mentionUserIds: transaction.mentionUserIds,
-      branchId: transaction.branchId,
-      departmentId: transaction.departmentId,
+      placeEntityId: transaction.placeEntityId,
+      responsibleEntityId: transaction.responsibleEntityId,
       customerType: transaction.customerType,
       customerId: transaction.customerId,
       details: [],
@@ -144,8 +144,9 @@ class InvSaleOutCostTrs {
         count: detail.count,
         amount,
         unitPrice: amount / (detail.count ?? 1),
-        branchId: detail.branchId || transaction.branchId,
-        departmentId: detail.departmentId || transaction.departmentId,
+        placeEntityId: detail.placeEntityId || transaction.placeEntityId,
+        responsibleEntityId:
+          detail.responsibleEntityId || transaction.responsibleEntityId,
       };
 
       followOutDetails.push({

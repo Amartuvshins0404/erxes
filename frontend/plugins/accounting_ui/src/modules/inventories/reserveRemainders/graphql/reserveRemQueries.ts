@@ -1,11 +1,10 @@
 import { gql } from '~/gql';
 
 export const RESERVE_REMS_QUERY = gql(`
-query accountingReserveRems($searchValue: String, $branchId: String, $departmentId: String, $productId: String, $productCategoryId: String, $page: Int, $perPage: Int, $sortField: String, $sortDirection: Int) {
+query accountingReserveRems($searchValue: String, $placeEntityId: String, $productId: String, $productCategoryId: String, $page: Int, $perPage: Int, $sortField: String, $sortDirection: Int) {
   reserveRems(
     searchValue: $searchValue
-    branchId: $branchId
-    departmentId: $departmentId
+    placeEntityId: $placeEntityId
     productId: $productId
     productCategoryId: $productCategoryId
     page: $page
@@ -14,8 +13,7 @@ query accountingReserveRems($searchValue: String, $branchId: String, $department
     sortDirection: $sortDirection
   ) {
     _id
-    branchId
-    departmentId
+    placeEntityId
     productId
     uom
     remainder
@@ -26,12 +24,7 @@ query accountingReserveRems($searchValue: String, $branchId: String, $department
       code
       name
     }
-    branch {
-      _id
-      code
-      title
-    }
-    department {
+    placeEntity {
       _id
       code
       title
@@ -46,8 +39,7 @@ query accountingReserveRems($searchValue: String, $branchId: String, $department
   }
   reserveRemsCount(
     searchValue: $searchValue
-    branchId: $branchId
-    departmentId: $departmentId
+    placeEntityId: $placeEntityId
     productId: $productId
     productCategoryId: $productCategoryId
   )

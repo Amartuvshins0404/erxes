@@ -208,14 +208,10 @@ const SafeRemainderStatusBar = ({
       value: dayjs(safeRemainder.date).format('YYYY-MM-DD HH:mm:ss'),
     },
     {
-      label: t('branch'),
-      value: joinLabel(safeRemainder.branch?.code, safeRemainder.branch?.title),
-    },
-    {
-      label: t('department'),
+      label: t('place', 'Place'),
       value: joinLabel(
-        safeRemainder.department?.code,
-        safeRemainder.department?.title,
+        safeRemainder.placeEntity?.code,
+        safeRemainder.placeEntity?.title,
       ),
     },
     ...(safeRemainder.productCategoryId

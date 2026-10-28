@@ -16,15 +16,16 @@ export interface ICommonAdjInvDetailInfo extends ICommonAdjInvDetail {
 export interface IAdjustInvDetailParams {
   productId: string;
   accountId: string;
-  departmentId: string;
-  branchId: string;
+  placeEntityId: string;
 }
 
 export interface IAdjustInvDetailParamsId extends IAdjustInvDetailParams {
   adjustId: string;
 }
 
-export interface IAdjustInvDetail extends IAdjustInvDetailParamsId, ICommonAdjInvDetail {
+export interface IAdjustInvDetail
+  extends IAdjustInvDetailParamsId,
+    ICommonAdjInvDetail {
   error?: string;
   warning?: string;
   infoPerDate?: ICommonAdjInvDetailInfo[];

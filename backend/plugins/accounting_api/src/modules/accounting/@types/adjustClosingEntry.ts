@@ -20,8 +20,8 @@ export interface IAdjustClosingEntry {
 
 export interface IAdjustClosingDetail {
   _id?: string;
-  branchId?: string;
-  departmentId?: string;
+  placeEntityId?: string;
+  responsibleEntityId?: string;
   beginDate?: Date;
   date?: Date;
   status?: string;

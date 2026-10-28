@@ -4,7 +4,8 @@ import { JournalEnum } from '@/settings/account/types/Account';
 import { TR_STATUSES } from '@/transactions/types/constants';
 import { Form, Select } from 'erxes-ui';
 import { UseFormReturn } from 'react-hook-form';
-import { SelectBranches, SelectDepartments } from 'ui-modules';
+import { SelectStructureEntities } from 'ui-modules';
+import { STOCK_PLACE_CAPABILITY } from '@/utils/structure';
 import { z } from 'zod';
 import {
   SyncConfigFormFooter,
@@ -25,10 +26,8 @@ export const syncDealMovementConfigFormSchema = z.object({
   trStatus: z.string().optional(),
   sourceAccountId: z.string(),
   destinationAccountId: z.string(),
-  defaultSourceBranchId: z.string().optional(),
-  defaultSourceDepartmentId: z.string().optional(),
-  defaultDestinationBranchId: z.string().optional(),
-  defaultDestinationDepartmentId: z.string().optional(),
+  defaultSourcePlaceEntityId: z.string().optional(),
+  defaultDestinationPlaceEntityId: z.string().optional(),
   dealLocationSide: z.enum(['source', 'destination']),
 });
 
@@ -64,58 +63,34 @@ const InventoryAccountField = ({
   );
 };
 
-const LocationFields = ({
+const PlaceField = ({
   form,
-  branchName,
-  departmentName,
-  branchLabel,
-  departmentLabel,
+  name,
+  label,
 }: {
   form: UseFormReturn<ConfigFormValues>;
-  branchName: 'defaultSourceBranchId' | 'defaultDestinationBranchId';
-  departmentName:
-    | 'defaultSourceDepartmentId'
-    | 'defaultDestinationDepartmentId';
-  branchLabel: string;
-  departmentLabel: string;
+  name: 'defaultSourcePlaceEntityId' | 'defaultDestinationPlaceEntityId';
+  label: string;
 }) => {
   return (
-    <>
-      <Form.Field
-        control={form.control}
-        name={branchName}
-        render={({ field }) => (
-          <Form.Item>
-            <Form.Label>{branchLabel}</Form.Label>
-            <Form.Control>
-              <SelectBranches.FormItem
-                mode="single"
-                value={field.value ?? ''}
-                onValueChange={field.onChange}
-              />
-            </Form.Control>
-            <Form.Message />
-          </Form.Item>
-        )}
-      />
-      <Form.Field
-        control={form.control}
-        name={departmentName}
-        render={({ field }) => (
-          <Form.Item>
-            <Form.Label>{departmentLabel}</Form.Label>
-            <Form.Control>
-              <SelectDepartments.FormItem
-                mode="single"
-                value={field.value ?? ''}
-                onValueChange={field.onChange}
-              />
-            </Form.Control>
-            <Form.Message />
-          </Form.Item>
-        )}
-      />
-    </>
+    <Form.Field
+      control={form.control}
+      name={name}
+      render={({ field }) => (
+        <Form.Item>
+          <Form.Label>{label}</Form.Label>
+          <Form.Control>
+            <SelectStructureEntities.FormItem
+              mode="single"
+              capability={STOCK_PLACE_CAPABILITY}
+              value={field.value ?? ''}
+              onValueChange={field.onChange}
+            />
+          </Form.Control>
+          <Form.Message />
+        </Form.Item>
+      )}
+    />
   );
 };
 
@@ -132,7 +107,7 @@ const DealLocationSideField = ({
       render={({ field }) => (
         <Form.Item>
           <Form.Label>
-            {t('side-using-the-deal-branch-and-department')}
+            {t('side-using-the-deal-place', 'Side using the deal place')}
           </Form.Label>
           <Form.Control>
             <Select
@@ -211,22 +186,18 @@ export const SyncDealMovementConfigForm = ({
           </SyncSettingSection>
 
           <SyncSettingSection title={t('default-source-location')}>
-            <LocationFields
+            <PlaceField
               form={form}
-              branchName="defaultSourceBranchId"
-              departmentName="defaultSourceDepartmentId"
-              branchLabel={t('source-branch')}
-              departmentLabel={t('source-department')}
+              name="defaultSourcePlaceEntityId"
+              label={t('source-place', 'Source place')}
             />
           </SyncSettingSection>
 
           <SyncSettingSection title={t('default-destination-location')}>
-            <LocationFields
+            <PlaceField
               form={form}
-              branchName="defaultDestinationBranchId"
-              departmentName="defaultDestinationDepartmentId"
-              branchLabel={t('destination-branch')}
-              departmentLabel={t('destination-department')}
+              name="defaultDestinationPlaceEntityId"
+              label={t('destination-place', 'Destination place')}
             />
             <DealLocationSideField form={form} />
           </SyncSettingSection>

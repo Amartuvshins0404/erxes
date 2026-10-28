@@ -48,8 +48,8 @@ const makeIncomeTransaction = (overrides: Record<string, unknown> = {}) => ({
   date: new Date('2026-01-01T00:00:00.000Z'),
   journal: JOURNALS.FXA_INCOME,
   status: TR_STATUSES.COMPLETE,
-  branchId: 'branch-a',
-  departmentId: 'dept-a',
+  placeEntityId: 'branch-a',
+  responsibleEntityId: 'dept-a',
   details: [
     {
       _id: 'detail-income',
@@ -357,8 +357,8 @@ describe('fixed asset income', () => {
           fixedAssetCategoryId: 'cat-a',
           fixedAssetCode: 'DELL-001',
           fixedAssetName: 'Dell laptop',
-          branchId: 'branch-a',
-          departmentId: 'dept-a',
+          placeEntityId: 'branch-a',
+          responsibleEntityId: 'dept-a',
           count: 3,
           unitPrice: 500,
           amount: 1500,
@@ -373,8 +373,8 @@ describe('fixed asset income', () => {
           fixedAssetCategoryId: 'cat-a',
           fixedAssetCode: 'DELL-001',
           fixedAssetName: 'Dell laptop',
-          branchId: 'branch-b',
-          departmentId: 'dept-b',
+          placeEntityId: 'branch-b',
+          responsibleEntityId: 'dept-b',
           count: 2,
           unitPrice: 500,
           amount: 1000,
@@ -776,10 +776,10 @@ describe('fixed asset move follow transaction', () => {
       status: TR_STATUSES.COMPLETE,
       parentId: 'move-a',
       date: new Date('2026-01-03T00:00:00.000Z'),
-      branchId: 'branch-a',
-      departmentId: '',
+      placeEntityId: 'branch-a',
+      responsibleEntityId: '',
       followInfos: {
-        moveInDepartmentId: 'dept-call-center',
+        moveInResponsibleEntityId: 'dept-call-center',
       },
       details: [
         {
@@ -807,14 +807,14 @@ describe('fixed asset move follow transaction', () => {
         originId: 'move-a',
         originType: TR_FOLLOW_TYPES.FXA_MOVE_IN,
         side: TR_SIDES.DEBIT,
-        branchId: undefined,
-        departmentId: 'dept-call-center',
+        placeEntityId: undefined,
+        responsibleEntityId: 'dept-call-center',
         details: [
           expect.objectContaining({
             originId: 'detail-move',
             originType: TR_FOLLOW_TYPES.FXA_MOVE_IN,
-            branchId: undefined,
-            departmentId: 'dept-call-center',
+            placeEntityId: undefined,
+            responsibleEntityId: 'dept-call-center',
             amount: 100,
           }),
         ],
@@ -823,7 +823,7 @@ describe('fixed asset move follow transaction', () => {
     );
   });
 
-  it('rejects move destinations without branch and department', async () => {
+  it('rejects move destinations without place and responsible', async () => {
     const models = makeModels();
     const transaction = {
       _id: 'move-a',
@@ -835,7 +835,7 @@ describe('fixed asset move follow transaction', () => {
 
     await expect(
       createFxaMoveInFollowTr(models as never, 'user-a', transaction as never),
-    ).rejects.toThrow('Move destination branch or department is required');
+    ).rejects.toThrow('Move destination place or responsible is required');
   });
 
   it('creates accumulated depreciation transfer follows for internal moves', async () => {
@@ -848,11 +848,11 @@ describe('fixed asset move follow transaction', () => {
       journal: JOURNALS.FXA_MOVE,
       status: TR_STATUSES.COMPLETE,
       date: new Date('2026-01-03T00:00:00.000Z'),
-      branchId: 'source-branch',
-      departmentId: 'source-dept',
+      placeEntityId: 'source-branch',
+      responsibleEntityId: 'source-dept',
       followInfos: {
-        moveInBranchId: 'dest-branch',
-        moveInDepartmentId: 'dest-dept',
+        moveInPlaceEntityId: 'dest-branch',
+        moveInResponsibleEntityId: 'dest-dept',
         accumulatedDepreciationAccountId: 'acc-dep-account',
       },
       details: [
@@ -922,8 +922,8 @@ describe('fixed asset move follow transaction', () => {
         originType: TR_FOLLOW_TYPES.FXA_DEP_OUT,
         ptrId: 'ptr-move',
         side: TR_SIDES.DEBIT,
-        branchId: 'source-branch',
-        departmentId: 'source-dept',
+        placeEntityId: 'source-branch',
+        responsibleEntityId: 'source-dept',
       }),
     );
     expect(depOutDoc).not.toHaveProperty('followInfos');
@@ -935,8 +935,8 @@ describe('fixed asset move follow transaction', () => {
         fixedAssetId: 'asset-a',
         accountId: 'acc-dep-account',
         originType: TR_FOLLOW_TYPES.FXA_DEP_OUT,
-        branchId: 'source-branch',
-        departmentId: 'source-dept',
+        placeEntityId: 'source-branch',
+        responsibleEntityId: 'source-dept',
         amount: 245000,
       }),
     );
@@ -949,8 +949,8 @@ describe('fixed asset move follow transaction', () => {
         originType: TR_FOLLOW_TYPES.FXA_DEP_IN,
         ptrId: 'ptr-move',
         side: TR_SIDES.CREDIT,
-        branchId: 'dest-branch',
-        departmentId: 'dest-dept',
+        placeEntityId: 'dest-branch',
+        responsibleEntityId: 'dest-dept',
       }),
     );
     expect(depInDoc).not.toHaveProperty('followInfos');
@@ -962,8 +962,8 @@ describe('fixed asset move follow transaction', () => {
         fixedAssetId: 'asset-a',
         accountId: 'acc-dep-account',
         originType: TR_FOLLOW_TYPES.FXA_DEP_IN,
-        branchId: 'dest-branch',
-        departmentId: 'dest-dept',
+        placeEntityId: 'dest-branch',
+        responsibleEntityId: 'dest-dept',
         amount: 245000,
       }),
     );
@@ -992,8 +992,8 @@ describe('fixed asset move follow transaction', () => {
         originId: 'move-a',
         originType: TR_FOLLOW_TYPES.FXA_MOVE_IN,
         side: TR_SIDES.DEBIT,
-        branchId: 'dest-branch',
-        departmentId: 'dest-dept',
+        placeEntityId: 'dest-branch',
+        responsibleEntityId: 'dest-dept',
       }),
     );
     expect(moveInDoc).not.toHaveProperty('followInfos');
@@ -1002,8 +1002,8 @@ describe('fixed asset move follow transaction', () => {
       expect.objectContaining({
         originId: 'detail-move',
         originType: TR_FOLLOW_TYPES.FXA_MOVE_IN,
-        branchId: 'dest-branch',
-        departmentId: 'dest-dept',
+        placeEntityId: 'dest-branch',
+        responsibleEntityId: 'dest-dept',
         amount: 350000,
       }),
     );
@@ -1019,11 +1019,11 @@ describe('fixed asset move follow transaction', () => {
       journal: JOURNALS.FXA_MOVE,
       status: TR_STATUSES.COMPLETE,
       date: new Date('2026-01-03T00:00:00.000Z'),
-      branchId: 'source-branch',
-      departmentId: 'source-dept',
+      placeEntityId: 'source-branch',
+      responsibleEntityId: 'source-dept',
       followInfos: {
-        moveInBranchId: 'dest-branch',
-        moveInDepartmentId: 'dest-dept',
+        moveInPlaceEntityId: 'dest-branch',
+        moveInResponsibleEntityId: 'dest-dept',
         accumulatedDepreciationAccountId: 'acc-dep-account',
       },
       details: [
@@ -1069,12 +1069,12 @@ describe('fixed asset move follow transaction', () => {
           journal: JOURNALS.FXA_DEP_OUT,
           originId: 'move-a',
           side: TR_SIDES.DEBIT,
-          branchId: 'source-branch',
+          placeEntityId: 'source-branch',
           details: [
             expect.objectContaining({
               amount: 490000,
               unitPrice: 245000,
-              branchId: 'source-branch',
+              placeEntityId: 'source-branch',
             }),
           ],
         }),
@@ -1082,12 +1082,12 @@ describe('fixed asset move follow transaction', () => {
           journal: JOURNALS.FXA_DEP_IN,
           originId: 'move-a',
           side: TR_SIDES.CREDIT,
-          branchId: 'dest-branch',
+          placeEntityId: 'dest-branch',
           details: [
             expect.objectContaining({
               amount: 490000,
               unitPrice: 245000,
-              branchId: 'dest-branch',
+              placeEntityId: 'dest-branch',
             }),
           ],
         }),
@@ -1105,11 +1105,11 @@ describe('fixed asset move follow transaction', () => {
       journal: JOURNALS.FXA_MOVE,
       status: TR_STATUSES.COMPLETE,
       date: new Date('2026-01-03T00:00:00.000Z'),
-      branchId: 'source-branch',
-      departmentId: 'source-dept',
+      placeEntityId: 'source-branch',
+      responsibleEntityId: 'source-dept',
       followInfos: {
-        moveInBranchId: 'dest-branch',
-        moveInDepartmentId: 'dest-dept',
+        moveInPlaceEntityId: 'dest-branch',
+        moveInResponsibleEntityId: 'dest-dept',
         accumulatedDepreciationAccountId: 'acc-dep-account',
       },
       details: [
@@ -1132,7 +1132,7 @@ describe('fixed asset move follow transaction', () => {
             originId: 'move-a',
             originType: TR_FOLLOW_TYPES.FXA_MOVE_IN,
             ptrId: 'old-ptr',
-            followInfos: { moveInBranchId: 'wrong-branch' },
+            followInfos: { moveInPlaceEntityId: 'wrong-branch' },
             extraData: { migrationSource: 'erkhet' },
             contentType: 'erkhet:ptr',
             contentId: 'parent-old',
@@ -1154,7 +1154,7 @@ describe('fixed asset move follow transaction', () => {
             originId: 'move-a',
             originType: TR_FOLLOW_TYPES.FXA_MOVE_IN,
             ptrId: 'old-ptr',
-            followInfos: { moveInBranchId: 'wrong-branch' },
+            followInfos: { moveInPlaceEntityId: 'wrong-branch' },
             extraData: { migrationSource: 'erkhet' },
             contentType: 'erkhet:ptr',
             contentId: 'parent-old',
@@ -1274,8 +1274,8 @@ describe('fixed asset adjustment', () => {
       journal: JOURNALS.FXA_INCOME,
       status: TR_STATUSES.COMPLETE,
       date: new Date('2026-01-01T00:00:00.000Z'),
-      branchId: 'branch-a',
-      departmentId: 'dept-a',
+      placeEntityId: 'branch-a',
+      responsibleEntityId: 'dept-a',
       details: [
         {
           _id: 'detail-income',
@@ -1291,8 +1291,8 @@ describe('fixed asset adjustment', () => {
       journal: JOURNALS.FXA_MOVE,
       status: TR_STATUSES.COMPLETE,
       date: new Date('2026-01-03T00:00:00.000Z'),
-      branchId: 'branch-a',
-      departmentId: 'dept-a',
+      placeEntityId: 'branch-a',
+      responsibleEntityId: 'dept-a',
       details: [
         {
           _id: 'detail-move-out',
@@ -1307,8 +1307,8 @@ describe('fixed asset adjustment', () => {
       journal: JOURNALS.FXA_MOVE_IN,
       status: TR_STATUSES.COMPLETE,
       date: new Date('2026-01-03T00:00:00.000Z'),
-      branchId: 'branch-b',
-      departmentId: 'dept-b',
+      placeEntityId: 'branch-b',
+      responsibleEntityId: 'dept-b',
       details: [
         {
           _id: 'detail-move-in',
@@ -1347,16 +1347,16 @@ describe('fixed asset adjustment', () => {
         details: expect.arrayContaining([
           expect.objectContaining({
             fixedAssetId: 'asset-a',
-            branchId: 'branch-a',
-            departmentId: 'dept-a',
+            placeEntityId: 'branch-a',
+            responsibleEntityId: 'dept-a',
             originalCost: 2400,
             preDeprecation: expect.any(Number),
             depreciationAmount: expect.any(Number),
           }),
           expect.objectContaining({
             fixedAssetId: 'asset-a',
-            branchId: 'branch-b',
-            departmentId: 'dept-b',
+            placeEntityId: 'branch-b',
+            responsibleEntityId: 'dept-b',
             originalCost: 2400,
             preDeprecation: expect.any(Number),
             depreciationAmount: expect.any(Number),
@@ -1617,8 +1617,8 @@ describe('fixed asset sale and disposal summaries', () => {
       journal: JOURNALS.FXA_SALE,
       status: TR_STATUSES.COMPLETE,
       date: new Date('2026-02-01T00:00:00.000Z'),
-      branchId: 'branch-a',
-      departmentId: 'dept-a',
+      placeEntityId: 'branch-a',
+      responsibleEntityId: 'dept-a',
       followInfos: {
         saleOutAccountId: 'asset-account',
         accumulatedDepreciationAccountId: 'acc-dep-account',
@@ -1706,8 +1706,8 @@ describe('fixed asset sale and disposal summaries', () => {
       journal: JOURNALS.FXA_OUT,
       status: TR_STATUSES.COMPLETE,
       date: new Date('2026-02-01T00:00:00.000Z'),
-      branchId: 'branch-a',
-      departmentId: 'dept-a',
+      placeEntityId: 'branch-a',
+      responsibleEntityId: 'dept-a',
       followInfos: {
         accumulatedDepreciationAccountId: 'acc-dep-account',
       },

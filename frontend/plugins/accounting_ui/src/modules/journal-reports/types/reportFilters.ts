@@ -1,8 +1,8 @@
 export type ReportFilterField =
   | 'accountCategoryId'
   | 'accountIds'
-  | 'branchId'
-  | 'departmentId'
+  | 'placeEntityId'
+  | 'responsibleEntityId'
   | 'customerId'
   | 'customerTagIds'
   | 'companyTagIds'
@@ -104,8 +104,12 @@ export const REPORT_FILTER_DEFINITIONS: Record<
     'fixedAssets',
     'asset-code-or-name',
   ),
-  branchId: define('branchId', 'organization', 'branch'),
-  departmentId: define('departmentId', 'organization', 'department'),
+  placeEntityId: define('placeEntityId', 'organization', 'place'),
+  responsibleEntityId: define(
+    'responsibleEntityId',
+    'organization',
+    'responsible',
+  ),
   createdUserId: define('createdUserId', 'ownership', 'created-by'),
   modifiedUserId: define('modifiedUserId', 'ownership', 'modified-by'),
   assignedUserId: define('assignedUserId', 'ownership', 'assigned-user'),
@@ -122,8 +126,8 @@ const BASE_FIELDS: ReportFilterField[] = [
   'accountIds',
   'isTemp',
   'isOutBalance',
-  'branchId',
-  'departmentId',
+  'placeEntityId',
+  'responsibleEntityId',
   'createdUserId',
   'modifiedUserId',
   'assignedUserId',

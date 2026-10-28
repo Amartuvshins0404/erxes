@@ -32,8 +32,8 @@ export const closingDetailEntrySchema = new Schema({
 export const adjustClosingDetailsSchema = new Schema({
   _id: mongooseStringRandomId,
 
-  branchId: { type: String, optional: true, label: 'Branch' }, // салбар сонгож болно. Сонгосон бол баримтууд уг салбараар, сонгоогүй бол дансныхаараа
-  departmentId: { type: String, optional: true, label: 'Department' }, // хэлтэс сонгож болно. Сонгосон бол баримтууд уг хэлтэсээр, сонгоогүй бол дансныхаараа
+  placeEntityId: { type: String, optional: true, label: 'Place' }, // салбар сонгож болно. Сонгосон бол баримтууд уг салбараар, сонгоогүй бол дансныхаараа
+  responsibleEntityId: { type: String, optional: true, label: 'Responsible' }, // хэлтэс сонгож болно. Сонгосон бол баримтууд уг хэлтэсээр, сонгоогүй бол дансныхаараа
   entries: { type: [closingDetailEntrySchema], label: 'Entries' }, // тухайн салбар хэлтэст хамаарах үлдэгдэлтэй данснуудаас хамаарч үүсэх
 
   closeIntegrateTrId: {

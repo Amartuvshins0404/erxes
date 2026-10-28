@@ -1,14 +1,15 @@
+import { STOCK_PLACE_CAPABILITY } from '@/utils/structure';
 import { useTranslation } from 'react-i18next';
 import { SelectAccount } from '@/settings/account/components/SelectAccount';
 import { IAccount, JournalEnum } from '@/settings/account/types/Account';
 import { Form } from 'erxes-ui';
-import { SelectBranches, SelectDepartments } from 'ui-modules';
+import { SelectStructureEntities } from 'ui-modules';
 import { ITransactionGroupForm } from '../../../types/JournalForms';
 import {
   AccountField,
   AssignToField,
-  BranchField,
-  DepartmentField,
+  PlaceField,
+  ResponsibleField,
   DescriptionField,
 } from '../../GeneralFormFields';
 import { CustomerFields } from '../../helpers/CustomerFields';
@@ -38,8 +39,12 @@ export const InvMoveForm = ({
           labelTxt="source-inventory-account"
         />
         <CustomerFields form={form} index={index} />
-        <BranchField form={form} index={index} />
-        <DepartmentField form={form} index={index} />
+        <PlaceField
+          form={form}
+          index={index}
+          capability={STOCK_PLACE_CAPABILITY}
+        />
+        <ResponsibleField form={form} index={index} />
         <AssignToField form={form} index={index} />
         <DescriptionField form={form} index={index} />
         <Form.Field
@@ -65,15 +70,18 @@ export const InvMoveForm = ({
         />
         <Form.Field
           control={form.control}
-          name={`trDocs.${index}.followInfos.moveInBranchId`}
+          name={`trDocs.${index}.followInfos.moveInPlaceEntityId`}
           render={({ field }) => (
             <Form.Item>
-              <Form.Label>{t('destination-branch')}</Form.Label>
+              <Form.Label>
+                {t('destination-place', 'Destination place')}
+              </Form.Label>
               <Form.Control>
-                <SelectBranches.FormItem
+                <SelectStructureEntities.FormItem
                   mode="single"
+                  capability={STOCK_PLACE_CAPABILITY}
                   value={field.value ?? ''}
-                  onValueChange={(branch) => field.onChange(branch)}
+                  onValueChange={(entityId) => field.onChange(entityId)}
                 />
               </Form.Control>
               <Form.Message />
@@ -82,15 +90,17 @@ export const InvMoveForm = ({
         />
         <Form.Field
           control={form.control}
-          name={`trDocs.${index}.followInfos.moveInDepartmentId`}
+          name={`trDocs.${index}.followInfos.moveInResponsibleEntityId`}
           render={({ field }) => (
             <Form.Item>
-              <Form.Label>{t('destination-department')}</Form.Label>
+              <Form.Label>
+                {t('destination-responsible', 'Destination responsible')}
+              </Form.Label>
               <Form.Control>
-                <SelectDepartments.FormItem
+                <SelectStructureEntities.FormItem
                   mode="single"
                   value={field.value ?? ''}
-                  onValueChange={(department) => field.onChange(department)}
+                  onValueChange={(entityId) => field.onChange(entityId)}
                 />
               </Form.Control>
               <Form.Message />

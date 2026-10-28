@@ -1,10 +1,11 @@
+import { STOCK_PLACE_CAPABILITY } from '@/utils/structure';
 import {
   IconCalendar,
   IconSearch,
   IconToggleRightFilled,
 } from '@tabler/icons-react';
 import { Combobox, Command, Filter, useMultiQueryState } from 'erxes-ui';
-import { SelectBranches, SelectDepartments, SelectMember } from 'ui-modules';
+import { SelectStructureEntities, SelectMember } from 'ui-modules';
 import { useTranslation } from 'react-i18next';
 import { useSafeRemainderQueryParams } from '../hooks/useSafeRemainders';
 
@@ -36,13 +37,9 @@ const SafeRemainderFilterPopover = () => {
                   <IconCalendar />
                   {t('date')}
                 </Filter.Item>
-                <SelectBranches.FilterItem
-                  value="branchId"
-                  label={t('branch')}
-                />
-                <SelectDepartments.FilterItem
-                  value="departmentId"
-                  label={t('department')}
+                <SelectStructureEntities.FilterItem
+                  value="placeEntityId"
+                  label={t('place', 'Place')}
                 />
                 <Filter.Item value="statuses" disabled={true}>
                   <IconToggleRightFilled />
@@ -72,10 +69,10 @@ const SafeRemainderFilterPopover = () => {
           <Filter.View filterKey="date">
             <Filter.DateView filterKey="date" />
           </Filter.View>
-          <SelectBranches.FilterView mode="single" filterKey="branchId" />
-          <SelectDepartments.FilterView
+          <SelectStructureEntities.FilterView
+            capability={STOCK_PLACE_CAPABILITY}
             mode="single"
-            filterKey="departmentId"
+            filterKey="placeEntityId"
           />
 
           <SelectMember.FilterView mode="single" queryKey="createdUserId" />
@@ -140,14 +137,10 @@ export const SafeRemainderFilter = ({
           </Filter.BarName>
           <Filter.Date filterKey="date" />
         </Filter.BarItem>
-        <SelectBranches.FilterBar
-          label={t('branch')}
-          filterKey="branchId"
-          mode="single"
-        />
-        <SelectDepartments.FilterBar
-          label={t('department')}
-          filterKey="departmentId"
+        <SelectStructureEntities.FilterBar
+          capability={STOCK_PLACE_CAPABILITY}
+          label={t('place', 'Place')}
+          filterKey="placeEntityId"
           mode="single"
         />
 

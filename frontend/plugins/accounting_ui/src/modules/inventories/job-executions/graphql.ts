@@ -3,8 +3,8 @@ import { gql } from '~/gql';
 export const executionFields = gql(`
   fragment AccountingJobExecutionFields on JobExecution {
     _id date description status parentId ptrId error
-    inputAccountId inputBranchId inputDepartmentId
-    outputAccountId outputBranchId outputDepartmentId
+    inputAccountId inputPlaceEntityId
+    outputAccountId outputPlaceEntityId
     jobs {
       _id jobId jobName quantity
       inputs { productId uom quantity costRatio }
@@ -19,16 +19,16 @@ export const GET_EXECUTIONS = gql(`
     $searchValue: String, $status: String, $jobId: String, $jobName: String,
     $inputProductId: String, $outputProductId: String,
     $laborCostName: String, $overheadCostName: String,
-    $inputAccountId: String, $inputBranchId: String, $inputDepartmentId: String,
-    $outputAccountId: String, $outputBranchId: String, $outputDepartmentId: String,
+    $inputAccountId: String, $inputPlaceEntityId: String,
+    $outputAccountId: String, $outputPlaceEntityId: String,
     $page: Int, $perPage: Int
   ) {
     jobExecutions(
       searchValue: $searchValue, status: $status, jobId: $jobId, jobName: $jobName,
       inputProductId: $inputProductId, outputProductId: $outputProductId,
       laborCostName: $laborCostName, overheadCostName: $overheadCostName,
-      inputAccountId: $inputAccountId, inputBranchId: $inputBranchId, inputDepartmentId: $inputDepartmentId,
-      outputAccountId: $outputAccountId, outputBranchId: $outputBranchId, outputDepartmentId: $outputDepartmentId,
+      inputAccountId: $inputAccountId, inputPlaceEntityId: $inputPlaceEntityId
+      outputAccountId: $outputAccountId, outputPlaceEntityId: $outputPlaceEntityId
       page: $page, perPage: $perPage
     ) {
       rows { ...AccountingJobExecutionFields }

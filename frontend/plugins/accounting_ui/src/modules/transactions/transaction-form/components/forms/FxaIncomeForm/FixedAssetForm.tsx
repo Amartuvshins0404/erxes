@@ -186,8 +186,8 @@ const FixedAssetTableHeader = ({
         {showAdvancedView && (
           <>
             <Table.Head>{t('accumulated-depreciation')}</Table.Head>
-            <Table.Head>{t('branch')}</Table.Head>
-            <Table.Head>{t('department')}</Table.Head>
+            <Table.Head>{t('place', 'Place')}</Table.Head>
+            <Table.Head>{t('responsible', 'Responsible')}</Table.Head>
           </>
         )}
       </Table.Row>

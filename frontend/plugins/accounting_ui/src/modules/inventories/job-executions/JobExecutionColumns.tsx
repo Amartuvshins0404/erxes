@@ -21,11 +21,7 @@ import type {
   ColumnDef,
   HeaderContext,
 } from '@tanstack/react-table';
-import {
-  BranchesInline,
-  DepartmentsInline,
-  usePermissionCheck,
-} from 'ui-modules';
+import { StructureEntitiesInline, usePermissionCheck } from 'ui-modules';
 import { AccountsInline } from '@/settings/account/components/AccountsInline';
 import { useExecutionActions } from '@/inventories/job-executions/useExecutionActions';
 import { JOB_EXECUTION_COLUMN_ORDER } from '@/inventories/job-executions/tableDefaults';
@@ -134,22 +130,17 @@ const sideColumns = (['input', 'output'] as const).flatMap((side) => [
     id: side + 'AccountId',
     side,
     label: 'account',
+    defaultLabel: 'Account',
     size: 240,
     cell: ExecutionAccountCell,
   },
   {
-    id: side + 'BranchId',
+    id: side + 'PlaceEntityId',
     side,
-    label: 'branch',
+    label: 'place',
+    defaultLabel: 'Place',
     size: 200,
-    cell: ExecutionBranchCell,
-  },
-  {
-    id: side + 'DepartmentId',
-    side,
-    label: 'department',
-    size: 200,
-    cell: ExecutionDepartmentCell,
+    cell: ExecutionPlaceCell,
   },
 ]);
 
@@ -167,7 +158,7 @@ const ExecutionColumnHeader = ({
       : { input: 'Inputs', output: 'Outputs' };
     const label = [
       t(sideColumn.side + 's', { defaultValue: defaults[sideColumn.side] }),
-      t(sideColumn.label),
+      t(sideColumn.label, { defaultValue: sideColumn.defaultLabel }),
     ].join(': ');
     return <RecordTable.InlineHead label={label} />;
   }
@@ -206,19 +197,11 @@ function ExecutionAccountCell({ cell }: CellContext<JobExecution, unknown>) {
     </RecordTableInlineCell>
   );
 }
-function ExecutionBranchCell({ cell }: CellContext<JobExecution, unknown>) {
+function ExecutionPlaceCell({ cell }: CellContext<JobExecution, unknown>) {
   const id = cell.getValue<string | undefined>();
   return (
     <RecordTableInlineCell>
-      <BranchesInline branchIds={id ? [id] : []} placeholder="-" />
-    </RecordTableInlineCell>
-  );
-}
-function ExecutionDepartmentCell({ cell }: CellContext<JobExecution, unknown>) {
-  const id = cell.getValue<string | undefined>();
-  return (
-    <RecordTableInlineCell>
-      <DepartmentsInline departmentIds={id ? [id] : []} placeholder="-" />
+      <StructureEntitiesInline entityIds={id ? [id] : []} placeholder="-" />
     </RecordTableInlineCell>
   );
 }

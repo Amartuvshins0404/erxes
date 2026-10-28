@@ -18,13 +18,17 @@ import {
   IconSearch,
   IconToggleRightFilled,
 } from '@tabler/icons-react';
-import { SelectBranches, SelectDepartments, SelectMember } from 'ui-modules';
+import { SelectStructureEntities, SelectMember } from 'ui-modules';
 
 import { SelectAccount } from '~/modules/settings/account/components/SelectAccount';
 import { useTransactionsQueryParams } from '../hooks/useTransactionVars';
 import { useTranslation } from 'react-i18next';
 
-const SIDEBAR_FILTER_KEYS = new Set(['branchId', 'departmentId', 'journal']);
+const SIDEBAR_FILTER_KEYS = new Set([
+  'placeEntityId',
+  'responsibleEntityId',
+  'journal',
+]);
 
 const TransactionsFilterPopover = ({
   sidebarFilters,
@@ -65,13 +69,13 @@ const TransactionsFilterPopover = ({
                 </Filter.Item>
                 {!sidebarFilters && (
                   <>
-                    <SelectBranches.FilterItem
-                      value="branchId"
-                      label={t('branch')}
+                    <SelectStructureEntities.FilterItem
+                      value="placeEntityId"
+                      label={t('place', 'Place')}
                     />
-                    <SelectDepartments.FilterItem
-                      value="departmentId"
-                      label={t('department')}
+                    <SelectStructureEntities.FilterItem
+                      value="responsibleEntityId"
+                      label={t('responsible', 'Responsible')}
                     />
                   </>
                 )}
@@ -148,10 +152,13 @@ const TransactionsFilterPopover = ({
           </Filter.View>
           {!sidebarFilters && (
             <>
-              <SelectBranches.FilterView mode="single" filterKey="branchId" />
-              <SelectDepartments.FilterView
+              <SelectStructureEntities.FilterView
                 mode="single"
-                filterKey="departmentId"
+                filterKey="placeEntityId"
+              />
+              <SelectStructureEntities.FilterView
+                mode="single"
+                filterKey="responsibleEntityId"
               />
             </>
           )}
@@ -252,14 +259,14 @@ export const TransactionsFilter = ({
         </Filter.BarItem>
         {!sidebarFilters && (
           <>
-            <SelectBranches.FilterBar
-              label={t('branch')}
-              filterKey="branchId"
+            <SelectStructureEntities.FilterBar
+              label={t('place', 'Place')}
+              filterKey="placeEntityId"
               mode="single"
             />
-            <SelectDepartments.FilterBar
-              label={t('department')}
-              filterKey="departmentId"
+            <SelectStructureEntities.FilterBar
+              label={t('responsible', 'Responsible')}
+              filterKey="responsibleEntityId"
               mode="single"
             />
           </>

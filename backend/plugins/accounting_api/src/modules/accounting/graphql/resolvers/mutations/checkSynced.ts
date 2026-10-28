@@ -28,17 +28,9 @@ type SalesDeal = {
     amount?: number;
     tickUsed?: boolean;
     currency?: string;
-    branchId?: string;
-    departmentId?: string;
-    branch?: string | { _id?: string } | null;
-    department?: string | { _id?: string } | null;
+    placeEntityId?: string;
+    responsibleEntityId?: string;
   }>;
-  branchId?: string;
-  departmentId?: string;
-  branch?: string | { _id?: string } | null;
-  department?: string | { _id?: string } | null;
-  branchIds?: string[];
-  departmentIds?: string[];
   assignedUserIds?: string[];
 };
 

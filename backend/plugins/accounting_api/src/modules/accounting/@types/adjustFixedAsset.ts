@@ -21,8 +21,8 @@ export interface IAdjustFxaDetail {
   fixedAssetId?: string;
   categoryId?: string;
   accountId?: string;
-  branchId?: string;
-  departmentId?: string;
+  placeEntityId?: string;
+  responsibleEntityId?: string;
 
   originalCost: number;
   salvageValue?: number;

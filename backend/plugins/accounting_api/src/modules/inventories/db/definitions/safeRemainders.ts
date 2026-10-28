@@ -5,8 +5,7 @@ import { mongooseStringRandomId, schemaWrapper } from 'erxes-api-shared/utils';
 export const safeRemainderSchema = schemaWrapper(
   new Schema({
     _id: mongooseStringRandomId,
-    branchId: { type: String, default: '', label: 'Branch' },
-    departmentId: { type: String, default: '', label: 'Department' },
+    placeEntityId: { type: String, default: '', label: 'Place' },
     productCategoryId: {
       type: String,
       optional: true,

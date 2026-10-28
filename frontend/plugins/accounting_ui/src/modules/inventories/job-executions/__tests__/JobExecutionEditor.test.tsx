@@ -114,8 +114,7 @@ jest.mock('erxes-ui', () => {
   };
 });
 jest.mock('ui-modules', () => ({
-  SelectBranches: { FormItem: () => null },
-  SelectDepartments: { FormItem: () => null },
+  SelectStructureEntities: { FormItem: () => null },
   usePermissionCheck: jest.fn(),
 }));
 jest.mock('@/settings/account/components/SelectAccount', () => ({
@@ -312,11 +311,9 @@ const postedExecution: JobExecution = {
   error: null,
   description: null,
   inputAccountId: 'inventory-account',
-  inputBranchId: null,
-  inputDepartmentId: null,
+  inputPlaceEntityId: null,
   outputAccountId: 'inventory-account',
-  outputBranchId: null,
-  outputDepartmentId: null,
+  outputPlaceEntityId: null,
   jobs: [
     {
       _id: 'row',

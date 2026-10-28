@@ -16,15 +16,9 @@ mutation accountingSafeRemainderSubmit($_id: String!) {
     date
     description
     status
-    branchId
-    departmentId
+    placeEntityId
     productCategoryId
-    branch {
-      _id
-      code
-      title
-    }
-    department {
+    placeEntity {
       _id
       code
       title
@@ -65,15 +59,9 @@ mutation accountingSafeRemainderCancel($_id: String!) {
     date
     description
     status
-    branchId
-    departmentId
+    placeEntityId
     productCategoryId
-    branch {
-      _id
-      code
-      title
-    }
-    department {
+    placeEntity {
       _id
       code
       title
@@ -114,15 +102,9 @@ mutation accountingSafeRemainderDoTr($_id: String!) {
     date
     description
     status
-    branchId
-    departmentId
+    placeEntityId
     productCategoryId
-    branch {
-      _id
-      code
-      title
-    }
-    department {
+    placeEntity {
       _id
       code
       title
@@ -163,15 +145,9 @@ mutation accountingSafeRemainderUndoTr($_id: String!) {
     date
     description
     status
-    branchId
-    departmentId
+    placeEntityId
     productCategoryId
-    branch {
-      _id
-      code
-      title
-    }
-    department {
+    placeEntity {
       _id
       code
       title
@@ -221,15 +197,9 @@ mutation accountingSafeRemainderEdit($_id: String!, $description: String, $incom
     date
     description
     status
-    branchId
-    departmentId
+    placeEntityId
     productCategoryId
-    branch {
-      _id
-      code
-      title
-    }
-    department {
+    placeEntity {
       _id
       code
       title
@@ -270,8 +240,7 @@ mutation accountingSafeRemainderItemEdit($_id: String!, $status: String, $remain
     trInfo: $trInfo
   ) {
     _id
-    branchId
-    departmentId
+    placeEntityId
     preCount
     count
     status

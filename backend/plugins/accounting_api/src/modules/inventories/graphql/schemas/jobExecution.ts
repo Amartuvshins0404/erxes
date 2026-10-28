@@ -23,11 +23,9 @@ export const types = `
     jobs: [JobExecutionItemInput!]!
     description: String
     inputAccountId: String!
-    inputBranchId: String
-    inputDepartmentId: String
+    inputPlaceEntityId: String
     outputAccountId: String!
-    outputBranchId: String
-    outputDepartmentId: String
+    outputPlaceEntityId: String
   }
   type JobExecution {
     _id: String!
@@ -35,11 +33,9 @@ export const types = `
     jobs: [JobExecutionItem!]!
     description: String
     inputAccountId: String!
-    inputBranchId: String
-    inputDepartmentId: String
+    inputPlaceEntityId: String
     outputAccountId: String!
-    outputBranchId: String
-    outputDepartmentId: String
+    outputPlaceEntityId: String
     status: String!
     parentId: String
     ptrId: String
@@ -55,8 +51,8 @@ export const queries = `
     searchValue: String, status: String, jobId: String, jobName: String,
     inputProductId: String, outputProductId: String,
     laborCostName: String, overheadCostName: String,
-    inputAccountId: String, inputBranchId: String, inputDepartmentId: String,
-    outputAccountId: String, outputBranchId: String, outputDepartmentId: String,
+    inputAccountId: String, inputPlaceEntityId: String,
+    outputAccountId: String, outputPlaceEntityId: String,
     page: Int, perPage: Int
   ): JobExecutionList!
   jobExecutionDetail(_id: String!): JobExecution!

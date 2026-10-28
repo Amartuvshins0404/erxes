@@ -5,7 +5,7 @@ import {
   RecordTableInlineCell,
   Table,
 } from 'erxes-ui';
-import { SelectBranches, SelectDepartments } from 'ui-modules';
+import { SelectStructureEntities } from 'ui-modules';
 import { ITransactionGroupForm } from '../../types/JournalForms';
 
 export const FxaDetailLocationCells = ({
@@ -32,14 +32,14 @@ export const FxaDetailLocationCells = ({
           <RecordTableInlineCell className="justify-center">
             <Form.Field
               control={form.control}
-              name={`trDocs.${journalIndex}.details.${detailIndex}.branchId`}
+              name={`trDocs.${journalIndex}.details.${detailIndex}.placeEntityId`}
               render={({ field }) => (
                 <Form.Item>
                   <Form.Control>
-                    <SelectBranches.InlineCell
+                    <SelectStructureEntities.InlineCell
                       mode="single"
                       value={field.value ?? ''}
-                      onValueChange={(branch) => field.onChange(branch)}
+                      onValueChange={(entityId) => field.onChange(entityId)}
                       scope={AccountingHotkeyScope.TransactionFormPage}
                     />
                   </Form.Control>
@@ -59,14 +59,14 @@ export const FxaDetailLocationCells = ({
           <RecordTableInlineCell className="justify-center">
             <Form.Field
               control={form.control}
-              name={`trDocs.${journalIndex}.details.${detailIndex}.departmentId`}
+              name={`trDocs.${journalIndex}.details.${detailIndex}.responsibleEntityId`}
               render={({ field }) => (
                 <Form.Item>
                   <Form.Control>
-                    <SelectDepartments.InlineCell
+                    <SelectStructureEntities.InlineCell
                       mode="single"
                       value={field.value ?? ''}
-                      onValueChange={(department) => field.onChange(department)}
+                      onValueChange={(entityId) => field.onChange(entityId)}
                       scope={AccountingHotkeyScope.TransactionFormPage}
                     />
                   </Form.Control>

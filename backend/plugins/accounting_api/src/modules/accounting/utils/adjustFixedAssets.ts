@@ -58,8 +58,8 @@ type TFixedAssetMovement = {
   fixedAssetId: string;
   date: Date;
   countDelta: number;
-  branchId?: string;
-  departmentId?: string;
+  placeEntityId?: string;
+  responsibleEntityId?: string;
   accountId?: string;
   transactionId?: string;
   transactionDetailId?: string;
@@ -453,8 +453,9 @@ const getFxaMovements = async (models: IModels, endDate: Date) => {
         fixedAssetId: detail.fixedAssetId,
         date: getPureDate(transaction.date),
         countDelta: sign * Math.max(0, Math.trunc(detail.count || 0)),
-        branchId: detail.branchId || transaction.branchId,
-        departmentId: detail.departmentId || transaction.departmentId,
+        placeEntityId: detail.placeEntityId || transaction.placeEntityId,
+        responsibleEntityId:
+          detail.responsibleEntityId || transaction.responsibleEntityId,
         accountId: detail.accountId,
         transactionId: transaction._id,
         transactionDetailId: detail._id,
@@ -524,15 +525,15 @@ const getDepreciationMovements = async (
   return movements;
 };
 
-const getLocationKey = (branchId?: string, departmentId?: string) =>
-  `${branchId || ''}:${departmentId || ''}`;
+const getLocationKey = (placeEntityId?: string, responsibleEntityId?: string) =>
+  `${placeEntityId || ''}:${responsibleEntityId || ''}`;
 
 const splitLocationKey = (key: string) => {
-  const [branchId, departmentId] = key.split(':');
+  const [placeEntityId, responsibleEntityId] = key.split(':');
 
   return {
-    branchId: branchId || undefined,
-    departmentId: departmentId || undefined,
+    placeEntityId: placeEntityId || undefined,
+    responsibleEntityId: responsibleEntityId || undefined,
   };
 };
 
@@ -551,7 +552,10 @@ const getAssetLocationCountsAtDate = (
       continue;
     }
 
-    const key = getLocationKey(movement.branchId, movement.departmentId);
+    const key = getLocationKey(
+      movement.placeEntityId,
+      movement.responsibleEntityId,
+    );
     counts.set(key, (counts.get(key) || 0) + movement.countDelta);
   }
 
@@ -1110,8 +1114,8 @@ export const runAdjustFixedAsset = async (
         fixedAssetId: fixedAsset._id,
         categoryId: fixedAsset.categoryId,
         accountId,
-        branchId: snapshot.branchId,
-        departmentId: snapshot.departmentId,
+        placeEntityId: snapshot.placeEntityId,
+        responsibleEntityId: snapshot.responsibleEntityId,
         originalCost: result.originalCost,
         salvageValue: result.salvageValue,
         openingBookValue: result.openingBookValue,
@@ -1202,15 +1206,15 @@ export const createAdjustFixedAssetTransaction = async ({
     debitDetails.push({
       accountId: expenseAccountId,
       amount,
-      branchId: detail.branchId,
-      departmentId: detail.departmentId,
+      placeEntityId: detail.placeEntityId,
+      responsibleEntityId: detail.responsibleEntityId,
       fixedAssetId: detail.fixedAssetId,
     });
     creditDetails.push({
       accountId: depreciationAccountId,
       amount,
-      branchId: detail.branchId,
-      departmentId: detail.departmentId,
+      placeEntityId: detail.placeEntityId,
+      responsibleEntityId: detail.responsibleEntityId,
       fixedAssetId: detail.fixedAssetId,
     });
   }

@@ -66,8 +66,9 @@ class TaxTrs {
     }
 
     if (hasCtax && this.doc.hasCtax) {
-      this.ctaxAccountId =
-        await this.models.Configs.getConfigValue('CtaxPayableAccount');
+      this.ctaxAccountId = await this.models.Configs.getConfigValue(
+        'CtaxPayableAccount',
+      );
 
       if (!this.ctaxAccountId) {
         throw new Error('must init ctax account id');
@@ -108,8 +109,8 @@ class TaxTrs {
       description: this.doc.description,
       journal: JOURNALS.TAX,
       side: this.side,
-      branchId: this.doc.branchId,
-      departmentId: this.doc.departmentId,
+      placeEntityId: this.doc.placeEntityId,
+      responsibleEntityId: this.doc.responsibleEntityId,
       customerType: this.doc.customerType,
       customerId: this.doc.customerId,
       details: [
@@ -154,8 +155,8 @@ class TaxTrs {
         description: this.doc.description,
         journal: JOURNALS.TAX,
         side: this.side,
-        branchId: this.doc.branchId,
-        departmentId: this.doc.departmentId,
+        placeEntityId: this.doc.placeEntityId,
+        responsibleEntityId: this.doc.responsibleEntityId,
         customerType: this.doc.customerType,
         customerId: this.doc.customerId,
         details: [

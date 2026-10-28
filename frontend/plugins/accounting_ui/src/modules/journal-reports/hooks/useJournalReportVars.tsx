@@ -71,8 +71,8 @@ export const useTransactionsQueryParams = () => {
     accountBrand: string;
     accountIsTemp: string;
     accountIsOutBalance: string;
-    accountBranchId: string;
-    accountDepartmentId: string;
+    accountPlaceEntityId: string;
+    accountResponsibleEntityId: string;
     accountCurrency: string;
     accountJournal: string;
     brandId: string;
@@ -91,8 +91,8 @@ export const useTransactionsQueryParams = () => {
     companyTagIds: string;
     contentType: string;
     contentId: string;
-    branchId: string;
-    departmentId: string;
+    placeEntityId: string;
+    responsibleEntityId: string;
     currency: string;
     journal: string;
     statuses: string;
@@ -121,8 +121,8 @@ export const useTransactionsQueryParams = () => {
     'accountBrand',
     'accountIsTemp',
     'accountIsOutBalance',
-    'accountBranchId',
-    'accountDepartmentId',
+    'accountPlaceEntityId',
+    'accountResponsibleEntityId',
     'accountCurrency',
     'accountJournal',
     'brandId',
@@ -141,8 +141,8 @@ export const useTransactionsQueryParams = () => {
     'companyTagIds',
     'contentType',
     'contentId',
-    'branchId',
-    'departmentId',
+    'placeEntityId',
+    'responsibleEntityId',
     'currency',
     'journal',
     'statuses',

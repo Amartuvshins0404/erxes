@@ -10,11 +10,9 @@ export const executionFilterKeys = [
   'laborCostName',
   'overheadCostName',
   'inputAccountId',
-  'inputBranchId',
-  'inputDepartmentId',
+  'inputPlaceEntityId',
   'outputAccountId',
-  'outputBranchId',
-  'outputDepartmentId',
+  'outputPlaceEntityId',
 ] as const;
 export type JobExecutionFilters = Partial<
   Record<(typeof executionFilterKeys)[number], string>

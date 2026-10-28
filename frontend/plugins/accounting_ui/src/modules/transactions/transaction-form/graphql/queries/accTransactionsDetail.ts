@@ -23,17 +23,17 @@ query accountingAccTransactionsDetail($_id: String!) {
     originType
     originSubId
     followInfos
-    branchId
-    departmentId
+    placeEntityId
+    responsibleEntityId
     customerType
     customerId
     assignedUserIds
-    branch {
+    placeEntity {
       _id
       code
       title
     }
-    department {
+    responsibleEntity {
       _id
       code
       title
@@ -42,14 +42,14 @@ query accountingAccTransactionsDetail($_id: String!) {
       _id
       accountId
       transactionId
-      branchId
-      departmentId
-      branch {
+      placeEntityId
+      responsibleEntityId
+      placeEntity {
         _id
         code
         title
       }
-      department {
+      responsibleEntity {
         _id
         code
         title
@@ -89,14 +89,14 @@ query accountingAccTransactionsDetail($_id: String!) {
       _id
       accountId
       transactionId
-      branchId
-      departmentId
-      branch {
+      placeEntityId
+      responsibleEntityId
+      placeEntity {
         _id
         code
         title
       }
-      department {
+      responsibleEntity {
         _id
         code
         title
@@ -144,14 +144,14 @@ query accountingAccTransactionsDetail($_id: String!) {
         _id
         accountId
         transactionId
-        branchId
-        departmentId
-        branch {
+        placeEntityId
+        responsibleEntityId
+        placeEntity {
           _id
           code
           title
         }
-        department {
+        responsibleEntity {
           _id
           code
           title
@@ -179,14 +179,14 @@ query accountingAccTransactionsDetail($_id: String!) {
         _id
         accountId
         transactionId
-        branchId
-        departmentId
-        branch {
+        placeEntityId
+        responsibleEntityId
+        placeEntity {
           _id
           code
           title
         }
-        department {
+        responsibleEntity {
           _id
           code
           title

@@ -4,8 +4,7 @@ import { IContext } from '~/connectionResolvers';
 import { ISafeRemainderDocument } from '../../../@types/safeRemainders';
 
 interface ISafeRemainderQueryParams {
-  branchId?: string;
-  departmentId?: string;
+  placeEntityId?: string;
   productId?: string;
   searchValue?: string;
   beginDate?: Date | string;
@@ -39,12 +38,8 @@ const safeRemainderQueries = {
 
     const query: FilterQuery<ISafeRemainderDocument> = {};
 
-    if (params.departmentId) {
-      query.departmentId = params.departmentId;
-    }
-
-    if (params.branchId) {
-      query.branchId = params.branchId;
+    if (params.placeEntityId) {
+      query.placeEntityId = params.placeEntityId;
     }
 
     if (params.searchValue) {

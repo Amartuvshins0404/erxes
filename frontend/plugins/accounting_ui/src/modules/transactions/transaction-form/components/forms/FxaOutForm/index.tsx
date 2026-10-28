@@ -3,8 +3,8 @@ import { ITransactionGroupForm } from '../../../types/JournalForms';
 import {
   AccountField,
   AssignToField,
-  BranchField,
-  DepartmentField,
+  PlaceField,
+  ResponsibleField,
   DescriptionField,
 } from '../../GeneralFormFields';
 import { CustomerFields } from '../../helpers/CustomerFields';
@@ -36,8 +36,8 @@ export const FxaOutForm = ({
           onAccountChange={onAccountChange}
         />
         <CustomerFields form={form} index={index} />
-        <BranchField form={form} index={index} />
-        <DepartmentField form={form} index={index} />
+        <PlaceField form={form} index={index} />
+        <ResponsibleField form={form} index={index} />
         <AssignToField form={form} index={index} />
         <DescriptionField form={form} index={index} />
         <FxaSaleAccountFields form={form} index={index} />

@@ -26,14 +26,12 @@ const configQueries = {
     {
       productIds,
       accountId,
-      branchId,
-      departmentId,
+      placeEntityId,
       excludedTransactionIds,
     }: {
       productIds: string[];
       accountId: string;
-      branchId?: string;
-      departmentId?: string;
+      placeEntityId?: string;
       excludedTransactionIds?: string[];
     },
     { models, checkPermission }: IContext,
@@ -45,8 +43,7 @@ const configQueries = {
     const costs = await activeCost(
       models,
       accountId,
-      branchId,
-      departmentId,
+      placeEntityId,
       productIds,
       excludedTransactionIds,
     );

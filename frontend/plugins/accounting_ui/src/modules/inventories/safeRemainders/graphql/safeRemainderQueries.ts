@@ -1,11 +1,10 @@
 import { gql } from '~/gql';
 
 export const SAFE_REMAINDERS_QUERY = gql(`
-query accountingSafeRemainders($searchValue: String, $departmentId: String, $branchId: String, $beginDate: Date, $endDate: Date, $productId: String, $createdUserId: String, $modifiedUserId: String, $createdStartDate: Date, $createdEndDate: Date, $updatedStartDate: Date, $updatedEndDate: Date, $page: Int, $perPage: Int, $sortField: String, $sortDirection: Int) {
+query accountingSafeRemainders($searchValue: String, $placeEntityId: String, $beginDate: Date, $endDate: Date, $productId: String, $createdUserId: String, $modifiedUserId: String, $createdStartDate: Date, $createdEndDate: Date, $updatedStartDate: Date, $updatedEndDate: Date, $page: Int, $perPage: Int, $sortField: String, $sortDirection: Int) {
   safeRemainders(
     searchValue: $searchValue
-    departmentId: $departmentId
-    branchId: $branchId
+    placeEntityId: $placeEntityId
     beginDate: $beginDate
     endDate: $endDate
     productId: $productId
@@ -29,15 +28,9 @@ query accountingSafeRemainders($searchValue: String, $departmentId: String, $bra
       date
       description
       status
-      branchId
-      departmentId
+      placeEntityId
       productCategoryId
-      branch {
-        _id
-        code
-        title
-      }
-      department {
+      placeEntity {
         _id
         code
         title
@@ -80,15 +73,9 @@ query accountingSafeRemainderDetail($_id: String!) {
     date
     description
     status
-    branchId
-    departmentId
+    placeEntityId
     productCategoryId
-    branch {
-      _id
-      code
-      title
-    }
-    department {
+    placeEntity {
       _id
       code
       title
@@ -131,8 +118,7 @@ query accountingSafeRemainderItems($remainderId: String!, $status: String, $prod
     perPage: $perPage
   ) {
     _id
-    branchId
-    departmentId
+    placeEntityId
     preCount
     count
     status

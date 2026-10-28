@@ -11,16 +11,14 @@ import { RESERVE_REMS_QUERY } from '../graphql/reserveRemQueries';
 
 type ReserveRemQueryParams = {
   searchValue: string;
-  branchId: string;
-  departmentId: string;
+  placeEntityId: string;
   productId: string;
   categoryId: string;
 };
 
 const RESERVE_REM_FILTER_KEYS: (keyof ReserveRemQueryParams)[] = [
   'searchValue',
-  'branchId',
-  'departmentId',
+  'placeEntityId',
   'productId',
   'categoryId',
 ];
@@ -37,9 +35,8 @@ export const useReserveRemVariables = () => {
   const variables: Record<string, any> = {};
 
   if (queryParams.searchValue) variables.searchValue = queryParams.searchValue;
-  if (queryParams.branchId) variables.branchId = queryParams.branchId;
-  if (queryParams.departmentId)
-    variables.departmentId = queryParams.departmentId;
+  if (queryParams.placeEntityId)
+    variables.placeEntityId = queryParams.placeEntityId;
   if (queryParams.productId) variables.productId = queryParams.productId;
   if (queryParams.categoryId)
     variables.productCategoryId = queryParams.categoryId;

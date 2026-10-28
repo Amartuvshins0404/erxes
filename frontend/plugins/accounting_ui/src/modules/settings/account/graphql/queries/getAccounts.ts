@@ -1,7 +1,7 @@
 import { gql } from '~/gql';
 
 export const GET_ACCOUNTS_MAIN = gql(`
-query accountingAccountsMain($status: String, $categoryId: String, $currency: String, $searchValue: String, $brand: String, $ids: [String], $excludeIds: Boolean, $isTemp: Boolean, $isOutBalance: Boolean, $branchId: String, $departmentId: String, $journal: String, $journals: [String], $kind: String, $code: String, $name: String, $permissionMode: String, $cursor: String, $cursorMode: CURSOR_MODE, $direction: CURSOR_DIRECTION, $limit: Int) {
+query accountingAccountsMain($status: String, $categoryId: String, $currency: String, $searchValue: String, $brand: String, $ids: [String], $excludeIds: Boolean, $isTemp: Boolean, $isOutBalance: Boolean, $placeEntityId: String, $responsibleEntityId: String, $journal: String, $journals: [String], $kind: String, $code: String, $name: String, $permissionMode: String, $cursor: String, $cursorMode: CURSOR_MODE, $direction: CURSOR_DIRECTION, $limit: Int) {
   accountsMain(
     status: $status
     categoryId: $categoryId
@@ -11,9 +11,9 @@ query accountingAccountsMain($status: String, $categoryId: String, $currency: St
     excludeIds: $excludeIds
     isTemp: $isTemp
     isOutBalance: $isOutBalance
-    branchId: $branchId
+    placeEntityId: $placeEntityId
     currency: $currency
-    departmentId: $departmentId
+    responsibleEntityId: $responsibleEntityId
     journal: $journal
     journals: $journals
     kind: $kind
@@ -33,8 +33,8 @@ query accountingAccountsMain($status: String, $categoryId: String, $currency: St
       currency
       kind
       journal
-      branchId
-      departmentId
+      placeEntityId
+      responsibleEntityId
       isTemp
       isOutBalance
       extra {
@@ -60,7 +60,7 @@ query accountingAccountsMain($status: String, $categoryId: String, $currency: St
 `);
 
 export const GET_ACCOUNTS = gql(`
-query accountingAccounts($status: String, $categoryId: String, $currency: String, $searchValue: String, $brand: String, $ids: [String], $excludeIds: Boolean, $isTemp: Boolean, $isOutBalance: Boolean, $branchId: String, $departmentId: String, $journal: String, $journals: [String], $kind: String, $code: String, $name: String, $permissionMode: String, $cursor: String, $cursorMode: CURSOR_MODE, $direction: CURSOR_DIRECTION, $limit: Int) {
+query accountingAccounts($status: String, $categoryId: String, $currency: String, $searchValue: String, $brand: String, $ids: [String], $excludeIds: Boolean, $isTemp: Boolean, $isOutBalance: Boolean, $placeEntityId: String, $responsibleEntityId: String, $journal: String, $journals: [String], $kind: String, $code: String, $name: String, $permissionMode: String, $cursor: String, $cursorMode: CURSOR_MODE, $direction: CURSOR_DIRECTION, $limit: Int) {
   accountsMain(
     status: $status
     categoryId: $categoryId
@@ -70,9 +70,9 @@ query accountingAccounts($status: String, $categoryId: String, $currency: String
     excludeIds: $excludeIds
     isTemp: $isTemp
     isOutBalance: $isOutBalance
-    branchId: $branchId
+    placeEntityId: $placeEntityId
     currency: $currency
-    departmentId: $departmentId
+    responsibleEntityId: $responsibleEntityId
     journal: $journal
     journals: $journals
     kind: $kind
@@ -92,8 +92,8 @@ query accountingAccounts($status: String, $categoryId: String, $currency: String
       currency
       kind
       journal
-      branchId
-      departmentId
+      placeEntityId
+      responsibleEntityId
       isTemp
       isOutBalance
       extra {
@@ -123,8 +123,8 @@ query accountingAccountDetail($id: String!) {
     currency
     kind
     journal
-    branchId
-    departmentId
+    placeEntityId
+    responsibleEntityId
     isTemp
     isOutBalance
     extra {
@@ -150,8 +150,8 @@ query accountingAssignedAccounts($ids: [String], $permissionMode: String) {
     currency
     kind
     journal
-    branchId
-    departmentId
+    placeEntityId
+    responsibleEntityId
     isTemp
     isOutBalance
     extra {

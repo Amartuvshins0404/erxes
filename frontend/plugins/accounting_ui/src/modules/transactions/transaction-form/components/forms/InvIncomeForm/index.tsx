@@ -1,3 +1,4 @@
+import { STOCK_PLACE_CAPABILITY } from '@/utils/structure';
 import { JournalEnum } from '@/settings/account/types/Account';
 import { fixNum } from 'erxes-ui/lib';
 import { useEffect } from 'react';
@@ -6,8 +7,8 @@ import { ITransactionGroupForm } from '../../../types/JournalForms';
 import {
   AccountField,
   AssignToField,
-  BranchField,
-  DepartmentField,
+  PlaceField,
+  ResponsibleField,
   DescriptionField,
 } from '../../GeneralFormFields';
 import { CtaxForm } from '../../helpers/CtaxForm';
@@ -34,8 +35,12 @@ export const InvIncomeForm = ({
           allDetails={true}
         />
         <CustomerFields form={form} index={index} />
-        <BranchField form={form} index={index} />
-        <DepartmentField form={form} index={index} />
+        <PlaceField
+          form={form}
+          index={index}
+          capability={STOCK_PLACE_CAPABILITY}
+        />
+        <ResponsibleField form={form} index={index} />
         <AssignToField form={form} index={index} />
         <DescriptionField form={form} index={index} />
         <VatForm

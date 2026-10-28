@@ -64,8 +64,9 @@ export const AddDetailRowButton = ({
               variables: {
                 productIds,
                 accountId: lastDetail.accountId,
-                branchId: lastDetail.branchId || trDoc.branchId,
-                departmentId: lastDetail.departmentId || trDoc.departmentId,
+                placeEntityId: lastDetail.placeEntityId || trDoc.placeEntityId,
+                responsibleEntityId:
+                  lastDetail.responsibleEntityId || trDoc.responsibleEntityId,
                 excludedTransactionIds: trDoc._id ? [trDoc._id] : undefined,
               },
               fetchPolicy: 'network-only',

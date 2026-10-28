@@ -105,22 +105,26 @@ const CreditCell = ({ row }: any) => {
   return <AmountCell value={side === TR_SIDES.CREDIT ? fixNum(amount) : 0} />;
 };
 
-const BranchCell = ({ row }: { row: Row<ITBalanceTransaction> }) => {
-  const branch = row.original.detail.branch || row.original.branch;
+const PlaceCell = ({ row }: { row: Row<ITBalanceTransaction> }) => {
+  const placeEntity =
+    row.original.detail.placeEntity || row.original.placeEntity;
 
   return (
     <RecordTableInlineCell>
-      {[branch?.code, branch?.title].filter(Boolean).join(' - ')}
+      {[placeEntity?.code, placeEntity?.title].filter(Boolean).join(' - ')}
     </RecordTableInlineCell>
   );
 };
 
-const DepartmentCell = ({ row }: { row: Row<ITBalanceTransaction> }) => {
-  const department = row.original.detail.department || row.original.department;
+const ResponsibleCell = ({ row }: { row: Row<ITBalanceTransaction> }) => {
+  const responsibleEntity =
+    row.original.detail.responsibleEntity || row.original.responsibleEntity;
 
   return (
     <RecordTableInlineCell>
-      {[department?.code, department?.title].filter(Boolean).join(' - ')}
+      {[responsibleEntity?.code, responsibleEntity?.title]
+        .filter(Boolean)
+        .join(' - ')}
     </RecordTableInlineCell>
   );
 };
@@ -265,20 +269,23 @@ export const tbalanceColumns = (
     ),
   },
   {
-    id: 'branch',
+    id: 'placeEntity',
     header: () => (
-      <RecordTable.InlineHead icon={IconFile} label={t('branch')} />
+      <RecordTable.InlineHead icon={IconFile} label={t('place', 'Place')} />
     ),
-    accessorKey: 'branch',
-    cell: ({ row }) => <BranchCell row={row} />,
+    accessorKey: 'placeEntity',
+    cell: ({ row }) => <PlaceCell row={row} />,
   },
   {
-    id: 'department',
+    id: 'responsibleEntity',
     header: () => (
-      <RecordTable.InlineHead icon={IconFile} label={t('department')} />
+      <RecordTable.InlineHead
+        icon={IconFile}
+        label={t('responsible', 'Responsible')}
+      />
     ),
-    accessorKey: 'department',
-    cell: ({ row }) => <DepartmentCell row={row} />,
+    accessorKey: 'responsibleEntity',
+    cell: ({ row }) => <ResponsibleCell row={row} />,
   },
   {
     id: 'description',

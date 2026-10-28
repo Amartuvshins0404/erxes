@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { IconCalendar, IconSearch } from '@tabler/icons-react';
 import { Combobox, Command, Filter, useQueryState } from 'erxes-ui';
-import { SelectBranches, SelectDepartments } from 'ui-modules';
+import { SelectStructureEntities } from 'ui-modules';
 import { SelectFixedAsset } from '@/settings/fixed-assets/components/SelectFixedAsset';
 import { SelectFixedAssetCategory } from '@/settings/fixed-assets/components/SelectFixedAssetCategory';
 
@@ -90,15 +90,15 @@ export const FxaRemainderFilters = () => {
         </Filter.BarItem>
         <FxaRemainderAssetFilter />
         <FxaRemainderCategoryFilter />
-        <SelectBranches.FilterBar
+        <SelectStructureEntities.FilterBar
           mode="single"
-          filterKey="branchId"
-          label={t('branch')}
+          filterKey="placeEntityId"
+          label={t('place', 'Place')}
         />
-        <SelectDepartments.FilterBar
+        <SelectStructureEntities.FilterBar
           mode="single"
-          filterKey="departmentId"
-          label={t('department')}
+          filterKey="responsibleEntityId"
+          label={t('responsible', 'Responsible')}
         />
         <Filter.BarItem queryKey="date">
           <Filter.BarName>

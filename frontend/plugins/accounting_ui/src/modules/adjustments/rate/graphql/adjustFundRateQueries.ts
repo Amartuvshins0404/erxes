@@ -72,8 +72,8 @@ query AccountingAdjustFundRateDetail($_id: String!) {
       currencyBalance
       diff
       transactionId
-      branchId
-      departmentId
+      placeEntityId
+      responsibleEntityId
       createdAt
       updatedAt
     }

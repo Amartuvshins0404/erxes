@@ -84,14 +84,13 @@ const safeRemainderMutations = {
       throw new Error('Already submited');
     }
 
-    const { branchId, departmentId, date, productCategoryId } = safeRemainder;
+    const { placeEntityId, date, productCategoryId } = safeRemainder;
 
     const afterSafeRems = await models.SafeRemainders.find({
       status: {
         $in: [SAFE_REMAINDER_STATUSES.PUBLISHED, SAFE_REMAINDER_STATUSES.DONE],
       },
-      branchId,
-      departmentId,
+      placeEntityId,
       productCategoryId,
       date: { $gt: date },
     }).lean();
@@ -122,14 +121,13 @@ const safeRemainderMutations = {
       throw new Error('status is not submitted');
     }
 
-    const { branchId, departmentId, date, productCategoryId } = safeRemainder;
+    const { placeEntityId, date, productCategoryId } = safeRemainder;
 
     const afterSafeRems = await models.SafeRemainders.find({
       status: {
         $in: [SAFE_REMAINDER_STATUSES.PUBLISHED, SAFE_REMAINDER_STATUSES.DONE],
       },
-      branchId,
-      departmentId,
+      placeEntityId,
       productCategoryId,
       date: { $gt: date },
     }).lean();

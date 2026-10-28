@@ -4,8 +4,7 @@ import { Schema } from 'mongoose';
 export const reserveRemSchema = schemaWrapper(
   new Schema({
     _id: mongooseStringRandomId,
-    departmentId: { type: String, label: 'Department' },
-    branchId: { type: String, label: 'Branch' },
+    placeEntityId: { type: String, label: 'Place' },
     productId: { type: String, label: 'product' },
     uom: { type: String, label: 'Uom' },
     remainder: { type: Number, label: 'Remainder' },

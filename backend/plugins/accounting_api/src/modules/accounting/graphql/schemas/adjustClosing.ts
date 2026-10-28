@@ -28,8 +28,8 @@ export const types = `
 
   type AdjustClosingDetail {
     _id: String!
-    branchId: String
-    departmentId: String
+    placeEntityId: String
+    responsibleEntityId: String
     entries: [AdjustClosingEntry]
     closeIntegrateTrId: String
     periodGLTrId: String
@@ -54,8 +54,8 @@ export const types = `
     earningAccountId: String
     taxPayableAccountId: String
 
-    branchId: String
-    departmentId: String
+    placeEntityId: String
+    responsibleEntityId: String
     closeIntegrateTrId: String
     periodGLTrId: String
 

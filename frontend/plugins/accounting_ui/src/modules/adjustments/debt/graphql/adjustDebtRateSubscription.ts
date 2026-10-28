@@ -20,8 +20,8 @@ subscription AccountingAdjustDebtRateChanged($adjustId: String!) {
     checkedAt
     error
     warning
-    branchId
-    departmentId
+    placeEntityId
+    responsibleEntityId
     createdBy
     modifiedBy
     createdAt
@@ -35,8 +35,8 @@ subscription AccountingAdjustDebtRateChanged($adjustId: String!) {
       accountCurrency
       customerType
       customerId
-      branchId
-      departmentId
+      placeEntityId
+      responsibleEntityId
       mainBalance
       currencyBalance
       diff

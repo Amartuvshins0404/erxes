@@ -1,8 +1,7 @@
 export const types = `
   type SafeRemainderItem {
     _id: String,
-    branchId: String,
-    departmentId: String,
+    placeEntityId: String,
     remainderId: String,
     product: Product,
     productId: String,

@@ -1,6 +1,6 @@
 import type { TFunction } from 'i18next';
-import { Cell, ColumnDef } from '@tanstack/react-table';
-import { IAdjustInventory } from '../types/AdjustInventory';
+import { Cell, ColumnDef, Row } from '@tanstack/react-table';
+import { IAdjustInvDetail } from '../types/AdjustInventory';
 import { Link } from 'react-router-dom';
 import {
   RecordTable,
@@ -56,18 +56,10 @@ const AccountCell = ({ row }: any) => {
   );
 };
 
-const BranchCell = ({ row }: any) => {
+const PlaceCell = ({ row }: { row: Row<IAdjustInvDetail> }) => {
   return (
     <RecordTableInlineCell>
-      {`${row.original.branch?.code} - ${row.original.branch?.title}`}
-    </RecordTableInlineCell>
-  );
-};
-
-const DepartmentCell = ({ row }: any) => {
-  return (
-    <RecordTableInlineCell>
-      {`${row.original.department?.code} - ${row.original.department?.title}`}
+      {`${row.original.placeEntity?.code} - ${row.original.placeEntity?.title}`}
     </RecordTableInlineCell>
   );
 };
@@ -90,7 +82,7 @@ const NumberCell = ({ getValue }: any) => {
 const TransactionMoreColumnCell = ({
   cell,
 }: {
-  cell: Cell<IAdjustInventory, unknown>;
+  cell: Cell<IAdjustInvDetail, unknown>;
 }) => {
   const { _id } = cell.row.original;
 
@@ -110,7 +102,7 @@ const transactionMoreColumn = {
 
 export const adjustDetailTableColumns = (
   t: TFunction<'accounting'>,
-): ColumnDef<IAdjustInventory>[] => [
+): ColumnDef<IAdjustInvDetail>[] => [
   transactionMoreColumn,
   // {
   //   id: 'date',
@@ -137,21 +129,12 @@ export const adjustDetailTableColumns = (
     size: 300,
   },
   {
-    id: 'branch',
+    id: 'placeEntity',
     header: () => (
-      <RecordTable.InlineHead icon={IconMoneybag} label={t('branch')} />
+      <RecordTable.InlineHead icon={IconMoneybag} label={t('place', 'Place')} />
     ),
-    accessorKey: 'branch',
-    cell: ({ row }) => <BranchCell row={row} />,
-    size: 200,
-  },
-  {
-    id: 'department',
-    header: () => (
-      <RecordTable.InlineHead icon={IconMoneybag} label={t('department')} />
-    ),
-    accessorKey: 'department',
-    cell: ({ row }) => <DepartmentCell row={row} />,
+    accessorKey: 'placeEntity',
+    cell: ({ row }) => <PlaceCell row={row} />,
     size: 200,
   },
   {

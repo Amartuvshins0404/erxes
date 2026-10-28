@@ -1,5 +1,8 @@
 import { canGroup, getGroupActionsMap } from 'erxes-api-shared/core-modules';
-import { sendTRPCMessage } from 'erxes-api-shared/utils';
+import {
+  IPermissionScopeResolution,
+  sendTRPCMessage,
+} from 'erxes-api-shared/utils';
 import { CMS_POST_ACTIONS, permissions } from '~/meta/permissions';
 import type { IContext } from '~/connectionResolvers';
 
@@ -9,25 +12,29 @@ type TranslationInput = {
   language?: string;
 };
 
-type CmsPermissionScope = 'own' | 'group' | 'all';
-
-type CmsPermission = {
-  plugin?: string;
-  module: string;
-  actions?: string[];
-  scope: CmsPermissionScope;
-};
-
 type CmsReadAccess = {
   language?: string;
   translationLanguage?: string;
-  query: Record<string, any>;
+  query: Record<string, unknown>;
 };
 
 const COMMON_LANGUAGE_ACTIONS: Record<string, string> = {
   [CMS_POST_ACTIONS.languageMn]: 'mn',
   [CMS_POST_ACTIONS.languageEn]: 'en',
 };
+
+const CMS_POST_MODULE = 'cmsPost';
+
+const OWNER_SCOPE: IPermissionScopeResolution = {
+  all: true,
+  userIds: [],
+  entityIds: [],
+};
+
+const scopeCache = new WeakMap<
+  CmsContext,
+  Map<string, Promise<IPermissionScopeResolution | null>>
+>();
 
 const normalizeLanguage = (language?: string | null) =>
   language ? language.trim().toLowerCase() : '';
@@ -42,115 +49,60 @@ const toLanguageActionSuffix = (language: string) =>
 const canCms = (context: CmsContext, action: string) =>
   canGroup(context.subdomain, action, context.user);
 
-const scopePriority: Record<CmsPermissionScope, number> = {
-  own: 1,
-  group: 2,
-  all: 3,
-};
-
-const normalizeScope = (scope?: string): CmsPermissionScope =>
-  scope === 'all' || scope === 'group' ? scope : 'own';
-
-const pickStrongerScope = (
-  current: CmsPermissionScope | null,
-  next?: string,
-): CmsPermissionScope => {
-  const normalized = normalizeScope(next);
-
-  if (!current || scopePriority[normalized] > scopePriority[current]) {
-    return normalized;
-  }
-
-  return current;
-};
-
-const getUserCmsPermissions = async (
+const resolveCmsScope = (
   context: CmsContext,
-): Promise<CmsPermission[]> => {
-  const cached = (context as any).__cmsPermissions as
-    | CmsPermission[]
-    | undefined;
+  userId: string,
+  actions: string[],
+) => {
+  const cache = scopeCache.get(context) || new Map();
+  const key = [...actions].sort((a, b) => a.localeCompare(b)).join(',');
+  let pending = cache.get(key);
 
-  if (cached) {
-    return cached;
+  if (!pending) {
+    pending = sendTRPCMessage({
+      subdomain: context.subdomain,
+      pluginName: 'core',
+      method: 'query',
+      module: 'permissions',
+      action: 'resolveScope',
+      input: {
+        userId,
+        plugin: permissions.plugin,
+        module: CMS_POST_MODULE,
+        actions,
+      },
+      defaultValue: null,
+    });
+    cache.set(key, pending);
+    scopeCache.set(context, cache);
   }
 
+  return pending;
+};
+
+export const getCmsPermissionScope = async (
+  context: CmsContext,
+  actions: string | string[],
+): Promise<IPermissionScopeResolution | null> => {
   const { user, subdomain } = context;
 
   if (!user?._id) {
     throw new Error('Login required');
   }
 
-  const groupIds = user.permissionGroupIds || [];
-  const defaultGroupIds = groupIds.filter((id) => id.includes(':'));
-  const customGroupIds = groupIds.filter((id) => !id.includes(':'));
-  const result: CmsPermission[] = [];
-
-  for (const groupId of defaultGroupIds) {
-    const group = permissions.defaultGroups?.find(
-      (item) => item.id === groupId,
-    );
-
-    if (group) {
-      result.push(...(group.permissions as CmsPermission[]));
-    }
-  }
-
-  if (customGroupIds.length) {
-    const groups = await sendTRPCMessage({
-      subdomain,
-      pluginName: 'core',
-      method: 'query',
-      module: 'permissionGroups',
-      action: 'find',
-      input: {
-        query: { _id: { $in: customGroupIds } },
-      },
-      defaultValue: [],
-    });
-
-    for (const group of groups) {
-      result.push(...((group.permissions || []) as CmsPermission[]));
-    }
-  }
-
-  result.push(...((user.customPermissions || []) as CmsPermission[]));
-
-  const filtered = result.filter(
-    (permission) =>
-      permission.plugin === 'content' && permission.module === 'cmsPost',
-  );
-
-  (context as any).__cmsPermissions = filtered;
-
-  return filtered;
-};
-
-export const getCmsPermissionScope = async (
-  context: CmsContext,
-  actions: string | string[],
-): Promise<CmsPermissionScope | null> => {
-  const { user } = context;
-
-  if (!user?._id) {
-    throw new Error('Login required');
-  }
-
   if (user.isOwner) {
-    return 'all';
+    return OWNER_SCOPE;
   }
 
   const actionList = Array.isArray(actions) ? actions : [actions];
-  const permissionList = await getUserCmsPermissions(context);
-  let bestScope: CmsPermissionScope | null = null;
+  const actionsMap = await getGroupActionsMap(subdomain, user);
+  const granted = actionList.filter((action) => actionsMap[action]);
 
-  for (const permission of permissionList) {
-    if (permission.actions?.some((action) => actionList.includes(action))) {
-      bestScope = pickStrongerScope(bestScope, permission.scope);
-    }
+  if (!granted.length) {
+    return null;
   }
 
-  return bestScope;
+  return resolveCmsScope(context, user._id, granted);
 };
 
 export const hasCmsPermission = async (
@@ -176,18 +128,14 @@ export const requireCmsPermission = async (
 export const getCmsScopeQuery = async (
   context: CmsContext,
   actions: string | string[],
-) => {
+): Promise<Record<string, unknown>> => {
   const scope = await requireCmsPermission(context, actions);
 
-  if (context.user?.isOwner || scope === 'all') {
+  if (scope.all) {
     return {};
   }
 
-  if (!context.user?._id) {
-    throw new Error('Login required');
-  }
-
-  return { authorId: context.user._id };
+  return { authorId: { $in: scope.userIds } };
 };
 
 export const assertCmsDocumentAccess = async ({
@@ -201,11 +149,11 @@ export const assertCmsDocumentAccess = async ({
 }) => {
   const scope = await requireCmsPermission(context, actions);
 
-  if (context.user?.isOwner || scope === 'all') {
+  if (scope.all) {
     return;
   }
 
-  if (!document || String(document.authorId || '') !== context.user?._id) {
+  if (!document?.authorId || !scope.userIds.includes(document.authorId)) {
     throw new Error('Permission required');
   }
 };

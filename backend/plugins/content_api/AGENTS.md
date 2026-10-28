@@ -6,7 +6,7 @@
 - **Project:** `content_api`
 - **Layer:** `Backend API`
 - **Path:** `backend/plugins/content_api`
-- **Last synchronized:** `2026-10-26`
+- **Last synchronized:** `2026-10-28`
 
 ## Scope
 
@@ -24,7 +24,7 @@
 ## Current Capabilities
 
 - Serves CMS and Web Builder GraphQL from the Content plugin on port 3303.
-- CMS access respects assigned members, author scope and allowed languages.
+- CMS access respects assigned members, structure-seat permission scope and allowed languages.
 - Ordinary published CMS posts can be explicitly shared to Postiz after CMS and Postiz authorization.
 - Postiz deliveries run only when a user shares, retries or refreshes (`cmsPostizRefresh`); there is no background timer.
 - Web Builder sites store a site-wide `texts` map: the builder reads it from `getWebDetail` and saves it with `editWeb`, and live sites read it from `cpGetWebDetail`.
@@ -51,7 +51,7 @@
 ### Consumes
 
 - Public `erxes-api-shared` startup, tenant model and permission APIs.
-- Core user and permission-group tRPC contracts.
+- Core user tRPC and `permissions.resolveScope`; CMS actions come from shared `canGroup`/`getGroupActionsMap` (seat-held positions).
 - Agent `postizCms.execute` through signed server-to-server tRPC.
 
 ## Data and State
@@ -64,6 +64,7 @@
 
 ## Local Invariants
 
+- CMS permissions come only from positions held through structure seats; never read permission fields from the user. `cmsPost` uses `self`/`entity` scopes: an inheriting root seat sees every post, other seats see posts authored by members of their covered nodes.
 - Sharing is only for ordinary published posts. Recheck CMS assignment, publishing/sharing permissions, author scope and language access before enqueue and dispatch.
 - Journalist 2's sharing grant does not grant approval or immediate publication. That role alone still cannot dispatch a share; the existing publish/approve and Postiz membership requirements remain mandatory.
 - Never accept browser workspace IDs or Postiz credentials; agent_api owns workspace routing and Postiz membership.
@@ -84,5 +85,5 @@
 - `pnpm nx build content_api`
 - `node --test backend/plugins/content_api/test/dockerfile.test.cjs`
 - `pnpm exec tsc --noEmit -p backend/plugins/content_api/tsconfig.json`
-- `pnpm exec jest --config backend/plugins/content_api/jest.postiz.cjs --runInBand`
+- `pnpm exec jest --config backend/plugins/content_api/jest.postiz.cjs --runInBand` (CMS permission and Postiz specs)
 - No Nx `lint` or `test` target is defined.

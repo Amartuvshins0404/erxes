@@ -68,9 +68,8 @@ export const getFieldDependentOptions = (
     { value: 'description', label: 'Description' },
     { value: 'priority', label: 'Priority' },
     { value: 'assignedTo', label: 'Assigned to' },
-    { value: 'branches', label: 'Branches' },
+    { value: 'entityIds', label: 'Structure entities' },
     { value: 'tags', label: 'Tags' },
-    { value: 'department', label: 'Department' },
   ];
 
   const relationsOptions = [{ value: 'empty', label: 'Empty' }];

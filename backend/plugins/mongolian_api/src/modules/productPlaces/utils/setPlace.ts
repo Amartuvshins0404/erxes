@@ -15,7 +15,7 @@ export const setPlace = async (
   const pdatas = productsData.map((p) => ({ ...p }));
 
   const conditions = config.conditions
-    .filter((c) => c.branchId || c.departmentId)
+    .filter((c) => c.placeEntityId || c.responsibleEntityId)
     .map((c) => ({ ...c }));
 
   await Promise.all(
@@ -61,16 +61,11 @@ export const setPlace = async (
       );
 
       if (matches) {
-        pdata.branchId = condition.branchId;
-        pdata.departmentId = condition.departmentId;
+        pdata.placeEntityId = condition.placeEntityId;
+        pdata.responsibleEntityId = condition.responsibleEntityId;
       }
     }
   }
-
-  const branchIds = [...new Set(pdatas.map((p) => p.branchId).filter(Boolean))];
-  const departmentIds = [
-    ...new Set(pdatas.map((p) => p.departmentId).filter(Boolean)),
-  ];
 
   await sendTRPCMessage({
     subdomain,
@@ -81,11 +76,7 @@ export const setPlace = async (
     input: {
       selector: { _id: dealId },
       modifier: {
-        $set: {
-          productsData: pdatas,
-          branchIds,
-          departmentIds,
-        },
+        $set: { productsData: pdatas },
       },
     },
   });

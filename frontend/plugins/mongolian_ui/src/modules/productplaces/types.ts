@@ -21,10 +21,12 @@ export type PlaceConditionUI = {
   ltUnitPrice?: number;
   gtUnitPrice?: number;
 
+  segmentId?: string;
+
   subUomType?: string;
 
-  branchId?: string;
-  departmentId?: string;
+  placeEntityId?: string;
+  responsibleEntityId?: string;
 };
 
 export type ProductPlacesReceiptProduct = {
@@ -39,12 +41,7 @@ export type ProductPlacesReceiptStock = {
   amount: string | number;
 };
 
-export type ProductPlacesReceiptBranch = {
-  code?: string;
-  title?: string;
-};
-
-export type ProductPlacesReceiptDepartment = {
+export type ProductPlacesReceiptEntity = {
   code?: string;
   title?: string;
 };
@@ -52,8 +49,8 @@ export type ProductPlacesReceiptDepartment = {
 export type ProductPlacesReceipt = {
   date: string;
   number?: string;
-  branch?: ProductPlacesReceiptBranch | null;
-  department?: ProductPlacesReceiptDepartment | null;
+  place?: ProductPlacesReceiptEntity | null;
+  responsible?: ProductPlacesReceiptEntity | null;
   customerCode?: string;
   customerName?: string;
   pDatas?: ProductPlacesReceiptStock[];

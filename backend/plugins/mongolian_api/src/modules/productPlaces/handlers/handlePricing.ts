@@ -4,24 +4,24 @@ export const handlePricing = async (subdomain, deal, productsData) => {
   const groupedData: Record<string, Record<string, any[]>> = {};
 
   for (const data of productsData) {
-    const { branchId = '', departmentId = '' } = data;
+    const { placeEntityId = '', responsibleEntityId = '' } = data;
 
-    if (!groupedData[branchId]) {
-      groupedData[branchId] = {};
+    if (!groupedData[placeEntityId]) {
+      groupedData[placeEntityId] = {};
     }
-    if (!groupedData[branchId][departmentId]) {
-      groupedData[branchId][departmentId] = [];
+    if (!groupedData[placeEntityId][responsibleEntityId]) {
+      groupedData[placeEntityId][responsibleEntityId] = [];
     }
 
-    groupedData[branchId][departmentId].push(data);
+    groupedData[placeEntityId][responsibleEntityId].push(data);
   }
 
   let isSetPricing = false;
   let afterPricingData: any[] = [];
 
-  for (const branchId of Object.keys(groupedData)) {
-    for (const departmentId of Object.keys(groupedData[branchId])) {
-      const perDatas = groupedData[branchId][departmentId];
+  for (const placeEntityId of Object.keys(groupedData)) {
+    for (const responsibleEntityId of Object.keys(groupedData[placeEntityId])) {
+      const perDatas = groupedData[placeEntityId][responsibleEntityId];
 
       if (!perDatas.length) {
         continue;
@@ -36,8 +36,8 @@ export const handlePricing = async (subdomain, deal, productsData) => {
         input: {
           prioritizeRule: 'exclude',
           totalAmount: perDatas.reduce((sum, cur) => sum + cur.amount, 0),
-          departmentId,
-          branchId,
+          placeEntityId,
+          responsibleEntityId,
           products: perDatas.map((i) => ({
             itemId: i._id,
             productId: i.productId,

@@ -2,6 +2,7 @@ import { getDealContactIds } from '@/ebarimt/utils/dealContacts';
 import { sendTRPCMessage } from 'erxes-api-shared/utils';
 import { generateModels } from '~/connectionResolvers';
 import { calcProductsTaxRule } from './productsByTaxType';
+import { getOtherCodeResolver } from './otherCode';
 
 export const validConfigMsg = async (config) => {
   if (!config.url) {
@@ -159,37 +160,7 @@ export const getConfigPostData = async (
 
   const details: any[] = [];
 
-  const branchIds = deal.productsData.map((pd) => pd.branchId) || [];
-  const departmentIds = deal.productsData.map((pd) => pd.departmentId) || [];
-
-  const branchesById = {};
-  const departmentsById = {};
-
-  if (branchIds.length) {
-    const branches = await sendTRPCMessage({
-      subdomain,
-      pluginName: 'core',
-      module: 'branches',
-      action: 'find',
-      input: { query: { _id: { $in: branchIds } } },
-      defaultValue: [],
-    });
-    for (const branch of branches) branchesById[branch._id] = branch;
-  }
-
-  if (departmentIds.length) {
-    const departments = await sendTRPCMessage({
-      subdomain,
-      pluginName: 'core',
-      module: 'departments',
-      action: 'find',
-      input: { query: { _id: { $in: departmentIds } } },
-      defaultValue: [],
-    });
-    for (const department of departments) {
-      departmentsById[department._id] = department;
-    }
-  }
+  const getOtherCode = await getOtherCodeResolver(subdomain, deal.productsData);
 
   for (const productData of deal.productsData) {
     // not tickUsed product not sent
@@ -203,13 +174,7 @@ export const getConfigPostData = async (
       continue;
     }
 
-    let otherCode = '';
-
-    if (productData.branchId || productData.departmentId) {
-      const branch = branchesById[productData.branchId || ''] || {};
-      const department = departmentsById[productData.departmentId || ''] || {};
-      otherCode = `${branch.code || ''}_${department.code || ''}`;
-    }
+    const otherCode = getOtherCode(productData);
 
     const tempAmount = productData.amount;
     const minusAmount = (tempAmount / 100) * itemAmountPrePercent;
@@ -407,41 +372,7 @@ export const getMoveData = async (subdomain, config, deal, dateType = '') => {
 
   const details: any[] = [];
 
-  const branchIds = deal.productsData.map((pd) => pd.branchId) || [];
-  const departmentIds = deal.productsData.map((pd) => pd.departmentId) || [];
-
-  const branchesById = {};
-  const departmentsById = {};
-
-  if (branchIds.length) {
-    const branches = await sendTRPCMessage({
-      subdomain,
-      pluginName: 'core',
-      module: 'branches',
-      action: 'find',
-      input: { query: { _id: { $in: branchIds } } },
-      defaultValue: [],
-    });
-
-    for (const branch of branches) {
-      branchesById[branch._id] = branch;
-    }
-  }
-
-  if (departmentIds.length) {
-    const departments = await sendTRPCMessage({
-      subdomain,
-      pluginName: 'core',
-      module: 'departments',
-      action: 'find',
-      input: { query: { _id: { $in: departmentIds } } },
-      defaultValue: [],
-    });
-
-    for (const department of departments) {
-      departmentsById[department._id] = department;
-    }
-  }
+  const getOtherCode = await getOtherCodeResolver(subdomain, deal.productsData);
 
   for (const productData of deal.productsData) {
     // not tickUsed product not sent
@@ -454,12 +385,7 @@ export const getMoveData = async (subdomain, config, deal, dateType = '') => {
       continue;
     }
 
-    let otherCode = '';
-    if (productData.branchId || productData.departmentId) {
-      const branch = branchesById[productData.branchId || ''] || {};
-      const department = departmentsById[productData.departmentId || ''] || {};
-      otherCode = `${branch.code || ''}_${department.code || ''}`;
-    }
+    const otherCode = getOtherCode(productData);
 
     details.push({
       count: productData.quantity,

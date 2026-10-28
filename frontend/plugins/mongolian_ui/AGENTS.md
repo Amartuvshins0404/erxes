@@ -6,7 +6,7 @@
 - **Project:** `mongolian_ui`
 - **Layer:** `Frontend UI`
 - **Path:** `frontend/plugins/mongolian_ui`
-- **Last synchronized:** `2026-10-27`
+- **Last synchronized:** `2026-10-28`
 
 ## Scope
 
@@ -43,9 +43,11 @@
 - Product places board, pipeline, and stage pickers and inline table displays
   use the shared sales selectors from `ui-modules`; plugin-local duplicate
   sales selectors are intentionally absent.
-- Product places product, tag, branch, and department selectors use shared
-  `ui-modules` selectors; plugin-local duplicate selectors are intentionally
-  absent.
+- Product places product and tag selectors use shared `ui-modules` selectors;
+  place and responsible conditions use `SelectStructureEntities`, with the
+  place picker limited to the `stockPlace` capability, and store
+  `placeEntityId` / `responsibleEntityId`. Plugin-local duplicate selectors are
+  intentionally absent.
 - Product places default product filters query Mongolian configs with
   `dealsProductsDefaultFilter`, store one config document per user with
   `subId` equal to the selected user id, and persist multi-segment selections
@@ -116,8 +118,8 @@
 - Public UI and utility APIs from `erxes-ui` and `ui-modules`.
 - Shared sales `SelectBoard`, `SelectPipeline`, and `SelectStage` components
   from `ui-modules` for product-place stage configuration and table display.
-- Shared product, tag, branch, and department selectors from `ui-modules` for
-  product-place condition and split configuration forms.
+- Shared product, tag, and `SelectStructureEntities` selectors from
+  `ui-modules` for product-place condition and split configuration forms.
 - Shared `SelectSegment` and `SelectMember` from `ui-modules` for product-place
   segment and assignee selection.
 - Apollo GraphQL contracts exposed by the Mongolian backend and platform
@@ -192,7 +194,7 @@
   before introducing tested behavior.
 - Product places smoke scenario: configure split/place/print settings for a
   sales stage, move a deal with products into that stage, and verify the
-  floating widget prints branch, department, product, customer, header, and
+  floating widget prints place, responsible, product, customer, header, and
   footer data without a manual refresh.
 - Put response smoke scenario: open `/mongolian/put-response/put-response` with
   rows where `date` is `null`; the table renders without `Invalid time value`

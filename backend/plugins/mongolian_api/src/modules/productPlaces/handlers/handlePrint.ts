@@ -1,4 +1,8 @@
-import { graphqlPubsub, sendTRPCMessage } from 'erxes-api-shared/utils';
+import { graphqlPubsub } from 'erxes-api-shared/utils';
+import {
+  getStructureNodesById,
+  groupLinesByPrintCondition,
+} from '../utils/structure';
 import { getCustomer } from '../utils/utils';
 
 export const handlePrint = async (
@@ -12,101 +16,37 @@ export const handlePrint = async (
 ) => {
   const { customerCode, customerName } = await getCustomer(subdomain, deal);
 
-  const branchIds = productsData.map((pd) => pd.branchId).filter(Boolean);
-  const branchById: Record<string, any> = {};
-  if (branchIds.length) {
-    const branches = await sendTRPCMessage({
-      subdomain,
-      pluginName: 'core',
-      module: 'branches',
-      action: 'find',
-      method: 'query',
-      input: { query: { _id: { $in: branchIds } } },
-      context: { userId: user },
-    });
-    for (const branch of branches) {
-      branchById[branch._id] = branch;
-    }
-  }
+  const conditions = printConfig.conditions || [];
+  const nodeById = await getStructureNodesById(
+    subdomain,
+    [...productsData, ...conditions].flatMap((item) => [
+      item.placeEntityId,
+      item.responsibleEntityId,
+    ]),
+  );
 
-  const departmentIds = productsData
-    .map((pd) => pd.departmentId)
-    .filter(Boolean);
-  const departmentById: Record<string, any> = {};
-  if (departmentIds.length) {
-    const departments = await sendTRPCMessage({
-      subdomain,
-      pluginName: 'core',
-      module: 'departments',
-      action: 'find',
-      method: 'query',
-      input: { query: { _id: { $in: departmentIds } } },
-      context: { userId: user },
-    });
-    for (const department of departments) {
-      departmentById[department._id] = department;
-    }
-  }
+  const groups = conditions.length
+    ? groupLinesByPrintCondition(productsData, conditions, nodeById)
+    : [{ condition: {}, lines: productsData }];
 
-  const content: any[] = [];
-
-  // If no conditions, treat as a single condition that includes all products
-  if (!printConfig.conditions || printConfig.conditions.length === 0) {
-    content.push({
-      branchId: null,
-      branch: null,
-      departmentId: null,
-      department: null,
-      date: new Date(),
-      name: deal.name,
-      number: deal.number,
-      customerCode,
-      customerName,
-      pDatas: productsData.map((fd) => ({
-        ...fd,
-        product: productById[fd.productId],
-      })),
-      amount: productsData.reduce((sum, i) => sum + i.amount, 0),
-      headerText: printConfig.headerText,
-      footerText: printConfig.footerText,
-    });
-  } else {
-    // Normal filtering by conditions – treat empty string in condition as match when product field is falsy
-    for (const condition of printConfig.conditions) {
-      const filteredData = productsData.filter(
-        (pd) =>
-          (condition.branchId === ''
-            ? !pd.branchId
-            : pd.branchId === condition.branchId) &&
-          (condition.departmentId === ''
-            ? !pd.departmentId
-            : pd.departmentId === condition.departmentId),
-      );
-
-      if (!filteredData.length) continue;
-
-      content.push({
-        branchId: condition.branchId || null,
-        branch: condition.branchId ? branchById[condition.branchId] : null,
-        departmentId: condition.departmentId || null,
-        department: condition.departmentId
-          ? departmentById[condition.departmentId]
-          : null,
-        date: new Date(),
-        name: deal.name,
-        number: deal.number,
-        customerCode,
-        customerName,
-        pDatas: filteredData.map((fd) => ({
-          ...fd,
-          product: productById[fd.productId],
-        })),
-        amount: filteredData.reduce((sum, i) => sum + i.amount, 0),
-        headerText: printConfig.headerText,
-        footerText: printConfig.footerText,
-      });
-    }
-  }
+  const content = groups.map(({ condition, lines }) => ({
+    placeEntityId: condition.placeEntityId || null,
+    place: nodeById[condition.placeEntityId] || null,
+    responsibleEntityId: condition.responsibleEntityId || null,
+    responsible: nodeById[condition.responsibleEntityId] || null,
+    date: new Date(),
+    name: deal.name,
+    number: deal.number,
+    customerCode,
+    customerName,
+    pDatas: lines.map((line) => ({
+      ...line,
+      product: productById[line.productId],
+    })),
+    amount: lines.reduce((sum, line) => sum + line.amount, 0),
+    headerText: printConfig.headerText,
+    footerText: printConfig.footerText,
+  }));
 
   if (!content.length) {
     return;

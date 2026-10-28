@@ -1,12 +1,13 @@
 import { Button } from 'erxes-ui';
 import { useTranslation } from 'react-i18next';
-import { SelectBranches, SelectDepartments } from 'ui-modules';
+import { SelectStructureEntities } from 'ui-modules';
 
+import { STOCK_PLACE_CAPABILITY } from '../constants';
 import { Condition } from '../types';
 
 type PrintCondition = Condition & {
-  branchId?: string;
-  departmentId?: string;
+  placeEntityId?: string;
+  responsibleEntityId?: string;
 };
 
 type Props = {
@@ -16,7 +17,7 @@ type Props = {
   onAddCondition?: () => void;
 };
 
-const PerPrintConditions = ({
+export const PerPrintConditions = ({
   condition,
   onChange,
   onRemove,
@@ -31,23 +32,28 @@ const PerPrintConditions = ({
     <div className="flex items-end gap-3">
       <div className="flex-1 grid grid-cols-2 gap-3">
         <div>
-          <SelectBranches.Root
-            value={condition.branchId || ''}
-            onValueChange={(branchId) =>
+          <SelectStructureEntities.Root
+            value={condition.placeEntityId || ''}
+            capability={STOCK_PLACE_CAPABILITY}
+            placeholder={t('set-place')}
+            onValueChange={(placeEntityId) =>
               onChangeConfig(
-                'branchId',
-                typeof branchId === 'string' ? branchId : '',
+                'placeEntityId',
+                typeof placeEntityId === 'string' ? placeEntityId : '',
               )
             }
           />
         </div>
         <div>
-          <SelectDepartments.Root
-            value={condition.departmentId || ''}
-            onValueChange={(departmentId) =>
+          <SelectStructureEntities.Root
+            value={condition.responsibleEntityId || ''}
+            placeholder={t('set-responsible')}
+            onValueChange={(responsibleEntityId) =>
               onChangeConfig(
-                'departmentId',
-                typeof departmentId === 'string' ? departmentId : '',
+                'responsibleEntityId',
+                typeof responsibleEntityId === 'string'
+                  ? responsibleEntityId
+                  : '',
               )
             }
           />
@@ -78,5 +84,3 @@ const PerPrintConditions = ({
     </div>
   );
 };
-
-export default PerPrintConditions;

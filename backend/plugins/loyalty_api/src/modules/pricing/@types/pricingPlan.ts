@@ -79,8 +79,7 @@ export interface IPricingPlan {
   startDate?: Date;
   endDate?: Date;
 
-  departmentIds?: string[];
-  branchIds?: string[];
+  placeEntityIds?: string[];
   boardId?: string;
   pipelineId?: string;
   stageId?: string;

@@ -93,9 +93,7 @@ export const pricingPlanSchema = schemaWrapper(
       startDate: { type: Date },
       endDate: { type: Date },
 
-      // Locations
-      departmentIds: { type: [String], default: [] },
-      branchIds: { type: [String], default: [] },
+      placeEntityIds: { type: [String], default: [] },
       boardId: { type: String },
       pipelineId: { type: String },
       stageId: { type: String },

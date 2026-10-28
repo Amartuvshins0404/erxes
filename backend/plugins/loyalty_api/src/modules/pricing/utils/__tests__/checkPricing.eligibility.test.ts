@@ -117,8 +117,6 @@ const run = (
     subdomain: 'test',
     prioritizeRule: 'exclude',
     totalAmount: 100,
-    departmentId: '',
-    branchId: '',
     pipelineId: '',
     orderItems: [{ itemId: 'i1', productId: 'p1', quantity: 1, price: 100 }],
     ...context,
@@ -334,19 +332,5 @@ describe('getMainConditions — location scope', () => {
     expect(conditions.$and).toContainEqual({
       $or: [{ pipelineId: 'pipeline-1' }, { pipelineId: { $in: [null, ''] } }],
     });
-  });
-
-  it('matches selected branch or plans with no branch', () => {
-    const conditions = getMainConditions({ branchId: 'branch-1' });
-
-    expect(conditions.$and).toContainEqual({
-      $or: [{ branchIds: { $in: ['branch-1'] } }, { branchIds: { $size: 0 } }],
-    });
-  });
-
-  it('only matches no-branch plans when no branch param is supplied', () => {
-    const conditions = getMainConditions({});
-
-    expect(conditions.$and).toContainEqual({ branchIds: { $size: 0 } });
   });
 });

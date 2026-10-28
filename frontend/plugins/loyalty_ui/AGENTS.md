@@ -6,7 +6,7 @@
 - **Project:** `loyalty_ui`
 - **Layer:** `Frontend UI`
 - **Path:** `frontend/plugins/loyalty_ui`
-- **Last synchronized:** `2026-10-27`
+- **Last synchronized:** `2026-10-28`
 
 ## Scope
 
@@ -29,7 +29,8 @@
 - Pricing general edit forms allow selected start and end dates to be cleared.
 - The Rules card has a Conditions tab (`edit-pricing/components/conditions/ConditionRulesInfo.tsx`, list state in `usePricingConditionRules`): a list like the quantity rules, one row per core condition (by code, names from core `productConditions` via `pricingProductConditions`; a code with no condition shows as removed and still saves), edited in `ConditionRuleSheet` (form + zod in `useConditionRuleForm`: condition, discount type default / subtraction / percentage / bonus, value or bonus product, price adjust type without `truncate`, factor), saved as the plan's `conditionRules` through `pricingPlanEdit`; codes must be unique per plan. `FixedPricingTable` has no condition columns. Deleted products (`productStatus: 'deleted'`) stay listed there but read-only, marked "Not available".
 - Pricing priority selection includes none, public, POS base, and scoped base pricing; POS-base and scoped-base plans hide participant targeting.
-- Options detail supports branch, department, board, and pipeline selection.
+- Options detail supports place node (`SelectStructureEntities`, saved as `placeEntityIds`), board, and pipeline selection; the pricing list filters by one `placeEntityId`.
+- Participant conditions have no position picker (ui-modules has none for structure positions); saved `userPositions` / `brokerUserPositions` are kept unchanged on save.
 - Board and pipeline selectors can clear an existing selection; clearing a board
   also clears the dependent pipeline in the options and stage forms.
 - Loyalty settings include an Account types page (`/loyalty/settings/config/account-type`)

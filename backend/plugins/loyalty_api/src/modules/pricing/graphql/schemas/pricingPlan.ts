@@ -110,8 +110,7 @@ export const types = `
     startDate: Date,
     endDate: Date,
 
-    branchIds: [String],
-    departmentIds: [String],
+    placeEntityIds: [String],
     boardId: String,
     pipelineId: String,
     stageId: String,
@@ -283,8 +282,7 @@ export const types = `
     startDate: Date,
     endDate: Date,
 
-    branchIds: [String],
-    departmentIds: [String],
+    placeEntityIds: [String],
     boardId: String,
     pipelineId: String,
     stageId: String,
@@ -361,8 +359,7 @@ export const types = `
     startDate: Date,
     endDate: Date,
 
-    branchIds: [String],
-    departmentIds: [String],
+    placeEntityIds: [String],
     boardId: String,
     pipelineId: String,
     stageId: String,
@@ -403,8 +400,7 @@ export const types = `
 const pricingQueryParams = `
   status: String
   priority: String
-  branchId: String
-  departmentId: String
+  placeEntityId: String
   productId: String
   date: Date
 
@@ -426,8 +422,7 @@ const pricingQueryParams = `
 const checkDiscountParams = `
   prioritizeRule: String
   totalAmount: Float
-  departmentId: String
-  branchId: String
+  placeEntityId: String
   pipelineId: String
   customerType: String
   customerId: String

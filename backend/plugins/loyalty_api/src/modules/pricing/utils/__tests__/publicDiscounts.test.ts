@@ -121,3 +121,45 @@ it('clears one product discounts when it no longer matches a plan', async () => 
     }),
   );
 });
+
+it('scopes public and base discounts to their place nodes', async () => {
+  const placed = (priority: 'public' | 'pipelineBase') =>
+    ({
+      ...plan(priority),
+      pipelineId: undefined,
+      placeEntityIds: ['north', 'south'],
+    } as IPricingPlanDocument);
+  const models = {
+    PricingPlans: {
+      find: jest.fn(() => ({
+        sort: jest
+          .fn()
+          .mockResolvedValue([placed('public'), placed('pipelineBase')]),
+      })),
+    },
+  } as unknown as IModels;
+
+  mockedTRPC
+    .mockResolvedValueOnce([{ _id: 'product-1', unitPrice: 100 }])
+    .mockResolvedValueOnce([{ _id: 'product-1', unitPrice: 100 }])
+    .mockResolvedValueOnce(null);
+
+  const result = await recalculateProductPricingPlanDiscounts({
+    models,
+    subdomain: 'test',
+    productId: 'product-1',
+  });
+
+  expect(result.discounts).toEqual([
+    expect.objectContaining({
+      base: null,
+      prefixes: ['placeEntityId'],
+      conditions: { placeEntityId: ['north', 'south'] },
+    }),
+    expect.objectContaining({
+      base: true,
+      prefixes: ['placeEntityId'],
+      conditions: { placeEntityId: ['north', 'south'] },
+    }),
+  ]);
+});

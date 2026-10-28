@@ -3,7 +3,7 @@ import { Button, Form, InfoCard, Label, useToast } from 'erxes-ui';
 import { IconEdit, IconTrash } from '@tabler/icons-react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { SelectBranches, SelectDepartments } from 'ui-modules';
+import { SelectStructureEntities } from 'ui-modules';
 import { IPricingPlanDetail } from '@/pricing/types';
 import { useEditPricing } from '@/pricing/hooks/useEditPricing';
 import { SelectBoardFormItem } from '@/pricing/hooks/useSelectBoard';
@@ -21,15 +21,13 @@ interface OptionsInfoProps {
 }
 
 interface OptionsFormValues {
-  departmentIds: string[];
-  branchIds: string[];
+  placeEntityIds: string[];
   boardId: string;
   pipelineId: string;
 }
 
 interface OptionsSnapshot {
-  departmentIds: string[];
-  branchIds: string[];
+  placeEntityIds: string[];
   boardId: string;
   pipelineId: string;
   repeatRules: RepeatRuleConfig[];
@@ -168,8 +166,7 @@ const getOptionsSnapshot = ({
   values: OptionsFormValues;
   repeatRules: RepeatRuleConfig[];
 }): OptionsSnapshot => ({
-  departmentIds: normalizeIds(values.departmentIds),
-  branchIds: normalizeIds(values.branchIds),
+  placeEntityIds: normalizeIds(values.placeEntityIds),
   boardId: values.boardId || '',
   pipelineId: values.pipelineId || '',
   repeatRules: normalizeRepeatRules(repeatRules),
@@ -191,8 +188,7 @@ export const OptionsInfo = ({
 
   const form = useForm<OptionsFormValues>({
     defaultValues: {
-      departmentIds: [],
-      branchIds: [],
+      placeEntityIds: [],
       boardId: '',
       pipelineId: '',
     },
@@ -214,13 +210,11 @@ export const OptionsInfo = ({
       return;
     }
 
-    const departmentIds = pricingDetail.departmentIds || [];
-    const branchIds = pricingDetail.branchIds || [];
+    const placeEntityIds = pricingDetail.placeEntityIds || [];
     const rules = getRepeatRules(pricingDetail);
 
     const values: OptionsFormValues = {
-      departmentIds,
-      branchIds,
+      placeEntityIds,
       boardId: pricingDetail.boardId || '',
       pipelineId: pricingDetail.pipelineId || '',
     };
@@ -306,8 +300,7 @@ export const OptionsInfo = ({
       };
     });
 
-    const departmentIds = values.departmentIds;
-    const branchIds = values.branchIds;
+    const placeEntityIds = values.placeEntityIds;
     const boardId = values.boardId || null;
     const pipelineId = values.pipelineId || null;
     const nextRepeatRules = mappedRepeatRules;
@@ -315,8 +308,7 @@ export const OptionsInfo = ({
     try {
       await editPricing({
         _id: pricingId,
-        departmentIds,
-        branchIds,
+        placeEntityIds,
         boardId,
         pipelineId,
         stageId: null,
@@ -325,8 +317,7 @@ export const OptionsInfo = ({
       });
 
       const savedValues: OptionsFormValues = {
-        departmentIds,
-        branchIds,
+        placeEntityIds,
         boardId: boardId || '',
         pipelineId: pipelineId || '',
       };
@@ -367,40 +358,19 @@ export const OptionsInfo = ({
               </div>
 
               <section className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <Form.Field
-                    control={control}
-                    name="branchIds"
-                    render={({ field }) => (
-                      <Form.Item>
-                        <Form.Label>{t('branches-caps')}</Form.Label>
-                        <Form.Control>
-                          <SelectBranches.FormItem
-                            mode="multiple"
-                            value={field.value}
-                            onValueChange={field.onChange}
-                          />
-                        </Form.Control>
-                      </Form.Item>
-                    )}
-                  />
-                  <Form.Field
-                    control={control}
-                    name="departmentIds"
-                    render={({ field }) => (
-                      <Form.Item>
-                        <Form.Label>{t('departments-caps')}</Form.Label>
-                        <Form.Control>
-                          <SelectDepartments.FormItem
-                            mode="multiple"
-                            value={field.value}
-                            onValueChange={field.onChange}
-                          />
-                        </Form.Control>
-                      </Form.Item>
-                    )}
-                  />
-                </div>
+                <Form.Field
+                  control={control}
+                  name="placeEntityIds"
+                  render={({ field }) => (
+                    <Form.Item>
+                      <SelectStructureEntities.FormItem
+                        mode="multiple"
+                        value={field.value}
+                        onValueChange={field.onChange}
+                      />
+                    </Form.Item>
+                  )}
+                />
               </section>
 
               <div className="flex items-center my-4">

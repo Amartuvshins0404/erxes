@@ -9,7 +9,6 @@ import {
   SelectCompany,
   SelectCustomer,
   SelectMember,
-  SelectPositions,
   SelectSegment,
   SelectTags,
 } from 'ui-modules';
@@ -133,13 +132,11 @@ function ConditionField<Name extends keyof CustomerBrokerFormValues>({
   control,
   name,
   label,
-  className,
   children,
 }: {
   control: Control<CustomerBrokerFormValues>;
   name: Name;
   label: string;
-  className?: string;
   children: (
     field: ControllerRenderProps<CustomerBrokerFormValues, Name>,
   ) => ReactNode;
@@ -149,7 +146,7 @@ function ConditionField<Name extends keyof CustomerBrokerFormValues>({
       control={control}
       name={name}
       render={({ field }) => (
-        <Form.Item className={className}>
+        <Form.Item>
           <Form.Label>{label}</Form.Label>
           <Form.Control>{children(field)}</Form.Control>
         </Form.Item>
@@ -309,18 +306,15 @@ const CompanyFields = ({
 const UserFields = ({
   control,
   idsName,
-  positionsName,
   segmentName,
   labels,
 }: {
   control: Control<CustomerBrokerFormValues>;
   idsName: 'userIds' | 'brokerUserIds';
-  positionsName: 'userPositions' | 'brokerUserPositions';
   segmentName: 'userSegmentId' | 'brokerUserSegmentId';
   labels: {
     ids: string;
     segment: string;
-    positions: string;
   };
 }) => (
   <div className="grid w-full grid-cols-1 gap-4 lg:grid-cols-2">
@@ -339,21 +333,6 @@ const UserFields = ({
         <SelectSegment
           selected={field.value || undefined}
           onSelect={(id) => field.onChange(id)}
-        />
-      )}
-    </ConditionField>
-
-    <ConditionField
-      control={control}
-      name={positionsName}
-      label={labels.positions}
-      className="lg:col-span-2"
-    >
-      {(field) => (
-        <SelectPositions.FormItem
-          mode="multiple"
-          value={field.value}
-          onValueChange={(value) => field.onChange(toArray(value))}
         />
       )}
     </ConditionField>
@@ -406,12 +385,10 @@ export const CustomerBrokerConditions = <
       <UserFields
         control={participantControl}
         idsName="userIds"
-        positionsName="userPositions"
         segmentName="userSegmentId"
         labels={{
           ids: 'USERS',
           segment: 'USER SEGMENT',
-          positions: 'USER POSITIONS',
         }}
       />
 
@@ -449,12 +426,10 @@ export const CustomerBrokerConditions = <
       <UserFields
         control={participantControl}
         idsName="brokerUserIds"
-        positionsName="brokerUserPositions"
         segmentName="brokerUserSegmentId"
         labels={{
           ids: 'BROKERS',
           segment: 'BROKER USER SEGMENT',
-          positions: 'BROKER POSITIONS',
         }}
       />
     </div>

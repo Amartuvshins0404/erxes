@@ -15,7 +15,6 @@ interface PmsCreateBranchResponse {
 export interface PmsCreateBranchVariables {
   name: string;
   description?: string;
-  departmentId?: string;
   token?: string;
   erxesAppToken?: string;
   user1Ids?: string[];

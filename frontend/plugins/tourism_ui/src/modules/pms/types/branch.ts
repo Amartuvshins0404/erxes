@@ -29,7 +29,6 @@ export interface IPmsBranch {
   token: string;
   erxesAppToken?: string;
   userId: string;
-  departmentId?: string;
   user1Ids?: string[];
   user2Ids?: string[];
   user3Ids?: string[];

@@ -38,7 +38,6 @@ const PmsBranchDetail = gql`
       user5Ids
       paymentIds
       paymentTypes
-      departmentId
       token
       erxesAppToken
       permissionConfig

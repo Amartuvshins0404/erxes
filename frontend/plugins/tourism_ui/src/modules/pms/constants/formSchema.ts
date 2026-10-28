@@ -56,7 +56,6 @@ export const PmsBranchFormSchema = z.object({
   user3Ids: z.array(z.string()).optional(),
   user4Ids: z.array(z.string()).optional(),
   user5Ids: z.array(z.string()).optional(),
-  departmentId: z.string().optional(),
   permissionConfig: z.any().optional(),
   uiOptions: z.any().optional(),
   pipelineConfig: z.any().optional(),

@@ -42,8 +42,8 @@ import {
   keyValueArrayToObject,
   objectToKeyValueArray,
 } from '../utils/transformers';
-import PerConditions from './PerConditions';
-import PerPrintConditions from './PerPrintConditions';
+import { PerConditions } from './PerConditions';
+import { PerPrintConditions } from './PerPrintConditions';
 
 type ProductPlacesConfigCode =
   | 'dealsProductsDataPlaces'

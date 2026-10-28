@@ -19,9 +19,6 @@ export const posCommonFields = `
   
   isOnline
   onServer
-  branchId
-  departmentId
-  allowBranchIds
   beginNumber
 `;
 export const POS_QUERY = gql`

@@ -63,12 +63,12 @@ export const PerResponse = (
         <p>Огноо: ${response.date}</p>
         ${showNumber ? `<p>№: ${response.number}</p>` : ''}
         <p>
-          Branch:
-          ${response.branch?.code || ''} - ${response.branch?.title || ''}
+          Place:
+          ${response.place?.code || ''} - ${response.place?.title || ''}
         </p>
         <p>
-          Department:
-          ${response.department?.code || ''} - ${response.department?.title || ''}
+          Responsible:
+          ${response.responsible?.code || ''} - ${response.responsible?.title || ''}
         </p>
       </div>
       ${customerBlock}

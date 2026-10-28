@@ -6,7 +6,7 @@
 - **Project:** `mongolian_api`
 - **Layer:** `Backend API`
 - **Path:** `backend/plugins/mongolian_api`
-- **Last synchronized:** `2026-10-23`
+- **Last synchronized:** `2026-10-28`
 
 ## Scope
 
@@ -17,7 +17,7 @@
 ### Does not own
 
 - Accounting transaction persistence, journal rules, or accounting migration orchestration.
-- Core users, products, branches, departments, organization configs, or contacts.
+- Core users, products, structure entities, organization configs, or contacts.
 - Frontend UI routes or presentation.
 
 ## Current Capabilities
@@ -33,6 +33,8 @@
   and sales pipeline/stage/POS remainder configuration.
 - Product places applies default product filters through the plugin `beforeResolvers` hook by reading the current user's `dealsProductsDefaultFilter` config from `subId`, supports multi-segment default filters, and runs split/place/pricing/print behavior only after a sales deal moves to a configured destination stage.
 - Product places publishes session-scoped printable receipt payloads through the `productPlacesResponded` GraphQL subscription.
+- Product-place place conditions assign `placeEntityId` and `responsibleEntityId` structure entity ids to deal product lines; print conditions route each line to the condition whose place, then responsible, node is the closest ancestor-or-self of the line's node.
+- Erkhet `otherCode` for deal and purchase lines is `<place code>_<responsible code>` from the line's structure entities.
 
 ## Architecture
 
@@ -65,6 +67,8 @@
 
 - Core organization config `mainCurrency` through public tRPC when `mainCurrency` is not provided.
 - Shared backend utilities, startup, Mongoose helpers, pagination constants, and service-to-service messaging from `erxes-api-shared`.
+- Core tRPC `structureEntities.find` for place and responsible node codes, titles, and `order` paths.
+- Sales deal and purchase product lines carrying `placeEntityId` and `responsibleEntityId`.
 
 ## Data and State
 
@@ -91,11 +95,15 @@
 - Product-place place and split product matching must honor excluded products,
   categories, and tags even when the include side is empty or segment-only.
 - Product-place place assignment evaluates every matching condition in order so
-  later matching conditions may overwrite earlier branch/department values,
+  later matching conditions may overwrite earlier place/responsible values,
   matching the legacy productplaces plugin behavior.
+- Product-place print routing gives each line to at most one condition: the
+  closest place node wins, then the closest responsible node, then the first
+  condition. A condition without a place or responsible node matches only lines
+  without one. Lines whose node is unknown match only an identical id.
 - Product-place print subscriptions must carry the originating `sessionCode`
   so multiple tabs or locations for the same user do not print each other's
-  receipts, and keep receipt `content` as JSON so branch, department, product,
+  receipts, and keep receipt `content` as JSON so place, responsible, product,
   and text payloads survive without narrowing the schema.
 - Plugin data access must remain tenant-scoped through generated models.
 - Put response list fallback ordering must remain `{ createdAt: -1 }`; cursor
@@ -107,6 +115,7 @@
 
 - `pnpm nx run mongolian_api:schema:print` - prints this subgraph's SDL to `generated/schema.graphql` (gitignored) offline, for `gateway:schema:compose`.
 - `pnpm nx build mongolian_api`
+- `pnpm nx test mongolian_api` - jest specs under `src/**/__tests__/*.spec.ts`.
 - `pnpm build`
 - `pnpm exec tsc -p backend/plugins/mongolian_api/tsconfig.json --noEmit`
 - Put response smoke scenario: open `/mongolian/put-response/put-response`

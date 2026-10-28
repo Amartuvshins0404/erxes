@@ -2,31 +2,34 @@ import { Button, Input, Label, Select } from 'erxes-ui';
 import { useTranslation } from 'react-i18next';
 import { IconTrash } from '@tabler/icons-react';
 import {
-  SelectBranches,
   SelectCategory,
-  SelectDepartments,
   SelectProduct,
   SelectSegment,
+  SelectStructureEntities,
   SelectTags,
 } from 'ui-modules';
+import { STOCK_PLACE_CAPABILITY } from '../constants';
+import { Condition, PlaceConditionUI } from '../types';
+
+type PlaceCondition = PlaceConditionUI & Condition;
 
 type Props = {
-  condition: any;
-  onChange: (id: string, condition: any) => void;
+  condition: PlaceCondition;
+  onChange: (id: string, condition: PlaceCondition) => void;
   onRemove: (id: string) => void;
   onAddCondition?: () => void;
 };
 
 const CLEAR_VALUE = '__clear__';
 
-const PerConditions = ({
+export const PerConditions = ({
   condition,
   onChange,
   onRemove,
   onAddCondition,
 }: Props) => {
   const { t } = useTranslation('mongolian');
-  const onChangeConfig = (key: string, value: any) => {
+  const onChangeConfig = (key: string, value: unknown) => {
     onChange(condition.id, { ...condition, [key]: value });
   };
 
@@ -207,14 +210,15 @@ const PerConditions = ({
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label className="text-xs font-semibold uppercase text-muted-foreground">
-              {t('set-branch')}
+              {t('set-place')}
             </Label>
-            <SelectBranches.Root
-              value={condition.branchId || ''}
-              onValueChange={(branchId) =>
+            <SelectStructureEntities.Root
+              value={condition.placeEntityId || ''}
+              capability={STOCK_PLACE_CAPABILITY}
+              onValueChange={(placeEntityId) =>
                 onChangeConfig(
-                  'branchId',
-                  typeof branchId === 'string' ? branchId : '',
+                  'placeEntityId',
+                  typeof placeEntityId === 'string' ? placeEntityId : '',
                 )
               }
             />
@@ -222,14 +226,16 @@ const PerConditions = ({
 
           <div className="space-y-2">
             <Label className="text-xs font-semibold uppercase text-muted-foreground">
-              {t('set-department')}
+              {t('set-responsible')}
             </Label>
-            <SelectDepartments.Root
-              value={condition.departmentId || ''}
-              onValueChange={(departmentId) =>
+            <SelectStructureEntities.Root
+              value={condition.responsibleEntityId || ''}
+              onValueChange={(responsibleEntityId) =>
                 onChangeConfig(
-                  'departmentId',
-                  typeof departmentId === 'string' ? departmentId : '',
+                  'responsibleEntityId',
+                  typeof responsibleEntityId === 'string'
+                    ? responsibleEntityId
+                    : '',
                 )
               }
             />
@@ -261,5 +267,3 @@ const PerConditions = ({
     </div>
   );
 };
-
-export default PerConditions;

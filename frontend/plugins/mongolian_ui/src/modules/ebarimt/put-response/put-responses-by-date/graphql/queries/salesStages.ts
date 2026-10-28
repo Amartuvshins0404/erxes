@@ -12,8 +12,6 @@ export const GET_SALES_STAGE = gql`
     $extraParams: JSON
     $closeDateType: String
     $assignedToMe: String
-    $branchIds: [String]
-    $departmentIds: [String]
     $segment: String
     $createdStartDate: Date
     $createdEndDate: Date
@@ -35,8 +33,6 @@ export const GET_SALES_STAGE = gql`
       extraParams: $extraParams
       closeDateType: $closeDateType
       assignedToMe: $assignedToMe
-      branchIds: $branchIds
-      departmentIds: $departmentIds
       segment: $segment
       createdStartDate: $createdStartDate
       createdEndDate: $createdEndDate

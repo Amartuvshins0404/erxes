@@ -85,16 +85,14 @@ const getOrCreateProduct = async (Products, code, now) => {
 
 const getOrCreateSafeRemainder = async ({
   SafeRemainders,
-  branchId,
-  departmentId,
+  placeEntityId,
   accountId,
   now,
   accCode,
   locCode,
 }) => {
   const selector = {
-    branchId,
-    departmentId,
+    placeEntityId,
     'incomeRule.accountId': accountId,
   };
 
@@ -105,8 +103,7 @@ const getOrCreateSafeRemainder = async ({
 
   const safeRemainder = {
     _id: nanoid(),
-    branchId,
-    departmentId,
+    placeEntityId,
     productCategoryId: '',
     attachment: null,
     date: SAFE_REM_DATE,
@@ -204,8 +201,7 @@ const command = async () => {
 
   const db = client.db();
   const Accounts = db.collection('accounts');
-  const Branches = db.collection('branches');
-  const Departments = db.collection('departments');
+  const StructureEntities = db.collection('structure_entities');
   const Products = db.collection('products');
   const SafeRemainderItems = db.collection('safe_remainder_items');
   const SafeRemainders = db.collection('safe_remainders');
@@ -243,15 +239,10 @@ const command = async () => {
       continue;
     }
 
-    const branch = await findByCode(Branches, branchCode);
-    if (branchCode && !branch) {
-      console.log('notFound Branch', row.accid, row.locId, row.invId);
-      continue;
-    }
-
-    const department = await findByCode(Departments, departmentCode);
-    if (departmentCode && !department) {
-      console.log('notFound Department', row.accid, row.locId, row.invId);
+    const placeCode = departmentCode || branchCode;
+    const place = await findByCode(StructureEntities, placeCode);
+    if (placeCode && !place) {
+      console.log('notFound Place', row.accid, row.locId, row.invId);
       continue;
     }
 
@@ -259,8 +250,7 @@ const command = async () => {
 
     const safeRemainder = await getOrCreateSafeRemainder({
       SafeRemainders,
-      branchId: branch?._id || '',
-      departmentId: department?._id || '',
+      placeEntityId: place?._id || '',
       accountId: account._id,
       now,
       accCode: row.accCode,

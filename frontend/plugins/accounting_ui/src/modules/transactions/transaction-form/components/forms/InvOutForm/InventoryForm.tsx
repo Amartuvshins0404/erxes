@@ -135,12 +135,7 @@ const InventoryTableHeader = ({
         <Table.Head>{t('quantity-label')}</Table.Head>
         <Table.Head>{t('unit-price')}</Table.Head>
         <Table.Head>{t('amount')}</Table.Head>
-        {showAdvancedView && (
-          <>
-            <Table.Head>{t('branch')}</Table.Head>
-            <Table.Head>{t('department')}</Table.Head>
-          </>
-        )}
+        {showAdvancedView && <Table.Head>{t('place', 'Place')}</Table.Head>}
       </Table.Row>
     </Table.Header>
   );

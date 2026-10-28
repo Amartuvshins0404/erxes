@@ -1,7 +1,7 @@
 import { gql } from '~/gql';
 
 export const ACCOUNTS_ADD = gql(`
-mutation accountingAccountsAdd($code: String, $name: String, $categoryId: String, $parentId: String, $currency: String, $kind: String, $journal: String, $description: String, $branchId: String, $departmentId: String, $isTemp: Boolean, $isOutBalance: Boolean, $scopeBrandIds: [String], $extra: JSON, $status: String) {
+mutation accountingAccountsAdd($code: String, $name: String, $categoryId: String, $parentId: String, $currency: String, $kind: String, $journal: String, $description: String, $placeEntityId: String, $responsibleEntityId: String, $isTemp: Boolean, $isOutBalance: Boolean, $scopeBrandIds: [String], $extra: JSON, $status: String) {
   accountsAdd(
     code: $code
     name: $name
@@ -11,8 +11,8 @@ mutation accountingAccountsAdd($code: String, $name: String, $categoryId: String
     kind: $kind
     journal: $journal
     description: $description
-    branchId: $branchId
-    departmentId: $departmentId
+    placeEntityId: $placeEntityId
+    responsibleEntityId: $responsibleEntityId
     isTemp: $isTemp
     isOutBalance: $isOutBalance
     scopeBrandIds: $scopeBrandIds
@@ -26,8 +26,8 @@ mutation accountingAccountsAdd($code: String, $name: String, $categoryId: String
     currency
     kind
     journal
-    branchId
-    departmentId
+    placeEntityId
+    responsibleEntityId
     isTemp
     isOutBalance
     extra {
@@ -44,7 +44,7 @@ mutation accountingAccountsAdd($code: String, $name: String, $categoryId: String
 `);
 
 export const ACCOUNTS_EDIT = gql(`
-mutation accountingAccountsEdit($_id: String!, $code: String, $name: String, $categoryId: String, $parentId: String, $currency: String, $kind: String, $journal: String, $description: String, $branchId: String, $departmentId: String, $isTemp: Boolean, $isOutBalance: Boolean, $scopeBrandIds: [String], $extra: JSON, $status: String) {
+mutation accountingAccountsEdit($_id: String!, $code: String, $name: String, $categoryId: String, $parentId: String, $currency: String, $kind: String, $journal: String, $description: String, $placeEntityId: String, $responsibleEntityId: String, $isTemp: Boolean, $isOutBalance: Boolean, $scopeBrandIds: [String], $extra: JSON, $status: String) {
   accountsEdit(
     _id: $_id
     code: $code
@@ -55,8 +55,8 @@ mutation accountingAccountsEdit($_id: String!, $code: String, $name: String, $ca
     kind: $kind
     journal: $journal
     description: $description
-    branchId: $branchId
-    departmentId: $departmentId
+    placeEntityId: $placeEntityId
+    responsibleEntityId: $responsibleEntityId
     isTemp: $isTemp
     isOutBalance: $isOutBalance
     scopeBrandIds: $scopeBrandIds
@@ -70,8 +70,8 @@ mutation accountingAccountsEdit($_id: String!, $code: String, $name: String, $ca
     currency
     kind
     journal
-    branchId
-    departmentId
+    placeEntityId
+    responsibleEntityId
     isTemp
     isOutBalance
     extra {

@@ -411,8 +411,8 @@ const FXA_FOLLOW_INFOS_DEFAULT_VALUES = (doc?: Partial<ITransaction>) => {
     deferredTaxLiabilityAccountId:
       doc?.followInfos?.deferredTaxLiabilityAccountId,
     incomeTaxExpenseAccountId: doc?.followInfos?.incomeTaxExpenseAccountId,
-    moveInBranchId: doc?.followInfos?.moveInBranchId ?? '',
-    moveInDepartmentId: doc?.followInfos?.moveInDepartmentId,
+    moveInPlaceEntityId: doc?.followInfos?.moveInPlaceEntityId ?? '',
+    moveInResponsibleEntityId: doc?.followInfos?.moveInResponsibleEntityId,
     ownerId: doc?.followInfos?.ownerId || doc?.followInfos?.responsibleUserId,
   };
 };

@@ -140,10 +140,10 @@ const InventoryTableHeader = ({
         <Table.Head>{t('amount')}</Table.Head>
         {showAdvancedView && (
           <>
-            <Table.Head>{t('source-branch')}</Table.Head>
-            <Table.Head>{t('source-department')}</Table.Head>
-            <Table.Head>{t('destination-branch')}</Table.Head>
-            <Table.Head>{t('destination-department')}</Table.Head>
+            <Table.Head>{t('source-place', 'Source place')}</Table.Head>
+            <Table.Head>
+              {t('destination-place', 'Destination place')}
+            </Table.Head>
           </>
         )}
       </Table.Row>

@@ -95,8 +95,8 @@ export default class CurrencyTr {
         description: this.doc.description,
         journal: JOURNALS.EXCHANGE_DIFF,
         side,
-        branchId: this.doc.branchId,
-        departmentId: this.doc.departmentId,
+        placeEntityId: this.doc.placeEntityId,
+        responsibleEntityId: this.doc.responsibleEntityId,
         customerType: this.doc.customerType,
         customerId: this.doc.customerId,
         details: [

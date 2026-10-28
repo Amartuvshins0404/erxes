@@ -36,8 +36,7 @@ type ProductsQueryVariables = {
   sortField?: string;
   sortDirection?: number;
 
-  branchId?: string;
-  departmentId?: string;
+  placeEntityId?: string;
   minRemainder?: number;
   maxRemainder?: number;
   minPrice?: number;
@@ -63,8 +62,7 @@ export const useProductsVariables = (
       sortField,
       sortDirection,
 
-      branchId,
-      departmentId,
+      placeEntityId,
       minRemainder,
       maxRemainder,
       minPrice,
@@ -85,8 +83,7 @@ export const useProductsVariables = (
     sortField: string;
     sortDirection: string; // stored in URL as string (ex: "-1")
 
-    branchId: string;
-    departmentId: string;
+    placeEntityId: string;
     minRemainder: number;
     maxRemainder: number;
     minPrice: number;
@@ -105,8 +102,7 @@ export const useProductsVariables = (
     'segment',
     'sortField',
     'sortDirection',
-    'branchId',
-    'departmentId',
+    'placeEntityId',
     'minRemainder',
     'maxRemainder',
     'minPrice',
@@ -140,8 +136,7 @@ export const useProductsVariables = (
     // URL key is "tags", GraphQL expects "tagIds"
     tagIds: tags?.length ? tags : undefined,
 
-    branchId: branchId || undefined,
-    departmentId: departmentId || undefined,
+    placeEntityId: placeEntityId || undefined,
     minRemainder:
       minRemainder !== undefined && minRemainder !== null
         ? Number(minRemainder)

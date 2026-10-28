@@ -1,5 +1,6 @@
+import { STOCK_PLACE_CAPABILITY } from '@/utils/structure';
 import { Button, DatePicker, Form, Sheet, Spinner, Textarea } from 'erxes-ui';
-import { SelectBranches, SelectCategory, SelectDepartments } from 'ui-modules';
+import { SelectStructureEntities, SelectCategory } from 'ui-modules';
 
 import { AccountingSheet } from '~/modules/layout/components/Sheet';
 import { IconPlus } from '@tabler/icons-react';
@@ -63,26 +64,12 @@ const AddSafeRemainderForm = ({
           <div className="grid grid-cols-2 gap-4">
             <Form.Field
               control={form.control}
-              name="branchId"
+              name="placeEntityId"
               render={({ field }) => (
                 <Form.Item>
-                  <Form.Label>{t('branch')}</Form.Label>
-                  <SelectBranches.FormItem
-                    mode="single"
-                    value={field.value}
-                    onValueChange={field.onChange}
-                  />
-                  <Form.Message />
-                </Form.Item>
-              )}
-            />
-            <Form.Field
-              control={form.control}
-              name="departmentId"
-              render={({ field }) => (
-                <Form.Item>
-                  <Form.Label>{t('department')}</Form.Label>
-                  <SelectDepartments.FormItem
+                  <Form.Label>{t('place', 'Place')}</Form.Label>
+                  <SelectStructureEntities.FormItem
+                    capability={STOCK_PLACE_CAPABILITY}
                     mode="single"
                     value={field.value}
                     onValueChange={field.onChange}

@@ -8,20 +8,20 @@ describe('journal report drill-down navigation', () => {
     const path = buildDetailedReportPath(
       {
         pathname: '/accounting/gen-journal-report',
-        search: '?report=invCost&groupKey=accBranchDep&unhideZero=true',
+        search: '?report=invCost&groupKey=accPlace&unhideZero=true',
       },
       'invCost',
-      'accountId+account-1*branchId+branch-1*departmentId+department-1,productId+product-1',
+      'accountId+account-1*placeEntityId+place-1*responsibleEntityId+responsible-1,productId+product-1',
     );
     const params = new URLSearchParams(path.split('?')[1]);
 
     expect(params.get('report')).toBe('invCost');
     expect(params.get('isMore')).toBe('true');
-    expect(params.get('groupKey')).toBe('accBranchDep');
+    expect(params.get('groupKey')).toBe('accPlace');
     expect(params.get('unhideZero')).toBe('true');
     expect(params.get('accountIds')).toBe('account-1');
-    expect(params.get('branchId')).toBe('branch-1');
-    expect(params.get('departmentId')).toBe('department-1');
+    expect(params.get('placeEntityId')).toBe('place-1');
+    expect(params.get('responsibleEntityId')).toBe('responsible-1');
     expect(params.get('productIds')).toBe('product-1');
   });
 

@@ -24,7 +24,7 @@ const makeModels = (transactions: Record<string, unknown>[] = []) =>
       find: jest.fn().mockReturnValue(queryResult(transactions)),
       updateOne: jest.fn().mockResolvedValue(undefined),
     },
-  }) as unknown as IModels;
+  } as unknown as IModels);
 
 describe('getInventoryOutAdjustment', () => {
   const details = {
@@ -121,7 +121,6 @@ describe('activeCost', () => {
       models as unknown as IModels,
       'inventory-account',
       'branch-a',
-      'department-a',
       ['product-a', 'product-b'],
       ['old-sale-out'],
     );
@@ -137,8 +136,7 @@ describe('activeCost', () => {
     expect(models.AdjustInvDetails.find).toHaveBeenCalledWith({
       adjustId: 'adjust-latest',
       accountId: 'inventory-account',
-      branchId: 'branch-a',
-      departmentId: 'department-a',
+      placeEntityId: 'branch-a',
       productId: { $in: ['product-a', 'product-b'] },
     });
     expect(transactionAggregate).toHaveBeenNthCalledWith(
@@ -155,48 +153,26 @@ describe('activeCost', () => {
         },
         {
           $addFields: {
-            locationBranchId: {
+            locationPlaceEntityId: {
               $cond: [
                 {
                   $gt: [
                     {
-                      $strLenCP: { $ifNull: ['$details.branchId', ''] },
+                      $strLenCP: { $ifNull: ['$details.placeEntityId', ''] },
                     },
                     0,
                   ],
                 },
-                '$details.branchId',
-                {
-                  $cond: [
-                    {
-                      $gt: [{ $strLenCP: { $ifNull: ['$branchId', ''] } }, 0],
-                    },
-                    '$branchId',
-                    '_',
-                  ],
-                },
-              ],
-            },
-            locationDepartmentId: {
-              $cond: [
-                {
-                  $gt: [
-                    {
-                      $strLenCP: { $ifNull: ['$details.departmentId', ''] },
-                    },
-                    0,
-                  ],
-                },
-                '$details.departmentId',
+                '$details.placeEntityId',
                 {
                   $cond: [
                     {
                       $gt: [
-                        { $strLenCP: { $ifNull: ['$departmentId', ''] } },
+                        { $strLenCP: { $ifNull: ['$placeEntityId', ''] } },
                         0,
                       ],
                     },
-                    '$departmentId',
+                    '$placeEntityId',
                     '_',
                   ],
                 },
@@ -206,8 +182,7 @@ describe('activeCost', () => {
         },
         {
           $match: expect.objectContaining({
-            locationBranchId: 'branch-a',
-            locationDepartmentId: 'department-a',
+            locationPlaceEntityId: 'branch-a',
           }),
         },
       ]),
@@ -257,7 +232,6 @@ describe('activeCost', () => {
     const result = await activeCost(
       models as unknown as IModels,
       'inventory-account',
-      undefined,
       undefined,
       ['product-a'],
     );
@@ -404,15 +378,13 @@ describe('adjustRunning', () => {
       expect.arrayContaining([
         expect.objectContaining({
           $addFields: expect.objectContaining({
-            locationBranchId: expect.any(Object),
-            locationDepartmentId: expect.any(Object),
+            locationPlaceEntityId: expect.any(Object),
           }),
         }),
         expect.objectContaining({
           $group: expect.objectContaining({
             _id: expect.objectContaining({
-              branchId: '$locationBranchId',
-              departmentId: '$locationDepartmentId',
+              placeEntityId: '$locationPlaceEntityId',
             }),
           }),
         }),

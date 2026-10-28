@@ -45,7 +45,9 @@ export const PrintInvSaleReturnDocument = ({
       <FormHeader code="accounting-form-bm-2" />
       <div className="mt-1 border-b border-black pb-1 font-bold">
         {t('organization-name-label-3', { nsSeparator: false })}{' '}
-        <span className="font-normal">{transaction?.branch?.title || ''}</span>
+        <span className="font-normal">
+          {transaction?.placeEntity?.title || ''}
+        </span>
       </div>
 
       <div className="mt-3 mb-3 text-center text-[16px] font-bold uppercase">

@@ -1,17 +1,15 @@
 import { gql } from '~/gql';
 
 export const RESERVE_REMS_ADD = gql(`
-mutation accountingReserveRemsAdd($departmentIds: [String], $branchIds: [String], $productCategoryId: String, $productId: String, $remainder: Float) {
+mutation accountingReserveRemsAdd($placeEntityIds: [String], $productCategoryId: String, $productId: String, $remainder: Float) {
   reserveRemsAdd(
-    departmentIds: $departmentIds
-    branchIds: $branchIds
+    placeEntityIds: $placeEntityIds
     productCategoryId: $productCategoryId
     productId: $productId
     remainder: $remainder
   ) {
     _id
-    branchId
-    departmentId
+    placeEntityId
     productId
     uom
     remainder
@@ -22,12 +20,7 @@ mutation accountingReserveRemsAdd($departmentIds: [String], $branchIds: [String]
       code
       name
     }
-    branch {
-      _id
-      code
-      title
-    }
-    department {
+    placeEntity {
       _id
       code
       title
@@ -44,18 +37,16 @@ mutation accountingReserveRemsAdd($departmentIds: [String], $branchIds: [String]
 `);
 
 export const RESERVE_REM_EDIT = gql(`
-mutation accountingReserveRemEdit($_id: String!, $branchId: String, $departmentId: String, $productId: String, $uom: String, $remainder: Float) {
+mutation accountingReserveRemEdit($_id: String!, $placeEntityId: String, $productId: String, $uom: String, $remainder: Float) {
   reserveRemEdit(
     _id: $_id
-    branchId: $branchId
-    departmentId: $departmentId
+    placeEntityId: $placeEntityId
     productId: $productId
     uom: $uom
     remainder: $remainder
   ) {
     _id
-    branchId
-    departmentId
+    placeEntityId
     productId
     uom
     remainder
@@ -66,12 +57,7 @@ mutation accountingReserveRemEdit($_id: String!, $branchId: String, $departmentI
       code
       name
     }
-    branch {
-      _id
-      code
-      title
-    }
-    department {
+    placeEntity {
       _id
       code
       title

@@ -48,8 +48,7 @@ export const loadSafeRemainderClass = (models: IModels) => {
       userId: string,
     ) {
       const {
-        branchId,
-        departmentId,
+        placeEntityId,
         date,
         description,
         productCategoryId,
@@ -60,8 +59,7 @@ export const loadSafeRemainderClass = (models: IModels) => {
       const safeRemainder = await models.SafeRemainders.create({
         date,
         description,
-        departmentId,
-        branchId,
+        placeEntityId,
         productCategoryId,
         attachment,
         status: SAFE_REMAINDER_STATUSES.DRAFT,
@@ -128,10 +126,7 @@ export const loadSafeRemainderClass = (models: IModels) => {
         }
       }
 
-      await models.SafeRemainders.updateOne(
-        { _id },
-        { $set: update },
-      );
+      await models.SafeRemainders.updateOne({ _id }, { $set: update });
       return await models.SafeRemainders.getRemainder(_id);
     }
 

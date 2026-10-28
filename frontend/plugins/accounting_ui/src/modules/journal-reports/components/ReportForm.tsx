@@ -17,9 +17,8 @@ import { useAtom } from 'jotai';
 import { useEffect, useMemo } from 'react';
 import { useForm, UseFormReturn } from 'react-hook-form';
 import {
-  SelectBranches,
+  SelectStructureEntities,
   SelectCategory,
-  SelectDepartments,
   SelectMember,
   SelectProduct,
   SelectTags,
@@ -50,8 +49,8 @@ interface ReportFormValues {
   fixedAssetCategoryId?: string;
   fixedAssetIds?: string[];
   fixedAssetSearchValue?: string;
-  branchId?: string;
-  departmentId?: string;
+  placeEntityId?: string;
+  responsibleEntityId?: string;
   createdUserId?: string;
   modifiedUserId?: string;
   assignedUserId?: string;
@@ -144,11 +143,11 @@ const ReportFormField = ({
     );
   }
 
-  if (field === 'branchId' || field === 'departmentId') {
+  if (field === 'placeEntityId' || field === 'responsibleEntityId') {
     const StructureSelect =
-      field === 'branchId'
-        ? SelectBranches.FormItem
-        : SelectDepartments.FormItem;
+      field === 'placeEntityId'
+        ? SelectStructureEntities.FormItem
+        : SelectStructureEntities.FormItem;
     return (
       <Form.Field
         control={form.control}

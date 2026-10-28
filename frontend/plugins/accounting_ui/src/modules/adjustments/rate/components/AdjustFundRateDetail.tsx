@@ -36,7 +36,7 @@ import type {
 } from '../types/AdjustFundRate';
 import { useAccountsInline } from '@/settings/account/hooks/useAccounts';
 import type { IAccount } from '@/settings/account/types/Account';
-import { SelectBranches, SelectDepartments } from 'ui-modules';
+import { StructureEntitiesInline } from 'ui-modules';
 import { ColumnDef } from '@tanstack/react-table';
 
 const DetailField = ({ label, value }: { label: string; value?: string }) => (
@@ -60,7 +60,7 @@ const formatAccount = (account?: IAccount, fallback?: string) => {
 const isPresent = (value?: string): value is string => Boolean(value);
 
 const makeGroupKey = (detail: IAdjustFundRateDetail) =>
-  `${detail.branchId || ''}:${detail.departmentId || ''}`;
+  `${detail.placeEntityId || ''}:${detail.responsibleEntityId || ''}`;
 
 type TLinkedTransactionRow = {
   transaction: ITransaction;
@@ -90,16 +90,24 @@ const TextCell = ({ value }: { value?: string }) => (
   <RecordTableInlineCell>{value || '-'}</RecordTableInlineCell>
 );
 
-const BranchCell = ({ branchId }: { branchId?: string }) => (
+const PlaceCell = ({ placeEntityId }: { placeEntityId?: string }) => (
   <RecordTableInlineCell>
-    {branchId ? <SelectBranches.InlineCell branchIds={[branchId]} /> : '-'}
+    {placeEntityId ? (
+      <StructureEntitiesInline entityIds={[placeEntityId]} />
+    ) : (
+      '-'
+    )}
   </RecordTableInlineCell>
 );
 
-const DepartmentCell = ({ departmentId }: { departmentId?: string }) => (
+const ResponsibleCell = ({
+  responsibleEntityId,
+}: {
+  responsibleEntityId?: string;
+}) => (
   <RecordTableInlineCell>
-    {departmentId ? (
-      <SelectDepartments.InlineCell departmentIds={[departmentId]} />
+    {responsibleEntityId ? (
+      <StructureEntitiesInline entityIds={[responsibleEntityId]} />
     ) : (
       '-'
     )}
@@ -229,16 +237,22 @@ const linkedTransactionColumns = (
     size: 140,
   },
   {
-    id: 'branch',
-    header: () => <RecordTable.InlineHead label={t('branch')} />,
-    cell: ({ row }) => <BranchCell branchId={row.original.detail.branchId} />,
+    id: 'placeEntity',
+    header: () => <RecordTable.InlineHead label={t('place', 'Place')} />,
+    cell: ({ row }) => (
+      <PlaceCell placeEntityId={row.original.detail.placeEntityId} />
+    ),
     size: 180,
   },
   {
-    id: 'department',
-    header: () => <RecordTable.InlineHead label={t('department')} />,
+    id: 'responsibleEntity',
+    header: () => (
+      <RecordTable.InlineHead label={t('responsible', 'Responsible')} />
+    ),
     cell: ({ row }) => (
-      <DepartmentCell departmentId={row.original.detail.departmentId} />
+      <ResponsibleCell
+        responsibleEntityId={row.original.detail.responsibleEntityId}
+      />
     ),
     size: 180,
   },
@@ -302,8 +316,8 @@ export const AdjustFundRateDetail = () => {
     const groups = new Map<
       string,
       {
-        branchId?: string;
-        departmentId?: string;
+        placeEntityId?: string;
+        responsibleEntityId?: string;
         details: IAdjustFundRateDetail[];
       }
     >();
@@ -311,8 +325,8 @@ export const AdjustFundRateDetail = () => {
     for (const detail of adjustFundRate?.details || []) {
       const key = makeGroupKey(detail);
       const group = groups.get(key) || {
-        branchId: detail.branchId,
-        departmentId: detail.departmentId,
+        placeEntityId: detail.placeEntityId,
+        responsibleEntityId: detail.responsibleEntityId,
         details: [],
       };
 
@@ -477,8 +491,8 @@ const CalculationGroups = ({
   groupedDetails,
 }: {
   groupedDetails: Array<{
-    branchId?: string;
-    departmentId?: string;
+    placeEntityId?: string;
+    responsibleEntityId?: string;
     details: IAdjustFundRateDetail[];
   }>;
 }) => {
@@ -495,29 +509,35 @@ const CalculationGroups = ({
     <div className="flex flex-col gap-3">
       {groupedDetails.map((group, index) => (
         <div
-          key={`${group.branchId || 'no-branch'}:${
-            group.departmentId || 'no-department'
+          key={`${group.placeEntityId || 'no-place'}:${
+            group.responsibleEntityId || 'no-responsible'
           }`}
           className="rounded-md border"
         >
           <div className="flex flex-wrap items-center gap-6 border-b bg-muted/30 px-3 py-2 text-sm">
             <div className="flex items-center gap-2">
               <span className="text-muted-foreground">
-                {t('Branch:', { nsSeparator: false })}
+                {t('place-label', {
+                  nsSeparator: false,
+                  defaultValue: 'Place:',
+                })}
               </span>
-              {group.branchId ? (
-                <SelectBranches.InlineCell branchIds={[group.branchId]} />
+              {group.placeEntityId ? (
+                <StructureEntitiesInline entityIds={[group.placeEntityId]} />
               ) : (
                 <span>-</span>
               )}
             </div>
             <div className="flex items-center gap-2">
               <span className="text-muted-foreground">
-                {t('Department:', { nsSeparator: false })}
+                {t('responsible-label', {
+                  nsSeparator: false,
+                  defaultValue: 'Responsible:',
+                })}
               </span>
-              {group.departmentId ? (
-                <SelectDepartments.InlineCell
-                  departmentIds={[group.departmentId]}
+              {group.responsibleEntityId ? (
+                <StructureEntitiesInline
+                  entityIds={[group.responsibleEntityId]}
                 />
               ) : (
                 <span>-</span>

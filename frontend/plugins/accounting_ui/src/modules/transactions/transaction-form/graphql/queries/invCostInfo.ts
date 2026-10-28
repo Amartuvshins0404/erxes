@@ -1,12 +1,11 @@
 import { gql } from '~/gql';
 
 export const GET_ACC_CURRENT_COST_QUERY = gql(`
-query accountingGetAccCurrentCost($productIds: [String!]!, $accountId: String!, $branchId: String, $departmentId: String, $excludedTransactionIds: [String!]) {
+query accountingGetAccCurrentCost($productIds: [String!]!, $accountId: String!, $placeEntityId: String, $excludedTransactionIds: [String!]) {
   getAccCurrentCost(
     productIds: $productIds
     accountId: $accountId
-    branchId: $branchId
-    departmentId: $departmentId
+    placeEntityId: $placeEntityId
     excludedTransactionIds: $excludedTransactionIds
   ) {
     productId

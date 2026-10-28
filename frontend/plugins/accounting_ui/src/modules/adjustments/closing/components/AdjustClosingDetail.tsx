@@ -29,12 +29,7 @@ import {
   Tooltip,
 } from 'erxes-ui';
 import { useCallback, useMemo, useState } from 'react';
-import {
-  IDepartment,
-  IBranch,
-  useBranchesMain,
-  useDepartmentsMain,
-} from 'ui-modules';
+import { useStructureEntities } from 'ui-modules';
 import { AccountsInline } from '~/modules/settings/account/components/AccountsInline';
 import { TBalanceTableRow } from '~/modules/transactions/transaction-form/components/TBalanceTableRow';
 import { tbalanceColumns } from '~/modules/transactions/transaction-form/components/TBalanceTableColumns';
@@ -100,10 +95,10 @@ const formatStructureLabel = (
   return [label.code, label.title].filter(Boolean).join(' - ') || id;
 };
 
-const getBranchLabel = (
+const getEntityLabel = (
   id: string | undefined,
   labelMap: TStructureLabelMap,
-): IBranch | undefined => {
+) => {
   if (!id || !labelMap[id]) {
     return undefined;
   }
@@ -112,30 +107,12 @@ const getBranchLabel = (
     _id: id,
     code: labelMap[id].code || '',
     title: labelMap[id].title || '',
-    order: labelMap[id].order || '',
-  };
-};
-
-const getDepartmentLabel = (
-  id: string | undefined,
-  labelMap: TStructureLabelMap,
-): IDepartment | undefined => {
-  if (!id || !labelMap[id]) {
-    return undefined;
-  }
-
-  return {
-    _id: id,
-    code: labelMap[id].code || '',
-    title: labelMap[id].title || '',
-    order: labelMap[id].order,
   };
 };
 
 const makeLinkedTransactionRows = (
   transactions: ITransaction[],
-  branchMap: TStructureLabelMap,
-  departmentMap: TStructureLabelMap,
+  entityMap: TStructureLabelMap,
 ): ITBalanceTransaction[] =>
   transactions.flatMap((transaction, transactionIndex) =>
     (transaction.details || []).map((detail) => ({
@@ -146,14 +123,17 @@ const makeLinkedTransactionRows = (
       date: new Date(transaction.date || new Date()),
       number: transaction.number || transaction.ptrNumber,
       detail,
-      branch:
-        transaction.branch ||
-        getBranchLabel(detail.branchId || transaction.branchId, branchMap),
-      department:
-        transaction.department ||
-        getDepartmentLabel(
-          detail.departmentId || transaction.departmentId,
-          departmentMap,
+      placeEntity:
+        transaction.placeEntity ||
+        getEntityLabel(
+          detail.placeEntityId || transaction.placeEntityId,
+          entityMap,
+        ),
+      responsibleEntity:
+        transaction.responsibleEntity ||
+        getEntityLabel(
+          detail.responsibleEntityId || transaction.responsibleEntityId,
+          entityMap,
         ),
       journalIndex: transactionIndex.toString(),
     })),
@@ -377,28 +357,26 @@ export const AdjustClosingDetail = ({ id }: AdjustClosingDetailProps) => {
     () => adjustClosingDetail?.details ?? [],
     [adjustClosingDetail?.details],
   );
-  const branchIds = useMemo(
+  const entityIds = useMemo(
     () =>
-      [...new Set(closingDetails.map((detail) => detail.branchId))].filter(
-        (branchId): branchId is string => Boolean(branchId),
-      ),
-    [closingDetails],
-  );
-  const departmentIds = useMemo(
-    () =>
-      [...new Set(closingDetails.map((detail) => detail.departmentId))].filter(
-        (departmentId): departmentId is string => Boolean(departmentId),
-      ),
+      [
+        ...new Set(
+          closingDetails.flatMap((detail) => [
+            detail.placeEntityId,
+            detail.responsibleEntityId,
+          ]),
+        ),
+      ].filter((entityId): entityId is string => Boolean(entityId)),
     [closingDetails],
   );
 
-  const { branches, loading: branchesLoading } = useBranchesMain({
-    variables: { ids: branchIds, withoutUserFilter: true },
-    skip: branchIds.length === 0,
-  });
-  const { departments, loading: departmentsLoading } = useDepartmentsMain({
-    variables: { ids: departmentIds, withoutUserFilter: true },
-    skip: departmentIds.length === 0,
+  const { structureEntities, loading: entitiesLoading } = useStructureEntities({
+    variables: {
+      ids: entityIds,
+      limit: entityIds.length,
+      includeArchived: true,
+    },
+    skip: entityIds.length === 0,
   });
 
   const linkedTransactionParentId = useMemo(
@@ -427,23 +405,16 @@ export const AdjustClosingDetail = ({ id }: AdjustClosingDetailProps) => {
     [t],
   );
 
-  const branchMap = useMemo<TStructureLabelMap>(
+  const entityMap = useMemo<TStructureLabelMap>(
     () =>
       Object.fromEntries(
-        (branches ?? []).map((branch) => [branch._id, branch]),
+        structureEntities.map((entity) => [entity._id, entity]),
       ),
-    [branches],
-  );
-  const departmentMap = useMemo<TStructureLabelMap>(
-    () =>
-      Object.fromEntries(
-        (departments ?? []).map((department) => [department._id, department]),
-      ),
-    [departments],
+    [structureEntities],
   );
   const transactionRows = useMemo(
-    () => makeLinkedTransactionRows(transactions, branchMap, departmentMap),
-    [branchMap, departmentMap, transactions],
+    () => makeLinkedTransactionRows(transactions, entityMap),
+    [entityMap, transactions],
   );
 
   const handleCalculate = () => calculateAdjust();
@@ -473,7 +444,7 @@ export const AdjustClosingDetail = ({ id }: AdjustClosingDetailProps) => {
     [handlePercentChange, t],
   );
 
-  if (loading || detailsLoading || branchesLoading || departmentsLoading) {
+  if (loading || detailsLoading || entitiesLoading) {
     return <Spinner />;
   }
 
@@ -537,9 +508,8 @@ export const AdjustClosingDetail = ({ id }: AdjustClosingDetailProps) => {
             closingDetails.map((detail) => (
               <ClosingDetailGroup
                 key={detail._id}
-                branchMap={branchMap}
                 columns={columns}
-                departmentMap={departmentMap}
+                entityMap={entityMap}
                 detail={detail}
               />
             ))
@@ -649,13 +619,11 @@ const ClosingLinkedTransactionsTable = ({
 };
 
 const ClosingDetailGroup = ({
-  branchMap,
-  departmentMap,
+  entityMap,
   detail,
   columns,
 }: {
-  branchMap: TStructureLabelMap;
-  departmentMap: TStructureLabelMap;
+  entityMap: TStructureLabelMap;
   detail: IAdjustClosingDetailItem;
   columns: ColumnDef<TClosingEntryRow>[];
 }) => {
@@ -683,18 +651,24 @@ const ClosingDetailGroup = ({
         <div className="flex min-w-0 flex-wrap items-center gap-x-6 gap-y-2">
           <div className="flex min-w-0 items-center gap-2">
             <span className="text-muted-foreground">
-              {t('Branch:', { nsSeparator: false })}
+              {t('place-label', { nsSeparator: false, defaultValue: 'Place:' })}
             </span>
             <TextOverflowTooltip
-              value={formatStructureLabel(detail.branchId, branchMap)}
+              value={formatStructureLabel(detail.placeEntityId, entityMap)}
             />
           </div>
           <div className="flex min-w-0 items-center gap-2">
             <span className="text-muted-foreground">
-              {t('Department:', { nsSeparator: false })}
+              {t('responsible-label', {
+                nsSeparator: false,
+                defaultValue: 'Responsible:',
+              })}
             </span>
             <TextOverflowTooltip
-              value={formatStructureLabel(detail.departmentId, departmentMap)}
+              value={formatStructureLabel(
+                detail.responsibleEntityId,
+                entityMap,
+              )}
             />
           </div>
           <span className="text-xs text-muted-foreground">

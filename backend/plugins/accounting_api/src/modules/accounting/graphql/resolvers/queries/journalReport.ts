@@ -24,8 +24,8 @@ export interface IReportFilterParams {
   accountBrand?: string;
   accountIsTemp?: boolean;
   accountIsOutBalance?: boolean;
-  accountBranchId: string;
-  accountDepartmentId: string;
+  accountPlaceEntityId: string;
+  accountResponsibleEntityId: string;
   accountCurrency: string;
   accountJournal: string;
 
@@ -45,8 +45,8 @@ export interface IReportFilterParams {
   companyTagIds?: string[];
   contentType?: string;
   contentId?: string;
-  branchId?: string;
-  departmentId?: string;
+  placeEntityId?: string;
+  responsibleEntityId?: string;
   currency?: string;
   journal?: string;
   journals?: string[];

@@ -330,10 +330,12 @@ export const InventorySplitSync = ({
   );
   const isMove = trDoc.journal === TrJournalEnum.INV_MOVE;
   const originId = trDoc._id;
-  const branchId = isMove ? trDoc.followInfos.moveInBranchId : trDoc.branchId;
-  const departmentId = isMove
-    ? trDoc.followInfos.moveInDepartmentId
-    : trDoc.departmentId;
+  const placeEntityId = isMove
+    ? trDoc.followInfos.moveInPlaceEntityId
+    : trDoc.placeEntityId;
+  const responsibleEntityId = isMove
+    ? trDoc.followInfos.moveInResponsibleEntityId
+    : trDoc.responsibleEntityId;
   const { parentId, ptrId } = trDoc;
 
   useEffect(() => {
@@ -370,8 +372,8 @@ export const InventorySplitSync = ({
         originId,
         ptrId: splitPtrId,
         parentId,
-        branchId,
-        departmentId,
+        placeEntityId,
+        responsibleEntityId,
       };
       const outTransaction = fixSumDtCt({
         ...existingOut,
@@ -395,8 +397,8 @@ export const InventorySplitSync = ({
       return [...next, outTransaction, incomeTransaction];
     });
   }, [
-    branchId,
-    departmentId,
+    placeEntityId,
+    responsibleEntityId,
     incomeDetails,
     originId,
     outDetails,

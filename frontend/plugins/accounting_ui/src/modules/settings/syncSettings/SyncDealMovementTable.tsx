@@ -7,10 +7,10 @@ import { RecordTable, RecordTableInlineCell } from 'erxes-ui';
 import {
   BoardSelect,
   PipelineSelect,
-  SelectBranches,
-  SelectDepartments,
+  SelectStructureEntities,
   StageSelect,
 } from 'ui-modules';
+import { STOCK_PLACE_CAPABILITY } from '@/utils/structure';
 import { ACCOUNTING_SETTINGS_CODES } from '../constants/settingsRoutes';
 import { IConfig } from '../types/Config';
 import {
@@ -20,10 +20,9 @@ import {
 } from '@/settings/syncSettings/SyncTableShared';
 
 type TMovementAccountKey = 'sourceAccountId' | 'destinationAccountId';
-type TMovementBranchKey = 'defaultSourceBranchId' | 'defaultDestinationBranchId';
-type TMovementDepartmentKey =
-  | 'defaultSourceDepartmentId'
-  | 'defaultDestinationDepartmentId';
+type TMovementPlaceKey =
+  | 'defaultSourcePlaceEntityId'
+  | 'defaultDestinationPlaceEntityId';
 
 const MovementAccountCell = ({
   config,
@@ -42,32 +41,17 @@ const MovementAccountCell = ({
   );
 };
 
-const MovementBranchCell = ({
+const MovementPlaceCell = ({
   config,
   name,
 }: {
   config: IConfig;
-  name: TMovementBranchKey;
+  name: TMovementPlaceKey;
 }) => {
   const updateValue = useSyncConfigValueUpdate(config);
   return (
-    <SelectBranches.InlineCell
-      value={config.value?.[name] || ''}
-      onValueChange={(value) => updateValue(name, value)}
-    />
-  );
-};
-
-const MovementDepartmentCell = ({
-  config,
-  name,
-}: {
-  config: IConfig;
-  name: TMovementDepartmentKey;
-}) => {
-  const updateValue = useSyncConfigValueUpdate(config);
-  return (
-    <SelectDepartments.InlineCell
+    <SelectStructureEntities.InlineCell
+      capability={STOCK_PLACE_CAPABILITY}
       value={config.value?.[name] || ''}
       onValueChange={(value) => updateValue(name, value)}
     />
@@ -131,52 +115,28 @@ export const dealMovementColumns = (
     ),
   },
   {
-    id: 'sourceBranch',
-    accessorKey: 'sourceBranch',
-    header: () => <RecordTable.InlineHead label={t('default-source-branch')} />,
+    id: 'sourcePlace',
+    accessorKey: 'sourcePlace',
+    header: () => (
+      <RecordTable.InlineHead label={t('default-source-location')} />
+    ),
     cell: ({ cell }) => (
-      <MovementBranchCell
+      <MovementPlaceCell
         config={cell.row.original}
-        name="defaultSourceBranchId"
+        name="defaultSourcePlaceEntityId"
       />
     ),
   },
   {
-    id: 'sourceDepartment',
-    accessorKey: 'sourceDepartment',
+    id: 'destinationPlace',
+    accessorKey: 'destinationPlace',
     header: () => (
-      <RecordTable.InlineHead label={t('default-source-department')} />
+      <RecordTable.InlineHead label={t('default-destination-location')} />
     ),
     cell: ({ cell }) => (
-      <MovementDepartmentCell
+      <MovementPlaceCell
         config={cell.row.original}
-        name="defaultSourceDepartmentId"
-      />
-    ),
-  },
-  {
-    id: 'destinationBranch',
-    accessorKey: 'destinationBranch',
-    header: () => (
-      <RecordTable.InlineHead label={t('default-destination-branch')} />
-    ),
-    cell: ({ cell }) => (
-      <MovementBranchCell
-        config={cell.row.original}
-        name="defaultDestinationBranchId"
-      />
-    ),
-  },
-  {
-    id: 'destinationDepartment',
-    accessorKey: 'destinationDepartment',
-    header: () => (
-      <RecordTable.InlineHead label={t('default-destination-department')} />
-    ),
-    cell: ({ cell }) => (
-      <MovementDepartmentCell
-        config={cell.row.original}
-        name="defaultDestinationDepartmentId"
+        name="defaultDestinationPlaceEntityId"
       />
     ),
   },

@@ -33,7 +33,9 @@ const OutReceipt = ({ transaction }: { transaction: ITransaction }) => {
       <FormHeader code="accounting-form-mh1" />
       <div className="mt-1 font-bold">
         {t('organization-label', { nsSeparator: false })}{' '}
-        <span className="font-normal">{transaction?.branch?.title || ''}</span>
+        <span className="font-normal">
+          {transaction?.placeEntity?.title || ''}
+        </span>
       </div>
 
       <div className="mt-2 mb-2 text-center text-[14px] font-bold leading-tight">

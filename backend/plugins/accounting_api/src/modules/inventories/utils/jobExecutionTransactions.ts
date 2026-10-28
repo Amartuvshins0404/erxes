@@ -79,16 +79,14 @@ const buildJobTransactions = (
       ...common,
       journal: 'invOut',
       side: 'ct',
-      branchId: execution.inputBranchId,
-      departmentId: execution.inputDepartmentId,
+      placeEntityId: execution.inputPlaceEntityId,
       details: inputDetails,
     },
     {
       ...common,
       journal: 'invIncome',
       side: 'dt',
-      branchId: execution.outputBranchId,
-      departmentId: execution.outputDepartmentId,
+      placeEntityId: execution.outputPlaceEntityId,
       details: outputDetails,
     },
     ...expenses.map((row): ITransaction => {
@@ -99,8 +97,7 @@ const buildJobTransactions = (
         ...common,
         journal,
         side: 'ct',
-        branchId: execution.outputBranchId,
-        departmentId: execution.outputDepartmentId,
+        placeEntityId: execution.outputPlaceEntityId,
         description: row.name,
         details: [
           { _id: nanoid(), accountId: row.accountId, amount: row.amount },
@@ -143,12 +140,7 @@ export const buildJobExecutionTransactions = (
       credits.push(doc);
       continue;
     }
-    const key = JSON.stringify([
-      doc.journal,
-      doc.side,
-      doc.branchId,
-      doc.departmentId,
-    ]);
+    const key = JSON.stringify([doc.journal, doc.side, doc.placeEntityId]);
     const target = inventory.get(key) ?? { ...doc, details: [] };
     inventory.set(key, target);
     const details =

@@ -99,8 +99,8 @@ describe('commonSave inventory costs', () => {
     const doc = {
       journal: 'invOut',
       side: 'dt',
-      branchId: 'branch-a',
-      departmentId: 'department-a',
+      placeEntityId: 'branch-a',
+      responsibleEntityId: 'department-a',
       details: [
         {
           accountId: 'inventory-account',
@@ -132,7 +132,6 @@ describe('commonSave inventory costs', () => {
       models,
       'inventory-account',
       'branch-a',
-      'department-a',
       ['product-a'],
       [],
     );
@@ -169,30 +168,25 @@ describe('commonSave inventory costs', () => {
     const models = {
       Transactions: {
         getTransaction: jest.fn().mockResolvedValue(saved),
-        find: jest
-          .fn()
-          .mockReturnValue({
-            lean: jest
-              .fn()
-              .mockResolvedValue([
-                { _id: 'out' },
-                { _id: 'income' },
-                { _id: 'cost' },
-              ]),
-          }),
+        find: jest.fn().mockReturnValue({
+          lean: jest
+            .fn()
+            .mockResolvedValue([
+              { _id: 'out' },
+              { _id: 'income' },
+              { _id: 'cost' },
+            ]),
+        }),
       },
     } as unknown as IModels;
-    jest
-      .mocked(activeCost)
-      .mockResolvedValue({
-        'product-a': { unitCost: 12, totalCost: 120, remainder: 10 },
-      });
+    jest.mocked(activeCost).mockResolvedValue({
+      'product-a': { unitCost: 12, totalCost: 120, remainder: 10 },
+    });
     jest.mocked(createOrUpdateTr).mockResolvedValue(saved as never);
     await commonSave('tenant', models, 'user', doc, oldTransaction as never);
     expect(activeCost).toHaveBeenCalledWith(
       models,
       'inventory-account',
-      undefined,
       undefined,
       ['product-a'],
       ['out', 'income', 'cost'],

@@ -85,8 +85,8 @@ query accountingAdjustFxaDetails($_id: String!, $page: Int, $perPage: Int, $sort
     fixedAssetId
     categoryId
     accountId
-    branchId
-    departmentId
+    placeEntityId
+    responsibleEntityId
     originalCost
     salvageValue
     openingBookValue

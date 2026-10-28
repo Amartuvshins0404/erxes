@@ -116,7 +116,7 @@ export const moreDataByKey = (
         record,
       );
 
-    if (rule === 'branchId' || rule === 'departmentId') {
+    if (rule === 'placeEntityId' || rule === 'responsibleEntityId') {
       const details = record.details;
       if (details && typeof details === 'object') {
         return (details as ReportRecord)[rule] || directValue;

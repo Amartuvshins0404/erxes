@@ -3,8 +3,7 @@ import { z } from 'zod';
 
 export const reserveRemSchema = z
   .object({
-    branchIds: z.array(z.string()).optional(),
-    departmentIds: z.array(z.string()).optional(),
+    placeEntityIds: z.array(z.string()).optional(),
     productCategoryId: z.string().optional(),
     productId: z.string().optional(),
     remainder: z.number({ invalid_type_error: 'Remainder is required' }),

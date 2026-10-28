@@ -19,7 +19,7 @@ export const types = `
 
 export const queries = `
   getAccLastIncomePrice(productIds: [String!]!): [AccountingLastIncomePrice!]!
-  getAccCurrentCost(productIds: [String!]!, accountId: String!, branchId: String, departmentId: String, excludedTransactionIds: [String!]): [AccCurrentCost!]!
+  getAccCurrentCost(productIds: [String!]!, accountId: String!, placeEntityId: String, excludedTransactionIds: [String!]): [AccCurrentCost!]!
 `;
 
 export const mutations = `

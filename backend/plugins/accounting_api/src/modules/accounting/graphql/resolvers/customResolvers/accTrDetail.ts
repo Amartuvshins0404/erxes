@@ -10,25 +10,25 @@ export default {
     return await models.Accounts.findOne({ _id: trDetail.accountId }).lean();
   },
 
-  async branch(trDetail: ITrDetail) {
-    if (!trDetail.branchId) {
+  async placeEntity(trDetail: ITrDetail) {
+    if (!trDetail.placeEntityId) {
       return;
     }
 
     return {
-      __typename: 'Branch',
-      _id: trDetail.branchId,
+      __typename: 'StructureEntity',
+      _id: trDetail.placeEntityId,
     };
   },
 
-  async department(trDetail: ITrDetail) {
-    if (!trDetail.departmentId) {
+  async responsibleEntity(trDetail: ITrDetail) {
+    if (!trDetail.responsibleEntityId) {
       return;
     }
 
     return {
-      __typename: 'Department',
-      _id: trDetail.departmentId,
+      __typename: 'StructureEntity',
+      _id: trDetail.responsibleEntityId,
     };
   },
 

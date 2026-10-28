@@ -1,9 +1,9 @@
+import { STOCK_PLACE_CAPABILITY } from '@/utils/structure';
 import { IconSearch } from '@tabler/icons-react';
 import { Combobox, Command, Filter, useMultiQueryState } from 'erxes-ui';
 import {
-  SelectBranches,
+  SelectStructureEntities,
   SelectCategory,
-  SelectDepartments,
   SelectProduct,
 } from 'ui-modules';
 import { useTranslation } from 'react-i18next';
@@ -41,23 +41,19 @@ const ReserveRemFilterPopover = () => {
                   value="productId"
                   label={t('product')}
                 />
-                <SelectBranches.FilterItem
-                  value="branchId"
-                  label={t('branch')}
-                />
-                <SelectDepartments.FilterItem
-                  value="departmentId"
-                  label={t('department')}
+                <SelectStructureEntities.FilterItem
+                  value="placeEntityId"
+                  label={t('place', 'Place')}
                 />
               </Command.List>
             </Command>
           </Filter.View>
           <SelectCategory.FilterView filterKey="categoryId" mode="single" />
           <SelectProduct.FilterView filterKey="productId" mode="single" />
-          <SelectBranches.FilterView mode="single" filterKey="branchId" />
-          <SelectDepartments.FilterView
+          <SelectStructureEntities.FilterView
+            capability={STOCK_PLACE_CAPABILITY}
             mode="single"
-            filterKey="departmentId"
+            filterKey="placeEntityId"
           />
         </Combobox.Content>
       </Filter.Popover>
@@ -105,14 +101,10 @@ export const ReserveRemFilter = ({
           label={t('product')}
           mode="single"
         />
-        <SelectBranches.FilterBar
-          label={t('branch')}
-          filterKey="branchId"
-          mode="single"
-        />
-        <SelectDepartments.FilterBar
-          label={t('department')}
-          filterKey="departmentId"
+        <SelectStructureEntities.FilterBar
+          capability={STOCK_PLACE_CAPABILITY}
+          label={t('place', 'Place')}
+          filterKey="placeEntityId"
           mode="single"
         />
         {afterBar && <>{afterBar}</>}

@@ -26,8 +26,8 @@ query AccountingAdjustDebtRates($limit: Int, $cursor: String, $orderBy: JSON, $s
       checkedAt
       error
       warning
-      branchId
-      departmentId
+      placeEntityId
+      responsibleEntityId
       createdBy
       modifiedBy
       createdAt
@@ -64,8 +64,8 @@ query AccountingAdjustDebtRateDetail($_id: String!) {
     checkedAt
     error
     warning
-    branchId
-    departmentId
+    placeEntityId
+    responsibleEntityId
     createdBy
     modifiedBy
     createdAt
@@ -79,8 +79,8 @@ query AccountingAdjustDebtRateDetail($_id: String!) {
       accountCurrency
       customerType
       customerId
-      branchId
-      departmentId
+      placeEntityId
+      responsibleEntityId
       mainBalance
       currencyBalance
       diff

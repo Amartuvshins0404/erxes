@@ -1,4 +1,4 @@
-import { sendTRPCMessage } from 'erxes-api-shared/utils';
+import { findStructureEntities } from '~/modules/accounting/utils/structureEntities';
 import { IModels } from '~/connectionResolvers';
 import {
   ACCOUNT_JOURNALS,
@@ -12,7 +12,7 @@ export async function prepareAccountDoc(
   row: any,
   addInfos: any,
 ) {
-  const { categories, branches, departments } = addInfos;
+  const { categories, structureEntities } = addInfos;
   const doc: any = { ...row };
 
   doc.createdAt = new Date();
@@ -28,14 +28,15 @@ export async function prepareAccountDoc(
     )?._id;
   }
 
-  if (row.branchId) {
-    doc.branchId = branches.find(
-      (c) => c._id === row.branchId || c.code === row.branchId,
+  if (row.placeEntityId) {
+    doc.placeEntityId = structureEntities.find(
+      (c) => c._id === row.placeEntityId || c.code === row.placeEntityId,
     )?._id;
   }
-  if (row.departmentId) {
-    doc.departmentId = departments.find(
-      (c) => c._id === row.departmentId || c.code === row.departmentId,
+  if (row.responsibleEntityId) {
+    doc.responsibleEntityId = structureEntities.find(
+      (c) =>
+        c._id === row.responsibleEntityId || c.code === row.responsibleEntityId,
     )?._id;
   }
 
@@ -79,16 +80,14 @@ export async function processAccountRows(
   try {
     const codes: string[] = [];
     const categoryIds: string[] = [];
-    const branchIds: string[] = [];
-    const departmentIds: string[] = [];
+    const entityRefs: string[] = [];
     for (const row of rows) {
       if (row.code) codes.push(row.code);
       if (row.categoryId && !categoryIds.includes(row.categoryId))
         categoryIds.push(row.categoryId);
-      if (row.branchId && !branchIds.includes(row.branchId))
-        branchIds.push(row.branchId);
-      if (row.departmentId && !departmentIds.includes(row.departmentId))
-        departmentIds.push(row.departmentId);
+      for (const ref of [row.placeEntityId, row.responsibleEntityId]) {
+        if (ref && !entityRefs.includes(ref)) entityRefs.push(ref);
+      }
     }
 
     const categories = await models.AccountCategories.find(
@@ -97,38 +96,10 @@ export async function processAccountRows(
       },
       { _id: 1, code: 1 },
     );
-    const branches = branchIds.length
-      ? await sendTRPCMessage({
-        subdomain,
-        pluginName: 'core',
-        module: 'branches',
-        action: 'find',
-        defaultValue: [],
-        input: {
-          query: {
-            $or: [{ _id: { $in: branchIds } }, { code: { $in: branchIds } }],
-          },
-          fields: { _id: 1, code: 1 },
-        },
-      })
-      : [];
-    const departments = departmentIds.length
-      ? await sendTRPCMessage({
-        subdomain,
-        pluginName: 'core',
-        module: 'departments',
-        action: 'find',
-        defaultValue: [],
-        input: {
-          query: {
-            $or: [
-              { _id: { $in: departmentIds } },
-              { code: { $in: departmentIds } },
-            ],
-          },
-          fields: { _id: 1, code: 1 },
-        },
-      })
+    const structureEntities = entityRefs.length
+      ? await findStructureEntities(subdomain, {
+          $or: [{ _id: { $in: entityRefs } }, { code: { $in: entityRefs } }],
+        })
       : [];
 
     const existingDocs = await models.Accounts.find({
@@ -147,8 +118,7 @@ export async function processAccountRows(
       try {
         const doc = await prepareAccountDoc(subdomain, models, row, {
           categories,
-          branches,
-          departments,
+          structureEntities,
         });
         const existing = existingByCode.get(doc.code);
 

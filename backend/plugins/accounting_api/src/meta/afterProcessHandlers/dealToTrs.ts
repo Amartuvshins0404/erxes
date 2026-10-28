@@ -40,8 +40,8 @@ export const dealToTrs = async ({
     saleAccountId: string;
     saleOutAccountId: string;
     saleCostAccountId: string;
-    branchId: string;
-    departmentId: string;
+    placeEntityId: string;
+    responsibleEntityId: string;
     hasVat: boolean;
     hasCtax: boolean;
     vatRowId: string;
@@ -102,8 +102,8 @@ export const dealToTrs = async ({
       saleOutAccountId: config.saleOutAccountId,
       saleCostAccountId: config.saleCostAccountId,
     },
-    branchId: deal.branchId || config.branchId,
-    departmentId: deal.departmentId || config.departmentId,
+    placeEntityId: config.placeEntityId,
+    responsibleEntityId: config.responsibleEntityId,
     assignedUserIds: deal.assignedUserIds,
 
     contentType,
@@ -238,8 +238,8 @@ export const dealToTrs = async ({
       description: `${deal.name} (${type})`,
       journal,
       side,
-      branchId: deal.branchId || config.branchId,
-      departmentId: deal.departmentId || config.departmentId,
+      placeEntityId: config.placeEntityId,
+      responsibleEntityId: config.responsibleEntityId,
       customerType: saleTrDoc.customerType,
       customerId: saleTrDoc.customerId,
       contentType,
@@ -274,8 +274,8 @@ export const dealToTrs = async ({
         description: `${deal.name} (change)`,
         journal,
         side,
-        branchId: saleTrDoc.branchId,
-        departmentId: saleTrDoc.departmentId,
+        placeEntityId: saleTrDoc.placeEntityId,
+        responsibleEntityId: saleTrDoc.responsibleEntityId,
         customerType: saleTrDoc.customerType,
         customerId: saleTrDoc.customerId,
         contentType,

@@ -10,6 +10,10 @@ import { IReportFilterParams } from '../../graphql/resolvers/queries/journalRepo
 import { generateFilter as accountGenerateFilter } from '../../graphql/resolvers/queries/accounts';
 import { IGroupCommon } from '.';
 import { resolveErkhetReportJournals } from './erkhetKinds';
+import {
+  findStructureEntities,
+  getEntityIdsWithDescendants,
+} from '../structureEntities';
 
 type ReportQuery = Record<string, unknown>;
 type ReportRecord = Record<string, unknown>;
@@ -54,8 +58,10 @@ const REPORT_GROUP_EXPRESSIONS: Record<string, unknown> = {
   createdBy: '$createdBy',
   contentId: '$contentId',
   contentType: '$contentType',
-  branchId: { $ifNull: ['$details.branchId', '$branchId'] },
-  departmentId: { $ifNull: ['$details.departmentId', '$departmentId'] },
+  placeEntityId: { $ifNull: ['$details.placeEntityId', '$placeEntityId'] },
+  responsibleEntityId: {
+    $ifNull: ['$details.responsibleEntityId', '$responsibleEntityId'],
+  },
   ptrId: { $ifNull: ['$ptrId', '$parentId'] },
 };
 
@@ -68,8 +74,8 @@ const REPORT_GROUP_PROJECTS: Record<string, string> = {
   createdBy: '$_id.createdBy',
   contentId: '$_id.contentId',
   contentType: '$_id.contentType',
-  branchId: '$_id.branchId',
-  departmentId: '$_id.departmentId',
+  placeEntityId: '$_id.placeEntityId',
+  responsibleEntityId: '$_id.responsibleEntityId',
   ptrId: '$_id.ptrId',
 };
 
@@ -98,31 +104,6 @@ const getStringField = (record: unknown, field: string) =>
     ? toSafeString((record as Record<string, unknown>)[field])
     : '';
 
-const getStructureIdsWithChildren = async (
-  subdomain: string,
-  module: 'branches' | 'departments',
-  id?: string,
-) => {
-  if (!id) {
-    return [];
-  }
-
-  const records = await sendTRPCMessage({
-    subdomain,
-    pluginName: 'core',
-    method: 'query',
-    module,
-    action: 'findWithChild',
-    input: {
-      query: { _id: id },
-      fields: { _id: 1 },
-    },
-    defaultValue: [],
-  });
-
-  return records.map((record) => record._id);
-};
-
 const getAccountIds = async (
   models: IModels,
   params: IReportFilterParams,
@@ -144,8 +125,8 @@ const getAccountIds = async (
       brand: params.accountBrand,
       isTemp: params.accountIsTemp,
       isOutBalance: params.accountIsOutBalance,
-      branchId: params.accountBranchId,
-      departmentId: params.accountDepartmentId,
+      placeEntityId: params.accountPlaceEntityId,
+      responsibleEntityId: params.accountResponsibleEntityId,
       currency: params.accountCurrency,
       journal: params.accountJournal,
       permissionMode: 'read',
@@ -419,30 +400,28 @@ export const getFilter = async (
     detailMatch['details.fixedAssetId'] = { $in: fixedAssetIds };
   }
 
-  const branchIds = await getStructureIdsWithChildren(
+  const placeEntityIds = await getEntityIdsWithDescendants(
     subdomain,
-    'branches',
-    params.branchId,
+    params.placeEntityId ? [params.placeEntityId] : [],
   );
-  if (branchIds.length) {
+  if (placeEntityIds.length) {
     detailAndFilters.push({
       $or: [
-        { branchId: { $in: branchIds } },
-        { 'details.branchId': { $in: branchIds } },
+        { placeEntityId: { $in: placeEntityIds } },
+        { 'details.placeEntityId': { $in: placeEntityIds } },
       ],
     });
   }
 
-  const departmentIds = await getStructureIdsWithChildren(
+  const responsibleEntityIds = await getEntityIdsWithDescendants(
     subdomain,
-    'departments',
-    params.departmentId,
+    params.responsibleEntityId ? [params.responsibleEntityId] : [],
   );
-  if (departmentIds.length) {
+  if (responsibleEntityIds.length) {
     detailAndFilters.push({
       $or: [
-        { departmentId: { $in: departmentIds } },
-        { 'details.departmentId': { $in: departmentIds } },
+        { responsibleEntityId: { $in: responsibleEntityIds } },
+        { 'details.responsibleEntityId': { $in: responsibleEntityIds } },
       ],
     });
   }
@@ -604,54 +583,19 @@ const buildProjectStage = (
   return project;
 };
 
-const fetchBranches = async (
+const fetchStructureEntities = async (
   subdomain: string,
-  branchIds: string[],
+  entityIds: string[],
 ): Promise<ReportLookup> => {
-  if (!branchIds.length) {
+  if (!entityIds.length) {
     return {};
   }
 
-  const branches = await sendTRPCMessage({
-    subdomain,
-    pluginName: 'core',
-    method: 'query',
-    module: 'branches',
-    action: 'find',
-    input: {
-      query: { _id: { $in: branchIds } },
-      fields: { _id: 1, title: 1, code: 1 },
-    },
-    defaultValue: [],
+  const entities = await findStructureEntities(subdomain, {
+    _id: { $in: entityIds },
   });
 
-  return Object.fromEntries(branches.map((branch) => [branch._id, branch]));
-};
-
-const fetchDepartments = async (
-  subdomain: string,
-  departmentIds: string[],
-): Promise<ReportLookup> => {
-  if (!departmentIds.length) {
-    return {};
-  }
-
-  const departments = await sendTRPCMessage({
-    subdomain,
-    pluginName: 'core',
-    method: 'query',
-    module: 'departments',
-    action: 'find',
-    input: {
-      query: { _id: { $in: departmentIds } },
-      fields: { _id: 1, title: 1, code: 1 },
-    },
-    defaultValue: [],
-  });
-
-  return Object.fromEntries(
-    departments.map((department) => [department._id, department]),
-  );
+  return Object.fromEntries(entities.map((entity) => [entity._id, entity]));
 };
 
 const PRODUCT_LOOKUP_BATCH_SIZE = 1000;
@@ -790,14 +734,12 @@ const enrichRecords = async (
       ];
     }),
   );
-  const branchById = await fetchBranches(
-    subdomain,
-    uniqueStringValues(records, 'branchId'),
-  );
-  const departmentById = await fetchDepartments(
-    subdomain,
-    uniqueStringValues(records, 'departmentId'),
-  );
+  const entityById = await fetchStructureEntities(subdomain, [
+    ...new Set([
+      ...uniqueStringValues(records, 'placeEntityId'),
+      ...uniqueStringValues(records, 'responsibleEntityId'),
+    ]),
+  ]);
   const productById = await fetchProducts(
     subdomain,
     uniqueStringValues(records, 'productId'),
@@ -824,13 +766,13 @@ const enrichRecords = async (
         ? accountById[record.accountId]
         : undefined;
     const accountCategory = account?.categoryId;
-    const branch =
-      typeof record.branchId === 'string'
-        ? branchById[record.branchId]
+    const placeEntity =
+      typeof record.placeEntityId === 'string'
+        ? entityById[record.placeEntityId]
         : undefined;
-    const department =
-      typeof record.departmentId === 'string'
-        ? departmentById[record.departmentId]
+    const responsibleEntity =
+      typeof record.responsibleEntityId === 'string'
+        ? entityById[record.responsibleEntityId]
         : undefined;
     const product =
       typeof record.productId === 'string'
@@ -865,10 +807,10 @@ const enrichRecords = async (
       accountCategoryId: accountCategory?._id,
       accountCategoryCode: accountCategory?.code,
       accountCategoryName: accountCategory?.name,
-      branchCode: branch?.code,
-      branchName: branch?.title,
-      departmentCode: department?.code,
-      departmentName: department?.title,
+      placeEntityCode: placeEntity?.code,
+      placeEntityName: placeEntity?.title,
+      responsibleEntityCode: responsibleEntity?.code,
+      responsibleEntityName: responsibleEntity?.title,
       productCode: product?.code,
       productName: product?.name,
       productCategoryId: product?.categoryId,
@@ -1012,8 +954,12 @@ export const getLineRecords = async (
         side: 1,
         detailInd: 1,
         accountId: '$details.accountId',
-        branchId: { $ifNull: ['$details.branchId', '$branchId'] },
-        departmentId: { $ifNull: ['$details.departmentId', '$departmentId'] },
+        placeEntityId: {
+          $ifNull: ['$details.placeEntityId', '$placeEntityId'],
+        },
+        responsibleEntityId: {
+          $ifNull: ['$details.responsibleEntityId', '$responsibleEntityId'],
+        },
         productId: '$details.productId',
         fixedAssetId: '$details.fixedAssetId',
         customerId: '$customerId',

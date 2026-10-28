@@ -2,7 +2,6 @@ import type { TFunction } from 'i18next';
 import {
   IconBox,
   IconBuildingWarehouse,
-  IconHierarchy2,
   IconRuler2,
   IconStack2,
 } from '@tabler/icons-react';
@@ -58,35 +57,17 @@ export const reserveRemColumns = (
     size: 320,
   },
   {
-    id: 'branch',
-    accessorKey: 'branch',
+    id: 'placeEntity',
+    accessorKey: 'placeEntity',
     header: () => (
       <RecordTable.InlineHead
         icon={IconBuildingWarehouse}
-        label={t('branch')}
+        label={t('place', 'Place')}
       />
     ),
     cell: ({ row }) => {
-      const code = row.original.branch?.code;
-      const title = row.original.branch?.title;
-      const value = [code, title].filter(Boolean).join(' - ') || '';
-      return (
-        <RecordTableInlineCell>
-          <TextOverflowTooltip value={value} />
-        </RecordTableInlineCell>
-      );
-    },
-    size: 240,
-  },
-  {
-    id: 'department',
-    accessorKey: 'department',
-    header: () => (
-      <RecordTable.InlineHead icon={IconHierarchy2} label={t('department')} />
-    ),
-    cell: ({ row }) => {
-      const code = row.original.department?.code;
-      const title = row.original.department?.title;
+      const code = row.original.placeEntity?.code;
+      const title = row.original.placeEntity?.title;
       const value = [code, title].filter(Boolean).join(' - ') || '';
       return (
         <RecordTableInlineCell>

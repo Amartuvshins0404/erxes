@@ -18,14 +18,14 @@ const entry = (
   amount: number,
   side = TR_SIDES.CREDIT,
   count = 1,
-  branchId = 'branch-a',
+  placeEntityId = 'branch-a',
 ): ITransaction => ({
-  _id: `${journal}-${date}-${branchId}-${side}`,
+  _id: `${journal}-${date}-${placeEntityId}-${side}`,
   journal,
   date: new Date(date),
   status: TR_STATUSES.COMPLETE,
   side,
-  branchId,
+  placeEntityId,
   details: [
     {
       _id: 'detail',
@@ -274,7 +274,7 @@ test('a full internal move does not duplicate closing depreciation at the old lo
   });
   const details = await fixture.run('2026-01-03');
   expect(
-    details.find((detail) => detail.branchId === 'branch-a'),
+    details.find((detail) => detail.placeEntityId === 'branch-a'),
   ).toMatchObject({
     closingAccumulatedDepreciation: 0,
     closingBookValue: 0,

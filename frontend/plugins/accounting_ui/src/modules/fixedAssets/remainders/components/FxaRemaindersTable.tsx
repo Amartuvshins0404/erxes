@@ -10,7 +10,7 @@ import {
   TextOverflowTooltip,
 } from 'erxes-ui';
 import { IconBuildingOff } from '@tabler/icons-react';
-import { useBranchesMain, useDepartmentsMain } from 'ui-modules';
+import { useStructureEntities } from 'ui-modules';
 import { AccountingEmptyState } from '@/layout/components/AccountingEmptyState';
 import { useFixedAssetCategories } from '@/settings/fixed-assets/hooks/useFixedAssetCategories';
 import { useFixedAssets } from '@/settings/fixed-assets/hooks/useFixedAssets';
@@ -52,15 +52,13 @@ const joinLocationLabel = (id?: string, object?: TLabelItem) => {
 };
 
 const getFxaRemainderColumns = ({
-  branchesById,
   categoriesById,
-  departmentsById,
+  entitiesById,
   fixedAssetsById,
   t,
 }: {
-  branchesById: Record<string, TLabelItem>;
   categoriesById: Record<string, IFixedAssetCategory>;
-  departmentsById: Record<string, TLabelItem>;
+  entitiesById: Record<string, TLabelItem>;
   fixedAssetsById: Record<string, IFixedAsset>;
   t: TFunction<'accounting'>;
 }): ColumnDef<TFxaRemainderRow>[] => [
@@ -99,16 +97,16 @@ const getFxaRemainderColumns = ({
     size: 220,
   },
   {
-    id: 'branchId',
-    accessorKey: 'branchId',
-    header: () => <RecordTable.InlineHead label={t('branch')} />,
+    id: 'placeEntityId',
+    accessorKey: 'placeEntityId',
+    header: () => <RecordTable.InlineHead label={t('place', 'Place')} />,
     cell: ({ row }) => (
       <RecordTableInlineCell>
         <TextOverflowTooltip
           value={joinLocationLabel(
-            row.original.branchId,
-            row.original.branchId
-              ? branchesById[row.original.branchId]
+            row.original.placeEntityId,
+            row.original.placeEntityId
+              ? entitiesById[row.original.placeEntityId]
               : undefined,
           )}
         />
@@ -117,16 +115,18 @@ const getFxaRemainderColumns = ({
     size: 220,
   },
   {
-    id: 'departmentId',
-    accessorKey: 'departmentId',
-    header: () => <RecordTable.InlineHead label={t('department')} />,
+    id: 'responsibleEntityId',
+    accessorKey: 'responsibleEntityId',
+    header: () => (
+      <RecordTable.InlineHead label={t('responsible', 'Responsible')} />
+    ),
     cell: ({ row }) => (
       <RecordTableInlineCell>
         <TextOverflowTooltip
           value={joinLocationLabel(
-            row.original.departmentId,
-            row.original.departmentId
-              ? departmentsById[row.original.departmentId]
+            row.original.responsibleEntityId,
+            row.original.responsibleEntityId
+              ? entitiesById[row.original.responsibleEntityId]
               : undefined,
           )}
         />
@@ -179,17 +179,10 @@ export const FxaRemaindersTable = () => {
         .filter((id): id is string => Boolean(id)),
     ),
   ];
-  const branchIds = [
+  const entityIds = [
     ...new Set(
       fixedAssetRemainders
-        .map((item) => item.branchId)
-        .filter((id): id is string => Boolean(id)),
-    ),
-  ];
-  const departmentIds = [
-    ...new Set(
-      fixedAssetRemainders
-        .map((item) => item.departmentId)
+        .flatMap((item) => [item.placeEntityId, item.responsibleEntityId])
         .filter((id): id is string => Boolean(id)),
     ),
   ];
@@ -199,13 +192,13 @@ export const FxaRemaindersTable = () => {
   });
   const { fixedAssetCategories, loading: loadingCategories } =
     useFixedAssetCategories();
-  const { branches, loading: loadingBranches } = useBranchesMain({
-    variables: { ids: branchIds, withoutUserFilter: true },
-    skip: branchIds.length === 0,
-  });
-  const { departments, loading: loadingDepartments } = useDepartmentsMain({
-    variables: { ids: departmentIds, withoutUserFilter: true },
-    skip: departmentIds.length === 0,
+  const { structureEntities, loading: loadingEntities } = useStructureEntities({
+    variables: {
+      ids: entityIds,
+      limit: entityIds.length,
+      includeArchived: true,
+    },
+    skip: entityIds.length === 0,
   });
   const fixedAssetsById = useMemo(
     () =>
@@ -229,27 +222,16 @@ export const FxaRemaindersTable = () => {
       ),
     [fixedAssetCategories],
   );
-  const branchesById = useMemo(
+  const entitiesById = useMemo(
     () =>
-      (branches || []).reduce<Record<string, TLabelItem>>(
-        (result, branch) => ({
+      structureEntities.reduce<Record<string, TLabelItem>>(
+        (result, entity) => ({
           ...result,
-          [branch._id]: branch,
+          [entity._id]: entity,
         }),
         {},
       ),
-    [branches],
-  );
-  const departmentsById = useMemo(
-    () =>
-      (departments || []).reduce<Record<string, TLabelItem>>(
-        (result, department) => ({
-          ...result,
-          [department._id]: department,
-        }),
-        {},
-      ),
-    [departments],
+    [structureEntities],
   );
   const rows = useMemo<TFxaRemainderRow[]>(
     () =>
@@ -264,20 +246,15 @@ export const FxaRemaindersTable = () => {
   const columns = useMemo(
     () =>
       getFxaRemainderColumns({
-        branchesById,
         categoriesById,
-        departmentsById,
+        entitiesById,
         fixedAssetsById,
         t,
       }),
-    [branchesById, categoriesById, departmentsById, fixedAssetsById, t],
+    [categoriesById, entitiesById, fixedAssetsById, t],
   );
   const isInitialLoading =
-    loading ||
-    loadingFixedAssets ||
-    loadingCategories ||
-    loadingBranches ||
-    loadingDepartments;
+    loading || loadingFixedAssets || loadingCategories || loadingEntities;
 
   const isEmpty = !isInitialLoading && !rows.length;
 

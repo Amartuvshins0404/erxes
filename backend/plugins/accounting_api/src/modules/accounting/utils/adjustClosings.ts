@@ -16,14 +16,14 @@ import { ITransaction, ITrDetail } from '../@types/transaction';
 type TAccountMeta = {
   _id: string;
   kind?: string;
-  branchId?: string;
-  departmentId?: string;
+  placeEntityId?: string;
+  responsibleEntityId?: string;
 };
 
 type TClosingBalance = {
   accountId: string;
-  branchId?: string;
-  departmentId?: string;
+  placeEntityId?: string;
+  responsibleEntityId?: string;
   balance: number;
 };
 
@@ -62,22 +62,22 @@ const getPureDate = (date: Date) => {
 const getNextDate = (date: Date) => addDays(getPureDate(date), 1);
 
 const makeGroupKey = ({
-  branchId,
-  departmentId,
+  placeEntityId,
+  responsibleEntityId,
 }: {
-  branchId?: string;
-  departmentId?: string;
-}) => `${branchId || ''}:${departmentId || ''}`;
+  placeEntityId?: string;
+  responsibleEntityId?: string;
+}) => `${placeEntityId || ''}:${responsibleEntityId || ''}`;
 
 const makeEntryKey = ({
   accountId,
-  branchId,
-  departmentId,
+  placeEntityId,
+  responsibleEntityId,
 }: {
   accountId: string;
-  branchId?: string;
-  departmentId?: string;
-}) => `${makeGroupKey({ branchId, departmentId })}:${accountId}`;
+  placeEntityId?: string;
+  responsibleEntityId?: string;
+}) => `${makeGroupKey({ placeEntityId, responsibleEntityId })}:${accountId}`;
 
 const getTempAccounts = async (models: IModels) => {
   const accounts: TAccountMeta[] = await models.Accounts.find(
@@ -85,7 +85,7 @@ const getTempAccounts = async (models: IModels) => {
       isTemp: true,
       status: 'active',
     },
-    { _id: 1, kind: 1, branchId: 1, departmentId: 1 },
+    { _id: 1, kind: 1, placeEntityId: 1, responsibleEntityId: 1 },
   ).lean();
 
   return {
@@ -175,8 +175,12 @@ const getClosingBalances = async (
       $project: {
         side: 1,
         accountId: '$details.accountId',
-        branchId: { $ifNull: ['$details.branchId', '$branchId'] },
-        departmentId: { $ifNull: ['$details.departmentId', '$departmentId'] },
+        placeEntityId: {
+          $ifNull: ['$details.placeEntityId', '$placeEntityId'],
+        },
+        responsibleEntityId: {
+          $ifNull: ['$details.responsibleEntityId', '$responsibleEntityId'],
+        },
         amount: '$details.amount',
       },
     },
@@ -184,8 +188,8 @@ const getClosingBalances = async (
       $group: {
         _id: {
           accountId: '$accountId',
-          branchId: '$branchId',
-          departmentId: '$departmentId',
+          placeEntityId: '$placeEntityId',
+          responsibleEntityId: '$responsibleEntityId',
         },
         balance: {
           $sum: {
@@ -206,8 +210,9 @@ const getClosingBalances = async (
 
       return {
         accountId: record._id.accountId,
-        branchId: record._id.branchId || account?.branchId,
-        departmentId: record._id.departmentId || account?.departmentId,
+        placeEntityId: record._id.placeEntityId || account?.placeEntityId,
+        responsibleEntityId:
+          record._id.responsibleEntityId || account?.responsibleEntityId,
         balance: fixNum(record.balance || 0, MONEY_PRECISION),
       };
     })
@@ -253,8 +258,8 @@ const getExistingPercentByEntry = (adjust: IAdjustClosing) => {
       percentByEntry.set(
         makeEntryKey({
           accountId: entry.accountId,
-          branchId: detail.branchId,
-          departmentId: detail.departmentId,
+          placeEntityId: detail.placeEntityId,
+          responsibleEntityId: detail.responsibleEntityId,
         }),
         entry.percent ?? DEFAULT_TAX_PERCENT,
       );
@@ -275,8 +280,8 @@ const buildClosingDetails = (
     const key = makeGroupKey(balance);
     const detail = detailsByGroup.get(key) || {
       _id: nanoid(),
-      branchId: balance.branchId,
-      departmentId: balance.departmentId,
+      placeEntityId: balance.placeEntityId,
+      responsibleEntityId: balance.responsibleEntityId,
       entries: [],
       createdAt: new Date(),
     };
@@ -296,12 +301,12 @@ const buildClosingDetails = (
 const makeDetail = (
   accountId: string,
   amount: number,
-  source: { branchId?: string; departmentId?: string },
+  source: { placeEntityId?: string; responsibleEntityId?: string },
 ): ITrDetail => ({
   accountId,
   amount: fixNum(amount, MONEY_PRECISION),
-  branchId: source.branchId,
-  departmentId: source.departmentId,
+  placeEntityId: source.placeEntityId,
+  responsibleEntityId: source.responsibleEntityId,
 });
 
 const pushTransaction = (

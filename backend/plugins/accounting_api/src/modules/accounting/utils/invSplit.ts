@@ -158,8 +158,8 @@ const getCommonFollowDoc = (
   status: originTransaction.status,
   mentionOwnerId: originTransaction.mentionOwnerId,
   mentionUserIds: originTransaction.mentionUserIds,
-  branchId: incomeTransaction.branchId,
-  departmentId: incomeTransaction.departmentId,
+  placeEntityId: incomeTransaction.placeEntityId,
+  responsibleEntityId: incomeTransaction.responsibleEntityId,
   customerType: originTransaction.customerType,
   customerId: originTransaction.customerId,
 });

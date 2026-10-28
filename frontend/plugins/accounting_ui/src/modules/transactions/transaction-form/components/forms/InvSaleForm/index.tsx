@@ -1,3 +1,4 @@
+import { STOCK_PLACE_CAPABILITY } from '@/utils/structure';
 import { useTranslation } from 'react-i18next';
 import { SelectAccount } from '@/settings/account/components/SelectAccount';
 import {
@@ -17,8 +18,8 @@ import { ITrDetail } from '~/modules/transactions/types/Transaction';
 import {
   AccountField,
   AssignToField,
-  BranchField,
-  DepartmentField,
+  PlaceField,
+  ResponsibleField,
   DescriptionField,
 } from '../../GeneralFormFields';
 import { CtaxForm } from '../../helpers/CtaxForm';
@@ -89,8 +90,12 @@ export const InvSaleForm = ({
           labelTxt="sales-account"
         />
         <CustomerFields form={form} index={index} />
-        <BranchField form={form} index={index} />
-        <DepartmentField form={form} index={index} />
+        <PlaceField
+          form={form}
+          index={index}
+          capability={STOCK_PLACE_CAPABILITY}
+        />
+        <ResponsibleField form={form} index={index} />
         <AssignToField form={form} index={index} />
         <DescriptionField form={form} index={index} />
         <Form.Field

@@ -50,7 +50,7 @@ const makeTransaction = (
       },
     ],
     ...overrides,
-  }) as ITransactionDocument;
+  } as ITransactionDocument);
 
 describe('inventory split follow transactions', () => {
   beforeEach(() => {
@@ -126,8 +126,8 @@ describe('inventory split follow transactions', () => {
     const moveInTransaction = makeTransaction({
       _id: 'move-in-1',
       journal: 'invMoveIn',
-      branchId: 'destination-branch',
-      departmentId: 'destination-department',
+      placeEntityId: 'destination-branch',
+      responsibleEntityId: 'destination-department',
       details: [
         {
           _id: 'move-in-detail-1',
@@ -150,8 +150,8 @@ describe('inventory split follow transactions', () => {
     expect(outTransaction).toEqual(
       expect.objectContaining({
         originId: 'income-1',
-        branchId: 'destination-branch',
-        departmentId: 'destination-department',
+        placeEntityId: 'destination-branch',
+        responsibleEntityId: 'destination-department',
       }),
     );
     expect(outTransaction.details[0].accountId).toBe('destination-account');
@@ -280,8 +280,8 @@ describe('inventory split follow transactions', () => {
       _id: 'move-in-1',
       ptrId: 'ptr-1',
       journal: 'invMoveIn',
-      branchId: 'destination-branch',
-      departmentId: 'destination-department',
+      placeEntityId: 'destination-branch',
+      responsibleEntityId: 'destination-department',
       details: Array.from({ length: 5 }, (_, index) => ({
         _id: `move-in-detail-${index + 1}`,
         originId: `detail-${index + 1}`,
@@ -316,8 +316,8 @@ describe('inventory split follow transactions', () => {
     expect(followDocs).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          branchId: 'destination-branch',
-          departmentId: 'destination-department',
+          placeEntityId: 'destination-branch',
+          responsibleEntityId: 'destination-department',
         }),
       ]),
     );
@@ -394,7 +394,7 @@ describe('inventory split follow transactions', () => {
       .mocked(createOrUpdateTr)
       .mockImplementation(
         async (_models, _userId, doc, oldTransaction) =>
-          ({ ...doc, _id: oldTransaction?._id || 'new-follow' }) as never,
+          ({ ...doc, _id: oldTransaction?._id || 'new-follow' } as never),
       );
 
     await syncInvSplitFollowTrs(

@@ -11,8 +11,8 @@ export const types = () => `
     currencyBalance: Float
     diff: Float
     transactionId: String
-    branchId: String
-    departmentId: String
+    placeEntityId: String
+    responsibleEntityId: String
     createdAt: Date
     updatedAt: Date
   }

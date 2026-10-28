@@ -16,7 +16,8 @@ import {
   useQueryState,
 } from 'erxes-ui';
 import { useTranslation } from 'react-i18next';
-import { SelectProduct, SelectBranches, SelectDepartments } from 'ui-modules';
+import { SelectProduct, SelectStructureEntities } from 'ui-modules';
+import { STOCK_PLACE_CAPABILITY } from '@/utils/structure';
 import { SelectAccount } from '@/settings/account/components/SelectAccount';
 import { AccountsInline } from '@/settings/account/components/AccountsInline';
 import { JournalEnum } from '@/settings/account/types/Account';
@@ -200,23 +201,14 @@ export const JobExecutionFilters = () => {
           </Filter.BarItem>
         ))}
         {sides.map((side) => (
-          <SelectBranches.FilterBar
+          <SelectStructureEntities.FilterBar
             key={side}
-            filterKey={`${side}BranchId`}
+            filterKey={`${side}PlaceEntityId`}
             mode="single"
-            label={[t('production-' + side + '-location'), t('branch')].join(
-              ': ',
-            )}
-          />
-        ))}
-        {sides.map((side) => (
-          <SelectDepartments.FilterBar
-            key={side}
-            filterKey={`${side}DepartmentId`}
-            mode="single"
+            capability={STOCK_PLACE_CAPABILITY}
             label={[
               t('production-' + side + '-location'),
-              t('department'),
+              t('place', 'Place'),
             ].join(': ')}
           />
         ))}
@@ -265,13 +257,9 @@ export const JobExecutionFilters = () => {
                         <IconShoppingCart />
                         {t('account')}
                       </Filter.Item>
-                      <Filter.Item value={`${side}BranchId`}>
+                      <Filter.Item value={`${side}PlaceEntityId`}>
                         <IconBuilding />
-                        {t('branch')}
-                      </Filter.Item>
-                      <Filter.Item value={`${side}DepartmentId`}>
-                        <IconBuilding />
-                        {t('department')}
+                        {t('place', 'Place')}
                       </Filter.Item>
                     </Command.Group>
                   ))}
@@ -302,17 +290,11 @@ export const JobExecutionFilters = () => {
               />
             ))}
             {sides.map((side) => (
-              <SelectBranches.FilterView
+              <SelectStructureEntities.FilterView
                 key={side}
-                filterKey={`${side}BranchId`}
+                filterKey={`${side}PlaceEntityId`}
                 mode="single"
-              />
-            ))}
-            {sides.map((side) => (
-              <SelectDepartments.FilterView
-                key={side}
-                filterKey={`${side}DepartmentId`}
-                mode="single"
+                capability={STOCK_PLACE_CAPABILITY}
               />
             ))}
           </Combobox.Content>

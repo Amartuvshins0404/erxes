@@ -1,7 +1,7 @@
 import { gql } from '~/gql';
 
 const productsMain = gql(`
-query accountingProductsRemainderMain($type: String, $categoryIds: [String], $searchValue: String, $vendorId: String, $brandIds: [String], $tagIds: [String], $segment: String, $sortField: String, $sortDirection: Int, $branchId: String, $departmentId: String, $minRemainder: Float, $maxRemainder: Float, $minPrice: Float, $maxPrice: Float, $minDiscountValue: Float, $maxDiscountValue: Float, $minDiscountPercent: Float, $maxDiscountPercent: Float, $cursor: String, $cursorMode: CURSOR_MODE, $direction: CURSOR_DIRECTION, $limit: Int) {
+query accountingProductsRemainderMain($type: String, $categoryIds: [String], $searchValue: String, $vendorId: String, $brandIds: [String], $tagIds: [String], $segment: String, $sortField: String, $sortDirection: Int, $placeEntityId: String, $minRemainder: Float, $maxRemainder: Float, $minPrice: Float, $maxPrice: Float, $minDiscountValue: Float, $maxDiscountValue: Float, $minDiscountPercent: Float, $maxDiscountPercent: Float, $cursor: String, $cursorMode: CURSOR_MODE, $direction: CURSOR_DIRECTION, $limit: Int) {
   productsMain(
     type: $type
     categoryIds: $categoryIds
@@ -12,8 +12,7 @@ query accountingProductsRemainderMain($type: String, $categoryIds: [String], $se
     segment: $segment
     sortField: $sortField
     sortDirection: $sortDirection
-    branchId: $branchId
-    departmentId: $departmentId
+    placeEntityId: $placeEntityId
     minRemainder: $minRemainder
     maxRemainder: $maxRemainder
     minPrice: $minPrice

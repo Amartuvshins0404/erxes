@@ -40,11 +40,9 @@ export const jobExecutionSchema = schemaWrapper(
     jobs: { type: [executionItem], required: true },
     description: String,
     inputAccountId: { type: String, required: true },
-    inputBranchId: String,
-    inputDepartmentId: String,
+    inputPlaceEntityId: String,
     outputAccountId: { type: String, required: true },
-    outputBranchId: String,
-    outputDepartmentId: String,
+    outputPlaceEntityId: String,
     status: {
       type: String,
       enum: ['draft', 'posting', 'posted', 'undoing', 'error'],

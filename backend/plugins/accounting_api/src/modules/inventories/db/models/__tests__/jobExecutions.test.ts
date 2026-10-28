@@ -662,8 +662,7 @@ test('posting a posted execution updates its existing group without unit convers
   expect(activeCost).toHaveBeenCalledWith(
     models,
     input.inputAccountId,
-    input.inputBranchId,
-    input.inputDepartmentId,
+    input.inputPlaceEntityId,
     ['input'],
     previous.map((row) => row._id),
   );
@@ -730,7 +729,6 @@ test('editing posted actuals updates the existing transaction group and excludes
     models,
     'raw',
     undefined,
-    undefined,
     ['input'],
     previous.map((row) => row._id),
   );
@@ -753,8 +751,8 @@ test('posted edits propagate changed inventory accounts and locations and remove
     {
       ...input,
       inputAccountId: 'new-raw',
-      inputBranchId: 'source',
-      outputDepartmentId: 'target',
+      inputPlaceEntityId: 'source',
+      outputPlaceEntityId: 'target',
       jobs: [{ ...input.jobs[0], laborCosts: [] }],
     },
     'user',
@@ -764,12 +762,12 @@ test('posted edits propagate changed inventory accounts and locations and remove
   expect(docs).toHaveLength(2);
   expect(docs[0]).toMatchObject({
     _id: 'old-out',
-    branchId: 'source',
+    placeEntityId: 'source',
     details: [{ accountId: 'new-raw', count: 3 }],
   });
   expect(docs[1]).toMatchObject({
     _id: 'old-income',
-    departmentId: 'target',
+    placeEntityId: 'target',
     details: [{ amount: 30 }],
   });
 });

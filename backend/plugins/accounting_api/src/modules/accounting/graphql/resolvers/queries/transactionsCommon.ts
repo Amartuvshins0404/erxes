@@ -2,6 +2,7 @@ import {
   ICursorPaginateParams,
   IUserDocument,
 } from 'erxes-api-shared/core-types';
+import { getStructureUserContext } from 'erxes-api-shared/core-modules';
 import { SortOrder } from 'mongoose';
 import {
   cursorPaginate,
@@ -17,6 +18,7 @@ import {
   ITransactionDocument,
 } from '@/accounting/@types/transaction';
 import { generateFilter as accountGenerateFilter } from './accounts';
+import { getEntityIdsWithDescendants } from '../../../utils/structureEntities';
 import { checkPermissionTrs } from '../../../utils/trPermissions';
 import {
   applyTransactionJournalPermissionFilter,
@@ -46,15 +48,15 @@ interface IQueryParams {
   accountBrand?: string;
   accountIsTemp?: boolean;
   accountIsOutBalance?: boolean;
-  accountBranchId: string;
-  accountDepartmentId: string;
+  accountPlaceEntityId: string;
+  accountResponsibleEntityId: string;
   accountCurrency: string;
   accountJournal: string;
 
   brandId?: string;
   isOutBalance?: boolean;
-  branchId: string;
-  departmentId: string;
+  placeEntityId: string;
+  responsibleEntityId: string;
   currency: string;
   journal: string;
   journals: string[];
@@ -105,8 +107,8 @@ const getAccountIds = async (
     accountBrand,
     accountIsTemp,
     accountIsOutBalance,
-    accountBranchId,
-    accountDepartmentId,
+    accountPlaceEntityId,
+    accountResponsibleEntityId,
     accountCurrency,
     accountJournal,
   } = params;
@@ -123,8 +125,8 @@ const getAccountIds = async (
       brand: accountBrand,
       isTemp: accountIsTemp,
       isOutBalance: accountIsOutBalance,
-      branchId: accountBranchId,
-      departmentId: accountDepartmentId,
+      placeEntityId: accountPlaceEntityId,
+      responsibleEntityId: accountResponsibleEntityId,
       currency: accountCurrency,
       journal: accountJournal,
       permissionMode: 'read',
@@ -156,91 +158,73 @@ const getConfigValues = async (subdomain: string) => {
     defaultValue: {},
   });
 
-  const branchMasterUserIds = configs.BRANCHES_MASTER_TEAM_MEMBERS_IDS;
-  const departmentMasterUserIds = configs.DEPARTMENTS_MASTER_TEAM_MEMBERS_IDS;
+  const placeMasterUserIds = configs.BRANCHES_MASTER_TEAM_MEMBERS_IDS;
+  const responsibleMasterUserIds = configs.DEPARTMENTS_MASTER_TEAM_MEMBERS_IDS;
 
   return {
     checkMasterUsers: configs.CHECK_TEAM_MEMBER_SHOWN,
-    branchMasterUserIds: Array.isArray(branchMasterUserIds)
-      ? branchMasterUserIds
+    placeMasterUserIds: Array.isArray(placeMasterUserIds)
+      ? placeMasterUserIds
       : [],
-    departmentMasterUserIds: Array.isArray(departmentMasterUserIds)
-      ? departmentMasterUserIds
+    responsibleMasterUserIds: Array.isArray(responsibleMasterUserIds)
+      ? responsibleMasterUserIds
       : [],
   };
-};
-
-const getStructureIdsWithChildren = async (
-  subdomain: string,
-  module: 'branches' | 'departments',
-  ids: string[],
-): Promise<string[]> => {
-  if (!ids.length) {
-    return [];
-  }
-
-  const records = await sendTRPCMessage({
-    subdomain,
-    pluginName: 'core',
-    method: 'query',
-    module,
-    action: 'findWithChild',
-    input: {
-      query: { _id: { $in: ids } },
-      fields: { _id: 1 },
-    },
-    defaultValue: [],
-  });
-
-  return records.map((record) => record._id);
 };
 
 const applyDefaultStructureFilter = async ({
   subdomain,
   filter,
   user,
-  branchId,
-  departmentId,
 }: {
   subdomain: string;
-  filter: any;
+  filter: Record<string, unknown>;
   user: IUserDocument;
-  branchId?: string;
-  departmentId?: string;
 }) => {
   if (user.isOwner) {
     return;
   }
 
-  const { checkMasterUsers, branchMasterUserIds, departmentMasterUserIds } =
+  const { checkMasterUsers, placeMasterUserIds, responsibleMasterUserIds } =
     await getConfigValues(subdomain);
 
   if (checkMasterUsers !== true) {
     return;
   }
 
-  if (!branchId && !branchMasterUserIds.includes(user._id)) {
-    const branchIds = await getStructureIdsWithChildren(
-      subdomain,
-      'branches',
-      user.branchIds || [],
-    );
+  const checkPlace = !placeMasterUserIds.includes(user._id);
+  const checkResponsible = !responsibleMasterUserIds.includes(user._id);
 
-    if (branchIds.length) {
-      filter.branchId = { $in: branchIds };
-    }
+  if (!checkPlace && !checkResponsible) {
+    return;
   }
 
-  if (!departmentId && !departmentMasterUserIds.includes(user._id)) {
-    const departmentIds = await getStructureIdsWithChildren(
-      subdomain,
-      'departments',
-      user.departmentIds || [],
-    );
+  const { entityIds } = await getStructureUserContext(subdomain, user._id);
+  const userEntityIds = await getEntityIdsWithDescendants(
+    subdomain,
+    entityIds || [],
+  );
 
-    if (departmentIds.length) {
-      filter.departmentId = { $in: departmentIds };
-    }
+  if (!userEntityIds.length) {
+    return;
+  }
+
+  const limitField = (field: 'placeEntityId' | 'responsibleEntityId') => {
+    const selected = filter[field] as { $in: string[] } | undefined;
+
+    filter[field] = {
+      $in: selected
+        ? selected.$in.filter((id) => userEntityIds.includes(id))
+        : userEntityIds,
+    };
+  };
+
+  if (checkPlace) {
+    limitField('placeEntityId');
+  }
+
+  if (checkResponsible) {
+    limitField('responsibleEntityId');
   }
 };
 
@@ -362,8 +346,8 @@ export const generateFilter = async (
     contentType,
     contentId,
     brandId,
-    branchId,
-    departmentId,
+    placeEntityId,
+    responsibleEntityId,
     currency,
     statuses,
     ptrStatus,
@@ -479,17 +463,15 @@ export const generateFilter = async (
     filter.scopeBrandIds = { $in: [brandId] };
   }
 
-  if (branchId) {
-    filter.branchId = {
-      $in: await getStructureIdsWithChildren(subdomain, 'branches', [branchId]),
+  if (placeEntityId) {
+    filter.placeEntityId = {
+      $in: await getEntityIdsWithDescendants(subdomain, [placeEntityId]),
     };
   }
 
-  if (departmentId) {
-    filter.departmentId = {
-      $in: await getStructureIdsWithChildren(subdomain, 'departments', [
-        departmentId,
-      ]),
+  if (responsibleEntityId) {
+    filter.responsibleEntityId = {
+      $in: await getEntityIdsWithDescendants(subdomain, [responsibleEntityId]),
     };
   }
 

@@ -131,22 +131,24 @@ const SumCreditCell = ({ getValue, row }: any) => {
   );
 };
 
-const BranchCell = ({ row }: any) => {
-  const { branch } = row.original;
+const PlaceCell = ({ row }: { row: Row<ITransaction> }) => {
+  const { placeEntity } = row.original;
 
   return (
     <RecordTableInlineCell>
-      {[branch?.code, branch?.title].filter(Boolean).join(' - ')}
+      {[placeEntity?.code, placeEntity?.title].filter(Boolean).join(' - ')}
     </RecordTableInlineCell>
   );
 };
 
-const DepartmentCell = ({ row }: any) => {
-  const { department } = row.original;
+const ResponsibleCell = ({ row }: { row: Row<ITransaction> }) => {
+  const { responsibleEntity } = row.original;
 
   return (
     <RecordTableInlineCell>
-      {[department?.code, department?.title].filter(Boolean).join(' - ')}
+      {[responsibleEntity?.code, responsibleEntity?.title]
+        .filter(Boolean)
+        .join(' - ')}
     </RecordTableInlineCell>
   );
 };
@@ -342,21 +344,22 @@ export const transactionColumns = (
     ),
   },
   {
-    id: 'branch',
+    id: 'placeEntity',
     header: () => (
-      <RecordTable.InlineHead icon={IconFile} label={t('branch')} />
+      <RecordTable.InlineHead icon={IconFile} label={t('place', 'Place')} />
     ),
-    accessorKey: 'branch',
-    cell: ({ getValue, row }) => <BranchCell getValue={getValue} row={row} />,
+    accessorKey: 'placeEntity',
+    cell: ({ row }) => <PlaceCell row={row} />,
   },
   {
-    id: 'department',
+    id: 'responsibleEntity',
     header: () => (
-      <RecordTable.InlineHead icon={IconFile} label={t('department')} />
+      <RecordTable.InlineHead
+        icon={IconFile}
+        label={t('responsible', 'Responsible')}
+      />
     ),
-    accessorKey: 'department',
-    cell: ({ getValue, row }) => (
-      <DepartmentCell getValue={getValue} row={row} />
-    ),
+    accessorKey: 'responsibleEntity',
+    cell: ({ row }) => <ResponsibleCell row={row} />,
   },
 ];

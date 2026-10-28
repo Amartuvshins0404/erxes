@@ -17,7 +17,7 @@ import {
   Spinner,
   Textarea,
 } from 'erxes-ui';
-import { SelectBranches, SelectDepartments } from 'ui-modules';
+import { SelectStructureEntities } from 'ui-modules';
 import { UseFormReturn, useWatch } from 'react-hook-form';
 
 import { JOURNAL_LABELS } from '../constants/journalLabel';
@@ -217,12 +217,12 @@ const AccountFormFields = ({
 
       <Form.Field
         control={control}
-        name="branchId"
+        name="placeEntityId"
         render={({ field }) => (
           <Form.Item>
-            <Form.Label>{t('branch')}</Form.Label>
+            <Form.Label>{t('place', 'Place')}</Form.Label>
             <Form.Control>
-              <SelectBranches.FormItem
+              <SelectStructureEntities.FormItem
                 mode="single"
                 value={field.value}
                 onValueChange={field.onChange}
@@ -235,12 +235,12 @@ const AccountFormFields = ({
 
       <Form.Field
         control={control}
-        name="departmentId"
+        name="responsibleEntityId"
         render={({ field }) => (
           <Form.Item>
-            <Form.Label>{t('department')}</Form.Label>
+            <Form.Label>{t('responsible', 'Responsible')}</Form.Label>
             <Form.Control>
-              <SelectDepartments.FormItem
+              <SelectStructureEntities.FormItem
                 mode="single"
                 value={field.value}
                 onValueChange={field.onChange}

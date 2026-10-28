@@ -15,11 +15,11 @@ export const createOrUpdateTr = async (
   oldTr?: ITransactionDocument,
 ): Promise<ITransactionDocument> => {
   for (const detail of doc.details) {
-    if (!detail.branchId) {
-      detail.branchId = doc.branchId;
+    if (!detail.placeEntityId) {
+      detail.placeEntityId = doc.placeEntityId;
     }
-    if (!detail.departmentId) {
-      detail.departmentId = doc.departmentId;
+    if (!detail.responsibleEntityId) {
+      detail.responsibleEntityId = doc.responsibleEntityId;
     }
   }
 
@@ -98,7 +98,10 @@ const addInventoryDiff = (
     diffCount: fixNum((current.diffCount ?? 0) + (diff.diffCount ?? 0), 6),
     diffCost: fixNum((current.diffCost ?? 0) + (diff.diffCost ?? 0), 6),
     diffSoonIn: fixNum((current.diffSoonIn ?? 0) + (diff.diffSoonIn ?? 0), 6),
-    diffSoonOut: fixNum((current.diffSoonOut ?? 0) + (diff.diffSoonOut ?? 0), 6),
+    diffSoonOut: fixNum(
+      (current.diffSoonOut ?? 0) + (diff.diffSoonOut ?? 0),
+      6,
+    ),
   };
 };
 
@@ -151,8 +154,8 @@ const hasInventoryDiff = (diff: TInventoryDiff) =>
 
 const sendInventoryDiffs = (
   subdomain: string,
-  branchId: string | undefined,
-  departmentId: string | undefined,
+  placeEntityId: string | undefined,
+  responsibleEntityId: string | undefined,
   diffsByProductId: Record<string, TInventoryDiff>,
 ) => {
   const productsInfo = Object.keys(diffsByProductId)
@@ -173,8 +176,8 @@ const sendInventoryDiffs = (
     module: 'products',
     action: 'increaseInventories',
     input: {
-      branchId,
-      departmentId,
+      placeEntityId,
+      responsibleEntityId,
       productsInfo,
     },
   });
@@ -194,14 +197,10 @@ export const syncProductsInventory = async (
 ) => {
   if (
     !oldTr?._id ||
-    (transaction.branchId === oldTr?.branchId &&
-      transaction.departmentId === oldTr?.departmentId)
+    (transaction.placeEntityId === oldTr?.placeEntityId &&
+      transaction.responsibleEntityId === oldTr?.responsibleEntityId)
   ) {
-    const diffsByProductId = collectInventoryDiffs(
-      transaction,
-      multiplier,
-      1,
-    );
+    const diffsByProductId = collectInventoryDiffs(transaction, multiplier, 1);
 
     if (oldTr?._id) {
       mergeInventoryDiffs(
@@ -212,8 +211,8 @@ export const syncProductsInventory = async (
 
     sendInventoryDiffs(
       subdomain,
-      transaction.branchId,
-      transaction.departmentId,
+      transaction.placeEntityId,
+      transaction.responsibleEntityId,
       diffsByProductId,
     );
     return;
@@ -221,15 +220,15 @@ export const syncProductsInventory = async (
 
   sendInventoryDiffs(
     subdomain,
-    oldTr?.branchId,
-    oldTr?.departmentId,
+    oldTr?.placeEntityId,
+    oldTr?.responsibleEntityId,
     collectInventoryDiffs(oldTr, multiplier, -1),
   );
 
   sendInventoryDiffs(
     subdomain,
-    transaction.branchId,
-    transaction.departmentId,
+    transaction.placeEntityId,
+    transaction.responsibleEntityId,
     collectInventoryDiffs(transaction, multiplier, 1),
   );
 };
@@ -246,8 +245,8 @@ export const removeSyncProductsInventory = async (
 ) => {
   sendInventoryDiffs(
     subdomain,
-    transaction.branchId,
-    transaction.departmentId,
+    transaction.placeEntityId,
+    transaction.responsibleEntityId,
     collectInventoryDiffs(transaction, multiplier, -1),
   );
 };

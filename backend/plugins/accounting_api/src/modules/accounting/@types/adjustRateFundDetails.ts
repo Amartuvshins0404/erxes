@@ -8,8 +8,8 @@ export interface IAdjustFundRateDetail {
   currencyBalance: number;
 
   transactionId?: string;
-  branchId?: string;
-  departmentId?: string;
+  placeEntityId?: string;
+  responsibleEntityId?: string;
 
   createdAt?: Date;
   updatedAt?: Date;

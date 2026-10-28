@@ -68,9 +68,9 @@ describe('moreDataByKey', () => {
     const records = [
       {
         parentId: 'pointer-1',
-        branchId: 'root-branch',
+        placeEntityId: 'root-place',
         details: {
-          branchId: 'detail-branch',
+          placeEntityId: 'detail-place',
           productId: 'product-1',
         },
       },
@@ -79,8 +79,8 @@ describe('moreDataByKey', () => {
       group: 'ptrId',
       code: 'ptrNumber',
       groupRule: {
-        group: 'branchId',
-        code: 'branchCode',
+        group: 'placeEntityId',
+        code: 'placeEntityCode',
         groupRule: {
           group: 'productId',
           code: 'productCode',
@@ -90,7 +90,7 @@ describe('moreDataByKey', () => {
     };
 
     expect(moreDataByKey(records, nestedGroupRule)).toEqual({
-      'pointer-1#detail-branch#product-1': records,
+      'pointer-1#detail-place#product-1': records,
     });
   });
 });

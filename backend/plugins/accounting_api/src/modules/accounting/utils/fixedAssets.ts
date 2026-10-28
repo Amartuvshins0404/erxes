@@ -27,8 +27,8 @@ export type TFxaTransactionExtraData = {
 };
 
 export type TFxaMoveFollowInfos = {
-  moveInBranchId?: string;
-  moveInDepartmentId?: string;
+  moveInPlaceEntityId?: string;
+  moveInResponsibleEntityId?: string;
   accumulatedDepreciationAccountId?: string;
 };
 
@@ -537,15 +537,15 @@ export const getFxaDisposalSummaries = async (
       const suppliedUnitDepreciation = detail.followInfos?.preDeprecation;
       if (
         suppliedUnitDepreciation !== undefined &&
-        (!Number.isFinite(suppliedUnitDepreciation) || suppliedUnitDepreciation < 0)
+        (!Number.isFinite(suppliedUnitDepreciation) ||
+          suppliedUnitDepreciation < 0)
       ) {
-        throw new Error(
-          'Fixed asset unit depreciation must be nonnegative',
-        );
+        throw new Error('Fixed asset unit depreciation must be nonnegative');
       }
       const adjustmentDepreciation = countBeforeThisDisposal
         ? ((latestAdjustment?.closingAccumulatedDepreciation || 0) /
-            countBeforeThisDisposal) * count
+            countBeforeThisDisposal) *
+          count
         : 0;
       const accumulatedDepreciation = fixNum(
         suppliedUnitDepreciation === undefined

@@ -1,3 +1,4 @@
+import { STOCK_PLACE_CAPABILITY } from '@/utils/structure';
 import {
   Combobox,
   Command,
@@ -14,7 +15,7 @@ import {
   RemainderFormField,
   ReserveRemFormFooter,
 } from './ReserveRemFormParts';
-import { SelectBranches, SelectDepartments, SelectProduct } from 'ui-modules';
+import { SelectStructureEntities, SelectProduct } from 'ui-modules';
 
 import { AccountingSheet } from '~/modules/layout/components/Sheet';
 import { Cell } from '@tanstack/react-table';
@@ -25,8 +26,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 type TEditForm = {
-  branchId?: string;
-  departmentId?: string;
+  placeEntityId?: string;
   productId?: string;
   uom?: string;
   remainder: number;
@@ -54,26 +54,12 @@ const EditReserveRemFields = ({ control }: { control: Control<TEditForm> }) => {
       <div className="grid grid-cols-2 gap-4">
         <Form.Field
           control={control}
-          name="branchId"
+          name="placeEntityId"
           render={({ field }) => (
             <Form.Item>
-              <Form.Label>{t('branch')}</Form.Label>
-              <SelectBranches.FormItem
-                mode="single"
-                value={field.value}
-                onValueChange={field.onChange}
-              />
-              <Form.Message />
-            </Form.Item>
-          )}
-        />
-        <Form.Field
-          control={control}
-          name="departmentId"
-          render={({ field }) => (
-            <Form.Item>
-              <Form.Label>{t('department')}</Form.Label>
-              <SelectDepartments.FormItem
+              <Form.Label>{t('place', 'Place')}</Form.Label>
+              <SelectStructureEntities.FormItem
+                capability={STOCK_PLACE_CAPABILITY}
                 mode="single"
                 value={field.value}
                 onValueChange={field.onChange}
@@ -111,8 +97,7 @@ const EditReserveRemSheet = ({
   const { editReserveRem, loading } = useReserveRemEdit();
   const form = useForm<TEditForm>({
     values: {
-      branchId: reserveRem.branchId,
-      departmentId: reserveRem.departmentId,
+      placeEntityId: reserveRem.placeEntityId,
       productId: reserveRem.productId,
       uom: reserveRem.uom,
       remainder: reserveRem.remainder ?? 0,

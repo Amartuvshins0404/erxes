@@ -12,8 +12,8 @@ interface IQueryParams {
   currency?: string;
   customerId?: string;
   searchValue?: string;
-  branchId?: string;
-  departmentId?: string;
+  placeEntityId?: string;
+  responsibleEntityId?: string;
   page?: number;
   perPage?: number;
   sortField?: string;
@@ -28,8 +28,8 @@ export const generateFilter = async (params: IQueryParams) => {
     currency,
     customerId,
     searchValue,
-    branchId,
-    departmentId,
+    placeEntityId,
+    responsibleEntityId,
   } = params;
 
   const filter: FilterQuery<IAdjustDebtRateDocument> = {};
@@ -54,12 +54,12 @@ export const generateFilter = async (params: IQueryParams) => {
     filter.customerId = customerId;
   }
 
-  if (branchId) {
-    filter.branchId = branchId;
+  if (placeEntityId) {
+    filter.placeEntityId = placeEntityId;
   }
 
-  if (departmentId) {
-    filter.departmentId = departmentId;
+  if (responsibleEntityId) {
+    filter.responsibleEntityId = responsibleEntityId;
   }
 
   if (searchValue) {

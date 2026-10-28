@@ -1,3 +1,4 @@
+import { STOCK_PLACE_CAPABILITY } from '@/utils/structure';
 import { SelectAccount } from '@/settings/account/components/SelectAccount';
 import { IAccount, JournalEnum } from '@/settings/account/types/Account';
 import { TR_SIDES, TrJournalEnum } from '@/transactions/types/constants';
@@ -18,7 +19,7 @@ import {
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useWatch } from 'react-hook-form';
-import { SelectBranches, SelectDepartments, SelectProduct } from 'ui-modules';
+import { SelectStructureEntities, SelectProduct } from 'ui-modules';
 import { useGetAccCurrentCost } from '../../../hooks/useGetInvCostInfo';
 import {
   followTrDocsState,
@@ -44,8 +45,8 @@ type TSaleReturnFollowAccount = Pick<
   | 'currency'
   | 'kind'
   | 'journal'
-  | 'branchId'
-  | 'departmentId'
+  | 'placeEntityId'
+  | 'responsibleEntityId'
 >;
 
 const findFollowTr = (
@@ -140,8 +141,7 @@ export const InventoryRow = ({
   const initProductId = useRef(detail.productId);
   const hasProductChanged = useRef(false);
   const initOutAccountId = useRef(trDoc.followInfos?.saleOutAccountId);
-  const initBranchId = useRef(trDoc.branchId);
-  const initDepartmentId = useRef(trDoc.departmentId);
+  const initPlaceEntityId = useRef(trDoc.placeEntityId);
   const [unitCost, setUnitCost] = useState(
     initialUnitCost ??
       followTrDocs
@@ -274,8 +274,7 @@ export const InventoryRow = ({
   const { currentCostInfo, loading } = useGetAccCurrentCost({
     variables: {
       accountId: trDoc.followInfos?.saleOutAccountId,
-      branchId: trDoc.branchId,
-      departmentId: trDoc.departmentId,
+      placeEntityId: trDoc.placeEntityId,
       productIds: detail.productId ? [detail.productId] : [],
     },
     skip:
@@ -284,8 +283,7 @@ export const InventoryRow = ({
       (!hasProductChanged.current &&
         Boolean(initProductId.current) &&
         detail.productId === initProductId.current &&
-        trDoc.branchId === initBranchId.current &&
-        trDoc.departmentId === initDepartmentId.current &&
+        trDoc.placeEntityId === initPlaceEntityId.current &&
         Boolean(initOutAccountId.current) &&
         trDoc.followInfos?.saleOutAccountId === initOutAccountId.current),
   });
@@ -712,64 +710,34 @@ export const InventoryRow = ({
         </>
       )}
       {showAdvancedView && (
-        <>
-          <RecordTableHotKeyControl
-            rowId={_id}
-            rowIndex={detailIndex}
-            enableOnFormTags
-          >
-            <Table.Cell>
-              <RecordTableInlineCell className="justify-center">
-                <Form.Field
-                  control={form.control}
-                  name={`trDocs.${journalIndex}.details.${detailIndex}.branchId`}
-                  render={({ field }) => (
-                    <Form.Item>
-                      <Form.Control>
-                        <SelectBranches.InlineCell
-                          mode="single"
-                          value={field.value ?? ''}
-                          onValueChange={(branch) => field.onChange(branch)}
-                          scope={AccountingHotkeyScope.TransactionFormPage}
-                        />
-                      </Form.Control>
-                      <Form.Message />
-                    </Form.Item>
-                  )}
-                />
-              </RecordTableInlineCell>
-            </Table.Cell>
-          </RecordTableHotKeyControl>
-          <RecordTableHotKeyControl
-            rowId={_id}
-            rowIndex={detailIndex}
-            enableOnFormTags
-          >
-            <Table.Cell>
-              <RecordTableInlineCell className="justify-center">
-                <Form.Field
-                  control={form.control}
-                  name={`trDocs.${journalIndex}.details.${detailIndex}.departmentId`}
-                  render={({ field }) => (
-                    <Form.Item>
-                      <Form.Control>
-                        <SelectDepartments.InlineCell
-                          mode="single"
-                          value={field.value ?? ''}
-                          onValueChange={(department) =>
-                            field.onChange(department)
-                          }
-                          scope={AccountingHotkeyScope.TransactionFormPage}
-                        />
-                      </Form.Control>
-                      <Form.Message />
-                    </Form.Item>
-                  )}
-                />
-              </RecordTableInlineCell>
-            </Table.Cell>
-          </RecordTableHotKeyControl>
-        </>
+        <RecordTableHotKeyControl
+          rowId={_id}
+          rowIndex={detailIndex}
+          enableOnFormTags
+        >
+          <Table.Cell>
+            <RecordTableInlineCell className="justify-center">
+              <Form.Field
+                control={form.control}
+                name={`trDocs.${journalIndex}.details.${detailIndex}.placeEntityId`}
+                render={({ field }) => (
+                  <Form.Item>
+                    <Form.Control>
+                      <SelectStructureEntities.InlineCell
+                        mode="single"
+                        capability={STOCK_PLACE_CAPABILITY}
+                        value={field.value ?? ''}
+                        onValueChange={(entityId) => field.onChange(entityId)}
+                        scope={AccountingHotkeyScope.TransactionFormPage}
+                      />
+                    </Form.Control>
+                    <Form.Message />
+                  </Form.Item>
+                )}
+              />
+            </RecordTableInlineCell>
+          </Table.Cell>
+        </RecordTableHotKeyControl>
       )}
     </Table.Row>
   );

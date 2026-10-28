@@ -1,3 +1,4 @@
+import { STOCK_PLACE_CAPABILITY } from '@/utils/structure';
 import { useMemo, useRef } from 'react';
 import { useApolloClient, useMutation } from '@apollo/client';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -17,11 +18,7 @@ import {
   toast,
   useConfirm,
 } from 'erxes-ui';
-import {
-  SelectBranches,
-  SelectDepartments,
-  usePermissionCheck,
-} from 'ui-modules';
+import { SelectStructureEntities, usePermissionCheck } from 'ui-modules';
 import { SelectAccount } from '@/settings/account/components/SelectAccount';
 import { AccountStatus, JournalEnum } from '@/settings/account/types/Account';
 import { TJobForm } from '@/settings/jobs/types/Job';
@@ -34,11 +31,9 @@ export const getExecutionMetadataSchema = (required: string) =>
     date: z.date({ required_error: required, invalid_type_error: required }),
     description: z.string(),
     inputAccountId: z.string().min(1, required),
-    inputBranchId: z.string(),
-    inputDepartmentId: z.string(),
+    inputPlaceEntityId: z.string(),
     outputAccountId: z.string().min(1, required),
-    outputBranchId: z.string(),
-    outputDepartmentId: z.string(),
+    outputPlaceEntityId: z.string(),
     jobs: z
       .array(
         z.object({
@@ -77,11 +72,9 @@ export const JobExecutionEditor = ({
       date: execution?.date ? new Date(execution.date) : new Date(),
       description: execution?.description ?? '',
       inputAccountId: execution?.inputAccountId ?? '',
-      inputBranchId: execution?.inputBranchId ?? '',
-      inputDepartmentId: execution?.inputDepartmentId ?? '',
+      inputPlaceEntityId: execution?.inputPlaceEntityId ?? '',
       outputAccountId: execution?.outputAccountId ?? '',
-      outputBranchId: execution?.outputBranchId ?? '',
-      outputDepartmentId: execution?.outputDepartmentId ?? '',
+      outputPlaceEntityId: execution?.outputPlaceEntityId ?? '',
       jobs: execution?.jobs.map((row) => ({
         _id: row._id,
         jobId: row.jobId,
@@ -264,27 +257,13 @@ export const JobExecutionEditor = ({
                 />
                 <Form.Field
                   control={metadata.control}
-                  name={`${side}BranchId`}
+                  name={`${side}PlaceEntityId`}
                   render={({ field }) => (
                     <Form.Item>
-                      <Form.Label>{t('branch')}</Form.Label>
-                      <SelectBranches.FormItem
+                      <Form.Label>{t('place', 'Place')}</Form.Label>
+                      <SelectStructureEntities.FormItem
                         mode="single"
-                        value={field.value}
-                        onValueChange={field.onChange}
-                      />
-                      <Form.Message />
-                    </Form.Item>
-                  )}
-                />
-                <Form.Field
-                  control={metadata.control}
-                  name={`${side}DepartmentId`}
-                  render={({ field }) => (
-                    <Form.Item>
-                      <Form.Label>{t('department')}</Form.Label>
-                      <SelectDepartments.FormItem
-                        mode="single"
+                        capability={STOCK_PLACE_CAPABILITY}
                         value={field.value}
                         onValueChange={field.onChange}
                       />

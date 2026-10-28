@@ -27,8 +27,8 @@ export const accountSchema = schemaWrapper(
       label: 'Journal',
     },
     description: { type: String, optional: true, label: 'Description' },
-    branchId: { type: String, optional: true, label: 'Branch' },
-    departmentId: { type: String, optional: true, label: 'Department' },
+    placeEntityId: { type: String, optional: true, label: 'Place' },
+    responsibleEntityId: { type: String, optional: true, label: 'Responsible' },
     createdAt: {
       type: Date,
       default: new Date(),

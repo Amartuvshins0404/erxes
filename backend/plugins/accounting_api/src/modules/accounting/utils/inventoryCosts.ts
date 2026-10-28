@@ -13,20 +13,17 @@ export const applyActiveInventoryCosts = async (
     string,
     {
       accountId: string;
-      branchId?: string;
-      departmentId?: string;
+      placeEntityId?: string;
       detailIndexes: number[];
     }
   >();
 
   details.forEach((detail, detailIndex) => {
-    const branchId = detail.branchId || doc.branchId;
-    const departmentId = detail.departmentId || doc.departmentId;
-    const key = JSON.stringify([detail.accountId, branchId, departmentId]);
+    const placeEntityId = detail.placeEntityId || doc.placeEntityId;
+    const key = JSON.stringify([detail.accountId, placeEntityId]);
     const group = groups.get(key) || {
       accountId: detail.accountId,
-      branchId,
-      departmentId,
+      placeEntityId,
       detailIndexes: [],
     };
 
@@ -42,8 +39,7 @@ export const applyActiveInventoryCosts = async (
       const costs = await activeCost(
         models,
         group.accountId,
-        group.branchId,
-        group.departmentId,
+        group.placeEntityId,
         productIds,
         excludedTransactionIds,
       );

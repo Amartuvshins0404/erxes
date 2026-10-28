@@ -29,25 +29,25 @@ export default {
     return await models.CtaxRows.findOne({ _id: transaction.ctaxRowId });
   },
 
-  async branch(transaction: ITrRecord) {
-    if (!transaction.branchId) {
+  async placeEntity(transaction: ITrRecord) {
+    if (!transaction.placeEntityId) {
       return;
     }
 
     return {
-      __typename: 'Branch',
-      _id: transaction.branchId,
+      __typename: 'StructureEntity',
+      _id: transaction.placeEntityId,
     };
   },
 
-  async department(transaction: ITrRecord) {
-    if (!transaction.departmentId) {
+  async responsibleEntity(transaction: ITrRecord) {
+    if (!transaction.responsibleEntityId) {
       return;
     }
 
     return {
-      __typename: 'Department',
-      _id: transaction.departmentId,
+      __typename: 'StructureEntity',
+      _id: transaction.responsibleEntityId,
     };
   },
 

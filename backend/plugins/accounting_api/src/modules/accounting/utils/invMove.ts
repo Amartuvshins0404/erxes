@@ -26,13 +26,10 @@ class InvMoveInTrs {
   }
 
   public async checkValidation() {
-    const { moveInAccountId, moveInBranchId, moveInDepartmentId } =
-      this.trDoc.followInfos;
+    const { moveInAccountId, moveInPlaceEntityId } = this.trDoc.followInfos;
 
-    // Зарим Erkhet location erxes дээр зөвхөн branch-р илэрхийлэгддэг.
-    // Тиймээс branch department ядаж нэг нь заавал бөглөгдсөн байх ёстой
-    if (!moveInBranchId && !moveInDepartmentId) {
-      throw new Error('Must fill move in branch');
+    if (!moveInPlaceEntityId) {
+      throw new Error('Must fill move in place');
     }
 
     if (!moveInAccountId) {
@@ -96,8 +93,8 @@ class InvMoveInTrs {
       status: transaction.status,
       mentionOwnerId: transaction.mentionOwnerId,
       mentionUserIds: transaction.mentionUserIds,
-      branchId: this.trDoc.followInfos.moveInBranchId,
-      departmentId: this.trDoc.followInfos.moveInDepartmentId,
+      placeEntityId: this.trDoc.followInfos.moveInPlaceEntityId,
+      responsibleEntityId: this.trDoc.followInfos.moveInResponsibleEntityId,
       customerType: transaction.customerType,
       customerId: transaction.customerId,
       details: [],
@@ -121,14 +118,14 @@ class InvMoveInTrs {
 
         originType: TR_DETAIL_FOLLOW_TYPES.MOVE_IN,
         accountId: this.moveInAccount?._id ?? '',
-        branchId:
-          detail.followInfos?.moveInBranchId ||
-          oldInDetail?.branchId ||
-          this.trDoc.followInfos.moveInBranchId,
-        departmentId:
-          detail.followInfos?.moveInDepartmentId ||
-          oldInDetail?.departmentId ||
-          this.trDoc.followInfos.moveInDepartmentId,
+        placeEntityId:
+          detail.followInfos?.moveInPlaceEntityId ||
+          oldInDetail?.placeEntityId ||
+          this.trDoc.followInfos.moveInPlaceEntityId,
+        responsibleEntityId:
+          detail.followInfos?.moveInResponsibleEntityId ||
+          oldInDetail?.responsibleEntityId ||
+          this.trDoc.followInfos.moveInResponsibleEntityId,
       });
     }
 

@@ -10,11 +10,11 @@ const setup = () => {
     status: 'posted',
     date: new Date('2026-10-21T00:00:00Z'),
     inputAccountId: 'raw',
-    inputBranchId: 'ib',
-    inputDepartmentId: 'id',
+    inputPlaceEntityId: 'ib',
+    inputResponsibleEntityId: 'id',
     outputAccountId: 'finished',
-    outputBranchId: 'ob',
-    outputDepartmentId: 'od',
+    outputPlaceEntityId: 'ob',
+    outputResponsibleEntityId: 'od',
     jobs: [
       {
         _id: 'j1',
@@ -55,8 +55,8 @@ const setup = () => {
     side: 'ct',
     sumDt: 0,
     sumCt: 30,
-    branchId: 'ib',
-    departmentId: 'id',
+    placeEntityId: 'ib',
+    responsibleEntityId: 'id',
     details: [
       {
         _id: 'raw-detail',
@@ -75,8 +75,8 @@ const setup = () => {
     side: 'dt',
     sumDt: 50,
     sumCt: 0,
-    branchId: 'ob',
-    departmentId: 'od',
+    placeEntityId: 'ob',
+    responsibleEntityId: 'od',
     details: [
       {
         _id: 'a-detail',
@@ -194,8 +194,8 @@ test('inventory out adjustment reprices execution income per job and updates cac
       {
         _id: {
           accountId: 'raw',
-          branchId: 'ib',
-          departmentId: 'id',
+          placeEntityId: 'ib',
+          responsibleEntityId: 'id',
           productId: 'raw-product',
         },
         records: [
@@ -275,8 +275,8 @@ test('an adjustment retry repairs stale income even when its outgoing cost alrea
       {
         _id: {
           accountId: 'raw',
-          branchId: 'ib',
-          departmentId: 'id',
+          placeEntityId: 'ib',
+          responsibleEntityId: 'id',
           productId: 'raw-product',
         },
         records: [

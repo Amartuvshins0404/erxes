@@ -6,8 +6,8 @@ type ReportLocation = {
 const queryParamByGroup: Record<string, string> = {
   accountCategoryId: 'accountCategoryId',
   accountId: 'accountIds',
-  branchId: 'branchId',
-  departmentId: 'departmentId',
+  placeEntityId: 'placeEntityId',
+  responsibleEntityId: 'responsibleEntityId',
   customerId: 'customerId',
   productId: 'productIds',
   fixedAssetId: 'fixedAssetIds',

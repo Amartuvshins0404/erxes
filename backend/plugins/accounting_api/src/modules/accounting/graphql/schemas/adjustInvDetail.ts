@@ -7,8 +7,7 @@ export const types = `
 
     productId: String
     accountId: String
-    departmentId: String
-    branchId: String
+    placeEntityId: String
 
     remainder: Float
     cost: Float
@@ -22,8 +21,7 @@ export const types = `
 
     product: Product
     account: Account
-    branch: Branch
-    department: Department
+    placeEntity: StructureEntity
   }
 
   type AdjustInventory @key(fields: "_id") @cacheControl(maxAge: 3){

@@ -7,8 +7,8 @@ export const fundReportRules: Record<string, IReportConfig> = {
     choices: [
       { code: 'default', title: 'by-account' },
       { code: 'cat', title: 'by-account-category' },
-      { code: 'branchDepartment', title: 'by-branch-and-department' },
-      { code: 'departmentBranch', title: 'by-department-and-branch' },
+      { code: 'placeResponsible', title: 'by-place-and-responsible' },
+      { code: 'responsiblePlace', title: 'by-responsible-and-place' },
     ],
     groups: {
       default: {
@@ -34,15 +34,15 @@ export const fundReportRules: Record<string, IReportConfig> = {
           groupRule: null,
         },
       },
-      branchDepartment: {
-        group: 'branchId',
-        code: 'branchCode',
-        name: 'branchName',
+      placeResponsible: {
+        group: 'placeEntityId',
+        code: 'placeEntityCode',
+        name: 'placeEntityName',
         style: 'font-semibold',
         groupRule: {
-          group: 'departmentId',
-          code: 'departmentCode',
-          name: 'departmentName',
+          group: 'responsibleEntityId',
+          code: 'responsibleEntityCode',
+          name: 'responsibleEntityName',
           style: 'font-semibold',
           groupRule: {
             group: 'accountId',
@@ -54,15 +54,15 @@ export const fundReportRules: Record<string, IReportConfig> = {
           },
         },
       },
-      departmentBranch: {
-        group: 'departmentId',
-        code: 'departmentCode',
-        name: 'departmentName',
+      responsiblePlace: {
+        group: 'responsibleEntityId',
+        code: 'responsibleEntityCode',
+        name: 'responsibleEntityName',
         style: 'font-semibold',
         groupRule: {
-          group: 'branchId',
-          code: 'branchCode',
-          name: 'branchName',
+          group: 'placeEntityId',
+          code: 'placeEntityCode',
+          name: 'placeEntityName',
           style: 'font-semibold',
           groupRule: {
             group: 'accountId',

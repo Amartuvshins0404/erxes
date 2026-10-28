@@ -10,42 +10,45 @@ import {
   TextOverflowTooltip,
 } from 'erxes-ui';
 import { useAtom } from 'jotai';
-import { useBranchesMain, useDepartmentsMain } from 'ui-modules';
+import { useStructureEntities } from 'ui-modules';
 import type { TFunction } from 'i18next';
 import { getI18n, useTranslation } from 'react-i18next';
 import { useReCalcRemainders } from '../hooks/useReCalcRemainders';
 import { selectedRemainderProductAtom } from '../states/productDetailStates';
 
 type InventoryEntry = {
-  branchId: string;
-  departmentId: string;
+  placeEntityId: string;
   remainder: number;
   cost: number;
   soonIn: number;
   soonOut: number;
 };
 
-const parseInventories = (inventories: any): InventoryEntry[] => {
+type TPlaceInventory = {
+  remainder?: number;
+  cost?: number;
+  soonIn?: number;
+  soonOut?: number;
+};
+
+const parseInventories = (inventories: unknown): InventoryEntry[] => {
   if (!inventories || typeof inventories !== 'object') return [];
 
-  const rows: InventoryEntry[] = [];
-  for (const branchId of Object.keys(inventories)) {
-    const departmentMap = inventories[branchId];
-    if (!departmentMap || typeof departmentMap !== 'object') continue;
-    for (const departmentId of Object.keys(departmentMap)) {
-      const data = departmentMap[departmentId];
-      if (!data) continue;
-      rows.push({
-        branchId,
-        departmentId,
-        remainder: data.remainder ?? 0,
-        cost: data.cost ?? 0,
-        soonIn: data.soonIn ?? 0,
-        soonOut: data.soonOut ?? 0,
-      });
-    }
-  }
-  return rows;
+  return Object.entries(
+    inventories as Record<string, TPlaceInventory | null>,
+  ).flatMap(([placeEntityId, data]) =>
+    data && typeof data === 'object'
+      ? [
+          {
+            placeEntityId,
+            remainder: data.remainder ?? 0,
+            cost: data.cost ?? 0,
+            soonIn: data.soonIn ?? 0,
+            soonOut: data.soonOut ?? 0,
+          },
+        ]
+      : [],
+  );
 };
 
 const fmt = (v: number) =>
@@ -69,34 +72,18 @@ const joinLabel = (id: string, object: LabelMap[string] | undefined) => {
 };
 
 const buildInventoryColumns = (
-  branchMap: LabelMap,
-  departmentMap: LabelMap,
+  placeMap: LabelMap,
   t: TFunction<'accounting'>,
 ): ColumnDef<InventoryEntry>[] => [
   {
-    id: 'branch',
-    header: t('branch'),
+    id: 'placeEntity',
+    header: t('place', 'Place'),
     cell: ({ row }) => (
       <RecordTableInlineCell>
         <TextOverflowTooltip
           value={joinLabel(
-            row.original.branchId,
-            branchMap[row.original.branchId],
-          )}
-        />
-      </RecordTableInlineCell>
-    ),
-    size: 220,
-  },
-  {
-    id: 'department',
-    header: t('department'),
-    cell: ({ row }) => (
-      <RecordTableInlineCell>
-        <TextOverflowTooltip
-          value={joinLabel(
-            row.original.departmentId,
-            departmentMap[row.original.departmentId],
+            row.original.placeEntityId,
+            placeMap[row.original.placeEntityId],
           )}
         />
       </RecordTableInlineCell>
@@ -140,39 +127,33 @@ const buildInventoryColumns = (
 ];
 
 type InventoriesTableProps = {
-  inventories: any;
+  inventories: unknown;
 };
 
 export const InventoriesTable = ({ inventories }: InventoriesTableProps) => {
   const { t } = useTranslation('accounting');
   const rows = parseInventories(inventories);
 
-  const branchIds = [...new Set(rows.map((r) => r.branchId))].filter(
-    (id) => id !== INVENTORY_GENERAL_KEY,
-  );
-  const departmentIds = [...new Set(rows.map((r) => r.departmentId))].filter(
+  const placeEntityIds = [...new Set(rows.map((r) => r.placeEntityId))].filter(
     (id) => id !== INVENTORY_GENERAL_KEY,
   );
 
-  const { branches, loading: loadingBranches } = useBranchesMain({
-    variables: { ids: branchIds, withoutUserFilter: true },
-    skip: branchIds.length === 0,
-  });
-  const { departments, loading: loadingDepartment } = useDepartmentsMain({
-    variables: { ids: departmentIds, withoutUserFilter: true },
-    skip: departmentIds.length === 0,
+  const { structureEntities, loading } = useStructureEntities({
+    variables: {
+      ids: placeEntityIds,
+      limit: placeEntityIds.length,
+      includeArchived: true,
+    },
+    skip: placeEntityIds.length === 0,
   });
 
-  const branchMap: LabelMap = Object.fromEntries(
-    (branches ?? []).map((b) => [b._id, b]),
-  );
-  const departmentMap: LabelMap = Object.fromEntries(
-    (departments ?? []).map((d) => [d._id, d]),
+  const placeMap: LabelMap = Object.fromEntries(
+    structureEntities.map((entity) => [entity._id, entity]),
   );
 
-  const columns = buildInventoryColumns(branchMap, departmentMap, t);
+  const columns = buildInventoryColumns(placeMap, t);
 
-  if (loadingBranches || loadingDepartment) {
+  if (loading) {
     return <Spinner />;
   }
 

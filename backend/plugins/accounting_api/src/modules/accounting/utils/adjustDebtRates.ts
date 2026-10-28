@@ -18,8 +18,8 @@ type TDebtBalance = {
   accountId: string;
   customerType?: string;
   customerId?: string;
-  branchId?: string;
-  departmentId?: string;
+  placeEntityId?: string;
+  responsibleEntityId?: string;
   mainBalance: number;
   currencyBalance: number;
 };
@@ -38,8 +38,8 @@ type TAccountMeta = {
   name?: string;
   kind?: string;
   currency?: string;
-  branchId?: string;
-  departmentId?: string;
+  placeEntityId?: string;
+  responsibleEntityId?: string;
 };
 
 type TPublishedDebtRateDetail = IAdjustDebtRateDetail & {
@@ -82,21 +82,21 @@ const makeDebtKey = ({
   accountId,
   customerType,
   customerId,
-  branchId,
-  departmentId,
+  placeEntityId,
+  responsibleEntityId,
 }: {
   accountId: string;
   customerType?: string;
   customerId?: string;
-  branchId?: string;
-  departmentId?: string;
+  placeEntityId?: string;
+  responsibleEntityId?: string;
 }) =>
   [
     accountId,
     customerType || '',
     customerId || '',
-    branchId || '',
-    departmentId || '',
+    placeEntityId || '',
+    responsibleEntityId || '',
   ].join(':');
 
 const getDebtAccounts = async (models: IModels, adjust: IAdjustDebtRate) => {
@@ -112,8 +112,8 @@ const getDebtAccounts = async (models: IModels, adjust: IAdjustDebtRate) => {
       name: 1,
       kind: 1,
       currency: 1,
-      branchId: 1,
-      departmentId: 1,
+      placeEntityId: 1,
+      responsibleEntityId: 1,
     },
   ).lean();
 
@@ -167,19 +167,19 @@ const getBaseTransactionFilter = (
   if (adjust.customerId) {
     filter.customerId = adjust.customerId;
   }
-  if (adjust.branchId) {
+  if (adjust.placeEntityId) {
     filter.$or = [
-      { branchId: adjust.branchId },
-      { 'details.branchId': adjust.branchId },
+      { placeEntityId: adjust.placeEntityId },
+      { 'details.placeEntityId': adjust.placeEntityId },
     ];
   }
-  if (adjust.departmentId) {
+  if (adjust.responsibleEntityId) {
     filter.$and = [
       ...((filter.$and as unknown[]) || []),
       {
         $or: [
-          { departmentId: adjust.departmentId },
-          { 'details.departmentId': adjust.departmentId },
+          { responsibleEntityId: adjust.responsibleEntityId },
+          { 'details.responsibleEntityId': adjust.responsibleEntityId },
         ],
       },
     ];
@@ -250,8 +250,12 @@ const getDebtMovements = async (
         customerType: 1,
         customerId: 1,
         accountId: '$details.accountId',
-        branchId: { $ifNull: ['$details.branchId', '$branchId'] },
-        departmentId: { $ifNull: ['$details.departmentId', '$departmentId'] },
+        placeEntityId: {
+          $ifNull: ['$details.placeEntityId', '$placeEntityId'],
+        },
+        responsibleEntityId: {
+          $ifNull: ['$details.responsibleEntityId', '$responsibleEntityId'],
+        },
         amount: '$details.amount',
         currencyAmount: { $ifNull: ['$details.currencyAmount', 0] },
       },
@@ -263,8 +267,8 @@ const getDebtMovements = async (
           accountId: '$accountId',
           customerType: '$customerType',
           customerId: '$customerId',
-          branchId: '$branchId',
-          departmentId: '$departmentId',
+          placeEntityId: '$placeEntityId',
+          responsibleEntityId: '$responsibleEntityId',
         },
         mainBalance: {
           $sum: {
@@ -297,8 +301,9 @@ const getDebtMovements = async (
         accountId: record._id.accountId,
         customerType: record._id.customerType,
         customerId: record._id.customerId,
-        branchId: record._id.branchId || account?.branchId,
-        departmentId: record._id.departmentId || account?.departmentId,
+        placeEntityId: record._id.placeEntityId || account?.placeEntityId,
+        responsibleEntityId:
+          record._id.responsibleEntityId || account?.responsibleEntityId,
         date: getPureDate(record._id.date),
         mainBalance: fixNum(record.mainBalance || 0, BALANCE_PRECISION),
         currencyBalance: fixNum(record.currencyBalance || 0, BALANCE_PRECISION),
@@ -318,8 +323,8 @@ const applyMovement = (
     accountId: movement.accountId,
     customerType: movement.customerType,
     customerId: movement.customerId,
-    branchId: movement.branchId,
-    departmentId: movement.departmentId,
+    placeEntityId: movement.placeEntityId,
+    responsibleEntityId: movement.responsibleEntityId,
     mainBalance: 0,
     currencyBalance: 0,
   };
@@ -386,7 +391,9 @@ const buildBalanceByDay = (
 
     if (invalidBalance) {
       throw new DebtRateValidationError(
-        `${validateDebtBalance(invalidBalance, accountById)} Date: ${currentDate.toISOString().slice(0, 10)}, Account: ${invalidBalance.accountId}`,
+        `${validateDebtBalance(invalidBalance, accountById)} Date: ${currentDate
+          .toISOString()
+          .slice(0, 10)}, Account: ${invalidBalance.accountId}`,
         currentDate,
         beginDate,
       );
@@ -454,8 +461,8 @@ const buildAdjustmentResult = async (
         accountId: balance.accountId,
         customerType: balance.customerType,
         customerId: balance.customerId,
-        branchId: balance.branchId,
-        departmentId: balance.departmentId,
+        placeEntityId: balance.placeEntityId,
+        responsibleEntityId: balance.responsibleEntityId,
         mainBalance: balance.mainBalance,
         currencyBalance: balance.currencyBalance,
         diff,
@@ -472,8 +479,8 @@ const makeDetail = (
 ): ITrDetail => ({
   accountId,
   amount,
-  branchId: source.branchId,
-  departmentId: source.departmentId,
+  placeEntityId: source.placeEntityId,
+  responsibleEntityId: source.responsibleEntityId,
 });
 
 const buildTransactionDocs = (
@@ -549,8 +556,8 @@ const toPersistedDetail = (
   accountId: detail.accountId,
   customerType: detail.customerType,
   customerId: detail.customerId,
-  branchId: detail.branchId,
-  departmentId: detail.departmentId,
+  placeEntityId: detail.placeEntityId,
+  responsibleEntityId: detail.responsibleEntityId,
   mainBalance: detail.mainBalance,
   currencyBalance: detail.currencyBalance,
   createdAt: detail.createdAt,
@@ -711,8 +718,8 @@ export const runAdjustDebtRate = async (
             accountId: detail.accountId,
             customerType: transaction.customerType,
             customerId: transaction.customerId,
-            branchId: detail.branchId,
-            departmentId: detail.departmentId,
+            placeEntityId: detail.placeEntityId,
+            responsibleEntityId: detail.responsibleEntityId,
           }),
           transactionId: transaction._id,
         })),

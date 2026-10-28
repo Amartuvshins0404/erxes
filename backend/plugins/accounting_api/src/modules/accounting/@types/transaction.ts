@@ -19,8 +19,8 @@ export interface ITrDetailFollowInfos extends Record<string, unknown> {
   fixedAssetTotalAmount?: number;
   depreciationStartDate?: Date;
   currencyDiffAccountId?: string;
-  moveInBranchId?: string;
-  moveInDepartmentId?: string;
+  moveInPlaceEntityId?: string;
+  moveInResponsibleEntityId?: string;
   invSplit?: IInvSplitDetailInfo;
   perCost?: number;
 }
@@ -28,8 +28,8 @@ export interface ITrDetailFollowInfos extends Record<string, unknown> {
 export interface ITrDetail {
   _id?: string;
   accountId: string;
-  branchId?: string;
-  departmentId?: string;
+  placeEntityId?: string;
+  responsibleEntityId?: string;
   followInfos?: ITrDetailFollowInfos;
   originId?: string;
   originType?: string;
@@ -77,8 +77,8 @@ export interface ITransaction {
   originSubId?: string;
   preTrId?: string;
 
-  branchId?: string;
-  departmentId?: string;
+  placeEntityId?: string;
+  responsibleEntityId?: string;
   customerType?: string;
   customerId?: string;
   assignedUserIds?: string[];
@@ -146,7 +146,8 @@ export interface ITransactionCounter {
 }
 
 export interface ITransactionCounterDocument
-  extends ITransactionCounter, Document {
+  extends ITransactionCounter,
+    Document {
   _id: string;
 }
 

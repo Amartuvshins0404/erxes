@@ -10,8 +10,8 @@ export const types = () => `
     accountCurrency: String
     customerType: String
     customerId: String
-    branchId: String
-    departmentId: String
+    placeEntityId: String
+    responsibleEntityId: String
     mainBalance: Float
     currencyBalance: Float
     diff: Float
@@ -39,8 +39,8 @@ export const types = () => `
     error: String
     warning: String
     details: [AdjustDebtRateDetail]
-    branchId: String
-    departmentId: String
+    placeEntityId: String
+    responsibleEntityId: String
     createdBy: String
     modifiedBy: String
     createdAt: Date
@@ -64,8 +64,8 @@ const adjustDebtRateParams = `
   spotRate: Float,
   gainAccountId: String,
   lossAccountId: String,
-  branchId: String,
-  departmentId: String,
+  placeEntityId: String,
+  responsibleEntityId: String,
 `;
 const adjustDebtRateFilterParams = `
   ids: [String],
@@ -74,8 +74,8 @@ const adjustDebtRateFilterParams = `
   currency: String,
   customerId: String,
   searchValue: String,
-  branchId: String,
-  departmentId: String,
+  placeEntityId: String,
+  responsibleEntityId: String,
 `;
 
 export const queries = `

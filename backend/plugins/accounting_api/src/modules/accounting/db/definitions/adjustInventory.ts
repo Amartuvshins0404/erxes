@@ -18,8 +18,7 @@ export const adjustInvDetailsSchema = schemaWrapper(
     adjustId: { type: String, optional: true, label: 'Adjust inventory' },
     productId: { type: String, optional: true, label: 'Product' },
     accountId: { type: String, label: 'account' },
-    branchId: { type: String, label: 'branch' },
-    departmentId: { type: String, label: 'department' },
+    placeEntityId: { type: String, label: 'Place' },
     remainder: { type: Number, optional: true, label: 'remainder' },
     cost: { type: Number, optional: true, label: 'cost' },
     unitCost: { type: Number, optional: true, label: 'unitCost' },
@@ -35,14 +34,12 @@ export const adjustInvDetailsSchema = schemaWrapper(
 
 adjustInvDetailsSchema.index({
   accountId: 1,
-  branchId: 1,
-  departmentId: 1,
+  placeEntityId: 1,
   productId: 1,
 });
 adjustInvDetailsSchema.index({
   adjustId: 1,
-  branchId: 1,
-  departmentId: 1,
+  placeEntityId: 1,
   productId: 1,
 });
 

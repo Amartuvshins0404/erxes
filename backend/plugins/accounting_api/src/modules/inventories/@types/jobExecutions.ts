@@ -11,11 +11,9 @@ export interface IJobExecutionListParams {
   laborCostName?: string;
   overheadCostName?: string;
   inputAccountId?: string;
-  inputBranchId?: string;
-  inputDepartmentId?: string;
+  inputPlaceEntityId?: string;
   outputAccountId?: string;
-  outputBranchId?: string;
-  outputDepartmentId?: string;
+  outputPlaceEntityId?: string;
   page?: number;
   perPage?: number;
 }
@@ -36,11 +34,9 @@ export interface IJobExecution {
   jobs: IJobExecutionItem[];
   description?: string;
   inputAccountId: string;
-  inputBranchId?: string;
-  inputDepartmentId?: string;
+  inputPlaceEntityId?: string;
   outputAccountId: string;
-  outputBranchId?: string;
-  outputDepartmentId?: string;
+  outputPlaceEntityId?: string;
 }
 
 export interface IJobExecutionDocument extends IJobExecution, Document {

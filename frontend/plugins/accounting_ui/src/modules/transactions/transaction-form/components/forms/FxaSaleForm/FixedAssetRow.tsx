@@ -46,13 +46,14 @@ export const FixedAssetRow = ({
     name: 'date',
   }) as Date | undefined;
   const showAdvancedView = useAtomValue(showAdvancedViewState);
-  const branchId = detail.branchId || trDoc.branchId || '';
-  const departmentId = detail.departmentId || trDoc.departmentId || '';
+  const placeEntityId = detail.placeEntityId || trDoc.placeEntityId || '';
+  const responsibleEntityId =
+    detail.responsibleEntityId || trDoc.responsibleEntityId || '';
   const { fixedAssetLocationRemainder } = useFixedAssetLocationRemainder({
     variables: {
       fixedAssetId: detail.fixedAssetId,
-      branchId,
-      departmentId,
+      placeEntityId,
+      responsibleEntityId,
       date,
       excludeTransactionId: trDoc._id,
     },
@@ -89,12 +90,12 @@ export const FixedAssetRow = ({
       fixedAsset.categoryId || '',
     );
     form.setValue(
-      `trDocs.${journalIndex}.details.${detailIndex}.branchId`,
-      detail.branchId || trDoc.branchId || '',
+      `trDocs.${journalIndex}.details.${detailIndex}.placeEntityId`,
+      detail.placeEntityId || trDoc.placeEntityId || '',
     );
     form.setValue(
-      `trDocs.${journalIndex}.details.${detailIndex}.departmentId`,
-      detail.departmentId || trDoc.departmentId || '',
+      `trDocs.${journalIndex}.details.${detailIndex}.responsibleEntityId`,
+      detail.responsibleEntityId || trDoc.responsibleEntityId || '',
     );
     form.setValue(`trDocs.${journalIndex}.details.${detailIndex}.count`, count);
     setAmount(count, detail.unitPrice);

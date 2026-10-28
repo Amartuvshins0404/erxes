@@ -172,16 +172,9 @@ const StatusBar = ({ safeRemainder }: { safeRemainder: ISafeRemainder }) => {
         <span className="text-accent-foreground">{'|'}</span>
       </div>
       <div className="flex items-center gap-2 text-sm">
-        <Label>{t('branch')}:</Label>
-        <span>{`${safeRemainder.branch?.code ?? ''} - ${
-          safeRemainder.branch?.title ?? ''
-        }`}</span>
-        <span className="text-accent-foreground">{'|'}</span>
-      </div>
-      <div className="flex items-center gap-2 text-sm">
-        <Label>{t('department')}:</Label>
-        <span>{`${safeRemainder.department?.code ?? ''} - ${
-          safeRemainder.department?.title ?? ''
+        <Label>{t('place', 'Place')}:</Label>
+        <span>{`${safeRemainder.placeEntity?.code ?? ''} - ${
+          safeRemainder.placeEntity?.title ?? ''
         }`}</span>
         <span className="text-accent-foreground">{'|'}</span>
       </div>

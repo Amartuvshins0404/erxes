@@ -61,26 +61,14 @@ export const safeRemainderColumns = (
       row.original.date ? <DateCell value={row.original.date} /> : '-',
   },
   {
-    id: 'branch',
+    id: 'placeEntity',
     header: () => (
-      <RecordTable.InlineHead icon={IconFile} label={t('branch')} />
+      <RecordTable.InlineHead icon={IconFile} label={t('place', 'Place')} />
     ),
-    accessorKey: 'branch',
+    accessorKey: 'placeEntity',
     cell: ({ row }) => (
       <RecordTableInlineCell>
-        {formatCodeTitle(row.original.branch)}
-      </RecordTableInlineCell>
-    ),
-  },
-  {
-    id: 'department',
-    header: () => (
-      <RecordTable.InlineHead icon={IconFile} label={t('department')} />
-    ),
-    accessorKey: 'department',
-    cell: ({ row }) => (
-      <RecordTableInlineCell>
-        {formatCodeTitle(row.original.department)}
+        {formatCodeTitle(row.original.placeEntity)}
       </RecordTableInlineCell>
     ),
   },

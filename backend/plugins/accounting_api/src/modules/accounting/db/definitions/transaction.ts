@@ -12,8 +12,8 @@ import {
 export const transactionDetailSchema = new Schema({
   _id: mongooseStringRandomId,
   accountId: { type: String, label: 'Account', index: true },
-  branchId: { type: String, optional: true, label: 'Branch' },
-  departmentId: { type: String, optional: true, label: 'Department' },
+  placeEntityId: { type: String, optional: true, label: 'Place' },
+  responsibleEntityId: { type: String, optional: true, label: 'Responsible' },
 
   followInfos: {
     type: Object,
@@ -139,8 +139,8 @@ export const transactionSchema = schemaWrapper(
       index: true,
     },
 
-    branchId: { type: String, optional: true, label: 'Branch' },
-    departmentId: { type: String, optional: true, label: 'Department' },
+    placeEntityId: { type: String, optional: true, label: 'Place' },
+    responsibleEntityId: { type: String, optional: true, label: 'Responsible' },
     customerType: { type: String, optional: true, label: 'Customer type' },
     customerId: { type: String, optional: true, label: 'Customer' },
     assignedUserIds: { type: [String], label: 'Assign Users' },
@@ -235,8 +235,8 @@ transactionSchema.index({
 transactionSchema.index({ 'details.accountId': 1, date: 1, journal: 1 });
 transactionSchema.index({ 'details.productId': 1, date: 1, journal: 1 });
 transactionSchema.index({
-  'details.branchId': 1,
-  'details.departmentId': 1,
+  'details.placeEntityId': 1,
+  'details.responsibleEntityId': 1,
   date: 1,
 });
 transactionSchema.index({ 'details.fixedAssetId': 1 });

@@ -20,10 +20,9 @@ import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import {
   CustomerType,
-  SelectBranches,
+  SelectStructureEntities,
   SelectCompany,
   SelectCustomer,
-  SelectDepartments,
 } from 'ui-modules';
 import { AccountingSheet } from '~/modules/layout/components/Sheet';
 import { useGetExchangeRate } from '~/modules/transactions/transaction-form/hooks/useGetExchangeRate';
@@ -97,8 +96,8 @@ const AdjustDebtRateFormContent = ({
       description: '',
       gainAccountId: '',
       lossAccountId: '',
-      branchId: '',
-      departmentId: '',
+      placeEntityId: '',
+      responsibleEntityId: '',
     },
   });
 
@@ -114,8 +113,8 @@ const AdjustDebtRateFormContent = ({
         description: adjustDebtRate.description || '',
         gainAccountId: adjustDebtRate.gainAccountId,
         lossAccountId: adjustDebtRate.lossAccountId,
-        branchId: adjustDebtRate.branchId || '',
-        departmentId: adjustDebtRate.departmentId || '',
+        placeEntityId: adjustDebtRate.placeEntityId || '',
+        responsibleEntityId: adjustDebtRate.responsibleEntityId || '',
       });
     }
   }, [adjustDebtRate, form]);
@@ -376,12 +375,12 @@ const AdjustDebtRateFormContent = ({
 
           <Form.Field
             control={form.control}
-            name="branchId"
+            name="placeEntityId"
             render={({ field }) => (
               <Form.Item>
-                <Form.Label>{t('branch')}</Form.Label>
+                <Form.Label>{t('place', 'Place')}</Form.Label>
                 <Form.Control>
-                  <SelectBranches.FormItem
+                  <SelectStructureEntities.FormItem
                     mode="single"
                     value={field.value ?? ''}
                     onValueChange={field.onChange}
@@ -394,12 +393,12 @@ const AdjustDebtRateFormContent = ({
 
           <Form.Field
             control={form.control}
-            name="departmentId"
+            name="responsibleEntityId"
             render={({ field }) => (
               <Form.Item>
-                <Form.Label>{t('department')}</Form.Label>
+                <Form.Label>{t('responsible', 'Responsible')}</Form.Label>
                 <Form.Control>
-                  <SelectDepartments.FormItem
+                  <SelectStructureEntities.FormItem
                     mode="single"
                     value={field.value ?? ''}
                     onValueChange={field.onChange}

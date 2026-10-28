@@ -20,8 +20,7 @@ export interface RealJobProduction {
 
 interface ProductionLocation {
   accountId: string;
-  branchId?: string;
-  departmentId?: string;
+  placeEntityId?: string;
   indexes: number[];
 }
 
@@ -149,8 +148,7 @@ const costProductionGroup = async (
       await activeCost(
         models,
         group.accountId,
-        group.branchId,
-        group.departmentId,
+        group.placeEntityId,
         missing,
         excludedIds,
       ),
@@ -209,10 +207,8 @@ const costProductionGroup = async (
                 jobs: [scaled],
                 inputAccountId: group.accountId,
                 outputAccountId: group.accountId,
-                inputBranchId: group.branchId,
-                outputBranchId: group.branchId,
-                inputDepartmentId: group.departmentId,
-                outputDepartmentId: group.departmentId,
+                inputPlaceEntityId: group.placeEntityId,
+                outputPlaceEntityId: group.placeEntityId,
               },
               stock,
               journals,
@@ -220,6 +216,7 @@ const costProductionGroup = async (
             for (const generatedDoc of generated) {
               const next: ITransaction = {
                 ...generatedDoc,
+                responsibleEntityId: inventoryDoc.responsibleEntityId,
                 status: inventoryDoc.status,
                 contentType: inventoryDoc.contentType,
                 contentId: inventoryDoc.contentId,
@@ -253,13 +250,11 @@ export const prepareRealJobProduction = async (
   const details = inventoryDoc.details.map((detail) => ({ ...detail }));
   const groups = new Map<string, ProductionLocation>();
   details.forEach((detail, index) => {
-    const branchId = detail.branchId || inventoryDoc.branchId;
-    const departmentId = detail.departmentId || inventoryDoc.departmentId;
-    const key = JSON.stringify([detail.accountId, branchId, departmentId]);
+    const placeEntityId = detail.placeEntityId || inventoryDoc.placeEntityId;
+    const key = JSON.stringify([detail.accountId, placeEntityId]);
     const group = groups.get(key) ?? {
       accountId: detail.accountId,
-      branchId,
-      departmentId,
+      placeEntityId,
       indexes: [],
     };
     group.indexes.push(index);
@@ -285,8 +280,7 @@ export const prepareRealJobProduction = async (
     const key = JSON.stringify([
       doc.journal,
       doc.side,
-      doc.branchId,
-      doc.departmentId,
+      doc.placeEntityId,
       !inventoryMultiplier(doc)
         ? [doc.details[0].accountId, doc.description]
         : doc.details[0].accountId,

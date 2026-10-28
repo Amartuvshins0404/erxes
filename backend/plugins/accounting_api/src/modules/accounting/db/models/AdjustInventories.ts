@@ -124,18 +124,15 @@ export const loadAdjustInvDetailsClass = (
     public static async getAdjustInvDetail({
       productId,
       accountId,
-      departmentId,
-      branchId,
+      placeEntityId,
       adjustId,
     }: IAdjustInvDetailParamsId) {
-      const branchKey = inventoryKey(branchId);
-      const departmentKey = inventoryKey(departmentId);
+      const placeKey = inventoryKey(placeEntityId);
       const detail = await models.AdjustInvDetails.findOne({
         adjustId,
         productId,
         accountId,
-        branchId: branchKey,
-        departmentId: departmentKey,
+        placeEntityId: placeKey,
       }).lean();
 
       if (detail) {
@@ -146,8 +143,7 @@ export const loadAdjustInvDetailsClass = (
         adjustId,
         productId,
         accountId,
-        branchId: branchKey,
-        departmentId: departmentKey,
+        placeEntityId: placeKey,
         remainder: 0,
         cost: 0,
         unitCost: 0,
@@ -207,22 +203,13 @@ export const loadAdjustInvDetailsClass = (
     public static async updateAdjustInvDetail(
       args: IAdjustInvDetail & { hasResp: boolean },
     ) {
-      const {
-        adjustId,
-        productId,
-        accountId,
-        branchId,
-        departmentId,
-        hasResp,
-      } = args;
-      const branchKey = inventoryKey(branchId);
-      const departmentKey = inventoryKey(departmentId);
+      const { adjustId, productId, accountId, placeEntityId, hasResp } = args;
+      const placeKey = inventoryKey(placeEntityId);
       const oldDetail = await models.AdjustInvDetails.findOne({
         adjustId,
         productId,
         accountId,
-        branchId: branchKey,
-        departmentId: departmentKey,
+        placeEntityId: placeKey,
       }).lean();
       if (oldDetail) {
         await models.AdjustInvDetails.updateOne(
@@ -230,8 +217,7 @@ export const loadAdjustInvDetailsClass = (
           {
             $set: {
               ...args,
-              branchId: branchKey,
-              departmentId: departmentKey,
+              placeEntityId: placeKey,
             },
           },
         );
@@ -243,8 +229,7 @@ export const loadAdjustInvDetailsClass = (
 
       const newDetail = await models.AdjustInvDetails.create({
         ...args,
-        branchId: branchKey,
-        departmentId: departmentKey,
+        placeEntityId: placeKey,
       });
       if (hasResp) {
         return newDetail;
@@ -256,8 +241,7 @@ export const loadAdjustInvDetailsClass = (
       adjustId,
       productId,
       accountId,
-      branchId,
-      departmentId,
+      placeEntityId,
       count,
       amount,
       adjustDetail,
@@ -275,8 +259,7 @@ export const loadAdjustInvDetailsClass = (
           adjustId,
           productId,
           accountId,
-          branchId,
-          departmentId,
+          placeEntityId,
         });
       }
 
@@ -322,21 +305,18 @@ export const loadAdjustInvDetailsClass = (
     public static async getAdjustInvDetailInfo({
       productId,
       accountId,
-      departmentId,
-      branchId,
+      placeEntityId,
       adjustId,
     }: IAdjustInvDetailParamsId) {
-      const branchKey = inventoryKey(branchId);
-      const departmentKey = inventoryKey(departmentId);
+      const placeKey = inventoryKey(placeEntityId);
 
-      // let adjusting = await models.AdjustInvDetails.getAdjustInvDetail({ adjustId, productId, accountId, departmentId, branchId });
+      // let adjusting = await models.AdjustInvDetails.getAdjustInvDetail({ adjustId, productId, accountId, placeEntityId });
       if (adjustId) {
         return await models.AdjustInvDetails.getAdjustInvDetail({
           adjustId,
           productId,
           accountId,
-          branchId: branchKey,
-          departmentId: departmentKey,
+          placeEntityId: placeKey,
         });
       }
 
@@ -352,8 +332,7 @@ export const loadAdjustInvDetailsClass = (
           adjustId,
           productId,
           accountId,
-          branchId: branchKey,
-          departmentId: departmentKey,
+          placeEntityId: placeKey,
         });
       }
 
@@ -363,8 +342,7 @@ export const loadAdjustInvDetailsClass = (
             journal: { $in: JOURNALS.ALL_REAL_INV },
             'details.productId': productId,
             'details.accountId': accountId,
-            branchId: branchId ? branchKey : { $in: [null, ''] },
-            departmentId: departmentId ? departmentKey : { $in: [null, ''] },
+            placeEntityId: placeEntityId ? placeKey : { $in: [null, ''] },
           },
         },
         { $sort: { date: 1 } },
@@ -399,8 +377,7 @@ export const loadAdjustInvDetailsClass = (
         adjustId: '',
         productId,
         accountId,
-        branchId: branchKey,
-        departmentId: departmentKey,
+        placeEntityId: placeKey,
         remainder,
         cost,
         unitCost: fixNum(cost / (remainder || 1)),

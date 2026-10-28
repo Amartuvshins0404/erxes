@@ -6,8 +6,8 @@ export interface IAdjustDebtRateDetail {
   accountId: string;
   customerType?: string;
   customerId?: string;
-  branchId?: string;
-  departmentId?: string;
+  placeEntityId?: string;
+  responsibleEntityId?: string;
   mainBalance: number;
   currencyBalance: number;
 
@@ -41,8 +41,8 @@ export interface IAdjustDebtRate {
 
   details?: IAdjustDebtRateDetail[];
 
-  branchId?: string;
-  departmentId?: string;
+  placeEntityId?: string;
+  responsibleEntityId?: string;
 
   createdBy: string;
   modifiedBy?: string;

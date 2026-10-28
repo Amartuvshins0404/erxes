@@ -12,8 +12,8 @@ export interface ISyncAccountsSectionFields {
   saleAccountId: string;
   saleOutAccountId: string;
   saleCostAccountId: string;
-  branchId: string;
-  departmentId: string;
+  placeEntityId: string;
+  responsibleEntityId: string;
 }
 
 export interface ISyncPaymentsFields {

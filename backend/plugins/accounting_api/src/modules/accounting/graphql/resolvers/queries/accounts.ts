@@ -28,8 +28,8 @@ export interface IAccountQueryParams {
   sortDirection?: number;
   isTemp?: boolean;
   isOutBalance?: boolean;
-  branchId?: string;
-  departmentId?: string;
+  placeEntityId?: string;
+  responsibleEntityId?: string;
   currency?: string;
   journal?: string;
   journals?: string[];
@@ -131,8 +131,8 @@ export const generateFilter = async (
     brand,
     isTemp,
     isOutBalance,
-    branchId,
-    departmentId,
+    placeEntityId,
+    responsibleEntityId,
     currency,
     journal,
     ids,
@@ -223,12 +223,12 @@ export const generateFilter = async (
     filter.journal = journal;
   }
 
-  if (branchId) {
-    filter.branchId = branchId;
+  if (placeEntityId) {
+    filter.placeEntityId = placeEntityId;
   }
 
-  if (departmentId) {
-    filter.departmentId = departmentId;
+  if (responsibleEntityId) {
+    filter.responsibleEntityId = responsibleEntityId;
   }
 
   if (brand) {

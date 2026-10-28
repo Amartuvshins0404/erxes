@@ -104,8 +104,8 @@ class InvSaleReturnOutCostTrs {
       status: transaction.status,
       mentionOwnerId: transaction.mentionOwnerId,
       mentionUserIds: transaction.mentionUserIds,
-      branchId: transaction.branchId,
-      departmentId: transaction.departmentId,
+      placeEntityId: transaction.placeEntityId,
+      responsibleEntityId: transaction.responsibleEntityId,
       customerType: transaction.customerType,
       customerId: transaction.customerId,
       details: [],
@@ -117,8 +117,7 @@ class InvSaleReturnOutCostTrs {
     const costs = await activeCost(
       this.models,
       this.outAccount?._id ?? '',
-      transaction.branchId,
-      transaction.departmentId,
+      transaction.placeEntityId,
       details.map((d) => d.productId),
       oldFollowOutTr?._id ? [oldFollowOutTr._id] : [],
     );

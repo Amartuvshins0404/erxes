@@ -6,8 +6,7 @@ export const inventoryReportRules: Record<string, IReportConfig> = {
     colCount: 9,
     choices: [
       { code: 'default', title: 'account' },
-      { code: 'accBranchDep', title: 'account-branch-department' },
-      { code: 'accDepBranch', title: 'account-department-branch' },
+      { code: 'accPlace', title: 'account-place' },
     ],
     groups: {
       default: {
@@ -23,53 +22,22 @@ export const inventoryReportRules: Record<string, IReportConfig> = {
           from: ['details'],
         },
       },
-      accBranchDep: {
+      accPlace: {
         group: 'accountId',
         code: 'accountCode',
         name: 'accountName',
         from: ['details'],
         style: 'font-semibold',
         groupRule: {
-          group: 'branchId',
-          code: 'branchCode',
-          name: 'branchName',
+          group: 'placeEntityId',
+          code: 'placeEntityCode',
+          name: 'placeEntityName',
           style: 'font-semibold',
           groupRule: {
-            group: 'departmentId',
-            code: 'departmentCode',
-            name: 'departmentName',
-            style: 'font-semibold',
-            groupRule: {
-              group: 'productId',
-              code: 'productCode',
-              name: 'productName',
-              from: ['details'],
-            },
-          },
-        },
-      },
-      accDepBranch: {
-        group: 'accountId',
-        code: 'accountCode',
-        name: 'accountName',
-        from: ['details'],
-        style: 'font-semibold',
-        groupRule: {
-          group: 'departmentId',
-          code: 'departmentCode',
-          name: 'departmentName',
-          style: 'font-semibold',
-          groupRule: {
-            group: 'branchId',
-            code: 'branchCode',
-            name: 'branchName',
-            style: 'font-semibold',
-            groupRule: {
-              group: 'productId',
-              code: 'productCode',
-              name: 'productName',
-              from: ['details'],
-            },
+            group: 'productId',
+            code: 'productCode',
+            name: 'productName',
+            from: ['details'],
           },
         },
       },

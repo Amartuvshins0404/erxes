@@ -14,8 +14,8 @@ interface IAdjustDebtRateInput {
   spotRate: number;
   gainAccountId: string;
   lossAccountId: string;
-  branchId?: string;
-  departmentId?: string;
+  placeEntityId?: string;
+  responsibleEntityId?: string;
 }
 
 const adjustDebtRateMutations = {

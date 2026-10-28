@@ -1,10 +1,9 @@
 import { gql } from '~/gql';
 
 export const SAFE_REMAINDER_ADD = gql(`
-mutation accountingSafeRemainderAdd($branchId: String, $departmentId: String, $date: Date, $description: String, $productCategoryId: String, $attachment: AttachmentInput, $filterField: String) {
+mutation accountingSafeRemainderAdd($placeEntityId: String, $date: Date, $description: String, $productCategoryId: String, $attachment: AttachmentInput, $filterField: String) {
   safeRemainderAdd(
-    branchId: $branchId
-    departmentId: $departmentId
+    placeEntityId: $placeEntityId
     date: $date
     description: $description
     productCategoryId: $productCategoryId
@@ -19,15 +18,9 @@ mutation accountingSafeRemainderAdd($branchId: String, $departmentId: String, $d
     date
     description
     status
-    branchId
-    departmentId
+    placeEntityId
     productCategoryId
-    branch {
-      _id
-      code
-      title
-    }
-    department {
+    placeEntity {
       _id
       code
       title

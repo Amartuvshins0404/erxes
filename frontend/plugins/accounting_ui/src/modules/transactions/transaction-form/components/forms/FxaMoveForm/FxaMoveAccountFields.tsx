@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { Form } from 'erxes-ui';
-import { SelectBranches, SelectDepartments } from 'ui-modules';
+import { SelectStructureEntities } from 'ui-modules';
 import { ITransactionGroupForm } from '../../../types/JournalForms';
 
 export const FxaMoveAccountFields = ({
@@ -15,12 +15,14 @@ export const FxaMoveAccountFields = ({
     <>
       <Form.Field
         control={form.control}
-        name={`trDocs.${index}.followInfos.moveInBranchId`}
+        name={`trDocs.${index}.followInfos.moveInPlaceEntityId`}
         render={({ field }) => (
           <Form.Item>
-            <Form.Label>{t('destination-branch-label')}</Form.Label>
+            <Form.Label>
+              {t('destination-place', 'Destination place')}
+            </Form.Label>
             <Form.Control>
-              <SelectBranches.FormItem
+              <SelectStructureEntities.FormItem
                 value={field.value}
                 onValueChange={field.onChange}
               />
@@ -31,12 +33,14 @@ export const FxaMoveAccountFields = ({
       />
       <Form.Field
         control={form.control}
-        name={`trDocs.${index}.followInfos.moveInDepartmentId`}
+        name={`trDocs.${index}.followInfos.moveInResponsibleEntityId`}
         render={({ field }) => (
           <Form.Item>
-            <Form.Label>{t('destination-department-label')}</Form.Label>
+            <Form.Label>
+              {t('destination-responsible', 'Destination responsible')}
+            </Form.Label>
             <Form.Control>
-              <SelectDepartments.FormItem
+              <SelectStructureEntities.FormItem
                 value={field.value}
                 onValueChange={field.onChange}
               />

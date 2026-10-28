@@ -35,8 +35,8 @@ export const orderToTrs = async ({
     saleAccountId: string;
     saleOutAccountId: string;
     saleCostAccountId: string;
-    branchId: string;
-    departmentId: string;
+    placeEntityId: string;
+    responsibleEntityId: string;
     hasVat: boolean;
     hasCtax: boolean;
     vatRowId: string;
@@ -95,8 +95,9 @@ export const orderToTrs = async ({
       saleOutAccountId: config.saleOutAccountId,
       saleCostAccountId: config.saleCostAccountId,
     },
-    branchId: order.branchId || config.branchId,
-    departmentId: order.departmentId || config.departmentId,
+    placeEntityId: order.placeEntityId || config.placeEntityId,
+    responsibleEntityId:
+      order.responsibleEntityId || config.responsibleEntityId,
 
     contentType,
     contentId,
@@ -118,7 +119,8 @@ export const orderToTrs = async ({
 
   const hasVat = config.hasVat && config.vatRowId;
   const firstCtaxRule = Object.values(ctaxRuleByProductId)[0];
-  const reverseCtaxRow = config.hasCtax ? undefined
+  const reverseCtaxRow = config.hasCtax
+    ? undefined
     : await ensureCtaxRowByProductRule(models, firstCtaxRule);
 
   const ctaxRowId = config.hasCtax ? config.ctaxRowId : reverseCtaxRow?._id;
@@ -168,8 +170,9 @@ export const orderToTrs = async ({
     saleTrDoc.details.push({
       _id: nanoid(),
       accountId: config.saleAccountId,
-      branchId: order.branchId || config.branchId,
-      departmentId: order.departmentId || config.departmentId,
+      placeEntityId: order.placeEntityId || config.placeEntityId,
+      responsibleEntityId:
+        order.responsibleEntityId || config.responsibleEntityId,
       amount,
       currency: productData.currency,
 
@@ -215,8 +218,9 @@ export const orderToTrs = async ({
       date,
       journal,
       side,
-      branchId: order.branchId || config.branchId,
-      departmentId: order.departmentId || config.departmentId,
+      placeEntityId: order.placeEntityId || config.placeEntityId,
+      responsibleEntityId:
+        order.responsibleEntityId || config.responsibleEntityId,
       customerType: saleTrDoc.customerType,
       customerId: saleTrDoc.customerId,
       contentType,
@@ -250,8 +254,8 @@ export const orderToTrs = async ({
         date,
         journal,
         side,
-        branchId: saleTrDoc.branchId,
-        departmentId: saleTrDoc.departmentId,
+        placeEntityId: saleTrDoc.placeEntityId,
+        responsibleEntityId: saleTrDoc.responsibleEntityId,
         customerType: saleTrDoc.customerType,
         customerId: saleTrDoc.customerId,
         contentType,

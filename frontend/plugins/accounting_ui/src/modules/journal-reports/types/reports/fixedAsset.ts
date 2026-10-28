@@ -7,7 +7,7 @@ export const fixedAssetReportRules: Record<string, IReportConfig> = {
     choices: [
       { code: 'fixedAsset', title: 'by-asset' },
       { code: 'accountFixedAsset', title: 'account-asset' },
-      { code: 'branchDepartmentFixedAsset', title: 'branch-department-asset' },
+      { code: 'placeResponsibleFixedAsset', title: 'place-responsible-asset' },
     ],
     groups: {
       fixedAsset: {
@@ -31,15 +31,15 @@ export const fixedAssetReportRules: Record<string, IReportConfig> = {
           groupRule: null,
         },
       },
-      branchDepartmentFixedAsset: {
-        group: 'branchId',
-        code: 'branchCode',
-        name: 'branchName',
+      placeResponsibleFixedAsset: {
+        group: 'placeEntityId',
+        code: 'placeEntityCode',
+        name: 'placeEntityName',
         style: 'font-semibold',
         groupRule: {
-          group: 'departmentId',
-          code: 'departmentCode',
-          name: 'departmentName',
+          group: 'responsibleEntityId',
+          code: 'responsibleEntityCode',
+          name: 'responsibleEntityName',
           style: 'font-semibold',
           groupRule: {
             group: 'fixedAssetId',

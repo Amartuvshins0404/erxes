@@ -17,14 +17,14 @@ type TAccountBalance = {
   accountId: string;
   mainBalance: number;
   currencyBalance: number;
-  branchId?: string;
-  departmentId?: string;
+  placeEntityId?: string;
+  responsibleEntityId?: string;
 };
 
 type TAdjustmentDetail = IAdjustFundRateDetail & {
   diff: number;
-  branchId?: string;
-  departmentId?: string;
+  placeEntityId?: string;
+  responsibleEntityId?: string;
 };
 
 type TBalanceMovement = TAccountBalance & {
@@ -68,13 +68,13 @@ const getNextDate = (date: Date) => addDays(getPureDate(date), 1);
 
 const makeBalanceKey = ({
   accountId,
-  branchId,
-  departmentId,
+  placeEntityId,
+  responsibleEntityId,
 }: {
   accountId: string;
-  branchId?: string;
-  departmentId?: string;
-}) => `${accountId}:${branchId || ''}:${departmentId || ''}`;
+  placeEntityId?: string;
+  responsibleEntityId?: string;
+}) => `${accountId}:${placeEntityId || ''}:${responsibleEntityId || ''}`;
 
 const getFundAccounts = async (models: IModels, adjust: IAdjustFundRate) => {
   const accounts = await models.Accounts.find(
@@ -83,7 +83,7 @@ const getFundAccounts = async (models: IModels, adjust: IAdjustFundRate) => {
       currency: adjust.currency,
       status: 'active',
     },
-    { _id: 1, branchId: 1, departmentId: 1 },
+    { _id: 1, placeEntityId: 1, responsibleEntityId: 1 },
   ).lean();
 
   return {
@@ -92,8 +92,8 @@ const getFundAccounts = async (models: IModels, adjust: IAdjustFundRate) => {
       accounts.map((account) => [
         account._id,
         {
-          branchId: account.branchId,
-          departmentId: account.departmentId,
+          placeEntityId: account.placeEntityId,
+          responsibleEntityId: account.responsibleEntityId,
         },
       ]),
     ),
@@ -173,7 +173,10 @@ const getBalanceMovements = async (
   models: IModels,
   adjust: IAdjustFundRate,
   accountIds: string[],
-  accountById: Map<string, { branchId?: string; departmentId?: string }>,
+  accountById: Map<
+    string,
+    { placeEntityId?: string; responsibleEntityId?: string }
+  >,
   endDate: Date,
 ): Promise<TBalanceMovement[]> => {
   const endExclusiveDate = getNextDate(endDate);
@@ -197,8 +200,12 @@ const getBalanceMovements = async (
         date: 1,
         side: 1,
         accountId: '$details.accountId',
-        branchId: { $ifNull: ['$details.branchId', '$branchId'] },
-        departmentId: { $ifNull: ['$details.departmentId', '$departmentId'] },
+        placeEntityId: {
+          $ifNull: ['$details.placeEntityId', '$placeEntityId'],
+        },
+        responsibleEntityId: {
+          $ifNull: ['$details.responsibleEntityId', '$responsibleEntityId'],
+        },
         amount: '$details.amount',
         currencyAmount: { $ifNull: ['$details.currencyAmount', 0] },
       },
@@ -208,8 +215,8 @@ const getBalanceMovements = async (
         _id: {
           date: '$date',
           accountId: '$accountId',
-          branchId: '$branchId',
-          departmentId: '$departmentId',
+          placeEntityId: '$placeEntityId',
+          responsibleEntityId: '$responsibleEntityId',
         },
         mainBalance: {
           $sum: {
@@ -237,16 +244,17 @@ const getBalanceMovements = async (
   return records
     .map((record) => {
       const account = accountById.get(record._id.accountId);
-      const branchId = record._id.branchId || account?.branchId;
-      const departmentId = record._id.departmentId || account?.departmentId;
+      const placeEntityId = record._id.placeEntityId || account?.placeEntityId;
+      const responsibleEntityId =
+        record._id.responsibleEntityId || account?.responsibleEntityId;
 
       return {
         accountId: record._id.accountId,
         date: getPureDate(record._id.date),
         mainBalance: fixNum(record.mainBalance || 0, BALANCE_PRECISION),
         currencyBalance: fixNum(record.currencyBalance || 0, BALANCE_PRECISION),
-        branchId,
-        departmentId,
+        placeEntityId,
+        responsibleEntityId,
       };
     })
     .filter(
@@ -263,8 +271,8 @@ const applyMovement = (
     accountId: movement.accountId,
     mainBalance: 0,
     currencyBalance: 0,
-    branchId: movement.branchId,
-    departmentId: movement.departmentId,
+    placeEntityId: movement.placeEntityId,
+    responsibleEntityId: movement.responsibleEntityId,
   };
 
   balance.mainBalance = fixNum(
@@ -312,7 +320,9 @@ const buildBalanceByDay = (
 
     if (negativeBalance) {
       throw new FundRateValidationError(
-        `Fund currency balance cannot be negative before adjustment. Date: ${currentDate.toISOString().slice(0, 10)}, Account: ${negativeBalance.accountId}`,
+        `Fund currency balance cannot be negative before adjustment. Date: ${currentDate
+          .toISOString()
+          .slice(0, 10)}, Account: ${negativeBalance.accountId}`,
         currentDate,
         beginDate,
       );
@@ -384,8 +394,8 @@ const buildAdjustmentResult = async (
         mainBalance: balance.mainBalance,
         currencyBalance: balance.currencyBalance,
         diff,
-        branchId: balance.branchId,
-        departmentId: balance.departmentId,
+        placeEntityId: balance.placeEntityId,
+        responsibleEntityId: balance.responsibleEntityId,
         createdAt: new Date(),
       };
     }),
@@ -399,8 +409,8 @@ const makeDetail = (
 ): ITrDetail => ({
   accountId,
   amount,
-  branchId: source.branchId,
-  departmentId: source.departmentId,
+  placeEntityId: source.placeEntityId,
+  responsibleEntityId: source.responsibleEntityId,
 });
 
 const buildTransactionDocs = (
@@ -462,8 +472,8 @@ const toPersistedDetail = (
   accountId: detail.accountId,
   mainBalance: detail.mainBalance,
   currencyBalance: detail.currencyBalance,
-  branchId: detail.branchId,
-  departmentId: detail.departmentId,
+  placeEntityId: detail.placeEntityId,
+  responsibleEntityId: detail.responsibleEntityId,
   createdAt: detail.createdAt,
 });
 
@@ -620,8 +630,8 @@ export const runAdjustFundRate = async (
         (transaction.details || []).map((detail) => ({
           key: makeBalanceKey({
             accountId: detail.accountId,
-            branchId: detail.branchId,
-            departmentId: detail.departmentId,
+            placeEntityId: detail.placeEntityId,
+            responsibleEntityId: detail.responsibleEntityId,
           }),
           transactionId: transaction._id,
         })),

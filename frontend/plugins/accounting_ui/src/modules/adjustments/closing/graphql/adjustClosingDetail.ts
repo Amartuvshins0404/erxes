@@ -4,8 +4,8 @@ export const ADJUST_CLOSING_DETAIL_QUERY = gql(`
 query accountingAdjustClosingDetail($_id: String!) {
   adjustClosingDetail(_id: $_id) {
     _id
-    branchId
-    departmentId
+    placeEntityId
+    responsibleEntityId
     beginDate
     date
     status
@@ -28,8 +28,8 @@ query accountingAdjustClosingDetail($_id: String!) {
     updatedAt
     details {
       _id
-      branchId
-      departmentId
+      placeEntityId
+      responsibleEntityId
       closeIntegrateTrId
       periodGLTrId
       entries {
@@ -51,8 +51,8 @@ query accountingAdjustClosingDetails($_id: String!) {
     _id
     details {
       _id
-      branchId
-      departmentId
+      placeEntityId
+      responsibleEntityId
       closeIntegrateTrId
       periodGLTrId
       entries {

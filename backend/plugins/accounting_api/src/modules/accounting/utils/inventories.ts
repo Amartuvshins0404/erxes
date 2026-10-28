@@ -88,8 +88,7 @@ export const getLastIncomePrices = async (
 export const activeCost = async (
   models: IModels,
   accountId: string,
-  branchId?: string,
-  departmentId?: string,
+  placeEntityId?: string,
   productIds: string[] = [],
   excludedTransactionIds: string[] = [],
 ) => {
@@ -113,15 +112,13 @@ export const activeCost = async (
     .sort({ date: -1, createdAt: -1, _id: -1 })
     .lean();
 
-  const branchKey = branchId || '_';
-  const departmentKey = departmentId || '_';
+  const placeKey = placeEntityId || '_';
 
   if (lastPublishedAdjust?._id) {
     const adjustDetails = await models.AdjustInvDetails.find({
       adjustId: lastPublishedAdjust._id,
       accountId,
-      branchId: branchKey,
-      departmentId: departmentKey,
+      placeEntityId: placeKey,
       productId: { $in: safeProductIds },
     }).lean();
 
@@ -161,13 +158,9 @@ export const activeCost = async (
       { $unwind: '$details' },
       {
         $addFields: {
-          locationBranchId: inventoryLocationKeyExpression(
-            '$details.branchId',
-            '$branchId',
-          ),
-          locationDepartmentId: inventoryLocationKeyExpression(
-            '$details.departmentId',
-            '$departmentId',
+          locationPlaceEntityId: inventoryLocationKeyExpression(
+            '$details.placeEntityId',
+            '$placeEntityId',
           ),
         },
       },
@@ -175,8 +168,7 @@ export const activeCost = async (
         $match: {
           'details.accountId': accountId,
           'details.productId': { $in: safeProductIds },
-          locationBranchId: branchKey,
-          locationDepartmentId: departmentKey,
+          locationPlaceEntityId: placeKey,
         },
       },
       {
@@ -421,9 +413,9 @@ const calcTrs = async (
 ) => {
   for (const trs of aggregateTrs) {
     const { _id, records } = trs;
-    const { accountId, branchId, departmentId, productId } = _id;
+    const { accountId, placeEntityId, productId } = _id;
 
-    if (!branchId || !departmentId || !productId || !accountId) {
+    if (!placeEntityId || !productId || !accountId) {
       continue;
     }
 
@@ -436,8 +428,7 @@ const calcTrs = async (
 
     await models.AdjustInvDetails.increaseAdjustInvDetail({
       adjustId,
-      branchId,
-      departmentId,
+      placeEntityId,
       accountId,
       productId,
       count,
@@ -470,23 +461,16 @@ const calcInvTrs = async (
     { $unwind: '$details' },
     {
       $addFields: {
-        locationBranchId: {
-          $cond: [
-            { $gt: [{ $strLenCP: { $ifNull: ['$details.branchId', ''] } }, 0] },
-            '$details.branchId',
-            '$branchId',
-          ],
-        },
-        locationDepartmentId: {
+        locationPlaceEntityId: {
           $cond: [
             {
               $gt: [
-                { $strLenCP: { $ifNull: ['$details.departmentId', ''] } },
+                { $strLenCP: { $ifNull: ['$details.placeEntityId', ''] } },
                 0,
               ],
             },
-            '$details.departmentId',
-            '$departmentId',
+            '$details.placeEntityId',
+            '$placeEntityId',
           ],
         },
       },
@@ -496,8 +480,7 @@ const calcInvTrs = async (
       $group: {
         _id: {
           accountId: '$details.accountId',
-          branchId: '$locationBranchId',
-          departmentId: '$locationDepartmentId',
+          placeEntityId: '$locationPlaceEntityId',
           productId: '$details.productId',
         },
         records: { $push: '$$ROOT' },
@@ -736,36 +719,19 @@ const getErrorDesc = async (
     }
   }
 
-  if (errFormat.includes('{branchId}') && args.branchId) {
-    const branch = await sendTRPCMessage({
+  if (errFormat.includes('{placeEntityId}') && args.placeEntityId) {
+    const place = await sendTRPCMessage({
       subdomain,
       pluginName: 'core',
-      module: 'branches',
+      module: 'structureEntities',
       action: 'findOne',
       defaultValue: {},
-      input: { query: { _id: args.branchId } },
+      input: { query: { _id: args.placeEntityId } },
     });
-    if (branch?._id) {
+    if (place?._id) {
       result = result.replace(
-        /{branchId}/g,
-        `${branch.code} - ${branch.title}`,
-      );
-    }
-  }
-
-  if (errFormat.includes('{departmentId}') && args.departmentId) {
-    const department = await sendTRPCMessage({
-      subdomain,
-      pluginName: 'core',
-      module: 'departments',
-      action: 'findOne',
-      defaultValue: {},
-      input: { query: { _id: args.departmentId } },
-    });
-    if (department?._id) {
-      result = result.replace(
-        /{departmentId}/g,
-        `${department.code} - ${department.title}`,
+        /{placeEntityId}/g,
+        `${place.code} - ${place.title}`,
       );
     }
   }
@@ -808,17 +774,16 @@ export const fixOutTrs = async (
         const trIds: string[] = [];
         const executions = new Map<string, string>();
         const { _id, records } = outTrs;
-        const { accountId, branchId, departmentId, productId } = _id;
+        const { accountId, placeEntityId, productId } = _id;
 
-        if (!branchId || !departmentId || !productId || !accountId) {
+        if (!placeEntityId || !productId || !accountId) {
           return;
         }
 
         const detailFilter = {
           productId,
           accountId,
-          branchId,
-          departmentId,
+          placeEntityId,
         };
 
         const sumCount = fixNum(
@@ -838,8 +803,8 @@ export const fixOutTrs = async (
           const error = await getErrorDesc(
             subdomain,
             models,
-            `Not enough stock for {productId} in {accountId} {branchId} {departmentId} (out)`,
-            { productId, accountId, branchId, departmentId },
+            `Not enough stock for {productId} in {accountId} {placeEntityId} (out)`,
+            { productId, accountId, placeEntityId },
           );
           await models.AdjustInvDetails.updateOne(
             { _id: adjustDetail._id },
@@ -910,8 +875,7 @@ export const fixOutTrs = async (
           adjustId,
           productId,
           accountId,
-          branchId,
-          departmentId,
+          placeEntityId,
           remainder,
           cost,
           unitCost,
@@ -963,17 +927,16 @@ const fixMoveTrs = async (
   for (const outcomeTrs of moveAggrs) {
     const trIds: string[] = [];
     const { _id, records } = outcomeTrs;
-    const { accountId, branchId, departmentId, productId } = _id;
+    const { accountId, placeEntityId, productId } = _id;
 
-    if (!branchId || !departmentId || !productId || !accountId) {
+    if (!placeEntityId || !productId || !accountId) {
       continue;
     }
 
     const detailFilter = {
       productId,
       accountId,
-      branchId,
-      departmentId,
+      placeEntityId,
     };
 
     const sumCount = fixNum(
@@ -993,8 +956,8 @@ const fixMoveTrs = async (
       const error = await getErrorDesc(
         subdomain,
         models,
-        'Not enough stock for {productId} in {accountId} {branchId} {departmentId}, (move)',
-        { productId, accountId, branchId, departmentId },
+        'Not enough stock for {productId} in {accountId} {placeEntityId}, (move)',
+        { productId, accountId, placeEntityId },
       );
       await models.AdjustInvDetails.updateOne(
         { _id: adjustDetail._id },
@@ -1035,8 +998,7 @@ const fixMoveTrs = async (
           adjustId,
           productId,
           accountId: moveInRec.details.accountId,
-          branchId: moveInRec.branchId,
-          departmentId: moveInRec.departmentId,
+          placeEntityId: moveInRec.placeEntityId,
           count: moveInRec.details.count,
           amount: moveInRec.details.amount,
           multiplier: 1,
@@ -1075,8 +1037,7 @@ const fixMoveTrs = async (
         adjustId,
         productId,
         accountId: moveInRec.details.accountId,
-        branchId: moveInRec.branchId,
-        departmentId: moveInRec.departmentId,
+        placeEntityId: moveInRec.placeEntityId,
         count: moveInRec.details.count,
         amount: moveInCost,
         multiplier: 1,
@@ -1089,8 +1050,7 @@ const fixMoveTrs = async (
       adjustId,
       productId,
       accountId,
-      branchId,
-      departmentId,
+      placeEntityId,
       remainder,
       cost,
       unitCost,
@@ -1118,17 +1078,16 @@ const fixSaleOutTrs = async (
   for (const saleOutTrs of saleOutAggrs) {
     const trIds: string[] = [];
     const { _id, records } = saleOutTrs;
-    const { accountId, branchId, departmentId, productId } = _id;
+    const { accountId, placeEntityId, productId } = _id;
 
-    if (!branchId || !departmentId || !productId || !accountId) {
+    if (!placeEntityId || !productId || !accountId) {
       continue;
     }
 
     const detailFilter = {
       productId,
       accountId,
-      branchId,
-      departmentId,
+      placeEntityId,
     };
 
     const sumCount = fixNum(
@@ -1148,8 +1107,8 @@ const fixSaleOutTrs = async (
       const error = await getErrorDesc(
         subdomain,
         models,
-        'Not enough stock for {productId} in {accountId} {branchId} {departmentId} (sale)',
-        { productId, accountId, branchId, departmentId },
+        'Not enough stock for {productId} in {accountId} {placeEntityId} (sale)',
+        { productId, accountId, placeEntityId },
       );
       await models.AdjustInvDetails.updateOne(
         { _id: adjustDetail._id },
@@ -1227,8 +1186,7 @@ const fixSaleOutTrs = async (
       adjustId,
       productId,
       accountId,
-      branchId,
-      departmentId,
+      placeEntityId,
       remainder,
       cost,
       unitCost,
@@ -1261,23 +1219,16 @@ const fixInvTrs = async (
     { $unwind: '$details' },
     {
       $addFields: {
-        locationBranchId: {
-          $cond: [
-            { $gt: [{ $strLenCP: { $ifNull: ['$details.branchId', ''] } }, 0] },
-            '$details.branchId',
-            '$branchId',
-          ],
-        },
-        locationDepartmentId: {
+        locationPlaceEntityId: {
           $cond: [
             {
               $gt: [
-                { $strLenCP: { $ifNull: ['$details.departmentId', ''] } },
+                { $strLenCP: { $ifNull: ['$details.placeEntityId', ''] } },
                 0,
               ],
             },
-            '$details.departmentId',
-            '$departmentId',
+            '$details.placeEntityId',
+            '$placeEntityId',
           ],
         },
       },
@@ -1287,8 +1238,7 @@ const fixInvTrs = async (
       $group: {
         _id: {
           accountId: '$details.accountId',
-          branchId: '$locationBranchId',
-          departmentId: '$locationDepartmentId',
+          placeEntityId: '$locationPlaceEntityId',
           productId: '$details.productId',
         },
         records: { $push: '$$ROOT' },
@@ -1393,8 +1343,8 @@ export const adjustRunning = async (
       'details.productId': { $exists: true, $ne: '' },
       'details.accountId': { $exists: true, $ne: '' },
       $or: [
-        { branchId: { $exists: true, $ne: '' } },
-        { 'details.branchId': { $exists: true, $ne: '' } },
+        { placeEntityId: { $exists: true, $ne: '' } },
+        { 'details.placeEntityId': { $exists: true, $ne: '' } },
       ],
       status: TR_STATUSES.COMPLETE,
     };
@@ -1448,7 +1398,7 @@ export const adjustRunning = async (
         while (step * per <= summary) {
           bulkOps = [];
           const details = await models.AdjustInvDetails.find({ adjustId })
-            .sort({ accountId: 1, branchId: 1, departmentId: 1, productId: 1 })
+            .sort({ accountId: 1, placeEntityId: 1, productId: 1 })
             .skip(step * per)
             .limit(per)
             .lean();

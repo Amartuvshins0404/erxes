@@ -67,8 +67,11 @@ export const createFxaMoveInFollowTr = async (
 ) => {
   const followInfos = getFxaMoveFollowInfos(transaction);
 
-  if (!followInfos.moveInBranchId && !followInfos.moveInDepartmentId) {
-    throw new Error('Move destination branch or department is required');
+  if (
+    !followInfos.moveInPlaceEntityId &&
+    !followInfos.moveInResponsibleEntityId
+  ) {
+    throw new Error('Move destination place or responsible is required');
   }
 
   const oldMoveInTr = await cleanFxaFollowTr(
@@ -87,8 +90,8 @@ export const createFxaMoveInFollowTr = async (
       originType: TR_DETAIL_FOLLOW_TYPES.FXA_MOVE_IN,
       fixedAssetId: detail.fixedAssetId,
       accountId: detail.accountId,
-      branchId: followInfos.moveInBranchId,
-      departmentId: followInfos.moveInDepartmentId,
+      placeEntityId: followInfos.moveInPlaceEntityId,
+      responsibleEntityId: followInfos.moveInResponsibleEntityId,
       count: detail.count,
       unitPrice: detail.unitPrice,
       amount: detail.amount,
@@ -110,8 +113,8 @@ export const createFxaMoveInFollowTr = async (
       status: transaction.status,
       mentionOwnerId: transaction.mentionOwnerId,
       mentionUserIds: transaction.mentionUserIds,
-      branchId: followInfos.moveInBranchId,
-      departmentId: followInfos.moveInDepartmentId,
+      placeEntityId: followInfos.moveInPlaceEntityId,
+      responsibleEntityId: followInfos.moveInResponsibleEntityId,
       customerType: transaction.customerType,
       customerId: transaction.customerId,
       journal: JOURNALS.FXA_MOVE_IN,
@@ -135,15 +138,15 @@ const deleteEmptyFxaFollowTr = async (
 
 const buildFxaMoveDepreciationDetails = ({
   accountId,
-  branchId,
-  departmentId,
+  placeEntityId,
+  responsibleEntityId,
   oldTr,
   originType,
   summaries,
 }: {
   accountId?: string;
-  branchId?: string;
-  departmentId?: string;
+  placeEntityId?: string;
+  responsibleEntityId?: string;
   oldTr?: ITransactionDocument | null;
   originType: string;
   summaries: TFxaDisposalSummary[];
@@ -161,8 +164,8 @@ const buildFxaMoveDepreciationDetails = ({
         originType,
         fixedAssetId: summary.fixedAssetId,
         accountId: accountId || '',
-        branchId,
-        departmentId,
+        placeEntityId,
+        responsibleEntityId,
         count: summary.count,
         unitPrice: summary.count
           ? fixNum(summary.accumulatedDepreciation / summary.count)
@@ -172,8 +175,8 @@ const buildFxaMoveDepreciationDetails = ({
     });
 
 const buildFxaMoveDepreciationTrDoc = ({
-  branchId,
-  departmentId,
+  placeEntityId,
+  responsibleEntityId,
   details,
   journal,
   oldTr,
@@ -182,8 +185,8 @@ const buildFxaMoveDepreciationTrDoc = ({
   side,
   transaction,
 }: {
-  branchId?: string;
-  departmentId?: string;
+  placeEntityId?: string;
+  responsibleEntityId?: string;
   details: ITrDetail[];
   journal: string;
   oldTr?: ITransactionDocument | null;
@@ -203,8 +206,8 @@ const buildFxaMoveDepreciationTrDoc = ({
   status: transaction.status,
   mentionOwnerId: transaction.mentionOwnerId,
   mentionUserIds: transaction.mentionUserIds,
-  branchId,
-  departmentId,
+  placeEntityId,
+  responsibleEntityId,
   customerType: transaction.customerType,
   customerId: transaction.customerId,
   journal,
@@ -219,8 +222,11 @@ export const createFxaMoveDepreciationFollowTrs = async (
 ) => {
   const followInfos = getFxaMoveFollowInfos(transaction);
 
-  if (!followInfos.moveInBranchId && !followInfos.moveInDepartmentId) {
-    throw new Error('Move destination branch or department is required');
+  if (
+    !followInfos.moveInPlaceEntityId &&
+    !followInfos.moveInResponsibleEntityId
+  ) {
+    throw new Error('Move destination place or responsible is required');
   }
 
   const summaries = await getFxaDisposalSummaries(models, transaction);
@@ -248,16 +254,16 @@ export const createFxaMoveDepreciationFollowTrs = async (
 
   const outDetails = buildFxaMoveDepreciationDetails({
     accountId: followInfos.accumulatedDepreciationAccountId,
-    branchId: transaction.branchId,
-    departmentId: transaction.departmentId,
+    placeEntityId: transaction.placeEntityId,
+    responsibleEntityId: transaction.responsibleEntityId,
     oldTr: oldOutTr,
     originType: TR_DETAIL_FOLLOW_TYPES.FXA_DEP_OUT,
     summaries,
   });
   const inDetails = buildFxaMoveDepreciationDetails({
     accountId: followInfos.accumulatedDepreciationAccountId,
-    branchId: followInfos.moveInBranchId,
-    departmentId: followInfos.moveInDepartmentId,
+    placeEntityId: followInfos.moveInPlaceEntityId,
+    responsibleEntityId: followInfos.moveInResponsibleEntityId,
     oldTr: oldInTr,
     originType: TR_DETAIL_FOLLOW_TYPES.FXA_DEP_IN,
     summaries,
@@ -272,8 +278,8 @@ export const createFxaMoveDepreciationFollowTrs = async (
       models,
       userId,
       buildFxaMoveDepreciationTrDoc({
-        branchId: transaction.branchId,
-        departmentId: transaction.departmentId,
+        placeEntityId: transaction.placeEntityId,
+        responsibleEntityId: transaction.responsibleEntityId,
         details: outDetails,
         journal: JOURNALS.FXA_DEP_OUT,
         oldTr: oldOutTr,
@@ -288,8 +294,8 @@ export const createFxaMoveDepreciationFollowTrs = async (
       models,
       userId,
       buildFxaMoveDepreciationTrDoc({
-        branchId: followInfos.moveInBranchId,
-        departmentId: followInfos.moveInDepartmentId,
+        placeEntityId: followInfos.moveInPlaceEntityId,
+        responsibleEntityId: followInfos.moveInResponsibleEntityId,
         details: inDetails,
         journal: JOURNALS.FXA_DEP_IN,
         oldTr: oldInTr,

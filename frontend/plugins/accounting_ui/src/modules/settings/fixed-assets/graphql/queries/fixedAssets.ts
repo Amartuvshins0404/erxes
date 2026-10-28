@@ -92,36 +92,36 @@ query accountingFixedAssetDetail($id: String!) {
 `);
 
 export const GET_FIXED_ASSET_LOCATION_REMAINDER = gql(`
-query accountingFixedAssetLocationRemainder($fixedAssetId: String!, $branchId: String, $departmentId: String, $date: Date, $excludeTransactionId: String) {
+query accountingFixedAssetLocationRemainder($fixedAssetId: String!, $placeEntityId: String, $responsibleEntityId: String, $date: Date, $excludeTransactionId: String) {
   fixedAssetLocationRemainder(
     fixedAssetId: $fixedAssetId
-    branchId: $branchId
-    departmentId: $departmentId
+    placeEntityId: $placeEntityId
+    responsibleEntityId: $responsibleEntityId
     date: $date
     excludeTransactionId: $excludeTransactionId
   ) {
     fixedAssetId
-    branchId
-    departmentId
+    placeEntityId
+    responsibleEntityId
     remainder
   }
 }
 `);
 
 export const GET_FIXED_ASSET_LOCATION_REMAINDERS = gql(`
-query AccountingFixedAssetLocationRemainders($searchValue: String, $fixedAssetId: String, $categoryId: String, $branchId: String, $departmentId: String, $date: Date, $limit: Int) {
+query AccountingFixedAssetLocationRemainders($searchValue: String, $fixedAssetId: String, $categoryId: String, $placeEntityId: String, $responsibleEntityId: String, $date: Date, $limit: Int) {
   fixedAssetLocationRemainders(
     searchValue: $searchValue
     fixedAssetId: $fixedAssetId
     categoryId: $categoryId
-    branchId: $branchId
-    departmentId: $departmentId
+    placeEntityId: $placeEntityId
+    responsibleEntityId: $responsibleEntityId
     date: $date
     limit: $limit
   ) {
     fixedAssetId
-    branchId
-    departmentId
+    placeEntityId
+    responsibleEntityId
     remainder
   }
 }

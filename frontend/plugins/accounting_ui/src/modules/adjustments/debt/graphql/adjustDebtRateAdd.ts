@@ -1,7 +1,7 @@
 import { gql } from '~/gql';
 
 export const ADJUST_DEBT_RATE_ADD = gql(`
-mutation AccountingAdjustDebtRateAdd($mainCurrency: String!, $currency: String!, $spotRate: Float!, $date: Date!, $customerType: String, $customerId: String, $description: String, $gainAccountId: String!, $lossAccountId: String!, $branchId: String, $departmentId: String) {
+mutation AccountingAdjustDebtRateAdd($mainCurrency: String!, $currency: String!, $spotRate: Float!, $date: Date!, $customerType: String, $customerId: String, $description: String, $gainAccountId: String!, $lossAccountId: String!, $placeEntityId: String, $responsibleEntityId: String) {
   adjustDebtRatesAdd(
     mainCurrency: $mainCurrency
     currency: $currency
@@ -12,8 +12,8 @@ mutation AccountingAdjustDebtRateAdd($mainCurrency: String!, $currency: String!,
     description: $description
     gainAccountId: $gainAccountId
     lossAccountId: $lossAccountId
-    branchId: $branchId
-    departmentId: $departmentId
+    placeEntityId: $placeEntityId
+    responsibleEntityId: $responsibleEntityId
   ) {
     _id
     date
@@ -32,8 +32,8 @@ mutation AccountingAdjustDebtRateAdd($mainCurrency: String!, $currency: String!,
     checkedAt
     error
     warning
-    branchId
-    departmentId
+    placeEntityId
+    responsibleEntityId
     createdBy
     modifiedBy
     createdAt

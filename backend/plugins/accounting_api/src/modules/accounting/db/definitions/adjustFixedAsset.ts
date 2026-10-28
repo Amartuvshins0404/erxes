@@ -33,11 +33,11 @@ export const adjustFxaDetailSchema = new Schema({
   fixedAssetId: { type: String, optional: true, label: 'Fixed asset' },
   categoryId: { type: String, optional: true, label: 'Category' },
   accountId: { type: String, optional: true, label: 'Account' },
-  branchId: { type: String, optional: true, label: 'Branch', index: true },
-  departmentId: {
+  placeEntityId: { type: String, optional: true, label: 'Place', index: true },
+  responsibleEntityId: {
     type: String,
     optional: true,
-    label: 'Department',
+    label: 'Responsible',
     index: true,
   },
   originalCost: { type: Number, label: 'Original cost' },
@@ -159,4 +159,8 @@ export const adjustFxaDetailSchema = new Schema({
 });
 
 adjustFxaDetailSchema.index({ adjustId: 1, fixedAssetId: 1 });
-adjustFxaDetailSchema.index({ adjustId: 1, branchId: 1, departmentId: 1 });
+adjustFxaDetailSchema.index({
+  adjustId: 1,
+  placeEntityId: 1,
+  responsibleEntityId: 1,
+});

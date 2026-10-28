@@ -1,5 +1,5 @@
-import { IContext } from "~/connectionResolvers";
-import { IAdjustInvDetail } from "~/modules/accounting/@types/adjustInventory";
+import { IContext } from '~/connectionResolvers';
+import { IAdjustInvDetail } from '~/modules/accounting/@types/adjustInventory';
 
 export default {
   __resolveReference({ _id }, { models }: IContext) {
@@ -21,25 +21,14 @@ export default {
     };
   },
 
-  async branch(detail: IAdjustInvDetail) {
-    if (!detail.branchId) {
+  async placeEntity(detail: IAdjustInvDetail) {
+    if (!detail.placeEntityId) {
       return;
     }
 
     return {
-      __typename: 'Branch',
-      _id: detail.branchId,
-    };
-  },
-
-  async department(detail: IAdjustInvDetail) {
-    if (!detail.departmentId) {
-      return;
-    }
-
-    return {
-      __typename: 'Department',
-      _id: detail.departmentId,
+      __typename: 'StructureEntity',
+      _id: detail.placeEntityId,
     };
   },
 };

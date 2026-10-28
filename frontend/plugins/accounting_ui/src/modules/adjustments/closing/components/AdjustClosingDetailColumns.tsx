@@ -19,8 +19,8 @@ export type IClosingDetailEntryRow = {
   mainAccTrId?: string;
   integrateTrId?: string;
 
-  branchId?: string;
-  departmentId?: string;
+  placeEntityId?: string;
+  responsibleEntityId?: string;
 };
 
 const MoneyCell = ({ getValue }: any) => {

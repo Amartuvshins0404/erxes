@@ -8,8 +8,8 @@ export const adjustFundRateDetailsSchema = new Schema({
   mainBalance: { type: Number, label: 'Main Currency Balance' }, // Төгрөгийн буюу үндсэн валютын үлдэгдэл
   currencyBalance: { type: Number, label: 'Currency Balance' }, // Гадаад валютын үлдэгдэл
   transactionId: { type: String, optional: true, label: 'Transaction' }, // Хадгалах үед зөрүү дүнтэй бол TR үүснэ
-  branchId: { type: String, optional: true, label: 'Branch' },
-  departmentId: { type: String, optional: true, label: 'Department' },
+  placeEntityId: { type: String, optional: true, label: 'Place' },
+  responsibleEntityId: { type: String, optional: true, label: 'Responsible' },
 
   createdAt: { type: Date, default: Date.now, label: 'Created at' },
   updatedAt: { type: Date, optional: true, label: 'Modified at' },

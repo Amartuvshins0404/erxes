@@ -1,8 +1,7 @@
 export const types = `
   type ReserveRem @key(fields: "_id") @cacheControl(maxAge: 3) {
     _id: String,
-    departmentId: String,
-    branchId: String,
+    placeEntityId: String,
     productId: String,
     uom: String,
     remainder: Float
@@ -11,8 +10,7 @@ export const types = `
     modifiedAt: Date,
     modifiedBy: String,
 
-    department: Department,
-    branch: Branch,
+    placeEntity: StructureEntity
     product: Product,
     createdUser: User,
     modifiedUser: User
@@ -29,8 +27,7 @@ export const paginateParams = `
 export const planFilterParams = `
   _ids:[String],
   searchValue: String,
-  departmentId: String,
-  branchId: String,
+  placeEntityId: String,
   productId: String,
   productCategoryId: String,
   remainder: Float,
@@ -45,8 +42,7 @@ export const queries = `
 `;
 
 export const planCreateParams = `
-  departmentIds: [String],
-  branchIds: [String],
+  placeEntityIds: [String],
   productCategoryId: String,
   productId: String,
   remainder: Float
@@ -55,5 +51,5 @@ export const planCreateParams = `
 export const mutations = `
   reserveRemsAdd(${planCreateParams}): [ReserveRem]
   reserveRemsRemove(_ids: [String!]!): JSON
-  reserveRemEdit(_id: String!, branchId: String, departmentId: String, productId: String, uom: String, remainder: Float): ReserveRem
+  reserveRemEdit(_id: String!, placeEntityId: String, productId: String, uom: String, remainder: Float): ReserveRem
 `;

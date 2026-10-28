@@ -23,8 +23,7 @@ import {
 } from '@/settings/types/SyncConfig';
 import {
   SelectBoard,
-  SelectBranches,
-  SelectDepartments,
+  SelectStructureEntities,
   SelectPipeline,
   SelectStage,
 } from 'ui-modules';
@@ -429,12 +428,12 @@ export const SyncConfigAccountsSection = <
       />
       <Form.Field
         control={control}
-        name={'branchId' as FieldPath<TFieldValues>}
+        name={'placeEntityId' as FieldPath<TFieldValues>}
         render={({ field }) => (
           <Form.Item>
-            <Form.Label>{t('branch')}</Form.Label>
+            <Form.Label>{t('place', 'Place')}</Form.Label>
             <Form.Control>
-              <SelectBranches.FormItem
+              <SelectStructureEntities.FormItem
                 mode="single"
                 value={field.value}
                 onValueChange={field.onChange}
@@ -445,12 +444,12 @@ export const SyncConfigAccountsSection = <
       />
       <Form.Field
         control={control}
-        name={'departmentId' as FieldPath<TFieldValues>}
+        name={'responsibleEntityId' as FieldPath<TFieldValues>}
         render={({ field }) => (
           <Form.Item>
-            <Form.Label>{t('department')}</Form.Label>
+            <Form.Label>{t('responsible', 'Responsible')}</Form.Label>
             <Form.Control>
-              <SelectDepartments.FormItem
+              <SelectStructureEntities.FormItem
                 mode="single"
                 value={field.value}
                 onValueChange={field.onChange}

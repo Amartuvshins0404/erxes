@@ -4,8 +4,7 @@ export const queries = ``;
 
 export const mutations = `
   reCalcRemainders(
-    departmentId: String,
-    branchId: String,
+    placeEntityId: String,
     productCategoryId: String,
     productIds: [String],
   ): String

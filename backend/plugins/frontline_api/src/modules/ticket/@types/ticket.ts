@@ -30,8 +30,7 @@ export interface ITicket {
   statusId?: string;
   description?: string;
   priority?: number;
-  branchId?: string;
-  departmentId?: string;
+  entityIds?: string[];
   labelIds?: string[];
   tagIds?: string[];
   status?: string;
@@ -79,8 +78,7 @@ export interface ITicketFilter
   targetDateEndDate?: Date;
   statusChangedStartDate?: Date;
   statusChangedEndDate?: Date;
-  branchIds?: string[];
-  departmentIds?: string[];
+  entityIds?: string[];
   propertiesData?: string;
   userId?: string;
   createdAt?: Date;

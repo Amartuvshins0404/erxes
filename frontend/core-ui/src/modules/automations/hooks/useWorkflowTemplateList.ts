@@ -14,16 +14,10 @@ export type TWorkflowTemplate = {
   description?: string;
   entryActionId?: string;
   actions: TAutomationAction[];
-  // Default binding expressions for the derived input.* refs in actions
   inputs?: TWorkflowInputBindings;
   createdAt?: string;
 };
 
-/**
- * Workflow template CRUD without any builder dependency, so it can be used
- * from the automations list and the standalone template editor as well as
- * from inside the builder.
- */
 export const useWorkflowTemplateList = ({
   searchValue,
 }: { searchValue?: string } = {}) => {
@@ -33,15 +27,12 @@ export const useWorkflowTemplateList = ({
 
   const [addTemplate, { loading: saving }] = useMutation(
     AUTOMATION_WORKFLOW_TEMPLATE_ADD,
-    { refetchQueries: [AUTOMATION_WORKFLOW_TEMPLATES] },
   );
   const [editTemplate, { loading: updatingTemplate }] = useMutation(
     AUTOMATION_WORKFLOW_TEMPLATE_EDIT,
-    { refetchQueries: [AUTOMATION_WORKFLOW_TEMPLATES] },
   );
   const [removeTemplateMutation] = useMutation(
     AUTOMATION_WORKFLOW_TEMPLATE_REMOVE,
-    { refetchQueries: [AUTOMATION_WORKFLOW_TEMPLATES] },
   );
 
   const templates = data?.automationWorkflowTemplates || [];

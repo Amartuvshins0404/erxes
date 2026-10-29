@@ -117,7 +117,6 @@ export const useAutomationHeader = () => {
           variant: 'success',
         });
         if (!id && automationsAdd) {
-          // The way back the seed link offered must outlive the seed.
           const returnSearch = automationReturnLinkSearch(
             parseAutomationReturnLink(searchParams),
           );
@@ -138,8 +137,6 @@ export const useAutomationHeader = () => {
       handleNodeErrors(nodeErrorMap);
     }
 
-    // The marked node can be off-canvas — a collapsed workflow, another scope —
-    // so the reason is always stated outright as well.
     const { message, ref } = findFirstErrorMessage(errors) || {};
 
     if (message) {

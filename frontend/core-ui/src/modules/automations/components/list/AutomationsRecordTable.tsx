@@ -12,7 +12,6 @@ import {
   Breadcrumb,
   Button,
   Separator,
-  Spinner,
   Kbd,
   useScopedHotkeys,
 } from 'erxes-ui';
@@ -60,9 +59,6 @@ export const AutomationsRecordTable = () => {
     AutomationsHotKeyScope.AutomationsPage,
     [canCreateAutomation, navigate],
   );
-  if (loading) {
-    return <Spinner />;
-  }
 
   return (
     <>
@@ -111,7 +107,7 @@ export const AutomationsRecordTable = () => {
           error={error}
           onRetry={() => refetch()}
         />
-      ) : list.length === 0 ? (
+      ) : !loading && list.length === 0 ? (
         <AutomationsRecordTableEmptyState />
       ) : layout === 'grid' ? (
         <AutomationsCardList

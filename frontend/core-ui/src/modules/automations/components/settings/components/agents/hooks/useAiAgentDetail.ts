@@ -4,9 +4,6 @@ import {
   AUTOMATIONS_AI_AGENT_ADD,
   AUTOMATIONS_AI_AGENT_DETAIL,
   AUTOMATIONS_AI_AGENT_EDIT,
-  AUTOMATIONS_AI_AGENT_KNOWLEDGE_SOURCE_STATUSES,
-  AUTOMATIONS_AI_AGENT_MODELS,
-  AUTOMATIONS_AI_AGENTS,
 } from '@/automations/components/settings/components/agents/graphql/automationsAiAgents';
 import { toast } from 'erxes-ui';
 import { useTranslation } from 'react-i18next';
@@ -83,23 +80,6 @@ export function useAiAgentDetail({
 
       const res = await mutation({
         variables: id ? { ...input, id } : input,
-        refetchQueries: [
-          AUTOMATIONS_AI_AGENTS,
-          // A new key or base url can change which models the provider lists.
-          AUTOMATIONS_AI_AGENT_MODELS,
-          ...(id
-            ? [
-                {
-                  query: AUTOMATIONS_AI_AGENT_DETAIL,
-                  variables: { id },
-                },
-                {
-                  query: AUTOMATIONS_AI_AGENT_KNOWLEDGE_SOURCE_STATUSES,
-                  variables: { agentId: id },
-                },
-              ]
-            : []),
-        ],
         onError: ({ message }) => {
           toast({
             title: t('sidebar-something-went-wrong'),

@@ -1,5 +1,4 @@
 import { AUTOMATION_DUPLICATE } from '@/automations/graphql/automationMutations';
-import { AUTOMATIONS_MAIN_LIST } from '@/automations/graphql/automationQueries';
 import { OperationVariables, useMutation } from '@apollo/client';
 
 export const useDuplicateAutomation = () => {
@@ -12,7 +11,6 @@ export const useDuplicateAutomation = () => {
     await automationsDuplicate({
       ...options,
       variables: { id: automationId, ...options?.variables },
-      refetchQueries: [AUTOMATIONS_MAIN_LIST],
     });
   };
 

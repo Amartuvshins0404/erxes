@@ -13,7 +13,7 @@ export const DragHandle = forwardRef<HTMLButtonElement, DragHandleProps>(
   ({ className, variant = 'ghost', ...props }, ref) => (
     <Button
       className={cn(
-        'size-5 flex-none cursor-grab px-0 text-accent-foreground active:cursor-grabbing',
+        'size-5 flex-none cursor-grab px-0 text-muted-foreground active:cursor-grabbing',
         className,
       )}
       ref={ref}

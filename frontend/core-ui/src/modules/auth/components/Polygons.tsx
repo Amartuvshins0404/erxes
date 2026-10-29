@@ -108,15 +108,15 @@ export const Polygons = ({ variant = 'dark', ...props }: PolygonsProps) => {
             gradientUnits="userSpaceOnUse"
             gradientTransform="translate(744 156.098) rotate(-180) scale(756 250.453)"
           >
-            <stop stopColor="var(--accent-foreground)" />
+            <stop stopColor="var(--muted-foreground)" />
             <stop
               offset="0.615762"
-              stopColor="var(--accent-foreground)"
+              stopColor="var(--muted-foreground)"
               stopOpacity="0.488108"
             />
             <stop
               offset="1"
-              stopColor="var(--accent-foreground)"
+              stopColor="var(--muted-foreground)"
               stopOpacity="0"
             />
           </radialGradient>
@@ -194,15 +194,15 @@ export const Polygons = ({ variant = 'dark', ...props }: PolygonsProps) => {
             gradientUnits="userSpaceOnUse"
             gradientTransform="translate(378 160.5) rotate(-180) scale(378 257.516)"
           >
-            <stop stopColor="var(--accent-foreground)" />
+            <stop stopColor="var(--muted-foreground)" />
             <stop
               offset="0.615762"
-              stopColor="var(--accent-foreground)"
+              stopColor="var(--muted-foreground)"
               stopOpacity="0.488108"
             />
             <stop
               offset="1"
-              stopColor="var(--accent-foreground)"
+              stopColor="var(--muted-foreground)"
               stopOpacity="0"
             />
           </radialGradient>
@@ -296,15 +296,15 @@ export const Polygons = ({ variant = 'dark', ...props }: PolygonsProps) => {
           gradientUnits="userSpaceOnUse"
           gradientTransform="translate(378 160.5) rotate(-180) scale(378 257.516)"
         >
-          <stop stopColor="var(--accent-foreground)" />
+          <stop stopColor="var(--muted-foreground)" />
           <stop
             offset="0.615762"
-            stopColor="var(--accent-foreground)"
+            stopColor="var(--muted-foreground)"
             stopOpacity="0.488108"
           />
           <stop
             offset="1"
-            stopColor="var(--accent-foreground)"
+            stopColor="var(--muted-foreground)"
             stopOpacity="0"
           />
         </radialGradient>

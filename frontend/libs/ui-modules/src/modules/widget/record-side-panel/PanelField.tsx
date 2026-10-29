@@ -15,7 +15,7 @@ export const PanelField = ({
   cell?: boolean;
 }) => (
   <div className="grid grid-cols-[6.5rem_minmax(0,1fr)] items-center gap-x-2 min-h-7">
-    <span className="truncate text-xs font-medium text-accent-foreground">
+    <span className="truncate text-xs font-medium text-muted-foreground">
       {label}
     </span>
     {/* Record table cells are 32px and 14px; the panel's rows are a little

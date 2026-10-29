@@ -18,7 +18,7 @@ export const AutomationOptionalConnectHandle =
         id={`${id}-${optionalId}-right`}
         type="source"
         position={isVertical ? Position.Bottom : Position.Right}
-        className={`!size-4 !bg-background !border !border-2 !rounded-full !border-accent-foreground !z-4 ${
+        className={`!size-4 !bg-background !border !border-2 !rounded-full !border-border-strong !z-4 ${
           isVertical ? '!bottom-0 !left-1/2 !right-auto' : '!right-4'
         }`}
         isConnectable

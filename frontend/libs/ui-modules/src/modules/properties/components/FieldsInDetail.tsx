@@ -331,7 +331,7 @@ const PropertyGroupRow = forwardRef<
               className="flex-1 justify-start gap-2 font-normal"
             >
               <Collapsible.TriggerIcon />
-              <span className="truncate text-accent-foreground">{label}</span>
+              <span className="truncate text-muted-foreground">{label}</span>
             </Button>
           </Collapsible.Trigger>
 

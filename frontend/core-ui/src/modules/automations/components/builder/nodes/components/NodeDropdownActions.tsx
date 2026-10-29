@@ -52,7 +52,7 @@ export const NodeDropdownActions = ({
           onClick={(e) => e.stopPropagation()}
           onDoubleClick={(e) => e.stopPropagation()}
           size={'icon'}
-          className="data-[state=open]:bg-accent-foreground/10"
+          className="data-[state=open]:bg-accent"
         >
           <IconDots className="size-4" />
         </Button>

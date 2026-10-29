@@ -51,7 +51,7 @@ export const BroadcastMethod = ({
               >
                 <div className="flex flex-col gap-1 p-2">
                   <Label variant="peer">{t(labelKey)}</Label>
-                  <div className="text-xs text-accent-foreground">
+                  <div className="text-xs text-muted-foreground">
                     {t(descriptionKey)}
                   </div>
                 </div>

@@ -170,7 +170,7 @@ const WorkflowNodeContent = ({
         </div>
       </div>
       <div className="p-3">
-        <span className="line-clamp-2 break-words text-xs text-accent-foreground">
+        <span className="line-clamp-2 break-words text-xs text-muted-foreground">
           {data.description}
         </span>
         <WorkflowMemberSummary />
@@ -229,7 +229,7 @@ const WorkflowSelectedNodes = ({
           type="target"
           position={isVertical ? Position.Top : Position.Left}
           className={cn(
-            '!size-4 !bg-background !border !border-2 !rounded-full !border-accent-foreground !z-4',
+            '!size-4 !bg-background !border !border-2 !rounded-full !border-border-strong !z-4',
             isVertical ? '!left-1/2 !top-0 -translate-x-1/2' : '!left-4',
           )}
           isConnectable

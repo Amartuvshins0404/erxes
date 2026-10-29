@@ -82,7 +82,7 @@ export const TagsListDescriptionField = ({
                 value={descriptionState}
               />
             ) : (
-              <p className="text-xs font-medium text-accent-foreground invisible group-hover:visible">
+              <p className="text-xs font-medium text-muted-foreground invisible group-hover:visible">
                 Add tag description...
               </p>
             )}

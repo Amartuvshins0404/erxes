@@ -119,7 +119,7 @@ const TriggerNode = ({ data, selected, id }: NodeProps<Node<NodeData>>) => {
         </div>
       </div>
       <div className="p-3">
-        <span className="text-xs text-accent-foreground ">
+        <span className="text-xs text-muted-foreground ">
           {data.description}
         </span>
 

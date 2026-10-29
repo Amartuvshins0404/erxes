@@ -243,9 +243,9 @@ const PrimaryEdge: FC<EdgeProps> = (edge) => {
                       {/* A plus reads as "connect one more"; this says the
                           action lands between the two ends instead. */}
                       {isVertical ? (
-                        <IconRowInsertBottom className="w-4 h-4 text-accent-foreground" />
+                        <IconRowInsertBottom className="w-4 h-4 text-muted-foreground" />
                       ) : (
-                        <IconColumnInsertRight className="w-4 h-4 text-accent-foreground" />
+                        <IconColumnInsertRight className="w-4 h-4 text-muted-foreground" />
                       )}
                     </Button>
                   </div>

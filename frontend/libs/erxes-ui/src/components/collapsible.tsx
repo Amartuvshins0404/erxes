@@ -13,7 +13,7 @@ export const TriggerButton = React.forwardRef<
         variant="ghost"
         size="sm"
         className={cn(
-          'w-full justify-start text-accent-foreground group',
+          'w-full justify-start text-muted-foreground group',
           className,
         )}
         {...props}

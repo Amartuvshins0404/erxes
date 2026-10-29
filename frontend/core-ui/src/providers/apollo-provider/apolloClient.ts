@@ -3,6 +3,7 @@ import {
   createHttpLink,
   from,
   InMemoryCache,
+  NormalizedCacheObject,
 } from '@apollo/client';
 import { setContext } from '@apollo/client/link/context';
 import { split } from '@apollo/client/link/core';
@@ -11,7 +12,7 @@ import { GraphQLWsLink } from '@apollo/client/link/subscriptions';
 import { getMainDefinition } from '@apollo/client/utilities';
 import { createClient } from 'graphql-ws';
 
-import { REACT_APP_API_URL } from 'erxes-ui';
+import { createLiveDataLink, REACT_APP_API_URL } from 'erxes-ui';
 
 const SESSION_CODE_STORAGE_KEY = 'sessioncode';
 
@@ -85,7 +86,15 @@ const authLink = setContext((_, { headers }) => {
 });
 
 // Combining httpLink and warelinks altogether
-const httpLinkWithMiddleware = from([errorLink, authLink, httpLink]);
+let liveClient: ApolloClient<NormalizedCacheObject> | undefined;
+const liveDataLink = createLiveDataLink(() => liveClient);
+
+const httpLinkWithMiddleware = from([
+  errorLink,
+  liveDataLink,
+  authLink,
+  httpLink,
+]);
 
 // Subscription config
 const wsUrl = REACT_APP_API_URL.replace(/^http/, 'ws') + '/graphql';
@@ -133,5 +142,7 @@ const client = new ApolloClient({
   link,
   connectToDevTools: true,
 });
+
+liveClient = client;
 
 export default client;

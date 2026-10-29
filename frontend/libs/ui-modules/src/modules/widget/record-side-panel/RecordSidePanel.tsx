@@ -434,7 +434,7 @@ const RecordSidePanelTabs = ({
               <Button
                 variant="ghost"
                 size="sm"
-                className="text-accent-foreground"
+                className="text-muted-foreground"
               >
                 {t('more', '+{{count}} More', { count: overflow.length })}
                 <IconChevronDown />

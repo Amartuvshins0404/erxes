@@ -168,7 +168,7 @@ const CustomersList = ({
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
-        <div className="text-accent-foreground text-xs mt-4">
+        <div className="text-muted-foreground text-xs mt-4">
           {totalCount} results
         </div>
       </div>
@@ -212,7 +212,7 @@ const CustomersList = ({
             {customers.length < totalCount && (
               <div ref={bottomRef} className="flex items-center gap-2 h-8">
                 <Spinner />
-                <span className="text-accent-foreground animate-pulse">
+                <span className="text-muted-foreground animate-pulse">
                   Loading more customers...
                 </span>
               </div>
@@ -238,7 +238,7 @@ const SelectedCustomersList = ({
   return (
     <ScrollArea className="h-full">
       <div className="p-4 flex flex-col gap-1">
-        <div className="text-accent-foreground text-xs px-3 mb-1">Added</div>
+        <div className="text-muted-foreground text-xs px-3 mb-1">Added</div>
 
         {selectedCustomerIds.map((customerId) => {
           return (

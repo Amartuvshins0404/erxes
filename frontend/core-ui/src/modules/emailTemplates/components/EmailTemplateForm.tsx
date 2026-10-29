@@ -275,7 +275,7 @@ export const EmailTemplateForm = ({ templateId }: { templateId?: string }) => {
             gets is never a guess. */}
         {isPreviewOpen && (
           <aside className="flex w-[45%] min-w-0 shrink-0 flex-col border-l bg-background">
-            <div className="flex h-10 shrink-0 items-center justify-between border-b pl-4 pr-2 font-mono text-xs uppercase text-accent-foreground">
+            <div className="flex h-10 shrink-0 items-center justify-between border-b pl-4 pr-2 font-mono text-xs uppercase text-muted-foreground">
               {t('preview')}
               <EmailPreviewDeviceToggle
                 value={previewDevice}

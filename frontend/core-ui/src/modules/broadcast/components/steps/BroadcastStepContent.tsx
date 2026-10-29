@@ -38,7 +38,7 @@ export const BroadcastStepContent = () => {
             />
           ))}
         </div>
-        <div className="text-xs text-accent-foreground">
+        <div className="text-xs text-muted-foreground">
           {t(descriptionKey)}
         </div>
       </div>

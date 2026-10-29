@@ -11,14 +11,14 @@ export const UnknownSystemNotificationContent = ({
       <div className="size-28 bg-sidebar rounded-2xl border border-dashed flex items-center justify-center">
         <IconInfoCircle
           size={32}
-          className="text-accent-foreground"
+          className="text-muted-foreground"
           stroke={1}
         />
       </div>
       <div className="text-lg font-semibold mt-5 text-muted-foreground">
         {t('unknown-template')}
       </div>
-      <div className=" text-accent-foreground mt-2 max-w-sm text-center">
+      <div className=" text-muted-foreground mt-2 max-w-sm text-center">
         {t('unknown-type-description', {
           contentType: contentType || t('unknown'),
         })}

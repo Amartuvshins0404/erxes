@@ -4,12 +4,13 @@ import {
   InMemoryCache,
   createHttpLink,
   ApolloLink,
+  NormalizedCacheObject,
 } from '@apollo/client';
 import { onError } from '@apollo/client/link/error';
 import { getMainDefinition } from '@apollo/client/utilities';
 import { createClient } from 'graphql-ws';
 import { GraphQLWsLink } from '@apollo/client/link/subscriptions';
-import { REACT_APP_API_URL } from 'erxes-ui';
+import { createLiveDataLink, REACT_APP_API_URL } from 'erxes-ui';
 import { setContext } from '@apollo/client/link/context';
 import { WIDGET_SESSION_HEADER, getWidgetToken } from './widgetSession';
 
@@ -72,7 +73,16 @@ const sessionLink = setContext((_, { headers }) => {
   };
 });
 
+let liveClient: ApolloClient<NormalizedCacheObject> | undefined;
+
 export const apolloClient = new ApolloClient({
-  link: ApolloLink.from([errorLink, sessionLink, splitLink]),
+  link: ApolloLink.from([
+    errorLink,
+    createLiveDataLink(() => liveClient),
+    sessionLink,
+    splitLink,
+  ]),
   cache: new InMemoryCache(),
 });
+
+liveClient = apolloClient;

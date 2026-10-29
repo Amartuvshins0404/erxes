@@ -37,7 +37,7 @@ export function InviteTeamMember() {
           </Dialog.Close>
         </Dialog.Header>
         <div className="flex flex-col gap-6 px-3 pb-3">
-          <span className="text-accent-foreground">{t('notify')}</span>
+          <span className="text-muted-foreground">{t('notify')}</span>
           <InviteForm setIsOpen={setIsOpen} />
         </div>
       </Dialog.Content>

@@ -91,7 +91,7 @@ const BoardsInlineTitle = () => {
   }
 
   if (boards.length === 0) {
-    return <span className="text-accent-foreground/70">{placeholder}</span>;
+    return <span className="text-muted-foreground/70">{placeholder}</span>;
   }
 
   if (boards.length < 3) {

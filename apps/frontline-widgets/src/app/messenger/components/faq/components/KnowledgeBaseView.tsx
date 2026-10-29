@@ -78,7 +78,7 @@ export const KnowledgeBaseView = () => {
               <h1 className="text-base font-semibold text-foreground">
                 {parent.title}
               </h1>
-              <p className="text-xs font-light mt-0.5 line-clamp-2 whitespace-break-spaces truncate text-accent-foreground">
+              <p className="text-xs font-light mt-0.5 line-clamp-2 whitespace-break-spaces truncate text-muted-foreground">
                 {parent.description}
               </p>
               <span className="text-[11px] text-muted-foreground font-medium">

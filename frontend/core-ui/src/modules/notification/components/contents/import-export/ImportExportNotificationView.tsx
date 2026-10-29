@@ -90,12 +90,12 @@ export const ImportExportNotificationView = ({
 const statusMap = {
   completed: {
     labelKey: 'status-completed',
-    icon: <IconUpload size={64} className="text-accent-foreground" />,
+    icon: <IconUpload size={64} className="text-muted-foreground" />,
     badgeClass: 'bg-success/10 text-success',
   },
   failed: {
     labelKey: 'status-failed',
-    icon: <IconUpload size={64} className="text-accent-foreground" />,
+    icon: <IconUpload size={64} className="text-muted-foreground" />,
     badgeClass: 'bg-destructive/10 text-destructive',
   },
 } as const;

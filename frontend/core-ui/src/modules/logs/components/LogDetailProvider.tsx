@@ -30,7 +30,7 @@ export function LogDetailProvider({ logId, children }: LogDetailProviderProps) {
     return (
       <div className="h-full w-full flex flex-col items-center justify-center">
         <div className="size-24 bg-sidebar rounded-xl border border-dashed flex items-center justify-center">
-          <IconFileX className="text-accent-foreground size-12" stroke={1.5} />
+          <IconFileX className="text-muted-foreground size-12" stroke={1.5} />
         </div>
         <div className="text-lg font-medium mt-5 text-foreground">
           {t('no-log-detail')}

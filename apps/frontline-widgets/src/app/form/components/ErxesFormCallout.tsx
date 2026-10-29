@@ -36,7 +36,7 @@ export const ErxesFormCallout = () => {
         />
       )}
       {callout?.body && (
-        <p className="text-accent-foreground whitespace-pre-line">
+        <p className="text-muted-foreground whitespace-pre-line">
           {callout.body}
         </p>
       )}

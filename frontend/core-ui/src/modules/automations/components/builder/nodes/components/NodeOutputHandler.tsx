@@ -42,7 +42,7 @@ const AwaitToConnectButtonIcon = ({
         transition={{ duration: 0.2 }}
       >
         <IconLinkPlus
-          className={cn('size-4 text-accent-foreground', {
+          className={cn('size-4 text-muted-foreground', {
             'text-primary': nodeType === AutomationNodeType.Trigger,
             'text-success': nodeType === AutomationNodeType.Action,
           })}
@@ -60,8 +60,8 @@ const AwaitToConnectButtonIcon = ({
       exit={{ opacity: 0, rotate: 90, scale: 0.5 }}
       transition={{ duration: 0.2 }}
     >
-      <IconPlus className="absolute inset-0 size-4 text-accent-foreground transition-opacity group-hover:opacity-0" />
-      <IconGripVertical className="absolute inset-0 size-4 text-accent-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+      <IconPlus className="absolute inset-0 size-4 text-muted-foreground transition-opacity group-hover:opacity-0" />
+      <IconGripVertical className="absolute inset-0 size-4 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
     </motion.div>
   );
 };
@@ -114,7 +114,7 @@ const AwaitToConnectButton = memo(
         )}
       >
         <div
-          className={cn('bg-accent-foreground ', {
+          className={cn('bg-muted-foreground ', {
             'h-5 w-px mt-[7px]': isVertical,
             'h-px w-4': !isVertical,
           })}

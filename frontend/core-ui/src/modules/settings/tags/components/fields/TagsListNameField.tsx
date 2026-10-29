@@ -127,7 +127,7 @@ export const TagsListNameField = ({
               value={form.watch('name')}
             />
           ) : (
-            <p className="text-xs font-medium truncate  text-accent-foreground">
+            <p className="text-xs font-medium truncate  text-muted-foreground">
               {t('add-tag-name')}
             </p>
           )}

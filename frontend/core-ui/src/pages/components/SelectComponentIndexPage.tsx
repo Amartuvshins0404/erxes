@@ -268,7 +268,7 @@ export const SelectComponentIndexPage = () => {
                 'bg-border',
                 'bg-scroll',
                 'bg-muted-foreground',
-                'bg-accent-foreground',
+                'bg-muted-foreground',
               ].map((className) => (
                 <div
                   className={cn(
@@ -290,7 +290,7 @@ export const SelectComponentIndexPage = () => {
                 'bg-border',
                 'bg-scroll',
                 'bg-muted-foreground',
-                'bg-accent-foreground',
+                'bg-muted-foreground',
               ].map((className) => (
                 <div
                   className={cn(

@@ -49,11 +49,11 @@ const CompanyWidgetItem = ({
             <CompaniesInline.Avatar size="xl" />
             <CompaniesInline.Title />
           </div>
-          <div className="text-sm text-accent-foreground flex items-center gap-2 justify-between">
+          <div className="text-sm text-muted-foreground flex items-center gap-2 justify-between">
             Company phone
             <span className="text-foreground">{primaryPhone || '-'}</span>
           </div>
-          <div className="text-sm text-accent-foreground flex items-center gap-2 justify-between">
+          <div className="text-sm text-muted-foreground flex items-center gap-2 justify-between">
             Company email
             <span className="text-foreground">{primaryEmail || '-'}</span>
           </div>
@@ -63,7 +63,7 @@ const CompanyWidgetItem = ({
           <Button
             variant="ghost"
             size="sm"
-            className="w-full text-accent-foreground"
+            className="w-full text-muted-foreground"
             onClick={() =>
               openRecord(
                 { contentType: 'core:company', contentId: companyId },

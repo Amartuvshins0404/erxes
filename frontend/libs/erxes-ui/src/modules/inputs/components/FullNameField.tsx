@@ -36,7 +36,7 @@ const FullNameFieldProvider = ({
 export const FullNameValue = () => {
   const { fullName } = useFullNameField();
   if (fullName.replace(/\s/g, '').length === 0)
-    return <span className="text-accent-foreground/70">Unknown</span>;
+    return <span className="text-muted-foreground/70">Unknown</span>;
   return fullName;
 };
 

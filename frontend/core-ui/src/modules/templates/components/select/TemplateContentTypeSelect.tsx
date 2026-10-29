@@ -72,7 +72,7 @@ const SelectProjectTypesValue = ({ placeholder }: { placeholder?: string }) => {
 
   if (!values) {
     return (
-      <span className="text-accent-foreground/80">
+      <span className="text-muted-foreground/80">
         {placeholder || t('select-type-placeholder')}
       </span>
     );
@@ -86,7 +86,7 @@ const SelectProjectTypesValue = ({ placeholder }: { placeholder?: string }) => {
     return (
       <>
         {selectedTypes.slice(0, 2).join(', ')},
-        <span className="text-accent-foreground/80">...</span>
+        <span className="text-muted-foreground/80">...</span>
       </>
     );
   }

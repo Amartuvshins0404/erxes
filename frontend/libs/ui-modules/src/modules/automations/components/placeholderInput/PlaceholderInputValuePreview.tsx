@@ -59,7 +59,7 @@ const PlaceholderInputTokenPreview = ({ token }: { token: string }) => {
         'inline rounded-sm box-decoration-clone ring-1 ring-inset',
         isAttribute
           ? 'bg-primary/10 text-primary ring-primary/15'
-          : 'bg-accent text-accent-foreground ring-border',
+          : 'bg-accent text-muted-foreground ring-border',
       )}
     >
       {token}

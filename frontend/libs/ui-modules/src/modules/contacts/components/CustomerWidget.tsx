@@ -45,11 +45,11 @@ const CustomerWidgetItem = ({
             <CustomersInline.Avatar size="xl" />
             <CustomersInline.Title />
           </div>
-          <div className="flex justify-between items-center gap-2 text-sm text-accent-foreground">
+          <div className="flex justify-between items-center gap-2 text-sm text-muted-foreground">
             Customer phone
             <span className="text-foreground">{primaryPhone || '-'}</span>
           </div>
-          <div className="flex justify-between items-center gap-2 text-sm text-accent-foreground">
+          <div className="flex justify-between items-center gap-2 text-sm text-muted-foreground">
             Customer email
             <span className="text-foreground">{primaryEmail || '-'}</span>
           </div>
@@ -59,7 +59,7 @@ const CustomerWidgetItem = ({
           <Button
             variant="ghost"
             size="sm"
-            className="w-full text-accent-foreground"
+            className="w-full text-muted-foreground"
             onClick={() =>
               openRecord(
                 {

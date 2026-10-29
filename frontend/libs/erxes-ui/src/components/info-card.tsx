@@ -31,7 +31,7 @@ const InfoCardRoot = ({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="size-6 text-accent-foreground"
+                  className="size-6 text-muted-foreground"
                 >
                   <IconInfoCircle className="size-4" />
                 </Button>

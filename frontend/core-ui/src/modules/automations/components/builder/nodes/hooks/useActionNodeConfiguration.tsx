@@ -90,7 +90,7 @@ export const createOptionConnectHandle = ({
         type="source"
         position={Position.Right}
         className={
-          '!right-4 !size-4 !bg-background !border !border-2 !rounded-full !border-accent-foreground !z-4'
+          '!right-4 !size-4 !bg-background !border !border-2 !rounded-full !border-border-strong !z-4'
         }
         isConnectable
         title="optional-connect"

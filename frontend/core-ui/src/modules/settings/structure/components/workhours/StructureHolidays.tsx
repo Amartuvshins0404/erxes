@@ -89,7 +89,7 @@ const StructureHolidayRow = ({
               setValue(`holidays.${index}.startDate`, toDateValue(date))
             }
           />
-          <span className="font-medium text-sm text-accent-foreground">
+          <span className="font-medium text-sm text-muted-foreground">
             {t('to')}
           </span>
           <DatePicker
@@ -118,13 +118,13 @@ const StructureHolidayRow = ({
           onCheckedChange={toggleWorkHours}
           disabled={isInactive}
         />
-        <span className="text-sm text-accent-foreground">
+        <span className="text-sm text-muted-foreground">
           {t('working-hours-label')}
         </span>
         {hasWorkHours && (
           <div className="flex items-center gap-3">
             <WorkTimeField name={`holidays.${index}.startFrom`} />
-            <span className="font-medium text-sm text-accent-foreground">
+            <span className="font-medium text-sm text-muted-foreground">
               {t('to')}
             </span>
             <WorkTimeField name={`holidays.${index}.endTo`} />
@@ -159,7 +159,7 @@ export const StructureHolidays = () => {
       <div className="flex items-center justify-between">
         <div className="flex flex-col">
           <span className="font-semibold">{t('custom-holidays')}</span>
-          <span className="text-sm text-accent-foreground">
+          <span className="text-sm text-muted-foreground">
             {t('add-special-periods')}
           </span>
         </div>
@@ -169,7 +169,7 @@ export const StructureHolidays = () => {
         </Button>
       </div>
       {fields.length === 0 ? (
-        <span className="text-sm text-accent-foreground py-2">
+        <span className="text-sm text-muted-foreground py-2">
           {t('no-holidays')}
         </span>
       ) : (

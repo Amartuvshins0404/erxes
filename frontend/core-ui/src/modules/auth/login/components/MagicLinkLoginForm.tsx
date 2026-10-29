@@ -10,7 +10,7 @@ export const MagicLinkLoginForm = () => {
   return (
     <Form {...form}>
       <form onSubmit={onMagicLinkSubmit} className="mx-auto grid gap-5">
-        <div className="text-center text-sm text-accent-foreground">
+        <div className="text-center text-sm text-muted-foreground">
           {t('magic-link-description')}
         </div>
         <Form.Field

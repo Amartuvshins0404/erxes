@@ -70,9 +70,9 @@ const PasswordField = ({
                 className="absolute right-1 top-1/2 -translate-y-1/2 peer-focus:opacity-100 peer-hover:opacity-100 hover:opacity-100 opacity-0"
               >
                 {visible ? (
-                  <IconEyeClosed className="text-accent-foreground/70 size-4" />
+                  <IconEyeClosed className="text-muted-foreground/70 size-4" />
                 ) : (
-                  <IconEye className="text-accent-foreground/70 size-4" />
+                  <IconEye className="text-muted-foreground/70 size-4" />
                 )}
               </Button>
             </div>

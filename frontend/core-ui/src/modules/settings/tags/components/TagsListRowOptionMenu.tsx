@@ -54,7 +54,7 @@ export const TagsListRowOptionMenu = ({ tag }: { tag: ITag }) => {
           onClick={(e) => e.stopPropagation()}
           className={cn(
             'absolute left-3 opacity-0 group-hover:opacity-100  ',
-            open && 'opacity-100 bg-accent-foreground/10',
+            open && 'opacity-100 bg-accent',
           )}
         >
           <IconDots />
@@ -100,7 +100,7 @@ export const TagsListRowOptionMenu = ({ tag }: { tag: ITag }) => {
                 <Command.Item onSelect={() => setMenuContent('groupSelect')}>
                   <IconArrowMoveRight />
                   {!tag.parentId ? t('move-to-group-item') : t('change-group')}
-                  <IconCaretRightFilled className="size-5 absolute right-1 text-accent-foreground" />
+                  <IconCaretRightFilled className="size-5 absolute right-1 text-muted-foreground" />
                 </Command.Item>
               )}
               <Command.Item

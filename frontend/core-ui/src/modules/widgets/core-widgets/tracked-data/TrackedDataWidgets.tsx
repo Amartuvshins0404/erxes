@@ -21,7 +21,7 @@ const TrackedDataRow = ({
   children: React.ReactNode;
 }) => (
   <li className="flex justify-between items-center gap-4 px-3 py-2 text-sm border-b last:border-b-0">
-    <span className="text-accent-foreground truncate">{label}</span>
+    <span className="text-muted-foreground truncate">{label}</span>
     <span className="font-medium text-foreground text-right truncate">
       {children}
     </span>
@@ -111,7 +111,7 @@ export const TrackedDataWidgets = ({
               ))}
             </ul>
             {items.length === 0 && (
-              <p className="px-3 pt-3 text-xs text-accent-foreground">
+              <p className="px-3 pt-3 text-xs text-muted-foreground">
                 {t(
                   'no-tracked-data',
                   'No tracked data has been collected yet.',

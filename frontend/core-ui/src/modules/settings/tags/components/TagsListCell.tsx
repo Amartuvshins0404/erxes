@@ -24,7 +24,7 @@ export const TagsListHead = ({
   return (
     <div
       className={cn(
-        'h-full w-40 flex items-center uppercase font-mono text-accent-foreground font-semibold text-xs',
+        'h-full w-40 flex items-center uppercase font-mono text-muted-foreground font-semibold text-xs',
         className,
       )}
     >

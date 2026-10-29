@@ -231,7 +231,7 @@ export const CustomersCommandBar = () => {
                                 <Label variant="peer">
                                   {tBroadcast(labelKey)}
                                 </Label>
-                                <div className="text-xs text-accent-foreground">
+                                <div className="text-xs text-muted-foreground">
                                   {tBroadcast(descriptionKey)}
                                 </div>
                               </div>

@@ -154,7 +154,7 @@ const SelectPipelineContent = () => {
       <Command.List>
         <Combobox.Empty loading={loading} />
         {isDisabled ? (
-          <div className="p-2 text-sm text-accent-foreground/70">
+          <div className="p-2 text-sm text-muted-foreground/70">
             Please select a board first
           </div>
         ) : (

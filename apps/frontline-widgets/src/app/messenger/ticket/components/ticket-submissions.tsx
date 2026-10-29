@@ -59,7 +59,7 @@ export const TicketSubmissions = () => {
             <div className="text-lg font-medium mt-5 text-muted-foreground">
               No tickets found
             </div>
-            <div className="text-accent-foreground mt-2 text-xs">
+            <div className="text-muted-foreground mt-2 text-xs">
               Please create a ticket to get started.
             </div>
             <NewTicket />
@@ -319,7 +319,7 @@ export const TicketNotes = ({ _id: contentId }: { _id: string }) => {
   return (
     <>
       <Separator />
-      <h4 className="font-mono uppercase text-sm text-accent-foreground">
+      <h4 className="font-mono uppercase text-sm text-muted-foreground">
         Activity
       </h4>
       <div className="ml-2.5 relative before:absolute before:left-1.5 before:top-1 before:bottom-1 before:w-px before:bg-muted flex flex-col">

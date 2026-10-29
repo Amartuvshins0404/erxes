@@ -43,7 +43,7 @@ export const createBroadcastFilterSelect = ({
 
     if (!option) {
       return (
-        <span className="text-accent-foreground/80">{t(placeholderKey)}</span>
+        <span className="text-muted-foreground/80">{t(placeholderKey)}</span>
       );
     }
 

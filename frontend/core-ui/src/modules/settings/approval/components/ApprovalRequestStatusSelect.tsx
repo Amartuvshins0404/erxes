@@ -47,7 +47,7 @@ export const ApprovalRequestStatusSelect = () => {
       value={status}
       onValueChange={(next) => setStatus(next as ApprovalRequestStatusFilter)}
     >
-      <Select.Trigger className="h-8 w-auto gap-1 shadow-none hover:bg-accent-foreground/10">
+      <Select.Trigger className="h-8 w-auto gap-1 shadow-none hover:bg-accent">
         <Select.Value />
       </Select.Trigger>
       <Select.Content>

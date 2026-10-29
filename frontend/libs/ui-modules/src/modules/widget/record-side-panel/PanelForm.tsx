@@ -21,7 +21,7 @@ export const PanelFormRow = ({
   children: React.ReactNode;
 }) => (
   <div className="grid grid-cols-[6.5rem_minmax(0,1fr)] items-center gap-x-2 gap-y-0.5 min-h-7">
-    <span className="truncate text-xs font-medium text-accent-foreground">
+    <span className="truncate text-xs font-medium text-muted-foreground">
       {label}
       {required && <span className="text-destructive"> *</span>}
     </span>

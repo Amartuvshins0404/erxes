@@ -58,7 +58,7 @@ export const ProfileStructureMemberships = () => {
   return (
     <div className="flex flex-col gap-3">
       <Label>{t('structure')}</Label>
-      <p className="text-xs text-accent-foreground">
+      <p className="text-xs text-muted-foreground">
         {t('structure-description')}
       </p>
       {renderContent()}

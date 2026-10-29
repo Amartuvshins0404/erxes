@@ -95,7 +95,7 @@ const BrandsInlineTitle = () => {
   }
 
   if (brandLabels.length === 0) {
-    return <span className="text-accent-foreground/70">{placeholder}</span>;
+    return <span className="text-muted-foreground/70">{placeholder}</span>;
   }
 
   if (brandLabels.length < 3) {

@@ -16,7 +16,7 @@ export const Login = () => {
     <>
       <div className="flex flex-col items-center gap-3">
         <div className="font-semibold text-xl leading-none">{t('welcome')}</div>
-        <div className="text-center text-accent-foreground">
+        <div className="text-center text-muted-foreground">
           {t('sign-in-to-continue')}
         </div>
       </div>

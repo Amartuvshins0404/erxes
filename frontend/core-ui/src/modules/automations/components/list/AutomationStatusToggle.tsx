@@ -51,7 +51,7 @@ export const AutomationStatusBadge = ({
     variant={status === 'active' ? 'success' : 'secondary'}
     className={cn(
       'font-bold',
-      { 'text-accent-foreground': status !== 'active' },
+      { 'text-muted-foreground': status !== 'active' },
       className,
     )}
   >

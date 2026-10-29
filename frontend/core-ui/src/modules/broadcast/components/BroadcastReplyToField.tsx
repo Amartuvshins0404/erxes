@@ -16,7 +16,7 @@ export const BroadcastReplyToField = () => {
   if (senderOptionsLoading) {
     return (
       <div className="space-y-2">
-        <span className="font-mono text-xs font-semibold uppercase text-accent-foreground">
+        <span className="font-mono text-xs font-semibold uppercase text-muted-foreground">
           {t('replyTo')}
         </span>
         <Skeleton className="h-8 w-full" />

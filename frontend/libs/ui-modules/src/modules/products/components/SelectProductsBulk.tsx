@@ -363,7 +363,7 @@ const ProductsList = ({
             />
           </div>
         </div>
-        <div className="mt-4 text-xs text-accent-foreground">
+        <div className="mt-4 text-xs text-muted-foreground">
           {!initialLoading && `${availableTotalCount} results`}
         </div>
       </div>
@@ -411,7 +411,7 @@ const SelectedProductsList = ({
   return (
     <ScrollArea className="h-full">
       <div className="flex flex-col gap-1 p-4">
-        <div className="px-3 mb-1 text-xs text-accent-foreground">
+        <div className="px-3 mb-1 text-xs text-muted-foreground">
           {selectedLabel}
         </div>
         {selectedProductIds.map((productId) => {

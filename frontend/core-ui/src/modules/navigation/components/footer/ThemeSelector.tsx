@@ -15,7 +15,7 @@ export const ThemeSelector = () => {
       {t('theme')}
       <Tooltip.Provider delayDuration={100}>
         <ToggleGroup
-          className="ml-auto h-6 gap-0.5 rounded bg-accent text-accent-foreground"
+          className="ml-auto h-6 gap-0.5 rounded bg-accent text-muted-foreground"
           onValueChange={(value) => {
             if (value && isThemeOption(value)) {
               setTheme(value);

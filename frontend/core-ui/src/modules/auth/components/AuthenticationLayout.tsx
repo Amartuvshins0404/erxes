@@ -25,7 +25,7 @@ export const AuthenticationLayout = ({
               <div className="w-auto h-full bg-background p-6 pt-8 border border-t-0 rounded-b-xl -mx-px space-y-6">
                 {children}
               </div>
-              <div className="flex flex-col text-accent-foreground space-y-1 py-5 w-full m-0 px-0">
+              <div className="flex flex-col text-muted-foreground space-y-1 py-5 w-full m-0 px-0">
                 <span className="text-sm text-center">
                   {t('accept-terms-prefix')}
                 </span>

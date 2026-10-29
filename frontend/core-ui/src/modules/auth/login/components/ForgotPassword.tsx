@@ -11,7 +11,7 @@ export const ForgotPassword = () => {
         <div className="font-semibold text-lg leading-none">
           {t('forgot-password')}
         </div>
-        <div className="text-center text-sm text-accent-foreground">
+        <div className="text-center text-sm text-muted-foreground">
           {t('forgot-password-description')}
         </div>
       </div>

@@ -139,7 +139,7 @@ export const HeaderTabs = () => {
           variant="ghost"
           tabIndex={0}
           aria-label="Back"
-          className="flex items-center gap-2 hover:bg-transparent size-8 text-accent-foreground"
+          className="flex items-center gap-2 hover:bg-transparent size-8 text-muted-foreground"
           onClick={goBack}
         >
           <IconChevronLeft className="w-4 h-4 shrink-0" />

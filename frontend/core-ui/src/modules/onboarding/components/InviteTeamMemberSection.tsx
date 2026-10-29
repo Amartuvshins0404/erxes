@@ -167,7 +167,7 @@ export const InviteTeamMemberSection = ({
         </motion.div>
       </motion.div>
       <span
-        className="absolute bottom-1/4 text-accent-foreground hover:text-foreground cursor-pointer"
+        className="absolute bottom-1/4 text-muted-foreground hover:text-foreground cursor-pointer"
         onClick={() => onContinue()}
       >
         {t('do-this-later')}

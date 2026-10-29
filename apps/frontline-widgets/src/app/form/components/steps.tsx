@@ -36,7 +36,7 @@ export const ErxesSteps = ({
           />
         ))}
       </div>
-      <div className="text-xs text-accent-foreground">{description}</div>
+      <div className="text-xs text-muted-foreground">{description}</div>
     </div>
   );
 };

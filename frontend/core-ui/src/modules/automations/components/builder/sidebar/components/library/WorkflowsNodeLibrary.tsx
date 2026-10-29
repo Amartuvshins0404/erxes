@@ -52,7 +52,7 @@ export const WorkflowsNodeLibrary = ({
                       {name}
                     </h3>
                   </div>
-                  <p className="text-accent-foreground leading-relaxed text-xs">
+                  <p className="text-muted-foreground leading-relaxed text-xs">
                     <RelativeDateDisplay.Value value={createdAt} />
                   </p>
                 </div>

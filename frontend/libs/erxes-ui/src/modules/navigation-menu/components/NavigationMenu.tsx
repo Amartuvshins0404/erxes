@@ -63,7 +63,7 @@ export const NavigationMenuLinkItem = forwardRef<
             {IconComponent && (
               <IconComponent
                 className={cn(
-                  'text-accent-foreground',
+                  'text-muted-foreground',
                   isActive && 'text-primary',
                 )}
               />
@@ -114,7 +114,7 @@ export const NavigationMenuItem = forwardRef<
   return (
     <Sidebar.MenuItem>
       <Sidebar.MenuButton ref={ref} {...props}>
-        {IconComponent && <IconComponent className="text-accent-foreground" />}
+        {IconComponent && <IconComponent className="text-muted-foreground" />}
         <span className="capitalize">{name}</span>
       </Sidebar.MenuButton>
     </Sidebar.MenuItem>

@@ -122,7 +122,7 @@ export const BroadcastDryRunDialog = ({
 
             {!!dryRun.sampleHtml && (
               <div className="flex flex-col">
-                <div className="py-2 font-mono text-xs uppercase text-accent-foreground">
+                <div className="py-2 font-mono text-xs uppercase text-muted-foreground">
                   {t('sample', { to: dryRun.sampleTo })}
                 </div>
                 <EmailPreviewFrame

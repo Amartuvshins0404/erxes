@@ -1,0 +1,179 @@
+/*
+  erxes design tokens. Single source of truth for every surface that renders
+  erxes-ui: the core-ui host and standalone apps import this file once.
+  theme.css maps these values to Tailwind utilities.
+
+  Surfaces stack: background < sidebar < card < popover. Borders are
+  translucent hairlines so they read correctly on every surface.
+*/
+@layer base {
+  :root {
+    --font-sans: 'Inter', sans-serif;
+    --font-mono: 'Roboto Mono', monospace;
+
+    --background: oklch(0.985 0.002 286);
+    --foreground: oklch(0.2 0.008 286);
+
+    --sidebar-background: oklch(0.97 0.003 286);
+    --sidebar-foreground: oklch(0.2 0.008 286);
+
+    --card: oklch(1 0 0);
+    --card-foreground: oklch(0.2 0.008 286);
+
+    --popover: oklch(1 0 0);
+    --popover-foreground: oklch(0.2 0.008 286);
+
+    --primary: oklch(0.55 0.22 285);
+    --primary-foreground: oklch(0.99 0 0);
+
+    --secondary: oklch(0.95 0.003 286);
+    --secondary-foreground: oklch(0.2 0.008 286);
+
+    --muted: oklch(0.955 0.003 286);
+    --muted-foreground: oklch(0.53 0.012 286);
+
+    --accent: oklch(0.94 0.004 286);
+    --accent-foreground: oklch(0.2 0.008 286);
+
+    --destructive: oklch(0.6 0.21 25);
+    --destructive-foreground: oklch(0.99 0 0);
+
+    --success: oklch(0.64 0.17 152);
+    --success-foreground: oklch(0.99 0 0);
+    --warning: oklch(0.74 0.16 62);
+    --warning-foreground: oklch(0.22 0.04 62);
+    --info: oklch(0.6 0.17 252);
+    --info-foreground: oklch(0.99 0 0);
+
+    --border: oklch(0.2 0.008 286 / 9%);
+    --border-strong: oklch(0.2 0.008 286 / 16%);
+    --input: oklch(0.2 0.008 286 / 13%);
+    --ring: oklch(0.55 0.22 285);
+    --scroll: oklch(0.2 0.008 286 / 18%);
+
+    --overlay: oklch(0.2 0.008 286 / 32%);
+    --highlight: oklch(1 0 0 / 70%);
+    --shadow: oklch(0.2 0.02 286 / 6%);
+    --shadow-strong: oklch(0.2 0.02 286 / 12%);
+
+    --chart-1: oklch(0.55 0.22 285);
+    --chart-2: oklch(0.72 0.19 150);
+    --chart-3: oklch(0.76 0.15 62);
+    --chart-4: oklch(0.62 0.17 252);
+    --chart-5: oklch(0.65 0.2 350);
+
+    --chart-50: oklch(0.972 0.021 285);
+    --chart-100: oklch(0.925 0.054 285);
+    --chart-200: oklch(0.852 0.102 285);
+    --chart-300: oklch(0.765 0.165 285);
+    --chart-400: oklch(0.654 0.208 285);
+    --chart-500: oklch(0.55 0.22 285);
+    --chart-600: oklch(0.47 0.21 285);
+    --chart-700: oklch(0.4 0.19 285);
+    --chart-800: oklch(0.33 0.16 285);
+    --chart-900: oklch(0.26 0.125 285);
+    --chart-950: oklch(0.185 0.095 285);
+  }
+
+  .dark {
+    --background: oklch(0.145 0 0);
+    --foreground: oklch(0.955 0 0);
+
+    --sidebar-background: oklch(0.145 0 0);
+    --sidebar-foreground: oklch(0.955 0 0);
+
+    --card: oklch(0.185 0 0);
+    --card-foreground: oklch(0.955 0 0);
+
+    --popover: oklch(0.205 0 0);
+    --popover-foreground: oklch(0.955 0 0);
+
+    --primary: oklch(0.7 0.17 290);
+    --primary-foreground: oklch(0.16 0.02 290);
+
+    --secondary: oklch(0.235 0 0);
+    --secondary-foreground: oklch(0.955 0 0);
+
+    --muted: oklch(0.215 0 0);
+    --muted-foreground: oklch(0.68 0 0);
+
+    --accent: oklch(0.255 0 0);
+    --accent-foreground: oklch(0.955 0 0);
+
+    --destructive: oklch(0.66 0.2 25);
+    --destructive-foreground: oklch(0.99 0 0);
+
+    --success: oklch(0.82 0.2 148);
+    --success-foreground: oklch(0.18 0.05 148);
+    --warning: oklch(0.8 0.15 62);
+    --warning-foreground: oklch(0.2 0.05 62);
+    --info: oklch(0.72 0.14 252);
+    --info-foreground: oklch(0.16 0.04 252);
+
+    --border: oklch(1 0 0 / 8%);
+    --border-strong: oklch(1 0 0 / 14%);
+    --input: oklch(1 0 0 / 11%);
+    --ring: oklch(0.7 0.17 290);
+    --scroll: oklch(1 0 0 / 16%);
+
+    --overlay: oklch(0 0 0 / 60%);
+    --highlight: oklch(1 0 0 / 6%);
+    --shadow: oklch(0 0 0 / 30%);
+    --shadow-strong: oklch(0 0 0 / 50%);
+
+    --chart-1: oklch(0.7 0.17 290);
+    --chart-2: oklch(0.82 0.2 148);
+    --chart-3: oklch(0.8 0.15 62);
+    --chart-4: oklch(0.72 0.14 252);
+    --chart-5: oklch(0.72 0.18 350);
+  }
+}
+
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--border);
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-feature-settings:
+      'rlig' 1,
+      'calt' 1,
+      'cv11' 1,
+      'ss01' 1;
+  }
+
+  ::selection {
+    background-color: color-mix(in oklch, var(--primary) 28%, transparent);
+  }
+
+  h1 {
+    font-size: var(--text-2xl);
+    line-height: var(--text-2xl--line-height);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+
+  h2 {
+    font-size: var(--text-xl);
+    line-height: var(--text-xl--line-height);
+    font-weight: 600;
+    letter-spacing: -0.015em;
+  }
+
+  h3 {
+    font-size: var(--text-base);
+    line-height: var(--text-base--line-height);
+    font-weight: 600;
+  }
+}

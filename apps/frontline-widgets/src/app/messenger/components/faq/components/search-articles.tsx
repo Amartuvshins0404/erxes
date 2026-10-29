@@ -6,7 +6,7 @@ export const SearchArticlesInput = () => {
       htmlFor="search"
       className="rounded-xl bg-muted text-foreground w-full py-2.5 px-3 flex items-center mt-4"
     >
-      <IconSearch className="size-4.5 text-accent-foreground" />
+      <IconSearch className="size-4.5 text-muted-foreground" />
       <input
         placeholder="Search for help"
         id="search"

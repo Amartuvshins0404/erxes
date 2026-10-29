@@ -208,7 +208,7 @@ export const SplitConditionByOutputVariables = ({
           <Button
             type="button"
             variant="secondary"
-            className="mt-2 w-full font-mono text-xs font-semibold uppercase text-accent-foreground"
+            className="mt-2 w-full font-mono text-xs font-semibold uppercase text-muted-foreground"
             onClick={addCondition}
           >
             <IconPlus />

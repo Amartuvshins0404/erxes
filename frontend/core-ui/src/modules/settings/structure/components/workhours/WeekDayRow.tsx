@@ -29,24 +29,24 @@ export const WeekDayRow = ({ weekDay }: { weekDay: WorkDay }) => {
         {t(`weekday-${weekDay.toLowerCase()}`)}
       </span>
       {isInactive ? (
-        <span className="font-normal text-sm h-8 text-accent-foreground flex items-center">
+        <span className="font-normal text-sm h-8 text-muted-foreground flex items-center">
           {t('not-working-day')}
         </span>
       ) : (
         <div className="flex items-center gap-8 ml-auto">
           <div className="flex items-center gap-3">
             <WorkTimeField name={`${weekDay}.startFrom`} />
-            <span className="font-medium text-sm text-accent-foreground">
+            <span className="font-medium text-sm text-muted-foreground">
               {t('to')}
             </span>
             <WorkTimeField name={`${weekDay}.endTo`} />
           </div>
           <div className="flex items-center gap-3">
-            <span className="font-medium text-sm text-accent-foreground">
+            <span className="font-medium text-sm text-muted-foreground">
               {t('lunch')}
             </span>
             <WorkTimeField name={`${weekDay}.lunchStartFrom`} />
-            <span className="font-medium text-sm text-accent-foreground">
+            <span className="font-medium text-sm text-muted-foreground">
               {t('to')}
             </span>
             <WorkTimeField name={`${weekDay}.lunchEndTo`} />

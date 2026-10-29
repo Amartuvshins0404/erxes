@@ -32,7 +32,7 @@ export const TagsListColorField = ({ tag }: { tag: ITag }) => {
     >
       <ColorPicker.Trigger asChild>
         <Button
-          className="size-7 flex items-center justify-center p-0 shadow-none bg-transparent hover:bg-accent-foreground/10 shrink-0"
+          className="size-7 flex items-center justify-center p-0 shadow-none bg-transparent hover:bg-accent shrink-0"
           variant="ghost"
           onClick={(e) => e.stopPropagation()}
         >

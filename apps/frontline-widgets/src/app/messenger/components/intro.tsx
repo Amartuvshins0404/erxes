@@ -114,7 +114,7 @@ export const Intro = () => {
               <div className="text-xs font-semibold text-foreground uppercase tracking-wide">
                 Popular Article
               </div>
-              <div className="text-sm font-normal text-accent-foreground truncate">
+              <div className="text-sm font-normal text-muted-foreground truncate">
                 Browse our help center
               </div>
             </div>
@@ -147,7 +147,7 @@ export const Intro = () => {
                     <div className="text-xs font-semibold text-foreground uppercase tracking-wide">
                       {form.name}
                     </div>
-                    <div className="text-sm font-normal text-accent-foreground truncate">
+                    <div className="text-sm font-normal text-muted-foreground truncate">
                       Issue a ticket
                     </div>
                   </div>
@@ -181,7 +181,7 @@ export const Intro = () => {
                   <div className="text-xs font-semibold text-foreground uppercase tracking-wide">
                     {app.credentials.buttonText}
                   </div>
-                  <div className="text-sm font-normal text-accent-foreground truncate">
+                  <div className="text-sm font-normal text-muted-foreground truncate">
                     {app.credentials.description}
                   </div>
                 </div>
@@ -226,7 +226,7 @@ export const Messages = () => {
             <div className="text-foreground text-[14px]">
               Start a new conversation
             </div>
-            <div className="text-xs text-accent-foreground font-light">
+            <div className="text-xs text-muted-foreground font-light">
               Replies in ~ 4 {responseRate} ·{' '}
               {onlineHours
                 ? formatOnlineHoursShort({
@@ -252,7 +252,7 @@ export const Messages = () => {
           />
         ))}
       </div>
-      <div className="mx-auto text-xs text-accent-foreground font-light pt-2 pb-1">
+      <div className="mx-auto text-xs text-muted-foreground font-light pt-2 pb-1">
         — end of your conversations —
       </div>
     </div>

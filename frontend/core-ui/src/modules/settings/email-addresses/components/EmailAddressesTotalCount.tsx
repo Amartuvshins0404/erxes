@@ -11,7 +11,7 @@ export const EmailAddressesTotalCount = () => {
   }
 
   return (
-    <div className="text-sm text-accent-foreground ml-auto">
+    <div className="text-sm text-muted-foreground ml-auto">
       {t('addresses-count', { totalCount })}
     </div>
   );

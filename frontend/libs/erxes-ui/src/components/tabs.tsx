@@ -3,7 +3,7 @@ import { Tabs as TabsPrimitive } from 'radix-ui';
 import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from 'erxes-ui/lib';
 
-const tabsListVariants = cva('h-auto text-accent-foreground', {
+const tabsListVariants = cva('h-auto text-muted-foreground', {
   variants: {
     variant: {
       underline:

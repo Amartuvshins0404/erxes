@@ -11,7 +11,7 @@ export function HeaderItem({ title, Icon, value, disabled }: IHeaderItem) {
       aria-disabled={disabled}
       onClick={() => !disabled && switchToTab(value)}
       className={cn(
-        'px-2 flex items-center gap-2 cursor-pointer rounded-sm bg-muted border-none text-accent-foreground',
+        'px-2 flex items-center gap-2 cursor-pointer rounded-sm bg-muted border-none text-muted-foreground',
         disabled && 'cursor-default',
       )}
     >

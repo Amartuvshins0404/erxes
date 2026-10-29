@@ -35,7 +35,7 @@ export const PanelDescriptionField = ({
 
   return (
     <div className="flex flex-col gap-1.5 pt-2">
-      <span className="text-xs font-medium text-accent-foreground">
+      <span className="text-xs font-medium text-muted-foreground">
         {label}
       </span>
       <div onBlur={handleBlur}>

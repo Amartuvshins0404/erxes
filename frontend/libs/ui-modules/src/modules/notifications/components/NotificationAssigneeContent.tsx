@@ -43,7 +43,7 @@ export const AssigneeNotificationContent = ({
   return (
     <div className="flex flex-col gap-3 h-screen justify-center w-full max-w-md mx-auto items-center text-muted-foreground">
       <div className="size-28 bg-sidebar rounded-2xl border-2 border-dashed flex items-center justify-center">
-        <Icon size={64} className="text-accent-foreground" stroke={1} />
+        <Icon size={64} className="text-muted-foreground" stroke={1} />
       </div>
 
       <div className="flex flex-col items-center gap-1 text-center">

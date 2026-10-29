@@ -25,7 +25,7 @@ export function Toaster() {
               }
             }}
           >
-            <div className="grid gap-1">
+            <div className="grid min-w-0 flex-1 gap-0.5">
               {title && <Toast.Title>{title}</Toast.Title>}
               {description && (
                 <Toast.Description>{description}</Toast.Description>

@@ -95,8 +95,8 @@ export const SidebarPanelTrigger = React.forwardRef<
       ref={ref}
       aria-expanded={open}
       aria-label={toggleLabel}
-      className={cn('size-6 shrink-0 rounded-md', className)}
-      size="icon"
+      className={cn('shrink-0', className)}
+      size="icon-sm"
       title={toggleLabel}
       variant="ghost"
       onClick={(event) => {

@@ -14,7 +14,7 @@ export const SidebarInput = React.forwardRef<
       ref={ref}
       data-sidebar="input"
       className={cn(
-        'w-full bg-background shadow-none focus-visible:ring-2',
+        'w-full',
         className,
       )}
       {...props}

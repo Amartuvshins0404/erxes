@@ -23,7 +23,6 @@ import {
   PRODUCT_FORM_SCHEMA,
   usePermissionCheck,
 } from 'ui-modules';
-import { productsQueries } from '../graphql';
 import { useTranslation } from 'react-i18next';
 import { ProductCreateSidebar } from './ProductCreateSidebar';
 import { FormWidgetSideTabs } from '@/widgets/components/FormWidgets';
@@ -104,7 +103,6 @@ export const ProductAddSheet = () => {
               }}
               showMoreInfo={showMoreInfo}
               onShowMoreInfoChange={setShowMoreInfo}
-              options={{ refetchQueries: [productsQueries.productsMain] }}
             />
           </div>
           <FormWidgetSideTabs contentType="core:product" form={form} />
@@ -135,10 +133,7 @@ const ProductAddSheetView = ({
 
   return (
     <FocusSheet.View
-      className={cn(
-        'transition-[width] duration-300 ease-in-out',
-        widthClass,
-      )}
+      className={cn('transition-[width] duration-300 ease-in-out', widthClass)}
     >
       {children}
     </FocusSheet.View>

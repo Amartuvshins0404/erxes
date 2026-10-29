@@ -8,19 +8,17 @@ export const useEditSimilarity = () => {
   const { t } = useTranslation('product', { keyPrefix: 'bulk-similarity' });
   const { toast } = useToast();
 
-  const [editMutation, { loading }] = useMutation(PRODUCT_SIMILARITY_EDIT, {
-    refetchQueries: ['ProductSimilarities', 'ProductSimilarity'],
-  });
+  const [editMutation, { loading }] = useMutation(PRODUCT_SIMILARITY_EDIT);
 
   const edit = async (_id: string, doc: IBulkSaveInput) => {
     try {
       const res = await editMutation({ variables: { _id, doc } });
       toast({ title: t('similarity-saved', 'Similarity saved') });
       return res.data?.productBulkSimilarityEdit as IProductSimilarity;
-    } catch (e: any) {
+    } catch (e) {
       toast({
         title: t('error', 'Error'),
-        description: e.message,
+        description: e instanceof Error ? e.message : undefined,
         variant: 'destructive',
       });
       throw e;

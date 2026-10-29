@@ -1,17 +1,16 @@
-import { useQuery } from '@apollo/client';
 import {
   Badge,
   Button,
+  Empty,
   EnumCursorDirection,
-  ICursorListResponse,
   Input,
   Sheet,
-  Spinner,
+  useCursorListQuery,
 } from 'erxes-ui';
 import { IconCheck, IconX } from '@tabler/icons-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useInView } from 'react-intersection-observer';
+import { LoadMoreSentinel } from 'ui-modules';
 import { useDebounce } from 'use-debounce';
 import { SIMILARITY_SEARCH_PRODUCTS } from '../graphql/queries';
 
@@ -96,42 +95,12 @@ const ChooserBody = ({
   const [search, setSearch] = useState('');
   const [debouncedSearch] = useDebounce(search, 400);
 
-  const { data, loading, fetchMore } = useQuery<
-    ICursorListResponse<ChoosableProduct>
-  >(SIMILARITY_SEARCH_PRODUCTS, {
-    variables: {
-      searchValue: debouncedSearch || undefined,
+  const { list, totalCount, loading, handleFetchMore, hasNextPage } =
+    useCursorListQuery<ChoosableProduct>(SIMILARITY_SEARCH_PRODUCTS, {
+      field: 'productsMain',
+      variables: { searchValue: debouncedSearch || undefined },
       limit: PER_PAGE,
-    },
-  });
-
-  const { list = [], totalCount = 0, pageInfo } = data?.productsMain || {};
-
-  const handleFetchMore = () => {
-    if (!pageInfo || totalCount <= list.length) return;
-    fetchMore({
-      variables: {
-        cursor: pageInfo.endCursor,
-        direction: EnumCursorDirection.FORWARD,
-      },
-      updateQuery: (prev, { fetchMoreResult }) => {
-        if (!fetchMoreResult) return prev;
-        return {
-          productsMain: {
-            ...fetchMoreResult.productsMain,
-            list: [
-              ...(prev.productsMain?.list || []),
-              ...fetchMoreResult.productsMain.list,
-            ],
-          },
-        };
-      },
     });
-  };
-
-  const { ref: bottomRef } = useInView({
-    onChange: (inView) => inView && handleFetchMore(),
-  });
 
   const visible = list.filter(
     (p) => !excludeIds.includes(p._id) && p._id !== value,
@@ -147,7 +116,10 @@ const ChooserBody = ({
           autoFocus
         />
         <span className="text-xs text-muted-foreground shrink-0">
-          {t('results', { count: totalCount, defaultValue: '{{count}} results' })}
+          {t('results', {
+            count: totalCount,
+            defaultValue: '{{count}} results',
+          })}
         </span>
       </div>
       <Sheet.Content className="overflow-auto p-0">
@@ -165,7 +137,9 @@ const ChooserBody = ({
                 <span className="font-mono text-xs bg-muted border rounded px-1.5 py-0.5 text-muted-foreground shrink-0">
                   {valueCode}
                 </span>
-                <span className="text-muted-foreground">{t('linked', 'Linked')}</span>
+                <span className="text-muted-foreground">
+                  {t('linked', 'Linked')}
+                </span>
               </div>
               <IconX size={14} className="ml-auto shrink-0" />
             </Button>
@@ -194,7 +168,11 @@ const ChooserBody = ({
                   </span>
                   <span className="truncate">{product.name}</span>
                   <span className="flex gap-2 items-center ml-auto shrink-0">
-                    {inGroup && <Badge variant="secondary">{t('in-a-group', 'in a group')}</Badge>}
+                    {inGroup && (
+                      <Badge variant="secondary">
+                        {t('in-a-group', 'in a group')}
+                      </Badge>
+                    )}
                     {product.unitPrice != null && (
                       <span className="text-xs font-medium tabular-nums">
                         <span className="mr-0.5 font-normal text-muted-foreground">
@@ -210,19 +188,22 @@ const ChooserBody = ({
           })}
 
           {!loading && !visible.length && (
-            <div className="px-2 py-8 text-sm text-center text-muted-foreground">
-              {t('no-products-found', 'No products found.')}
-            </div>
+            <Empty className="py-8">
+              <Empty.Header>
+                <Empty.Title>
+                  {t('no-products-found', 'No products found.')}
+                </Empty.Title>
+              </Empty.Header>
+            </Empty>
           )}
 
-          {list.length < totalCount && (
-            <div className="flex gap-2 items-center px-2 h-8" ref={bottomRef}>
-              <Spinner containerClassName="flex-none" />
-              <span className="text-muted-foreground animate-pulse">
-                {t('loading-more', 'Loading more…')}
-              </span>
-            </div>
-          )}
+          <LoadMoreSentinel
+            hasMore={!!hasNextPage}
+            loading={loading}
+            onLoadMore={() =>
+              handleFetchMore({ direction: EnumCursorDirection.FORWARD })
+            }
+          />
         </div>
       </Sheet.Content>
     </>

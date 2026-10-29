@@ -9,7 +9,6 @@ export const useProductConditionsRemove = () => {
   const { toast } = useToast();
   const [removeConditions, { loading }] = useMutation(
     PRODUCT_CONDITIONS_REMOVE,
-    { refetchQueries: ['productConditions'] },
   );
 
   const remove = (_ids: string[]) =>

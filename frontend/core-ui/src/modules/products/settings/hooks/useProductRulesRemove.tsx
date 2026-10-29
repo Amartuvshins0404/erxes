@@ -34,7 +34,6 @@ export const useProductRulesRemove = (options?: MutationHookOptions) => {
         });
         options?.onCompleted?.(data);
       },
-      refetchQueries: ['productRules'],
     });
   };
 

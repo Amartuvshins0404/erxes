@@ -1,5 +1,13 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Button, Form, Input, Sheet, Textarea, useToast } from 'erxes-ui';
+import {
+  Button,
+  Form,
+  Input,
+  Sheet,
+  Table,
+  Textarea,
+  useToast,
+} from 'erxes-ui';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { useTranslation } from 'react-i18next';
@@ -210,41 +218,45 @@ export const BundleRuleForm = ({
             </Button>
 
             {rules.length > 0 && (
-              <div className="overflow-hidden mt-3 rounded-lg border">
-                <table className="w-full text-xs">
-                  <thead className="bg-muted">
-                    <tr>
-                      <th className="px-4 py-2 text-left">{t('code')}</th>
-                      <th className="px-4 py-2 text-right">{t('actions')}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
+              <div className="overflow-hidden mt-3 rounded-xl border">
+                <Table>
+                  <Table.Header>
+                    <Table.Row>
+                      <Table.Head>{t('code')}</Table.Head>
+                      <Table.Head className="text-right">
+                        {t('actions')}
+                      </Table.Head>
+                    </Table.Row>
+                  </Table.Header>
+                  <Table.Body>
                     {rules.map((rule, index) => (
-                      <tr key={index} className="border-t">
-                        <td className="px-4 py-2">{rule.code || '-'}</td>
-                        <td className="flex gap-2 justify-end px-4 py-2">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEditItem(index)}
-                          >
-                            <IconEdit className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="text-destructive"
-                            onClick={() => handleDeleteItem(index)}
-                          >
-                            <IconTrash className="w-4 h-4" />
-                          </Button>
-                        </td>
-                      </tr>
+                      <Table.Row key={rule.code || index}>
+                        <Table.Cell>{rule.code || '-'}</Table.Cell>
+                        <Table.Cell>
+                          <div className="flex gap-1 justify-end">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleEditItem(index)}
+                            >
+                              <IconEdit />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="text-destructive"
+                              onClick={() => handleDeleteItem(index)}
+                            >
+                              <IconTrash />
+                            </Button>
+                          </div>
+                        </Table.Cell>
+                      </Table.Row>
                     ))}
-                  </tbody>
-                </table>
+                  </Table.Body>
+                </Table>
               </div>
             )}
           </div>
@@ -259,8 +271,8 @@ export const BundleRuleForm = ({
                 ? t('updating')
                 : t('creating')
               : bundleRule
-                ? t('update')
-                : t('create')}
+              ? t('update')
+              : t('create')}
           </Button>
         </Sheet.Footer>
       </form>

@@ -1,6 +1,6 @@
 import type { NotificationSelectionToolbarProps } from '@/notification/types/myInbox';
 import { IconCheck, IconTrash, IconX } from '@tabler/icons-react';
-import { Button, Checkbox, Spinner, cn } from 'erxes-ui';
+import { Button, Checkbox, Label, Spinner, cn } from 'erxes-ui';
 import { useTranslation } from 'react-i18next';
 import { NotificationShortcuts } from './NotificationShortcuts';
 
@@ -38,7 +38,8 @@ export const NotificationSelectionToolbar = ({
         aria-label={t('select-visible')}
         onCheckedChange={onToggleAll}
       />
-      <label
+      <Label
+        variant="peer"
         htmlFor="notification-select-visible"
         className={cn(
           'mr-auto cursor-pointer text-muted-foreground',
@@ -56,7 +57,7 @@ export const NotificationSelectionToolbar = ({
               defaultValue_one: '{{count}} conversation',
               defaultValue_other: '{{count}} conversations',
             })}
-      </label>
+      </Label>
       {selectedCount > 0 ? (
         <>
           <Button

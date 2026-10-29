@@ -1,10 +1,16 @@
 import { IconPhotoUp, IconTrash } from '@tabler/icons-react';
-import { Button, Form, Input, Spinner, Textarea } from 'erxes-ui';
+import {
+  Button,
+  ColorPicker,
+  Form,
+  Input,
+  Spinner,
+  Textarea,
+} from 'erxes-ui';
 import { useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useEmailBrandForm } from '../hooks/useEmailBrandForm';
 
-/** The header and footer every customized notification email is sent in. */
 export const NotificationEmailBrandForm = () => {
   const { t } = useTranslation('common', { keyPrefix: 'notification' });
   const fileInput = useRef<HTMLInputElement>(null);
@@ -106,16 +112,15 @@ export const NotificationEmailBrandForm = () => {
               <Form.Item>
                 <Form.Label>{t('brand-color')}</Form.Label>
                 <div className="flex items-center gap-2">
-                  <input
-                    type="color"
+                  <ColorPicker
                     value={color}
-                    onChange={(e) =>
-                      form.setValue('color', e.target.value, {
+                    onValueChange={(value) =>
+                      form.setValue('color', value, {
                         shouldDirty: true,
                         shouldValidate: true,
                       })
                     }
-                    className="bg-transparent border rounded w-10 h-9 cursor-pointer"
+                    className="w-14"
                     aria-label={t('brand-color')}
                   />
                   <Form.Control>

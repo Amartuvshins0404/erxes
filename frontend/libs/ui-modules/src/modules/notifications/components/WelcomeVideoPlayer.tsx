@@ -1,5 +1,5 @@
-import { Button, cn } from 'erxes-ui';
-import { motion } from 'framer-motion';
+import { Button, Spinner, cn } from 'erxes-ui';
+import { motion } from 'motion/react';
 import { useWelcomeVideoPlayer } from 'ui-modules/modules/notifications/hooks/useWelcomeVideoPlayer';
 import type { WelcomeVideoPlayerProps } from 'ui-modules/modules/notifications/types/welcome';
 
@@ -53,7 +53,7 @@ export const WelcomeVideoPlayer = ({
                   {activeTabLabel === item.label && (
                     <motion.div
                       layoutId="activeTab"
-                      className="absolute inset-0 bg-white shadow-sm rounded-[4px] z-[-1]"
+                      className="absolute inset-0 bg-background shadow-sm rounded-full z-[-1]"
                       initial={false}
                       transition={{
                         type: 'spring',
@@ -72,7 +72,7 @@ export const WelcomeVideoPlayer = ({
       <div className="relative w-full border border-foreground/10 overflow-hidden bg-foreground/10 p-2 rounded-[20px]">
         {!isLoaded && (
           <div className="absolute inset-0 flex items-center justify-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            <Spinner size="lg" />
           </div>
         )}
         {youtubeEmbedSrc ? (

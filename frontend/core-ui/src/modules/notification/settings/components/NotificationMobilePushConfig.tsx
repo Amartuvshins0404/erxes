@@ -243,8 +243,8 @@ export const NotificationMobilePushConfig = () => {
                       </Form.Control>
                     ) : (
                       <Form.Control>
-                        <button
-                          type="button"
+                        <Button
+                          variant="ghost"
                           onClick={() => fileInput.current?.click()}
                           onDragOver={(e) => {
                             e.preventDefault();
@@ -253,11 +253,10 @@ export const NotificationMobilePushConfig = () => {
                           onDragLeave={() => setDragging(false)}
                           onDrop={onDrop}
                           className={cn(
-                            'flex flex-col items-center gap-2 px-4 py-8 border border-dashed rounded-lg w-full text-center transition-colors duration-150 cursor-pointer',
-                            'focus-visible:outline-2 focus-visible:outline-ring/70 focus-visible:outline-offset-2',
+                            'flex h-auto w-full flex-col items-center gap-2 whitespace-normal rounded-2xl border border-dashed px-4 py-8 text-center',
                             dragging
                               ? 'border-primary bg-primary/5'
-                              : 'hover:border-foreground/30 hover:bg-muted/40',
+                              : 'hover:border-border-strong hover:bg-muted/40',
                           )}
                         >
                           <span
@@ -280,7 +279,7 @@ export const NotificationMobilePushConfig = () => {
                           <span className="text-muted-foreground text-xs">
                             {t('drop-key-file-hint')}
                           </span>
-                        </button>
+                        </Button>
                       </Form.Control>
                     )}
                     <input

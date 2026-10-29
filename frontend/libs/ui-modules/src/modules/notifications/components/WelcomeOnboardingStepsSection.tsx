@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 import { WelcomeOnboardingGrid } from 'ui-modules/modules/notifications/components/WelcomeOnboardingGrid';
 import type { WelcomeOnboardingStepsSectionProps } from 'ui-modules/modules/notifications/types/welcome';
 

@@ -1,5 +1,5 @@
 import { IconFilterOff, IconInbox } from '@tabler/icons-react';
-import { Button } from 'erxes-ui';
+import { Button, Empty } from 'erxes-ui';
 import { useTranslation } from 'react-i18next';
 import { useNotificationFilterControls } from '@/notification/hooks/useNotificationFilterControls';
 
@@ -16,27 +16,35 @@ export const NotificationEmptyState = () => {
   }
 
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-4 p-6 text-center text-muted-foreground">
-      <div className="rounded-xl border border-primary/15 bg-primary/5 p-6">
-        <Icon className="text-primary" />
-      </div>
-      <span className="text-sm font-medium text-foreground">{message}</span>
+    <Empty className="h-full">
+      <Empty.Header>
+        <Empty.Media variant="icon">
+          <Icon />
+        </Empty.Media>
+        <Empty.Title className="text-sm">{message}</Empty.Title>
+        {hasActiveFilters && (
+          <Empty.Description className="text-xs">
+            {t('empty-filter-hint')}
+          </Empty.Description>
+        )}
+      </Empty.Header>
       {hasActiveFilters ? (
-        <>
-          <p className="text-xs">{t('empty-filter-hint')}</p>
+        <Empty.Content>
           <Button variant="secondary" onClick={clearFilters}>
             <IconFilterOff />
             {t('clear-filters')}
           </Button>
-        </>
+        </Empty.Content>
       ) : (
         status !== 'all' && (
-          <Button variant="secondary" onClick={() => setStatus('all')}>
-            <IconInbox />
-            {t('view-all')}
-          </Button>
+          <Empty.Content>
+            <Button variant="secondary" onClick={() => setStatus('all')}>
+              <IconInbox />
+              {t('view-all')}
+            </Button>
+          </Empty.Content>
         )
       )}
-    </div>
+    </Empty>
   );
 };

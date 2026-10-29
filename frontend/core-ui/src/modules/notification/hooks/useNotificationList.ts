@@ -5,7 +5,6 @@ import {
   inboxDisplayOptionsState,
 } from '@/notification/states/notificationState';
 import { groupNotifications } from '@/notification/utils/groupNotifications';
-import { useInView } from 'react-intersection-observer';
 import { useNotifications } from '@/notification/hooks/useNotifications';
 import { useNotificationFilters } from '@/notification/hooks/useNotificationFilters';
 import type { UseNotificationListResult } from '@/notification/types/myInbox';
@@ -25,11 +24,6 @@ export const useNotificationList = (): UseNotificationListResult => {
   const hiddenIds = useAtomValue(hiddenNotificationIdsState);
   const { grouping, unreadFirst } = useAtomValue(inboxDisplayOptionsState);
   const { t, i18n } = useTranslation('common', { keyPrefix: 'notification' });
-  const { ref: inViewRef } = useInView({
-    onChange: (inView) => {
-      if (inView) void handleFetchMore();
-    },
-  });
   const visible = notifications.filter(
     (item) =>
       !hiddenIds.includes(item._id) &&
@@ -46,7 +40,6 @@ export const useNotificationList = (): UseNotificationListResult => {
     groups,
     notifications: groups.flatMap(([, items]) => items),
     loading,
-    inViewRef,
     isEmpty:
       !loading &&
       !error &&
@@ -57,6 +50,7 @@ export const useNotificationList = (): UseNotificationListResult => {
     retry,
     fetchingMore,
     fetchMoreError,
-    loadMore: () => handleFetchMore(true),
+    loadMore: () => handleFetchMore(),
+    retryLoadMore: () => handleFetchMore(true),
   };
 };

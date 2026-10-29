@@ -65,7 +65,6 @@ export interface UseNotificationListResult {
   notifications: TNotification[];
   groups: [string, TNotification[]][];
   loading: boolean;
-  inViewRef: (node?: Element | null) => void;
   isEmpty: boolean;
   hasMore: boolean;
   error: ApolloError | undefined;
@@ -73,6 +72,7 @@ export interface UseNotificationListResult {
   fetchingMore: boolean;
   retry: () => Promise<void>;
   loadMore: () => Promise<void>;
+  retryLoadMore: () => Promise<void>;
 }
 
 export interface NotificationSelection {

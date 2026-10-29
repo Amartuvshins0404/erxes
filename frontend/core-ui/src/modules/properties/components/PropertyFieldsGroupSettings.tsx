@@ -21,8 +21,11 @@ import { IconListDetails } from '@tabler/icons-react';
 import { Button, cn, EnumCursorDirection, Spinner } from 'erxes-ui';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { useInView } from 'react-intersection-observer';
-import { IPropertyContentScope, useFieldGroups } from 'ui-modules';
+import {
+  IPropertyContentScope,
+  LoadMoreSentinel,
+  useFieldGroups,
+} from 'ui-modules';
 import { useFieldGroupsReorder } from '../hooks/useFieldGroupsReorder';
 import { PropertiesCommandBar } from './record/PropertiesCommandBar';
 import { PropertiesGroupSection } from './record/PropertiesGroupSection';
@@ -49,14 +52,6 @@ export const PropertyFieldsGroupSettings = ({
   const { reorderFieldGroups } = useFieldGroupsReorder({
     contentType,
     contentTypeId,
-  });
-
-  const [loadMoreRef] = useInView({
-    onChange(inView) {
-      if (inView) {
-        handleFetchMore({ direction: EnumCursorDirection.FORWARD });
-      }
-    },
   });
 
   const sensors = useSensors(
@@ -130,11 +125,12 @@ export const PropertyFieldsGroupSettings = ({
                 ))}
               </SortableContext>
             </DndContext>
-            {pageInfo?.hasNextPage && (
-              <div ref={loadMoreRef}>
-                <Spinner containerClassName="py-6" />
-              </div>
-            )}
+            <LoadMoreSentinel
+              hasMore={!!pageInfo?.hasNextPage}
+              onLoadMore={() =>
+                handleFetchMore({ direction: EnumCursorDirection.FORWARD })
+              }
+            />
           </>
         )}
         {!perTypePath && (

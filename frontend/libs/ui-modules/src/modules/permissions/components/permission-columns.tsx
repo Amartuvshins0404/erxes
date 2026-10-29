@@ -9,7 +9,6 @@ import {
   TextOverflowTooltip,
   toast,
   useConfirm,
-  useQueryState,
 } from 'erxes-ui';
 import { IPermission } from 'ui-modules/modules/permissions/types/permission';
 import { usePermissionsRemove } from 'ui-modules/modules/permissions/hooks/usePermissionsMutations';

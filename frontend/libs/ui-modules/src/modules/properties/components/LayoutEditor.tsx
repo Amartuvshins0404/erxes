@@ -300,16 +300,18 @@ const LayoutRow = ({
           isDragging && 'opacity-40',
         )}
       >
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="icon"
           ref={setActivatorNodeRef}
-          className="flex shrink-0 cursor-grab items-center text-muted-foreground"
+          className="size-7 shrink-0 cursor-grab text-muted-foreground"
           aria-label={t('move-row', 'Move row')}
           {...attributes}
           {...listeners}
         >
           <IconGripVertical className="size-4" />
-        </button>
+        </Button>
         {row.ids.map((id) => (
           <LayoutChip
             key={id}
@@ -385,16 +387,18 @@ const ChipBody = ({
         <span className="truncate">{label}</span>
       )}
       {onUnplace && (
-        <button
+        <Button
           type="button"
-          className="ml-auto flex shrink-0 items-center text-muted-foreground hover:text-foreground"
+          variant="ghost"
+          size="icon"
+          className="ml-auto size-6 shrink-0 text-muted-foreground"
           aria-label={t('layout-unplace', 'Remove from the form')}
           title={t('layout-unplace', 'Remove from the form')}
           onPointerDown={(event) => event.stopPropagation()}
           onClick={onUnplace}
         >
           <IconX className="size-3.5" />
-        </button>
+        </Button>
       )}
     </div>
   );

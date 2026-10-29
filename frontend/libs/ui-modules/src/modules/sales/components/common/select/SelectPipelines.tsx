@@ -319,7 +319,7 @@ export const SelectPipelineInlineCell = ({
           className={cn('flex items-center justify-between gap-2', className)}
         >
           <SelectPipelinesValue placeholder={''} />
-          <IconChevronDown className="size-4 text-zinc-600 shrink-0" />
+          <IconChevronDown className="size-4 text-muted-foreground shrink-0" />
         </RecordTableInlineCell.Trigger>
         <RecordTableInlineCell.Content>
           <SelectPipelineContent />

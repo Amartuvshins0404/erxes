@@ -77,14 +77,14 @@ const SelectCustomerProvider = ({
     const newSelectedCustomerIds = isSingleMode
       ? [customer._id]
       : isSelected
-        ? multipleValue.filter((t) => t !== customer._id)
-        : [...multipleValue, customer._id];
+      ? multipleValue.filter((t) => t !== customer._id)
+      : [...multipleValue, customer._id];
 
     const newSelectedCustomers = isSingleMode
       ? [customer]
       : isSelected
-        ? customers.filter((t) => t._id !== customer._id)
-        : [...customers, customer];
+      ? customers.filter((t) => t._id !== customer._id)
+      : [...customers, customer];
 
     setCustomers(newSelectedCustomers);
     onValueChange?.(isSingleMode ? customer._id : newSelectedCustomerIds);
@@ -283,7 +283,7 @@ const SelectCustomerValue = ({ placeholder }: { placeholder?: string }) => {
   if (hideAvatar) {
     return (
       <span className="text-muted-foreground flex items-center gap-1 -ml-1">
-        <IconUser className="w-4 h-4 text-gray-400" /> Customers +
+        <IconUser className="w-4 h-4 text-muted-foreground" /> Customers +
         {customerIds.length}
       </span>
     );

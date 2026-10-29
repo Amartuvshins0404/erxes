@@ -265,33 +265,37 @@ export function ProductVideosUpload({
             >
               <VideoThumbnail item={item} embed={embed} base={base} />
 
-              <button
+              <Button
+                variant="ghost"
                 type="button"
                 onClick={() => setPreviewItem(item)}
                 aria-label={`Play ${item.name || 'video'}`}
-                className="flex absolute inset-0 justify-center items-center transition cursor-pointer bg-black/20 hover:bg-black/40"
+                className="absolute inset-0 h-full w-full rounded-none bg-black/20 hover:bg-black/40"
               >
                 <IconPlayerPlayFilled size={20} className="text-white/90" />
-              </button>
+              </Button>
 
-              <button
+              <Button
+                variant="destructive"
+                size="icon"
                 type="button"
                 disabled={isRemoving}
                 onClick={() => handleRemove(item, index)}
-                className="absolute top-1 right-1 z-10 p-1 text-white rounded-md shadow opacity-0 transition group-hover:opacity-100 bg-destructive disabled:cursor-not-allowed disabled:opacity-60"
+                className="absolute top-1 right-1 z-10 size-6 opacity-0 transition group-hover:opacity-100"
               >
                 <IconTrash size={14} />
-              </button>
+              </Button>
             </div>
           );
         })}
 
         {videos.length < maxVideos && streamEnabled && (
-          <button
+          <Button
+            variant="outline"
             type="button"
             onClick={() => inputRef.current?.click()}
             disabled={loading}
-            className="flex flex-col justify-center items-center w-24 h-24 shrink-0 aspect-square rounded-md border border-dashed transition cursor-pointer text-muted-foreground bg-background hover:bg-accent disabled:cursor-not-allowed disabled:opacity-70"
+            className="size-24 shrink-0 flex-col gap-1 rounded-xl border-dashed text-muted-foreground shadow-none"
           >
             {loading ? (
               <span className="text-[11px]">{progress}%</span>
@@ -301,7 +305,7 @@ export function ProductVideosUpload({
                 <span className="text-[11px]">Add video</span>
               </>
             )}
-          </button>
+          </Button>
         )}
 
         {videos.length < maxVideos && (
@@ -316,13 +320,14 @@ export function ProductVideosUpload({
             }}
           >
             <Popover.Trigger asChild>
-              <button
+              <Button
+                variant="outline"
                 type="button"
-                className="flex flex-col justify-center items-center w-24 h-24 shrink-0 aspect-square rounded-md border border-dashed transition cursor-pointer text-muted-foreground bg-background hover:bg-accent"
+                className="size-24 shrink-0 flex-col gap-1 rounded-xl border-dashed text-muted-foreground shadow-none"
               >
                 <IconLink size={18} />
                 <span className="text-[11px]">Embed link</span>
-              </button>
+              </Button>
             </Popover.Trigger>
             <Popover.Content className="w-80">
               <div className="flex flex-col gap-2">

@@ -15,19 +15,18 @@ import {
   cn,
   Collapsible,
   DropdownMenu,
+  Empty,
   EnumCursorDirection,
   RecordTable,
   Spinner,
 } from 'erxes-ui';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useInView } from 'react-intersection-observer';
-import { useAtom, useSetAtom } from 'jotai';
+import { useSetAtom } from 'jotai';
 import { useTranslation } from 'react-i18next';
-import { Can, useFields } from 'ui-modules';
+import { Can, LoadMoreSentinel, useFields } from 'ui-modules';
 import { activePropertyState } from '../../states/activePropertyState';
 import { activeLayoutGroupState } from '../../states/activeLayoutGroupState';
 import { archiveTargetState } from '../../states/archiveTargetState';
-import { needsToRefreshState } from '../../states/needsToRefresh';
 import { IFieldGroup } from '../../types/Properties';
 import { propertiesColumns } from './PropertiesColumns';
 import { PropertiesRow } from './PropertiesRow';
@@ -61,7 +60,6 @@ const PropertiesGroupActions = ({
         className="min-w-48"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* A plugin's group holds only the fields that plugin puts there. */}
         {!group.owner && (
           <Can action="fieldsManage">
             <DropdownMenu.Item onClick={() => addField(group._id)}>
@@ -110,7 +108,6 @@ export const PropertiesGroupSection = ({
 }) => {
   const { addField, editField } = usePropertyFieldActions(contentType);
   const { t } = useTranslation('settings', { keyPrefix: 'properties' });
-  const [needsToRefresh, setNeedsToRefresh] = useAtom(needsToRefreshState);
   const {
     attributes,
     isDragging,
@@ -119,26 +116,10 @@ export const PropertiesGroupSection = ({
     transform,
     transition,
   } = useSortable({ id: group._id });
-  const { fields, totalCount, loading, refetch, handleFetchMore, pageInfo } =
-    useFields({
-      contentType,
-      groupId: group._id,
-    });
-
-  const [loadMoreRef] = useInView({
-    onChange(inView) {
-      if (inView) {
-        handleFetchMore({ direction: EnumCursorDirection.FORWARD });
-      }
-    },
+  const { fields, totalCount, loading, handleFetchMore, pageInfo } = useFields({
+    contentType,
+    groupId: group._id,
   });
-
-  useEffect(() => {
-    if (needsToRefresh) {
-      refetch();
-      setNeedsToRefresh(false);
-    }
-  }, [needsToRefresh, refetch, setNeedsToRefresh]);
 
   const [open, setOpen] = useState(true);
   const hasUserToggledRef = useRef(false);
@@ -212,15 +193,19 @@ export const PropertiesGroupSection = ({
         {loading ? (
           <Spinner containerClassName="py-6" />
         ) : fields.length === 0 ? (
-          <div className="rounded-md border py-10 text-center text-sm text-muted-foreground">
-            {t('no-fields-found', 'No fields found')}
-          </div>
+          <Empty className="rounded-xl border py-10">
+            <Empty.Header>
+              <Empty.Title>
+                {t('no-fields-found', 'No fields found')}
+              </Empty.Title>
+            </Empty.Header>
+          </Empty>
         ) : (
           <RecordTable.Provider
             columns={columns}
             data={fields}
             stickyColumns={['more', 'checkbox', 'name']}
-            className="rounded-md border"
+            className="rounded-xl border"
           >
             <RecordTable.Scroll className="h-auto" viewportClassName="max-h-96">
               <RecordTable>
@@ -233,11 +218,12 @@ export const PropertiesGroupSection = ({
                   />
                 </RecordTable.Body>
               </RecordTable>
-              {pageInfo?.hasNextPage && (
-                <div ref={loadMoreRef}>
-                  <Spinner containerClassName="py-3" />
-                </div>
-              )}
+              <LoadMoreSentinel
+                hasMore={!!pageInfo?.hasNextPage}
+                onLoadMore={() =>
+                  handleFetchMore({ direction: EnumCursorDirection.FORWARD })
+                }
+              />
             </RecordTable.Scroll>
           </RecordTable.Provider>
         )}

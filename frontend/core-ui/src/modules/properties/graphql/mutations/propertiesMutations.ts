@@ -74,10 +74,32 @@ export const FIELD_EDIT = gql`
       isVisibleInCard: $isVisibleInCard
     ) {
       _id
+      name
+      icon
+      code
+      type
+      order
+      groupId
+      validations
+      logics
+      configs
+      createdAt
+      updatedAt
       isVisible
       isVisibleToCreate
       isRequired
       isVisibleInCard
+      owner {
+        plugin
+        module
+        key
+        status
+      }
+      options {
+        label
+        value
+        deprecated
+      }
     }
   }
 `;

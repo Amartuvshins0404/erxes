@@ -116,7 +116,9 @@ const SelectCustomersBulkContent = ({
               Cancel
             </Button>
           </Sheet.Close>
-          <Button onClick={handleSelect}>{`Set ${selectedCustomerIds.length} customer(s)`}</Button>
+          <Button
+            onClick={handleSelect}
+          >{`Set ${selectedCustomerIds.length} customer(s)`}</Button>
         </div>
       </Sheet.Footer>
     </>
@@ -210,11 +212,11 @@ const CustomersList = ({
             })}
 
             {customers.length < totalCount && (
-              <div ref={bottomRef} className="flex items-center gap-2 h-8">
+              <div
+                ref={bottomRef}
+                className="flex items-center justify-center h-8"
+              >
                 <Spinner />
-                <span className="text-muted-foreground animate-pulse">
-                  Loading more customers...
-                </span>
               </div>
             )}
           </Tooltip.Provider>

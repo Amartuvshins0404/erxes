@@ -1,5 +1,5 @@
 import { IconGripVertical, IconTrash, IconUpload } from '@tabler/icons-react';
-import { readImage, useErxesUpload, useRemoveFile } from 'erxes-ui';
+import { Button, readImage, useErxesUpload, useRemoveFile } from 'erxes-ui';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 
 export type ProductAttachmentItem = {
@@ -117,18 +117,15 @@ export function ProductPrimaryImageUpload({
   return (
     <div className="flex flex-col gap-2 h-full min-h-24">
       <div className="relative flex-1 min-h-24 group">
-        <button
+        <Button
+          variant="outline"
           type="button"
           onClick={uploadProps.open}
           disabled={uploadProps.loading}
-          className="overflow-hidden relative flex justify-center items-center w-full h-full min-h-24 rounded-md border border-dashed transition bg-background hover:bg-accent disabled:cursor-not-allowed disabled:opacity-70"
+          className="relative h-full min-h-24 w-full overflow-hidden rounded-xl border-dashed bg-cover bg-center p-0 shadow-none"
           style={
             value?.url
-              ? {
-                  backgroundImage: `url(${readImage(value.url)})`,
-                  backgroundSize: 'cover',
-                  backgroundPosition: 'center',
-                }
+              ? { backgroundImage: `url(${readImage(value.url)})` }
               : {}
           }
         >
@@ -152,17 +149,19 @@ export function ProductPrimaryImageUpload({
               </span>
             </div>
           )}
-        </button>
+        </Button>
 
         {value && (
-          <button
+          <Button
+            variant="destructive"
+            size="icon"
             type="button"
             disabled={isLoading}
             onClick={handleRemove}
-            className="absolute p-1 text-white rounded-md shadow opacity-0 transition top-2 right-2 bg-destructive group-hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-60"
+            className="absolute top-2 right-2 size-7 opacity-0 transition group-hover:opacity-100"
           >
             <IconTrash size={14} />
-          </button>
+          </Button>
         )}
       </div>
 
@@ -268,14 +267,16 @@ export function ProductSecondaryImagesUpload({
             />
 
             <div className="flex absolute inset-0 justify-center items-center transition bg-black/0 group-hover:bg-black/30">
-              <button
+              <Button
+                variant="destructive"
+                size="icon"
                 type="button"
                 disabled={isLoading}
                 onClick={() => handleRemove(item)}
-                className="p-1 text-white rounded-md shadow opacity-0 transition group-hover:opacity-100 bg-destructive disabled:cursor-not-allowed disabled:opacity-60"
+                className="size-7 opacity-0 transition group-hover:opacity-100"
               >
                 <IconTrash size={14} />
-              </button>
+              </Button>
             </div>
 
             <div className="absolute top-1 left-1 opacity-0 group-hover:opacity-100">
@@ -285,11 +286,12 @@ export function ProductSecondaryImagesUpload({
         ))}
 
         {images.length < maxImages && (
-          <button
+          <Button
+            variant="outline"
             type="button"
             onClick={uploadProps.open}
             disabled={uploadProps.loading}
-            className="flex flex-col justify-center items-center w-24 h-24 shrink-0 aspect-square rounded-md border border-dashed transition cursor-pointer text-muted-foreground bg-background hover:bg-accent disabled:cursor-not-allowed disabled:opacity-70"
+            className="size-24 shrink-0 flex-col gap-1 rounded-xl border-dashed text-muted-foreground shadow-none"
           >
             {uploadProps.loading ? (
               <span className="text-xs">Uploading...</span>
@@ -299,7 +301,7 @@ export function ProductSecondaryImagesUpload({
                 <span className="text-[11px]">Add images</span>
               </>
             )}
-          </button>
+          </Button>
         )}
       </div>
 

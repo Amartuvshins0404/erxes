@@ -40,7 +40,7 @@ export const DealSelect = ({
   return (
     <div className="flex flex-col">
       <div className="px-4 py-1">
-        <span className=" text-xs text-gray-400">BOARD</span>
+        <span className=" text-xs text-muted-foreground">BOARD</span>
       </div>
       <div className="px-2">
         <BoardSelect
@@ -51,7 +51,7 @@ export const DealSelect = ({
       </div>
       <Separator className="mt-2 mb-1" />
       <div className="px-4 py-1 mt-1">
-        <span className=" text-xs  text-gray-400">PIPELINE</span>
+        <span className=" text-xs  text-muted-foreground">PIPELINE</span>
       </div>
       <div className="px-2">
         <PipelineSelect
@@ -62,7 +62,7 @@ export const DealSelect = ({
       </div>
       <Separator className="mt-2 mb-1" />
       <div className="px-4 py-1 mt-1">
-        <span className="text-xs  text-gray-400">STAGE</span>
+        <span className="text-xs  text-muted-foreground">STAGE</span>
       </div>
       <div className="px-2">
         <StageSelect

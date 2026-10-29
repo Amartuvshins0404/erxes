@@ -290,18 +290,19 @@ const PropertyValueInput = ({
           {options.map((option) => {
             const isSelected = selected.includes(option.value);
             return (
-              <button
+              <Button
                 key={option.value}
                 type="button"
+                variant="ghost"
                 onClick={() => toggle(option.value)}
                 className={cn(
-                  'flex h-8 items-center gap-2 rounded px-2 text-sm text-left transition-colors hover:bg-accent',
+                  'h-8 justify-between gap-2 px-2 font-normal',
                   isSelected && 'text-primary',
                 )}
               >
                 <span className="truncate">{option.label}</span>
                 <Combobox.Check checked={isSelected} className="text-primary" />
-              </button>
+              </Button>
             );
           })}
         </div>

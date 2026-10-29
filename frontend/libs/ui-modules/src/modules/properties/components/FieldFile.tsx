@@ -1,8 +1,4 @@
-import {
-  IconFile,
-  IconPaperclip,
-  IconTrash,
-} from '@tabler/icons-react';
+import { IconFile, IconPaperclip, IconTrash } from '@tabler/icons-react';
 import {
   Button,
   Dialog,
@@ -37,10 +33,11 @@ const FileRow = ({
     <li className="group flex items-center gap-2 bg-background shadow-xs px-1 border rounded-sm w-full h-8 text-foreground text-sm">
       {isImage(file) ? (
         <>
-          <button
+          <Button
             type="button"
+            variant="ghost"
             onClick={() => setPreviewOpen(true)}
-            className="flex flex-1 items-center gap-2 text-left hover:underline truncate"
+            className="h-auto min-w-0 flex-1 justify-start gap-2 px-0 font-normal hover:bg-transparent hover:underline"
             title={file.name}
           >
             <img
@@ -50,7 +47,7 @@ const FileRow = ({
               className="border rounded size-6 object-cover shrink-0"
             />
             <span className="truncate">{file.name}</span>
-          </button>
+          </Button>
 
           <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
             <Dialog.Content className="bg-transparent shadow-none p-0 border-0 max-w-fit">

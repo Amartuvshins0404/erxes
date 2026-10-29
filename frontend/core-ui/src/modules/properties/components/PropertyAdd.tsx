@@ -1,7 +1,5 @@
 import { Sheet, toast } from 'erxes-ui';
 import { useTranslation } from 'react-i18next';
-import { useSetAtom } from 'jotai';
-import { needsToRefreshState } from '../states/needsToRefresh';
 import {
   IPropertyContentScope,
   IPropertyForm,
@@ -20,7 +18,6 @@ export const AddProperty = ({
 }) => {
   const { t } = useTranslation('settings', { keyPrefix: 'properties' });
   const { addProperty, loading } = useAddProperty();
-  const setNeedsToRefresh = useSetAtom(needsToRefreshState);
 
   const onSubmit = (data: IPropertyForm) => {
     addProperty({
@@ -34,7 +31,6 @@ export const AddProperty = ({
           title: t('property-added', 'Property added'),
           variant: 'success',
         });
-        setNeedsToRefresh(true);
         onClose();
       },
       onError: (error) => {

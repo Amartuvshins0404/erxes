@@ -79,8 +79,8 @@ const SelectCategoryProvider = ({
       Array.isArray(selectedValue)
         ? selectedValue
         : selectedValue
-          ? [selectedValue]
-          : [],
+        ? [selectedValue]
+        : [],
     [selectedValue],
   );
   const handleValueChange = onValueChange || onSelect;
@@ -346,7 +346,7 @@ const SelectCategoryValue = ({ placeholder }: { placeholder?: string }) => {
   if (categoryIds.length > 1) {
     return (
       <span className="flex gap-1 items-center -ml-1 text-muted-foreground">
-        <IconCategory className="size-4 text-gray-400" /> Categories +
+        <IconCategory className="size-4 text-muted-foreground" /> Categories +
         {categoryIds.length}
       </span>
     );

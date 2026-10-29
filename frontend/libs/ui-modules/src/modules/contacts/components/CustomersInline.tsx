@@ -194,7 +194,7 @@ const CustomersInlineTitle = ({ className }: { className?: string }) => {
     if (hideAvatar) {
       return (
         <span className="text-muted-foreground flex items-center gap-1 -ml-1">
-          <IconUser className="w-4 h-4 text-gray-400" /> Customers +
+          <IconUser className="w-4 h-4 text-muted-foreground" /> Customers +
           {(customers || []).length}
         </span>
       );

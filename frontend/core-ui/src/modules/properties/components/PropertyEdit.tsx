@@ -1,8 +1,6 @@
 import { Sheet, Spinner, toast } from 'erxes-ui';
 import { useFieldDetail } from '../hooks/useFieldDetail';
 import { useEditProperty } from '../hooks/useEditProperty';
-import { useSetAtom } from 'jotai';
-import { needsToRefreshState } from '../states/needsToRefresh';
 import { useTranslation } from 'react-i18next';
 import { IPropertyContentScope, IPropertyForm, PropertyForm } from 'ui-modules';
 
@@ -19,7 +17,6 @@ export const PropertyEdit = ({
 
   const { fieldDetail, loading } = useFieldDetail({ id: fieldId });
   const { editProperty, loading: editPropertyLoading } = useEditProperty();
-  const setNeedsToRefresh = useSetAtom(needsToRefreshState);
 
   const [fieldType, ...relationType] = fieldDetail?.type?.split(':') || [];
 
@@ -30,12 +27,13 @@ export const PropertyEdit = ({
         contentType,
         ...data,
       },
+      refetchQueries:
+        data.groupId && data.groupId !== fieldDetail?.groupId ? ['Fields'] : [],
       onCompleted: () => {
         toast({
           title: t('property-updated', 'Property updated'),
           variant: 'success',
         });
-        setNeedsToRefresh(true);
         onClose();
       },
       onError: (error) => {

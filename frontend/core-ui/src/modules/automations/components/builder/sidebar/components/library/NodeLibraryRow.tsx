@@ -21,33 +21,12 @@ interface NodeLibraryRowProps {
   rightElement?: React.ReactNode;
   onDragStart?: (
     event: React.DragEvent<HTMLDivElement>,
-    { type, label, description, icon, isCustom }: any,
+    node: TNodeLibraryRowItem & { nodeType: AutomationNodeType },
   ) => void;
   onSelectNode: (
     node: TNodeLibraryRowItem & { nodeType: AutomationNodeType },
   ) => void;
 }
-
-const GHOST_COLORS: Record<
-  AutomationNodeType,
-  { border: string; background: string; color: string }
-> = {
-  [AutomationNodeType.Trigger]: {
-    border: 'rgba(99,102,241,0.18)',
-    background: 'rgba(99,102,241,0.10)',
-    color: 'rgb(99,102,241)',
-  },
-  [AutomationNodeType.Action]: {
-    border: 'rgba(34,197,94,0.18)',
-    background: 'rgba(34,197,94,0.10)',
-    color: 'rgb(34,197,94)',
-  },
-  [AutomationNodeType.Workflow]: {
-    border: 'rgba(59,130,246,0.18)',
-    background: 'rgba(59,130,246,0.10)',
-    color: 'rgb(59,130,246)',
-  },
-};
 
 const createDragGhost = ({
   label,
@@ -59,54 +38,34 @@ const createDragGhost = ({
   iconMarkup: string;
 }) => {
   const ghost = document.createElement('div');
+  ghost.className =
+    'pointer-events-none fixed -left-[1000px] -top-[1000px] z-[9999]';
 
-  ghost.style.position = 'fixed';
-  ghost.style.top = '-1000px';
-  ghost.style.left = '-1000px';
-  ghost.style.pointerEvents = 'none';
-  ghost.style.zIndex = '9999';
+  const card = document.createElement('div');
+  card.className =
+    'flex min-w-40 items-center gap-2.5 rounded-xl border border-border bg-background px-3 py-2.5 text-foreground shadow-lg';
 
-  ghost.innerHTML = `
-    <div
-      style="
-        display:flex;
-        align-items:center;
-        gap:10px;
-        padding:10px 12px;
-        border-radius:12px;
-        border:1px solid ${GHOST_COLORS[nodeType].border};
-        background:var(--background, rgba(255,255,255,0.96));
-        color:var(--foreground, rgb(15,23,42));
-        box-shadow:0 16px 40px rgba(15,23,42,0.16);
-        min-width:160px;
-        font-family:inherit;
-      "
-    >
-      <div
-        style="
-          display:flex;
-          align-items:center;
-          justify-content:center;
-          width:32px;
-          height:32px;
-          border-radius:10px;
-          background:${GHOST_COLORS[nodeType].background};
-          color:${GHOST_COLORS[nodeType].color};
-        "
-      >
-        ${iconMarkup}
-      </div>
-      <div style="display:flex;flex-direction:column;min-width:0;">
-        <div style="font-size:11px;line-height:1;text-transform:uppercase;opacity:.6;">
-          ${nodeType}
-        </div>
-        <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-          ${label}
-        </div>
-      </div>
-    </div>
-  `;
+  const icon = document.createElement('div');
+  icon.className = cn(
+    'flex size-8 items-center justify-center rounded-lg [&>svg]:size-4',
+    getNodeColor(nodeType),
+  );
+  icon.innerHTML = iconMarkup;
 
+  const text = document.createElement('div');
+  text.className = 'flex min-w-0 flex-col gap-0.5';
+
+  const kind = document.createElement('div');
+  kind.className = 'text-[11px] uppercase leading-none text-muted-foreground';
+  kind.textContent = nodeType;
+
+  const name = document.createElement('div');
+  name.className = 'truncate text-[13px] font-semibold';
+  name.textContent = label;
+
+  text.append(kind, name);
+  card.append(icon, text);
+  ghost.append(card);
   document.body.appendChild(ghost);
 
   return ghost;

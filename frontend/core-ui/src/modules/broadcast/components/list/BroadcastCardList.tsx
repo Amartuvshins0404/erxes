@@ -1,7 +1,7 @@
 import { Card, EnumCursorDirection, ScrollArea, Skeleton } from 'erxes-ui';
 import { LoadMoreSentinel } from 'ui-modules';
 import { useMessages } from '../../hooks/useBroadcastMessages';
-import { BroadcastCard } from './BroadcastCard';
+import { BroadcastCard, TBroadcastCardMessage } from './BroadcastCard';
 import { BroadcastEmptyState, BroadcastErrorState } from './BroadcastStates';
 
 const INITIAL_SKELETON_COUNT = 8;
@@ -24,7 +24,7 @@ export const BroadcastCardList = () => {
     refetch,
     hasNextPage,
     handleFetchMore,
-  } = useMessages();
+  } = useMessages<TBroadcastCardMessage>();
 
   if (error) {
     return <BroadcastErrorState error={error} onRetry={() => refetch()} />;

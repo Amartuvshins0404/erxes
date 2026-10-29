@@ -11,14 +11,7 @@ export const useBroadcastMessageVariables = () => {
       trigger: string;
       status: string;
       methods: string;
-    }>([
-      'searchValue',
-      'brand',
-      'fromUser',
-      'trigger',
-      'status',
-      'methods',
-    ]);
+    }>(['searchValue', 'brand', 'fromUser', 'trigger', 'status', 'methods']);
 
   return {
     searchValue: searchValue || undefined,
@@ -30,13 +23,13 @@ export const useBroadcastMessageVariables = () => {
   };
 };
 
-export const useMessages = () => {
+export const useMessages = <TItem = TBroadcastMessage>() => {
   const variables = useBroadcastMessageVariables();
 
-  const { list, ...rest } = useCursorListQuery<TBroadcastMessage>(
-    BROADCAST_MESSAGES,
-    { field: 'engageMessages', variables },
-  );
+  const { list, ...rest } = useCursorListQuery<TItem>(BROADCAST_MESSAGES, {
+    field: 'engageMessages',
+    variables,
+  });
 
   return { messages: list, ...rest };
 };

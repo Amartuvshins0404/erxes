@@ -1,10 +1,15 @@
 import { TAutomationStatsActivity } from '@/automations/components/builder/stats/hooks/useAutomationStatsActivity';
 import { formatStatsDuration } from '@/automations/components/builder/stats/utils/automationStatsFormat';
-import { ChartContainer, ChartTooltipContent } from 'erxes-ui';
+import {
+  ChartConfig,
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+} from 'erxes-ui';
 import { useTranslation } from 'react-i18next';
-import { Bar, BarChart, CartesianGrid, Tooltip, XAxis, YAxis } from 'recharts';
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts';
 
-const CHART_CONFIG = {
+const CHART_CONFIG: ChartConfig = {
   p50Ms: { label: 'P50', color: 'var(--primary)' },
   p95Ms: { label: 'P95', color: 'var(--muted-foreground)' },
 };
@@ -43,7 +48,7 @@ export const AutomationStatsLatency = ({
           axisLine={false}
           tickFormatter={(ms: number) => formatStatsDuration(ms)}
         />
-        <Tooltip
+        <ChartTooltip
           content={
             <ChartTooltipContent
               labelFormatter={(_, [item]) =>
@@ -60,12 +65,8 @@ export const AutomationStatsLatency = ({
             />
           }
         />
-        <Bar dataKey="p50Ms" fill="var(--primary)" radius={[2, 2, 0, 0]} />
-        <Bar
-          dataKey="p95Ms"
-          fill="var(--muted-foreground)"
-          radius={[2, 2, 0, 0]}
-        />
+        <Bar dataKey="p50Ms" fill="var(--color-p50Ms)" radius={[2, 2, 0, 0]} />
+        <Bar dataKey="p95Ms" fill="var(--color-p95Ms)" radius={[2, 2, 0, 0]} />
       </BarChart>
     </ChartContainer>
   );

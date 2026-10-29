@@ -3,7 +3,7 @@ import {
   IconRowInsertBottom,
 } from '@tabler/icons-react';
 import { cn } from 'erxes-ui';
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 import React, { useState } from 'react';
 
 const InsertBadge = ({

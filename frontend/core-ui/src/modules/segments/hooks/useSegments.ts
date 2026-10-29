@@ -15,5 +15,6 @@ export const useSegments = () => {
     loading,
     error,
     refetch,
+    handleRefresh: refetch,
   };
 };

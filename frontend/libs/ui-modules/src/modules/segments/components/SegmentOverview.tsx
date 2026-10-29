@@ -6,9 +6,12 @@ import {
 } from '@tabler/icons-react';
 import {
   Button,
+  ChartConfig,
   ChartContainer,
+  ChartTooltip,
   ChartTooltipContent,
   cn,
+  Empty,
   Label,
   Spinner,
 } from 'erxes-ui';
@@ -21,7 +24,6 @@ import {
   Line,
   LineChart,
   ReferenceLine,
-  Tooltip,
   XAxis,
   YAxis,
 } from 'recharts';
@@ -30,8 +32,10 @@ import { SegmentRebuildButton } from './SegmentRebuildButton';
 import { ISegment } from '../types';
 import { SegmentBuildProgress } from './SegmentBuildProgress';
 
-const LEVEL_CONFIG = { count: { label: 'Members', color: 'var(--primary)' } };
-const MOVEMENT_CONFIG = {
+const LEVEL_CONFIG: ChartConfig = {
+  count: { label: 'Members', color: 'var(--primary)' },
+};
+const MOVEMENT_CONFIG: ChartConfig = {
   joined: { label: 'Joined', color: 'var(--success)' },
   left: { label: 'Left', color: 'var(--destructive)' },
 };
@@ -87,7 +91,6 @@ export const SegmentOverview = ({
   segment?: ISegment;
   days?: number;
   onRefresh?: () => Promise<unknown> | void;
-  // The host's own buttons for this segment, placed beside rebuild.
   actions?: ReactNode;
 }) => {
   const { t } = useTranslation('segment', { keyPrefix: 'analytics' });
@@ -137,11 +140,6 @@ export const SegmentOverview = ({
           <IconReload className={cn('size-4', refreshing && 'animate-spin')} />
           {t('refresh')}
         </Button>
-        {/* Re-reading the number and re-deriving it are different actions,
-            so they are two buttons rather than one that guesses. */}
-        {/* While a build runs, its own row carries the stop - repeating it
-            here left two of them on screen with nothing to tell them
-            apart. */}
         {segment?.status !== 'building' && (
           <SegmentRebuildButton segment={segment} size="sm" />
         )}
@@ -158,8 +156,6 @@ export const SegmentOverview = ({
               : segment.membersCount.toLocaleString()
           }
         />
-        {/* Nothing has moved yet on a segment this young, and a coloured zero
-            reads as a measurement rather than as the absence of one. */}
         {!!(joined || left) && (
           <>
             <Stat
@@ -189,18 +185,19 @@ export const SegmentOverview = ({
           />
         )}
       </div>
-
-      {/* Two full charts drawn from a single day look broken rather than new,
-          so a segment with nothing to plot yet says so in one line. */}
       {!hasTrend ? (
-        <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed px-6 py-10 text-center">
-          <IconChartLine className="size-6 text-muted-foreground" />
-          <p className="max-w-md text-sm text-muted-foreground">
-            {measuredSince
-              ? t('measured-since', { date: measuredSince })
-              : t('no-history')}
-          </p>
-        </div>
+        <Empty className="rounded-lg border border-dashed">
+          <Empty.Header>
+            <Empty.Media variant="icon">
+              <IconChartLine />
+            </Empty.Media>
+            <Empty.Description>
+              {measuredSince
+                ? t('measured-since', { date: measuredSince })
+                : t('no-history')}
+            </Empty.Description>
+          </Empty.Header>
+        </Empty>
       ) : (
         <div className="space-y-4">
           <section className="space-y-2 rounded-lg border p-4">
@@ -208,10 +205,6 @@ export const SegmentOverview = ({
               {hourly ? t('level-recent') : t('level', { days: span })}
             </Label>
             <ChartContainer config={LEVEL_CONFIG} className="h-48 w-full">
-              {/* A line, not an area, because the axis does not start at
-                  zero. A filled area reads as the quantity underneath it, so
-                  cutting its baseline overstates every wobble; a line claims
-                  nothing but the path it traces. */}
               <LineChart data={series} margin={{ top: 8 }}>
                 <CartesianGrid vertical={false} />
                 <XAxis
@@ -223,11 +216,6 @@ export const SegmentOverview = ({
                   tickFormatter={(at: string) => tickLabel(at, hourly)}
                   className="text-xs"
                 />
-                {/* Scaled to the data, not to zero: a segment of a million
-                    moving by ten is a flat line on any axis that starts at
-                    zero, which is the one thing this chart exists to show. The
-                    labels carry the real numbers, so the scale is readable
-                    rather than implied. */}
                 <YAxis
                   width={64}
                   tickLine={false}
@@ -237,7 +225,7 @@ export const SegmentOverview = ({
                   tickFormatter={(value: number) => value.toLocaleString()}
                   className="text-xs"
                 />
-                <Tooltip
+                <ChartTooltip
                   content={
                     <ChartTooltipContent labelFormatter={tooltipLabel} />
                   }
@@ -277,7 +265,7 @@ export const SegmentOverview = ({
                   className="text-xs"
                 />
                 <ReferenceLine y={0} stroke="var(--border)" />
-                <Tooltip
+                <ChartTooltip
                   content={
                     <ChartTooltipContent labelFormatter={tooltipLabel} />
                   }

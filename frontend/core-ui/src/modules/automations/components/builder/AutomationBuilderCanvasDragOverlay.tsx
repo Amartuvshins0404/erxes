@@ -5,7 +5,7 @@ import {
 } from '@/automations/context/AutomationBuilderDnDProvider';
 import { AutomationNodeType } from '@/automations/types';
 import { IconPlus } from '@tabler/icons-react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion } from 'motion/react';
 import { IconComponent, cn } from 'erxes-ui';
 import { useTranslation } from 'react-i18next';
 

@@ -15,7 +15,7 @@ import {
   useScopedHotkeys,
   useSetHotkeyScope,
 } from 'erxes-ui';
-import { AnimatePresence } from 'framer-motion';
+import { AnimatePresence } from 'motion/react';
 import { useEffect } from 'react';
 import { AutomationVariableInsertionProvider } from 'ui-modules';
 import { useTranslation } from 'react-i18next';

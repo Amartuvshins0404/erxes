@@ -1,11 +1,10 @@
 import {
-  IconAlertCircle,
+  IconAlertTriangle,
   IconChevronDown,
-  IconChevronUp,
   IconRefresh,
   IconX,
 } from '@tabler/icons-react';
-import { Button, Collapsible } from 'erxes-ui';
+import { Badge, Button, Collapsible, Empty, cn } from 'erxes-ui';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -30,84 +29,72 @@ export function AutomationErrorState({
   const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <div className="p-4 rounded-lg border border-destructive/20 bg-background max-w-full overflow-auto">
-      <div className="border-destructive/50 flex flex-row items-center gap-2">
-        <IconAlertCircle className="h-5 w-5" />
-        <div className="flex-1">
-          <div className="flex items-start justify-between">
-            <h4 className="text-destructive font-medium">{title}</h4>
-            {onDismiss && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6 rounded-full -mt-1 -mr-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100"
-                onClick={onDismiss}
-              >
-                <IconX className="h-4 w-4" />
-                <span className="sr-only">{t('common-dismiss')}</span>
-              </Button>
-            )}
-          </div>
-          {description && (
-            <span className="text-destructive/90 mt-1">{description}</span>
-          )}
-        </div>
-      </div>
-
-      <div className="mt-3 text-sm">
-        {errorCode && (
-          <div className="flex items-center text-gray-500 mb-1">
-            <span className="font-mono text-xs bg-destructive/5 px-2 py-0.5 rounded border border-destructive/10">
-              {errorCode}
-            </span>
-          </div>
+    <Empty className="relative max-w-full gap-4 overflow-auto rounded-xl border border-destructive/20 bg-destructive/5 p-6">
+      {onDismiss && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="absolute right-2 top-2 rounded-full text-muted-foreground"
+          onClick={onDismiss}
+        >
+          <IconX />
+          <span className="sr-only">{t('common-dismiss')}</span>
+        </Button>
+      )}
+      <Empty.Header>
+        <Empty.Media variant="icon" className="bg-destructive/10">
+          <IconAlertTriangle className="text-destructive" />
+        </Empty.Media>
+        <Empty.Title>{title}</Empty.Title>
+        {description && (
+          <Empty.Description className="break-words">
+            {description}
+          </Empty.Description>
         )}
-
-        {errorDetails && (
-          <Collapsible open={isOpen} onOpenChange={setIsOpen} className="mt-2">
-            <div className="flex items-center gap-1">
+      </Empty.Header>
+      {(errorCode || errorDetails || onRetry) && (
+        <Empty.Content className="max-w-full">
+          {errorCode && (
+            <Badge variant="destructive" className="font-mono">
+              {errorCode}
+            </Badge>
+          )}
+          {errorDetails && (
+            <Collapsible
+              open={isOpen}
+              onOpenChange={setIsOpen}
+              className="w-full"
+            >
               <Collapsible.Trigger asChild>
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="p-0 h-auto text-gray-500 hover:text-gray-700 hover:bg-transparent"
-                  data-collapsible-trigger="true"
+                  className="text-xs text-muted-foreground"
                 >
-                  <span className="text-xs underline underline-offset-2">
-                    {isOpen
-                      ? t('common-hide-details')
-                      : t('common-show-details')}
-                  </span>
-                  {isOpen ? (
-                    <IconChevronUp className="h-3 w-3 ml-1" />
-                  ) : (
-                    <IconChevronDown className="h-3 w-3 ml-1" />
-                  )}
+                  {isOpen ? t('common-hide-details') : t('common-show-details')}
+                  <IconChevronDown
+                    className={cn(
+                      'transition-transform',
+                      isOpen && 'rotate-180',
+                    )}
+                  />
                 </Button>
               </Collapsible.Trigger>
-            </div>
-            <Collapsible.Content className="mt-2 ">
-              <div className="bg-gray-50 p-3 rounded border border-gray-100 text-xs text-gray-600 font-mono whitespace-pre-wrap w-auto overflow-auto">
-                {errorDetails}
-              </div>
-            </Collapsible.Content>
-          </Collapsible>
-        )}
-      </div>
-
-      {onRetry && (
-        <div className="mt-4 flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="text-sm border-destructive/20 hover:bg-destructive/5 hover:text-destructive hover:border-destructive/30"
-            onClick={onRetry}
-          >
-            <IconRefresh className="h-3.5 w-3.5 mr-1.5" />
-            {t('common-try-again')}
-          </Button>
-        </div>
+              <Collapsible.Content className="mt-2">
+                <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded-lg border bg-muted p-3 text-left font-mono text-xs text-muted-foreground">
+                  {errorDetails}
+                </pre>
+              </Collapsible.Content>
+            </Collapsible>
+          )}
+          {onRetry && (
+            <Button variant="outline" size="sm" onClick={onRetry}>
+              <IconRefresh />
+              {t('common-try-again')}
+            </Button>
+          )}
+        </Empty.Content>
       )}
-    </div>
+    </Empty>
   );
 }

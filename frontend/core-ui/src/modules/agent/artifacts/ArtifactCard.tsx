@@ -220,7 +220,7 @@ export const ArtifactCard = ({ artifact }: IArtifactCardProps) => {
             className="size-7"
           >
             {copied ? (
-              <IconCheck className="size-3.5 text-emerald-600" />
+              <IconCheck className="size-3.5 text-success" />
             ) : (
               <IconCopy className="size-3.5" />
             )}

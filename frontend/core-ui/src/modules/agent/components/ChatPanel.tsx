@@ -284,18 +284,18 @@ export const ChatPanel = ({
         const Icon = suggestion.icon;
 
         return (
-          <button
+          <Button
             key={suggestion.prompt}
-            type="button"
+            variant="ghost"
             disabled={noConnection}
             onClick={() => sendMessage({ text: suggestion.prompt })}
             onPointerEnter={winkOnce}
             onFocus={winkOnce}
-            className="flex items-center gap-2.5 rounded-xl bg-muted/40 px-3 py-2.5 text-left text-[13px] transition-[background-color,transform] duration-200 hover:bg-muted motion-safe:hover:translate-x-1 motion-safe:active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
+            className="h-auto justify-start gap-2.5 rounded-2xl bg-muted/40 px-3 py-2.5 text-left text-[13px] font-normal transition-[background-color,transform] duration-200 hover:bg-muted motion-safe:hover:translate-x-1 motion-safe:active:scale-[0.99] disabled:opacity-60 [&>svg]:text-muted-foreground"
           >
             <Icon className="size-4 shrink-0 text-muted-foreground" />
             <span className="min-w-0 truncate">{suggestion.prompt}</span>
-          </button>
+          </Button>
         );
       })}
     </div>

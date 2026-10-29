@@ -7,7 +7,7 @@ import {
   IconTool,
   IconX,
 } from '@tabler/icons-react';
-import { Collapsible, cn } from 'erxes-ui';
+import { Button, Collapsible, cn } from 'erxes-ui';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -131,10 +131,11 @@ export const AgentStepRow = ({
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
       <Collapsible.Trigger asChild>
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="sm"
           className={cn(
-            'flex w-full items-center gap-2 rounded-md px-1 py-1 text-left text-xs transition-colors hover:text-foreground',
+            'w-full justify-start gap-2 rounded-lg px-1 text-left text-xs font-normal hover:bg-transparent hover:text-foreground [&>svg]:size-3.5',
             failed ? 'text-destructive' : 'text-muted-foreground',
           )}
         >
@@ -152,7 +153,7 @@ export const AgentStepRow = ({
               open && 'rotate-90',
             )}
           />
-        </button>
+        </Button>
       </Collapsible.Trigger>
       <Collapsible.Content className="pl-6 pr-1 pb-1">
         {calls.map((call) => (

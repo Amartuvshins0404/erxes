@@ -1,7 +1,7 @@
 /** @jest-environment jsdom */
 import { render, screen, within } from '@testing-library/react';
 import type { UIMessage } from 'ai';
-import type { ReactNode } from 'react';
+import type { ButtonHTMLAttributes, ReactNode } from 'react';
 import { I18nextProvider } from 'react-i18next';
 
 import { AgentTurnActivity } from '../components/AgentTurnActivity';
@@ -14,6 +14,18 @@ import { initAgentI18n, readCommonLocale } from './support/agentI18n';
 jest.mock('erxes-ui', () => {
   const Wrapper = ({ children }: { children?: ReactNode }) => <>{children}</>;
   return {
+    Button: ({
+      variant: _variant,
+      size: _size,
+      ...props
+    }: ButtonHTMLAttributes<HTMLButtonElement> & {
+      variant?: string;
+      size?: string;
+    }) => {
+      void _variant;
+      void _size;
+      return <button type="button" {...props} />;
+    },
     Collapsible: Object.assign(Wrapper, {
       Trigger: Wrapper,
       Content: Wrapper,

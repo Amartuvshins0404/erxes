@@ -3,7 +3,7 @@ import { createAgentReferenceRegistry } from '../references/referenceRegistry';
 import { resolveAgentReference } from '../references/resolveAgentReference';
 /** @jest-environment jsdom */
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import type { PropsWithChildren } from 'react';
+import type { ButtonHTMLAttributes, PropsWithChildren } from 'react';
 import { pluginsConfigState, usePermissionCheck } from 'ui-modules';
 import { createStore, Provider } from 'jotai';
 
@@ -45,6 +45,18 @@ jest.mock('react-i18next', () => ({
 jest.mock('erxes-ui', () => {
   const Passthrough = ({ children }: PropsWithChildren) => <>{children}</>;
   return {
+    Button: ({
+      variant: _variant,
+      size: _size,
+      ...props
+    }: ButtonHTMLAttributes<HTMLButtonElement> & {
+      variant?: string;
+      size?: string;
+    }) => {
+      void _variant;
+      void _size;
+      return <button type="button" {...props} />;
+    },
     Tooltip: Object.assign(Passthrough, {
       Provider: Passthrough,
       Trigger: Passthrough,

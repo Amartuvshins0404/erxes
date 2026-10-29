@@ -1,4 +1,5 @@
 import { IconCheck } from '@tabler/icons-react';
+import { Button, cn } from 'erxes-ui';
 
 import { ProviderIcon } from './ProviderIcon';
 
@@ -6,11 +7,9 @@ export interface IProviderOption {
   value: string;
   label: string;
   description: string;
-  /** Model stored for a fresh entry; mirrors backend PROVIDER_DEFAULTS. */
   defaultModel: string;
 }
 
-/** Provider whitelist used by the settings connection form. */
 export const PROVIDER_OPTIONS: IProviderOption[] = [
   {
     value: 'openai',
@@ -43,22 +42,14 @@ export interface IProviderPickerProps {
   onChange: (provider: string) => void;
 }
 
-/** Stored provider option lookup (`openai` -> its PROVIDER_OPTIONS entry). */
 export const getProviderOption = (
   value: string,
 ): IProviderOption | undefined =>
   PROVIDER_OPTIONS.find((option) => option.value === value);
 
-/** Human label for a provider value (`openai` -> `OpenAI`). */
 export const getProviderLabel = (value: string): string =>
   getProviderOption(value)?.label ?? value;
 
-/**
- * 2x2 grid of selectable provider cards, used by the settings connection
- * form. Each card leads with the provider's brand mark and shows the
- * default model in parentheses next to the label so it is never hidden
- * which model a fresh entry will run.
- */
 export const ProviderPicker = ({ value, onChange }: IProviderPickerProps) => (
   <div
     className="grid grid-cols-2 gap-2"
@@ -69,16 +60,15 @@ export const ProviderPicker = ({ value, onChange }: IProviderPickerProps) => (
       const selected = option.value === value;
 
       return (
-        <button
+        <Button
           key={option.value}
-          type="button"
+          variant="outline"
           onClick={() => onChange(option.value)}
           aria-pressed={selected}
-          className={`relative flex items-center gap-3 rounded-lg border p-3 text-left transition-colors ${
-            selected
-              ? 'border-primary bg-primary/5'
-              : 'hover:bg-accent/50'
-          }`}
+          className={cn(
+            'relative h-auto justify-start gap-3 whitespace-normal rounded-2xl border p-3 text-left font-normal',
+            selected && 'border-primary bg-primary/5 hover:bg-primary/10',
+          )}
         >
           <ProviderIcon provider={option.value} className="size-9" />
           <span className="min-w-0">
@@ -98,7 +88,7 @@ export const ProviderPicker = ({ value, onChange }: IProviderPickerProps) => (
               aria-hidden="true"
             />
           )}
-        </button>
+        </Button>
       );
     })}
   </div>

@@ -11,7 +11,7 @@ import {
   IconSquare,
   IconSquareCheckFilled,
 } from '@tabler/icons-react';
-import { Badge, Button, Textarea, cn } from 'erxes-ui';
+import { Badge, Button, Label, Textarea, cn } from 'erxes-ui';
 import { useEffect, useId, useRef, useState } from 'react';
 
 import {
@@ -323,7 +323,8 @@ export const AskUserPrompt = ({
               </div>
             )}
             <div className="space-y-2">
-              <label
+              <Label
+                variant="peer"
                 htmlFor={`${id}-answer-${step}`}
                 className="block text-xs font-medium text-muted-foreground"
               >
@@ -332,7 +333,7 @@ export const AskUserPrompt = ({
                     ? 'Add details (optional)'
                     : 'Your own answer'
                   : 'Your answer'}
-              </label>
+              </Label>
               <Textarea
                 id={`${id}-answer-${step}`}
                 value={drafts[step] ?? ''}

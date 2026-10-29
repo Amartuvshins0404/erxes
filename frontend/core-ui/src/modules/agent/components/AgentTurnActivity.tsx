@@ -1,5 +1,5 @@
 import { IconChevronRight } from '@tabler/icons-react';
-import { Collapsible, cn } from 'erxes-ui';
+import { Button, Collapsible, cn } from 'erxes-ui';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -193,9 +193,10 @@ export const AgentTurnActivity = ({
       <div className="flex min-w-0 items-center gap-2.5">
         {leading}
         <Collapsible.Trigger asChild>
-          <button
-            type="button"
-            className="flex min-w-0 max-w-full items-center gap-1 rounded-md py-1 pr-1 text-left text-xs text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          <Button
+            variant="ghost"
+            size="sm"
+            className="min-w-0 max-w-full justify-start gap-1 rounded-lg pl-0 pr-1 text-left text-xs font-normal text-muted-foreground hover:bg-transparent hover:text-foreground [&>svg]:size-3.5"
           >
             <ActivityLabel
               label={streaming ? activity : summary()}
@@ -207,7 +208,7 @@ export const AgentTurnActivity = ({
                 open && 'rotate-90',
               )}
             />
-          </button>
+          </Button>
         </Collapsible.Trigger>
       </div>
       <Collapsible.Content className="agent-timeline-content">

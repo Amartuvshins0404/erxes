@@ -26,6 +26,7 @@ jest.mock('erxes-ui', () => ({
     return <button {...props} />;
   },
   Spinner: () => <span />,
+  cn: (...values: unknown[]) => values.filter(Boolean).join(' '),
 }));
 jest.mock('../utils/pageSelection', () => ({
   ...jest.requireActual('../utils/pageSelection'),

@@ -1,7 +1,7 @@
 import { resolveAgentReference } from '../references/resolveAgentReference';
 import { useAgentReferenceRegistry } from '../references/AgentReferenceScope';
 import { referenceIdentity } from '../references/referenceRegistry';
-import { Tooltip, cn } from 'erxes-ui';
+import { Button, Tooltip, cn } from 'erxes-ui';
 import { useAtomValue } from 'jotai';
 import {
   pluginsConfigState,
@@ -169,17 +169,17 @@ export const AgentReferenceChip = ({
   );
 
   const trigger = clickable ? (
-    <button
-      type="button"
+    <Button
+      variant="ghost"
       onClick={handleClick}
-      className="inline-flex align-baseline"
+      className="h-auto gap-0 rounded-full p-0 align-baseline font-normal hover:bg-transparent"
       aria-label={`${typeLabel}: ${displayLabel}`}
       aria-busy={resolving}
       disabled={resolving}
       title={embedded ? typeLabel : undefined}
     >
       {chip}
-    </button>
+    </Button>
   ) : (
     chip
   );

@@ -2,6 +2,7 @@ import {
   useDnDActions,
   useDnDMetaState,
 } from '@/automations/context/AutomationBuilderDnDProvider';
+import { TDraggingNode } from '@/automations/components/builder/sidebar/states/automationNodeLibrary';
 import { AutomationNodeType } from '@/automations/types';
 import { getNodeColor } from '@/automations/utils/automationBuilderUtils/getNodeColor';
 import { cn, Command, IconComponent, Tooltip } from 'erxes-ui';
@@ -21,7 +22,7 @@ interface NodeLibraryRowProps {
   rightElement?: React.ReactNode;
   onDragStart?: (
     event: React.DragEvent<HTMLDivElement>,
-    node: TNodeLibraryRowItem & { nodeType: AutomationNodeType },
+    node: TDraggingNode,
   ) => void;
   onSelectNode: (
     node: TNodeLibraryRowItem & { nodeType: AutomationNodeType },
@@ -119,10 +120,9 @@ export const NodeLibraryRow = ({
       onDragStart={
         draggable
           ? (event) => {
-              startDragging({
-                nodeType,
-                ...item,
-              } as Parameters<typeof startDragging>[0]);
+              const draggingNode = { nodeType, ...item } as TDraggingNode;
+
+              startDragging(draggingNode);
 
               const iconElement = event.currentTarget.querySelector(
                 '.node-library-row-icon',
@@ -135,7 +135,7 @@ export const NodeLibraryRow = ({
               });
 
               event.dataTransfer.setDragImage(ghost, 24, 20);
-              onDragStart?.(event, { nodeType, ...item });
+              onDragStart?.(event, draggingNode);
 
               window.setTimeout(() => {
                 ghost.remove();

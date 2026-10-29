@@ -61,11 +61,7 @@ export const EmailTemplatePicker = ({
               </div>
             )}
             {error && (
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={refetch}
-              >
+              <Button type="button" variant="ghost" onClick={refetch}>
                 Could not load email templates. Retry
               </Button>
             )}

@@ -5,7 +5,7 @@ import { Form, Input, Select, Switch } from 'erxes-ui';
 import { useFormContext } from 'react-hook-form';
 
 export const OutgoingWebhookOptions = () => {
-  const { control, getValues } = useFormContext<TOutgoingWebhookForm>();
+  const { control } = useFormContext<TOutgoingWebhookForm>();
   const { t } = useTranslation('automations');
 
   return (

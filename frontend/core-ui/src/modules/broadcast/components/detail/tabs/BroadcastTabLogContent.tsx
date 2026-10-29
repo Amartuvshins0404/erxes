@@ -4,7 +4,7 @@ import {
   IconCircleX,
   IconInfoCircle,
 } from '@tabler/icons-react';
-import { cn, Empty, RelativeDateDisplay } from 'erxes-ui';
+import { cn, Empty, RelativeDateDisplay, Skeleton } from 'erxes-ui';
 import { useBroadcastTraces } from '../../../hooks/useBroadcastTraces';
 import { TBroadcastMessage, TBroadcastTrace } from '../../../types';
 import { useTranslation } from 'react-i18next';
@@ -82,11 +82,29 @@ export const BroadcastTabLogContent = ({
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden">
       <div className="flex-1 overflow-y-auto px-8 py-5">
-        {loading && (
-          <p className="text-sm text-muted-foreground">{t('loading')}</p>
+        {loading && !traces.length && (
+          <div className="flex flex-col gap-4">
+            {[0, 1, 2, 3].map((row) => (
+              <div key={row} className="flex items-center gap-3">
+                <Skeleton className="size-6 rounded-full" />
+                <Skeleton className="h-4 flex-1" />
+              </div>
+            ))}
+          </div>
         )}
 
-        {error && <p className="text-sm text-destructive">{error.message}</p>}
+        {error && (
+          <Empty>
+            <Empty.Header>
+              <Empty.Media variant="icon">
+                <IconCircleX className="text-destructive" />
+              </Empty.Media>
+              <Empty.Description className="break-words">
+                {error.message}
+              </Empty.Description>
+            </Empty.Header>
+          </Empty>
+        )}
 
         {!loading && !error && traces.length === 0 && (
           <Empty>

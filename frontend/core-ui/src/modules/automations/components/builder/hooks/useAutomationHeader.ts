@@ -5,7 +5,7 @@ import {
   AUTOMATION_EDIT,
 } from '@/automations/graphql/automationMutations';
 import { useAutomationNodes } from '@/automations/hooks/useAutomationNodes';
-import { AutomationBuilderTabsType, NodeData } from '@/automations/types';
+import { AutomationBuilderTabsType } from '@/automations/types';
 import {
   TAutomationBuilderForm,
   TAutomationBuilderSaveValues,
@@ -16,7 +16,7 @@ import {
 } from '@/automations/utils/automationBuilderUtils/collectNodeErrors';
 import { setAutomationSettingsReturnPath } from '@/automations/utils/settingsReturn';
 import { useMutation } from '@apollo/client';
-import { Node, useReactFlow } from '@xyflow/react';
+import { useReactFlow } from '@xyflow/react';
 import { toast } from 'erxes-ui';
 import { useAtomValue } from 'jotai';
 import { SubmitErrorHandler, useFormContext } from 'react-hook-form';

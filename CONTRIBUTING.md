@@ -51,7 +51,7 @@ have a real, current need for it.
 
 Use the same major toolchain as CI:
 
-- Node.js 24 or newer; `.nvmrc` pins 26, CI builds on 24 and 26
+- Node.js 24.15+ or 26+; `.nvmrc` pins 26, CI builds on 24 and 26
 - pnpm 9 as pinned by `packageManager`; npm and Yarn are not supported
 - MongoDB
 - Redis

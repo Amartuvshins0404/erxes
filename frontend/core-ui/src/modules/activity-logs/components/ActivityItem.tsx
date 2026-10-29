@@ -34,7 +34,7 @@ export const ActivityItem = ({
           <div
             className={cn(
               'bg-muted p-3 rounded-lg space-y-2',
-              moduleName === 'internalNote' && 'bg-yellow-100',
+              moduleName === 'internalNote' && 'bg-warning/10',
             )}
           >
             <ActivityItemDate />

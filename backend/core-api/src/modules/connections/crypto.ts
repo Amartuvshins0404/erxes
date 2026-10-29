@@ -140,7 +140,9 @@ export const openSecret = ({
       return null;
     }
 
-    const decipher = createDecipheriv('aes-256-gcm', derived.key, iv);
+    const decipher = createDecipheriv('aes-256-gcm', derived.key, iv, {
+      authTagLength: TAG_BYTES,
+    });
 
     decipher.setAAD(aad(connectionId, field));
     decipher.setAuthTag(tag);

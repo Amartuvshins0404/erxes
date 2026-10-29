@@ -3,18 +3,21 @@ import { Tabs as TabsPrimitive } from 'radix-ui';
 import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from 'erxes-ui/lib';
 
-const tabsListVariants = cva('inline-flex h-auto items-center text-muted-foreground', {
-  variants: {
-    variant: {
-      underline:
-        'flex gap-1 rounded-none border-b border-border bg-transparent px-0 pb-1.5',
-      segment: 'w-fit gap-0.5 rounded-full bg-muted p-1',
+const tabsListVariants = cva(
+  'inline-flex h-auto items-center text-muted-foreground',
+  {
+    variants: {
+      variant: {
+        underline:
+          'flex gap-1 rounded-none border-b border-border bg-transparent px-0 pb-1.5',
+        segment: 'w-fit gap-0.5 rounded-full bg-muted p-1',
+      },
+    },
+    defaultVariants: {
+      variant: 'underline',
     },
   },
-  defaultVariants: {
-    variant: 'underline',
-  },
-});
+);
 
 const tabsTriggerVariants = cva(
   'inline-flex cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-3 text-sm font-medium outline-hidden transition-[background-color,color,box-shadow] ease-out focus-visible:shadow-focus disabled:pointer-events-none disabled:opacity-50 [&>svg]:size-4 [&>svg]:shrink-0',

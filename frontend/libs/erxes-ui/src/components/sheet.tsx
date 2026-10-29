@@ -61,8 +61,7 @@ export const SheetPortal = ({
 SheetPortal.displayName = SheetPrimitive.Portal.displayName;
 
 interface SheetContentProps
-  extends
-    React.ComponentPropsWithoutRef<typeof SheetPrimitive.Content>,
+  extends React.ComponentPropsWithoutRef<typeof SheetPrimitive.Content>,
     VariantProps<typeof sheetVariants> {}
 
 const SheetView = React.forwardRef<
@@ -126,10 +125,7 @@ const SheetContent = ({
   className,
   ...props
 }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div
-    className={cn('min-h-0 flex-1', className)}
-    {...props}
-  />
+  <div className={cn('min-h-0 flex-1', className)} {...props} />
 );
 SheetContent.displayName = 'SheetContent';
 

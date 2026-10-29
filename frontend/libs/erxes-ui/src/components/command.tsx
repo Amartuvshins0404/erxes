@@ -89,7 +89,10 @@ const CommandInput = React.forwardRef<
     if (variant === 'primary') {
       return (
         <div
-          className={cn('flex items-center gap-2 border-b border-border px-3.5', wrapperClassName)}
+          className={cn(
+            'flex items-center gap-2 border-b border-border px-3.5',
+            wrapperClassName,
+          )}
           cmdk-input-wrapper=""
         >
           <IconSearch className="size-4 shrink-0 text-muted-foreground" />

@@ -73,8 +73,8 @@ const Value = React.forwardRef<
       {onClose && (
         <Button
           variant="ghost"
-          className="mr-1 text-muted-foreground hover:text-foreground"
-          size="icon-sm"
+          className="mr-1 size-7 text-muted-foreground hover:text-foreground"
+          size="icon"
           onClick={onClose}
         >
           <IconX />

@@ -13,10 +13,7 @@ export const SidebarInput = React.forwardRef<
     <Input
       ref={ref}
       data-sidebar="input"
-      className={cn(
-        'w-full',
-        className,
-      )}
+      className={cn('w-full', className)}
       {...props}
     />
   );

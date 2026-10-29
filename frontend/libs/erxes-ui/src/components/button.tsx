@@ -28,8 +28,6 @@ export const buttonVariants = cva(
         sm: 'h-7 px-3 text-xs gap-1 [&>svg]:size-3.5',
         lg: 'h-9 px-4',
         icon: 'size-8 px-0',
-        'icon-sm': 'size-7 px-0 [&>svg]:size-3.5',
-        'icon-lg': 'size-9 px-0',
       },
     },
     defaultVariants: {

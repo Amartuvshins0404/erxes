@@ -18,8 +18,7 @@ export const Kbd = React.forwardRef<
       className={cn(
         'inline-flex h-5 w-fit min-w-5 items-center justify-center rounded-md px-1 font-sans text-[11px] font-medium leading-none',
         variant === 'background' && 'bg-current/15 text-current',
-        variant === 'foreground' &&
-          'bg-muted text-muted-foreground shadow-2xs',
+        variant === 'foreground' && 'bg-muted text-muted-foreground shadow-2xs',
         className,
       )}
     >

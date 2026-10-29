@@ -49,10 +49,7 @@ const AlertDialogHeader = ({
   ...props
 }: React.HTMLAttributes<HTMLDivElement>) => (
   <div
-    className={cn(
-      'flex flex-col gap-1.5 text-left',
-      className,
-    )}
+    className={cn('flex flex-col gap-1.5 text-left', className)}
     {...props}
   />
 );
@@ -78,7 +75,10 @@ const AlertDialogTitle = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <AlertDialogPrimitive.Title
     ref={ref}
-    className={cn('text-lg font-semibold leading-snug tracking-tight', className)}
+    className={cn(
+      'text-lg font-semibold leading-snug tracking-tight',
+      className,
+    )}
     {...props}
   />
 ));
@@ -115,10 +115,7 @@ const AlertDialogCancel = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <AlertDialogPrimitive.Cancel
     ref={ref}
-    className={cn(
-      buttonVariants({ variant: 'outline' }),
-      className,
-    )}
+    className={cn(buttonVariants({ variant: 'outline' }), className)}
     {...props}
   />
 ));

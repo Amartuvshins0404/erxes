@@ -5,7 +5,7 @@ import { cva, VariantProps } from 'class-variance-authority';
 import { cn } from 'erxes-ui/lib/utils';
 import { Except } from 'type-fest';
 import { IMaskInput } from 'react-imask';
-import { fieldClassName, fieldSizeClassNames } from './styles';
+import { fieldClassName, fieldSizeClassNames, FieldSize } from './styles';
 
 export const inputVariants = cva(fieldClassName, {
   variants: {
@@ -35,13 +35,16 @@ export type InputProps = Except<
   React.InputHTMLAttributes<HTMLInputElement>,
   'size'
 > &
-  Except<VariantProps<typeof inputVariants>, 'type'>;
+  Except<VariantProps<typeof inputVariants>, 'type' | 'size'> & {
+    size?: FieldSize | number;
+  };
 
 const InputMain = React.forwardRef<HTMLInputElement, InputProps>(
   ({ className, type, variant, size, ...props }, ref) => {
     return (
       <input
         type={type}
+        size={typeof size === 'number' ? size : undefined}
         autoComplete="off"
         className={cn(
           inputVariants({
@@ -52,7 +55,7 @@ const InputMain = React.forwardRef<HTMLInputElement, InputProps>(
                 ? 'search'
                 : 'default',
             variant,
-            size,
+            size: typeof size === 'number' ? undefined : size,
           }),
           className,
         )}

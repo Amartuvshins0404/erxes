@@ -29,28 +29,33 @@ export type ProgressProps = React.ComponentPropsWithoutRef<
 export const Progress = React.forwardRef<
   React.ElementRef<typeof ProgressPrimitive.Root>,
   ProgressProps
->(({ className, indicatorClassName, value, max = 100, variant, ...props }, ref) => {
-  const percent = Math.min(Math.max(((value ?? 0) / max) * 100, 0), 100);
+>(
+  (
+    { className, indicatorClassName, value, max = 100, variant, ...props },
+    ref,
+  ) => {
+    const percent = Math.min(Math.max(((value ?? 0) / max) * 100, 0), 100);
 
-  return (
-    <ProgressPrimitive.Root
-      ref={ref}
-      value={value}
-      max={max}
-      className={cn(
-        'relative h-1.5 w-full overflow-hidden rounded-full bg-muted',
-        className,
-      )}
-      {...props}
-    >
-      <ProgressPrimitive.Indicator
+    return (
+      <ProgressPrimitive.Root
+        ref={ref}
+        value={value}
+        max={max}
         className={cn(
-          progressIndicatorVariants({ variant }),
-          indicatorClassName,
+          'relative h-1.5 w-full overflow-hidden rounded-full bg-muted',
+          className,
         )}
-        style={{ transform: `translateX(-${100 - percent}%)` }}
-      />
-    </ProgressPrimitive.Root>
-  );
-});
+        {...props}
+      >
+        <ProgressPrimitive.Indicator
+          className={cn(
+            progressIndicatorVariants({ variant }),
+            indicatorClassName,
+          )}
+          style={{ transform: `translateX(-${100 - percent}%)` }}
+        />
+      </ProgressPrimitive.Root>
+    );
+  },
+);
 Progress.displayName = ProgressPrimitive.Root.displayName;

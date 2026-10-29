@@ -10,8 +10,7 @@ const labelVariants = cva(
   {
     variants: {
       variant: {
-        default:
-          'text-sm font-medium text-foreground',
+        default: 'text-sm font-medium text-foreground',
         peer: '',
       },
     },

@@ -30,7 +30,7 @@ const InfoCardRoot = ({
               <Tooltip.Trigger asChild>
                 <Button
                   variant="ghost"
-                  size="icon-sm"
+                  size="icon"
                   className="size-6 text-muted-foreground hover:text-foreground"
                 >
                   <IconInfoCircle className="size-4" />

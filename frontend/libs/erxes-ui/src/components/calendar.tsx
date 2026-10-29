@@ -66,16 +66,15 @@ export const Calendar = React.forwardRef<React.JSX.Element, CalendarProps>(
           [UI.Month]: 'space-y-4 ml-0',
           [UI.MonthCaption]: 'flex justify-center items-center h-7',
           [UI.PreviousMonthButton]: cn(
-            buttonVariants({ variant: 'ghost', size: 'icon-sm' }),
-            'absolute left-0 top-0 text-muted-foreground hover:text-foreground',
+            buttonVariants({ variant: 'ghost', size: 'icon' }),
+            'absolute left-0 top-0 size-7 text-muted-foreground hover:text-foreground',
           ),
           [UI.NextMonthButton]: cn(
-            buttonVariants({ variant: 'ghost', size: 'icon-sm' }),
-            'absolute right-0 top-0 text-muted-foreground hover:text-foreground',
+            buttonVariants({ variant: 'ghost', size: 'icon' }),
+            'absolute right-0 top-0 size-7 text-muted-foreground hover:text-foreground',
           ),
           [UI.Weekdays]: 'flex gap-1',
-          [UI.Weekday]:
-            'w-8 text-xs font-medium text-muted-foreground',
+          [UI.Weekday]: 'w-8 text-xs font-medium text-muted-foreground',
           [UI.Week]: 'flex w-full mt-2 gap-1',
           ...classNames,
         })}
@@ -143,16 +142,15 @@ export const CalendarTwoMonths = React.forwardRef<
           'space-y-4 ml-0 first-of-type:mr-12 first-of-type:relative first-of-type:after:absolute first-of-type:after:w-px first-of-type:after:h-auto first-of-type:after:inset-y-0 first-of-type:after:-right-6 first-of-type:after:bg-border',
         [UI.MonthCaption]: 'flex items-center h-7',
         [UI.PreviousMonthButton]: cn(
-          buttonVariants({ variant: 'secondary', size: 'icon-sm' }),
-          'absolute right-10 top-0',
+          buttonVariants({ variant: 'secondary', size: 'icon' }),
+          'absolute right-10 top-0 size-7',
         ),
         [UI.NextMonthButton]: cn(
-          buttonVariants({ variant: 'secondary', size: 'icon-sm' }),
-          'absolute right-1 top-0',
+          buttonVariants({ variant: 'secondary', size: 'icon' }),
+          'absolute right-1 top-0 size-7',
         ),
         [UI.Weekdays]: 'flex w-full border-b border-border',
-        [UI.Weekday]:
-          'h-7 w-8 text-xs font-medium text-muted-foreground',
+        [UI.Weekday]: 'h-7 w-8 text-xs font-medium text-muted-foreground',
         [UI.Week]: 'flex w-full mt-0.5',
         ...classNames,
       })}

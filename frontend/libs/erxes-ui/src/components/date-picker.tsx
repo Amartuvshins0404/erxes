@@ -416,7 +416,10 @@ export const DatePicker = ({
               variant={variant}
               disabled={isDisabled}
               className={cn(
-                variant === 'outline' && [fieldClassName, fieldSizeClassNames.default],
+                variant === 'outline' && [
+                  fieldClassName,
+                  fieldSizeClassNames.default,
+                ],
                 'w-full justify-start rounded-lg text-left font-normal active:scale-100 data-[state=open]:shadow-focus',
                 className,
               )}

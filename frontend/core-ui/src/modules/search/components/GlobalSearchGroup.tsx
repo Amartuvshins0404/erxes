@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useInView } from 'react-intersection-observer';
-import { IconArrowRight, IconLoader2 } from '@tabler/icons-react';
-import { Button, Command, TSearchResultItem } from 'erxes-ui';
+import { IconArrowRight } from '@tabler/icons-react';
+import { Button, Command, Spinner, TSearchResultItem } from 'erxes-ui';
 import { useTranslation } from 'react-i18next';
 import {
   TGlobalSearchGroup,
@@ -173,7 +173,7 @@ export const GlobalSearchProviderGroup = ({
         >
           {group.loadingMore && (
             <>
-              <IconLoader2 className="size-4 animate-spin" />
+              <Spinner containerClassName="h-auto flex-none" />
               {tCommon('loading-more', 'Loading more...')}
             </>
           )}
@@ -216,7 +216,6 @@ const toPluginsMergedItem = (
   item,
 });
 
-// Renders every plugin source as a single list with no per-source heading.
 export const GlobalSearchPluginsGroup = ({
   groups,
   searchValue,
@@ -385,7 +384,7 @@ export const GlobalSearchPluginsGroup = ({
         >
           {showLoadingIndicator && (
             <>
-              <IconLoader2 className="size-4 animate-spin" />
+              <Spinner containerClassName="h-auto flex-none" />
               {t('loading-more', 'Loading more...')}
             </>
           )}

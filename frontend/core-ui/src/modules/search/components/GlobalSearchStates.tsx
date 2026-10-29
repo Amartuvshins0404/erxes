@@ -1,5 +1,5 @@
-import { IconAlertTriangle, IconLoader2 } from '@tabler/icons-react';
-import { Button } from 'erxes-ui';
+import { IconAlertTriangle } from '@tabler/icons-react';
+import { Button, Spinner } from 'erxes-ui';
 import { useTranslation } from 'react-i18next';
 
 const StateShell = ({ children }: { children: React.ReactNode }) => (
@@ -25,7 +25,7 @@ export const GlobalSearchLoading = () => {
 
   return (
     <div className="flex h-24 items-center justify-center gap-2 text-sm text-muted-foreground">
-      <IconLoader2 className="size-4 animate-spin" />
+      <Spinner containerClassName="h-auto flex-none" />
       {t('loading', 'Loading...')}
     </div>
   );

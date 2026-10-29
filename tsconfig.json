@@ -20,9 +20,6 @@
       "path": "./apps/posclient-front/tsconfig.json"
     },
     {
-      "path": "./apps/client-portal-template/tsconfig.json"
-    },
-    {
       "path": "./apps/frontline-widgets/tsconfig.json"
     },
     {

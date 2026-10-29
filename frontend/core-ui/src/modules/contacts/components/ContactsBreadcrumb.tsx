@@ -13,10 +13,6 @@ export const ContactsBreadcrumb = () => {
     { path: ContactsPath.Customers, label: t('customers') },
     { path: ContactsPath.Leads, label: t('leads') },
     { path: ContactsPath.Companies, label: t('companies') },
-    {
-      path: ContactsPath.ClientPortalUsers,
-      label: t('client-portal-users', 'Client Portal Users'),
-    },
   ];
   const currentSection = sections.find(({ path }) =>
     pathname.startsWith(`${ContactsPath.Index}${path}`),

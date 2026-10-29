@@ -52,11 +52,6 @@ import {
 } from '@/organization/structure/graphql/schemas/structure';
 
 import {
-  queries as StructureLegacyQueries,
-  types as StructureLegacyTypes,
-} from '@/organization/structure/graphql/schemas/legacy';
-
-import {
   mutations as UserMutations,
   queries as UserQueries,
   types as UserTypes,
@@ -158,11 +153,6 @@ import {
   types as PropertiesTypes,
 } from '@/properties/graphql/schemas';
 
-import {
-  mutations as ClientPortalMutations,
-  queries as ClientPortalQueries,
-  types as ClientPortalTypes,
-} from '@/clientportal/graphql/schemas/clientPortal';
 
 import {
   queries as ImportExportCommonQueries,
@@ -178,23 +168,8 @@ import {
   queries as ExportQueries,
   types as ExportTypes,
 } from '~/modules/import-export/graphql/schema/export';
-import {
-  mutations as CPUserMutations,
-  queries as CPUserQueries,
-  types as CPUserTypes,
-} from '@/clientportal/graphql/schemas/cpUser';
 
-import {
-  mutations as CommentMutations,
-  queries as CommentQueries,
-  types as CommentTypes,
-} from '@/clientportal/graphql/schemas/comment';
 
-import {
-  mutations as CPNotificationMutations,
-  queries as CPNotificationQueries,
-  types as CPNotificationTypes,
-} from '@/clientportal/graphql/schemas/cpNotification';
 
 import {
   mutations as BroadcastMutations,
@@ -263,7 +238,6 @@ export const types = `
     ${TagTypes}
     ${ProductTypes}
     ${StructureTypes}
-    ${StructureLegacyTypes}
     ${BrandTypes}
     ${AppTypes}
     ${SegmentTypes}
@@ -281,13 +255,9 @@ export const types = `
     ${NotificationsTypes}
     ${InternalNoteTypes}
     ${PropertiesTypes}
-    ${ClientPortalTypes}
     ${ImportExportCommonTypes}
     ${ImportTypes}
     ${ExportTypes}
-    ${CPUserTypes}
-    ${CommentTypes}
-    ${CPNotificationTypes}
     ${BroadcastTypes}
     ${bundleTypes}
     ${templateTypes}
@@ -309,7 +279,6 @@ export const queries = `
     ${TagQueries}
     ${ProductQueries}
     ${StructureQueries}
-    ${StructureLegacyQueries}
     ${BrandQueries}
     ${AppQueries}
     ${FormQueries}
@@ -328,13 +297,9 @@ export const queries = `
     ${NotificationsQueries}
     ${InternalNoteQueries}  
     ${PropertiesQueries}
-    ${ClientPortalQueries}
     ${ImportExportCommonQueries}
     ${ImportQueries}
     ${ExportQueries}
-    ${CPUserQueries}
-    ${CommentQueries}
-    ${CPNotificationQueries}
     ${BroadcastQueries}
     ${bundleQueries}
     ${templateQueries}
@@ -370,12 +335,8 @@ export const mutations = `
     ${NotificationsMutations}
     ${InternalNoteMutations}
     ${PropertiesMutations}
-    ${ClientPortalMutations}
     ${ImportMutations}
     ${ExportMutations}
-    ${CPUserMutations}
-    ${CommentMutations}
-    ${CPNotificationMutations}
     ${BroadcastMutations}
     ${bundleMutations}
     ${templateMutations}

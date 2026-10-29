@@ -191,7 +191,6 @@ const command = async () => {
     'core:company': db.collection('companies'),
     'core:product': db.collection('products'),
     'core:user': db.collection('users'),
-    'core:cpUser': db.collection('client_portal_users'),
 
     // plugin:modules: collection
 

@@ -25,7 +25,6 @@ export type TBroadcastCardMessage = {
   validCustomersCount?: number;
   fromEmail?: string;
   email?: { subject?: string };
-  notification?: { title?: string };
   segments?: { _id: string; name?: string }[];
   customerTags?: { _id: string; name?: string }[];
   isDraft?: boolean;
@@ -76,10 +75,6 @@ const audience = (
 const subject = (message: TBroadcastCardMessage) => {
   if (message.method === BROADCAST_METHODS.EMAIL) {
     return message.email?.subject;
-  }
-
-  if (message.method === BROADCAST_METHODS.NOTIFICATION) {
-    return message.notification?.title;
   }
 
   return undefined;

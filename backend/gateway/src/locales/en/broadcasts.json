@@ -77,7 +77,6 @@
     "email": "Email",
     "sms": "Sms",
     "messenger": "Messenger",
-    "notification": "Notification",
     "workflow": "Workflow",
     "unknown": "Unknown",
     "email-description": "Master email marketing with fully customized templates",
@@ -189,16 +188,6 @@
     "has-run": "This campaign has run:",
     "last-run": "Last run at:",
     "never": "Never",
-    "notification": {
-      "total": "Targeted",
-      "total-body": "Customers matched by the selected tag who are eligible for this campaign.",
-      "sent": "Sent",
-      "sent-body": "Client portal users who successfully received the notification.",
-      "read": "Read",
-      "read-body": "Recipients who opened and marked the in-app notification as read.",
-      "push": "Push enabled",
-      "push-body": "Campaign was configured to deliver mobile and web push notifications."
-    },
     "workflow": {
       "total": "Targeted",
       "total-body": "Customers matched by this campaign’s audience when it was last run.",
@@ -430,28 +419,6 @@
     "no-method": "Method not found. Try refreshing the page.",
     "nothing-to-configure": "Nothing to configure for this broadcast type",
     "no-preview": "No preview for this broadcast type"
-  },
-  "notification": {
-    "no-channel": "Select a notification channel",
-    "no-channel-body": "Enable in-app or mobile & web push before saving the campaign.",
-    "portal": "Client portal",
-    "portal-required": "Client portal is required",
-    "portal-placeholder": "Select client portal",
-    "no-portals": "No client portals found",
-    "in-app": "In-app push notification",
-    "mobile": "Mobile & Web push notification",
-    "title": "Notification title",
-    "title-required": "Notification title is required",
-    "content": "Notification content",
-    "content-required": "Notification content is required",
-    "unknown-portal": "Unknown portal",
-    "channels": "Channels",
-    "in-app-short": "In-app",
-    "mobile-short": "Mobile & Web push",
-    "none-selected": "None selected",
-    "preview": "Notification preview",
-    "content-placeholder": "Notification content will appear here",
-    "select-channel-preview": "Select at least one notification channel to preview"
   },
   "target": {
     "title": "Title",

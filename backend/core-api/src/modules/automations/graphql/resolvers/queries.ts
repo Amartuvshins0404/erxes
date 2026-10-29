@@ -233,14 +233,6 @@ export const automationQueries = {
     return automation;
   },
 
-  async cpAutomationDetail(
-    _root,
-    { _id }: { _id: string },
-    { models }: IContext,
-  ) {
-    return models.Automations.getAutomation(_id);
-  },
-
   /**
    * Automations history list
    */
@@ -653,7 +645,3 @@ export const automationQueries = {
     });
   },
 };
-
-Object.assign(automationQueries.cpAutomationDetail, {
-  wrapperConfig: { forClientPortal: true },
-});

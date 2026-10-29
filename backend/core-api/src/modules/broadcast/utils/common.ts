@@ -458,14 +458,6 @@ export const send = async (
   //     );
   //   }
   // }
-
-  // if (engageMessage.method === CAMPAIGN_METHODS.NOTIFICATION) {
-  //   return sendNotifications(models, subdomain, {
-  //     engageMessage,
-  //     customersSelector,
-  //     user,
-  //   });
-  // }
 };
 
 export const prepareEngageCustomers = async (
@@ -620,73 +612,4 @@ const sendEmailOrSms = async (
     action,
     user,
   });
-};
-
-const sendCampaignNotification = async (
-  models: IModels,
-  subdomain: string,
-  doc: any,
-) => {
-  const { groupId } = doc;
-  try {
-    // TODO: uncomment
-    // await sendClientPortalMessage({
-    //   subdomain,
-    //   action: 'sendNotification',
-    //   data: doc,
-    //   isRPC: false,
-    // }).then(async () => {
-    //   await models.Logs.createLog(groupId, 'success', 'Notification sent');
-    //   await models.EngageMessages.updateOne(
-    //     { _id: groupId },
-    //     { $inc: { runCount: 1 } },
-    //   );
-    // });
-  } catch (e) {
-    // await models.Logs.createLog(groupId, 'failure', e.message);
-  }
-};
-
-const sendNotifications = async (
-  models: IModels,
-  subdomain: string,
-  { engageMessage, customersSelector, user }: IEngageParams,
-) => {
-  const { notification, cpId } = engageMessage;
-  const engageMessageId = engageMessage._id;
-
-  const erxesCustomerIds = await models.Customers.find(
-    customersSelector,
-  ).distinct('_id');
-
-  const cpUserIds = await models.CPUser.find({
-    clientPortalId: cpId,
-    erxesCustomerId: { $in: [...erxesCustomerIds] },
-  }).distinct('_id');
-
-  const doc = {
-    createdUser: user,
-    receivers: cpUserIds,
-    title: notification?.title || '',
-    content: notification?.content || '',
-    notifType: 'engage',
-    isMobile: notification?.isMobile || false,
-    link: '',
-    groupId: engageMessageId,
-  };
-
-  const receiversLength = doc.receivers.length || 0;
-
-  if (receiversLength > 0) {
-    await models.EngageMessages.updateOne(
-      { _id: doc.groupId },
-      {
-        $set: {
-          totalCustomersCount: receiversLength,
-        },
-      },
-    );
-  }
-
-  await sendCampaignNotification(models, subdomain, doc);
 };

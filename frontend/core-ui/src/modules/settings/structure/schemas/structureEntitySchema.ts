@@ -6,7 +6,6 @@ import {
   IStructureLocationForm,
 } from '../types/structureEntity';
 import { STRUCTURE_SEAT_COVERAGES } from '@/structure-access';
-import { STRUCTURE_LEGACY_KINDS } from '../constants/structureCapabilities';
 
 const coordinateValue = (limit: number, message: string) =>
   z
@@ -79,7 +78,6 @@ export const getStructureEntityTypeSchema = (
     name: z.string().trim().min(1, t('name-required')),
     icon: z.string(),
     parentTypeIds: z.array(z.string()),
-    legacyKind: z.enum(STRUCTURE_LEGACY_KINDS),
     capabilities: z.array(z.string()),
   });
 

@@ -1,6 +1,5 @@
 import {
   IconArrowsSplit2,
-  IconBellRinging,
   IconBrandMessenger,
   IconInfoSquareRounded,
   IconMail,
@@ -29,10 +28,6 @@ const BROADCAST_METHOD_DISPLAY: Record<
   [BROADCAST_METHODS.MESSENGER]: {
     Icon: IconBrandMessenger,
     labelKey: 'method.messenger',
-  },
-  [BROADCAST_METHODS.NOTIFICATION]: {
-    Icon: IconBellRinging,
-    labelKey: 'method.notification',
   },
   [BROADCAST_METHODS.WORKFLOW]: { Icon: IconArrowsSplit2, labelKey: 'method.workflow' },
 };

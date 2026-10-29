@@ -1,7 +1,6 @@
 import {
   ICursorPaginateParams,
   IListParams,
-  IOffsetPaginateParams,
 } from 'erxes-api-shared/core-types';
 import {
   IFeaturedFieldOwner,
@@ -103,4 +102,3 @@ export interface IFieldValueUsage extends IPropertyValueSamples {
   dependents: string[];
 }
 
-export interface IFieldOffsetParams extends IOffsetPaginateParams {}

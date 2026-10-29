@@ -11,10 +11,7 @@ import {
   IconXboxXFilled,
 } from '@tabler/icons-react';
 import type { TablerIcon } from '@tabler/icons-react';
-import {
-  BROADCAST_NOTIFICATION_STATISTIC,
-  BROADCAST_WORKFLOW_STATISTIC,
-} from '../constants';
+import { BROADCAST_WORKFLOW_STATISTIC } from '../constants';
 import { TBroadcastMessage } from '../types';
 
 export type TBroadcastStatisticConfig = Record<
@@ -86,22 +83,6 @@ const buildWorkflowStats = (message: TBroadcastMessage) => {
   return { total: totalCustomersCount, started: validCustomersCount };
 };
 
-const buildNotificationStats = (message: TBroadcastMessage) => {
-  const {
-    totalCustomersCount = 0,
-    validCustomersCount = 0,
-    stats,
-    notification,
-  } = message;
-
-  return {
-    total: totalCustomersCount,
-    sent: validCustomersCount,
-    read: stats?.read || 0,
-    push: notification?.isMobile ? 1 : 0,
-  };
-};
-
 export const STATISTIC_BUILDERS: Record<
   string,
   {
@@ -109,10 +90,6 @@ export const STATISTIC_BUILDERS: Record<
     build: (message: TBroadcastMessage) => Record<string, number>;
   }
 > = {
-  notification: {
-    config: BROADCAST_NOTIFICATION_STATISTIC,
-    build: buildNotificationStats,
-  },
   workflow: {
     config: BROADCAST_WORKFLOW_STATISTIC,
     build: buildWorkflowStats,

@@ -1,8 +1,6 @@
 import { Document } from 'mongoose';
 import { IAttachment, ILink, IPropertyField } from '../../common';
 
-export type TStructureLegacyKind = 'branch' | 'department' | 'unit';
-
 export type TStructureSeatCoverage = 'node' | 'below' | 'selected';
 
 export interface IStructurePosition {
@@ -43,7 +41,6 @@ export interface IStructureEntityType {
   icon?: string;
   parentTypeIds?: string[];
   capabilities?: string[];
-  legacyKind?: TStructureLegacyKind;
   isSystem?: boolean;
 }
 

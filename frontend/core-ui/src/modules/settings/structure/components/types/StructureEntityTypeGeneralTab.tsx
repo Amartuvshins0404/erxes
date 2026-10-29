@@ -1,7 +1,6 @@
-import { Form, IconPicker, Input, MultipleSelector, Select } from 'erxes-ui';
+import { Form, IconPicker, Input, MultipleSelector } from 'erxes-ui';
 import { useFormContext } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { STRUCTURE_LEGACY_KINDS } from '../../constants/structureCapabilities';
 import {
   IStructureEntityTypeDetail,
   IStructureEntityTypeForm,
@@ -75,37 +74,6 @@ export const StructureEntityTypeGeneralTab = ({
             </Form.Control>
             <Form.Description>
               {t('allowed-parents-description')}
-            </Form.Description>
-            <Form.Message />
-          </Form.Item>
-        )}
-      />
-      <Form.Field
-        control={control}
-        name="legacyKind"
-        render={({ field }) => (
-          <Form.Item>
-            <Form.Label>{t('client-portal-kind')}</Form.Label>
-            <Select
-              value={field.value}
-              onValueChange={field.onChange}
-              disabled={isSystem}
-            >
-              <Form.Control>
-                <Select.Trigger className="w-64">
-                  <Select.Value />
-                </Select.Trigger>
-              </Form.Control>
-              <Select.Content>
-                {STRUCTURE_LEGACY_KINDS.map((kind) => (
-                  <Select.Item key={kind} value={kind}>
-                    {t(`legacy-kind-${kind}`)}
-                  </Select.Item>
-                ))}
-              </Select.Content>
-            </Select>
-            <Form.Description>
-              {t('client-portal-kind-description')}
             </Form.Description>
             <Form.Message />
           </Form.Item>

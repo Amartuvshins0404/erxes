@@ -25,7 +25,6 @@ export const queries = `
     getRelationsByEntity(contentType: String!, contentId: String!, relatedContentType: String!): [Relation!]
     getRelationsByEntities(contentTypes: [String!]!, contentIds: [String!]!): [Relation!]
     getRelationsByContentIds(contentType: String!, contentIds: [String!]!, relatedContentType: String!): [Relation!]
-    cpGetRelationsByEntity(contentType: String!, contentId: String!, relatedContentType: String!): [Relation!]
 `;
 
 export const mutations = `
@@ -34,9 +33,6 @@ export const mutations = `
     deleteRelation(id: String!): String!
     createMultipleRelations(relations: [RelationInput!]!): JSON
     manageRelations(
-        contentType: String!, contentId: String!, relatedContentType: String!, relatedContentIds: [String]
-    ): [Relation!]
-    cpManageRelations(
         contentType: String!, contentId: String!, relatedContentType: String!, relatedContentIds: [String]
     ): [Relation!]
 `;

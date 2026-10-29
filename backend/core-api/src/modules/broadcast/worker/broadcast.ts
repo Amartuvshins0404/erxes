@@ -3,12 +3,11 @@ import { SegmentMaterializedPayload } from 'erxes-api-shared/core-modules';
 import { heartbeatRun } from './drain';
 import { handleEmailProcessor } from './email';
 import { handleMessengerProcessor } from './messenger';
-import { handleNotificationProcessor } from './notification';
 import { reconcileSchedules } from './reconcile';
 import { fireAfterSegment, fireSchedule, ISchedulePayload } from './schedule';
 import { handleWorkflowProcessor } from './workflow';
 
-type BroadcastMethod = 'email' | 'messenger' | 'notification' | 'workflow';
+type BroadcastMethod = 'email' | 'messenger' | 'workflow';
 
 interface BroadcastDrainPayload {
   subdomain: string;
@@ -40,7 +39,6 @@ const PROCESS_HANDLERS: Record<
 > = {
   email: handleEmailProcessor,
   messenger: handleMessengerProcessor,
-  notification: handleNotificationProcessor,
   workflow: handleWorkflowProcessor,
 };
 

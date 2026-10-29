@@ -9,7 +9,6 @@ export const types = `
     segmentIds: [String]
     brandIds: [String]
     customerIds: [String]
-    cpId: String
     title: String
     fromEmail: String
     fromUserId: String
@@ -39,7 +38,6 @@ export const types = `
     email: JSON
     messenger: JSON
     shortMessage: EngageMessageSms
-    notification: JSON
     createdBy: String
 
     scheduleDate: EngageScheduleDate
@@ -196,13 +194,6 @@ export const types = `
     from: String,
     content: String!
     fromIntegrationId: String!
-  }
-
-  input EngageMessageNotification {
-    title: String!,
-    content: String!,
-    isMobile: Boolean,
-    inApp: Boolean
   }
 
   type EngageMessageListResponse {
@@ -386,7 +377,6 @@ const mutationParams = `
   method: String
   fromEmail: String
   fromUserId: String
-  cpId: String
 
   targetType: String
   targetIds: [String]
@@ -397,7 +387,6 @@ const mutationParams = `
 
   email: EngageMessageEmail
   messenger: EngageMessageMessenger
-  notification: EngageMessageNotification
   workflow: JSON
 `;
 

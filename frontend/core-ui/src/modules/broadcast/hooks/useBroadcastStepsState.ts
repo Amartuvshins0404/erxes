@@ -1,9 +1,7 @@
-import { useQueryState, useToast } from 'erxes-ui';
+import { useQueryState } from 'erxes-ui';
 import { useState } from 'react';
 import { useWatch } from 'react-hook-form';
-import { useTranslation } from 'react-i18next';
 import {
-  BROADCAST_CONFIG_STEP,
   BROADCAST_STEPS,
   stepFields,
 } from '../components/steps/broadcastStepConfig';
@@ -26,8 +24,6 @@ export const useBroadcastStepsState = ({
   onClose,
 }: TBroadcastStepsOptions) => {
   const [method] = useQueryState<IBroadcastMethodEnum>('method');
-  const { t } = useTranslation('broadcasts');
-  const { toast } = useToast();
   const { form } = useBroadcastForm(initialValues);
   const { submit } = useBroadcastSubmit({ messageId, method });
   const [step, setStep] = useState(0);
@@ -41,20 +37,6 @@ export const useBroadcastStepsState = ({
   const isStepValid = async () => {
     if (!(await form.trigger(stepFields(step, method)))) {
       return false;
-    }
-
-    if (method === 'notification' && step === BROADCAST_CONFIG_STEP) {
-      const notification = form.getValues('notification');
-
-      if (!notification?.inApp && !notification?.isMobile) {
-        toast({
-          variant: 'destructive',
-          title: t('notification.no-channel'),
-          description: t('notification.no-channel-body'),
-        });
-
-        return false;
-      }
     }
 
     return true;

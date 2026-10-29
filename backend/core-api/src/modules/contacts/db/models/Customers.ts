@@ -114,11 +114,6 @@ export const loadCustomerClass = (
     oldCustomerIds: string[],
     newCustomerId: string,
   ) => {
-    await models.CPUser.updateMany(
-      { erxesCustomerId: { $in: oldCustomerIds } },
-      { $set: { erxesCustomerId: newCustomerId } },
-    );
-
     await models.FormSubmissions.updateMany(
       { customerId: { $in: oldCustomerIds } },
       { $set: { customerId: newCustomerId } },

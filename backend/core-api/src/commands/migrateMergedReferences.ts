@@ -249,14 +249,6 @@ const migrateCustomerReferences = async (db: Db, mergeMap: MergeMap) => {
   console.log('Migrating customer references...');
 
   logStats(
-    'client_portal_users.erxesCustomerId',
-    await replaceScalarReferences(
-      db.collection('client_portal_users'),
-      'erxesCustomerId',
-      mergeMap,
-    ),
-  );
-  logStats(
     'form_submissions.customerId',
     await replaceScalarReferences(
       db.collection('form_submissions'),
@@ -313,14 +305,6 @@ const migrateCompanyReferences = async (db: Db, mergeMap: MergeMap) => {
 
   console.log('Migrating company references...');
 
-  logStats(
-    'client_portal_users.erxesCompanyId',
-    await replaceScalarReferences(
-      db.collection('client_portal_users'),
-      'erxesCompanyId',
-      mergeMap,
-    ),
-  );
   logStats(
     'products.vendorId',
     await replaceScalarReferences(

@@ -4,7 +4,6 @@ import {
   Resolver,
 } from 'erxes-api-shared/core-types';
 import { getEnv } from 'erxes-api-shared/utils';
-import { syncCustomerContactToCPUsers } from '@/clientportal/services/user/contactService';
 import { IContext } from '~/connectionResolvers';
 import { COC_LIFECYCLE_STATE_TYPES } from '~/modules/contacts/constants';
 
@@ -24,16 +23,6 @@ export const customerMutations: Record<string, Resolver<any, any, IContext>> = {
     return customer;
   },
 
-  async cpCustomersAdd(
-    _parent: undefined,
-    doc: ICustomer,
-    { models, clientPortal }: IContext,
-  ) {
-    return await models.Customers.createCustomer({
-      ...doc,
-      clientPortalId: clientPortal?._id,
-    });
-  },
   /**
    * Updates a customer
    */
@@ -44,11 +33,7 @@ export const customerMutations: Record<string, Resolver<any, any, IContext>> = {
   ) {
     await checkPermission('contactsUpdate');
 
-    const updated = await models.Customers.updateCustomer(_id, doc);
-
-    await syncCustomerContactToCPUsers(models, _id, doc);
-
-    return updated;
+    return await models.Customers.updateCustomer(_id, doc);
   },
 
   /**
@@ -254,8 +239,4 @@ export const customerMutations: Record<string, Resolver<any, any, IContext>> = {
       { $set: { state: value } },
     );
   },
-};
-
-customerMutations.cpCustomersAdd.wrapperConfig = {
-  forClientPortal: true,
 };

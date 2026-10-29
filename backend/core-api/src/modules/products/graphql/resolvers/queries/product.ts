@@ -797,38 +797,6 @@ export const productQueries: Record<string, Resolver<any, any, IContext>> = {
     return applyBasePrices(context, result, params);
   },
 
-  async cpProducts(
-    _parent: undefined,
-    params: IProductParams,
-    context: IContext,
-  ) {
-    const { commonQuerySelector, models } = context;
-    const filter = await generateFilter(context, commonQuerySelector, params);
-
-    const { sortDirection } = params;
-    const sortField = getSortField(params);
-
-    let sort: { [key: string]: SortOrder } = { code: 1 };
-
-    if (sortField) {
-      sort = { [sortField]: (sortDirection || 1) as SortOrder };
-    }
-
-    if (params.groupedSimilarity) {
-      return await getSimilaritiesProducts(models, filter, sort, {
-        groupedSimilarity: params.groupedSimilarity,
-      });
-    }
-
-    if (isDiscountSortField(params.sortField)) {
-      return await paginateDiscountSortedProducts(context, filter, params);
-    }
-
-    return await defaultPaginate(models.Products.find(filter).sort(sort), {
-      ...params,
-    });
-  },
-
   async productDetail(
     _parent: undefined,
     { _id }: { _id: string },
@@ -874,14 +842,6 @@ export const productQueries: Record<string, Resolver<any, any, IContext>> = {
     ]);
 
     return product?.code || null;
-  },
-
-  async cpProductDetail(
-    _parent: undefined,
-    { _id }: { _id: string },
-    { models }: IContext,
-  ) {
-    return await models.Products.findOne({ _id }).lean();
   },
 
   async productsTotalCount(
@@ -1080,12 +1040,4 @@ export const productQueries: Record<string, Resolver<any, any, IContext>> = {
 
     return counts;
   },
-};
-
-productQueries.cpProducts.wrapperConfig = {
-  forClientPortal: true,
-};
-
-productQueries.cpProductDetail.wrapperConfig = {
-  forClientPortal: true,
 };

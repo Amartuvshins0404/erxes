@@ -40,25 +40,12 @@ const queryParams = `
   ${GQL_CURSOR_PARAM_DEFS}
 `;
 
-const cpQueryParams = `
-  type: String,
-  searchValue: String,
-  parentId: String,
-  ids: [String],
-  excludeIds: Boolean,
-  isGroup: Boolean,
-  instanceId: String,
-  includeWorkspaceTags: Boolean,
-`;
-
 export const queries = `
   tagsGetTypes: JSON
   tags(${queryParams}): TagsListResponse
   tagsMain(type: String, excludeWorkspaceTags: Boolean): [Tag]
   tagDetail(_id: String!): Tag
   tagsQueryCount(type: String, searchValue: String): Int
-
-  cpTags(${cpQueryParams}): [Tag]
 `;
 
 const mutationParams = `
@@ -73,8 +60,5 @@ export const mutations = `
   tagsAdd(name: String!, ${mutationParams}): Tag
   tagsEdit(_id: String!, name: String, ${mutationParams}): Tag
   tagsTag(type: String!, targetIds: [String!]!, tagIds: [String!]!): JSON
-  cpTagsTag(type: String!, targetIds: [String!]!, tagIds: [String!]!): JSON
   tagsRemove(_id: String!): JSON
-
-  cpTagsAdd(name: String!, ${mutationParams}): Tag
 `;

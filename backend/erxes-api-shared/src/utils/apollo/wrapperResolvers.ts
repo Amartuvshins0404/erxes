@@ -1,8 +1,5 @@
 import * as Sentry from '@sentry/node';
-import {
-  wrapPermission,
-  wrapPublicResolver,
-} from '../../core-modules/permissions/utils';
+import { wrapPermission } from '../../core-modules/permissions/utils';
 import {
   IMainContext,
   IResolverSymbol,
@@ -100,16 +97,9 @@ export const wrapApolloResolvers = (resolvers: Record<string, Resolver>) => {
       const mutationResolvers: any = {};
 
       for (const [mutationKey, mutationResolver] of Object.entries(resolver)) {
-        const { skipPermission, cpUserRequired, forClientPortal } =
-          mutationResolver.wrapperConfig || {};
-        const isPublic = skipPermission || forClientPortal || cpUserRequired;
-
         let wrapped: Resolver;
-        if (isPublic) {
-          wrapped = wrapPublicResolver(
-            withBeforeResolvers(mutationResolver, mutationKey),
-            mutationResolver.wrapperConfig,
-          );
+        if (mutationResolver.wrapperConfig?.skipPermission) {
+          wrapped = withBeforeResolvers(mutationResolver, mutationKey);
         } else {
           wrapped = withLogging(
             wrapPermission(
@@ -134,16 +124,9 @@ export const wrapApolloResolvers = (resolvers: Record<string, Resolver>) => {
       const queryResolvers: any = {};
 
       for (const [queryKey, queryResolver] of Object.entries(resolver)) {
-        const { skipPermission, cpUserRequired, forClientPortal } =
-          queryResolver.wrapperConfig || {};
-        const isPublic = skipPermission || forClientPortal || cpUserRequired;
-
         let wrapped: Resolver;
-        if (isPublic) {
-          wrapped = wrapPublicResolver(
-            withBeforeResolvers(queryResolver, queryKey),
-            queryResolver.wrapperConfig,
-          );
+        if (queryResolver.wrapperConfig?.skipPermission) {
+          wrapped = withBeforeResolvers(queryResolver, queryKey);
         } else {
           wrapped = wrapPermission(
             withBeforeResolvers(queryResolver, queryKey),

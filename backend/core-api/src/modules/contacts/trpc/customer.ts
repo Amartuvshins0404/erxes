@@ -1,7 +1,6 @@
 import { initTRPC, TRPCError } from '@trpc/server';
 import { ICustomer } from 'erxes-api-shared/core-types';
 import { z } from 'zod';
-import { syncCustomerContactToCPUsers } from '@/clientportal/services/user/contactService';
 import { IModels } from '~/connectionResolvers';
 import { CoreTRPCContext } from '~/init-trpc';
 import { createOrUpdate } from '../utils';
@@ -214,11 +213,7 @@ export const customerRouter = t.router({
           ];
         }
 
-        const updated = await models.Customers.updateCustomer(_id, doc);
-
-        await syncCustomerContactToCPUsers(models, _id, doc);
-
-        return updated;
+        return await models.Customers.updateCustomer(_id, doc);
       }),
 
     createCustomer: t.procedure

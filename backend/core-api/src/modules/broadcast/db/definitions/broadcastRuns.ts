@@ -1,6 +1,6 @@
 import { mongooseStringRandomId } from 'erxes-api-shared/utils';
 import { Schema } from 'mongoose';
-import { emailSchema, messengerSchema, notificationSchema } from './common';
+import { emailSchema, messengerSchema } from './common';
 
 export const BROADCAST_RUN_STATUSES = [
   'running',
@@ -20,15 +20,9 @@ export const broadcastRunSchema = new Schema({
   method: { type: String, label: 'Method' },
   email: { type: emailSchema, optional: true, label: 'Email' },
   messenger: { type: messengerSchema, optional: true, label: 'Messenger' },
-  notification: {
-    type: notificationSchema,
-    optional: true,
-    label: 'Notification',
-  },
   automationId: { type: String, optional: true, label: 'Workflow' },
   fromEmail: { type: String, optional: true, label: 'From sender' },
   fromUserId: { type: String, optional: true, label: 'From user' },
-  cpId: { type: String, optional: true, label: 'Client portal id' },
   configSet: { type: String, optional: true, label: 'SES configuration set' },
 
   // Which occurrence of a repeating schedule opened this run. Absent on a run

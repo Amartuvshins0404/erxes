@@ -45,7 +45,6 @@ export interface ICustomer {
   status?: string;
   code?: string;
   integrationId?: string;
-  clientPortalId?: string;
   tagIds?: string[];
 
   mergedIds?: string[];
@@ -90,5 +89,4 @@ export interface ICustomerQueryFilterParams
 
   brandIds?: string[];
 
-  clientPortalId?: string;
 }

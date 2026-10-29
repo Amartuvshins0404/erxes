@@ -15,11 +15,6 @@ export const structureEntityTypeSchema = schemaWrapper(
       icon: { type: String, label: 'Icon' },
       parentTypeIds: { type: [String], default: [], label: 'Parent types' },
       capabilities: { type: [String], default: [], label: 'Capabilities' },
-      legacyKind: {
-        type: String,
-        enum: ['branch', 'department', 'unit'],
-        label: 'Client portal kind',
-      },
       isSystem: { type: Boolean, default: false, label: 'System type' },
       createdBy: { type: String, label: 'Created by' },
       updatedBy: { type: String, label: 'Updated by' },

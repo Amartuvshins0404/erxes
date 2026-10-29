@@ -2,13 +2,11 @@ import { useQueryState } from 'erxes-ui';
 import { useTranslation } from 'react-i18next';
 import { BroadcastEmailPreview } from './preview/BroadcastEmailPreview';
 import { BroadcastMessengerPreview } from './preview/BroadcastMessengerPreview';
-import { MessengerNotificationPreview } from './preview/MessengerNotificationPreview';
 import { BroadcastWorkflowPreview } from './preview/BroadcastWorkflowPreview';
 
 const BROADCAST_PREVIEW = {
   email: BroadcastEmailPreview,
   messenger: BroadcastMessengerPreview,
-  notification: MessengerNotificationPreview,
   workflow: BroadcastWorkflowPreview,
 };
 

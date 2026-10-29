@@ -151,7 +151,7 @@ frontend/
   libs/erxes-ui/       Core UI primitives + state
   libs/ui-modules/     Reusable business/UI modules
   plugins/<name>_ui/   Plugin remotes: config.tsx, modules/, pages/, widgets/
-apps/                  Standalone apps (client-portal, posclient-front, widgets)
+apps/                  Standalone apps (posclient-front, frontline-widgets)
 scripts/               Dev scripts (create-plugin.js, start-*-dev.js)
 .github/workflows/     CI/CD pipelines
 ```

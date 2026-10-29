@@ -11,8 +11,6 @@ import { Skeleton } from 'erxes-ui';
 import { pluginsConfigState, useVersion } from 'ui-modules';
 import { useAtomValue } from 'jotai';
 import { PluginSettingsRedirect } from '@/settings/components/PluginSettingsRedirect';
-import { ClientPortalDetailPage } from '~/pages/settings/client-portal/ClientPortalDetailPage';
-import { ClientPortalPage } from '~/pages/settings/client-portal/ClientPortalPage';
 import { TeamMemberSettingsRoutes } from '@/settings/team-member/components/TeamMemberSettingsRoutes';
 
 const AgentSettingsRoutes = lazy(() =>
@@ -206,14 +204,6 @@ export function SettingsRoutes() {
           element={<TeamMemberSettingsRoutes />}
         />
 
-        <Route
-          path={SettingsWorkspacePath.ClientPortals}
-          element={<ClientPortalPage />}
-        />
-        <Route
-          path={`${SettingsWorkspacePath.ClientPortals}/:clientPortalId`}
-          element={<ClientPortalDetailPage />}
-        />
         <Route path={SettingsWorkspacePath.Logs} element={<LogsRoutes />} />
         <Route
           path={SettingsWorkspacePath.EmailDeliveries}

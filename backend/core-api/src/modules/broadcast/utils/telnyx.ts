@@ -86,19 +86,6 @@ export const prepareSmsStats = async (
   return result;
 };
 
-export const prepareNotificationStats = async (
-  models: IModels,
-  engageMessageId: string,
-) => {
-  const read = await models.CPNotifications.countDocuments({
-    contentTypeId: engageMessageId,
-    contentType: 'core:broadcast',
-    isRead: true,
-  });
-
-  return { read };
-};
-
 // alphanumeric sender id only works for countries outside north america
 const isNumberNorthAmerican = (phoneNumber: string) => {
   return phoneNumber.substring(0, 2) === '+1';

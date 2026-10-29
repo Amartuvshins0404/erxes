@@ -1,11 +1,7 @@
 import { ExpressContextFunctionArgument } from '@apollo/server/dist/esm/express4';
 import { Request as ApiRequest, Response as ApiResponse } from 'express';
 import { IMainContext } from '../../core-types';
-import {
-  extractCPUserFromHeader,
-  extractClientPortalFromHeader,
-  extractUserFromHeader,
-} from '../headers';
+import { extractUserFromHeader } from '../headers';
 import { generateRequestProcess, getSubdomain } from '../utils';
 import { createScopedEventHandlers } from '../../core-modules/common/eventHandlers/generateEventHandlers';
 import { setEventHandlerRuntimeContext } from '../../core-modules/common/eventHandlers/runtimeContext';
@@ -29,8 +25,6 @@ export const generateApolloContext =
     }
 
     const user: any = extractUserFromHeader(req.headers);
-    const cpUser: any = extractCPUserFromHeader(req.headers);
-    const clientPortal: any = extractClientPortalFromHeader(req.headers);
 
     const subdomain = getSubdomain(req);
 
@@ -53,8 +47,6 @@ export const generateApolloContext =
 
     const context = {
       user,
-      cpUser,
-      clientPortal,
       req,
       res,
       subdomain,

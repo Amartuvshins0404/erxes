@@ -19,7 +19,6 @@ import { appRouter } from './trpc';
 
 const {
   DOMAIN,
-  CLIENT_PORTAL_DOMAINS,
   ALLOWED_DOMAINS,
   PORT,
   LOAD_BALANCER_ADDRESS,
@@ -49,7 +48,6 @@ const corsOptions = {
     ...(DOMAIN ? [DOMAIN] : []),
     ...(isDev ? ['http://localhost:3001'] : []),
     ALLOWED_DOMAINS || 'http://localhost:3200',
-    ...(CLIENT_PORTAL_DOMAINS || '').split(','),
     ...(process.env.ALLOWED_ORIGINS || '')
       .split(',')
       .map((c) => c && RegExp(c)),

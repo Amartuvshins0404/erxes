@@ -50,14 +50,6 @@ export interface IShortMessage {
   fromIntegrationId: string;
 }
 
-interface INotification {
-  title?: string;
-  content?: string;
-  isMobile?: boolean;
-  inApp?: boolean;
-}
-
-export interface INotificationDocument extends INotification, Document {}
 export interface IShortMessage {
   content: string;
   from?: string;
@@ -70,7 +62,6 @@ export interface IEngageMessage {
   targetIds: string[];
   targetCount: number;
 
-  cpId: string;
   title: string;
   fromEmail?: string;
   fromUserId?: string;
@@ -85,7 +76,6 @@ export interface IEngageMessage {
   workflow?: { actions?: any[]; entryActionId?: string };
   email?: IEmail;
   messenger?: IMessenger;
-  notification?: INotification;
 
   lastRunAt?: Date;
 
@@ -112,7 +102,6 @@ export interface IEngageMessageDocument extends IEngageMessage, Document {
 
   email?: IEmailDocument;
   messenger?: IMessengerDocument;
-  notification?: INotificationDocument;
   scheduleDate?: IScheduleDateDocument;
 }
 

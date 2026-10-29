@@ -4,7 +4,6 @@ import { CAMPAIGN_KINDS, CAMPAIGN_METHODS } from '../../constants';
 import {
   emailSchema,
   messengerSchema,
-  notificationSchema,
   scheduleDateSchema,
 } from './common';
 
@@ -24,7 +23,6 @@ export const engageMessageSchema = new Schema(
     targetCount: { type: Number, label: 'Target count' },
 
     title: { type: String, label: 'Title', required: true },
-    cpId: { type: String, label: 'Client portal ID' },
     fromEmail: { type: String, label: 'From sender' },
     fromUserId: { type: String, label: 'From user' },
 
@@ -49,10 +47,6 @@ export const engageMessageSchema = new Schema(
     },
     email: { type: emailSchema, label: 'Email' },
     messenger: { type: messengerSchema, label: 'Messenger' },
-    notification: {
-      type: notificationSchema,
-      label: 'Notification',
-    },
 
     lastRunAt: { type: Date, label: 'Last run at' },
     runCount: { type: Number, label: 'Run count', default: 0 },

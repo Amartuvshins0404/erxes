@@ -14,7 +14,6 @@ export const types = `
     updatedAt: Date
     avatar: String
     integrationId: String
-    clientPortalId: String
     firstName: String
     lastName: String
     middleName: String
@@ -93,7 +92,6 @@ const queryParams = `
   integrationIds: [String]
   integrationTypes: [String]
 
-  clientPortalId: String
 
   formIds: [String]
 
@@ -122,8 +120,6 @@ export const queries = `
   customerDetail(_id: String!): Customer
   contactsLogs(action: String, content:JSON, contentType: String): JSON
   
-  cpCustomers(${queryParams}): CustomersListResponse
-  cpCustomerDetail(_id: String!): Customer
   `;
 
 const fields = `
@@ -165,5 +161,4 @@ export const mutations = `
   customersChangeVerificationStatus(customerIds: [String], type: String!, status: String!): [Customer]
   customersChangeStateBulk(_ids: [String]!, value: String!): JSON
 
-  cpCustomersAdd(state: String, ${fields}): Customer
 `;

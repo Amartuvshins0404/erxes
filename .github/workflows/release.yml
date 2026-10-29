@@ -35,7 +35,6 @@ jobs:
           - erxes/erxes-next-ui
           - erxes/frontline-widgets
           - erxes/posclient-front
-          - erxes/help-center
       fail-fast: false
     steps:
       - name: Set up Docker Buildx

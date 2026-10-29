@@ -19,8 +19,6 @@ export const AGENTS_GRAPHQL_RECORD_TYPES: Record<string, string> = {
   User: 'user',
   Product: 'product',
   StructureEntity: 'structureEntity',
-  Branch: 'structureEntity',
-  Department: 'structureEntity',
   Brand: 'brand',
   Deal: 'deal',
   SalesDeal: 'deal',

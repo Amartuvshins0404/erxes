@@ -114,19 +114,6 @@ export const checkCampaignDoc = async (
       throw new Error('Email content is missing');
     }
   }
-
-  if (method === CAMPAIGN_METHODS.NOTIFICATION) {
-    if (!doc.notification || !doc.title || !doc?.notification.content) {
-      throw new Error(
-        'Required fields are missing. Please fill in all mandatory fields.',
-      );
-    }
-    if (!doc.cpId) {
-      throw new Error(
-        'Please select "Clientportal" in the notification campaign',
-      );
-    }
-  }
 };
 
 const count = async (

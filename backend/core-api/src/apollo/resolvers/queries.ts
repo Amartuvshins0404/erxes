@@ -6,10 +6,6 @@ import { automationQueries } from '@/automations/graphql/resolvers/queries';
 import { emailTemplateQueries } from '@/emailTemplates/graphql/resolvers';
 import { notificationTemplateQueries } from '@/notificationTemplates/graphql/resolvers';
 import { beforeResolverQueries } from '@/beforeResolvers/graphql/queries';
-import { clientPortalQueries } from '@/clientportal/graphql/resolvers/queries/clientPortal';
-import { cpUserQueries } from '@/clientportal/graphql/resolvers/queries/cpUser';
-import { commentQueries } from '@/clientportal/graphql/resolvers/queries/comment';
-import { cpNotificationQueries } from '@/clientportal/graphql/resolvers/queries/cpNotification';
 import { contactQueries } from '@/contacts/graphql/resolvers/queries';
 import { documentQueries } from '@/documents/graphql/queries';
 import { queries as formQueries } from '@/forms/graphql/resolvers';
@@ -19,7 +15,6 @@ import { notificationQueries } from '@/notifications/graphql/resolver/queries';
 import { brandQueries } from '@/organization/brand/graphql/queries';
 import { organizationConfigQueries } from '@/organization/settings/graphql/configs/queries';
 import { favoriteQueries } from '@/organization/settings/graphql/favorites/queries';
-import { legacyQueries } from '@/organization/structure/graphql/resolvers/legacy';
 import { structureQueries } from '@/organization/structure/graphql/resolvers/queries';
 import { userQueries } from '@/organization/team-member/graphql/queries';
 import { permissionQueries } from '~/modules/permissions/graphql/resolvers/queries/permission';
@@ -74,7 +69,6 @@ export const queries = {
   ...relationsQueries,
   ...favoriteQueries,
   ...structureQueries,
-  ...legacyQueries,
   ...brandQueries,
   ...organizationConfigQueries,
   ...permissionQueries,
@@ -90,13 +84,9 @@ export const queries = {
   ...internalNoteQueries,
   ...broadcastQueries,
   ...propertiesQueries,
-  ...clientPortalQueries,
   ...importExportCommonQueries,
   ...importQueries,
   ...exportQueries,
-  ...cpUserQueries,
-  ...commentQueries,
-  ...cpNotificationQueries,
   ...activityLogQueries,
   ...bundleQueries,
   ...templateQueries,

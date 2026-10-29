@@ -15,14 +15,7 @@
  */
 
 import type { CoreTRPCContext } from '~/init-trpc';
-import { syncCustomerContactToCPUsers } from '@/clientportal/services/user/contactService';
 import { customerRouter } from '@/contacts/trpc/customer';
-
-jest.mock('@/clientportal/services/user/contactService', () => ({
-  syncCustomerContactToCPUsers: jest.fn(async () => undefined),
-}));
-
-const mockedSync = jest.mocked(syncCustomerContactToCPUsers);
 
 const actingUser = { _id: 'user1', email: 'agent@erxes.io' };
 
@@ -199,7 +192,7 @@ describe('customers.edit', () => {
     });
   });
 
-  it('updates through updateCustomer and syncs the contact to client portal users', async () => {
+  it('updates through updateCustomer', async () => {
     const { caller, models } = buildCaller();
 
     const result = await caller.customers.edit({
@@ -209,7 +202,6 @@ describe('customers.edit', () => {
 
     const doc = { firstName: 'Janet' };
     expect(models.Customers.updateCustomer).toHaveBeenCalledWith('c1', doc);
-    expect(mockedSync).toHaveBeenCalledWith(models, 'c1', doc);
     expect(result).toEqual({ _id: 'c1', doc });
   });
 

@@ -58,36 +58,4 @@ export const tagMutations: Record<string, Resolver<any, any, IContext>> = {
     return models.Tags.removeTag(_id);
   },
 
-  async cpTagsAdd(
-    _parent: undefined,
-    doc: ITag,
-    { models, checkPermission }: IContext,
-  ) {
-    await checkPermission('tagsCreate');
-
-    return await models.Tags.createTag(doc);
-  },
-
-  /**
-   * Attach a cp tag
-   */
-  async cpTagsTag(
-    _parent: undefined,
-    {
-      type,
-      targetIds,
-      tagIds,
-    }: { type: string; targetIds: string[]; tagIds: string[] },
-    { models }: IContext,
-  ) {
-    return await models.Tags.tagsTag(type, targetIds, tagIds);
-  },
-};
-
-tagMutations.cpTagsTag.wrapperConfig = {
-  forClientPortal: true,
-};
-
-tagMutations.cpTagsAdd.wrapperConfig = {
-  forClientPortal: true,
 };

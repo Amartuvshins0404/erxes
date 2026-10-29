@@ -315,4 +315,3 @@ After a successful creation the following happen automatically:
 | `customersRemove(customerIds)`                | `contactsDelete` | Soft-delete customers                    |
 | `customersChangeState(_id, value)`            | —                | Change `state` only                      |
 | `customersMerge(customerIds, customerFields)` | —                | Merge duplicate customers                |
-| `cpCustomersAdd(...fields)`                   | none             | Client-portal variant (no auth required) |

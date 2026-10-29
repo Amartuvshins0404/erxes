@@ -35,20 +35,6 @@ const getDefaultValues = (
         title: '',
       };
 
-  if (method === 'notification') {
-    return {
-      ...base,
-      method: 'notification',
-      cpId: '',
-      notification: {
-        inApp: true,
-        isMobile: false,
-        title: '',
-        content: '',
-      },
-    };
-  }
-
   if (method === 'workflow') {
     return {
       ...base,

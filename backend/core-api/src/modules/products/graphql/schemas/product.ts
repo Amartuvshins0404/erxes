@@ -134,15 +134,6 @@ export const queries = `
   productLastCodeByCategory(categoryId: String): String
   productSimilarities(_id: String!, groupedSimilarity: String): ProductSimilarity
   productCountByTags: JSON
-
-  cpProducts(
-    ${queryParams}
-    page: Int,
-    perPage: Int,
-    sortField: String,
-    sortDirection: Int,
-  ): [Product]
-  cpProductDetail(_id: String): Product
 `;
 
 export const mutationParams = `

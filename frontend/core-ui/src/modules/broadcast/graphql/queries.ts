@@ -39,7 +39,6 @@ export const BROADCAST_MESSAGES = gql`
         brandIds
         segmentIds
         messenger
-        notification
         email
         brandId
         targetType
@@ -102,7 +101,6 @@ export const BROADCAST_MESSAGES = gql`
           name
           colorCode
         }
-        cpId
       }
       ${GQL_PAGE_INFO}
     }
@@ -125,7 +123,6 @@ export const BROADCAST_MESSAGE = gql`
       brandIds
       segmentIds
       messenger
-      notification
       email
       brandId
       targetType
@@ -189,7 +186,6 @@ export const BROADCAST_MESSAGE = gql`
         name
         colorCode
       }
-      cpId
     }
   }
 `;

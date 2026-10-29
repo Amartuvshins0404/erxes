@@ -6,8 +6,6 @@ import {
   getSubdomain,
   redis,
   sanitizeHeaders,
-  setClientPortalHeader,
-  setCPUserHeader,
   setUserHeader,
 } from 'erxes-api-shared/utils';
 import { NextFunction, Request, Response } from 'express';
@@ -32,7 +30,7 @@ const USER_HEADER_PROJECTION =
   '_id email details isOwner groupIds brandIds username code';
 
 const debugAuth = (
-  req: Request & { user?: any; cpUser?: any; clientPortal?: any },
+  req: Request & { user?: any },
   event: string,
   extra: Record<string, unknown> = {},
 ) => {
@@ -48,7 +46,6 @@ const debugAuth = (
       path: req.originalUrl,
       hostname: req.hostname,
       hasUser: Boolean(req.user?._id),
-      hasClientPortalUser: Boolean(req.cpUser?._id),
       ...extra,
     }),
   );
@@ -72,7 +69,7 @@ const getBearerToken = (req: Request) => {
 
 // skipcq: JS-R1005 — legacy middleware complexity
 export default async function userMiddleware(
-  req: Request & { user?: any; cpUser?: any; clientPortal?: any },
+  req: Request & { user?: any },
   res: Response,
   next: NextFunction,
 ) {
@@ -88,10 +85,6 @@ export default async function userMiddleware(
   debugAuth(req, 'start', {
     hasAuthorizationHeader: Boolean(req.headers.authorization),
     hasAuthCookie: Boolean(req.cookies?.['auth-token']),
-    hasClientAuthToken: Boolean(
-      req.headers['client-auth-token'] || req.cookies?.['client-auth-token'],
-    ),
-    hasClientPortalToken: Boolean(req.headers['x-app-token']),
   });
 
   if (Array.isArray(erxesCoreToken)) {
@@ -232,90 +225,6 @@ export default async function userMiddleware(
     } catch (e) {
       console.error(e);
       debugAuth(req, 'app-token-error', {
-        subdomain,
-        error: e instanceof Error ? e.message : 'unknown',
-        durationMs: Date.now() - startedAt,
-      });
-
-      return next();
-    }
-  }
-
-  const clientPortalToken = req.headers['x-app-token'];
-  const clientAuthToken =
-    req.headers['client-auth-token'] || req.cookies['client-auth-token'];
-
-  if (clientPortalToken) {
-    const clientPortalTokenString = String(clientPortalToken);
-
-    try {
-      const clientPortalTokenDecoded: any = jwt.verify(
-        clientPortalTokenString,
-        process.env.JWT_TOKEN_SECRET || 'SECRET',
-      );
-
-      const clientPortal = await models.ClientPortals.findOne(
-        { _id: clientPortalTokenDecoded.clientPortalId },
-        { _id: 1, name: 1, url: 1, domain: 1, token: 1, auth: 1 },
-      );
-
-      if (!clientPortal) {
-        debugAuth(req, 'client-portal-not-found', {
-          subdomain,
-          durationMs: Date.now() - startedAt,
-        });
-        return next();
-      }
-
-      req.clientPortal = clientPortal;
-
-      setClientPortalHeader(req.headers, req.clientPortal);
-
-      if (clientAuthToken) {
-        try {
-          const clientAuthTokenString = String(clientAuthToken);
-
-          const clientAuthTokenDecoded: any = jwt.verify(
-            clientAuthTokenString,
-            process.env.JWT_TOKEN_SECRET || 'SECRET',
-          );
-
-          const clientPortalUser = await models.CPUsers.findOne({
-            _id: clientAuthTokenDecoded.userId,
-            clientPortalId: clientPortal._id,
-          });
-
-          if (clientPortalUser) {
-            req.cpUser = clientPortalUser;
-            setCPUserHeader(req.headers, req.cpUser);
-            debugAuth(req, 'client-portal-user-set', {
-              subdomain,
-              clientPortalId: String(clientPortal._id),
-              durationMs: Date.now() - startedAt,
-            });
-          }
-        } catch (e) {
-          if (e instanceof jwt.TokenExpiredError) {
-            debugAuth(req, 'client-auth-token-expired', {
-              subdomain,
-              durationMs: Date.now() - startedAt,
-            });
-            return next();
-          } else {
-            console.error(e);
-            debugAuth(req, 'client-auth-token-error', {
-              subdomain,
-              error: e instanceof Error ? e.message : 'unknown',
-              durationMs: Date.now() - startedAt,
-            });
-          }
-        }
-      }
-
-      // return next();
-    } catch (e) {
-      console.error(e);
-      debugAuth(req, 'client-portal-token-error', {
         subdomain,
         error: e instanceof Error ? e.message : 'unknown',
         durationMs: Date.now() - startedAt,

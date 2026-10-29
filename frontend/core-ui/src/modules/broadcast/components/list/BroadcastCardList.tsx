@@ -1,12 +1,10 @@
 import { Card, EnumCursorDirection, ScrollArea, Skeleton } from 'erxes-ui';
-import { useState } from 'react';
-import { useInView } from 'react-intersection-observer';
+import { LoadMoreSentinel } from 'ui-modules';
 import { useMessages } from '../../hooks/useBroadcastMessages';
-import { BroadcastCard, TBroadcastCardMessage } from './BroadcastCard';
+import { BroadcastCard } from './BroadcastCard';
 import { BroadcastEmptyState, BroadcastErrorState } from './BroadcastStates';
 
 const INITIAL_SKELETON_COUNT = 8;
-const FETCH_MORE_SKELETON_COUNT = 4;
 
 const BroadcastCardSkeleton = () => (
   <Card className="flex flex-col gap-4 border p-4">
@@ -17,49 +15,16 @@ const BroadcastCardSkeleton = () => (
   </Card>
 );
 
-/**
- * Mirrors the table's cursor skeleton: reaching the end of the grid fetches the
- * next page instead of asking for a click.
- */
-const BroadcastCardsForwardSkeleton = ({
-  root,
-  handleFetchMore,
-}: {
-  root: Element | null;
-  handleFetchMore: ({ direction }: { direction: EnumCursorDirection }) => void;
-}) => {
-  const { ref } = useInView({
-    root,
-    onChange: (inView) =>
-      inView && handleFetchMore({ direction: EnumCursorDirection.FORWARD }),
-  });
-
-  return (
-    <>
-      <div ref={ref}>
-        <BroadcastCardSkeleton />
-      </div>
-      {Array.from({ length: FETCH_MORE_SKELETON_COUNT - 1 }).map((_, index) => (
-        <BroadcastCardSkeleton key={index} />
-      ))}
-    </>
-  );
-};
-
 export const BroadcastCardList = () => {
   const {
-    messages = [],
+    messages,
     loading,
+    initialLoading,
     error,
     refetch,
-    pageInfo,
+    hasNextPage,
     handleFetchMore,
   } = useMessages();
-
-  // Held in state so the observer re-registers once the viewport is mounted.
-  const [scrollElement, setScrollElement] = useState<HTMLDivElement | null>(
-    null,
-  );
 
   if (error) {
     return <BroadcastErrorState error={error} onRetry={() => refetch()} />;
@@ -71,22 +36,23 @@ export const BroadcastCardList = () => {
 
   return (
     <ScrollArea.Root className="h-full w-full">
-      <ScrollArea.Viewport ref={setScrollElement}>
+      <ScrollArea.Viewport>
         <div className="grid grid-cols-[repeat(auto-fill,minmax(18rem,1fr))] gap-3 p-3">
-          {messages.map((message: TBroadcastCardMessage) => (
+          {messages.map((message) => (
             <BroadcastCard key={message._id} message={message} />
           ))}
-          {loading &&
+          {initialLoading &&
             Array.from({ length: INITIAL_SKELETON_COUNT }).map((_, index) => (
               <BroadcastCardSkeleton key={index} />
             ))}
-          {pageInfo?.hasNextPage && !loading && (
-            <BroadcastCardsForwardSkeleton
-              root={scrollElement}
-              handleFetchMore={handleFetchMore}
-            />
-          )}
         </div>
+        <LoadMoreSentinel
+          hasMore={!!hasNextPage}
+          loading={loading}
+          onLoadMore={() =>
+            handleFetchMore({ direction: EnumCursorDirection.FORWARD })
+          }
+        />
       </ScrollArea.Viewport>
       <ScrollArea.Bar orientation="vertical" />
     </ScrollArea.Root>

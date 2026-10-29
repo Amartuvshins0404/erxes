@@ -69,6 +69,12 @@ export const generateOptionalConnection = (
   };
 };
 
+type TWorkflowConnection = {
+  sourceActionId: string;
+  handle?: string | null;
+  targetActionId?: string;
+};
+
 export const generateWorkflowConnection = (
   sourceAction: TAutomationBuilderActions[number],
   workFlows: TAutomationBuilderForm['workflows'] = [],
@@ -82,10 +88,11 @@ export const generateWorkflowConnection = (
     if (!workFlow.config) {
       workFlow.config = {};
     }
-    const existingConnections = workFlow.config.connections || [];
+    const existingConnections: TWorkflowConnection[] =
+      workFlow.config.connections || [];
     const { sourceId, sourceHandle, actionId } = info;
 
-    const updatedConnections = existingConnections.map((conn: any) =>
+    const updatedConnections = existingConnections.map((conn) =>
       conn.sourceActionId === sourceId && conn.handle === sourceHandle
         ? { ...conn, targetActionId: actionId }
         : conn,
@@ -93,7 +100,7 @@ export const generateWorkflowConnection = (
 
     if (
       !existingConnections.some(
-        (conn: any) =>
+        (conn) =>
           conn.sourceActionId === sourceId && conn.handle === sourceHandle,
       )
     ) {

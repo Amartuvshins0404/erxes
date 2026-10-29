@@ -11,13 +11,6 @@ export interface EmailTemplate {
   contentFormat?: EmailTemplateContentFormat;
 }
 
-export interface EmailTemplateListResult {
-  emailTemplates: {
-    list: EmailTemplate[];
-    pageInfo: { endCursor?: string; hasNextPage: boolean };
-  };
-}
-
 export const emailTemplateFormat = (
   template?: Pick<EmailTemplate, 'contentFormat' | 'contentJson'>,
 ): EmailTemplateContentFormat =>

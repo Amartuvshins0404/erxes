@@ -1,3 +1,4 @@
+import { LoadMoreSentinel } from '../../shared/components/LoadMoreSentinel';
 import { useEmailTemplatePicker } from '../hooks/useEmailTemplatePicker';
 import type { EmailTemplatePickerOptions } from '../hooks/useEmailTemplatePicker';
 import type { EmailTemplate } from '../types';
@@ -63,7 +64,7 @@ export const EmailTemplatePicker = ({
               <Button
                 type="button"
                 variant="ghost"
-                onClick={() => void refetch().catch(() => undefined)}
+                onClick={refetch}
               >
                 Could not load email templates. Retry
               </Button>
@@ -109,19 +110,12 @@ export const EmailTemplatePicker = ({
                 )}
               </Command.Item>
             ))}
-            {hasNextPage && (
-              <Button
-                type="button"
-                variant="ghost"
-                className="w-full"
-                disabled={loading || applying}
-                onClick={() => {
-                  loadMore();
-                }}
-              >
-                {loading ? <Spinner size="sm" /> : 'Load more'}
-              </Button>
-            )}
+            <LoadMoreSentinel
+              hasMore={hasNextPage && !error}
+              loading={loading}
+              onLoadMore={loadMore}
+              rootMargin="80px"
+            />
           </Command.List>
         </Command>
       </Popover.Content>

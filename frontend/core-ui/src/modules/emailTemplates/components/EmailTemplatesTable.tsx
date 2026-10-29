@@ -133,9 +133,15 @@ const emailTemplateColumns = (t: TFunction): ColumnDef<IEmailTemplate>[] => [
 export const EmailTemplatesTable = () => {
   const { t } = useTranslation('settings', { keyPrefix: 'email-templates' });
   const columns = useMemo(() => emailTemplateColumns(t), [t]);
-  const { emailTemplates, pageInfo, loading, error, refetch, handleFetchMore } =
-    useEmailTemplates();
-  const { hasPreviousPage, hasNextPage } = pageInfo || {};
+  const {
+    emailTemplates,
+    hasPreviousPage,
+    hasNextPage,
+    loading,
+    error,
+    refetch,
+    handleFetchMore,
+  } = useEmailTemplates();
 
   if (error) {
     return <EmailTemplatesErrorState error={error} onRetry={() => refetch()} />;
@@ -157,21 +163,14 @@ export const EmailTemplatesTable = () => {
         hasPreviousPage={hasPreviousPage}
         hasNextPage={hasNextPage}
         dataLength={emailTemplates.length}
-        sessionKey="email-templates-cursor"
+        loading={loading}
       >
         <RecordTable>
           <RecordTable.Header />
           <RecordTable.Body>
-            <RecordTable.CursorBackwardSkeleton
+            <RecordTable.CursorRows
               handleFetchMore={handleFetchMore}
-            />
-            {loading ? (
-              <RecordTable.RowSkeleton rows={32} />
-            ) : (
-              <RecordTable.RowList />
-            )}
-            <RecordTable.CursorForwardSkeleton
-              handleFetchMore={handleFetchMore}
+              loading={loading}
             />
           </RecordTable.Body>
         </RecordTable>

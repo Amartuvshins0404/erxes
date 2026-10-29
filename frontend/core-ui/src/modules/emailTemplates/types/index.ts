@@ -12,17 +12,6 @@ export interface IEmailTemplate extends EmailTemplate {
   createdUser?: IUser;
 }
 
-export interface IEmailTemplatesListResponse {
-  list: IEmailTemplate[];
-  totalCount: number;
-  pageInfo: {
-    hasNextPage: boolean;
-    hasPreviousPage: boolean;
-    startCursor: string | null;
-    endCursor: string | null;
-  };
-}
-
 export type TEmailTemplateInput = {
   name: string;
   description?: string;

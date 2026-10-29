@@ -1,10 +1,10 @@
 
-FROM node:22-alpine AS deps
+FROM node:26-alpine AS deps
 WORKDIR /app/apps/help-center
 COPY apps/help-center/package.json apps/help-center/package-lock.json ./
 RUN npm ci
 
-FROM node:22-alpine AS build
+FROM node:26-alpine AS build
 WORKDIR /app
 
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -20,7 +20,7 @@ RUN ln -s apps/help-center/node_modules /app/node_modules
 WORKDIR /app/apps/help-center
 RUN npx next build
 
-FROM node:22-alpine AS runner
+FROM node:26-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production

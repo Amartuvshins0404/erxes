@@ -1,5 +1,5 @@
 # Stage 1: install production deps as flat real directories (no pnpm virtual store)
-FROM node:22-alpine3.22 AS installer
+FROM node:26-alpine3.22 AS installer
 WORKDIR /app
 RUN npm install -g pnpm@9
 
@@ -38,7 +38,7 @@ fs.writeFileSync( \
          -o -name ".github" -o -name "coverage" \
        \) -prune -exec rm -rf {} \; 2>/dev/null || true
 # Stage 2: minimal runtime
-FROM node:22-alpine3.22
+FROM node:26-alpine3.22
 WORKDIR /app
 # qpdf rewrites PDFs with object streams so the viewer opens them in a few range reads
 RUN apk add --no-cache qpdf

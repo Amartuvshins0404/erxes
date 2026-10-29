@@ -7,7 +7,7 @@
 # do not touch Elasticsearch/Redis/RabbitMQ. Connection string and the
 # SOURCE_SUBDOMAIN/TARGET_SUBDOMAIN params are injected at run time (see the
 # Kubernetes Job in infra/kubernetes/erxes-saas/migrations-job.ts).
-FROM node:22-alpine3.22
+FROM node:26-alpine3.22
 WORKDIR /app
 
 RUN npm install -g pnpm@9

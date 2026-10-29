@@ -177,7 +177,7 @@ const StepperTrigger = React.forwardRef<HTMLButtonElement, StepperTriggerProps>(
         ref={ref}
         data-slot="stepper-trigger"
         className={cn(
-          'focus-visible:border-ring focus-visible:ring-ring/50 inline-flex items-center gap-3 rounded-full outline-hidden focus-visible:z-10 focus-visible:ring-[3px] disabled:pointer-events-none disabled:opacity-50',
+          'inline-flex cursor-pointer items-center gap-3 rounded-full outline-hidden transition-colors ease-out focus-visible:z-10 focus-visible:shadow-focus disabled:pointer-events-none disabled:opacity-50',
           className,
         )}
         onClick={() => setActiveStep(step)}
@@ -206,7 +206,7 @@ const StepperIndicator = React.forwardRef<
       ref={ref}
       data-slot="stepper-indicator"
       className={cn(
-        'bg-muted text-muted-foreground data-[state=active]:bg-primary data-[state=completed]:bg-primary data-[state=active]:text-primary-foreground data-[state=completed]:text-primary-foreground relative flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-medium',
+        'relative flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground shadow-[inset_0_0_0_1px_var(--border)] transition-[background-color,color,box-shadow] duration-200 ease-out data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-[0_0_0_4px_color-mix(in_oklch,var(--primary)_18%,transparent)] data-[state=completed]:bg-primary data-[state=completed]:text-primary-foreground data-[state=completed]:shadow-none',
         className,
       )}
       data-state={state}
@@ -251,7 +251,7 @@ const StepperTitle = React.forwardRef<
       ref={ref}
       data-slot="stepper-title"
       className={cn(
-        'text-sm font-medium data-[state=active]:text-primary data-[state=completed]:text-primary',
+        'text-sm font-medium text-muted-foreground transition-colors data-[state=active]:text-foreground data-[state=completed]:text-foreground',
         className,
       )}
       data-state={state}
@@ -285,7 +285,7 @@ const StepperSeparator = React.forwardRef<
       ref={ref}
       data-slot="stepper-separator"
       className={cn(
-        'bg-muted group-data-[state=completed]/step:bg-primary m-0.5 group-data-[orientation=horizontal]/stepper:h-0.5 group-data-[orientation=horizontal]/stepper:w-full group-data-[orientation=horizontal]/stepper:flex-1 group-data-[orientation=vertical]/stepper:h-12 group-data-[orientation=vertical]/stepper:w-0.5',
+        'm-0.5 rounded-full bg-border-strong transition-colors duration-300 ease-out group-data-[state=completed]/step:bg-primary group-data-[orientation=horizontal]/stepper:h-0.5 group-data-[orientation=horizontal]/stepper:w-full group-data-[orientation=horizontal]/stepper:flex-1 group-data-[orientation=vertical]/stepper:h-12 group-data-[orientation=vertical]/stepper:w-0.5',
         className,
       )}
       {...props}

@@ -13,7 +13,6 @@ import {
 import { UseErxesUploadReturn } from 'erxes-ui/hooks/use-upload-new';
 import { cn } from 'erxes-ui/lib';
 import { createContext, useCallback, useContext } from 'react';
-import { Spinner } from './spinner';
 import { Button } from './button';
 
 export const getFileIcon = (fileType: string, fileName: string) => {
@@ -98,11 +97,11 @@ const Dropzone = ({
       <div
         {...getRootProps({
           className: cn(
-            'shadow-xs rounded-lg p-6 text-center bg-sidebar transition-colors duration-300 text-foreground',
+            'rounded-2xl bg-card p-6 text-center text-foreground shadow-[inset_0_0_0_1px_var(--border-strong)] transition-[background-color,box-shadow] duration-200 ease-out',
             className,
             isSuccess && 'shadow-focus',
-            isActive && 'shadow-focus bg-muted',
-            isInvalid && 'bg-destructive/10',
+            isActive && 'bg-primary/5 shadow-focus',
+            isInvalid && 'bg-destructive/8 shadow-focus-destructive',
           ),
         })}
       >
@@ -159,10 +158,10 @@ const DropzoneContent = ({ className }: { className?: string }) => {
         return (
           <div
             key={`${file.name}-${idx}`}
-            className="flex items-center gap-x-4 border-b py-2 first:mt-4 last:mb-4 "
+            className="flex items-center gap-x-3 border-b border-border py-2.5 first:mt-4 last:mb-4 last:border-b-0"
           >
             {file.type.startsWith('image/') ? (
-              <div className="h-10 w-10 rounded border overflow-hidden shrink-0 bg-muted flex items-center justify-center">
+              <div className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-muted shadow-2xs">
                 <img
                   src={file.preview}
                   alt={file.name}
@@ -170,7 +169,7 @@ const DropzoneContent = ({ className }: { className?: string }) => {
                 />
               </div>
             ) : (
-              <div className="h-10 w-10 rounded border bg-muted flex items-center justify-center">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground shadow-2xs">
                 {getFileIcon(file.type, file.name)}
               </div>
             )}
@@ -236,16 +235,10 @@ const DropzoneContent = ({ className }: { className?: string }) => {
           <Button
             variant="outline"
             onClick={onUpload}
-            disabled={files.some((file) => file.errors.length !== 0) || loading}
+            loading={loading}
+            disabled={files.some((file) => file.errors.length !== 0)}
           >
-            {loading ? (
-              <>
-                <Spinner className="mr-2 h-4 w-4 animate-spin" />
-                Uploading...
-              </>
-            ) : (
-              <>Upload files</>
-            )}
+            {loading ? 'Uploading...' : 'Upload files'}
           </Button>
         </div>
       )}
@@ -262,8 +255,10 @@ const DropzoneEmptyState = ({ className }: { className?: string }) => {
 
   return (
     <div className={cn('flex flex-col items-center gap-y-2', className)}>
-      <IconUpload size={20} className="text-muted-foreground" />
-      <p className="text-sm">
+      <div className="mb-1 flex size-10 items-center justify-center rounded-full bg-muted text-muted-foreground shadow-2xs">
+        <IconUpload size={18} />
+      </div>
+      <p className="text-sm font-medium">
         Upload{!!maxFiles && maxFiles > 1 ? ` ${maxFiles}` : ''} file
         {!maxFiles || maxFiles > 1 ? 's' : ''}
       </p>
@@ -272,7 +267,7 @@ const DropzoneEmptyState = ({ className }: { className?: string }) => {
           Drag and drop or{' '}
           <span
             onClick={() => inputRef.current?.click()}
-            className="underline cursor-pointer transition hover:text-foreground"
+            className="cursor-pointer text-primary underline-offset-4 transition-colors hover:underline"
           >
             select {maxFiles === 1 ? `file` : 'files'}
           </span>{' '}

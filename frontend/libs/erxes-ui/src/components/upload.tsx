@@ -72,8 +72,8 @@ const UploadRoot = React.forwardRef<HTMLDivElement, UploadPreviewProps>(
       >
         <Dialog open={isImageFocused} onOpenChange={setIsImageFocused}>
           <Dialog.Portal>
-            <Dialog.Overlay className="fixed inset-0 bg-accent" />
-            <Dialog.Content className="fixed left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] max-w-none w-auto bg-transparent border-0 p-0">
+            <Dialog.Overlay className="fixed inset-0 bg-overlay backdrop-blur-sm" />
+            <Dialog.Content className="fixed left-1/2 top-1/2 w-auto max-w-none -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-3xl bg-transparent p-0 shadow-xl">
               <img
                 src={readImage(url)}
                 alt="Focused view"
@@ -183,7 +183,7 @@ const UploadPreview = React.forwardRef<
           <Button
             type="button"
             variant="outline"
-            className="relative size-16 overflow-hidden"
+            className="relative size-16 overflow-hidden rounded-2xl p-0 text-muted-foreground"
             onClick={!url ? handleThumbnailClick : ImageFocus}
             aria-label={url ? 'Change image' : 'Upload image'}
           >
@@ -197,7 +197,7 @@ const UploadPreview = React.forwardRef<
               />
             ) : (
               <div aria-hidden="true">
-                <IconUserCircle className="opacity-60" size={16} />
+                <IconUserCircle size={20} />
               </div>
             )}
           </Button>

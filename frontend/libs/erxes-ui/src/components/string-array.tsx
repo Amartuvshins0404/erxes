@@ -42,20 +42,20 @@ export function StringArrayInput({
       }}
       styleClasses={{
         inlineTagsContainer: cn(
-          'rounded bg-background border-none transition-[color,box-shadow] focus-within:shadow-focus outline-none min-h-7 h-auto p-0 px-1 gap-1 flex-wrap',
+          'h-auto min-h-8 flex-wrap gap-1 rounded-lg border-none bg-card p-1 shadow-button-outline outline-none transition-[box-shadow] ease-out focus-within:shadow-focus',
           styleClasses?.inlineTagsContainer,
         ),
         input: cn(
-          'w-full min-w-[80px] shadow-none px-2 h-7',
+          'h-6 w-full min-w-20 bg-transparent px-2 shadow-none placeholder:text-muted-foreground',
           styleClasses?.input,
         ),
         tag: {
           body: cn(
-            'h-6 relative bg-background border border-input hover:bg-background rounded-md font-medium text-xs ps-2 pe-5',
+            'relative h-6 rounded-full border-none bg-secondary ps-2.5 pe-6 text-xs font-medium text-secondary-foreground shadow-2xs hover:bg-secondary',
             styleClasses?.tag?.body,
           ),
           closeButton: cn(
-            'absolute -inset-y-px -end-px p-0 rounded-e-md flex size-6 transition-[color,box-shadow] outline-none text-muted-foreground/80 hover:text-foreground',
+            'absolute inset-y-0 end-0 flex size-6 rounded-full p-0 text-muted-foreground outline-none transition-colors hover:text-foreground',
             styleClasses?.tag?.closeButton,
           ),
         },

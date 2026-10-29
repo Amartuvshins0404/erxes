@@ -6,12 +6,12 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '../lib/utils';
 
 const labelVariants = cva(
-  'leading-none inline-block peer-disabled:cursor-not-allowed peer-disabled:opacity-70',
+  'inline-block leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-50',
   {
     variants: {
       variant: {
         default:
-          'font-mono uppercase font-semibold text-xs text-muted-foreground ',
+          'text-sm font-medium text-foreground',
         peer: '',
       },
     },

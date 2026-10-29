@@ -1,5 +1,6 @@
 import type { Dispatch, SetStateAction } from 'react';
 import { IconAlertTriangle, IconRefresh } from '@tabler/icons-react';
+import { Button, Empty } from 'erxes-ui';
 import {
   RemoteComponent,
   RemoteModule,
@@ -55,24 +56,27 @@ export const RenderPluginsComponentErrorState = ({
   };
 
   return (
-    <div className="flex min-h-svh flex-col items-center justify-center gap-3 p-6 text-center">
-      <div className="flex size-10 items-center justify-center rounded-full bg-amber-50 dark:bg-amber-950/40">
-        <IconAlertTriangle className="size-5 text-amber-500" />
-      </div>
-      <div className="space-y-1">
-        <p className="text-sm font-semibold">{t('module-unavailable')}</p>
+    <Empty className="min-h-svh">
+      <Empty.Header>
+        <Empty.Media variant="icon" className="bg-warning/10 text-warning">
+          <IconAlertTriangle />
+        </Empty.Media>
+        <Empty.Title className="text-sm font-semibold">
+          {t('module-unavailable')}
+        </Empty.Title>
         <code className="block text-xs text-muted-foreground">
           {pluginName}/{remoteModuleName}
         </code>
-        <p className="text-xs text-muted-foreground">{t('failed-to-load')}</p>
-      </div>
-      <button
-        onClick={retry}
-        className="flex items-center gap-1.5 rounded-md border bg-background px-3 py-1.5 text-xs font-medium transition-colors hover:bg-muted"
-      >
-        <IconRefresh className="size-3.5" />
-        {t('try-again')}
-      </button>
-    </div>
+        <Empty.Description className="text-xs">
+          {t('failed-to-load')}
+        </Empty.Description>
+      </Empty.Header>
+      <Empty.Content>
+        <Button variant="outline" className="rounded-full" onClick={retry}>
+          <IconRefresh />
+          {t('try-again')}
+        </Button>
+      </Empty.Content>
+    </Empty>
   );
 };

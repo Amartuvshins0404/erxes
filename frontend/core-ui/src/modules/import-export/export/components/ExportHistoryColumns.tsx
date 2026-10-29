@@ -34,7 +34,7 @@ function PieChart({ value }: { value: number }) {
         cy={center}
         r={radius}
         fill="transparent"
-        stroke="hsl(var(--muted))"
+        className="stroke-muted"
         strokeWidth="2"
       />
       <circle
@@ -42,16 +42,11 @@ function PieChart({ value }: { value: number }) {
         cy={center}
         r={radius}
         fill="transparent"
-        stroke="#10b981"
+        className="origin-center -rotate-90 [transform-box:fill-box] stroke-success transition-[stroke-dashoffset] duration-300 ease-out"
         strokeWidth="2"
         strokeDasharray={circumference}
         strokeDashoffset={strokeDashoffset}
         strokeLinecap="round"
-        style={{
-          transform: 'rotate(-90deg)',
-          transformOrigin: '50% 50%',
-          transition: 'stroke-dashoffset 0.3s ease',
-        }}
       />
     </svg>
   );

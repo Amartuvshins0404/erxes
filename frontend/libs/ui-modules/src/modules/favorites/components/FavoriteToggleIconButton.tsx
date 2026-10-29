@@ -1,5 +1,5 @@
 import { IconStar } from '@tabler/icons-react';
-import { Button } from 'erxes-ui';
+import { Button, cn } from 'erxes-ui';
 import { AnimatePresence, motion } from 'motion/react';
 import { useState } from 'react';
 import { useToggleFavorite } from '../hooks/useToggleFavorite';
@@ -84,20 +84,18 @@ export function FavoriteToggleIconButton(
           />
 
           <IconStar
-            className="absolute inset-0 text-amber-500 fill-amber-500 transition-all duration-300"
+            className={cn(
+              'absolute inset-0 fill-warning text-warning transition-all duration-300',
+              isFavorite ? 'opacity-100' : 'opacity-0',
+            )}
             size={16}
             aria-hidden="true"
-            style={{ opacity: isFavorite ? 1 : 0 }}
           />
 
           <AnimatePresence>
             {isAnimating && isFavorite && (
               <motion.div
-                className="absolute inset-0 rounded-full"
-                style={{
-                  background:
-                    'radial-gradient(circle, rgba(255, 215, 0, 0.4) 0%, rgba(255, 215, 0, 0) 80%)',
-                }}
+                className="absolute inset-0 rounded-full bg-warning/30 blur-[2px]"
                 {...animations.burst}
                 onAnimationComplete={() => setIsAnimating(false)}
               />
@@ -115,13 +113,8 @@ export function FavoriteToggleIconButton(
               return (
                 <motion.div
                   key={particle.id}
-                  className="absolute rounded-full bg-amber-500"
-                  style={{
-                    width: `${particle.size}px`,
-                    height: `${particle.size}px`,
-                    filter: 'blur(1px)',
-                    transform: 'translate(-50%, -50%)',
-                  }}
+                  className="absolute rounded-full bg-warning blur-[1px]"
+                  style={{ width: particle.size, height: particle.size }}
                   initial={particleAnimation.initial}
                   animate={particleAnimation.animate}
                   transition={particleAnimation.transition}

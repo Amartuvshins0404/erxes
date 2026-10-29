@@ -80,8 +80,16 @@ export function ImportProgress({
             <span>{t('time-remaining', { time: timeRemaining })}</span>
           )}
         </div>
-        <Progress.Root value={importProgress.progress} className="h-2">
-          <Progress.Indicator />
+        <Progress.Root
+          value={importProgress.progress}
+          className="relative h-2 overflow-hidden rounded-full bg-muted"
+        >
+          <Progress.Indicator
+            className="h-full bg-primary transition-transform"
+            style={{
+              transform: `translateX(-${100 - importProgress.progress}%)`,
+            }}
+          />
         </Progress.Root>
       </div>
       {totalProcessed > 0 && (
@@ -97,11 +105,11 @@ export function ImportProgress({
           </div>
           <div className="flex h-1.5 rounded-full overflow-hidden bg-muted">
             <div
-              className="bg-green-500 h-full transition-all"
+              className="bg-success h-full transition-all"
               style={{ width: `${successRatio}%` }}
             />
             <div
-              className="bg-red-500 h-full transition-all"
+              className="bg-destructive h-full transition-all"
               style={{ width: `${errorRatio}%` }}
             />
           </div>

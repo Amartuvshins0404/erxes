@@ -1,5 +1,5 @@
-// One record in a contact overview section: a leading mark (status, avatar),
-// its title and a short detail; clicking opens the record.
+import { Button } from 'erxes-ui';
+
 export const ContactWidgetRow = ({
   leading,
   title,
@@ -11,10 +11,10 @@ export const ContactWidgetRow = ({
   meta?: React.ReactNode;
   onClick?: () => void;
 }) => (
-  <button
-    type="button"
+  <Button
+    variant="ghost"
     onClick={onClick}
-    className="flex h-8 w-full min-w-0 items-center gap-2 rounded-sm px-2 text-left text-sm hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    className="h-8 w-full min-w-0 justify-start gap-2 rounded-lg px-2 text-left font-normal"
   >
     {leading && (
       <span className="flex flex-none items-center text-muted-foreground">
@@ -27,5 +27,5 @@ export const ContactWidgetRow = ({
         {meta}
       </span>
     )}
-  </button>
+  </Button>
 );

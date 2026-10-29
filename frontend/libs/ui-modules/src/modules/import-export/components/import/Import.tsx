@@ -5,7 +5,7 @@ import {
   IconHistory,
   IconUpload,
 } from '@tabler/icons-react';
-import { Button, Popover, ScrollArea, Sheet, cn } from 'erxes-ui';
+import { Button, Popover, ScrollArea, Sheet, Spinner, cn } from 'erxes-ui';
 import { Badge } from 'erxes-ui/components/badge';
 import {
   forwardRef,
@@ -300,7 +300,7 @@ const ImportUploader = () => {
 
         {isLoading ? (
           <div className="flex flex-col items-center gap-2">
-            <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+            <Spinner size="lg" />
             <span className="text-sm text-muted-foreground">
               {t('uploading-csv')}
             </span>

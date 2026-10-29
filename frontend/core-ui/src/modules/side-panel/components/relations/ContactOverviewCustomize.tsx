@@ -62,16 +62,17 @@ const CustomizeItem = ({
       )}
       style={{ transform: CSS.Transform.toString(transform), transition }}
     >
-      <button
+      <Button
         ref={setActivatorNodeRef}
-        type="button"
-        className="flex size-6 cursor-grab items-center justify-center rounded-sm text-muted-foreground active:cursor-grabbing focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        variant="ghost"
+        size="icon"
+        className="size-6 cursor-grab text-muted-foreground hover:bg-transparent active:cursor-grabbing"
         aria-label={t('drag-to-reorder', 'Drag to reorder')}
         {...attributes}
         {...listeners}
       >
         <IconGripVertical className="size-4" />
-      </button>
+      </Button>
       {EntryIcon && <EntryIcon className="size-4 text-muted-foreground" />}
       <span className="min-w-0 flex-1 truncate text-sm">{entry.label}</span>
       <Button

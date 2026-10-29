@@ -9,37 +9,28 @@ export const TemplatesRecordTable = () => {
   const { t } = useTranslation('templates', { keyPrefix: 'template' });
   const columns = useMemo(() => templateColumns(t), [t]);
 
-  const { templates, pageInfo, loading, handleFetchMore } = useTemplates();
-
-  const { hasPreviousPage, hasNextPage } = pageInfo || {};
+  const { templates, hasPreviousPage, hasNextPage, loading, handleFetchMore } =
+    useTemplates();
 
   return (
     <RecordTable.Provider
       columns={columns}
-      data={templates || []}
+      data={templates}
       stickyColumns={['more', 'checkbox', 'name']}
       className="m-3"
     >
       <RecordTable.CursorProvider
         hasPreviousPage={hasPreviousPage}
         hasNextPage={hasNextPage}
-        dataLength={templates?.length}
-        sessionKey={'template-cursor'}
+        dataLength={templates.length}
+        loading={loading}
       >
         <RecordTable>
           <RecordTable.Header />
           <RecordTable.Body>
-            <RecordTable.CursorBackwardSkeleton
+            <RecordTable.CursorRows
               handleFetchMore={handleFetchMore}
-            />
-            {loading ? (
-              <RecordTable.RowSkeleton rows={32} />
-            ) : (
-              <RecordTable.RowList />
-            )}
-
-            <RecordTable.CursorForwardSkeleton
-              handleFetchMore={handleFetchMore}
+              loading={loading}
             />
           </RecordTable.Body>
         </RecordTable>

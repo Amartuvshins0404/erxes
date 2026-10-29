@@ -1,7 +1,6 @@
 import { TEMPLATE_CATEGORY_REMOVE } from '@/templates/graphql/mutations';
 import { MutationHookOptions, useMutation } from '@apollo/client';
 import { toast } from 'erxes-ui';
-import { QUERY_TEMPLATE_CATEGORIES } from 'ui-modules';
 import { useTranslation } from 'react-i18next';
 
 export interface ITemplateCategoryRemove {
@@ -17,9 +16,7 @@ export const useTemplateCategoryRemove = () => {
   const [mutate, { loading }] = useMutation<
     ITemplateCategoryRemoveResponse,
     ITemplateCategoryRemove
-  >(TEMPLATE_CATEGORY_REMOVE, {
-    refetchQueries: [QUERY_TEMPLATE_CATEGORIES],
-  });
+  >(TEMPLATE_CATEGORY_REMOVE);
 
   const templateCategoryRemove = ({
     variables,

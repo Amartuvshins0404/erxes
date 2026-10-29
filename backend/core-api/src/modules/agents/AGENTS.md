@@ -443,7 +443,7 @@ export const agent: IAgentPluginMeta = {
 - Write skills as guidance for your plugin's data: which operations answer
   which questions and how to read their fields. Do not restate or relax core
   rules; they take precedence anyway.
-- Hide operations the agent cannot use well (e.g. client portal `cp*`
+- Hide operations the agent cannot use well (e.g. bulk or internal
   operations). Hiding is not security: keep resolver permissions, and use
   `graphqlPolicy.ts` (a core change) for anything that must be denied.
 - Plugin names must be lowercase letters and digits to namespace skills.

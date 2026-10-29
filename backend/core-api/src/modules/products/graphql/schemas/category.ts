@@ -34,7 +34,6 @@ export const queries = `
   productCategoriesTotalCount(${queryParams}): Int
   productCategoryDetail(_id: String): ProductCategory
   categoriesWithChilds(ids: [String!]!): [ProductCategory]
-  cpProductCategories(${queryParams}): [ProductCategory]
 `;
 
 const mutationParams = `

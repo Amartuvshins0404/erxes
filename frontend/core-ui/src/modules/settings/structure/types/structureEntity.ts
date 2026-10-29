@@ -126,15 +126,10 @@ export interface IStructureEntitiesTreeVariables {
   direction?: string;
 }
 
-export type TStructureLegacyKindOption =
-  | NonNullable<IStructureEntityType['legacyKind']>
-  | 'none';
-
 export interface IStructureEntityTypeForm {
   name: string;
   icon: string;
   parentTypeIds: string[];
-  legacyKind: TStructureLegacyKindOption;
   capabilities: string[];
 }
 
@@ -143,6 +138,5 @@ export interface IStructureEntityTypeVariables {
   code?: string;
   icon: string;
   parentTypeIds?: string[];
-  legacyKind?: NonNullable<IStructureEntityType['legacyKind']> | null;
   capabilities: string[];
 }

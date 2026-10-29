@@ -53,24 +53,4 @@ export const relationsQueries: Record<string, Resolver<any, any, any>> = {
       relatedContentType,
     });
   },
-
-  cpGetRelationsByEntity: async (
-    _parent: undefined,
-    {
-      contentType,
-      contentId,
-      relatedContentType,
-    }: { contentType: string; contentId: string; relatedContentType: string },
-    { models }: { models: IModels },
-  ) => {
-    return models.Relations.getRelationsByEntity({
-      contentType,
-      contentId,
-      relatedContentType,
-    });
-  },
-};
-
-relationsQueries.cpGetRelationsByEntity.wrapperConfig = {
-  forClientPortal: true,
 };

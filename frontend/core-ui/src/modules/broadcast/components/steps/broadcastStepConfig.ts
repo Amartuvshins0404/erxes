@@ -29,10 +29,6 @@ const configFields = (method?: string | null): TBroadcastField[] => {
     return [];
   }
 
-  if (method === 'notification') {
-    return ['cpId', 'notification.title', 'notification.content'];
-  }
-
   if (method === 'messenger') {
     return [
       'fromUserId',

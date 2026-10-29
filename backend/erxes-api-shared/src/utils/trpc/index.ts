@@ -26,7 +26,6 @@ export type MessageProps = {
 export type CommonTRPCContext = {
   processId?: string;
   userId?: string;
-  cpUserId?: string;
 };
 
 export type ScopedEventHandlers = ReturnType<typeof createScopedEventHandlers>;

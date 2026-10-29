@@ -612,28 +612,6 @@ export const permissions: IPermissionConfig = {
       ],
     },
     {
-      name: 'clientPortal',
-      description: 'Client portal management',
-      scopeField: null,
-      ownerFields: [],
-
-      scopes: [{ name: 'all', description: 'All records' }],
-
-      actions: [
-        {
-          title: 'View client portal',
-          name: 'clientPortalRead',
-          description: 'View client portal settings',
-          always: true,
-        },
-        {
-          title: 'Manage client portal',
-          name: 'clientPortalManage',
-          description: 'Create, edit, delete client portals',
-        },
-      ],
-    },
-    {
       name: 'approval',
       description: 'Approval lock management',
       scopeField: null,
@@ -902,12 +880,6 @@ export const permissions: IPermissionConfig = {
         },
         {
           plugin: 'core',
-          module: 'clientPortal',
-          actions: ['clientPortalManage'],
-          scope: 'all',
-        },
-        {
-          plugin: 'core',
           module: 'approval',
           actions: ['approvalLocksManage', 'approvalLocksForceRelease'],
           scope: 'all',
@@ -1107,12 +1079,6 @@ export const permissions: IPermissionConfig = {
           plugin: 'core',
           module: 'apps',
           actions: ['appsRead'],
-          scope: 'all',
-        },
-        {
-          plugin: 'core',
-          module: 'clientPortal',
-          actions: ['clientPortalRead'],
           scope: 'all',
         },
         {

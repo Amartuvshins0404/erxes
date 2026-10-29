@@ -29,7 +29,6 @@ export const generateFilter = async (
     ids,
     excludeIds,
     segmentIds,
-    clientPortalId,
   } = params;
 
   const filter: any = {
@@ -66,14 +65,6 @@ export const generateFilter = async (
 
   if (ids?.length) {
     filter['_id'] = excludeIds ? { $nin: ids } : { $in: ids };
-  }
-
-  if (clientPortalId) {
-    const cpUsers = await models.CPUser.find({ clientPortalId }).distinct('erxesCustomerId');
-
-    filter['_id'] = {
-      $in: [...new Set([...cpUsers, ...(filter['_id'] || [])])]
-    };
   }
 
   if (brandIds || integrationIds || integrationTypes) {

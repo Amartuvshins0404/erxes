@@ -5,13 +5,6 @@ export const STRUCTURE_CAPABILITY = {
   stockPlace: 'stockPlace',
 } as const;
 
-export const STRUCTURE_LEGACY_KINDS = [
-  'none',
-  'branch',
-  'department',
-  'unit',
-] as const;
-
 export const STRUCTURE_PROPERTIES_CONTENT_TYPE = 'core:structureEntity';
 
 export const STRUCTURE_SETTINGS_PATH = '/settings/structures';

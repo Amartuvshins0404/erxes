@@ -16,11 +16,9 @@ export interface IBroadcastRun {
   method: string;
   email?: Record<string, any>;
   messenger?: Record<string, any>;
-  notification?: Record<string, any>;
   automationId?: string;
   fromEmail?: string;
   fromUserId?: string;
-  cpId?: string;
   configSet?: string;
 
   // Which occurrence of a schedule opened this run, absent when started by hand.
@@ -80,12 +78,9 @@ export const loadBroadcastRunClass = (models: IModels) => {
         method: campaign.method,
         email: campaign.email?.toObject?.() ?? campaign.email,
         messenger: campaign.messenger?.toObject?.() ?? campaign.messenger,
-        notification:
-          campaign.notification?.toObject?.() ?? campaign.notification,
         ...extras,
         fromEmail: campaign.fromEmail,
         fromUserId: campaign.fromUserId,
-        cpId: campaign.cpId,
         status: 'running',
       });
     }

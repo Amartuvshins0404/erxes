@@ -6,7 +6,6 @@ import {
 import {
   IconAdjustmentsAlt,
   IconBolt,
-  IconBuilding,
   IconChessKnight,
   IconFile,
   IconFileImport,
@@ -198,11 +197,6 @@ export const SETTINGS_PATH_DATA = (
   ],
   developer: [
     {
-      name: t('client-portal'),
-      icon: IconBuilding,
-      path: SettingsWorkspacePath.ClientPortals,
-    },
-    {
       name: t('app-tokens'),
       icon: IconKey,
       path: SettingsWorkspacePath.AppTokens,
@@ -363,7 +357,6 @@ export const SETTINGS_PERMISSION_MAP: Record<string, string> = {
   [SettingsWorkspacePath.Properties]: 'properties',
   [SettingsWorkspacePath.Products]: 'products',
   [SettingsWorkspacePath.Automations]: 'automations',
-  [SettingsWorkspacePath.ClientPortals]: 'clientPortal',
   [SettingsWorkspacePath.OAuthClients]: 'apps',
   [SettingsWorkspacePath.Permissions]: 'permissions',
   [SettingsWorkspacePath.ApprovalRequests]: 'approval',

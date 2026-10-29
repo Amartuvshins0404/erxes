@@ -11,7 +11,6 @@ export const ContactsPageEffect = () => {
   const isMatchingLocation = useIsMatchingLocation(ContactsPath.Index);
   const [contactId] = useQueryState<string>('contactId');
   const [companyId] = useQueryState<string>('companyId');
-  const [cpUserId] = useQueryState<string>('cpUserId');
   const setHotkeyScope = useSetHotkeyScope();
 
   useEffect(() => {
@@ -43,17 +42,8 @@ export const ContactsPageEffect = () => {
         setHotkeyScope(ContactsHotKeyScope.CompaniesPage);
         break;
       }
-      case isMatchingLocation(ContactsPath.ClientPortalUsers): {
-        if (cpUserId) {
-          setHotkeyScope(ContactsHotKeyScope.ClientPortalUserEditSheet);
-          break;
-        }
-
-        setHotkeyScope(ContactsHotKeyScope.ClientPortalUsersPage);
-        break;
-      }
     }
-  }, [isMatchingLocation, setHotkeyScope, contactId, companyId, cpUserId]);
+  }, [isMatchingLocation, setHotkeyScope, contactId, companyId]);
 
   return <></>;
 };

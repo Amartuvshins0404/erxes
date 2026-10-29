@@ -9,10 +9,6 @@ export const uomQueries: Record<string, Resolver<any, any, IContext>> = {
     return models.Uoms.find({}).sort({ order: 1 }).lean();
   },
 
-  async cpUoms(_parent: undefined, _args: undefined, { models }: IContext) {
-    return models.Uoms.find({}).sort({ order: 1 }).lean();
-  },
-
   /**
    * Get all uoms count. We will use it in pager
    */
@@ -23,8 +19,4 @@ export const uomQueries: Record<string, Resolver<any, any, IContext>> = {
   ) {
     return models.Uoms.countDocuments();
   },
-};
-
-uomQueries.cpUoms.wrapperConfig = {
-  forClientPortal: true,
 };

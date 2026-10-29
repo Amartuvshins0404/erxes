@@ -96,15 +96,3 @@ export const smsSchema = new Schema(
     _id: false,
   },
 );
-
-export const notificationSchema = new Schema(
-  {
-    title: { type: String, label: 'Title', required: true },
-    content: { type: String, label: 'Notification content', required: true },
-    inApp: { type: Boolean, label: 'In app', required: true },
-    isMobile: { type: Boolean, label: 'Is mobile', required: true },
-  },
-  {
-    _id: false,
-  },
-);

@@ -103,7 +103,6 @@ export const STRUCTURE_ENTITY_TYPES_LIST = gql`
       icon
       parentTypeIds
       capabilities
-      legacyKind
       isSystem
       entityCount
     }

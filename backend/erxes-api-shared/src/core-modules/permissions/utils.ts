@@ -254,21 +254,3 @@ export const checkPermissionGroup = (
     recordPermissionAction(action);
   };
 };
-
-export const wrapPublicResolver = (resolver: Resolver, wrapperConfig: any) => {
-  return async (parent: any, args: any, context: any, info: any) => {
-    const { cpUserRequired, forClientPortal } = wrapperConfig || {};
-
-    if (forClientPortal) {
-      if (!context.clientPortal) {
-        throw new ExpectedError('Client portal required', 'UNAUTHORIZED');
-      }
-
-      if (cpUserRequired && !context.cpUser) {
-        throw new ExpectedError('Client portal user required', 'UNAUTHORIZED');
-      }
-    }
-
-    return resolver(parent, args, context, info);
-  };
-};

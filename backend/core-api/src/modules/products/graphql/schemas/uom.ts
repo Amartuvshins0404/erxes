@@ -20,8 +20,6 @@ export const types = `
 export const queries = `
   uoms: [Uom]
   uomsTotalCount: Int
-
-  cpUoms: [Uom]
 `;
 
 const mutationParams = `

@@ -45,11 +45,6 @@ export const loadCompanyClass = (
     oldCompanyIds: string[],
     newCompanyId: string,
   ) => {
-    await models.CPUser.updateMany(
-      { erxesCompanyId: { $in: oldCompanyIds } },
-      { $set: { erxesCompanyId: newCompanyId } },
-    );
-
     await models.Products.updateMany(
       { vendorId: { $in: oldCompanyIds } },
       { $set: { vendorId: newCompanyId } },

@@ -7,7 +7,6 @@ export const BROADCAST_MESSAGE_ADD = gql`
     $method: String
     $fromUserId: String
     $fromEmail: String
-    $cpId: String
     $targetType: String
     $targetIds: [String]
     $targetCount: Int
@@ -15,7 +14,6 @@ export const BROADCAST_MESSAGE_ADD = gql`
     $isLive: Boolean
     $email: EngageMessageEmail
     $messenger: EngageMessageMessenger
-    $notification: EngageMessageNotification
     $workflow: JSON
   ) {
     engageMessageAdd(
@@ -24,7 +22,6 @@ export const BROADCAST_MESSAGE_ADD = gql`
       method: $method
       fromUserId: $fromUserId
       fromEmail: $fromEmail
-      cpId: $cpId
 
       targetType: $targetType
       targetIds: $targetIds
@@ -35,7 +32,6 @@ export const BROADCAST_MESSAGE_ADD = gql`
 
       email: $email
       messenger: $messenger
-      notification: $notification
       workflow: $workflow
     ) {
       _id
@@ -52,7 +48,6 @@ export const BROADCAST_MESSAGE_EDIT = gql`
     $method: String
     $fromUserId: String
     $fromEmail: String
-    $cpId: String
     $targetType: String
     $targetIds: [String]
     $targetCount: Int
@@ -60,7 +55,6 @@ export const BROADCAST_MESSAGE_EDIT = gql`
     $isLive: Boolean
     $email: EngageMessageEmail
     $messenger: EngageMessageMessenger
-    $notification: EngageMessageNotification
     $workflow: JSON
   ) {
     engageMessageEdit(
@@ -70,7 +64,6 @@ export const BROADCAST_MESSAGE_EDIT = gql`
       method: $method
       fromUserId: $fromUserId
       fromEmail: $fromEmail
-      cpId: $cpId
 
       targetType: $targetType
       targetIds: $targetIds
@@ -81,7 +74,6 @@ export const BROADCAST_MESSAGE_EDIT = gql`
 
       email: $email
       messenger: $messenger
-      notification: $notification
       workflow: $workflow
     ) {
       _id

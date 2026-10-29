@@ -36,27 +36,6 @@ export const companyQueries: Record<
     return { list, totalCount, pageInfo };
   },
 
-  cpCompanies: async (
-    _parent: undefined,
-    params: ICompanyFilterQueryParams,
-    { models, subdomain }: IContext,
-  ) => {
-    const filter: FilterQuery<ICompanyDocument> = await generateFilter(
-      subdomain,
-      params,
-      models,
-    );
-
-    const { list, totalCount, pageInfo } =
-      await cursorPaginate<ICompanyDocument>({
-        model: models.Companies,
-        params,
-        query: filter,
-      });
-
-    return { list, totalCount, pageInfo };
-  },
-
   /**
    * Get one company
    */
@@ -67,8 +46,4 @@ export const companyQueries: Record<
   ) => {
     return await models.Companies.findOne({ $or: [{ _id }, { code: _id }] });
   },
-};
-
-companyQueries.cpCompanies.wrapperConfig = {
-  forClientPortal: true,
 };

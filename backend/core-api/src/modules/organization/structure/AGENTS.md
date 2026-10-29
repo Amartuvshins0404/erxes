@@ -13,8 +13,7 @@
 ## Contracts
 
 - `graphql/schemas/structure.ts` exposes entity-type, entity, membership,
-  position, and seat operations; `graphql/resolvers/legacy.ts` preserves the
-  client-portal branch, department, and unit queries through `legacyKind`.
+  position, and seat operations.
 - `trpc/index.ts` provides structure lookups and user context, including
   membership nodes, seat coverage, and principal entity ids.
 - Positions require `permissionsManage`; seats require

@@ -78,16 +78,6 @@ export const categoryQueries: Record<string, Resolver<any, any, IContext>> = {
     return await models.ProductCategories.find(filter).sort(sortParams).lean();
   },
 
-  async cpProductCategories(
-    _parent: undefined,
-    params: IProductCategoryParams,
-    { models }: IContext,
-  ) {
-    const filter = await generateFilter(models, params);
-    const sortParams: any = { order: 1 };
-    return await models.ProductCategories.find(filter).sort(sortParams).lean();
-  },
-
   async productCategoriesTotalCount(
     _parent: undefined,
     params: IProductCategoryParams,
@@ -112,8 +102,4 @@ export const categoryQueries: Record<string, Resolver<any, any, IContext>> = {
   ) {
     return await models.ProductCategories.getChildCategories(ids);
   },
-};
-
-categoryQueries.cpProductCategories.wrapperConfig = {
-  forClientPortal: true,
 };

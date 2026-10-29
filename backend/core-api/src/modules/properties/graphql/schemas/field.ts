@@ -101,14 +101,6 @@ export const types = `
 
         ${GQL_CURSOR_PARAM_DEFS}
     }
-
-    input CpFieldsParams {
-        contentType: String
-        contentTypeId: String
-        groupId: String
-
-        ${GQL_CURSOR_PARAM_DEFS}
-    }
 `;
 
 export const queries = `
@@ -118,9 +110,6 @@ export const queries = `
     fieldValueUsage(_id: String!, value: String): FieldValueUsage!
     fieldValueCounts(_id: String!, value: String): FieldValueCounts!
     fieldOptionDependents(_id: String!, value: String!): FieldOptionDependents!
-
-    cpFields(params: CpFieldsParams): [Field]
-    cpFieldDetail(_id: String!): Field
 `;
 
 const mutationParams = `

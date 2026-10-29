@@ -4,7 +4,6 @@ import type { TStoredSchedule } from './utils/scheduleForm';
 export enum IBroadcastMethodEnum {
   EMAIL = 'email',
   MESSENGER = 'messenger',
-  NOTIFICATION = 'notification',
   WORKFLOW = 'workflow',
 }
 
@@ -87,7 +86,6 @@ export type TBroadcastMessage = {
   nextRunAt?: string;
   fromEmail?: string;
   fromUserId?: string;
-  cpId?: string;
   brandId?: string;
   workflowAutomationId?: string;
   stats?: Record<string, number> | null;
@@ -98,12 +96,6 @@ export type TBroadcastMessage = {
     contentJson?: JSONContent;
     previewText?: string;
     replyTo?: string;
-  } | null;
-  notification?: {
-    title?: string;
-    content?: string;
-    inApp?: boolean;
-    isMobile?: boolean;
   } | null;
   messenger?: Record<string, unknown> | null;
   scheduleDate?: TStoredSchedule | null;

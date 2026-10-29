@@ -3,10 +3,7 @@ export const BROADCAST_APPROVAL_CONTENT_TYPE = 'core:broadcast_campaign';
 
 import { BadgeProps } from 'erxes-ui';
 import {
-  IconBellRinging,
-  IconDeviceMobile,
   IconRouteSquare,
-  IconUserCheck,
   IconUsers,
 } from '@tabler/icons-react';
 
@@ -19,7 +16,6 @@ export const BROADCAST_MESSAGE_KINDS: Record<string, string> = {
 export const BROADCAST_MESSAGE_METHOD_KINDS: Record<string, string> = {
   email: 'manual',
   messenger: 'visitorAuto',
-  notification: 'manual',
   workflow: 'manual',
 };
 
@@ -27,7 +23,6 @@ export const BROADCAST_METHODS: Record<string, string> = {
   MESSENGER: 'messenger',
   EMAIL: 'email',
   SMS: 'sms',
-  NOTIFICATION: 'notification',
   WORKFLOW: 'workflow',
 };
 
@@ -144,11 +139,6 @@ export const BROADCAST_MESSAGE_METHODS = [
     descriptionKey: 'method.messenger-description',
   },
   {
-    value: 'notification',
-    labelKey: 'method.notification',
-    descriptionKey: 'method.notification-description',
-  },
-  {
     value: 'workflow',
     labelKey: 'method.workflow',
     descriptionKey: 'method.workflow-description',
@@ -166,29 +156,6 @@ export const BROADCAST_MESSAGE_METHODS = [
 export const BROADCAST_SELECTABLE_METHODS = BROADCAST_MESSAGE_METHODS.filter(
   ({ value }) => value !== 'messenger',
 );
-
-export const BROADCAST_NOTIFICATION_STATISTIC = {
-  total: {
-    titleKey: 'stat.notification.total',
-    descriptionKey: 'stat.notification.total-body',
-    icon: IconUsers,
-  },
-  sent: {
-    titleKey: 'stat.notification.sent',
-    descriptionKey: 'stat.notification.sent-body',
-    icon: IconUserCheck,
-  },
-  read: {
-    titleKey: 'stat.notification.read',
-    descriptionKey: 'stat.notification.read-body',
-    icon: IconBellRinging,
-  },
-  push: {
-    titleKey: 'stat.notification.push',
-    descriptionKey: 'stat.notification.push-body',
-    icon: IconDeviceMobile,
-  },
-};
 
 export const BROADCAST_WORKFLOW_STATISTIC = {
   total: {

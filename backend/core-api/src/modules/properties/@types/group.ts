@@ -1,7 +1,6 @@
 import {
   ICursorPaginateParams,
   IListParams,
-  IOffsetPaginateParams,
 } from 'erxes-api-shared/core-types';
 import { IFeaturedFieldOwner } from 'erxes-api-shared/core-modules';
 import { Document } from 'mongoose';
@@ -41,4 +40,3 @@ export interface IFieldGroupParams extends IListParams {
 export interface IFieldGroupCursorParams extends ICursorPaginateParams {
   archived?: boolean;
 }
-export interface IFieldGroupOffsetParams extends IOffsetPaginateParams {}

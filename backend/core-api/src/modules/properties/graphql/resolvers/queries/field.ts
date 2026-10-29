@@ -2,11 +2,10 @@ import {
   IField,
   IFieldCursorParams,
   IFieldDocument,
-  IFieldOffsetParams,
   IFieldParams,
 } from '@/properties/@types';
 import { Resolver } from 'erxes-api-shared/core-types';
-import { cursorPaginate, defaultPaginate } from 'erxes-api-shared/utils';
+import { cursorPaginate } from 'erxes-api-shared/utils';
 import { FilterQuery } from 'mongoose';
 import { IContext, IModels } from '~/connectionResolvers';
 import { reconcileDeclaredFeaturedFields } from '~/modules/properties/utils/featuredFields';
@@ -36,12 +35,6 @@ const generateFilter = async (
 
   return filter;
 };
-
-// External forms only offer what can still be picked; records keep the rest.
-const withLiveOptions = (field: IFieldDocument) => ({
-  ...field,
-  options: (field.options || []).filter((option) => !option.deprecated),
-});
 
 export const fieldQueries: Record<string, Resolver<any, any, IContext>> = {
   fields: async (
@@ -120,38 +113,4 @@ export const fieldQueries: Record<string, Resolver<any, any, IContext>> = {
     return await models.Fields.getField({ _id });
   },
 
-  cpFields: async (
-    _: undefined,
-    { params }: { params: IFieldOffsetParams },
-    { models, subdomain }: IContext,
-  ) => {
-    const { sortField = 'code', sortDirection = 1 } = params || {};
-
-    const filter = await generateFilter(models, subdomain, params);
-
-    const fields: IFieldDocument[] = await defaultPaginate(
-      models.Fields.find(filter)
-        .sort({ [sortField]: sortDirection })
-        .lean(),
-      params,
-    );
-
-    return fields.map(withLiveOptions);
-  },
-
-  cpFieldDetail: async (
-    _: undefined,
-    { _id }: { _id: string },
-    { models }: IContext,
-  ) => {
-    return withLiveOptions(await models.Fields.getField({ _id }));
-  },
-};
-
-fieldQueries.cpFields.wrapperConfig = {
-  forClientPortal: true,
-};
-
-fieldQueries.cpFieldDetail.wrapperConfig = {
-  forClientPortal: true,
 };

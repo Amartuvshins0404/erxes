@@ -68,13 +68,6 @@ export const prepareBroadcastVariables = async (
     return variables;
   }
 
-  if (method === 'notification') {
-    variables.cpId = data.cpId;
-    variables.notification = data.notification;
-
-    return variables;
-  }
-
   if (method === 'messenger') {
     variables.fromUserId = data.fromUserId;
     variables.messenger = data.messenger;

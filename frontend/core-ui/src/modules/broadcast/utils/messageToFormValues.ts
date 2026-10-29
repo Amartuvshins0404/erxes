@@ -24,10 +24,8 @@ export const messageToFormValues = (
     isDraft,
     fromEmail,
     fromUserId,
-    cpId,
     email,
     messenger,
-    notification,
     scheduleDate,
   } = message || {};
 
@@ -48,21 +46,6 @@ export const messageToFormValues = (
       workflow: {
         actions: workflow?.actions || [],
         entryActionId: workflow?.entryActionId,
-      },
-    };
-  }
-
-  if (method === 'notification') {
-    return {
-      ...base,
-      method: 'notification',
-      cpId: cpId || '',
-      notification: {
-        inApp: true,
-        isMobile: false,
-        title: '',
-        content: '',
-        ...(notification || {}),
       },
     };
   }

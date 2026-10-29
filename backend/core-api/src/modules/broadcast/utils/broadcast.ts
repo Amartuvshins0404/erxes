@@ -190,39 +190,6 @@ const sendBroadcastEmail = async ({
   });
 };
 
-const sendBroadcastNotification = async ({
-  models,
-  subdomain,
-  engageMessage,
-  scheduledFor,
-}: {
-  models: IModels;
-  subdomain: string;
-  engageMessage: IEngageMessageDocument;
-  scheduledFor?: Date;
-}) => {
-  const { cpId } = engageMessage;
-
-  if (!cpId) {
-    throw new Error(
-      'Please select "Clientportal" in the notification campaign',
-    );
-  }
-
-  const clientPortal = await models.ClientPortal.findOne({ _id: cpId }).lean();
-
-  if (!clientPortal) {
-    throw new Error('Client portal not found');
-  }
-
-  await startManifestRun({
-    models,
-    subdomain,
-    engageMessage,
-    extras: { scheduledFor },
-  });
-};
-
 const queueDrains = async ({
   subdomain,
   engageMessage,
@@ -369,15 +336,6 @@ export const sendBroadcast = async ({
 
   if (method === 'email') {
     return sendBroadcastEmail({
-      models,
-      subdomain,
-      engageMessage,
-      scheduledFor,
-    });
-  }
-
-  if (method === 'notification') {
-    return sendBroadcastNotification({
       models,
       subdomain,
       engageMessage,

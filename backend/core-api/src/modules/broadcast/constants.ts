@@ -144,10 +144,9 @@ export const CAMPAIGN_KINDS = {
 export const CAMPAIGN_METHODS = {
   MESSENGER: 'messenger',
   EMAIL: 'email',
-  NOTIFICATION: 'notification',
   // Runs an automation per targeted customer instead of sending one message.
   WORKFLOW: 'workflow',
-  ALL: ['messenger', 'email', 'notification', 'workflow'],
+  ALL: ['messenger', 'email', 'workflow'],
 };
 
 /** The trigger a broadcast-owned automation carries. Deliberately not

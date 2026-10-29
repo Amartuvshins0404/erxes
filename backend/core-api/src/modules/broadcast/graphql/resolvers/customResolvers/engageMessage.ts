@@ -5,7 +5,6 @@ import { ApprovalLockState } from 'erxes-api-shared/core-modules';
 import {
   findCampaignAutomation,
   isWorkflowCampaign,
-  prepareNotificationStats,
 } from '@/broadcast/utils';
 import { IContext } from '~/connectionResolvers';
 import { CAMPAIGN_METHODS } from '~/modules/broadcast/constants';
@@ -153,10 +152,6 @@ export default {
   ) {
     if (method === CAMPAIGN_METHODS.EMAIL) {
       return models.Stats.findOne({ engageMessageId: _id });
-    }
-
-    if (method === CAMPAIGN_METHODS.NOTIFICATION) {
-      return prepareNotificationStats(models, _id);
     }
 
     // Methods that keep no stats document report none. A sentinel string here

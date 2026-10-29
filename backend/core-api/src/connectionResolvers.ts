@@ -222,25 +222,6 @@ import {
   ISmsRequestModel,
   loadSmsRequestClass,
 } from './modules/broadcast/db/models/SmsRequests';
-import {
-  ICPNotificationModel,
-  loadCPNotificationClass,
-} from './modules/clientportal/db/models/CPNotification';
-import {
-  ICPUserModel,
-  loadCPUserClass,
-} from './modules/clientportal/db/models/CPUser';
-import {
-  IClientPortalModel,
-  loadClientPortalClass,
-} from './modules/clientportal/db/models/ClientPortal';
-import {
-  ICPCommentsModel,
-  loadCommentClass,
-} from './modules/clientportal/db/models/Comment';
-import { IClientPortalDocument } from './modules/clientportal/types/clientPortal';
-import { ICPCommentDocument } from './modules/clientportal/types/comment';
-import { ICPUserDocument } from './modules/clientportal/types/cpUser';
 import { IConformityDocument } from './modules/conformities/db/definitions/conformities';
 import {
   IForm,
@@ -315,7 +296,6 @@ import {
   IProductSimilarityModel,
   loadProductSimilarityClass,
 } from '@/products/db/models/Similarities';
-import { ICPNotificationDocument } from './modules/clientportal/types/cpNotification';
 
 import {
   IPermissionGroupModel,
@@ -430,10 +410,6 @@ export interface IModels {
   EmailDeliveries: IEmailDeliveryModel;
   EmailRamp: IEmailRampModel;
   EmailSenders: IEmailSenderModel;
-  ClientPortal: IClientPortalModel;
-  CPUser: ICPUserModel;
-  CPComments: ICPCommentsModel;
-  CPNotifications: ICPNotificationModel;
 
   AiAgents: IAiAgentModel;
   ActivityLogs: IActivityLogsModel;
@@ -857,29 +833,6 @@ export const loadClasses = (
     'org_white_labels',
     loadOrgWhiteLabelClass(models),
   );
-  models.ClientPortal = db.model<IClientPortalDocument, IClientPortalModel>(
-    'client_portals',
-    loadClientPortalClass(models),
-  );
-
-  models.CPUser = db.model<ICPUserDocument, ICPUserModel>(
-    'client_portal_users',
-    loadCPUserClass(
-      models,
-      subdomain,
-      coreEventHandlers('clientportal', 'cpUser'),
-    ),
-  );
-  models.CPComments = db.model<ICPCommentDocument, ICPCommentsModel>(
-    'client_portal_comments',
-    loadCommentClass(models, subdomain),
-  );
-
-  models.CPNotifications = db.model<
-    ICPNotificationDocument,
-    ICPNotificationModel
-  >('client_portal_notifications', loadCPNotificationClass(models));
-
   models.BundleCondition = db.model<
     IBundleConditionDocument,
     IBundleConditionModel

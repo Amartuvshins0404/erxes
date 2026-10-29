@@ -100,8 +100,6 @@ export interface IMainContext {
   req: ApiRequest;
   requestInfo: any;
   user: IUserDocument;
-  cpUser?: any;
-  clientPortal?: any;
   models?: any;
   __: <T extends object>(doc: T) => T & { processId: string };
   processId: string;
@@ -131,8 +129,6 @@ export interface IPageInfo {
 export interface IResolverSymbol {
   wrapperConfig?: {
     skipPermission?: boolean;
-    forClientPortal?: boolean;
-    cpUserRequired?: boolean;
   };
 }
 

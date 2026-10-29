@@ -16,7 +16,6 @@ export const types = `
     icon: String
     parentTypeIds: [String]
     capabilities: [String]
-    legacyKind: String
     isSystem: Boolean
     entityCount: Int
     createdAt: Date
@@ -138,7 +137,6 @@ const typeParams = `
   icon: String
   parentTypeIds: [String]
   capabilities: [String]
-  legacyKind: String
 `;
 
 const entityParams = `

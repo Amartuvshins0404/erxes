@@ -5,8 +5,6 @@ import {
 } from 'erxes-ui';
 import { IUser } from '../../team-members/types/TeamMembers';
 
-export type TStructureLegacyKind = 'branch' | 'department' | 'unit';
-
 export type TStructureSeatCoverage = 'node' | 'below' | 'selected';
 
 export interface IStructureEntityType {
@@ -17,7 +15,6 @@ export interface IStructureEntityType {
   icon?: string;
   parentTypeIds?: string[];
   capabilities?: string[];
-  legacyKind?: TStructureLegacyKind;
   isSystem?: boolean;
   entityCount?: number;
 }

@@ -67,18 +67,6 @@ export const broadcastSchema = z.discriminatedUnion('method', [
     ...baseSchema,
   }),
 
-  z.object({
-    method: z.literal('notification'),
-    cpId: z.string().min(1),
-    notification: z.object({
-      inApp: z.boolean().default(true),
-      isMobile: z.boolean(),
-      title: z.string().min(1),
-      content: z.string().min(1),
-    }),
-    ...baseSchema,
-  }),
-
   // A workflow campaign has no content of its own: the flow lives in the
   // automation the campaign owns, so only the recipients are filled in here.
   z.object({

@@ -61,40 +61,10 @@ export const customerQueries: Record<
     }
   },
 
-  async cpCustomers(
-    _parent: undefined,
-    params: ICustomerQueryFilterParams,
-    { models, subdomain }: IContext,
-  ) {
-    const filter: FilterQuery<ICustomerDocument> = await generateFilter(
-      subdomain,
-      params,
-      models,
-      customerSearchTokenConfig,
-    );
-
-    const { list, totalCount, pageInfo } =
-      await cursorPaginate<ICustomerDocument>({
-        model: models.Customers,
-        params,
-        query: filter,
-      });
-
-    return { list, totalCount, pageInfo };
-  },
-
   /**
    * Get one customer
    */
   customerDetail(
-    _parent: undefined,
-    { _id }: { _id: string },
-    { models }: IContext,
-  ) {
-    return models.Customers.getCustomer(_id);
-  },
-
-  cpCustomerDetail(
     _parent: undefined,
     { _id }: { _id: string },
     { models }: IContext,
@@ -156,12 +126,4 @@ export const customerQueries: Record<
 
     return counts;
   },
-};
-
-customerQueries.cpCustomers.wrapperConfig = {
-  forClientPortal: true,
-};
-
-customerQueries.cpCustomerDetail.wrapperConfig = {
-  forClientPortal: true,
 };

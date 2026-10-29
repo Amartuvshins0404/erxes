@@ -284,7 +284,6 @@ export const loadStructureEntityTypeClass = (models: IModels) => {
       if (type.isSystem) {
         delete update.code;
         delete update.parentTypeIds;
-        delete update.legacyKind;
       }
 
       if (
@@ -293,13 +292,6 @@ export const loadStructureEntityTypeClass = (models: IModels) => {
         (await models.StructureEntityTypes.exists({ code: update.code }))
       ) {
         throw new Error(`Type code "${update.code}" is already used`);
-      }
-
-      if (update.legacyKind) {
-        await models.StructureEntityTypes.updateMany(
-          { _id: { $ne: _id }, legacyKind: update.legacyKind },
-          { $unset: { legacyKind: 1 } },
-        );
       }
 
       await models.StructureEntityTypes.updateOne(

@@ -146,31 +146,6 @@ app.get('/health', async (_req, res) => {
   res.end('ok');
 });
 
-app.get('/get-client-portal-token', async (req, res) => {
-  const token = req.query.GET_CP_TOKEN as string;
-
-  if (!token) {
-    return res.status(400).json({ error: 'GET_CP_TOKEN is required' });
-  }
-
-  if (token !== process.env.GET_CP_TOKEN) {
-    return res.status(401).json({ error: 'Invalid GET_CP_TOKEN' });
-  }
-
-  const subdomain = getSubdomain(req);
-  const models = await generateModels(subdomain);
-
-  const clientPortal = await models.ClientPortal.findOne({
-    useB2B: true,
-  }).lean();
-
-  if (!clientPortal) {
-    return res.status(404).json({ error: 'Client portal not found' });
-  }
-
-  return res.status(200).json({ token: clientPortal.token });
-});
-
 app.get('/debug-sentry', () => {
   throw new Error('Sentry test error (core-api): ' + new Date().toISOString());
 });

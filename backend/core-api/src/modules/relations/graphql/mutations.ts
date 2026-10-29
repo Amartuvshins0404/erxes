@@ -55,31 +55,4 @@ export const relationsMutations: Record<string, Resolver<any, any, any>> = {
       relatedContentIds,
     });
   },
-
-  cpManageRelations: async (
-    _parent: undefined,
-    {
-      contentType,
-      contentId,
-      relatedContentType,
-      relatedContentIds,
-    }: {
-      contentType: string;
-      contentId: string;
-      relatedContentType: string;
-      relatedContentIds: string[];
-    },
-    { models }: { models: IModels },
-  ) => {
-    return await models.Relations.manageRelations({
-      contentType,
-      contentId,
-      relatedContentType,
-      relatedContentIds,
-    });
-  },
-};
-
-relationsMutations.cpManageRelations.wrapperConfig = {
-  forClientPortal: true,
 };

@@ -1,7 +1,4 @@
-import {
-  GQL_CURSOR_PARAM_DEFS,
-  GQL_OFFSET_PARAM_DEFS,
-} from 'erxes-api-shared/utils';
+import { GQL_CURSOR_PARAM_DEFS } from 'erxes-api-shared/utils';
 
 export const types = `
     type FieldGroup {
@@ -40,19 +37,10 @@ export const types = `
         _id: String!
         order: Float!
     }
-
-    input CpFieldGroupParams {
-        contentType: String!
-        contentTypeId: String
-        codes: [String]
-
-        ${GQL_OFFSET_PARAM_DEFS}
-    }
 `;
 
 export const queries = `
     fieldGroups(params: FieldGroupParams): FieldGroupListResponse
-    cpFieldGroups(params: CpFieldGroupParams): [FieldGroup]
 `;
 
 const mutationParams = `

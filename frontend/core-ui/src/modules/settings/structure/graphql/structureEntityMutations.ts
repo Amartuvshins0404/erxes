@@ -119,7 +119,6 @@ const STRUCTURE_ENTITY_TYPE_PARAM_DEFS = `
   $icon: String
   $parentTypeIds: [String]
   $capabilities: [String]
-  $legacyKind: String
 `;
 
 const STRUCTURE_ENTITY_TYPE_PARAMS = `
@@ -129,7 +128,6 @@ const STRUCTURE_ENTITY_TYPE_PARAMS = `
   icon: $icon
   parentTypeIds: $parentTypeIds
   capabilities: $capabilities
-  legacyKind: $legacyKind
 `;
 
 export const STRUCTURE_ENTITY_TYPES_ADD = gql`

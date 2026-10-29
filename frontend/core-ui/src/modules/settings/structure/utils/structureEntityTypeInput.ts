@@ -12,7 +12,6 @@ export const toStructureEntityTypeFormValues = (
   name: type.name,
   icon: type.icon ?? '',
   parentTypeIds: type.parentTypeIds ?? [],
-  legacyKind: type.legacyKind ?? 'none',
   capabilities: type.capabilities ?? [],
 });
 
@@ -33,7 +32,6 @@ export const toStructureEntityTypeVariables = (
   return {
     ...variables,
     parentTypeIds: values.parentTypeIds,
-    legacyKind: values.legacyKind === 'none' ? null : values.legacyKind,
   };
 };
 

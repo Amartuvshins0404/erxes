@@ -1,10 +1,11 @@
-import { OperationVariables, useQuery } from '@apollo/client';
+import { OperationVariables } from '@apollo/client';
+import { useCursorListQuery, useMultiQueryState } from 'erxes-ui';
 import { GET_BRANDS } from '../graphql';
-import { useMultiQueryState } from 'erxes-ui';
+import { IBrand } from '../types';
 
+const BRANDS_LIMIT = 30;
 
 export const useBrandsVariables = (options?: OperationVariables) => {
-  const BRANDS_LIMIT = 30;
   const [queries] = useMultiQueryState<{
     searchValue: string;
   }>(['searchValue']);
@@ -19,20 +20,15 @@ export const useBrandsVariables = (options?: OperationVariables) => {
 };
 
 export const useBrands = (options?: OperationVariables) => {
-  const variables = useBrandsVariables(options);
-  const { data, error, loading } = useQuery(GET_BRANDS, {
+  const { limit, ...variables } = useBrandsVariables(options);
+  const { list, ...rest } = useCursorListQuery<IBrand>(GET_BRANDS, {
+    field: 'brands',
     variables,
-    ...options,
+    limit,
   });
-  const brands = data?.brands?.list || [];
-  const totalCount = data?.brands?.totalCount || 0;
-  const pageInfo = data?.brands?.pageInfo || undefined;
 
   return {
-    brands,
-    totalCount,
-    pageInfo,
-    error,
-    loading,
+    brands: list,
+    ...rest,
   };
 };

@@ -52,8 +52,8 @@ export const RecordTableHead = ({
             column.getIsPinned() === 'left'
               ? 'left'
               : column.getIsPinned() === 'right'
-                ? 'right'
-                : null,
+              ? 'right'
+              : null,
         }),
         className,
       )}

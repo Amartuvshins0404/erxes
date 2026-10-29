@@ -39,7 +39,10 @@ export const PackageCommandBar = () => {
     }).then(async () => {
       try {
         await removePackages({ variables: { _ids: selectedIds } });
-        toast({ variant: 'success', title: t('packages-deleted', 'Packages deleted') });
+        toast({
+          variant: 'success',
+          title: t('packages-deleted', 'Packages deleted'),
+        });
         table.resetRowSelection();
       } catch (e: any) {
         toast({

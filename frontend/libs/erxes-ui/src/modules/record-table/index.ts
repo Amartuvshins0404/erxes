@@ -20,6 +20,7 @@ import {
 import { checkboxColumn } from './components/CheckboxColumn';
 import { RecordTableRow } from './components/RecordTableRow';
 import { RecordTableColumnSelector } from './components/RecordTableColumnSelector';
+import { RecordTableCursorRows } from './components/RecordTableCursorRows';
 
 export const RecordTable = Object.assign(RecordTableRoot, {
   Provider: RecordTableProvider,
@@ -37,12 +38,14 @@ export const RecordTable = Object.assign(RecordTableRoot, {
   CursorProvider: RecordTableCursorProvider,
   CursorBackwardSkeleton: RecordTableBackwardSkeleton,
   CursorForwardSkeleton: RecordTableForwardSkeleton,
+  CursorRows: RecordTableCursorRows,
   Row: RecordTableRow,
   ColumnSelector: RecordTableColumnSelector,
 });
 
 export * from './types/RecordTableCursorTypes';
 export * from './hooks/useRecordTableCursor';
+export * from './hooks/useCursorListQuery';
 export * from './utils/cursorUtils';
 export * from './components/RecordTableCellInline';
 export * from './components/RecordTableTree';

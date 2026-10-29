@@ -136,7 +136,9 @@ const isEntity = (value: unknown) =>
     'id' in (value as Record<string, unknown>));
 
 const returnsEntities = (value: unknown) =>
-  Array.isArray(value) ? value.length > 0 && value.every(isEntity) : isEntity(value);
+  Array.isArray(value)
+    ? value.length > 0 && value.every(isEntity)
+    : isEntity(value);
 
 const ID_KEY_PATTERN = /(^_?ids?$|Ids?$)/;
 
@@ -155,7 +157,10 @@ const collectIds = (value: unknown, ids: Set<string>, depth = 0) => {
   }
 };
 
-const evictIds = (cache: ApolloCache<NormalizedCacheObject>, ids: Set<string>) => {
+const evictIds = (
+  cache: ApolloCache<NormalizedCacheObject>,
+  ids: Set<string>,
+) => {
   if (!ids.size) return;
 
   const keys = Object.keys(cache.extract() as Record<string, unknown>);
@@ -167,7 +172,7 @@ const evictIds = (cache: ApolloCache<NormalizedCacheObject>, ids: Set<string>) =
 
     const rest = key.slice(separator + 1);
     const id = rest.startsWith('{')
-      ? (/"_?id":"([^"]+)"/.exec(rest)?.[1] ?? '')
+      ? /"_?id":"([^"]+)"/.exec(rest)?.[1] ?? ''
       : rest;
 
     if (ids.has(id)) {

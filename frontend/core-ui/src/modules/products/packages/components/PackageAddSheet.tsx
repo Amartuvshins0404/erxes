@@ -204,8 +204,8 @@ export const PackageAddSheet = () => {
                                     Array.isArray(value)
                                       ? value
                                       : value
-                                        ? [value]
-                                        : [],
+                                      ? [value]
+                                      : [],
                                   )
                                 }
                               />

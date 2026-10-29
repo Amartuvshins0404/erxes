@@ -10,7 +10,14 @@ import { renderingBrandDetailAtom } from '../state';
 import { BrandsAddRow } from '@/settings/brands/components/BrandsAddRow';
 
 export function BrandsRecordTable() {
-  const { brands, loading, error } = useBrands();
+  const {
+    brands,
+    loading,
+    error,
+    handleFetchMore,
+    hasNextPage,
+    hasPreviousPage,
+  } = useBrands();
   const { t } = useTranslation('settings', { keyPrefix: 'brands' });
   const isAddingBrand = useAtomValue(renderingBrandDetailAtom);
   const columns = useMemo(() => brandsColumns(t), [t]);
@@ -27,13 +34,20 @@ export function BrandsRecordTable() {
       stickyColumns={['more', 'checkbox', 'name']}
       className="m-3"
     >
-      <RecordTable.Scroll>
+      <RecordTable.CursorProvider
+        hasPreviousPage={hasPreviousPage}
+        hasNextPage={hasNextPage}
+        dataLength={brands.length}
+        loading={loading}
+      >
         <RecordTable>
           <RecordTable.Header />
           <RecordTable.Body>
             {isAddingBrand && <BrandsAddRow />}
-            <RecordTable.RowList />
-            {loading && <RecordTable.RowSkeleton rows={30} />}
+            <RecordTable.CursorRows
+              handleFetchMore={handleFetchMore}
+              loading={loading}
+            />
           </RecordTable.Body>
         </RecordTable>
         {isEmpty && (
@@ -61,7 +75,7 @@ export function BrandsRecordTable() {
             </Empty.Header>
           </Empty>
         )}
-      </RecordTable.Scroll>
+      </RecordTable.CursorProvider>
       <BrandsCommandBar />
     </RecordTable.Provider>
   );

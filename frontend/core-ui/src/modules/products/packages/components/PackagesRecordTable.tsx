@@ -14,7 +14,14 @@ export const PackagesRecordTable = () => {
   const [tags] = useQueryState<string[]>('tags');
   const packageColumns = useMemo(() => createPackageColumns(t), [t]);
 
-  const { packages, loading, error } = usePackages({
+  const {
+    packages,
+    loading,
+    error,
+    handleFetchMore,
+    hasNextPage,
+    hasPreviousPage,
+  } = usePackages({
     searchValue: searchValue || undefined,
     status: status || undefined,
     tagIds: tags?.length ? tags : undefined,
@@ -52,17 +59,22 @@ export const PackagesRecordTable = () => {
       className="h-full"
       stickyColumns={['checkbox', 'name']}
     >
-      <RecordTable.Scroll>
+      <RecordTable.CursorProvider
+        hasPreviousPage={hasPreviousPage}
+        hasNextPage={hasNextPage}
+        dataLength={packages.length}
+        loading={loading}
+      >
         <RecordTable>
           <RecordTable.Header />
           <RecordTable.Body>
-            {loading && <RecordTable.RowSkeleton rows={10} />}
-            {!loading && (packages?.length ?? 0) > 0 && (
-              <RecordTable.RowList />
-            )}
+            <RecordTable.CursorRows
+              handleFetchMore={handleFetchMore}
+              loading={loading}
+            />
           </RecordTable.Body>
         </RecordTable>
-      </RecordTable.Scroll>
+      </RecordTable.CursorProvider>
       <PackageCommandBar />
     </RecordTable.Provider>
   );

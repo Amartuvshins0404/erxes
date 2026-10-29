@@ -42,7 +42,8 @@ export function useRecordTable() {
   return context;
 }
 
-export interface RecordTableProviderProps extends HTMLAttributes<HTMLDivElement> {
+export interface RecordTableProviderProps
+  extends HTMLAttributes<HTMLDivElement> {
   children: ReactNode;
   columns: ColumnDef<any>[];
   data: any[];

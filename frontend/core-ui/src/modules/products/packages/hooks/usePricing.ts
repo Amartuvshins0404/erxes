@@ -8,9 +8,15 @@ export const usePricing = (
   initialPercent?: number,
   initialTotal?: number,
 ) => {
-  const [price, setPrice] = useState(initialPrice != null ? String(initialPrice) : '');
-  const [percent, setPercent] = useState(initialPercent != null ? String(initialPercent) : '');
-  const [displayTotal, setDisplayTotal] = useState<number | null>(initialTotal ?? null);
+  const [price, setPrice] = useState(
+    initialPrice != null ? String(initialPrice) : '',
+  );
+  const [percent, setPercent] = useState(
+    initialPercent != null ? String(initialPercent) : '',
+  );
+  const [displayTotal, setDisplayTotal] = useState<number | null>(
+    initialTotal ?? null,
+  );
 
   const totalRef = useRef<number | null>(initialTotal ?? null);
   const percentRef = useRef(percent);
@@ -70,7 +76,8 @@ export const usePricing = (
     confirmedInitialTotal.current = total ?? null;
   };
 
-  const showTotal = displayTotal != null && price !== '' && Number(price) !== displayTotal;
+  const showTotal =
+    displayTotal != null && price !== '' && Number(price) !== displayTotal;
 
   return {
     price,

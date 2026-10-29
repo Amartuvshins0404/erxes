@@ -3,7 +3,6 @@ import {
   createHttpLink,
   from,
   InMemoryCache,
-  NormalizedCacheObject,
 } from '@apollo/client';
 import { setContext } from '@apollo/client/link/context';
 import { split } from '@apollo/client/link/core';
@@ -86,8 +85,7 @@ const authLink = setContext((_, { headers }) => {
 });
 
 // Combining httpLink and warelinks altogether
-let liveClient: ApolloClient<NormalizedCacheObject> | undefined;
-const liveDataLink = createLiveDataLink(() => liveClient);
+const liveDataLink = createLiveDataLink(() => client);
 
 const httpLinkWithMiddleware = from([
   errorLink,
@@ -142,7 +140,5 @@ const client = new ApolloClient({
   link,
   connectToDevTools: true,
 });
-
-liveClient = client;
 
 export default client;

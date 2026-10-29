@@ -21,7 +21,7 @@ export const MessageProNodeContent = ({
     <SelectDocument.Provider
       mode="single"
       value={documentId}
-      onValueChange={() => {}}
+      onValueChange={() => undefined}
     >
       <SelectDocument.Value />
     </SelectDocument.Provider>

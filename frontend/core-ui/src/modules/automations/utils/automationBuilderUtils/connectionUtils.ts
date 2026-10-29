@@ -85,7 +85,7 @@ export const generateWorkflowConnection = (
     const existingConnections = workFlow.config.connections || [];
     const { sourceId, sourceHandle, actionId } = info;
 
-    let updatedConnections = existingConnections.map((conn: any) =>
+    const updatedConnections = existingConnections.map((conn: any) =>
       conn.sourceActionId === sourceId && conn.handle === sourceHandle
         ? { ...conn, targetActionId: actionId }
         : conn,

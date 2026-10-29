@@ -4,6 +4,7 @@ import {
   CommandBar,
   RecordTable,
   Separator,
+  toast,
   useConfirm,
 } from 'erxes-ui';
 import { usePermissionsRemove } from 'ui-modules/modules/permissions/hooks/usePermissionsMutations';
@@ -24,15 +25,10 @@ export const PermissionsCommandBar = () => {
       message: 'Are you sure you want to remove the selected?',
       options: confirmOptions,
     }).then(async () => {
-      try {
-        permissionsRemove({
-          variables: {
-            ids,
-          },
-        });
-      } catch (e) {
-        console.error(e);
-      }
+      permissionsRemove({
+        variables: { ids },
+        onError: (e) => toast({ title: e.message, variant: 'destructive' }),
+      });
     });
   };
 

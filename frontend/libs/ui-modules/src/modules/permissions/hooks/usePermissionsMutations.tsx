@@ -10,7 +10,6 @@ export const usePermissionsAdd = () => {
     permissionsAdd({
       ...options,
       variables,
-      refetchQueries: ['Permissions'],
     });
   };
 
@@ -26,7 +25,6 @@ export const usePermissionsFix = () => {
   const mutate = ({ ...options }: MutationHookOptions) => {
     fix({
       ...options,
-      refetchQueries: ['Permissions'],
     });
   };
 
@@ -43,7 +41,6 @@ export const usePermissionsRemove = () => {
     permissionsRemove({
       ...options,
       variables,
-      refetchQueries: ['Permissions'],
     });
   };
 

@@ -7,6 +7,7 @@ import {
   RecordTable,
   RecordTableInlineCell,
   TextOverflowTooltip,
+  toast,
   useConfirm,
   useQueryState,
 } from 'erxes-ui';
@@ -34,13 +35,10 @@ export const PermissionsColumnsMoreCell = ({
       message: 'Are you sure you want to remove the selected?',
       options: confirmOptions,
     }).then(async () => {
-      try {
-        permissionsRemove({
-          variables: { ids: [_id] },
-        });
-      } catch (e) {
-        console.error(e.message);
-      }
+      permissionsRemove({
+        variables: { ids: [_id] },
+        onError: (e) => toast({ title: e.message, variant: 'destructive' }),
+      });
     });
   };
   return (

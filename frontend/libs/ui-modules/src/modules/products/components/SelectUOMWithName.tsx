@@ -3,7 +3,6 @@ import React, { useState } from 'react';
 import { useUom } from '../hooks/useUom';
 import { useMutation } from '@apollo/client';
 import { UOMS_ADD } from '../graphql/mutations/uomMutations';
-import { UOM_QUERY } from '../graphql/queries/productsQueries';
 import { IconPlus } from '@tabler/icons-react';
 
 function normalizeUomCode(name: string): string {
@@ -28,9 +27,7 @@ export const SelectUOMWithName = ({
   const { uoms, loading } = useUom();
   const [isCreating, setIsCreating] = useState(false);
   const [newUomName, setNewUomName] = useState('');
-  const [uomsAdd, { loading: addingUom }] = useMutation(UOMS_ADD, {
-    refetchQueries: [{ query: UOM_QUERY }],
-  });
+  const [uomsAdd, { loading: addingUom }] = useMutation(UOMS_ADD);
 
   const handleCreateUom = async () => {
     if (!newUomName.trim()) {

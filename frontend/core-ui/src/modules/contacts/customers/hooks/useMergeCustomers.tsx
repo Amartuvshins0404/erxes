@@ -1,29 +1,31 @@
 import { OperationVariables, useMutation } from '@apollo/client';
 import { CUSTOMERS_MERGE_MUTATION } from '../graphql/mutations/mergeCustomers';
-import { ICustomer } from 'ui-modules';
-import { useRecordTableCursor } from 'erxes-ui';
-import { useIsCustomerLeadSessionKey } from './useCustomerLeadSessionKey';
+
 interface ICustomerMergeData {
-  mergeCustomers: ICustomer[];
+  customersMerge: { _id: string } | null;
 }
 
 export const useMergeCustomers = () => {
-  const { sessionKey } = useIsCustomerLeadSessionKey();
-  const { setCursor } = useRecordTableCursor({
-    sessionKey,
-  });
   const [_mergeCustomers, { loading, error }] = useMutation<ICustomerMergeData>(
     CUSTOMERS_MERGE_MUTATION,
   );
 
   const mergeCustomers = (options?: OperationVariables) => {
+    const mergedIds: string[] = options?.variables?.customerIds || [];
+
     return _mergeCustomers({
       ...options,
-      onCompleted: (data) => {
-        options?.onCompleted?.(data);
-        setTimeout(() => {
-          setCursor('');
-        }, 100);
+      update: (cache, { data }) => {
+        const keptId = data?.customersMerge?._id;
+
+        mergedIds
+          .filter((id) => id !== keptId)
+          .forEach((id) =>
+            cache.evict({
+              id: cache.identify({ __typename: 'Customer', _id: id }),
+            }),
+          );
+        cache.gc();
       },
     });
   };

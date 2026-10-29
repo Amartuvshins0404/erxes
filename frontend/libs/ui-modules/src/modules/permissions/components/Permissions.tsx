@@ -32,7 +32,7 @@ import {
   useSetHotkeyScope,
   useToast,
 } from 'erxes-ui';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion } from 'motion/react';
 import React, { useEffect, useState } from 'react';
 import { SubmitHandler, useFormContext } from 'react-hook-form';
 import { Link, useLocation } from 'react-router-dom';

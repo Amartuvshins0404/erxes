@@ -8,7 +8,6 @@ export const useBrandsAdd = () => {
     _addBrand({
       ...options,
       variables,
-      refetchQueries: ['Brands'],
     });
   };
 

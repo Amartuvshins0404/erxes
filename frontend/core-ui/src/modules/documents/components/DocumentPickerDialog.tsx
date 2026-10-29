@@ -1,5 +1,5 @@
 import { IconFileText, IconX } from '@tabler/icons-react';
-import { Button, Command, Dialog, Spinner } from 'erxes-ui';
+import { Button, Combobox, Command, Dialog } from 'erxes-ui';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useDebounce } from 'use-debounce';
@@ -83,8 +83,6 @@ export const DocumentPickerDialog = ({
     skip: !open,
   });
 
-  const hasMore = totalCount > documents.length;
-
   const handleSelect = (document: EmailDocument) => {
     onSelect(document);
     onOpenChange(false);
@@ -142,23 +140,11 @@ export const DocumentPickerDialog = ({
                 </div>
               </Command.Item>
             ))}
-            {loading && documents.length > 0 && (
-              <div className="flex items-center justify-center p-3">
-                <Spinner size="sm" />
-              </div>
-            )}
-            {hasMore && (
-              <div className="border-t p-2">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  className="w-full"
-                  onClick={handleFetchMore}
-                >
-                  {t('load-more')}
-                </Button>
-              </div>
-            )}
+            <Combobox.FetchMore
+              totalCount={totalCount}
+              currentLength={documents.length}
+              fetchMore={() => void handleFetchMore()}
+            />
           </Command.List>
         </Command>
       </Dialog.Content>

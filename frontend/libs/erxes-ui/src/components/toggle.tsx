@@ -4,17 +4,18 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '../lib/utils';
 
 export const toggleVariants = cva(
-  'inline-flex items-center justify-center rounded text-sm font-medium text-muted-foreground ring-offset-background transition-colors hover:bg-muted focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=on]:bg-border data-[state=on]:text-foreground [&>svg]:pointer-events-none [&>svg]:size-4 [&>svg]:shrink-0 gap-2',
+  'inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-full text-sm font-medium text-muted-foreground outline-hidden transition-[background-color,color,box-shadow] ease-out hover:bg-accent hover:text-foreground focus-visible:shadow-focus disabled:pointer-events-none disabled:opacity-50 data-[state=on]:bg-accent data-[state=on]:text-accent-foreground [&>svg]:pointer-events-none [&>svg]:size-4 [&>svg]:shrink-0',
   {
     variants: {
       variant: {
         default: 'bg-transparent',
-        outline: 'shadow-xs bg-background hover:bg-accent',
+        outline:
+          'bg-card shadow-button-outline hover:bg-accent data-[state=on]:bg-accent',
       },
       size: {
-        default: 'h-7 px-3 min-w-10',
-        sm: 'h-6 px-3 min-w-9 font-normal text-xs',
-        lg: 'h-8 px-5 min-w-11',
+        default: 'h-8 min-w-8 px-3',
+        sm: 'h-7 min-w-7 px-2.5 text-xs',
+        lg: 'h-9 min-w-9 px-4',
       },
     },
     defaultVariants: {

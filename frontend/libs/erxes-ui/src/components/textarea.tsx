@@ -1,6 +1,7 @@
 import * as React from 'react';
 
 import { cn } from 'erxes-ui/lib/utils';
+import { fieldClassName } from './styles';
 
 export const Textarea = React.forwardRef<
   HTMLTextAreaElement,
@@ -9,7 +10,8 @@ export const Textarea = React.forwardRef<
   return (
     <textarea
       className={cn(
-        'flex min-h-[60px] w-full rounded bg-transparent px-3 py-1.5 text-sm shadow-xs transition-[color,box-shadow] placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:shadow-focus disabled:cursor-not-allowed disabled:opacity-50 md:text-sm',
+        fieldClassName,
+        'block min-h-20 resize-y px-3 py-2 leading-relaxed',
         className,
       )}
       ref={ref}

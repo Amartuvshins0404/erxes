@@ -4,6 +4,10 @@ import { Calendar, CalendarProps } from 'erxes-ui/components/calendar';
 import { Button } from 'erxes-ui/components/button';
 import { Popover } from 'erxes-ui/components/popover';
 import React from 'react';
+import {
+  fieldClassName,
+  fieldSizeClassNames,
+} from 'erxes-ui/components/styles';
 import { cn } from 'erxes-ui/lib/utils';
 import dayjs from 'dayjs';
 import customParseFormat from 'dayjs/plugin/customParseFormat';
@@ -324,7 +328,9 @@ export const DatePicker = ({
     <div
       aria-disabled={isDisabled}
       className={cn(
-        'flex h-7 w-full items-center gap-1 rounded-sm bg-background px-3 text-sm text-foreground shadow-xs transition-[color,box-shadow] focus-within:shadow-focus',
+        fieldClassName,
+        fieldSizeClassNames.default,
+        'cursor-text gap-1.5 pr-2 focus-within:shadow-focus has-aria-invalid:shadow-focus-destructive',
         isDisabled && 'cursor-not-allowed opacity-50',
         className,
       )}
@@ -340,7 +346,7 @@ export const DatePicker = ({
         onBlur={handleInputBlur}
         onKeyDown={handleInputKeyDown}
         autoComplete="off"
-        className="h-full w-full min-w-0 flex-1 bg-transparent p-0 placeholder:text-muted-foreground/70 focus-visible:outline-hidden disabled:cursor-not-allowed"
+        className="h-full w-full min-w-0 flex-1 bg-transparent p-0 placeholder:text-muted-foreground focus-visible:outline-hidden disabled:cursor-not-allowed"
       />
       {canClear ? (
         <button
@@ -351,12 +357,12 @@ export const DatePicker = ({
             e.stopPropagation();
             handleClear();
           }}
-          className="flex size-5 shrink-0 items-center justify-center rounded-sm text-muted-foreground opacity-50 hover:bg-accent hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-hidden focus-visible:shadow-focus"
+          className="flex size-5 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors ease-out hover:bg-accent hover:text-foreground focus-visible:outline-hidden focus-visible:shadow-focus"
         >
           <IconX className="size-4" />
         </button>
       ) : (
-        <IconCalendar className="size-4 shrink-0 text-muted-foreground opacity-50" />
+        <IconCalendar className="size-4 shrink-0 text-muted-foreground" />
       )}
     </div>
   );
@@ -375,7 +381,7 @@ export const DatePicker = ({
         } as React.ComponentProps<typeof Calendar>)}
       />
       {clearable && !isDisabled && hasValue && mode !== 'single' && (
-        <div className="border-t p-1">
+        <div className="border-t border-border p-1.5">
           <Button
             type="button"
             variant="ghost"
@@ -393,7 +399,7 @@ export const DatePicker = ({
   if (inline) {
     return (
       <div className="flex flex-col">
-        {mode === 'single' && <div className="p-2 pb-0">{singleInput}</div>}
+        {mode === 'single' && <div className="p-3 pb-0">{singleInput}</div>}
         {calendar}
       </div>
     );
@@ -410,7 +416,8 @@ export const DatePicker = ({
               variant={variant}
               disabled={isDisabled}
               className={cn(
-                'w-full justify-start text-left font-normal',
+                variant === 'outline' && [fieldClassName, fieldSizeClassNames.default],
+                'w-full justify-start rounded-lg text-left font-normal active:scale-100 data-[state=open]:shadow-focus',
                 className,
               )}
             >

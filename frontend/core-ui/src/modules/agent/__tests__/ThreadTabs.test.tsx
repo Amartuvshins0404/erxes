@@ -6,6 +6,7 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react';
+import { mockAllIsIntersecting } from 'react-intersection-observer/test-utils';
 import { ThreadTabs } from '../components/ThreadTabs';
 import type { IUseAgentsThreadsResult } from '../hooks/useAgentsThreads';
 
@@ -126,13 +127,15 @@ it('shows the optimistic first turn immediately and supports keyboard deletion',
   fireEvent.keyDown(tab, { key: 'Delete' });
   await waitFor(() => expect(props.onDelete).toHaveBeenCalledWith('new-id'));
 });
-it('keeps the last empty tab usable and exposes paginated sessions', () => {
+it('keeps the last empty tab usable and auto-loads paginated sessions on scroll', () => {
   const { props } = setup({
     activeThreadId: undefined,
     threadsState: { ...state, threads: [], hasMore: true },
   });
   expect(screen.getByRole('tab', { name: 'New chat' })).toBeTruthy();
-  fireEvent.click(screen.getByRole('button', { name: 'More sessions' }));
+  expect(screen.queryByRole('button', { name: 'More sessions' })).toBeNull();
+  expect(props.threadsState.loadMore).not.toHaveBeenCalled();
+  act(() => mockAllIsIntersecting(true));
   expect(props.threadsState.loadMore).toHaveBeenCalledTimes(1);
 });
 

@@ -18,7 +18,6 @@ export * from './tags';
 export * from './team-members';
 export * from './types/PageInfo';
 export * from './widget';
-export * from './tags-new';
 
 export * from './import-export';
 export * from './activity-logs';

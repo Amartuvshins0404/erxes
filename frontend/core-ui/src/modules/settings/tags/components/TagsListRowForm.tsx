@@ -1,12 +1,11 @@
 import { TagsListCell } from '@/settings/tags/components/TagsListCell';
 import { TagsListColorField } from '@/settings/tags/components/fields/TagsListColorField';
 import { TagsListNameField } from '@/settings/tags/components/fields/TagsListNameField';
-import { useTagAdd, ITag } from 'ui-modules';
+import { ITag, TAG_DEFAULT_COLORS, useTagAdd } from 'ui-modules';
 import { TagsListCreatedAtField } from '@/settings/tags/components/fields/TagsListCreatedAtField';
 import { TagsListDescriptionField } from '@/settings/tags/components/fields/TagsListDescriptionField';
 import { addingTagAtom } from '@/settings/tags/states/addingTagAtom';
 import { useAtom } from 'jotai';
-import { TAG_DEFAULT_COLORS } from '@/settings/tags/constants/Colors';
 import { useQueryState, cn, usePreviousHotkeyScope } from 'erxes-ui';
 import { useMemo } from 'react';
 

@@ -6,7 +6,7 @@ import {
   useFilterContext,
   useQueryState,
 } from 'erxes-ui';
-import { TagsSelect } from 'ui-modules/modules/tags-new/components/TagsSelect';
+import { TagsSelect } from 'ui-modules/modules/tags/components/TagsSelect';
 import { useState } from 'react';
 
 const TagsFilterCommandItem = () => {

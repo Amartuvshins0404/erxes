@@ -8,7 +8,7 @@ import {
 } from 'erxes-ui';
 import { IconCheck, IconTag } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
-import { SelectTags } from 'ui-modules';
+import { TagsFilter } from 'ui-modules';
 import { PACKAGE_STATUS_OPTIONS } from '../types/Package';
 
 function StatusFilterView() {
@@ -71,22 +71,6 @@ function StatusFilterBar() {
   );
 }
 
-function TagsFilterBar() {
-  const { t } = useTranslation('product', { keyPrefix: 'package' });
-  const [tags] = useQueryState<string[]>('tags');
-
-  if (!tags?.length) return null;
-
-  return (
-    <SelectTags.FilterBar
-      mode="multiple"
-      filterKey="tags"
-      label={t('tags', 'Tags')}
-      tagType="core:product"
-    />
-  );
-}
-
 export const PackagesFilter = () => {
   return (
     <Filter id="packages-filter">
@@ -99,7 +83,7 @@ export const PackagesFilter = () => {
         </Filter.Dialog>
         <Filter.SearchValueBarItem />
         <StatusFilterBar />
-        <TagsFilterBar />
+        <TagsFilter.Bar tagType="core:product" />
       </Filter.Bar>
     </Filter>
   );
@@ -124,16 +108,12 @@ export const PackagesFilterPopover = () => {
                   <IconTag />
                   {t('status', 'Status')}
                 </Filter.Item>
-                <SelectTags.FilterItem value="tags" label={t('tags', 'Tags')} />
+                <TagsFilter />
               </Command.List>
             </Command>
           </Filter.View>
           <StatusFilterView />
-          <SelectTags.FilterView
-            mode="multiple"
-            filterKey="tags"
-            tagType="core:product"
-          />
+          <TagsFilter.View tagType="core:product" />
         </Combobox.Content>
       </Filter.Popover>
     </>

@@ -1,11 +1,11 @@
 import { IconCheck, IconPackage, IconTagPlus } from '@tabler/icons-react';
 import {
-  Badge,
   Button,
   Combobox,
   CurrencyField,
   InfoCard,
   Input,
+  Label,
   Popover,
   ScrollArea,
   Select,
@@ -19,8 +19,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ProductPrimaryImageUpload,
-  SelectTags,
-  TagBadge,
+  TagsSelect,
   type ProductAttachmentItem,
 } from 'ui-modules';
 import { usePackageDetail } from '../hooks/usePackageDetail';
@@ -36,10 +35,6 @@ import {
 } from '../types/Package';
 import { PackageProductPicker } from './PackageProductPicker';
 
-const Label = ({ children }: { children: React.ReactNode }) => (
-  <label className="font-medium text-sm">{children}</label>
-);
-
 const PackageTagsField = ({
   value,
   onChange,
@@ -48,51 +43,32 @@ const PackageTagsField = ({
   value: string[];
   onChange: (tagIds: string[]) => void;
   disabled?: boolean;
-}) => {
-  const [open, setOpen] = useState(false);
-
-  return (
+}) => (
+  <TagsSelect.Provider
+    type="core:product"
+    mode="multiple"
+    value={value}
+    onValueChange={onChange}
+  >
     <div className="flex flex-wrap items-center gap-2">
-      {value.map((tagId) => (
-        <TagBadge
-          key={tagId}
-          tagId={tagId}
-          variant="secondary"
-          onClose={
-            disabled
-              ? undefined
-              : () => onChange(value.filter((id) => id !== tagId))
-          }
-        />
-      ))}
-      <SelectTags.Provider
-        tagType="core:product"
-        mode="multiple"
-        value={value}
-        onValueChange={(next) =>
-          onChange(Array.isArray(next) ? next : next ? [next] : [])
-        }
-      >
-        <Popover open={open} onOpenChange={disabled ? undefined : setOpen}>
-          <Popover.Trigger asChild>
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              disabled={disabled}
-              className="size-7 shadow-xs"
-            >
-              <IconTagPlus className="size-4" />
-            </Button>
-          </Popover.Trigger>
-          <Combobox.Content>
-            <SelectTags.Content />
-          </Combobox.Content>
-        </Popover>
-      </SelectTags.Provider>
+      <TagsSelect.SelectedList />
+      <Popover.Trigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          disabled={disabled}
+          className="size-7 rounded-full"
+        >
+          <IconTagPlus className="size-4" />
+        </Button>
+      </Popover.Trigger>
     </div>
-  );
-};
+    <Combobox.Content className="w-64 p-0" align="start">
+      <TagsSelect.Content />
+    </Combobox.Content>
+  </TagsSelect.Provider>
+);
 
 const PackageDetailEditor = ({
   pkg,
@@ -103,7 +79,7 @@ const PackageDetailEditor = ({
 }) => {
   const { t } = useTranslation('product', { keyPrefix: 'package' });
   const { changeStatus, loading: savingStatus } = useChangePackageStatus();
-  const { editPackage, loading: savingEdits } = useEditPackage(pkg._id);
+  const { editPackage, loading: savingEdits } = useEditPackage();
 
   const [name, setName] = useState(pkg.name || '');
   const [description, setDescription] = useState(pkg.description || '');
@@ -192,11 +168,11 @@ const PackageDetailEditor = ({
         variant: 'success',
         title: t('package-updated', 'Package updated'),
       });
-    } catch (e: any) {
+    } catch (e) {
       toast({
         variant: 'destructive',
         title: t('update-failed', 'Failed to update package'),
-        description: e?.message,
+        description: e instanceof Error ? e.message : undefined,
       });
     }
   };

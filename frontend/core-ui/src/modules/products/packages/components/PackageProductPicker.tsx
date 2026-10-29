@@ -1,13 +1,16 @@
+import { IconMinus, IconPackageOff, IconPlus } from '@tabler/icons-react';
 import {
-  IconChevronDown,
-  IconChevronUp,
-  IconPackageOff,
-} from '@tabler/icons-react';
-import { Checkbox, InfoCard, Spinner, cn } from 'erxes-ui';
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+  Button,
+  Checkbox,
+  Empty,
+  InfoCard,
+  Input,
+  Skeleton,
+  cn,
+} from 'erxes-ui';
+import { useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useInView } from 'react-intersection-observer';
-import { IProduct } from 'ui-modules';
+import { IProduct, LoadMoreSentinel } from 'ui-modules';
 import { useProducts } from 'ui-modules/modules/products/hooks/useProducts';
 import { IPackageProduct } from '../types/Package';
 
@@ -28,57 +31,39 @@ const QtyControl = ({
   qty: number;
   disabled?: boolean;
   onChange: (qty: number) => void;
-}) => {
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  const handleWheel = useCallback(
-    (e: WheelEvent) => {
-      e.preventDefault();
-      onChange(clamp(qty + (e.deltaY < 0 ? 1 : -1)));
-    },
-    [qty, onChange],
-  );
-
-  useEffect(() => {
-    const el = inputRef.current;
-    if (!el) return;
-    el.addEventListener('wheel', handleWheel, { passive: false });
-    return () => el.removeEventListener('wheel', handleWheel);
-  }, [handleWheel]);
-
-  return (
-    <div className="flex items-center gap-0.5 shrink-0">
-      <input
-        ref={inputRef}
-        type="number"
-        min={1}
-        max={999}
-        value={qty}
-        disabled={disabled}
-        onChange={(e) => onChange(clamp(parseInt(e.target.value, 10) || 1))}
-        className="box-content bg-transparent border-0 outline-none w-8 tabular-nums text-sm text-center [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [appearance:textfield]"
-      />
-      <div className="flex flex-col">
-        <button
-          type="button"
-          disabled={disabled || qty >= 999}
-          onClick={() => onChange(clamp(qty + 1))}
-          className="flex justify-center items-center disabled:opacity-30 size-3 text-foreground/60 hover:text-foreground disabled:cursor-not-allowed"
-        >
-          <IconChevronUp className="size-2.5" />
-        </button>
-        <button
-          type="button"
-          disabled={disabled || qty <= 1}
-          onClick={() => onChange(clamp(qty - 1))}
-          className="flex justify-center items-center disabled:opacity-30 size-3 text-foreground/60 hover:text-foreground disabled:cursor-not-allowed"
-        >
-          <IconChevronDown className="size-2.5" />
-        </button>
-      </div>
-    </div>
-  );
-};
+}) => (
+  <div className="flex items-center gap-0.5 shrink-0">
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon"
+      className="size-6 rounded-full"
+      disabled={disabled || qty <= 1}
+      onClick={() => onChange(clamp(qty - 1))}
+    >
+      <IconMinus className="size-3" />
+    </Button>
+    <Input.Number
+      value={qty}
+      disabled={disabled}
+      scale={0}
+      min={1}
+      max={999}
+      onChange={(next) => onChange(clamp(Number(next) || 1))}
+      className="h-6 w-10 px-1 text-center tabular-nums shadow-none bg-transparent"
+    />
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon"
+      className="size-6 rounded-full"
+      disabled={disabled || qty >= 999}
+      onClick={() => onChange(clamp(qty + 1))}
+    >
+      <IconPlus className="size-3" />
+    </Button>
+  </div>
+);
 
 const ProductRow = ({
   product,
@@ -149,9 +134,10 @@ export const PackageProductPicker = ({
   disabled?: boolean;
 }) => {
   const { t } = useTranslation('product', { keyPrefix: 'package' });
-  const { products, loading, handleFetchMore, totalCount } = useProducts({
-    variables: {},
-  });
+  const { products, loading, fetchingMore, handleFetchMore, totalCount } =
+    useProducts({
+      variables: {},
+    });
 
   const itemMap = useMemo(
     () => new Map(value.map((p) => [p.productId, p])),
@@ -191,13 +177,6 @@ export const PackageProductPicker = ({
 
   const hasMore = products.length < totalCount;
 
-  const { ref: sentinelRef } = useInView({
-    skip: !hasMore || loading,
-    onChange: (inView) => {
-      if (inView) handleFetchMore();
-    },
-  });
-
   return (
     <InfoCard
       title={t('products-count', {
@@ -208,16 +187,24 @@ export const PackageProductPicker = ({
     >
       <InfoCard.Content className="p-0 overflow-auto">
         {loading && !products.length ? (
-          <div className="flex justify-center items-center gap-2 py-12 text-muted-foreground text-sm">
-            <Spinner /> {t('loading-products', 'Loading products…')}
+          <div className="flex flex-col gap-2 p-3">
+            {Array.from({ length: 8 }).map((_, index) => (
+              <Skeleton key={index} className="h-6 w-full" />
+            ))}
           </div>
         ) : products.length === 0 ? (
-          <div className="flex flex-col justify-center items-center gap-2 py-12 text-muted-foreground text-sm text-center">
-            <IconPackageOff className="opacity-60 size-6" />
-            <span>{t('no-products-found', 'No products found.')}</span>
-          </div>
+          <Empty className="py-12">
+            <Empty.Header>
+              <Empty.Media variant="icon">
+                <IconPackageOff />
+              </Empty.Media>
+              <Empty.Title>
+                {t('no-products-found', 'No products found.')}
+              </Empty.Title>
+            </Empty.Header>
+          </Empty>
         ) : (
-          <ul className="divide-y">
+          <ul className="divide-y divide-border">
             {products.map((p) => (
               <li key={p._id}>
                 <ProductRow
@@ -229,14 +216,13 @@ export const PackageProductPicker = ({
                 />
               </li>
             ))}
-            {hasMore && (
-              <li
-                ref={sentinelRef}
-                className="flex justify-center items-center gap-2 py-3 text-muted-foreground text-sm"
-              >
-                <Spinner className="size-4" />
-              </li>
-            )}
+            <li>
+              <LoadMoreSentinel
+                hasMore={hasMore}
+                loading={fetchingMore}
+                onLoadMore={handleFetchMore}
+              />
+            </li>
           </ul>
         )}
       </InfoCard.Content>

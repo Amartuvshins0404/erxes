@@ -1,51 +1,59 @@
 import { Badge, Skeleton, TextOverflowTooltip } from 'erxes-ui';
-
-import { ITag } from 'ui-modules/index';
+import { useTagsByIds } from 'ui-modules/modules/tags/hooks/useTagByIds';
+import { ITag } from 'ui-modules/modules/tags/types/Tag';
 import React from 'react';
-import { useTagsByIds } from '../hooks/useTags';
+import { TagInline } from 'ui-modules/modules/tags/components/TagInline';
+
+const UNKNOWN_TAG_LABEL = 'Unknown tag';
 
 export const TagBadge = React.forwardRef<
   React.ElementRef<typeof Badge>,
   React.ComponentPropsWithoutRef<typeof Badge> & {
     tag?: ITag;
     tagId?: string;
-    renderClose?: (tag: ITag) => React.ReactNode;
     onCompleted?: (tags: ITag) => void;
     renderAsPlainText?: boolean;
   }
->(
-  (
-    { tag, tagId, renderClose, onCompleted, renderAsPlainText, ...props },
-    ref,
-  ) => {
-    const { tagDetail, loading } = useTagsByIds({
-      variables: {
-        id: tagId,
-      },
-      skip: !!tag || !tagId,
-      onCompleted: ({ tagDetail }: { tagDetail: ITag }) => {
-        onCompleted?.(tagDetail);
-      },
-    });
+>(({ tag, tagId, onCompleted, renderAsPlainText, ...props }, ref) => {
+  const { tagDetail, loading } = useTagsByIds({
+    variables: {
+      id: tagId,
+    },
+    skip: !!tag || !tagId,
+    onCompleted: ({ tagDetail }: { tagDetail: ITag }) => {
+      onCompleted?.(tagDetail);
+    },
+  });
 
-    const tagValue = tag || tagDetail;
+  const tagValue = tag || tagDetail;
 
-    if (loading) {
-      return <Skeleton className="w-8 h-4" />;
+  if (loading) {
+    return <Skeleton className="w-8 h-4" />;
+  }
+
+  if (!tagValue) {
+    if (tagId) {
+      if (renderAsPlainText) {
+        return <TextOverflowTooltip value={UNKNOWN_TAG_LABEL} />;
+      }
+
+      return (
+        <Badge ref={ref} title={UNKNOWN_TAG_LABEL} {...props}>
+          <span className="max-w-24 truncate">{UNKNOWN_TAG_LABEL}</span>
+        </Badge>
+      );
     }
 
-    if (!tagValue) {
-      return null;
-    }
+    return null;
+  }
 
-    if (renderAsPlainText) {
-      return <TextOverflowTooltip value={tagValue?.name} />;
-    }
+  if (renderAsPlainText) {
+    return <TextOverflowTooltip value={tagValue?.name} />;
+  }
 
-    return (
-      <Badge ref={ref} {...props}>
-        <TextOverflowTooltip value={tagValue?.name} />
-      </Badge>
-    );
-  },
-);
+  return (
+    <Badge ref={ref} {...props}>
+      <TagInline tag={tagValue} />
+    </Badge>
+  );
+});

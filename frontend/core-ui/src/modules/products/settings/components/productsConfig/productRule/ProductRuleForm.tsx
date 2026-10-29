@@ -3,7 +3,7 @@ import { Button, Form, Input, Sheet, useToast } from 'erxes-ui';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { useTranslation } from 'react-i18next';
-import { SelectCategory, SelectProduct, SelectTags } from 'ui-modules';
+import { SelectCategory, SelectProduct, TagsSelect } from 'ui-modules';
 import { useProductRulesAdd } from '@/products/settings/hooks/useProductRulesAdd';
 import { useProductRulesEdit } from '@/products/settings/hooks/useProductRulesEdit';
 import { IProductRule } from './types';
@@ -307,15 +307,15 @@ export const ProductRuleForm = ({
                 render={({ field }) => (
                   <Form.Item>
                     <Form.Label>{t('choose-tags')}</Form.Label>
-                    <Form.Control>
-                      <SelectTags
-                        mode="multiple"
-                        value={field.value || []}
-                        onValueChange={(value) => {
-                          field.onChange(value || []);
-                        }}
-                      />
-                    </Form.Control>
+                    <TagsSelect.FormItem
+                      type="core:product"
+                      mode="multiple"
+                      value={field.value || []}
+                      onValueChange={field.onChange}
+                      variant="outline"
+                      className="w-full justify-start"
+                      showValue
+                    />
                     <Form.Message />
                   </Form.Item>
                 )}
@@ -326,15 +326,15 @@ export const ProductRuleForm = ({
                 render={({ field }) => (
                   <Form.Item>
                     <Form.Label>{t('choose-exclude-tags')}</Form.Label>
-                    <Form.Control>
-                      <SelectTags
-                        mode="multiple"
-                        value={field.value || []}
-                        onValueChange={(value) => {
-                          field.onChange(value || []);
-                        }}
-                      />
-                    </Form.Control>
+                    <TagsSelect.FormItem
+                      type="core:product"
+                      mode="multiple"
+                      value={field.value || []}
+                      onValueChange={field.onChange}
+                      variant="outline"
+                      className="w-full justify-start"
+                      showValue
+                    />
                     <Form.Message />
                   </Form.Item>
                 )}
@@ -352,8 +352,8 @@ export const ProductRuleForm = ({
                 ? t('updating')
                 : t('creating')
               : productRule
-                ? t('update')
-                : t('create')}
+              ? t('update')
+              : t('create')}
           </Button>
         </Sheet.Footer>
       </form>

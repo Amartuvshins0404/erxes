@@ -1,6 +1,6 @@
 import { Sidebar, cn, useQueryState } from 'erxes-ui';
 
-import { useTagTypes } from 'ui-modules/modules/tags-new/hooks/useTagTypes';
+import { useTagTypes } from 'ui-modules';
 import { useTranslation } from 'react-i18next';
 
 export const TagsSidebar = ({
@@ -8,7 +8,6 @@ export const TagsSidebar = ({
   pluginName,
 }: {
   className?: string;
-  /** Only this plugin's tag types (a plugin's own settings). */
   pluginName?: string;
 }) => {
   const { t } = useTranslation('settings', { keyPrefix: 'tags' });

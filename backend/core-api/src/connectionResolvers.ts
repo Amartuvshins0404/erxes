@@ -351,11 +351,13 @@ import {
   IActivityLogsModel,
   loadActivityLogsClass,
 } from '@/logs/db/models/ActivityLogs';
-import { IAgentsConnectionsDocument } from '@/agents/@types/connection';
+import { IAgentsUserPreferencesDocument } from '@/agents/@types/preferences';
+import { agentsUserPreferencesSchema } from '@/agents/db/definitions/preferences';
+import { IConnectionDocument } from '@/connections/@types/connection';
 import {
-  IAgentsConnectionModel,
-  loadAgentsConnectionClass,
-} from '@/agents/db/models/Connection';
+  IConnectionModel,
+  loadConnectionClass,
+} from '@/connections/db/models/Connections';
 import { IAgentsSettingsDocument } from '@/agents/@types/settings';
 import {
   IAgentsSettingsModel,
@@ -445,7 +447,8 @@ export interface IModels {
   OAuthDeviceCodes: Model<IOAuthDeviceCodeDocument>;
   OAuthRefreshTokens: Model<IOAuthRefreshTokenDocument>;
 
-  AgentsConnection: IAgentsConnectionModel;
+  Connections: IConnectionModel;
+  AgentsUserPreferences: Model<IAgentsUserPreferencesDocument>;
   AgentsSettings: IAgentsSettingsModel;
 }
 
@@ -915,11 +918,18 @@ export const loadClasses = (
     Model<IOAuthRefreshTokenDocument>
   >('oauth_refresh_tokens', oauthRefreshTokenSchema);
 
-  // Per-user BYOK agents connection; one document per user per tenant.
-  models.AgentsConnection = db.model<
-    IAgentsConnectionsDocument,
-    IAgentsConnectionModel
-  >('agents_user_connections', loadAgentsConnectionClass(models));
+  models.Connections = db.model<IConnectionDocument, IConnectionModel>(
+    'connections',
+    loadConnectionClass(
+      models,
+      coreEventHandlers('connections', 'connections'),
+    ),
+  );
+
+  models.AgentsUserPreferences = db.model<
+    IAgentsUserPreferencesDocument,
+    Model<IAgentsUserPreferencesDocument>
+  >('agents_user_preferences', agentsUserPreferencesSchema);
 
   // Tenant-wide agents settings singleton (admin-controlled code mode flag).
   models.AgentsSettings = db.model<

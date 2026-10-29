@@ -17,7 +17,7 @@ import { SortOrder } from 'mongoose';
 import { IContext, IModels } from '~/connectionResolvers';
 import { AUTOMATION_APPROVAL_CONTENT_TYPES } from '../../constants';
 import { IAutomationActivityParams } from '../../db/models/Executions';
-import { sanitizeAiAgent, sanitizeAiAgents } from '../../utils/aiAgent';
+import { toAiAgentView } from '../../utils/aiAgent';
 import {
   getAutomationNodeCatalog,
   getAutomationNodeSchema,
@@ -458,14 +458,8 @@ export const automationQueries = {
     return botsConstants;
   },
 
-  async automationsAiAgents(
-    _root,
-    { kind }: { kind?: string },
-    { models, user }: IContext,
-  ) {
-    const agents = await models.AiAgents.find(
-      kind ? { 'connection.provider': kind } : {},
-    );
+  async automationsAiAgents(_root, _args, { models, user }: IContext) {
+    const agents = await models.AiAgents.find({});
     const agentIds = agents.map((agent) => agent._id.toString());
     const lockStates = await models.ApprovalLocks.getStates({
       user,
@@ -479,22 +473,27 @@ export const automationQueries = {
 
     const usageByAgentId = await getAiAgentUsage(models, agentIds);
 
-    return sanitizeAiAgents(agents as any[]).map((agent) => ({
-      ...agent,
-      approvalLockState: lockStateByAgentId.get(agent._id.toString()),
-      usage: usageByAgentId[agent._id.toString()] || {
-        total: 0,
-        active: 0,
-        automations: [],
-      },
-    }));
+    return agents.map((doc) => {
+      const agent = toAiAgentView<{ _id: string }>(doc);
+      const agentId = agent._id.toString();
+
+      return {
+        ...agent,
+        approvalLockState: lockStateByAgentId.get(agentId),
+        usage: usageByAgentId[agentId] || {
+          total: 0,
+          active: 0,
+          automations: [],
+        },
+      };
+    });
   },
 
   async automationsAiAgentTotalCounts(_root, _args, { models }: IContext) {
     const counts = await models.AiAgents.aggregate([
       {
         $group: {
-          _id: '$connection.provider',
+          _id: '$connection.connectionId',
           totalCount: { $sum: 1 },
         },
       },
@@ -526,7 +525,7 @@ export const automationQueries = {
     }
 
     if (!agent) {
-      return sanitizeAiAgent(agent);
+      return null;
     }
 
     const usageByAgentId = await getAiAgentUsage(models, [
@@ -534,7 +533,7 @@ export const automationQueries = {
     ]);
 
     return {
-      ...sanitizeAiAgent(agent),
+      ...toAiAgentView(agent),
       usage: usageByAgentId[agent._id.toString()] || {
         total: 0,
         active: 0,
@@ -569,12 +568,11 @@ export const automationQueries = {
     _root,
     {
       agentId,
-      provider,
+      connectionId,
       selectedModel,
-    }: { agentId?: string; provider: string; selectedModel?: string },
+    }: { agentId?: string; connectionId: string; selectedModel?: string },
     { models, subdomain, user, checkPermission }: IContext,
   ) {
-    // Without an agent this lists with the platform key, so gate it like create.
     if (agentId) {
       await models.ApprovalLocks.assertAccess({
         user,
@@ -591,7 +589,7 @@ export const automationQueries = {
       queueName: 'aiAgent',
       jobName: 'listAiAgentModels',
       subdomain,
-      data: { agentId, provider, selectedModel },
+      data: { agentId, connectionId, selectedModel },
       timeout: 10000,
     });
   },

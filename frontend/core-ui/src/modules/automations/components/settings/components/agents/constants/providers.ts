@@ -23,17 +23,6 @@ export const AI_AGENT_PROVIDER_LABELS: Record<TAiAgentProvider, string> = {
   openai: 'OpenAI Direct',
 };
 
-export const AI_AGENT_PROVIDER_DESCRIPTIONS: Record<TAiAgentProvider, string> =
-  {
-    'cloudflare-ai-gateway':
-      'Use the platform gateway by default, or override it with your own Cloudflare Gateway settings.',
-    grok: 'Connect directly to xAI Grok with organization-owned credentials.',
-    kimi: 'Connect directly to Moonshot Kimi with organization-owned credentials.',
-    'kimi-code':
-      'Connect to Kimi Coding with Anthropic Messages-compatible credentials.',
-    openai: 'Connect directly to OpenAI with organization-owned credentials.',
-  };
-
 export const AI_AGENT_PROVIDER_DEFAULT_MODELS: Record<
   TAiAgentProvider,
   string
@@ -45,24 +34,9 @@ export const AI_AGENT_PROVIDER_DEFAULT_MODELS: Record<
   openai: 'gpt-5-mini',
 };
 
-export const AI_AGENT_PROVIDER_DEFAULT_BASE_URLS: Record<
-  TAiAgentProvider,
-  string
-> = {
-  'cloudflare-ai-gateway': '',
-  grok: 'https://api.x.ai/v1',
-  kimi: 'https://api.moonshot.ai/v1',
-  'kimi-code': 'https://api.kimi.com/coding',
-  openai: 'https://api.openai.com/v1',
-};
+export const isAiAgentProvider = (value: unknown): value is TAiAgentProvider =>
+  AI_AGENT_PROVIDER_TYPES.some((provider) => provider === value);
 
-export const AI_AGENT_PROVIDER_API_KEY_PLACEHOLDERS: Record<
-  TAiAgentProvider,
-  string
-> = {
-  'cloudflare-ai-gateway': 'Use platform provider key',
-  grok: 'Enter xAI API key',
-  kimi: 'Enter Moonshot API key',
-  'kimi-code': 'Enter Kimi Coding API key',
-  openai: 'Enter OpenAI API key',
-};
+export const AI_AGENT_AUTOMATIONS_SERVICE = 'automations';
+
+export const AI_AGENT_CONNECTIONS_SETTINGS_PATH = '/settings/connections';

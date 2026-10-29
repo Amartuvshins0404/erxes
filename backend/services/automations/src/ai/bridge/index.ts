@@ -6,7 +6,7 @@ import type {
   TAiBridgeMessage,
   TAiBridgeToolDefinition,
 } from './types';
-import { resolveAiProviderConnection } from '../providers';
+import { resolveAiAgentConnection } from '../providers';
 
 const providerBridgeRegistry: Record<string, IAiProviderBridge> = {
   'cloudflare-ai-gateway': openAiCompatibleBridge,
@@ -28,9 +28,9 @@ export const getAiProviderBridge = (provider: string): IAiProviderBridge => {
 
 export const checkAiProviderHealth = async (
   agent: TAiAgentInput,
-  subdomain?: string,
+  subdomain: string,
 ) => {
-  const connection = resolveAiProviderConnection({
+  const connection = await resolveAiAgentConnection({
     subdomain,
     connection: agent.connection,
   });
@@ -45,14 +45,14 @@ export const checkAiProviderHealth = async (
 export const invokeAiProvider = async (
   agent: TAiAgentInput,
   messages: TAiBridgeMessage[],
-  subdomain?: string,
+  subdomain: string,
   options?: {
     responseFormat?: 'json' | 'text';
     tools?: TAiBridgeToolDefinition[];
     toolChoice?: 'auto' | 'required';
   },
 ) => {
-  const connection = resolveAiProviderConnection({
+  const connection = await resolveAiAgentConnection({
     subdomain,
     connection: agent.connection,
   });

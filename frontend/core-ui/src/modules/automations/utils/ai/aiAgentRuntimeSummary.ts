@@ -4,7 +4,6 @@ import { DeepPartial } from 'react-hook-form';
 export type TAiAgentRuntimeSummarySource = {
   name?: string;
   connection?: {
-    provider?: string;
     model?: string;
   };
   runtime?: {

@@ -16,6 +16,7 @@ import { resolveAgentsReference } from '@/agents/referenceResolution';
  */
 
 import { router } from '@/agents/routes';
+import { sealSecret } from '@/connections/crypto';
 import { probeAgentsRun } from '@/agents/runLiveness';
 import { checkPermissionGroup } from 'erxes-api-shared/core-modules';
 import { ExpectedError } from 'erxes-api-shared/utils';
@@ -229,21 +230,41 @@ const ACTING_USER = { _id: 'user-1', email: 'agent@example.com' };
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-const CONNECTION_DOC = {
-  userId: 'user-1',
-  connections: [
-    {
-      provider: 'openai',
-      model: 'gpt-5.6-luna',
-      config: { apiKey: 'sk-test' },
-    },
-  ],
-};
+process.env.ERXES_MASTER_KEY = 'routes-test-master-key';
+
+const makeConnection = ({
+  _id = 'conn-openai',
+  type = 'openai',
+  scope = 'personal',
+  apiKey = 'sk-test',
+  createdAt = new Date(1),
+}: {
+  _id?: string;
+  type?: string;
+  scope?: string;
+  apiKey?: string | null;
+  createdAt?: Date;
+} = {}) => ({
+  _id,
+  type,
+  name: `${type} key`,
+  scope,
+  config: {},
+  secrets: apiKey
+    ? { apiKey: sealSecret({ connectionId: _id, field: 'apiKey', plain: apiKey }) }
+    : {},
+  services: [],
+  createdAt,
+});
 
 const connectionModel = {
-  getConnections: jest.fn(),
-  upsertConnection: jest.fn(),
-  removeConnection: jest.fn(),
+  listForUser: jest.fn(),
+};
+
+let storedPreferences: { defaultConnectionId?: string } | null = null;
+
+const preferencesModel = {
+  findOne: jest.fn(() => ({ lean: async () => storedPreferences })),
 };
 
 const settingsModel = {
@@ -438,10 +459,12 @@ beforeEach(() => {
   }));
   memory = buildMemory();
   mockedGenerateModels.mockResolvedValue({
-    AgentsConnection: connectionModel,
+    Connections: connectionModel,
+    AgentsUserPreferences: preferencesModel,
     AgentsSettings: settingsModel,
   } as unknown as Awaited<ReturnType<typeof generateModels>>);
-  connectionModel.getConnections.mockResolvedValue(CONNECTION_DOC);
+  storedPreferences = null;
+  connectionModel.listForUser.mockResolvedValue([makeConnection()]);
   settingsModel.getSettings.mockResolvedValue({
     codeModeEnabled: false,
     codeModeEnvironment: 'in-process',
@@ -564,8 +587,8 @@ describe('POST /agents/chat — authentication and validation', () => {
     expect(streamMock).not.toHaveBeenCalled();
   });
 
-  it('asks for an API key when the acting user has no stored connection', async () => {
-    connectionModel.getConnections.mockResolvedValue(null);
+  it('asks for a connection when the acting user has none available', async () => {
+    connectionModel.listForUser.mockResolvedValue([]);
     const res = buildRes();
     await chatHandler(
       buildReq({ user: ACTING_USER, body: { messages: [userMessage('hi')] } }),
@@ -573,7 +596,9 @@ describe('POST /agents/chat — authentication and validation', () => {
     );
 
     expect(res.statusCode).toBe(400);
-    expect(body(res).error).toBe('Add your API key to start using Agents.');
+    expect(body(res).error).toBe(
+      'Add an AI connection in Settings → Connections to start using Agents.',
+    );
     expect(streamMock).not.toHaveBeenCalled();
   });
 
@@ -935,14 +960,14 @@ describe('POST /agents/chat — model input and identity', () => {
     expect(streamMock).not.toHaveBeenCalled();
   });
 
-  it('rejects non-string provider/model overrides with 400 instead of crashing', async () => {
+  it('rejects non-string connectionId/model overrides with 400 instead of crashing', async () => {
     const res = buildRes();
     await chatHandler(
       buildReq({
         user: ACTING_USER,
         body: {
           messages: [userMessage('hi')],
-          provider: 42,
+          connectionId: 42,
           model: { id: 'x' },
         },
       }),
@@ -969,13 +994,28 @@ describe('POST /agents/chat — model input and identity', () => {
 });
 
 describe('POST /agents/chat — default connection', () => {
-  const TWO_CONNECTIONS = {
-    userId: 'user-1',
-    connections: [
-      { provider: 'openai', model: 'gpt-5.6-luna', config: { apiKey: 'sk-a' } },
-      { provider: 'kimi', model: 'kimi-k3', config: { apiKey: 'sk-b' } },
-    ],
-  };
+  const OPENAI_WORKSPACE = makeConnection({
+    _id: 'conn-openai',
+    type: 'openai',
+    scope: 'workspace',
+    apiKey: 'sk-a',
+    createdAt: new Date(1),
+  });
+  const KIMI_PERSONAL = makeConnection({
+    _id: 'conn-kimi',
+    type: 'kimi',
+    scope: 'personal',
+    apiKey: 'sk-b',
+    createdAt: new Date(2),
+  });
+
+  beforeEach(() => {
+    connectionModel.listForUser.mockResolvedValue([
+      OPENAI_WORKSPACE,
+      KIMI_PERSONAL,
+    ]);
+  });
+
   const runOn = async (body: Record<string, unknown> = {}) => {
     await chatHandler(
       buildReq({
@@ -987,49 +1027,43 @@ describe('POST /agents/chat — default connection', () => {
     );
     const context = streamMock.mock.calls[0][1].requestContext;
     return {
-      provider: context?.get('provider'),
+      connectionId: context?.get('connectionId'),
       model: context?.get('model'),
     };
   };
 
-  it('runs an unselected turn on the explicit default, read for the acting user and tenant', async () => {
-    connectionModel.getConnections.mockResolvedValue({
-      ...TWO_CONNECTIONS,
-      defaultProvider: 'kimi',
-    });
+  it('runs an unselected turn on the saved default, read for the acting user and tenant', async () => {
+    storedPreferences = { defaultConnectionId: 'conn-openai' };
 
     await expect(runOn()).resolves.toEqual({
-      provider: 'kimi',
-      model: 'kimi-k3',
+      connectionId: 'conn-openai',
+      model: 'gpt-5.6-luna',
     });
     expect(generateModels).toHaveBeenCalledWith('tenant');
-    expect(connectionModel.getConnections).toHaveBeenCalledWith('user-1');
+    expect(connectionModel.listForUser).toHaveBeenCalledWith('user-1', {
+      category: 'ai',
+    });
+    expect(preferencesModel.findOne).toHaveBeenCalledWith({ userId: 'user-1' });
   });
 
   it.each([
-    ['no default was chosen', undefined],
-    ['the default is no longer connected', 'grok'],
-  ])('keeps the first saved connection when %s', async (_case, stored) => {
-    connectionModel.getConnections.mockResolvedValue({
-      ...TWO_CONNECTIONS,
-      defaultProvider: stored,
-    });
+    ['no default was chosen', null],
+    ['the default is no longer usable', { defaultConnectionId: 'conn-gone' }],
+  ])('prefers the caller personal connection when %s', async (_case, stored) => {
+    storedPreferences = stored;
 
     await expect(runOn()).resolves.toEqual({
-      provider: 'openai',
-      model: 'gpt-5.6-luna',
+      connectionId: 'conn-kimi',
+      model: 'kimi-k3',
     });
   });
 
-  it('lets an explicit provider/model selection override the default', async () => {
-    connectionModel.getConnections.mockResolvedValue({
-      ...TWO_CONNECTIONS,
-      defaultProvider: 'kimi',
-    });
+  it('lets an explicit connection and model selection override the default', async () => {
+    storedPreferences = { defaultConnectionId: 'conn-kimi' };
 
     await expect(
-      runOn({ provider: 'openai', model: 'gpt-5.6' }),
-    ).resolves.toEqual({ provider: 'openai', model: 'gpt-5.6' });
+      runOn({ connectionId: 'conn-openai', model: 'gpt-5.6' }),
+    ).resolves.toEqual({ connectionId: 'conn-openai', model: 'gpt-5.6' });
   });
 });
 
@@ -1038,14 +1072,17 @@ describe('POST /agents/chat — thinking level validation', () => {
     connection: { provider: string; model: string },
     thinkingLevel: unknown,
   ) => {
-    connectionModel.getConnections.mockResolvedValue({
-      userId: 'user-1',
-      connections: [{ ...connection, config: { apiKey: 'sk-a' } }],
-    });
+    connectionModel.listForUser.mockResolvedValue([
+      makeConnection({ type: connection.provider, apiKey: 'sk-a' }),
+    ]);
     await chatHandler(
       buildReq({
         user: ACTING_USER,
-        body: { messages: [userMessage('hi')], thinkingLevel },
+        body: {
+          messages: [userMessage('hi')],
+          thinkingLevel,
+          model: connection.model,
+        },
       }),
       buildRes(),
     );
@@ -1141,7 +1178,7 @@ describe('POST /agents/approve — destructive action approval resume', () => {
       runs: [suspendedRun('run-1')],
       total: 1,
     });
-    connectionModel.getConnections.mockResolvedValue(null);
+    connectionModel.listForUser.mockResolvedValue([]);
     const res = buildRes();
     await approveHandler(
       buildReq({ user: ACTING_USER, body: { threadId: 't1', approved: true } }),
@@ -1833,7 +1870,7 @@ describe('POST /agents/answer — ask_user answer resume', () => {
         body: {
           threadId: 't1',
           answer: 'yes',
-          provider: 'openai',
+          connectionId: 'conn-openai',
           model: 'gpt-5.6-luna',
           thinkingLevel: 'high',
         },
@@ -1843,7 +1880,7 @@ describe('POST /agents/answer — ask_user answer resume', () => {
 
     expect(res.statusCode).toBe(200);
     // The durable agent uses its registered/snapshot RequestContext so
-    // provider/model/thinking stay from the original run; body fields
+    // connection/model/thinking stay from the original run; body fields
     // are accepted for compatibility but do not rebuild anything.
     expect(streamMock).not.toHaveBeenCalled();
     expect(resumeStreamMock).toHaveBeenCalled();
@@ -2747,36 +2784,32 @@ describe('POST /agents/chat — mentions', () => {
 
   it.each([
     [
-      'no saved connection',
-      null,
+      'no available connection',
+      [],
       {},
-      'Add your API key to start using Agents.',
+      'Add an AI connection in Settings → Connections',
     ],
     [
-      'a requested provider that is not saved',
-      CONNECTION_DOC,
-      { provider: 'grok' },
-      'No connection stored for provider "grok". Add it under Settings → API key.',
+      'a requested connection that is not usable',
+      [makeConnection()],
+      { connectionId: 'conn-someone-else' },
+      'This connection is not available',
     ],
     [
       'a saved key this server cannot read',
-      {
-        userId: 'user-1',
-        connections: [
-          {
-            provider: 'openai',
-            model: 'gpt-5.6-luna',
-            config: { apiKey: 'enc:v1:AAAA:AAAA:AAAA' },
-          },
-        ],
-      },
+      [
+        {
+          ...makeConnection(),
+          secrets: { apiKey: 'enc:v2:deadbeef:AAAA:AAAA:AAAA' },
+        },
+      ],
       {},
       'OpenAI',
     ],
   ])(
     'rejects a turn with %s before looking up any mention',
     async (_case, stored, selection, message) => {
-      connectionModel.getConnections.mockResolvedValue(stored);
+      connectionModel.listForUser.mockResolvedValue(stored);
       // A lookup would succeed, so only the order decides the outcome.
       jest
         .mocked(resolveAgentsReference)

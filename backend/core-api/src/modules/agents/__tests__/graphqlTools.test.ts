@@ -596,13 +596,13 @@ describe('GraphQL approval admission', () => {
   it('returns denied or malformed inputs as tool errors without asking for permission', async () => {
     expect(
       await needsApproval(
-        'mutation Denied { agentsConnectionRemove(provider: "openai") }',
+        'mutation Denied { connectionsRemove(_id: "c1") }',
       ),
     ).toBe(false);
     expect(await needsApproval('not graphql')).toBe(false);
     fetchSpy.mockRejectedValue(new Error('Must not fetch'));
     const output = await runCall(
-      { query: 'query Denied { agentsConnections { provider } }' },
+      { query: 'query Denied { connections { _id } }' },
       { subdomain: 'tenant', userId: 'user' },
     );
     expect(output.status).toBe('error');

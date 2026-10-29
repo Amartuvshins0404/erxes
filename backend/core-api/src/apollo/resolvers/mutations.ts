@@ -29,7 +29,8 @@ import {
 } from '~/modules/import-export/graphql/resolvers';
 import { bundleMutations } from '@/bundle/graphql/resolvers/mutations';
 import { templateMutations } from '@/template/graphql/mutations';
-import { agentsConnectionMutations } from '@/agents/graphql/resolvers/mutations/connection';
+import { agentsModelMutations } from '@/agents/graphql/resolvers/mutations/models';
+import { connectionsMutations } from '@/connections/graphql/resolvers/mutations';
 import { agentsThreadMutations } from '@/agents/graphql/resolvers/mutations/threads';
 import { agentsSettingsMutations } from '@/agents/graphql/resolvers/mutations/settings';
 
@@ -63,7 +64,8 @@ export const mutations = {
   ...exportMutations,
   ...bundleMutations,
   ...templateMutations,
-  ...agentsConnectionMutations,
+  ...agentsModelMutations,
+  ...connectionsMutations,
   ...agentsThreadMutations,
   ...agentsSettingsMutations,
 };

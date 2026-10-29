@@ -7,13 +7,8 @@ import type {
   IAgentsModelVerifyVariables,
 } from '../graphql/connection';
 
-/**
- * Checks a typed model id with a minimal server-side request through the
- * user's saved connection. Resolves to null when the provider accepts it,
- * otherwise to a readable, key-free reason for the picker to show.
- */
 export const useAgentsModelVerify = (): ((
-  provider: string,
+  connectionId: string,
   model: string,
 ) => Promise<string | null>) => {
   const [verify] = useMutation<
@@ -22,9 +17,9 @@ export const useAgentsModelVerify = (): ((
   >(AGENTS_MODEL_VERIFY);
 
   return useCallback(
-    async (provider: string, model: string) => {
+    async (connectionId: string, model: string) => {
       try {
-        const { data } = await verify({ variables: { provider, model } });
+        const { data } = await verify({ variables: { connectionId, model } });
         const result = data?.agentsModelVerify;
 
         if (result?.ok) {

@@ -14,6 +14,7 @@ export type TAiAgentRecord = {
     automations: Array<{ _id: string; name: string; status: string }>;
   };
   connection?: {
+    connectionId?: string;
     provider?: string;
     model?: string;
   };
@@ -39,10 +40,8 @@ type AiAgents = {
   automationsAiAgents: TAiAgentRecord[];
 };
 
-export const useAiAgents = (kind?: string | null) => {
-  const { data, loading } = useQuery<AiAgents>(AUTOMATIONS_AI_AGENTS, {
-    variables: { kind: kind || undefined },
-  });
+export const useAiAgents = () => {
+  const { data, loading } = useQuery<AiAgents>(AUTOMATIONS_AI_AGENTS);
 
   const { automationsAiAgents = [] } = data || {};
 

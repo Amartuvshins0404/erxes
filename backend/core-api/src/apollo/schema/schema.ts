@@ -196,10 +196,15 @@ import {
 import { queries as ReferenceQueries } from '~/meta/references/graphql/schema';
 
 import {
-  mutations as AgentsConnectionMutations,
-  queries as AgentsConnectionQueries,
-  types as AgentsConnectionTypes,
-} from '@/agents/graphql/schemas/connection';
+  mutations as AgentsModelMutations,
+  queries as AgentsModelQueries,
+  types as AgentsModelTypes,
+} from '@/agents/graphql/schemas/models';
+import {
+  mutations as ConnectionsMutations,
+  queries as ConnectionsQueries,
+  types as ConnectionsTypes,
+} from '@/connections/graphql/schemas';
 import {
   mutations as AgentsThreadMutations,
   queries as AgentsThreadQueries,
@@ -262,7 +267,8 @@ export const types = `
     ${bundleTypes}
     ${templateTypes}
     ${searchTypes}
-    ${AgentsConnectionTypes}
+    ${AgentsModelTypes}
+    ${ConnectionsTypes}
     ${AgentsThreadTypes}
     ${AgentsSettingsTypes}
     ${AgentsToolTypes}
@@ -304,7 +310,8 @@ export const queries = `
     ${bundleQueries}
     ${templateQueries}
     ${searchQueries}
-    ${AgentsConnectionQueries}
+    ${AgentsModelQueries}
+    ${ConnectionsQueries}
     ${AgentsThreadQueries}
     ${AgentsSettingsQueries}
     ${AgentsToolQueries}
@@ -341,7 +348,8 @@ export const mutations = `
     ${bundleMutations}
     ${templateMutations}
     ${LogsMutations}
-    ${AgentsConnectionMutations}
+    ${AgentsModelMutations}
+    ${ConnectionsMutations}
     ${AgentsThreadMutations}
     ${AgentsSettingsMutations}
   `;

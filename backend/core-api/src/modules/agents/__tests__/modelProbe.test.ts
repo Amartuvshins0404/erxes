@@ -1,9 +1,3 @@
-/**
- * Manual model verification: a typed model id is checked with one minimal
- * request through the chat's provider client. Invalid, non-chat and
- * unreadable-key cases never reach the network, and every error is key-free.
- */
-
 const doStream = jest.fn();
 const resolveModelConfig = jest.fn<
   Promise<{ doStream: jest.Mock }>,
@@ -19,19 +13,20 @@ jest.mock('@ai-sdk/anthropic', () => ({
   })),
 }));
 
-import type { IAiAgentConnection } from 'erxes-api-shared/core-modules';
+import type { IResolvedConnection } from 'erxes-api-shared/core-modules';
 import { probeProviderModel } from '@/agents/modelProbe';
 
 const KEY = 'sk-proj-probe-test-secret-value';
 const connection = (
   provider: string,
   apiKey: string | null = KEY,
-): IAiAgentConnection =>
-  ({
-    provider,
-    model: 'saved-model',
-    config: apiKey === null ? {} : { apiKey },
-  } as IAiAgentConnection);
+): IResolvedConnection => ({
+  _id: 'conn-1',
+  type: provider,
+  name: 'Team key',
+  config: {},
+  secrets: apiKey === null ? {} : { apiKey },
+});
 
 const streamOf = (...chunks: Array<{ type: string; error?: unknown }>) => ({
   stream: new ReadableStream({
@@ -156,7 +151,7 @@ it('never echoes the key, even when the provider does', async () => {
   });
 
   expect(result.error).toBe(
-    'OpenAI rejected the saved API key (401). Re-enter it in Settings → API key.',
+    'OpenAI rejected the saved API key (401). Re-enter it in Settings → Connections.',
   );
   expect(JSON.stringify(result)).not.toContain(KEY);
 
@@ -201,7 +196,7 @@ it.each([
   expect(resolveModelConfig).not.toHaveBeenCalled();
 });
 
-it('explains an unusable stored key before any request', async () => {
+it('explains a connection without a key before any request', async () => {
   const result = await probeProviderModel({
     connection: connection('openai', null),
     model: 'gpt-6-luna',
@@ -209,7 +204,8 @@ it('explains an unusable stored key before any request', async () => {
 
   expect(result).toEqual({
     ok: false,
-    error: 'No OpenAI API key is saved. Add it in Settings → API key.',
+    error:
+      'Connection "Team key" has no API key. Add it in Settings → Connections.',
   });
   expect(resolveModelConfig).not.toHaveBeenCalled();
 });

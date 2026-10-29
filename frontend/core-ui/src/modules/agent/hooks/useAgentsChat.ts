@@ -260,12 +260,10 @@ export interface IUseAgentsChatResult {
   startNewConversation: () => Promise<void>;
   /** Loads an existing thread's stored messages into the chat. */
   openThread: (threadId: string) => Promise<void>;
-  /** Current model/thinking selection; empty provider means server default. */
-  modelProvider: string;
+  modelConnectionId: string;
   modelId: string;
   thinkingLevel: IAgentsThinkingLevel;
-  /** Picks the provider/model the next turns run on ('' = auto). */
-  selectModel: (provider: string, model: string) => void;
+  selectModel: (connectionId: string, model: string) => void;
   selectThinkingLevel: (level: IAgentsThinkingLevel) => void;
   /** True while an ask_user answer is being submitted and resumed. */
   answerBusy: boolean;
@@ -326,7 +324,7 @@ export const useAgentsChat = (options?: {
   const [loadingThread, setLoadingThread] = useState<boolean>(
     () => readSelectedThreadId(sessionScope) !== undefined,
   );
-  const [modelProvider, setModelProvider] = useState('');
+  const [modelConnectionId, setModelConnectionId] = useState('');
   const [modelId, setModelId] = useState('');
   const [thinkingLevel, setThinkingLevel] = useState<IAgentsThinkingLevel>(
     DEFAULT_THINKING_LEVEL,
@@ -620,15 +618,18 @@ export const useAgentsChat = (options?: {
     [sendMessage, clearError],
   );
 
-  const selectModel = useCallback((nextProvider: string, nextModel: string) => {
-    selectionRef.current = {
-      ...selectionRef.current,
-      provider: nextProvider,
-      model: nextModel,
-    };
-    setModelProvider(nextProvider);
-    setModelId(nextModel);
-  }, []);
+  const selectModel = useCallback(
+    (nextConnectionId: string, nextModel: string) => {
+      selectionRef.current = {
+        ...selectionRef.current,
+        connectionId: nextConnectionId,
+        model: nextModel,
+      };
+      setModelConnectionId(nextConnectionId);
+      setModelId(nextModel);
+    },
+    [],
+  );
 
   const selectThinkingLevel = useCallback((level: IAgentsThinkingLevel) => {
     selectionRef.current = { ...selectionRef.current, thinkingLevel: level };
@@ -1053,7 +1054,7 @@ export const useAgentsChat = (options?: {
   }, [regenerate]);
 
   return {
-    modelProvider,
+    modelConnectionId,
     modelId,
     thinkingLevel,
     selectModel,

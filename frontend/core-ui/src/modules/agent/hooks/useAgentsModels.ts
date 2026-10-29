@@ -9,38 +9,30 @@ import type {
 import { toModelThinking } from '../utils/thinkingLevels';
 import type { IAgentsModelThinking } from '../utils/thinkingLevels';
 
-/** One usable model of a provider, in the backend's ranked order. */
 export interface IAgentsModelOption {
   id: string;
   family: string;
   recommended: boolean;
-  /** Human name; absent or null shows the raw id. */
   name?: string | null;
-  /** Absent or null: no catalog data, the original five levels apply. */
   thinking?: IAgentsModelThinking | null;
 }
 
 export interface IAgentsProviderCatalog {
+  connectionId: string;
+  connectionName: string;
   provider: string;
-  /** Usable chat models only; empty when the listing failed. */
+  scope: string;
+  isDefault: boolean;
   models: IAgentsModelOption[];
-  /** Key-free reason this provider's listing failed. */
   error?: string;
 }
 
 export interface IUseAgentsModelsResult {
-  /** One entry per configured provider, including ones whose listing failed. */
   providerModels: IAgentsProviderCatalog[];
   loading: boolean;
   error: string | undefined;
 }
 
-/**
- * Lists the usable models of every provider the acting user has configured.
- * The backend fetches each provider's /models endpoint server-side with the
- * stored keys (no secret reaches the browser) and filters it to chat models
- * the agent can run, marking a short recommended list per provider.
- */
 export const useAgentsModels = (): IUseAgentsModelsResult => {
   const { data, loading, error } = useQuery<IAgentsModelsData>(AGENTS_MODELS, {
     fetchPolicy: 'network-only',
@@ -49,7 +41,11 @@ export const useAgentsModels = (): IUseAgentsModelsResult => {
   const providerModels = useMemo(
     () =>
       (data?.agentsModels ?? []).map((group) => ({
+        connectionId: group.connectionId,
+        connectionName: group.connectionName,
         provider: group.provider,
+        scope: group.scope,
+        isDefault: group.isDefault === true,
         models: (
           group.catalog ??
           (group.models ?? []).map(

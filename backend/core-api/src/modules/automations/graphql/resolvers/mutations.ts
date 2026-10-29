@@ -4,7 +4,7 @@ import {
 } from 'erxes-api-shared/core-modules';
 import { IContext } from '~/connectionResolvers';
 import { AUTOMATION_APPROVAL_CONTENT_TYPES } from '../../constants';
-import { sanitizeAiAgent } from '../../utils/aiAgent';
+import { toAiAgentView } from '../../utils/aiAgent';
 
 export interface IAutomationsEdit extends IAutomation {
   _id: string;
@@ -116,7 +116,7 @@ export const automationMutations = {
   ) {
     await checkPermission('automationsAiAgentAdd');
 
-    return sanitizeAiAgent(await models.AiAgents.createAgent(doc));
+    return toAiAgentView(await models.AiAgents.createAgent(doc));
   },
   async automationsAiAgentEdit(
     _root,
@@ -132,7 +132,7 @@ export const automationMutations = {
       action: 'edit',
     });
 
-    return sanitizeAiAgent(await models.AiAgents.editAgent(_id, doc));
+    return toAiAgentView(await models.AiAgents.editAgent(_id, doc));
   },
 
   async automationsAiAgentRemove(

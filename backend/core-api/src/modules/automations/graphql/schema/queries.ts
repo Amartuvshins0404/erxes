@@ -63,11 +63,11 @@ const queries = `
   automationValidate(_id: String, status: String, triggers: [TriggerInput], actions: [ActionInput], workflows: [WorkflowInput]): JSON
   automationReferenceFields(type: String!, field: String!): JSON
   automationBotsConstants:JSON
-  automationsAiAgents(kind:String):JSON
+  automationsAiAgents:JSON
   automationsAiAgentTotalCounts:JSON
   automationsAiAgentDetail(_id:String):JSON
   automationsAiAgentHealth(agentId: String!): AiAgentHealth!
-  automationsAiAgentModels(agentId: String, provider: String!, selectedModel: String): [AiAgentModelOption!]!
+  automationsAiAgentModels(agentId: String, connectionId: String!, selectedModel: String): [AiAgentModelOption!]!
   automationsAiAgentKnowledgeSourceStatuses(agentId: String!): JSON
   getAutomationWebhookEndpoint(_id:String!,waitEventActionId:String):String
   getAutomationExecutionDetail(executionId: String!): AutomationHistory

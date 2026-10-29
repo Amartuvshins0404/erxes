@@ -3,17 +3,17 @@
 The `agents` module is the AI assistant backend living **inside core-api** (not a
 plugin; ported from the former private `erxes-agent` service). It provides:
 
-- per-user **BYOK** multi-provider connections (`openai`, `grok`, `kimi`,
-  `kimi-code`; `cloudflare-ai-gateway` resolves but is not offered on the BYOK
-  surface) stored on `agents_user_connections` — one doc per user per tenant,
-  one entry per provider, `hasKey`-only reads; an optional top-level
-  `defaultProvider` names the entry an unselected turn runs on
-  (`findDefaultConnection`: that entry while still saved, else the first; no
-  migration); `config.apiKey` is sealed at rest (`secretBox.ts`, AES-256-GCM, `enc:v1:` envelope keyed from
-  `JWT_TOKEN_SECRET`) — readers use `openSecret`, writers seal on upsert,
-  `getConnections` lazily re-seals legacy plaintext;
+- model access through **core connections** (`src/modules/connections`,
+  category `ai`: `openai`, `grok`, `kimi`, `kimi-code`,
+  `cloudflare-ai-gateway`). A user may run on every workspace AI connection
+  plus their own personal ones (`connectionAccess.ts`: personal first, then
+  workspace, each by `createdAt`). Agents reads them in-process through
+  `models.Connections` — no tRPC, no key storage of its own. The per-user
+  default is `agents_user_preferences { userId, defaultConnectionId }`; an
+  unselected turn uses that connection while it is still usable, else the
+  first usable one;
 - a Mastra **DurableAgent** chat over SSE with durable suspend/resume
-  (destructive-tool approval, `ask_user` questions), per-turn provider/model/
+  (destructive-tool approval, `ask_user` questions), per-turn connection/model/
   `thinkingLevel` selection, and generated thread titles;
 - assistant text is semantic HTML reply content, without fences or file
   controls. Actual reports/documents use the `createArtifact` tool's structured
@@ -140,11 +140,12 @@ plugin; ported from the former private `erxes-agent` service). It provides:
 ## Surfaces
 
 - HTTP (mounted in `src/routes.ts` via `src/modules/agents/routes.ts`):
-  `POST /agents/chat` (SSE; optional `runId` UUID, `provider`, `model`,
-  `thinkingLevel` (clamped to the selected model's levels by
-  `normalizeThinkingLevel` before it is stamped), `pageContext`, mention parts
-  in the newest message; without `provider`, `pickConnection` uses
-  `findDefaultConnection`; `X-Agents-Thread-Id` response header),
+  `POST /agents/chat` (SSE; optional `runId` UUID, `connectionId`, `model`
+  (empty → the type's `PROVIDER_DEFAULTS` model), `thinkingLevel` (clamped to
+  the selected model's levels by `normalizeThinkingLevel` before it is
+  stamped), `pageContext`, mention parts in the newest message; without
+  `connectionId`, `selectChatConnection` uses the user's default connection;
+  `X-Agents-Thread-Id` response header),
   `POST /agents/approve` `{ threadId, toolCallId?, approved, reason? }`,
   `POST /agents/answer` `{ threadId, answer }`,
   `POST /agents/chat/reconnect` `{ threadId, runId }` (SSE replay, 204 when
@@ -153,7 +154,8 @@ plugin; ported from the former private `erxes-agent` service). It provides:
   All require the gateway `user` header and `agentsChat`, including plain text,
   approval, answer and reconnect requests. Permission denial precedes credential,
   runtime and attachment access. Chat then resolves the connection and checks
-  its key opens (400 with the key-free reason otherwise) before any mention
+  its secrets open and its config is complete (400 with the key-free reason
+  otherwise) before any mention
   lookup through the gateway. Identity is stamped from the header into Mastra
   RequestContext — never from the body or the model.
 - Chat accepts optional `editMessageId`, matching the newest user message id
@@ -164,31 +166,29 @@ plugin; ported from the former private `erxes-agent` service). It provides:
   rewind. Failed stream startup restores the removed messages. Editing does
   not reverse business operations already executed by tools.
 - GraphQL (wired into `src/apollo/schema/schema.ts` + resolvers):
-  `agentsConnections`, `agentsModels` (server-side provider /models fetch,
-  filtered by `modelCatalog.ts`; per provider `models` = usable ids in rank
-  order, additive `catalog: [AgentsModelInfo { id, family, recommended, name,
-  thinking: AgentsModelThinking { kind, levels } }]` (`modelThinking.ts`; null
-  name/thinking = not in the snapshot), and
-  a key-free `error` that says why when the stored key cannot be opened
-  (missing vs changed `JWT_TOKEN_SECRET`, or no key) or the listing fails
-  (OpenAI keys without Models: Read / `api.model.read`, 401, 403, 429, 5xx);
-  every saved provider is returned, never silently dropped),
-  `agentsModelVerify(provider: String!, model: String!): AgentsModelVerification
-  { provider model ok error }` (`agentsChat`; own saved connection only;
-  `modelProbe.ts` sends one minimal request through `providers.ts` +
-  Mastra `resolveModelConfig` — 16 output tokens, kimi-code with the
-  `MIN_ANTHROPIC_THINKING_BUDGET` (1,024) thinking budget because `k3.1-pro`
-  rejects thinking off; ok only after an output, metadata or finish chunk,
-  otherwise a "no response" error; id shape and `isUsableProviderModel` are
-  checked first; nothing is persisted; like
-  `agentsConnectionSetDefault`, denied to the agent by `graphqlPolicy.ts`),
-  `agentsConnectionUpsert`/`agentsConnectionRemove` (BYOK; key never read
-  back; `AgentsConnectionEntry.isDefault` is the effective default),
-  `agentsConnectionSetDefault(provider: String): [AgentsConnectionEntry]`
-  (`agentsChat`; own document only; the write is conditional on the provider
-  being saved, unknown providers are a VALIDATION_ERROR, empty clears; a
-  document still in the old single-`connection` shape is written as the
-  sealed array with the default; `removeConnection` unsets a removed default),
+  `agentsModels: [AgentsProviderModels { connectionId connectionName provider
+  scope isDefault models catalog error }]` (`agentsChat`; one entry per usable
+  AI connection, never silently dropped; `isDefault` is the effective default;
+  server-side provider /models fetch filtered by `modelCatalog.ts`; `models` =
+  usable ids in rank order, `catalog: [AgentsModelInfo { id, family,
+  recommended, name, thinking: AgentsModelThinking { kind, levels } }]`
+  (`modelThinking.ts`; null name/thinking = not in the snapshot); a key-free
+  `error` says why when the key is missing, cannot be opened (rotated or
+  missing `ERXES_MASTER_KEY`) or the listing fails (OpenAI keys without
+  Models: Read / `api.model.read`, 401, 403, 429, 5xx)),
+  `agentsModelVerify(connectionId: String!, model: String!):
+  AgentsModelVerification { provider model ok error }` (`agentsChat`; usable
+  connections only; `modelProbe.ts` sends one minimal request through
+  `providers.ts` + Mastra `resolveModelConfig` — 16 output tokens, kimi-code
+  with the `MIN_ANTHROPIC_THINKING_BUDGET` (1,024) thinking budget because
+  `k3.1-pro` rejects thinking off; ok only after an output, metadata or finish
+  chunk, otherwise a "no response" error; id shape and `isUsableProviderModel`
+  are checked first; nothing is persisted),
+  `agentsSetDefaultConnection(connectionId: String): Boolean` (`agentsChat`;
+  writes `agents_user_preferences` for the acting user only; the id must be a
+  usable connection, otherwise VALIDATION_ERROR; empty clears). Both mutations
+  and every `connections*` operation are denied to the agent by
+  `graphqlPolicy.ts`. Connection CRUD lives in the connections module,
   `agentsThreads(page, perPage, pinned)` (`pinned: true` →
   `filter.metadata.pinned`), `agentsThreadDetail(threadId)`,
   `agentsThreadUpdate(threadId, title?, pinned?)` (rename ≤120 chars /
@@ -220,7 +220,9 @@ plugin; ported from the former private `erxes-agent` service). It provides:
   narrow query rather than fall back to plain text; guidance only, evidence
   verification is unchanged), `AGENTS_MAX_STEPS` (32), model settings
   (thinking translation lives in `modelThinking.ts`),
-  BYOK model resolution with construction-safe fallback, `buildBaseAgentsAgent`.
+  connection model resolution (re-reads the snapshot's `connectionId` through
+  `connectionAccess.ts` on every resolution, so edits and removals apply to
+  resumes) with construction-safe fallback, `buildBaseAgentsAgent`.
 - `memory.ts` — per-subdomain runtime `{ memory, mastra, agent }` cache;
   `MongoDBStore` (`core-agents-store`) on the dedicated `{db}_agents_memory`
   sub-database via the shared mongoose `connectorHandler`; installs the
@@ -276,7 +278,7 @@ plugin; ported from the former private `erxes-agent` service). It provides:
 - `references.ts` — token grammar, toolId→type table, label pickers, result
   walking, sanitization (max 25 tokens, label ≤80 chars).
 - `requestContext.ts` — JSON-safe per-run snapshot
-  (subdomain/userId/provider/model/thinkingLevel/codeModeEnabled/
+  (subdomain/userId/connectionId/model/thinkingLevel/codeModeEnabled/
   approvalMode/threadId/attachmentUrls); never secrets.
 - `modelCatalog.ts` — data-driven per-provider usability rules (shared
   non-chat deny patterns: embeddings, tts/whisper/transcribe/audio/realtime,
@@ -285,7 +287,7 @@ plugin; ported from the former private `erxes-agent` service). It provides:
   deep-research; Kimi drops `kimi-thinking-preview`). Dated snapshots collapse
   behind a listed alias, otherwise to the newest snapshot. Ranking: family tier,
   version, alias before variants, `created`. Up to four `recommended`: the
-  stored connection model and `PROVIDER_DEFAULTS` model when listed, then the
+  `PROVIDER_DEFAULTS` model when listed, then the
   leading generation line minus slow/preview variants. Model knowledge has
   one source, the bundled snapshot (`modelsDevSnapshot.ts`): a model it knows
   is usable only when it calls tools, takes text and answers in text only;
@@ -351,7 +353,9 @@ plugin; ported from the former private `erxes-agent` service). It provides:
   `AGENTS_DOCUMENT_MIME_TYPES`; keep aligned with core-ui `agentsFiles.ts`),
   `toolSchemaCompatibility.ts`, `mongo44Compatibility.ts`, `providers.ts`,
   `threadsEvents.ts`.
-- `db/` — `AgentsConnection` + `AgentsSettings` models (registered in
+- `connectionAccess.ts` — usable AI connections for a user, ordering, default
+  pick (`agents_user_preferences`), in-process resolution.
+- `db/` — `AgentsUserPreferences` + `AgentsSettings` models (registered in
   `src/connectionResolvers.ts`); `graphql/` — schemas + thin resolvers.
 
 ## Invariants (carry over)
@@ -361,10 +365,9 @@ plugin; ported from the former private `erxes-agent` service). It provides:
   approval, the deny policy or permissions. Hidden operations stay a
   discovery filter; do not turn them into execution blocking.
 
-- Never introduce env-var secrets; BYOK keys live only on the per-user
-  document — sealed `enc:v1:` envelopes only, never plaintext — and never
-  appear in responses, errors, or logs. `sealSecret` throws when
-  `JWT_TOKEN_SECRET` is unset (fail closed).
+- Never introduce env-var or module-local secrets; provider keys live only in
+  core connections (sealed, see `src/modules/connections/AGENTS.md`) and
+  never appear in responses, errors, logs or the RequestContext snapshot.
 - Threads/messages/approvals live in `{db}_agents_memory` only — never the
   base DB's legacy `mastra_*` collections.
 - GraphQL is the only CRM execution path. Identity is never model-controlled;

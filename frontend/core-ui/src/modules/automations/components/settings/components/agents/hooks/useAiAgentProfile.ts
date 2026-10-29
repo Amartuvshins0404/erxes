@@ -1,5 +1,9 @@
 import { AI_AGENT_STEPS } from '@/automations/components/settings/components/agents/constants/aiAgentSteps';
 import { AI_AGENT_PROVIDER_LABELS } from '@/automations/components/settings/components/agents/constants/providers';
+import {
+  getConnectionProvider,
+  useAiAgentConnections,
+} from '@/automations/components/settings/components/agents/hooks/useAiAgentConnections';
 import { useAiAgentDetailContext } from '@/automations/components/settings/components/agents/context/AiAgentDetailContext';
 import { useAiAgentMemoryItems } from '@/automations/components/settings/components/agents/hooks/useAiAgentMemoryItems';
 import { TAiAgentForm } from '@/automations/components/settings/components/agents/states/AiAgentFormSchema';
@@ -21,6 +25,8 @@ export const useAiAgentProfile = () => {
       'context.knowledgeSources',
     ],
   });
+  const { byId } = useAiAgentConnections();
+  const provider = getConnectionProvider(byId.get(connection?.connectionId || ''));
   const { items } = useAiAgentMemoryItems({
     knowledgeSources: knowledgeSources || [],
     knowledgeStatuses,
@@ -42,7 +48,7 @@ export const useAiAgentProfile = () => {
   const summary = isHealthy
     ? [
         connection?.model,
-        AI_AGENT_PROVIDER_LABELS[connection?.provider],
+        provider ? AI_AGENT_PROVIDER_LABELS[provider] : undefined,
         `${memoryChips.length} memory item${
           memoryChips.length === 1 ? '' : 's'
         }`,

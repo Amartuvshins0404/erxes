@@ -19,6 +19,14 @@ const AgentSettingsRoutes = lazy(() =>
   })),
 );
 
+const ConnectionsSettingsPage = lazy(() =>
+  import('~/pages/settings/workspace/ConnectionsSettingsPage').then(
+    (module) => ({
+      default: module.ConnectionsSettingsPage,
+    }),
+  ),
+);
+
 const SettingsProfile = lazy(() =>
   import('~/pages/settings/account/ProfilePage').then((module) => ({
     default: module.SettingsProfilePage,
@@ -239,6 +247,10 @@ export function SettingsRoutes() {
               </Suspense>
             </PermissionRouteGuard>
           }
+        />
+        <Route
+          path={SettingsWorkspacePath.Connections}
+          element={<ConnectionsSettingsPage />}
         />
         <Route
           path={SettingsWorkspacePath.AutomationsCatchAll}

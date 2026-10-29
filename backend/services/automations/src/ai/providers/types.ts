@@ -1,14 +1,14 @@
-import type { TAiAgentConnection } from '../aiAgent/connection';
+import type { TAiProviderConnection } from '../aiAgent/connection';
 
-export type TAiProvider = TAiAgentConnection['provider'];
+export type TAiProvider = TAiProviderConnection['provider'];
 
 export type TCloudflareAiGatewayMode = 'compat' | 'openai-provider';
 
 export type TAiProviderResolutionInput = {
-  subdomain?: string;
-  connection: TAiAgentConnection;
+  connection: TAiProviderConnection;
+  connectionName?: string;
 };
 
 export type TAiProviderResolver = (
   input: TAiProviderResolutionInput,
-) => TAiAgentConnection;
+) => TAiProviderConnection;

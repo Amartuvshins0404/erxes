@@ -36,7 +36,7 @@ import { bundleQueries } from '@/bundle/graphql/resolvers/queries';
 import { templateQueries } from '@/template/graphql/queries';
 import { globalSearchQueries } from '@/search/graphql/resolvers/queries/globalSearch';
 import { referenceQueries } from '~/meta/references/graphql/queries';
-import { agentsConnectionsQueries } from '@/agents/graphql/resolvers/queries/connection';
+import { connectionsQueries } from '@/connections/graphql/resolvers/queries';
 import { agentsModelsQueries } from '@/agents/graphql/resolvers/queries/models';
 import { agentsThreadsQueries } from '@/agents/graphql/resolvers/queries/threads';
 import { agentsSettingsQueries } from '@/agents/graphql/resolvers/queries/settings';
@@ -91,7 +91,7 @@ export const queries = {
   ...bundleQueries,
   ...templateQueries,
   ...globalSearchQueries,
-  ...agentsConnectionsQueries,
+  ...connectionsQueries,
   ...agentsModelsQueries,
   ...agentsThreadsQueries,
   ...agentsSettingsQueries,

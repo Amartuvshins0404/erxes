@@ -3,15 +3,16 @@ import {
   AI_AGENT_PROVIDER_DEFAULT_MODELS,
 } from '../../aiAgent/constants';
 import type { TKimiAgentConnection } from '../../aiAgent/connection';
-import { getFirstAiProviderEnv } from '../env';
 import { TAiProviderResolutionInput } from '../types';
 
-type TKimiResolutionInput = Omit<TAiProviderResolutionInput, 'connection'> & {
+type TKimiResolutionInput = Omit<
+  TAiProviderResolutionInput,
+  'connection'
+> & {
   connection: TKimiAgentConnection;
 };
 
 export const resolveKimiConnection = ({
-  subdomain,
   connection,
 }: TKimiResolutionInput): TKimiAgentConnection => {
   const config = connection.config || {};
@@ -19,28 +20,11 @@ export const resolveKimiConnection = ({
   return {
     ...connection,
     provider: 'kimi',
-    model:
-      connection.model?.trim() ||
-      getFirstAiProviderEnv({
-        names: ['KIMI_DEFAULT_MODEL', 'MOONSHOT_DEFAULT_MODEL'],
-        defaultValue: AI_AGENT_PROVIDER_DEFAULT_MODELS.kimi,
-        subdomain,
-      }),
+    model: connection.model?.trim() || AI_AGENT_PROVIDER_DEFAULT_MODELS['kimi'],
     config: {
       ...config,
-      apiKey:
-        config.apiKey?.trim() ||
-        getFirstAiProviderEnv({
-          names: ['KIMI_API_KEY', 'MOONSHOT_API_KEY'],
-          subdomain,
-        }),
-      baseUrl:
-        config.baseUrl?.trim() ||
-        getFirstAiProviderEnv({
-          names: ['KIMI_BASE_URL', 'MOONSHOT_BASE_URL'],
-          defaultValue: AI_AGENT_DEFAULTS.kimiBaseUrl,
-          subdomain,
-        }),
+      apiKey: config.apiKey?.trim() || '',
+      baseUrl: config.baseUrl?.trim() || AI_AGENT_DEFAULTS.kimiBaseUrl,
     },
   };
 };

@@ -9,6 +9,7 @@ import {
 import { createStore, Provider } from 'jotai';
 import type { MutableRefObject, Ref } from 'react';
 import { ModelPicker, type IModelPickerProps } from '../components/ModelPicker';
+import type { IAgentsProviderCatalog } from '../hooks/useAgentsModels';
 import { agentRecentModelsState } from '../states/agentRecentModelsState';
 
 // Use the real erxes-ui/CMDK/Radix controls to cover search and keyboard behavior.
@@ -52,14 +53,25 @@ afterAll(() => {
   HTMLElement.prototype.scrollIntoView = originalScroll;
 });
 
-const saved = [
-  { provider: 'openai', model: 'gpt-6-luna' },
-  { provider: 'kimi', model: 'kimi-k3' },
-];
 const option = (id: string, recommended = false) => ({
   id,
   family: id.startsWith('gpt-6') ? 'gpt-6' : '',
   recommended,
+});
+const connection = (
+  connectionId: string,
+  connectionName: string,
+  provider: string,
+  models: ReturnType<typeof option>[],
+  extra: Partial<IAgentsProviderCatalog> = {},
+): IAgentsProviderCatalog => ({
+  connectionId,
+  connectionName,
+  provider,
+  scope: 'workspace',
+  isDefault: false,
+  models,
+  ...extra,
 });
 const openaiModels = [
   option('gpt-6', true),
@@ -67,18 +79,27 @@ const openaiModels = [
   option('gpt-6-mini', true),
   ...Array.from({ length: 132 }, (_, i) => option(`catalog-model-${i}`)),
 ];
+const openaiConnection = (extra: Partial<IAgentsProviderCatalog> = {}) =>
+  connection('conn-openai', 'Team OpenAI', 'openai', openaiModels, {
+    isDefault: true,
+    ...extra,
+  });
+const kimiConnection = (extra: Partial<IAgentsProviderCatalog> = {}) =>
+  connection('conn-kimi', 'My Kimi', 'kimi', [option('kimi-k3', true)], {
+    scope: 'personal',
+    ...extra,
+  });
+const modelsOf = (
+  providerModels: IAgentsProviderCatalog[],
+): IModelPickerProps['models'] => ({
+  loading: false,
+  error: undefined,
+  providerModels,
+});
 const baseProps: IModelPickerProps = {
-  value: 'openai|gpt-6-luna',
+  value: 'conn-openai|gpt-6-luna',
   onChange: jest.fn(),
-  savedModels: saved,
-  models: {
-    loading: false,
-    error: undefined,
-    providerModels: [
-      { provider: 'openai', models: openaiModels },
-      { provider: 'kimi', models: [option('kimi-k3', true)] },
-    ],
-  },
+  models: modelsOf([openaiConnection(), kimiConnection()]),
 };
 const setup = (
   overrides: Partial<IModelPickerProps> = {},
@@ -96,25 +117,24 @@ const setup = (
   return { store, onChange };
 };
 
-const chooseProvider = (name = 'OpenAI') =>
+const chooseConnection = (name = 'Team OpenAI') =>
   fireEvent.click(screen.getByRole('option', { name: new RegExp(`^${name}`) }));
 const optionNames = () =>
   screen.getAllByRole('option').map((item) => item.textContent);
 
-it('opens with providers, then shows the provider’s recommended models immediately', async () => {
+it('opens with connections, then shows the connection’s recommended models immediately', async () => {
   const { onChange } = setup({ value: '' });
-  expect(screen.getByText('Provider')).toBeTruthy();
+  expect(screen.getByText('Connection')).toBeTruthy();
   expect(screen.getAllByRole('option')).toHaveLength(3);
   expect(screen.queryByText('Recommended')).toBeNull();
   expect(
     screen.queryByRole('button', { name: 'Browse all models' }),
   ).toBeNull();
-  chooseProvider();
+  chooseConnection();
   expect(onChange).not.toHaveBeenCalled();
   expect(screen.getByText('Recommended')).toBeTruthy();
-  expect(optionNames()).toEqual(['gpt-6', 'gpt-6-lunaDefault', 'gpt-6-mini']);
+  expect(optionNames()).toEqual(['gpt-6', 'gpt-6-luna', 'gpt-6-mini']);
   expect(screen.queryByRole('option', { name: /kimi-k3/ })).toBeNull();
-  expect(screen.queryByText('135 models')).toBeNull();
   await waitFor(() =>
     expect(
       screen
@@ -124,76 +144,46 @@ it('opens with providers, then shows the provider’s recommended models immedia
   );
 });
 
-it('marks only the model an empty selection runs as Default', () => {
-  setup({
-    value: '',
-    savedModels: [
-      { provider: 'kimi-code', model: 'kimi-for-coding' },
-      { provider: 'kimi', model: 'kimi-k3' },
-    ],
-    models: {
-      loading: false,
-      error: undefined,
-      providerModels: [
-        { provider: 'kimi-code', models: [option('kimi-for-coding', true)] },
-        { provider: 'kimi', models: [option('kimi-k3', true)] },
-      ],
-    },
-  });
+it('names the connection an empty selection runs and marks personal ones', () => {
+  setup({ value: '' });
   const trigger = screen.getByRole('combobox', { name: 'Model' });
-  expect(trigger.textContent).toBe('kimi-for-coding');
-  expect(trigger.getAttribute('title')).toBe(
-    'Kimi Code · kimi-for-coding (saved default)',
-  );
+  expect(trigger.textContent).toBe('Team OpenAI');
+  expect(trigger.getAttribute('title')).toBe('Team OpenAI (saved default)');
   expect(
-    screen.getByRole('option', { name: /^Kimi Code/ }).textContent,
+    screen.getByRole('option', { name: /^Team OpenAI/ }).textContent,
   ).toContain('In use');
   expect(
+    screen.getByRole('option', { name: /^My Kimi/ }).textContent,
+  ).toContain('Personal');
+  expect(
     screen.getByRole('option', { name: /Use saved default/ }).textContent,
-  ).toContain('Kimi Code · kimi-for-coding');
-  chooseProvider('Kimi$');
-  expect(optionNames()).toEqual(['kimi-k3']);
-  fireEvent.click(screen.getByRole('button', { name: 'Back to providers' }));
-  chooseProvider('Kimi Code');
-  expect(optionNames()).toEqual(['kimi-for-codingDefault']);
+  ).toContain('Team OpenAI');
 });
 
-it('follows the explicit default rather than the first saved connection', () => {
+it('follows the explicit default rather than the first connection', () => {
   setup({
     value: '',
-    savedModels: [
-      { provider: 'openai', model: 'gpt-6-luna', isDefault: false },
-      { provider: 'kimi', model: 'kimi-k3', isDefault: true },
-    ],
+    models: modelsOf([
+      openaiConnection({ isDefault: false }),
+      kimiConnection({ isDefault: true }),
+    ]),
   });
   const trigger = screen.getByRole('combobox', { name: 'Model' });
-  expect(trigger.textContent).toBe('kimi-k3');
-  expect(trigger.getAttribute('title')).toBe('Kimi · kimi-k3 (saved default)');
-  expect(screen.getByRole('option', { name: /^Kimi/ }).textContent).toContain(
-    'In use',
-  );
+  expect(trigger.textContent).toBe('My Kimi');
   expect(
-    screen.getByRole('option', { name: /^OpenAI/ }).textContent,
+    screen.getByRole('option', { name: /^My Kimi/ }).textContent,
+  ).toContain('In use');
+  expect(
+    screen.getByRole('option', { name: /^Team OpenAI/ }).textContent,
   ).not.toContain('In use');
-  expect(
-    screen.getByRole('option', { name: /Use saved default/ }).textContent,
-  ).toContain('Kimi · kimi-k3');
-  chooseProvider();
-  expect(optionNames()).toEqual(['gpt-6', 'gpt-6-luna', 'gpt-6-mini']);
-  fireEvent.click(screen.getByRole('button', { name: 'Back to providers' }));
-  chooseProvider('Kimi');
-  expect(optionNames()).toEqual(['kimi-k3Default']);
 });
 
-it('selects a provider then an exact model with the keyboard', async () => {
+it('selects a connection then an exact model with the keyboard', async () => {
   const { onChange, store } = setup();
-  expect(
-    screen.queryByRole('combobox', { name: 'Search providers' }),
-  ).toBeNull();
-  const providerMenu = document.activeElement;
-  if (!providerMenu) throw new Error('Provider menu was not focused');
-  expect(providerMenu.hasAttribute('cmdk-root')).toBe(true);
-  fireEvent.keyDown(providerMenu, { key: 'Enter' });
+  const menu = document.activeElement;
+  if (!menu) throw new Error('Connection menu was not focused');
+  expect(menu.hasAttribute('cmdk-root')).toBe(true);
+  fireEvent.keyDown(menu, { key: 'Enter' });
   expect(onChange).not.toHaveBeenCalled();
   const search = screen.getByRole('combobox', { name: 'Search models' });
   fireEvent.change(search, { target: { value: 'catalog-model-131' } });
@@ -201,14 +191,16 @@ it('selects a provider then an exact model with the keyboard', async () => {
   expect(screen.getByText('Others')).toBeTruthy();
   fireEvent.keyDown(search, { key: 'ArrowDown' });
   fireEvent.keyDown(search, { key: 'Enter' });
-  expect(onChange).toHaveBeenCalledWith('openai|catalog-model-131');
-  expect(store.get(agentRecentModelsState)[0]).toBe('openai|catalog-model-131');
+  expect(onChange).toHaveBeenCalledWith('conn-openai|catalog-model-131');
+  expect(store.get(agentRecentModelsState)[0]).toBe(
+    'conn-openai|catalog-model-131',
+  );
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
 });
 
-it('browses the selected provider’s complete usable catalog in groups', () => {
+it('browses the selected connection’s complete usable catalog in groups', () => {
   setup();
-  chooseProvider();
+  chooseConnection();
   fireEvent.click(screen.getByRole('button', { name: 'Browse all models' }));
   expect(screen.getAllByRole('option')).toHaveLength(135);
   expect(screen.getByText('Recommended')).toBeTruthy();
@@ -218,143 +210,128 @@ it('browses the selected provider’s complete usable catalog in groups', () => 
   expect(screen.getAllByRole('option')).toHaveLength(3);
 });
 
-it('can go back and switch providers without changing the selection', () => {
+it('can go back and switch connections without changing the selection', () => {
   const { onChange } = setup();
-  chooseProvider();
-  fireEvent.click(screen.getByRole('button', { name: 'Back to providers' }));
-  chooseProvider('Kimi');
+  chooseConnection();
+  fireEvent.click(screen.getByRole('button', { name: 'Back to connections' }));
+  chooseConnection('My Kimi');
   expect(screen.getAllByRole('option')).toHaveLength(1);
   expect(screen.getByRole('option', { name: /kimi-k3/ })).toBeTruthy();
   expect(screen.queryByRole('option', { name: /gpt-6-luna/ })).toBeNull();
   expect(onChange).not.toHaveBeenCalled();
 });
 
-it('focuses a model from the newly chosen provider for keyboard selection', async () => {
-  const { onChange } = setup();
-  chooseProvider('Kimi');
-  await waitFor(() =>
-    expect(
-      screen
-        .getByRole('option', { name: /kimi-k3/ })
-        .getAttribute('aria-selected'),
-    ).toBe('true'),
-  );
-  fireEvent.keyDown(screen.getByRole('combobox', { name: 'Search models' }), {
-    key: 'Enter',
+it('selects the model by connection id so two keys of one provider stay apart', () => {
+  const { onChange } = setup({
+    models: modelsOf([
+      openaiConnection(),
+      connection('conn-openai-2', 'Backup OpenAI', 'openai', [
+        option('gpt-6-mini', true),
+      ]),
+    ]),
   });
-  expect(onChange).toHaveBeenCalledWith('kimi|kimi-k3');
+  chooseConnection('Backup OpenAI');
+  fireEvent.click(screen.getByRole('option', { name: /gpt-6-mini/ }));
+  expect(onChange).toHaveBeenCalledWith('conn-openai-2|gpt-6-mini');
 });
 
 it('lists bounded recent choices above recommendations and excludes unavailable models', () => {
   setup({}, [
-    'openai|catalog-model-4',
-    'kimi|kimi-k3',
+    'conn-openai|catalog-model-4',
+    'conn-kimi|kimi-k3',
     'removed|private',
-    'openai|missing',
-    'openai|gpt-6-mini',
-    'openai|catalog-model-3',
-    'openai|catalog-model-2',
-    'openai|catalog-model-1',
+    'conn-openai|missing',
+    'conn-openai|gpt-6-mini',
+    'conn-openai|catalog-model-3',
+    'conn-openai|catalog-model-2',
+    'conn-openai|catalog-model-1',
   ]);
-  chooseProvider();
+  chooseConnection();
   expect(screen.getByText('Recent')).toBeTruthy();
   expect(optionNames()).toEqual([
     'catalog-model-4',
     'catalog-model-3',
     'catalog-model-2',
     'gpt-6',
-    'gpt-6-lunaDefault',
+    'gpt-6-luna',
     'gpt-6-mini',
   ]);
   expect(screen.queryByText('private')).toBeNull();
   expect(screen.queryByText('missing')).toBeNull();
 });
 
-it('explains a provider whose listing failed and keeps its saved model', () => {
-  const { onChange } = setup({
+it('explains a connection whose listing failed', () => {
+  setup({
     value: '',
-    models: {
-      loading: false,
-      error: undefined,
-      providerModels: [
-        {
-          provider: 'openai',
-          models: [],
-          error:
-            'Failed to list models for "openai" (401). Check your API key.',
-        },
-        { provider: 'kimi', models: [option('kimi-k3', true)] },
-      ],
-    },
+    models: modelsOf([
+      openaiConnection({
+        models: [],
+        error: 'Failed to list models for "openai" (401). Check your API key.',
+      }),
+      kimiConnection(),
+    ]),
   });
-  // A failed listing never hides the provider the saved default runs on.
-  expect(screen.getByRole('option', { name: /^OpenAI/ }).textContent).toContain(
-    'In use',
-  );
-  chooseProvider();
+  expect(
+    screen.getByRole('option', { name: /^Team OpenAI/ }).textContent,
+  ).toContain('In use');
+  chooseConnection();
   expect(screen.getByRole('status').textContent).toContain(
     'Check your API key',
   );
-  expect(screen.getByText('Saved model')).toBeTruthy();
   expect(
     screen.queryByRole('button', { name: 'Browse all models' }),
   ).toBeNull();
-  fireEvent.click(screen.getByRole('option', { name: /gpt-6-luna/ }));
-  expect(onChange).toHaveBeenCalledWith('openai|gpt-6-luna');
 });
 
-it('flags an unavailable provider that is not in use', () => {
+it('flags an unavailable connection that is not in use', () => {
   setup({
-    models: {
-      loading: false,
-      error: undefined,
-      providerModels: [
-        { provider: 'openai', models: openaiModels },
-        { provider: 'kimi', models: [], error: 'Could not reach kimi.' },
-      ],
-    },
+    models: modelsOf([
+      openaiConnection(),
+      kimiConnection({ models: [], error: 'Could not reach kimi.' }),
+    ]),
   });
-  expect(screen.getByRole('option', { name: /^Kimi/ }).textContent).toContain(
-    'Unavailable',
-  );
+  expect(
+    screen.getByRole('option', { name: /^My Kimi/ }).textContent,
+  ).toContain('Unavailable');
 });
 
-it('shows an empty state when a provider lists no usable models', () => {
+it('shows an empty state when a connection lists no usable models', () => {
   setup({
     value: '',
-    models: {
-      loading: false,
-      error: undefined,
-      providerModels: [{ provider: 'openai', models: [] }],
-    },
+    models: modelsOf([openaiConnection({ models: [] })]),
   });
-  chooseProvider();
+  chooseConnection();
   expect(screen.getByRole('status').textContent).toContain(
     'No usable chat models',
   );
   expect(screen.queryAllByRole('option')).toHaveLength(0);
 });
 
-it('shows provider loading while discovery is pending', () => {
-  setup({ models: { loading: true, error: undefined, providerModels: [] } });
-  chooseProvider();
-  expect(screen.getByRole('status').textContent).toContain(
-    'Loading OpenAI models',
-  );
-});
-
-it.each([
-  { loading: true, error: undefined },
-  { loading: false, error: 'provider failure' },
-])('keeps the saved default usable when discovery is unavailable', (state) => {
-  const { onChange } = setup({ models: { ...state, providerModels: [] } });
+it('keeps the saved default usable when discovery is unavailable', () => {
+  const { onChange } = setup({
+    models: { loading: false, error: 'provider failure', providerModels: [] },
+  });
   fireEvent.click(screen.getByRole('option', { name: /Use saved default/ }));
   expect(onChange).toHaveBeenCalledWith('');
 });
 
-it('scopes model search and always reopens at provider selection', async () => {
+it('makes a connection the default and reports it through the callback', async () => {
+  const onSetDefault = jest.fn(async () => undefined);
+  setup({ onSetDefault });
+  chooseConnection('My Kimi');
+  fireEvent.click(screen.getByRole('button', { name: 'Make default' }));
+  await waitFor(() => expect(onSetDefault).toHaveBeenCalledWith('conn-kimi'));
+});
+
+it('shows no make-default action on the connection that is already default', () => {
+  setup({ onSetDefault: jest.fn(async () => undefined) });
+  chooseConnection();
+  expect(screen.queryByRole('button', { name: 'Make default' })).toBeNull();
+});
+
+it('scopes model search and always reopens at connection selection', async () => {
   setup();
-  chooseProvider();
+  chooseConnection();
   const search = screen.getByRole('combobox', { name: 'Search models' });
   fireEvent.change(search, { target: { value: 'kimi-k3' } });
   expect(screen.getByRole('status').textContent).toContain(
@@ -364,26 +341,18 @@ it('scopes model search and always reopens at provider selection', async () => {
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
   fireEvent.click(screen.getByRole('combobox', { name: 'Model' }));
   expect(screen.queryByRole('combobox', { name: 'Search models' })).toBeNull();
-  expect(
-    screen.queryByRole('combobox', { name: 'Search providers' }),
-  ).toBeNull();
-  expect(screen.getByText('Provider')).toBeTruthy();
+  expect(screen.getByText('Connection')).toBeTruthy();
   expect(screen.getAllByRole('option')).toHaveLength(3);
 });
 
 describe('typed model ids', () => {
-  const forbidden = {
-    loading: false,
-    error: undefined,
-    providerModels: [
-      {
-        provider: 'openai',
-        models: [],
-        error:
-          "This OpenAI key can't list models (missing Models: Read permission). Type a model id to use it, or allow Models: Read for the key.",
-      },
-    ],
-  };
+  const forbidden = modelsOf([
+    openaiConnection({
+      models: [],
+      error:
+        "This OpenAI key can't list models (missing Models: Read permission). Type a model id to use it, or allow Models: Read for the key.",
+    }),
+  ]);
   const typeModel = (text: string) =>
     fireEvent.change(screen.getByRole('combobox', { name: 'Search models' }), {
       target: { value: text },
@@ -396,20 +365,21 @@ describe('typed model ids', () => {
       models: forbidden,
       onVerifyModel,
     });
-    chooseProvider();
+    chooseConnection();
     expect(screen.getByRole('status').textContent).toContain(
       'missing Models: Read permission',
     );
-    expect(optionNames()).toEqual(['gpt-6-lunaDefault']);
 
     typeModel(' gpt-5.6-luna ');
     fireEvent.click(screen.getByRole('option', { name: 'Use "gpt-5.6-luna"' }));
 
     await waitFor(() =>
-      expect(onChange).toHaveBeenCalledWith('openai|gpt-5.6-luna'),
+      expect(onChange).toHaveBeenCalledWith('conn-openai|gpt-5.6-luna'),
     );
-    expect(onVerifyModel).toHaveBeenCalledWith('openai', 'gpt-5.6-luna');
-    expect(store.get(agentRecentModelsState)[0]).toBe('openai|gpt-5.6-luna');
+    expect(onVerifyModel).toHaveBeenCalledWith('conn-openai', 'gpt-5.6-luna');
+    expect(store.get(agentRecentModelsState)[0]).toBe(
+      'conn-openai|gpt-5.6-luna',
+    );
   });
 
   it('shows why a typed model was rejected and keeps the selection', async () => {
@@ -417,7 +387,7 @@ describe('typed model ids', () => {
       async () => 'OpenAI rejected "gpt-7" (404): The model does not exist.',
     );
     const { onChange } = setup({ models: forbidden, onVerifyModel });
-    chooseProvider();
+    chooseConnection();
     typeModel('gpt-7');
     fireEvent.click(screen.getByRole('option', { name: 'Use "gpt-7"' }));
 
@@ -441,7 +411,7 @@ describe('typed model ids', () => {
       'another choice was picked',
       () => {
         fireEvent.click(
-          screen.getByRole('button', { name: 'Back to providers' }),
+          screen.getByRole('button', { name: 'Back to connections' }),
         );
         fireEvent.click(
           screen.getByRole('option', { name: /Use saved default/ }),
@@ -461,7 +431,7 @@ describe('typed model ids', () => {
           }),
       );
       const { onChange } = setup({ models: forbidden, onVerifyModel });
-      chooseProvider();
+      chooseConnection();
       typeModel('gpt-5.6-luna');
       fireEvent.click(
         screen.getByRole('option', { name: 'Use "gpt-5.6-luna"' }),
@@ -475,25 +445,25 @@ describe('typed model ids', () => {
     },
   );
 
-  it('offers recent picks when the provider cannot list models', () => {
+  it('offers recent picks when the connection cannot list models', () => {
     setup({ value: '', models: forbidden }, [
-      'openai|gpt-5.6-luna',
-      'kimi|kimi-k3',
+      'conn-openai|gpt-5.6-luna',
+      'conn-kimi|kimi-k3',
     ]);
-    chooseProvider();
+    chooseConnection();
     expect(screen.getByText('Recent')).toBeTruthy();
-    expect(optionNames()).toEqual(['gpt-6-lunaDefault', 'gpt-5.6-luna']);
+    expect(optionNames()).toEqual(['gpt-5.6-luna']);
   });
 
   it('keeps a verified unlisted selection visible next to the catalog', () => {
-    setup({ value: 'openai|gpt-6-luna-preview' });
-    chooseProvider();
+    setup({ value: 'conn-openai|gpt-6-luna-preview' });
+    chooseConnection();
     expect(optionNames()[0]).toBe('gpt-6-luna-preview');
   });
 
   it('only offers custom ids that are unlisted, valid and verifiable', () => {
     setup({ onVerifyModel: jest.fn(async () => null) });
-    chooseProvider();
+    chooseConnection();
     typeModel('gpt-6-luna');
     expect(screen.queryByRole('option', { name: /^Use "/ })).toBeNull();
     typeModel('gpt 6');
@@ -506,7 +476,7 @@ describe('typed model ids', () => {
 
   it('offers no custom ids without a verifier', () => {
     setup({ models: forbidden });
-    chooseProvider();
+    chooseConnection();
     typeModel('gpt-6-nano');
     expect(screen.queryByRole('option', { name: /^Use "/ })).toBeNull();
   });
@@ -519,70 +489,57 @@ describe('access checks for listed models', () => {
         'OpenAI rejected "gpt-6" (403): Project does not have access to model gpt-6.',
     );
     const { onChange } = setup({ onVerifyModel });
-    chooseProvider();
+    chooseConnection();
     fireEvent.click(screen.getByRole('option', { name: /^gpt-6$/ }));
 
     expect(
       await screen.findByText(/Project does not have access to model gpt-6/),
     ).toBeTruthy();
-    expect(onVerifyModel).toHaveBeenCalledWith('openai', 'gpt-6');
+    expect(onVerifyModel).toHaveBeenCalledWith('conn-openai', 'gpt-6');
     expect(onChange).not.toHaveBeenCalled();
   });
 
-  it('selects a listed model once the provider accepts it', async () => {
+  it('selects a listed model once the connection accepts it', async () => {
     const onVerifyModel = jest.fn(async () => null);
     const { onChange } = setup({ onVerifyModel });
-    chooseProvider();
+    chooseConnection();
     fireEvent.click(screen.getByRole('option', { name: /^gpt-6-mini$/ }));
 
     await waitFor(() =>
-      expect(onChange).toHaveBeenCalledWith('openai|gpt-6-mini'),
+      expect(onChange).toHaveBeenCalledWith('conn-openai|gpt-6-mini'),
     );
   });
 
-  it('skips the check for current, saved and recent selections', () => {
+  it('skips the check for current and recent selections', () => {
     const onVerifyModel = jest.fn(async () => null);
     const { onChange } = setup({ value: '', onVerifyModel }, [
-      'openai|gpt-6-mini',
+      'conn-openai|gpt-6-mini',
     ]);
-    chooseProvider();
+    chooseConnection();
     fireEvent.click(screen.getByRole('option', { name: /^gpt-6-mini$/ }));
-    expect(onChange).toHaveBeenCalledWith('openai|gpt-6-mini');
-
-    fireEvent.click(screen.getByRole('combobox', { name: 'Model' }));
-    chooseProvider();
-    fireEvent.click(screen.getByRole('option', { name: /^gpt-6-luna/ }));
-    expect(onChange).toHaveBeenLastCalledWith('openai|gpt-6-luna');
+    expect(onChange).toHaveBeenCalledWith('conn-openai|gpt-6-mini');
     expect(onVerifyModel).not.toHaveBeenCalled();
   });
 });
 
 describe('display names', () => {
-  const named = {
-    loading: false,
-    error: undefined,
-    providerModels: [
-      {
-        provider: 'openai',
-        models: [
-          { ...option('gpt-6-luna', true), name: 'GPT-6 Luna' },
-          option('gpt-6', true),
-        ],
-      },
-    ],
-  };
+  const named = modelsOf([
+    connection('conn-openai', 'Team OpenAI', 'openai', [
+      { ...option('gpt-6-luna', true), name: 'GPT-6 Luna' },
+      option('gpt-6', true),
+    ]),
+  ]);
 
   it('titles a model with its name and shows the id muted', () => {
-    setup({ value: 'openai|gpt-6-luna', models: named });
+    setup({ value: 'conn-openai|gpt-6-luna', models: named });
     expect(screen.getByRole('combobox', { name: 'Model' }).textContent).toBe(
       'GPT-6 Luna',
     );
-    chooseProvider();
+    chooseConnection();
     const row = screen.getByRole('option', { name: /^GPT-6 Luna/ });
     expect(row.querySelector('.text-muted-foreground')?.textContent).toBe(
       'gpt-6-luna',
     );
-    // A model without a name keeps its raw id only.
     expect(screen.getByRole('option', { name: /^gpt-6$/ }).textContent).toBe(
       'gpt-6',
     );
@@ -590,11 +547,11 @@ describe('display names', () => {
 
   it('finds a model by its name or its id', () => {
     setup({ models: named });
-    chooseProvider();
+    chooseConnection();
     const search = screen.getByRole('combobox', { name: 'Search models' });
     fireEvent.change(search, { target: { value: 'luna' } });
-    expect(optionNames()).toEqual(['GPT-6 Lunagpt-6-lunaDefault']);
+    expect(optionNames()).toEqual(['GPT-6 Lunagpt-6-luna']);
     fireEvent.change(search, { target: { value: 'GPT-6 L' } });
-    expect(optionNames()).toEqual(['GPT-6 Lunagpt-6-lunaDefault']);
+    expect(optionNames()).toEqual(['GPT-6 Lunagpt-6-luna']);
   });
 });

@@ -12,8 +12,8 @@ import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
 import {
-  findDefaultAgentsConnection,
   useAgentsConnection,
+  useAgentsSetDefaultConnection,
 } from '../hooks/useAgentsConnection';
 import { useAgentsModelVerify } from '../hooks/useAgentsModelVerify';
 import { useAgentsModels } from '../hooks/useAgentsModels';
@@ -92,14 +92,12 @@ export const ChatPanel = ({
   const { connections, loading: connectionsLoading } = useAgentsConnection();
   const models = useAgentsModels();
   const verifyModel = useAgentsModelVerify();
-  // The picker shows the levels of the model a turn runs on (the selection,
-  // or the server default connection); the server clamps what is sent.
-  const defaultConnection = findDefaultAgentsConnection(connections);
+  const setDefaultConnection = useAgentsSetDefaultConnection();
   const modelThinking = findModelThinking(
     models.providerModels,
     chat.modelId
-      ? { provider: chat.modelProvider, model: chat.modelId }
-      : defaultConnection,
+      ? { connectionId: chat.modelConnectionId, model: chat.modelId }
+      : undefined,
   );
 
   const isStreaming = status === 'submitted' || status === 'streaming';
@@ -213,11 +211,11 @@ export const ChatPanel = ({
       <p className="min-w-0 flex-1 text-muted-foreground">
         {t(
           'no-connection',
-          'Connect an AI provider before chatting. Keys stay on your account.',
+          'Add an AI connection before chatting. Keys are stored encrypted.',
         )}
       </p>
       <Button variant="outline" size="sm" className="h-7 shrink-0" asChild>
-        <Link to="/settings/agent">{t('set-up', 'Set up')}</Link>
+        <Link to="/settings/connections">{t('set-up', 'Set up')}</Link>
       </Button>
     </div>
   ) : null;
@@ -226,9 +224,9 @@ export const ChatPanel = ({
     <>
       <ModelPicker
         models={models}
-        value={modelSelectionValue(chat.modelProvider, chat.modelId)}
-        savedModels={connections}
+        value={modelSelectionValue(chat.modelConnectionId, chat.modelId)}
         onVerifyModel={verifyModel}
+        onSetDefault={setDefaultConnection}
         onChange={(value) => {
           if (!value) {
             chat.selectModel('', '');
@@ -238,7 +236,7 @@ export const ChatPanel = ({
           const choice = parseModelSelection(value);
 
           if (choice) {
-            chat.selectModel(choice.provider, choice.model);
+            chat.selectModel(choice.connectionId, choice.model);
           }
         }}
       />

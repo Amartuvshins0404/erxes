@@ -1,48 +1,75 @@
-import { useQuery } from '@apollo/client';
-import { useCallback } from 'react';
+import { useMutation, useQuery } from '@apollo/client';
+import { toast } from 'erxes-ui';
+import { useCallback, useMemo } from 'react';
 
-import { AGENTS_CONNECTIONS } from '../graphql/connection';
+import {
+  AGENTS_AI_CONNECTIONS,
+  AGENTS_MODELS,
+  AGENTS_SET_DEFAULT_CONNECTION,
+} from '../graphql/connection';
 import type {
-  IAgentsConnectionEntry,
-  IAgentsConnectionsData,
+  IAgentsAiConnection,
+  IAgentsAiConnectionsData,
+  IAgentsSetDefaultConnectionData,
+  IAgentsSetDefaultConnectionVariables,
 } from '../graphql/connection';
 
 export interface IUseAgentsConnectionResult {
-  connections: IAgentsConnectionEntry[];
+  connections: IAgentsAiConnection[];
   loading: boolean;
   error: string | undefined;
   refetch: () => Promise<void>;
 }
 
-/**
- * The connection an unselected chat turn runs on: the entry the server marks
- * `isDefault`, else the first saved one (older responses, same fallback as
- * the backend).
- */
-export const findDefaultAgentsConnection = <
-  T extends { isDefault?: boolean | null },
->(
-  connections: readonly T[],
-): T | undefined =>
-  connections.find((connection) => connection.isDefault) ?? connections[0];
-
-/**
- * Loads the acting user's configured BYOK connections (one entry per
- * provider). The backend never returns the stored API keys; `hasKey` only
- * reports whether one is stored.
- */
 export const useAgentsConnection = (): IUseAgentsConnectionResult => {
-  const { data, loading, error, refetch } =
-    useQuery<IAgentsConnectionsData>(AGENTS_CONNECTIONS);
+  const { data, loading, error, refetch } = useQuery<IAgentsAiConnectionsData>(
+    AGENTS_AI_CONNECTIONS,
+  );
 
   const handleRefetch = useCallback(async () => {
     await refetch();
   }, [refetch]);
 
+  const connections = useMemo(
+    () =>
+      (data?.connections ?? []).filter(
+        (connection) => connection.secretsUnreadable.length === 0,
+      ),
+    [data],
+  );
+
   return {
-    connections: data?.agentsConnections ?? [],
+    connections,
     loading,
     error: error?.message,
     refetch: handleRefetch,
   };
+};
+
+export const useAgentsSetDefaultConnection = (): ((
+  connectionId: string,
+) => Promise<void>) => {
+  const [setDefault] = useMutation<
+    IAgentsSetDefaultConnectionData,
+    IAgentsSetDefaultConnectionVariables
+  >(AGENTS_SET_DEFAULT_CONNECTION, {
+    refetchQueries: [{ query: AGENTS_MODELS }],
+    awaitRefetchQueries: true,
+  });
+
+  return useCallback(
+    async (connectionId: string) => {
+      try {
+        await setDefault({ variables: { connectionId } });
+        toast({ title: 'Default connection updated' });
+      } catch (error: unknown) {
+        toast({
+          title: 'Failed to set the default connection',
+          description: error instanceof Error ? error.message : undefined,
+          variant: 'destructive',
+        });
+      }
+    },
+    [setDefault],
+  );
 };

@@ -6,9 +6,9 @@ import {
 import { Model } from 'mongoose';
 import { IModels } from '~/connectionResolvers';
 import {
-  mergeAiAgentConnectionSecrets,
   scheduleAiAgentKnowledgeIndex,
   TAiAgentMutationDoc,
+  toAiAgentView,
 } from '../../utils/aiAgent';
 
 export interface IAiAgentModel extends Model<AiAgentDocument> {
@@ -47,7 +47,7 @@ export const loadAiAgentClass = (
       sendDbEventLog({
         action: 'create',
         docId: agent._id,
-        currentDocument: agent,
+        currentDocument: toAiAgentView(agent),
       });
 
       await scheduleAiAgentKnowledgeIndex({ subdomain, agentId: agent._id });
@@ -58,12 +58,9 @@ export const loadAiAgentClass = (
     public static async editAgent(_id: string, doc: TAiAgentMutationDoc) {
       const current = await models.AiAgents.getAgent(_id);
 
-      // A masked secret means "unchanged", never "cleared".
-      const merged = mergeAiAgentConnectionSecrets(current, doc);
-
       const updated = await models.AiAgents.findOneAndUpdate(
         { _id },
-        { $set: { ...merged } },
+        { $set: { ...doc } },
         { runValidators: true, new: true },
       );
 
@@ -74,8 +71,8 @@ export const loadAiAgentClass = (
       sendDbEventLog({
         action: 'update',
         docId: _id,
-        prevDocument: current,
-        currentDocument: updated,
+        prevDocument: toAiAgentView(current),
+        currentDocument: toAiAgentView(updated),
       });
 
       await scheduleAiAgentKnowledgeIndex({ subdomain, agentId: _id });

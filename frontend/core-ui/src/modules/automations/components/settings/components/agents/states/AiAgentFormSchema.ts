@@ -2,12 +2,7 @@ import { z } from 'zod';
 import {
   aiAgentConnectionSchema,
   normalizeAiAgentConnection,
-  TAiAgentConnection,
 } from '@/automations/components/settings/components/agents/states/AiAgentConnectionSchema';
-import {
-  AI_AGENT_PROVIDERS_REQUIRING_API_KEY,
-  TAiAgentProvider,
-} from '@/automations/components/settings/components/agents/constants/providers';
 
 const aiAgentFileVersionSchema = z.object({
   key: z.string(),
@@ -50,7 +45,7 @@ const aiAgentToolSchema = z.object({
   config: z.record(z.unknown()).default({}),
 });
 
-const baseAiAgentFormSchema = z.object({
+export const aiAgentFormSchema = z.object({
   name: z.string().trim().min(1, 'Name is required'),
   description: z.string().max(500).default(''),
   connection: aiAgentConnectionSchema,
@@ -101,30 +96,7 @@ const normalizeUploadedAt = (value: unknown) => {
   return undefined;
 };
 
-export const buildAiAgentFormSchema = ({
-  requireApiKey = false,
-}: {
-  requireApiKey?: boolean;
-} = {}) =>
-  baseAiAgentFormSchema.superRefine((value, ctx) => {
-    if (
-      requireApiKey &&
-      AI_AGENT_PROVIDERS_REQUIRING_API_KEY.includes(
-        value.connection.provider,
-      ) &&
-      !value.connection.config.apiKey?.trim()
-    ) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['connection', 'config', 'apiKey'],
-        message: 'API key is required',
-      });
-    }
-  });
-
-export const aiAgentFormSchema = buildAiAgentFormSchema();
-
-export type TAiAgentForm = z.infer<typeof baseAiAgentFormSchema>;
+export type TAiAgentForm = z.infer<typeof aiAgentFormSchema>;
 type TAiAgentFormFileVersionInput = {
   key?: unknown;
   name?: unknown;
@@ -171,9 +143,8 @@ export type TAiAgentFormDetail = {
   name?: string;
   description?: string;
   connection?: {
-    provider?: TAiAgentConnection['provider'];
+    connectionId?: string;
     model?: string;
-    config?: Partial<TAiAgentConnection['config']> & Record<string, unknown>;
   };
   runtime?: {
     temperature?: number;
@@ -373,26 +344,10 @@ const normalizeAiAgentTools = (tools: unknown[] = []) =>
 
 export const normalizeAiAgentFormValues = (
   detail?: TAiAgentFormDetail,
-  defaultProvider?: TAiAgentProvider,
 ): TAiAgentForm => ({
   name: detail?.name || '',
   description: detail?.description || '',
-  connection: {
-    ...normalizeAiAgentConnection({
-      provider: detail?.connection?.provider || defaultProvider,
-      model: detail?.connection?.model,
-      config: {
-        ...(detail?.connection?.config || {}),
-        headers: isRecord(detail?.connection?.config?.headers)
-          ? Object.fromEntries(
-              Object.entries(detail.connection.config.headers).map(
-                ([key, value]) => [key, String(value ?? '')],
-              ),
-            )
-          : {},
-      },
-    } as Partial<TAiAgentConnection>),
-  },
+  connection: normalizeAiAgentConnection(detail?.connection),
   runtime: {
     temperature: detail?.runtime?.temperature ?? 0,
     maxTokens: detail?.runtime?.maxTokens ?? 2000,

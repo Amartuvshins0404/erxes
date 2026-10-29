@@ -1,5 +1,4 @@
 import {
-  AI_AGENT_SUPPORTED_PROVIDERS,
   aiAgentInputSchema,
   getAiAgentHealth,
   getAiAgentKnowledgeSourceStatuses,
@@ -12,7 +11,6 @@ import {
   syncAiAgentKnowledgeSources,
   syncAiKnowledgeSourceScope,
 } from '../ai';
-import type { TAiAgentProvider } from '../ai';
 import type {
   TAiKnowledgeSourceReference,
   TKnowledgeIndexJob,
@@ -33,15 +31,12 @@ export const checkAiAgentHealthWorker = async (job: Job) => {
   return await getAiAgentHealth(subdomain, agent);
 };
 
-const isAiAgentProvider = (value: unknown): value is TAiAgentProvider =>
-  AI_AGENT_SUPPORTED_PROVIDERS.some((provider) => provider === value);
-
 export const listAiAgentModelsWorker = async (job: Job) => {
   const { data, subdomain } = job.data;
-  const { agentId, provider, selectedModel } = data;
+  const { agentId, connectionId, selectedModel } = data;
 
-  if (!isAiAgentProvider(provider)) {
-    throw new Error(`Unsupported AI provider "${provider}"`);
+  if (typeof connectionId !== 'string' || !connectionId.trim()) {
+    throw new Error('Select an AI connection first.');
   }
 
   const models = await generateModels(subdomain);
@@ -53,8 +48,8 @@ export const listAiAgentModelsWorker = async (job: Job) => {
 
   return await listAiAgentModels({
     subdomain,
+    connectionId,
     storedAgent: parsed?.success ? parsed.data : null,
-    provider,
     selectedModel,
   });
 };

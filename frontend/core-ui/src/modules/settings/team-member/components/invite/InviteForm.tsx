@@ -12,7 +12,7 @@ import {
   useToast,
 } from 'erxes-ui';
 import { useId, useMemo, useState } from 'react';
-import { IconSend, IconX } from '@tabler/icons-react';
+import { IconSend } from '@tabler/icons-react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -232,17 +232,10 @@ export function InviteForm({
                 <Badge
                   key={tag}
                   variant="secondary"
-                  className="gap-1.5 pr-1.5 max-w-full"
+                  className="max-w-full"
+                  onClose={() => removeTag(tag)}
                 >
                   <TextOverflowTooltip value={tag} className="truncate" />
-                  <button
-                    type="button"
-                    aria-label={`Remove ${tag}`}
-                    onClick={() => removeTag(tag)}
-                    className="hover:bg-secondary-foreground/20 rounded-sm p-0.5 shrink-0"
-                  >
-                    <IconX className="size-3" />
-                  </button>
                 </Badge>
               ))}
             </div>

@@ -1,6 +1,4 @@
-import FormField from './FormField';
-import DefaultFields from './DefaultFields';
-import AdvancedFields from './AdvancedFields';
-import LinkFields from './LinkFields';
-
-export { FormField, DefaultFields, AdvancedFields, LinkFields };
+export { FormField } from './FormField';
+export { DefaultFields } from './DefaultFields';
+export { AdvancedFields } from './AdvancedFields';
+export { LinkFields } from './LinkFields';

@@ -8,7 +8,8 @@ import { useOAuthClients } from '../hooks/useOAuthClients';
 import { useTranslation } from 'react-i18next';
 
 export function OAuthClientsRecordTable() {
-  const { oauthClientApps, loading, error } = useOAuthClients();
+  const { oauthClientApps, loading, error, hasMore, handleFetchMore } =
+    useOAuthClients();
   const { t } = useTranslation('settings', { keyPrefix: 'oauth-clients' });
   const columns = useMemo(
     () => [...oauthClientsSettingsColumns(t), oauthClientsMoreColumn],
@@ -49,6 +50,12 @@ export function OAuthClientsRecordTable() {
           <RecordTable.Body>
             <RecordTable.RowList />
             {loading && <RecordTable.RowSkeleton rows={20} />}
+            {!loading && hasMore && (
+              <RecordTable.RowSkeleton
+                rows={1}
+                handleInView={handleFetchMore}
+              />
+            )}
           </RecordTable.Body>
         </RecordTable>
       </RecordTable.Scroll>

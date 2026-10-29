@@ -1,9 +1,9 @@
 import { Form } from 'erxes-ui';
-import FormField from '@/settings/profile/components/fields/FormField';
+import { FormField } from '@/settings/profile/components/fields/FormField';
 import { FormType } from '@/settings/profile/hooks/useProfileForm';
 import { useTranslation } from 'react-i18next';
 
-const DefaultFields = () => {
+export const DefaultFields = () => {
   const { t } = useTranslation('settings', {
     keyPrefix: 'profile',
   });
@@ -45,5 +45,3 @@ const DefaultFields = () => {
     </div>
   );
 };
-
-export default DefaultFields;

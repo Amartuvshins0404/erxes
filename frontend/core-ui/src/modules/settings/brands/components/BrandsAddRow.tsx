@@ -1,4 +1,4 @@
-import { Table, useToast } from 'erxes-ui';
+import { Input, Table, useToast } from 'erxes-ui';
 import { useEffect, useRef, useState } from 'react';
 import { useSetAtom } from 'jotai';
 import { renderingBrandDetailAtom } from '@/settings/brands/state';
@@ -49,27 +49,25 @@ export const BrandsAddRow = () => {
       <Table.Cell />
       <Table.Cell />
       <Table.Cell className="p-1">
-        <div className="h-full w-full flex items-center bg-accent rounded-lg">
-          <input
-            ref={inputRef}
-            disabled={loading}
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            onBlur={submit}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                submit();
-              }
-              if (e.key === 'Escape') {
-                e.preventDefault();
-                cancel();
-              }
-            }}
-            placeholder="Brand name"
-            className="w-full max-w-xs bg-transparent text-sm px-3 py-1.5 outline-none focus:ring-2 focus:ring-inset focus:ring-primary rounded-lg focus-visible:ring-0 focus-visible:shadow-none resize-none font-medium"
-          />
-        </div>
+        <Input
+          ref={inputRef}
+          disabled={loading}
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onBlur={submit}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              submit();
+            }
+            if (e.key === 'Escape') {
+              e.preventDefault();
+              cancel();
+            }
+          }}
+          placeholder="Brand name"
+          className="h-8 max-w-xs rounded-lg font-medium"
+        />
       </Table.Cell>
       <Table.Cell />
       <Table.Cell />

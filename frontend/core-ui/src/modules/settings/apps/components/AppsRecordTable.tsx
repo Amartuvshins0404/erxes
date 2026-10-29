@@ -13,7 +13,7 @@ import { useTranslation } from 'react-i18next';
 
 export function AppsRecordTable() {
   const { t } = useTranslation('settings', { keyPrefix: 'apps' });
-  const { apps, loading, error } = useApps();
+  const { apps, loading, error, hasMore, handleFetchMore } = useApps();
   const { t: tAppTokens } = useTranslation('settings', {
     keyPrefix: 'app-tokens',
   });
@@ -39,6 +39,12 @@ export function AppsRecordTable() {
             {isAddingApp && <AppsAddRow />}
             <RecordTable.RowList />
             {loading && <RecordTable.RowSkeleton rows={20} />}
+            {!loading && hasMore && (
+              <RecordTable.RowSkeleton
+                rows={1}
+                handleInView={handleFetchMore}
+              />
+            )}
           </RecordTable.Body>
         </RecordTable>
         {isEmpty && (

@@ -1,11 +1,11 @@
-import { ToggleGroup } from 'erxes-ui';
+import { cn, ToggleGroup } from 'erxes-ui';
 import { PROFILE_LINK_FIELDS } from '@/settings/profile/constants/profileFields';
-import FormField from '@/settings/profile/components/fields/FormField';
+import { FormField } from '@/settings/profile/components/fields/FormField';
 import { FormType } from '@/settings/profile/hooks/useProfileForm';
 import { useFormContext } from 'react-hook-form';
 import { useState } from 'react';
 
-const LinkFields = () => {
+export const LinkFields = () => {
   const form = useFormContext<FormType>();
   const [currentLink, setCurrentLink] = useState<string>('');
   return (
@@ -30,7 +30,7 @@ const LinkFields = () => {
               value={fieldName}
               aria-label="Toggle bold"
               key={`toggle-item-${index}`}
-              className={`${field.error && 'border-red-500'} w-10`}
+              className={cn('w-10', field.error && 'border-destructive')}
               onDoubleClick={() => {
                 const rawValue = form.getValues(
                   [fieldPath, fieldName].join('.') as keyof FormType,
@@ -50,7 +50,9 @@ const LinkFields = () => {
                 }
               }}
             >
-              <Icon className={`h-4 w-4 ${field.error && 'text-rose-600'}`} />
+              <Icon
+                className={cn('size-4', field.error && 'text-destructive')}
+              />
             </ToggleGroup.Item>
           );
         })}
@@ -71,5 +73,3 @@ const LinkFields = () => {
     </div>
   );
 };
-
-export default LinkFields;

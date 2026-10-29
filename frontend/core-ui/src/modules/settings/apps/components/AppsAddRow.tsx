@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { Table, useToast } from 'erxes-ui';
+import { Input, Table, useToast } from 'erxes-ui';
 import { useEffect, useRef, useState } from 'react';
 import { useSetAtom } from 'jotai';
 import { isAddingAppAtom } from '@/settings/apps/state';
@@ -51,27 +51,25 @@ export const AppsAddRow = () => {
       <Table.Cell />
       <Table.Cell />
       <Table.Cell colSpan={1} className="p-1">
-        <div className="h-full w-full flex items-center bg-accent rounded-lg">
-          <input
-            ref={inputRef}
-            disabled={loading}
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            onBlur={submit}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                submit();
-              }
-              if (e.key === 'Escape') {
-                e.preventDefault();
-                cancel();
-              }
-            }}
-            placeholder={t('my-app')}
-            className="w-full bg-transparent text-sm px-3 py-1.5 outline-none focus:ring-2 focus:ring-inset focus:ring-primary rounded-lg focus-visible:ring-0 focus-visible:shadow-none resize-none"
-          />
-        </div>
+        <Input
+          ref={inputRef}
+          disabled={loading}
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onBlur={submit}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              submit();
+            }
+            if (e.key === 'Escape') {
+              e.preventDefault();
+              cancel();
+            }
+          }}
+          placeholder={t('my-app')}
+          className="h-8 rounded-lg"
+        />
       </Table.Cell>
       <Table.Cell />
       <Table.Cell />

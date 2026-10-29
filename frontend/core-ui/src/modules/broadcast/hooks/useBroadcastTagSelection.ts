@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useFormContext } from 'react-hook-form';
-import { useGetTags } from 'ui-modules/modules/tags-new/hooks/useTags';
+import { useGetTags } from 'ui-modules';
 import {
   CUSTOMER_RELATION_TYPE,
   useBroadcastChooser,

@@ -1,7 +1,7 @@
 import { IconPin, IconUpload } from '@tabler/icons-react';
-import { Button, Checkbox, Empty, Spinner, Table } from 'erxes-ui';
+import { Checkbox, Empty, Spinner, Table } from 'erxes-ui';
 import { useTranslation } from 'react-i18next';
-import { IFile, IFilesFolder } from 'ui-modules';
+import { IFile, IFilesFolder, LoadMoreSentinel } from 'ui-modules';
 import { useFilesBrowserView } from '../hooks/useFilesBrowserView';
 import { FilesFileCard } from './FilesFileCard';
 import { FilesFileRow } from './FilesFileRow';
@@ -211,17 +211,11 @@ export const FilesBrowser = () => {
         </section>
       )}
 
-      {view.hasMore && (
-        <div className="text-center">
-          <Button
-            variant="ghost"
-            onClick={view.loadMore}
-            disabled={view.loading}
-          >
-            {t('load-more')}
-          </Button>
-        </div>
-      )}
+      <LoadMoreSentinel
+        hasMore={view.hasMore}
+        loading={view.fetchingMore}
+        onLoadMore={view.loadMore}
+      />
     </div>
   );
 };

@@ -1,4 +1,4 @@
-import { useQuery } from '@apollo/client';
+import { NetworkStatus, useQuery } from '@apollo/client';
 import { IPageInfo } from '../../types/PageInfo';
 import {
   FILES_FOLDERS,
@@ -68,19 +68,34 @@ export const useFilesBrowser = ({
 
   useFilesPreviewPolling(files);
 
+  const fetchingMore = filesQuery.networkStatus === NetworkStatus.fetchMore;
+
   const loadMore = () => {
-    if (!pageInfo?.hasNextPage) {
+    if (!pageInfo?.hasNextPage || fetchingMore) {
       return;
     }
 
     filesQuery.fetchMore({
       variables: { cursor: pageInfo.endCursor },
-      updateQuery: (prev, { fetchMoreResult }) => ({
-        filesList: {
-          ...fetchMoreResult.filesList,
-          list: [...prev.filesList.list, ...fetchMoreResult.filesList.list],
-        },
-      }),
+      updateQuery: (prev, { fetchMoreResult }) => {
+        if (!fetchMoreResult?.filesList) {
+          return prev;
+        }
+
+        const seen = new Set(prev.filesList.list.map((file) => file._id));
+
+        return {
+          filesList: {
+            ...fetchMoreResult.filesList,
+            list: [
+              ...prev.filesList.list,
+              ...fetchMoreResult.filesList.list.filter(
+                (file) => !seen.has(file._id),
+              ),
+            ],
+          },
+        };
+      },
     });
   };
 
@@ -110,5 +125,6 @@ export const useFilesBrowser = ({
       sharedQuery.error,
     hasMore: !isSharedList && !!pageInfo?.hasNextPage,
     loadMore,
+    fetchingMore,
   };
 };

@@ -19,9 +19,8 @@ import { withoutResentPageContext } from './utils/pageContext';
 /** Header the backend stamps with the resolved thread id on every chat SSE. */
 const THREAD_ID_HEADER = 'X-Agents-Thread-Id';
 
-/** Model/thinking selection sent with every turn (empty provider = auto). */
 export interface IAgentsRequestSelection {
-  provider?: string;
+  connectionId?: string;
   model?: string;
   thinkingLevel?: string;
 }
@@ -100,8 +99,8 @@ const selectionToBody = (
 ): Record<string, string> => {
   const body: Record<string, string> = {};
 
-  if (selection.provider) {
-    body.provider = selection.provider;
+  if (selection.connectionId) {
+    body.connectionId = selection.connectionId;
   }
 
   if (selection.model) {
@@ -312,8 +311,6 @@ export class AgentsChatTransport
       threadId,
       approved: decision.approved,
       toolCallId: decision.toolCallId,
-      // The resumed run continues on the same provider/model/thinking the
-      // UI used for the suspended turn.
       ...selectionToBody(this.getRequestSelection()),
     };
 
@@ -364,8 +361,6 @@ export class AgentsChatTransport
     const body: Record<string, unknown> = {
       threadId,
       answer: pendingAnswer.answer,
-      // The resumed run continues on the same provider/model/thinking the
-      // UI used for the suspended turn.
       ...selectionToBody(this.getRequestSelection()),
     };
 

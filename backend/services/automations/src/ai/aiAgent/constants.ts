@@ -6,8 +6,6 @@ export const AI_AGENT_SUPPORTED_PROVIDERS = [
   'openai',
 ] as const;
 
-export const AI_AGENT_DEFAULT_PROVIDER = 'cloudflare-ai-gateway';
-
 export const AI_AGENT_PROVIDER_DEFAULT_MODELS = {
   'cloudflare-ai-gateway': 'openai/gpt-5-mini',
   grok: 'grok-4.3',

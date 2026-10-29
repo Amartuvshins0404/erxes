@@ -3,23 +3,16 @@ import { Button, Combobox, Command, Popover, Spinner } from 'erxes-ui';
 import { useAtom } from 'jotai';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-import { findDefaultAgentsConnection } from '../hooks/useAgentsConnection';
 import type {
   IAgentsModelOption,
   IUseAgentsModelsResult,
 } from '../hooks/useAgentsModels';
 import { agentRecentModelsState } from '../states/agentRecentModelsState';
 import { ProviderIcon } from './ProviderIcon';
-import { getProviderLabel } from './ProviderPicker';
 
 interface IModelChoice {
-  provider: string;
+  connectionId: string;
   model: string;
-}
-
-interface ISavedModelChoice extends IModelChoice {
-  /** Server-resolved default (explicit choice, else the first saved). */
-  isDefault?: boolean | null;
 }
 
 interface IModelGroup {
@@ -29,88 +22,83 @@ interface IModelGroup {
 
 export interface IModelPickerProps {
   models: IUseAgentsModelsResult;
-  /** Selected `provider|model` value; '' means the saved workspace default. */
   value: string;
   onChange: (value: string) => void;
   disabled?: boolean;
-  /**
-   * Saved connections in server order. The one marked `isDefault` (else the
-   * first, for older responses) is what an empty value runs, so only it
-   * carries the Default marker.
-   */
-  savedModels?: ISavedModelChoice[];
-  /**
-   * Checks a typed model id against the provider (server-side probe) and
-   * resolves to null when it works or to a readable reason when it does not.
-   * Without it the picker offers listed models only.
-   */
-  onVerifyModel?: (provider: string, model: string) => Promise<string | null>;
+  onVerifyModel?: (
+    connectionId: string,
+    model: string,
+  ) => Promise<string | null>;
+  onSetDefault?: (connectionId: string) => Promise<void>;
 }
 
 const VALUE_SEPARATOR = '|';
 const RECENT_LIMIT = 3;
 const FALLBACK_RECOMMENDED_LIMIT = 4;
-/** Mirrors the backend probe's accepted model id shape. */
 const MODEL_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:/@-]{0,127}$/;
-export const modelSelectionValue = (provider: string, model: string) =>
-  provider && model ? `${provider}${VALUE_SEPARATOR}${model}` : '';
-/** Splits a `provider|model` value; null when it carries no separator. */
+export const modelSelectionValue = (connectionId: string, model: string) =>
+  connectionId && model ? `${connectionId}${VALUE_SEPARATOR}${model}` : '';
 export const parseModelSelection = (value: string): IModelChoice | null => {
   const index = value.indexOf(VALUE_SEPARATOR);
   return index === -1
     ? null
-    : { provider: value.slice(0, index), model: value.slice(index + 1) };
+    : { connectionId: value.slice(0, index), model: value.slice(index + 1) };
 };
 const choiceValue = (choice: IModelChoice) =>
-  modelSelectionValue(choice.provider, choice.model);
+  modelSelectionValue(choice.connectionId, choice.model);
 
 const rowClassName =
   'h-9 gap-3 rounded-md px-3 text-[13px] data-[selected=true]:bg-muted';
 const groupClassName =
   'p-0 **:[[cmdk-group-heading]]:px-3 **:[[cmdk-group-heading]]:text-[11px] **:[[cmdk-group-heading]]:text-muted-foreground';
 
-/** Choose a provider first, then its recommended models or full catalog. */
 export const ModelPicker = ({
   models,
   value,
   onChange,
   disabled = false,
-  savedModels = [],
   onVerifyModel,
+  onSetDefault,
 }: IModelPickerProps) => {
   const [open, setOpen] = useState(false);
   const [browse, setBrowse] = useState(false);
-  const [activeProvider, setActiveProvider] = useState('');
+  const [activeId, setActiveId] = useState('');
   const [search, setSearch] = useState('');
   const [verifying, setVerifying] = useState('');
   const [verifyError, setVerifyError] = useState<string | null>(null);
+  const [settingDefault, setSettingDefault] = useState(false);
   const commandRef = useRef<HTMLDivElement>(null);
   const [recentModels, setRecentModels] = useAtom(agentRecentModelsState);
-  // Device storage may hold anything; only an array is a recent list.
   const recentList: unknown[] = Array.isArray(recentModels) ? recentModels : [];
   const selected = parseModelSelection(value);
-  const selectedProvider = selected?.provider ?? '';
+  const selectedId = selected?.connectionId ?? '';
   const selectedModel = selected?.model ?? '';
-  const serverDefault: IModelChoice | undefined =
-    findDefaultAgentsConnection(savedModels);
-  const defaultValue = serverDefault ? choiceValue(serverDefault) : '';
-  const inUseProvider = selectedProvider || serverDefault?.provider || '';
   const searching = search.trim().length > 0;
   const showCatalog = browse || searching;
 
   const catalogs = useMemo(
     () =>
-      new Map(models.providerModels.map((group) => [group.provider, group])),
+      new Map(
+        models.providerModels.map((group) => [group.connectionId, group]),
+      ),
     [models.providerModels],
   );
-  // models.dev display names ("GPT-6 Luna"); a model without one keeps its id.
+  const serverDefault =
+    models.providerModels.find((group) => group.isDefault) ??
+    models.providerModels[0];
+  const inUseId = selectedId || serverDefault?.connectionId || '';
   const displayNames = useMemo(
     () =>
       new Map(
         models.providerModels.flatMap((group) =>
           group.models.flatMap((model) =>
             model.name
-              ? [[modelSelectionValue(group.provider, model.id), model.name]]
+              ? [
+                  [
+                    modelSelectionValue(group.connectionId, model.id),
+                    model.name,
+                  ],
+                ]
               : [],
           ),
         ),
@@ -119,40 +107,35 @@ export const ModelPicker = ({
   );
   const nameOf = (choice: IModelChoice) =>
     displayNames.get(choiceValue(choice)) ?? choice.model;
+  const connectionNameOf = (connectionId: string) =>
+    catalogs.get(connectionId)?.connectionName ?? connectionId;
   const describeChoice = (choice: IModelChoice) =>
-    `${getProviderLabel(choice.provider)} · ${nameOf(choice)}`;
-  const activeCatalog = catalogs.get(activeProvider);
+    `${connectionNameOf(choice.connectionId)} · ${nameOf(choice)}`;
+  const activeCatalog = catalogs.get(activeId);
   const activeModels: IAgentsModelOption[] = activeCatalog?.models ?? [];
   const toChoice = (model: IAgentsModelOption): IModelChoice => ({
-    provider: activeProvider,
+    connectionId: activeId,
     model: model.id,
   });
 
-  // Without a usable listing, the provider's saved model is still what the
-  // server runs for it, so it stays selectable.
-  const savedForProvider = savedModels.find(
-    (choice) => choice.provider === activeProvider,
-  );
   const catalogUnavailable =
     !models.loading && (!activeCatalog || Boolean(activeCatalog.error));
   const typedId = search.trim();
-  // Keys that may call models they cannot list (or listings that omit some)
-  // can still use any id the provider accepts once the probe confirms it.
   const customId =
     onVerifyModel &&
-    activeProvider &&
+    activeId &&
     MODEL_ID_PATTERN.test(typedId) &&
     !activeModels.some((model) => model.id === typedId)
       ? typedId
       : '';
-  const customKey = modelSelectionValue(activeProvider, customId);
-  const recentForProvider = (keep: (model: string, key: string) => boolean) =>
+  const customKey = modelSelectionValue(activeId, customId);
+  const recentForConnection = (keep: (model: string, key: string) => boolean) =>
     Array.from(new Set([value, ...recentList]))
       .flatMap((key) => {
         if (typeof key !== 'string') return [];
         const choice = parseModelSelection(key);
-        return choice?.provider === activeProvider &&
-          choice.provider &&
+        return choice?.connectionId === activeId &&
+          choice.connectionId &&
           keep(choice.model, key)
           ? [choice]
           : [];
@@ -160,7 +143,7 @@ export const ModelPicker = ({
       .slice(0, RECENT_LIMIT);
 
   const groups = ((): IModelGroup[] => {
-    if (!activeProvider) return [];
+    if (!activeId) return [];
 
     if (showCatalog) {
       const terms = search.toLowerCase().trim().split(/\s+/).filter(Boolean);
@@ -183,20 +166,7 @@ export const ModelPicker = ({
     }
 
     if (catalogUnavailable) {
-      // Without a listing there is nothing to check recents against; they
-      // were all explicit (listed or verified) selections.
-      return [
-        {
-          heading: 'Saved model',
-          choices: savedForProvider ? [savedForProvider] : [],
-        },
-        {
-          heading: 'Recent',
-          choices: recentForProvider(
-            (model) => model !== savedForProvider?.model,
-          ),
-        },
-      ];
+      return [{ heading: 'Recent', choices: recentForConnection(() => true) }];
     }
 
     const recommended = activeModels.some((model) => model.recommended)
@@ -204,10 +174,7 @@ export const ModelPicker = ({
       : activeModels.slice(0, FALLBACK_RECOMMENDED_LIMIT);
     const recommendedIds = new Set(recommended.map((model) => model.id));
     const listedIds = new Set(activeModels.map((model) => model.id));
-    // Current and recent selections stay close. Removed/unavailable models
-    // never leak back into the choices from local storage; the current
-    // selection (possibly a verified unlisted id) always stays visible.
-    const recent = recentForProvider(
+    const recent = recentForConnection(
       (model, key) =>
         (listedIds.has(model) || key === value) && !recommendedIds.has(model),
     );
@@ -222,8 +189,6 @@ export const ModelPicker = ({
     group.choices.map(choiceValue),
   );
 
-  // A model check that outlives the step it started in is ignored: closing,
-  // reopening, leaving the provider or picking something else bumps the id.
   const verifyRequest = useRef(0);
   const cancelVerify = () => {
     verifyRequest.current += 1;
@@ -233,7 +198,7 @@ export const ModelPicker = ({
     setOpen(next);
     cancelVerify();
     if (next) {
-      setActiveProvider('');
+      setActiveId('');
       setBrowse(false);
       setSearch('');
       setVerifyError(null);
@@ -256,37 +221,22 @@ export const ModelPicker = ({
     setOpen(false);
   };
 
-  const providers = Array.from(
-    new Set([
-      ...savedModels.map((choice) => choice.provider),
-      ...models.providerModels.map((group) => group.provider),
-    ]),
-  );
-
-  // With no provider search field, the command root owns keyboard navigation.
   useEffect(() => {
-    if (open && !activeProvider) commandRef.current?.focus();
-  }, [open, activeProvider]);
+    if (open && !activeId) commandRef.current?.focus();
+  }, [open, activeId]);
 
-  const activeLabel = getProviderLabel(activeProvider);
-  const navigateProvider = (provider: string) => {
+  const activeLabel = activeCatalog?.connectionName ?? '';
+  const navigateConnection = (connectionId: string) => {
     cancelVerify();
-    setActiveProvider(provider);
+    setActiveId(connectionId);
     setBrowse(false);
     setSearch('');
     setVerifyError(null);
   };
 
-  // Listings do not reflect every access rule (OpenAI lists the whole
-  // organisation's models regardless of a project's allowed models), so a
-  // model the user has not used before is checked before it is selected.
-  const knownValues = new Set([
-    value,
-    ...savedModels.map(choiceValue),
-    ...recentList,
-  ]);
-  const choose = async (provider: string, model: string) => {
-    const key = modelSelectionValue(provider, model);
+  const knownValues = new Set([value, ...recentList]);
+  const choose = async (connectionId: string, model: string) => {
+    const key = modelSelectionValue(connectionId, model);
     if (!onVerifyModel || knownValues.has(key)) {
       select(key);
       return;
@@ -295,7 +245,7 @@ export const ModelPicker = ({
     const request = ++verifyRequest.current;
     setVerifying(key);
     setVerifyError(null);
-    const error = await onVerifyModel(provider, model).catch(
+    const error = await onVerifyModel(connectionId, model).catch(
       (failure: unknown) =>
         failure instanceof Error
           ? failure.message
@@ -310,13 +260,23 @@ export const ModelPicker = ({
     select(key);
   };
 
+  const handleSetDefault = async () => {
+    if (!onSetDefault || !activeId || settingDefault) return;
+    setSettingDefault(true);
+    try {
+      await onSetDefault(activeId);
+    } finally {
+      setSettingDefault(false);
+    }
+  };
+
   const renderChoice = (choice: IModelChoice) => {
     const key = choiceValue(choice);
     return (
       <Command.Item
         key={key}
         value={key}
-        onSelect={() => void choose(choice.provider, choice.model)}
+        onSelect={() => void choose(choice.connectionId, choice.model)}
         disabled={Boolean(verifying) && verifying !== key}
         className={rowClassName}
       >
@@ -335,11 +295,6 @@ export const ModelPicker = ({
             </>
           )}
         </span>
-        {key === defaultValue && (
-          <span className="shrink-0 text-[11px] text-muted-foreground">
-            Default
-          </span>
-        )}
         <Combobox.Check
           checked={value === key}
           className="shrink-0 text-foreground"
@@ -348,12 +303,21 @@ export const ModelPicker = ({
     );
   };
 
+  const triggerCatalog = catalogs.get(selectedId) ?? serverDefault;
   const triggerChoice = selectedModel
-    ? { provider: selectedProvider, model: selectedModel }
-    : serverDefault;
+    ? { connectionId: selectedId, model: selectedModel }
+    : undefined;
+  const triggerLabel = triggerChoice
+    ? nameOf(triggerChoice)
+    : triggerCatalog?.connectionName ?? 'Default model';
+  const triggerTitle = triggerChoice
+    ? describeChoice(triggerChoice)
+    : triggerCatalog
+    ? `${triggerCatalog.connectionName} (saved default)`
+    : undefined;
   const statusClassName = 'px-3 py-3 text-xs leading-5 text-muted-foreground';
-  const providerStatus = (() => {
-    if (!activeProvider) return null;
+  const connectionStatus = (() => {
+    if (!activeId) return null;
     if (verifyError) {
       return (
         <p role="status" className={`${statusClassName} text-destructive`}>
@@ -368,15 +332,15 @@ export const ModelPicker = ({
           className="flex items-center gap-2 px-3 py-4 text-xs text-muted-foreground"
         >
           <Spinner className="size-3.5" />
-          Loading {activeLabel} models…
+          Loading models…
         </div>
       );
     }
     if (!activeCatalog) {
       return (
         <p role="status" className={statusClassName}>
-          Model list unavailable. Your saved model is still available
-          {onVerifyModel ? '; type a model id to use another.' : '.'}
+          Model list unavailable
+          {onVerifyModel ? '; type a model id to use one.' : '.'}
         </p>
       );
     }
@@ -400,7 +364,7 @@ export const ModelPicker = ({
     if (activeModels.length === 0) {
       return (
         <p role="status" className={statusClassName}>
-          No usable chat models are listed for this provider.
+          No usable chat models are listed for this connection.
         </p>
       );
     }
@@ -414,54 +378,44 @@ export const ModelPicker = ({
         className="h-8 min-w-0 max-w-[200px] flex-1 justify-between rounded-md px-2 text-[13px]"
         disabled={disabled}
         aria-label="Model"
-        title={
-          triggerChoice
-            ? `${describeChoice(triggerChoice)}${
-                selectedModel ? '' : ' (saved default)'
-              }`
-            : undefined
-        }
+        title={triggerTitle}
       >
         <span className="flex min-w-0 items-center gap-1.5">
-          {triggerChoice && (
+          {triggerCatalog && (
             <ProviderIcon
-              provider={triggerChoice.provider}
+              provider={triggerCatalog.provider}
               variant="plain"
               className="size-4 shrink-0"
             />
           )}
-          <span className="truncate">
-            {triggerChoice ? nameOf(triggerChoice) : 'Default model'}
-          </span>
+          <span className="truncate">{triggerLabel}</span>
         </span>
       </Combobox.Trigger>
       <Combobox.Content
         className="w-80 min-w-0 max-w-[calc(100vw-24px)] overflow-hidden rounded-lg"
         collisionPadding={12}
         onOpenAutoFocus={(event) => {
-          if (!activeProvider) {
+          if (!activeId) {
             event.preventDefault();
             commandRef.current?.focus();
           }
         }}
-        aria-label={
-          activeProvider ? `${activeLabel} models` : 'Choose a provider'
-        }
+        aria-label={activeId ? `${activeLabel} models` : 'Choose a connection'}
       >
         <Command
           ref={commandRef}
-          key={activeProvider || 'providers'}
-          label={activeProvider ? 'Search models' : 'Providers'}
+          key={activeId || 'connections'}
+          label={activeId ? 'Search models' : 'Connections'}
           defaultValue={
-            activeProvider
+            activeId
               ? visibleValues.includes(value)
                 ? value
                 : visibleValues[0] ?? ''
-              : inUseProvider || 'workspace-default'
+              : inUseId || 'workspace-default'
           }
           shouldFilter={false}
         >
-          {activeProvider ? (
+          {activeId ? (
             <>
               <div className="flex h-11 items-center justify-between gap-2 border-b px-2.5">
                 <div className="flex min-w-0 items-center gap-2">
@@ -469,8 +423,8 @@ export const ModelPicker = ({
                     variant="ghost"
                     size="icon"
                     className="size-7 shrink-0 rounded-md text-muted-foreground"
-                    onClick={() => navigateProvider('')}
-                    aria-label="Back to providers"
+                    onClick={() => navigateConnection('')}
+                    aria-label="Back to connections"
                   >
                     <IconArrowLeft className="size-4" />
                   </Button>
@@ -478,26 +432,48 @@ export const ModelPicker = ({
                     {activeLabel}
                   </span>
                 </div>
-                {browse && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 px-2 text-xs font-normal text-muted-foreground"
-                    onClick={() => {
-                      setBrowse(false);
-                      setSearch('');
-                    }}
-                  >
-                    Show less
-                  </Button>
-                )}
+                <div className="flex shrink-0 items-center gap-1">
+                  {browse && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-xs font-normal text-muted-foreground"
+                      onClick={() => {
+                        setBrowse(false);
+                        setSearch('');
+                      }}
+                    >
+                      Show less
+                    </Button>
+                  )}
+                  {activeCatalog?.isDefault ? (
+                    <span className="px-2 text-[11px] text-muted-foreground">
+                      Default
+                    </span>
+                  ) : (
+                    onSetDefault && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 text-xs font-normal text-muted-foreground"
+                        disabled={settingDefault}
+                        onClick={() => void handleSetDefault()}
+                      >
+                        {settingDefault ? (
+                          <Spinner className="size-3.5" />
+                        ) : (
+                          'Make default'
+                        )}
+                      </Button>
+                    )
+                  )}
+                </div>
               </div>
               <Command.Input
-                placeholder={`Find a ${activeLabel} model…`}
+                placeholder="Find a model…"
                 aria-label="Search models"
                 value={search}
                 onValueChange={(next) => {
-                  // A check for the previous text must not select it later.
                   cancelVerify();
                   setSearch(next);
                   setVerifyError(null);
@@ -510,33 +486,38 @@ export const ModelPicker = ({
             </>
           ) : (
             <div className="px-4 pb-1 pt-3 text-[11px] font-medium text-muted-foreground">
-              Provider
+              Connection
             </div>
           )}
           <Command.List className="m-0 max-h-[min(320px,45vh)] p-1.5">
-            {!activeProvider && (
+            {!activeId && (
               <>
-                {providers.map((provider) => (
+                {models.providerModels.map((group) => (
                   <Command.Item
-                    key={provider}
-                    value={provider}
-                    onSelect={() => navigateProvider(provider)}
+                    key={group.connectionId}
+                    value={group.connectionId}
+                    onSelect={() => navigateConnection(group.connectionId)}
                     className="h-10 gap-3 rounded-md px-3 text-[13px] data-[selected=true]:bg-muted"
                   >
                     <ProviderIcon
-                      provider={provider}
+                      provider={group.provider}
                       variant="plain"
                       className="size-4 shrink-0"
                     />
                     <span className="min-w-0 flex-1 truncate font-medium">
-                      {getProviderLabel(provider)}
+                      {group.connectionName}
+                      {group.scope === 'personal' && (
+                        <span className="ml-1.5 text-[11px] font-normal text-muted-foreground">
+                          Personal
+                        </span>
+                      )}
                     </span>
-                    {inUseProvider === provider ? (
+                    {inUseId === group.connectionId ? (
                       <span className="text-[11px] text-muted-foreground">
                         In use
                       </span>
                     ) : (
-                      catalogs.get(provider)?.error && (
+                      group.error && (
                         <span className="text-[11px] text-muted-foreground">
                           Unavailable
                         </span>
@@ -558,9 +539,9 @@ export const ModelPicker = ({
                   {serverDefault && (
                     <span
                       className="ml-auto truncate text-[11px]"
-                      title={describeChoice(serverDefault)}
+                      title={serverDefault.connectionName}
                     >
-                      {describeChoice(serverDefault)}
+                      {serverDefault.connectionName}
                     </span>
                   )}
                   <Combobox.Check
@@ -598,7 +579,7 @@ export const ModelPicker = ({
               <Command.Group heading="Custom model" className={groupClassName}>
                 <Command.Item
                   value={`verify:${customId}`}
-                  onSelect={() => void choose(activeProvider, customId)}
+                  onSelect={() => void choose(activeId, customId)}
                   disabled={Boolean(verifying)}
                   className={rowClassName}
                 >
@@ -613,9 +594,9 @@ export const ModelPicker = ({
                 </Command.Item>
               </Command.Group>
             )}
-            {providerStatus}
+            {connectionStatus}
           </Command.List>
-          {activeProvider && !showCatalog && activeModels.length > 0 && (
+          {activeId && !showCatalog && activeModels.length > 0 && (
             <div className="border-t p-1.5">
               <Button
                 variant="ghost"

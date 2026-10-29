@@ -1,5 +1,6 @@
 import { AI_AGENT_INSTRUCTIONS_KEY } from '@/automations/components/settings/components/agents/constants/aiAgentSteps';
 import { TAiAgentDetailContext } from '@/automations/components/settings/components/agents/context/AiAgentDetailContext';
+import { useAiAgentConnections } from '@/automations/components/settings/components/agents/hooks/useAiAgentConnections';
 import { useAiAgentHealth } from '@/automations/components/settings/components/agents/hooks/useAiAgentHealth';
 import { useAiAgentKnowledgeSourceStatuses } from '@/automations/components/settings/components/agents/hooks/useAiAgentKnowledgeSourceStatuses';
 import { useAiAgentStep } from '@/automations/components/settings/components/agents/hooks/useAiAgentStep';
@@ -43,6 +44,9 @@ export const useAiAgentDetailState = ({
   const { confirm } = useConfirm();
   const { step, setStep } = useAiAgentStep({ isEditing, persistStepInUrl });
   const health = useAiAgentHealth(detail?._id);
+  const { byId: connectionsById, loaded: connectionsLoaded } =
+    useAiAgentConnections();
+  const connectionId = values.connection?.connectionId;
   const { statuses: knowledgeStatuses } = useAiAgentKnowledgeSourceStatuses(
     detail?._id,
   );
@@ -54,7 +58,8 @@ export const useAiAgentDetailState = ({
         values,
         isEditing,
         usageTotal: detail?.usage?.total,
-        hasStoredApiKey: !!detail?.connection?.config?.apiKey,
+        connection: connectionId ? connectionsById.get(connectionId) : undefined,
+        connectionsLoaded,
         health: health.health,
         healthLoading: health.loading,
         knowledgeStatuses,
@@ -64,6 +69,9 @@ export const useAiAgentDetailState = ({
       values,
       isEditing,
       detail,
+      connectionId,
+      connectionsById,
+      connectionsLoaded,
       health.health,
       health.loading,
       knowledgeStatuses,

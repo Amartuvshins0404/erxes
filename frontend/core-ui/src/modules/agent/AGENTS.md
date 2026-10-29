@@ -88,58 +88,60 @@ The `agent` module is the core-ui surface for the core-api `agents` backend
   questions to the summary. Groups longer than 4 show 3 pairs behind "Show all
   N answers". The summary settles in with `agent-ask-settle` (220ms fade/rise,
   none for reduced motion);
-- settings at `/settings/agent/*`: `connection` (BYOK; each saved connection
-  shows a `Default` badge or a `Set as default` action →
-  `AgentsConnectionSetDefault`, toasts, awaited `AgentsConnections` refetch;
-  tests in `pages/settings/agent/__tests__`), `code-mode`
-  (admin-gated switch), `approvals` (admin-gated `approvalMode` radio —
-  `writes` default asks before every mutation), wired through
-  `settingsPath('agent')` + `SettingsWorkspacePath.Agent` +
-  `GET_SETTINGS_SUB_NAVIGATION`;
-- `ModelPicker` opens on the connected providers (bare brand marks and names,
-  no provider search or decorative icons) with one muted `Use saved default`
-  row at the bottom naming the provider and model it runs. The trigger is a
-  quiet ghost button titled with provider and model. Picking a provider shows
-  compact 13px model rows without repeated provider marks: `Recent` (current or
-  recent picks outside the shortlist, at most three) and `Recommended`
-  (`catalog[].recommended`), plus provider-scoped search and Browse all models,
-  which group the usable catalog into `Recommended` / `Others` in backend rank
-  order (`Show less` returns). Back keeps the selection; reopening starts at
-  providers; there is no model-count badge. Loading, empty and no-match states
-  are explicit.
-  Only the connection the backend marks `isDefault` — what the empty value
-  runs (`findDefaultAgentsConnection` in `useAgentsConnection.ts`, first saved
-  entry when none is flagged; shared with `ChatPanel` and settings) — is
-  marked `Default`, its provider `In use`, and named by the trigger and saved
-  default row. A provider whose listing failed shows its key-free `error` (e.g.
-  a key without Models: Read, or one the server cannot decrypt), an
-  `Unavailable` marker when not in use, its saved model and its recent picks.
+- settings at `/settings/agent/*`: `code-mode` (admin-gated switch),
+  `approvals` (admin-gated `approvalMode` radio — `writes` default asks
+  before every mutation) and `appearance`; the index redirects to `code-mode`
+  and the removed `connection` path redirects to `/settings/connections`.
+  Wired through `settingsPath('agent')` + `SettingsWorkspacePath.Agent` +
+  `GET_SETTINGS_SUB_NAVIGATION`. AI keys are no longer managed here: they are
+  core Connections (`modules/settings/connections`, `/settings/connections`),
+  category `ai`, workspace or personal;
+- `ModelPicker` opens on the AI connections the caller can use (`agentsModels`
+  groups: `connectionId`, `connectionName`, `provider`, `scope`, `isDefault`;
+  bare brand marks and names, `Personal` tag, no search) with one muted
+  `Use saved default` row at the bottom naming the default connection. The
+  trigger is a quiet ghost button titled with the model (or the default
+  connection name when nothing is selected). Picking a connection shows
+  compact 13px model rows: `Recent` (current or recent picks outside the
+  shortlist, at most three) and `Recommended` (`catalog[].recommended`), plus
+  connection-scoped search and Browse all models, which group the usable
+  catalog into `Recommended` / `Others` in backend rank order (`Show less`
+  returns). The connection header shows `Default` or a `Make default` action
+  (`useAgentsSetDefaultConnection` → `agentsSetDefaultConnection`, awaited
+  `AgentsModels` refetch, toasts). Back keeps the selection; reopening starts at
+  connections. Loading, empty and no-match states are explicit.
+  The connection marked `isDefault` (first one when none is flagged) is what
+  the empty value runs and is marked `In use`. A connection whose listing
+  failed shows its key-free `error` (e.g. a key without Models: Read, or one
+  the server cannot decrypt), an `Unavailable` marker when not in use, and its
+  recent picks.
   A well-formed unlisted id typed in search offers `Use "<id>"` (`Custom
   model`); it is selected only after `onVerifyModel` (`useAgentsModelVerify` →
-  `AgentsModelVerify`) resolves null, otherwise the reason shows inline. Listed
-  models get the same check when first picked, because listings ignore some
-  access rules (OpenAI lists the organisation's models regardless of a
-  project's allowed models); current, saved and recent selections skip it.
-  A check that resolves after the picker closed, reopened, left the provider
+  `AgentsModelVerify(connectionId, model)`) resolves null, otherwise the
+  reason shows inline. Listed models get the same check when first picked,
+  because listings ignore some access rules (OpenAI lists the organisation's
+  models regardless of a project's allowed models); current and recent
+  selections skip it.
+  A check that resolves after the picker closed, reopened, left the connection
   or selected something else, or after the search text changed, is ignored
-  (request id). Values are `provider|model` (`modelSelectionValue` / `parseModelSelection`).
+  (request id). Values are `connectionId|model` (`modelSelectionValue` /
+  `parseModelSelection`); the chat transport sends `connectionId` + `model`
+  (never a provider) with every turn.
   Device-local `agent:recent-models` keeps six explicit picks,
-  intersected with the live catalog so removed models/providers cannot return;
-  the current selection always stays visible. The saved default stays usable
-  while discovery loads or fails; ids and the empty-value server-default
-  contract are unchanged.
+  intersected with the live catalog so removed models/connections cannot
+  return; the current selection always stays visible. The saved default stays
+  usable while discovery loads or fails.
   `useAgentsModels` normalizes `agentsModels` into ranked
-  `{ id, family, recommended, name, thinking }` options per provider (falling
-  back to the flat `models` ids). A models.dev `name` titles the row (raw id
-  muted beside it) and the trigger; search matches name and id. Saving or
-  removing a connection in settings refetches the active `AgentsModels` query;
-  settings marks a key the server cannot read (`hasKey: false`) with
-  `Re-enter key`.
+  `{ id, family, recommended, name, thinking }` options per connection
+  (falling back to the flat `models` ids). A models.dev `name` titles the row
+  (raw id muted beside it) and the trigger; search matches name and id.
+  Connection add/edit/remove in settings evicts the cached `connections` and
+  `agentsModels` root fields so the chat refetches.
 - The thinking picker starts at High, and the initial outgoing request explicitly
   sends `thinkingLevel: 'high'`. Manual selections override that default for later turns.
   The trigger is a compact ghost button with an intensity mark and the level name
   only; the menu lists each level with a one-line description. Levels follow the
-  model a turn runs on (the selection, else the server default connection) via
+  model a turn runs on (the explicit selection; the default connection falls back to the original five levels) via
   `catalog[].thinking { kind, levels }`: only that model's levels are offered
   (`k3.1-pro` has no Off), bars spread over its depth range, a toggle reads
   Off/On, and `none`/`fixed` models lock the trigger ("Off"/"Auto").
@@ -188,8 +190,8 @@ The `agent` module is the core-ui surface for the core-api `agents` backend
   other edits inside one turn it into plain text. At most 10 distinct records
   per message. `utils/mentionText.ts` owns ranges/tokens; `useAgentMentions`
   binds ranges to one exact text value, so resets drop them automatically.
-- BYOK-gated composer: no configured connection shows an inline banner
-  linking to the settings page and disables input.
+- Connection-gated composer: no usable AI connection (`useAgentsConnection`, `connections(category: "ai")` without unreadable secrets) shows an inline banner
+  linking to `/settings/connections` and disables input.
 - assistant message action row under each turn (Copy — the turn's answer
   text only, never narration; Regenerate on the
   last assistant message only and not while streaming → `retryLastTurn`;

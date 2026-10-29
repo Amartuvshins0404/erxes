@@ -23,6 +23,9 @@ import { listAgentPluginSkills } from '@/agents/graphqlTools';
 import { buildAgentPluginContributions } from '@/agents/pluginContributions';
 import { REPORT_CREATION_SKILL } from '@/agents/skills/reportCreation';
 import { getProviderDefaultModel } from '@/agents/providers';
+import { sealSecret } from '@/connections/crypto';
+
+process.env.ERXES_MASTER_KEY = 'agent-test-master-key';
 
 jest.mock('~/connectionResolvers', () => ({
   generateModels: jest.fn(),
@@ -78,21 +81,27 @@ const mockedGenerateModels = generateModels as jest.MockedFunction<
   typeof generateModels
 >;
 
-const getConnectionsMock = jest.fn();
+const connectionFor = (type: string, apiKey: string) => ({
+  _id: 'conn-1',
+  type,
+  name: 'Team key',
+  scope: 'personal',
+  config: {},
+  secrets: {
+    apiKey: sealSecret({ connectionId: 'conn-1', field: 'apiKey', plain: apiKey }),
+  },
+  services: [],
+  createdAt: new Date(1),
+});
+
+const listForUserMock = jest.fn();
 
 beforeEach(() => {
   jest.clearAllMocks();
-  getConnectionsMock.mockResolvedValue({
-    connections: [
-      {
-        provider: 'openai',
-        model: 'gpt-5.6-luna',
-        config: { apiKey: 'sk-test' },
-      },
-    ],
-  });
+  listForUserMock.mockResolvedValue([connectionFor('openai', 'sk-test')]);
   mockedGenerateModels.mockResolvedValue({
-    AgentsConnection: { getConnections: getConnectionsMock },
+    Connections: { listForUser: listForUserMock },
+    AgentsUserPreferences: { findOne: () => ({ lean: async () => null }) },
   } as unknown as Awaited<ReturnType<typeof generateModels>>);
 });
 
@@ -121,7 +130,7 @@ describe('resolveAgentsModelEntry', () => {
       contextWith({
         subdomain: undefined,
         userId: undefined,
-        provider: undefined,
+        connectionId: undefined,
         model: undefined,
       }),
     );
@@ -136,7 +145,7 @@ describe('resolveAgentsModelEntry', () => {
       contextWith({
         subdomain: 'tenant',
         userId: 'user-1',
-        provider: 'openai',
+        connectionId: 'conn-1',
         model: 'gpt-x',
         thinkingLevel: 'high',
         codeModeEnabled: false,
@@ -144,7 +153,7 @@ describe('resolveAgentsModelEntry', () => {
     );
 
     expect(mockedGenerateModels).toHaveBeenCalledWith('tenant');
-    expect(getConnectionsMock).toHaveBeenCalledWith('user-1');
+    expect(listForUserMock).toHaveBeenCalledWith('user-1', { category: 'ai' });
     expect(entries).toHaveLength(1);
     expect(entries[0]?.model).toMatchObject({
       id: 'openai/gpt-x',
@@ -153,12 +162,12 @@ describe('resolveAgentsModelEntry', () => {
     expect(entries[0]?.providerOptions).toBeDefined();
   });
 
-  it('rejects a stamped run missing provider/model instead of mis-resolving', async () => {
+  it('rejects a stamped run missing connection/model instead of mis-resolving', async () => {
     await expect(
       resolveAgentsModelEntry(
         contextWith({ subdomain: 'tenant', userId: 'user-1' }),
       ),
-    ).rejects.toThrow('Agents request context is missing provider/model.');
+    ).rejects.toThrow('Agents request context is missing connection/model.');
   });
 });
 
@@ -206,20 +215,14 @@ describe('artifact output allowance', () => {
   it.each(['minimal', 'low', 'medium', 'high'] as const)(
     'keeps visible output headroom with %s thinking',
     async (thinkingLevel) => {
-      getConnectionsMock.mockResolvedValue({
-        connections: [
-          {
-            provider: 'kimi-code',
-            model: 'kimi-for-coding',
-            config: { apiKey: 'test-key' },
-          },
-        ],
-      });
+      listForUserMock.mockResolvedValue([
+        connectionFor('kimi-code', 'test-key'),
+      ]);
       const entries = await resolveAgentsModelEntry(
         contextWith({
           subdomain: 'tenant',
           userId: 'user-1',
-          provider: 'kimi-code',
+          connectionId: 'conn-1',
           model: 'kimi-for-coding',
           thinkingLevel,
         }),

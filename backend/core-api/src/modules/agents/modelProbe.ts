@@ -1,7 +1,7 @@
-import type { IAiAgentConnection } from 'erxes-api-shared/core-modules';
+import type { IResolvedConnection } from 'erxes-api-shared/core-modules';
+import { ExpectedError } from 'erxes-api-shared/utils';
 import { isUsableProviderModel } from '@/agents/modelCatalog';
 import {
-  describeUnreadableKey,
   getByokProviderLabel,
   readProviderErrorMessage,
   sanitizeProviderMessage,
@@ -92,7 +92,7 @@ const describeProbeFailure = (
   const status = typeof statusCode === 'number' ? ` (${statusCode})` : '';
 
   if (statusCode === 401) {
-    return `${label} rejected the saved API key${status}. Re-enter it in Settings → API key.`;
+    return `${label} rejected the saved API key${status}. Re-enter it in Settings → Connections.`;
   }
 
   return `${label} rejected "${model}"${status}${detail ? `: ${detail}` : '.'}`;
@@ -107,10 +107,10 @@ export const probeProviderModel = async ({
   connection,
   model,
 }: {
-  connection: IAiAgentConnection;
+  connection: IResolvedConnection;
   model: string;
 }): Promise<IAgentsModelProbeResult> => {
-  const provider = connection.provider;
+  const provider = connection.type;
   const label = getByokProviderLabel(provider);
 
   if (!MODEL_ID_PATTERN.test(model)) {
@@ -131,11 +131,14 @@ export const probeProviderModel = async ({
   let resolved: ReturnType<typeof resolveModelConnection>;
 
   try {
-    resolved = resolveModelConnection({ connection: { ...connection, model } });
-  } catch {
+    resolved = resolveModelConnection({ connection, model });
+  } catch (error: unknown) {
     return {
       ok: false,
-      error: describeUnreadableKey(provider, connection.config?.apiKey),
+      error:
+        error instanceof ExpectedError
+          ? error.message
+          : `Could not use this ${label} connection.`,
     };
   }
 

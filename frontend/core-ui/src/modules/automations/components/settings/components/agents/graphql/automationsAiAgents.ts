@@ -47,8 +47,21 @@ export const AUTOMATIONS_AI_AGENT_DETAIL = gql`
 `;
 
 export const AUTOMATIONS_AI_AGENTS = gql`
-  query AutomationsAiAgents($kind: String) {
-    automationsAiAgents(kind: $kind)
+  query AutomationsAiAgents {
+    automationsAiAgents
+  }
+`;
+
+export const AUTOMATIONS_AI_AGENT_CONNECTIONS_LIST = gql`
+  query AutomationsAiAgentConnectionsList {
+    connections(category: "ai", scope: "workspace") {
+      _id
+      type
+      name
+      services
+      secretsSet
+      secretsUnreadable
+    }
   }
 `;
 
@@ -67,12 +80,12 @@ export const AUTOMATIONS_AI_AGENT_HEALTH = gql`
 export const AUTOMATIONS_AI_AGENT_MODELS = gql`
   query AutomationsAiAgentModels(
     $agentId: String
-    $provider: String!
+    $connectionId: String!
     $selectedModel: String
   ) {
     automationsAiAgentModels(
       agentId: $agentId
-      provider: $provider
+      connectionId: $connectionId
       selectedModel: $selectedModel
     ) {
       id

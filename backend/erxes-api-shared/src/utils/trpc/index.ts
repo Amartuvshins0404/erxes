@@ -9,6 +9,10 @@ import { getPlugin, isEnabled } from '../service-discovery';
 import { generateRequestProcess, getEnv } from '../utils';
 import { setEventHandlerRuntimeContext } from '../../core-modules/common/eventHandlers/runtimeContext';
 import { createInternalHTTPBatchLink } from './httpBatchLink';
+import {
+  buildServiceAuthHeader,
+  SERVICE_AUTH_HEADER,
+} from '../service-auth';
 
 export type MessageProps = {
   subdomain: string;
@@ -26,6 +30,7 @@ export type MessageProps = {
 export type CommonTRPCContext = {
   processId?: string;
   userId?: string;
+  serviceAuthHeader?: string;
 };
 
 export type ScopedEventHandlers = ReturnType<typeof createScopedEventHandlers>;
@@ -129,15 +134,24 @@ export const sendTRPCMessage = async ({
   try {
     // Encode context into header
     const contextHeader = encodeTRPCContextHeader(subdomain, method, context);
+    const serviceAuthHeader = buildServiceAuthHeader({
+      subdomain,
+      path: `${module}.${action}`,
+      input,
+    });
+    const buildHeaders = () => ({
+      [trpcContextHeaderName]: contextHeader,
+      ...(serviceAuthHeader
+        ? { [SERVICE_AUTH_HEADER]: serviceAuthHeader }
+        : {}),
+    });
 
     if (VERSION && VERSION === 'saas') {
       client = createTRPCUntypedClient({
         links: [
           createInternalHTTPBatchLink({
             url: `https://${subdomain}.next.erxes.io/gateway/pl:${pluginName}/trpc`,
-            headers: () => ({
-              [trpcContextHeaderName]: contextHeader,
-            }),
+            headers: buildHeaders,
           }),
         ],
       });
@@ -158,9 +172,7 @@ export const sendTRPCMessage = async ({
         links: [
           createInternalHTTPBatchLink({
             url: `${pluginInfo.address}/trpc`,
-            headers: () => ({
-              [trpcContextHeaderName]: contextHeader,
-            }),
+            headers: buildHeaders,
           }),
         ],
       });
@@ -241,9 +253,15 @@ export const createTRPCContext =
       throw new Error('Invalid context');
     }
 
+    const serviceAuthHeader = req.headers[SERVICE_AUTH_HEADER];
+
     return (await createPluginTRPCContext(
       subdomain,
-      reqContext || {},
+      {
+        ...(reqContext || {}),
+        serviceAuthHeader:
+          typeof serviceAuthHeader === 'string' ? serviceAuthHeader : undefined,
+      },
       trpcContext,
     )) as TContext & TRPCContext;
   };

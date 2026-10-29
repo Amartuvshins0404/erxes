@@ -2,16 +2,12 @@ import { AiAgentDetailFooter } from '@/automations/components/settings/component
 import { AiAgentProfileBar } from '@/automations/components/settings/components/agents/components/detail/AiAgentProfileBar';
 import { AiAgentStepContent } from '@/automations/components/settings/components/agents/components/detail/AiAgentStepContent';
 import { AiAgentStepNav } from '@/automations/components/settings/components/agents/components/detail/AiAgentStepNav';
-import {
-  AI_AGENT_PROVIDER_TYPES,
-  TAiAgentProvider,
-} from '@/automations/components/settings/components/agents/constants/providers';
 import { AiAgentDetailProvider } from '@/automations/components/settings/components/agents/context/AiAgentDetailContext';
 import { useAiAgentDefaultModel } from '@/automations/components/settings/components/agents/hooks/useAiAgentDefaultModel';
 import { AiAgentInput } from '@/automations/components/settings/components/agents/hooks/useAiAgentDetail';
 import { useAiAgentDetailState } from '@/automations/components/settings/components/agents/hooks/useAiAgentDetailState';
 import {
-  buildAiAgentFormSchema,
+  aiAgentFormSchema,
   normalizeAiAgentFormValues,
   TAiAgentForm,
   TAiAgentFormDetail,
@@ -21,7 +17,6 @@ import { toast } from 'erxes-ui';
 import { MutableRefObject, useEffect } from 'react';
 import { FormProvider, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { useSearchParams } from 'react-router';
 
 type TRequestCloseRef = MutableRefObject<(() => void) | null>;
 
@@ -83,18 +78,9 @@ export const AutomationAiAgentDetail = ({
 }) => {
   const { t } = useTranslation('automations');
 
-  const [searchParams] = useSearchParams();
-  const queryKind = searchParams.get('kind');
-  const defaultProvider =
-    !detail && AI_AGENT_PROVIDER_TYPES.includes(queryKind as TAiAgentProvider)
-      ? (queryKind as TAiAgentProvider)
-      : undefined;
-
   const form = useForm<TAiAgentForm>({
-    resolver: zodResolver(
-      buildAiAgentFormSchema({ requireApiKey: !detail?._id }),
-    ),
-    values: normalizeAiAgentFormValues(detail, defaultProvider),
+    resolver: zodResolver(aiAgentFormSchema),
+    values: normalizeAiAgentFormValues(detail),
   });
 
   const save = form.handleSubmit(handleSave, () => {

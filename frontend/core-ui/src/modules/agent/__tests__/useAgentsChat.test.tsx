@@ -128,11 +128,11 @@ it('sends the chosen level as chosen and leaves model clamping to the server', (
 
   // k3.1-pro rejects Off; the server clamps it, so the client never rewrites
   // what it sends or reports a model's levels for a second clamp.
-  act(() => result.current.selectModel('kimi-code', 'k3.1-pro'));
+  act(() => result.current.selectModel('conn-kimi', 'k3.1-pro'));
   act(() => result.current.selectThinkingLevel('off'));
 
   expect(mockGetRequestSelection()).toMatchObject({
-    provider: 'kimi-code',
+    connectionId: 'conn-kimi',
     model: 'k3.1-pro',
     thinkingLevel: 'off',
   });

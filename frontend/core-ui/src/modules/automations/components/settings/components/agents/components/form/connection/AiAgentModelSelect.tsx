@@ -1,4 +1,3 @@
-import { TAiAgentProvider } from '@/automations/components/settings/components/agents/constants/providers';
 import { useAiAgentDetailContext } from '@/automations/components/settings/components/agents/context/AiAgentDetailContext';
 import {
   TAiAgentModelOption,
@@ -109,7 +108,7 @@ export const AiAgentModelSelect = () => {
   const { t } = useTranslation('automations');
   const { control, watch } = useFormContext<TAiAgentForm>();
   const { detail } = useAiAgentDetailContext();
-  const provider = watch('connection.provider') as TAiAgentProvider;
+  const connectionId = watch('connection.connectionId');
   const value = watch('connection.model');
 
   const {
@@ -124,9 +123,9 @@ export const AiAgentModelSelect = () => {
     error,
   } = useAiAgentModelOptions({
     agentId: detail?._id,
-    provider,
+    connectionId,
     savedModel:
-      detail?.connection?.provider === provider
+      detail?.connection?.connectionId === connectionId
         ? detail.connection.model
         : undefined,
     value,

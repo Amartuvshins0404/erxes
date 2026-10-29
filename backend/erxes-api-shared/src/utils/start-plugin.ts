@@ -58,6 +58,7 @@ import {
   leaveErxesGateway,
 } from './service-discovery';
 import { createTRPCContext } from './trpc';
+import { setCurrentServiceName } from './service-auth';
 import { applyTrustProxy, getSubdomain } from './utils';
 import * as Sentry from '@sentry/node';
 
@@ -178,6 +179,8 @@ export async function startPlugin(
     plugin: name,
     service: name,
   });
+
+  setCurrentServiceName(name);
 
   const app = express();
   applyTrustProxy(app);

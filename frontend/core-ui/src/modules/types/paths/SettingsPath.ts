@@ -39,6 +39,7 @@ export enum SettingsWorkspacePath {
   Broadcast = 'broadcast',
   MessagePro = 'message-pro',
   Agent = 'agent',
+  Connections = 'connections',
   AgentCatchAll = 'agent/*',
 }
 

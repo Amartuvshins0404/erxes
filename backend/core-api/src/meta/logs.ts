@@ -50,5 +50,9 @@ export const logs: LogsConfigs = {
       moduleName: 'app_tokens',
       collectionName: 'app_tokens',
     },
+    {
+      moduleName: 'connections',
+      collectionName: 'connections',
+    },
   ],
 };

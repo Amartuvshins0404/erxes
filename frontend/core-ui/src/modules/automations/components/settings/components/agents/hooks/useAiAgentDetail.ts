@@ -5,7 +5,6 @@ import {
   AUTOMATIONS_AI_AGENT_DETAIL,
   AUTOMATIONS_AI_AGENT_EDIT,
   AUTOMATIONS_AI_AGENT_KNOWLEDGE_SOURCE_STATUSES,
-  AUTOMATIONS_AI_AGENT_MODELS,
   AUTOMATIONS_AI_AGENTS,
 } from '@/automations/components/settings/components/agents/graphql/automationsAiAgents';
 import { toast } from 'erxes-ui';
@@ -15,17 +14,8 @@ export interface AiAgentInput {
   name?: string;
   description?: string;
   connection?: {
-    provider?: string;
+    connectionId?: string;
     model?: string;
-    config?: {
-      apiKey?: string;
-      baseUrl?: string;
-      headers?: Record<string, string>;
-      accountId?: string;
-      gatewayId?: string;
-      gatewayToken?: string;
-      mode?: 'compat' | 'openai-provider';
-    };
   };
   runtime?: {
     temperature?: number;
@@ -85,8 +75,6 @@ export function useAiAgentDetail({
         variables: id ? { ...input, id } : input,
         refetchQueries: [
           AUTOMATIONS_AI_AGENTS,
-          // A new key or base url can change which models the provider lists.
-          AUTOMATIONS_AI_AGENT_MODELS,
           ...(id
             ? [
                 {

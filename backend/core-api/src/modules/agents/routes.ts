@@ -20,7 +20,7 @@ import type { MastraMemory } from '@mastra/core/memory' with {
 import type { DurableAgent } from '@mastra/core/agent/durable' with {
   'resolution-mode': 'import',
 };
-import type { IAiAgentConnection } from 'erxes-api-shared/core-modules';
+import type { IResolvedConnection } from 'erxes-api-shared/core-modules';
 import { randomUUID } from 'crypto';
 import express, { Router } from 'express';
 import type { IUserDocument } from 'erxes-api-shared/core-types';
@@ -36,11 +36,16 @@ import {
   normalizeThinkingLevel,
   type IAgentsThinkingLevel,
 } from '@/agents/modelThinking';
-import type { IAgentsConnections } from '@/agents/@types/connection';
-import { findDefaultConnection } from '@/agents/db/models/Connection';
+import {
+  NO_CONNECTION_MESSAGE,
+  resolveUsableConnection,
+} from '@/agents/connectionAccess';
 import { getAgentsRuntime } from '@/agents/memory';
 import { describeUnreadableKey } from '@/agents/providerModels';
-import { openSecret } from '@/agents/secretBox';
+import {
+  getProviderDefaultModel,
+  resolveModelConnection,
+} from '@/agents/providers';
 import { probeAgentsRun } from '@/agents/runLiveness';
 import {
   agentsRunInterruptedError,
@@ -74,7 +79,7 @@ import { generateModels, type IModels } from '~/connectionResolvers';
  * The agents module runs one stable native DurableAgent per cached tenant
  * runtime (not one agent per request). The base Agent's dynamic model
  * callback re-fetches the acting user's current BYOK credentials from the
- * RequestContext snapshot (subdomain/userId/provider/model), so the same
+ * RequestContext snapshot (subdomain/userId/connectionId/model), so the same
  * instance serves every request and durable resume without leaks.
  *
  * - `POST /agents/chat` streams an AI SDK v7 UI message stream over SSE
@@ -190,66 +195,44 @@ const resolveOwnedThreadId = async ({
   return { threadId, isNew: !existing };
 };
 
-/**
- * Resolves the acting user's stored BYOK connections, shared by chat and
- * approve. Without one the user is told exactly what is missing; the key
- * itself is never echoed into the error.
- */
-const resolveUserConnections = async (
-  models: IModels,
-  userId: string,
-): Promise<IAgentsConnections> => {
-  const doc = await models.AgentsConnection.getConnections(userId);
+export const selectChatConnection = async ({
+  models,
+  userId,
+  connectionId,
+}: {
+  models: IModels;
+  userId: string;
+  connectionId?: string;
+}): Promise<IResolvedConnection> => {
+  const picked = await resolveUsableConnection(models, userId, connectionId);
 
-  if (!doc || doc.connections.length === 0) {
-    throw new HttpError(400, 'Add your API key to start using Agents.');
-  }
-
-  return doc;
-};
-
-/**
- * Picks the connection a turn runs on: the body's provider when given
- * (validated against the user's stored entries), otherwise the user's
- * default (`findDefaultConnection`: the explicit default while it is still
- * saved, else the first saved provider). An explicit `model` overrides the
- * stored one for this turn only and is never persisted.
- */
-export const pickConnection = (
-  stored: Pick<IAgentsConnections, 'connections' | 'defaultProvider'>,
-  provider?: string,
-  model?: string,
-): IAiAgentConnection => {
-  const requestedProvider = provider?.trim();
-  const selected = requestedProvider
-    ? stored.connections.find(
-        (connection) => connection.provider === requestedProvider,
-      )
-    : findDefaultConnection(stored);
-
-  if (!selected) {
+  if (!picked) {
     throw new HttpError(
       400,
-      `No connection stored for provider "${requestedProvider}". Add it under Settings → API key.`,
+      connectionId?.trim()
+        ? 'This connection is not available. Pick another one in the model picker.'
+        : NO_CONNECTION_MESSAGE,
     );
   }
 
-  const requestedModel = model?.trim();
-
-  return requestedModel ? { ...selected, model: requestedModel } : selected;
-};
-
-/**
- * Rejects a connection whose stored key this server cannot open (missing, or
- * sealed under another secret) with the same key-free reason the model list
- * shows, instead of failing later inside the run.
- */
-const assertUsableConnectionKey = (connection: IAiAgentConnection): void => {
-  const stored = connection.config?.apiKey;
-
-  if (!openSecret(stored)) {
-    throw new HttpError(400, describeUnreadableKey(connection.provider, stored));
+  if (picked.unreadable.length) {
+    throw new HttpError(
+      400,
+      describeUnreadableKey(picked.resolved.type, 'unreadable'),
+    );
   }
+
+  try {
+    resolveModelConnection({ connection: picked.resolved });
+  } catch (error: unknown) {
+    if (error instanceof ExpectedError) {
+      throw new HttpError(400, error.message);
+    }
+
+    throw error;
+  }
+
+  return picked.resolved;
 };
 
 const parseThinkingLevel = (value: unknown): IAgentsThinkingLevel =>
@@ -411,10 +394,10 @@ interface ISuspendedToolCall {
 /**
  * Shared preamble for both resume routes: resolves the tenant runtime and
  * re-checks thread ownership. The durable agent is stable per tenant — no
- * per-request agent build. Body selection fields (provider/model/thinking)
+ * per-request agent build. Body selection fields (connectionId/model/thinking)
  * are accepted for compatibility but do NOT control rehydration; the
  * durable agent uses its registered/snapshot RequestContext so the original
- * run's provider/model/thinking/codeMode stay intact.
+ * run's connectionId/model/thinking/codeMode stay intact.
  */
 const prepareResume = async (input: {
   identity: IRequestIdentity;
@@ -521,7 +504,7 @@ const findSuspendedToolCall = async (
 
 /**
  * Resume options shared by approve/decline and answer. The durable agent
- * uses its registered/snapshot RequestContext so provider/model/thinking/
+ * uses its registered/snapshot RequestContext so connectionId/model/thinking/
  * codeMode stay from the original run; only runId, toolCallId, memory,
  * step budget, and lifecycle callbacks are specified here. `onSuspended`
  * ends the HTTP response after already-published suspension chunks so a
@@ -605,7 +588,7 @@ router.post('/agents/chat', async (req, res) => {
     messages?: UIMessage[];
     threadId?: string;
     runId?: string;
-    provider?: string;
+    connectionId?: string;
     model?: string;
     thinkingLevel?: string;
     fileIds?: unknown;
@@ -661,16 +644,14 @@ router.post('/agents/chat', async (req, res) => {
 
   const runId = rawRunId || randomUUID();
 
-  // Provider/model overrides must be strings when present; a wrong-typed
-  // value 400s instead of throwing inside `pickConnection` (500).
   if (
-    (body.provider !== undefined && typeof body.provider !== 'string') ||
+    (body.connectionId !== undefined && typeof body.connectionId !== 'string') ||
     (body.model !== undefined && typeof body.model !== 'string')
   ) {
     jsonError(
       res,
       400,
-      new Error('`provider` and `model` must be strings when provided.'),
+      new Error('`connectionId` and `model` must be strings when provided.'),
     );
     return;
   }
@@ -698,19 +679,14 @@ router.post('/agents/chat', async (req, res) => {
     const files = collectAgentsAttachments(
       Array.isArray(newestMessage.parts) ? newestMessage.parts : [],
     );
-    // A turn without a usable connection is rejected before any gateway
-    // work: no mention lookup runs for a request that cannot reach a model.
     const models = await generateModels(identity.subdomain);
-    const storedConnections = await resolveUserConnections(
+    const connection = await selectChatConnection({
       models,
-      identity.userId,
-    );
-    const connection = pickConnection(
-      storedConnections,
-      body.provider,
-      body.model,
-    );
-    assertUsableConnectionKey(connection);
+      userId: identity.userId,
+      connectionId: body.connectionId,
+    });
+    const model =
+      body.model?.trim() || getProviderDefaultModel(connection.type);
 
     const requestedMentions = collectAgentsMentions(
       Array.isArray(newestMessage.parts) ? newestMessage.parts : [],
@@ -725,8 +701,8 @@ router.post('/agents/chat', async (req, res) => {
     // Only levels the selected model supports reach the provider (clamped to
     // the nearest one; unknown models keep the original five levels).
     const thinkingLevel = normalizeThinkingLevel(
-      connection.provider,
-      connection.model,
+      connection.type,
+      model,
       parseThinkingLevel(body.thinkingLevel),
     );
     const runSettings = await resolveRunSettings(models);
@@ -789,8 +765,8 @@ router.post('/agents/chat', async (req, res) => {
     const requestContext = await buildAgentsRequestContext({
       subdomain: identity.subdomain,
       userId: identity.userId,
-      provider: connection.provider,
-      model: connection.model,
+      connectionId: connection._id,
+      model,
       thinkingLevel,
       codeModeEnabled: runSettings.codeModeEnabled,
       approvalMode: runSettings.approvalMode,
@@ -803,7 +779,7 @@ router.post('/agents/chat', async (req, res) => {
     });
 
     // Use the tenant's stable DurableAgent. The dynamic model callback
-    // reads provider/model/thinking/codeMode from the RequestContext above.
+    // reads connectionId/model/thinking/codeMode from the RequestContext above.
     // modelSettings go via stream options (not the Agent constructor's
     // model list) because durable serialization drops list-entry
     // modelSettings but serializes stream-level ones.
@@ -811,9 +787,9 @@ router.post('/agents/chat', async (req, res) => {
       runId,
       maxSteps: AGENTS_MAX_STEPS,
       modelSettings: buildAgentsModelSettings(
-        connection.provider,
+        connection.type,
         thinkingLevel,
-        connection.model,
+        model,
       ),
       memory: {
         thread: threadId,
@@ -884,7 +860,6 @@ router.post('/agents/approve', async (req, res) => {
     approved?: boolean;
     toolCallId?: string;
     reason?: string;
-    provider?: string;
     model?: string;
     thinkingLevel?: string;
   };
@@ -936,7 +911,7 @@ router.post('/agents/approve', async (req, res) => {
 
     // The durable agent's native approveToolCall/declineToolCall routes
     // through the durable resume path, preserving the original run's
-    // RequestContext snapshot (provider/model/thinking/codeMode).
+    // RequestContext snapshot (connectionId/model/thinking/codeMode).
     const output = body.approved
       ? await agent.approveToolCall(options)
       : await agent.declineToolCall({
@@ -963,7 +938,6 @@ router.post('/agents/answer', async (req, res) => {
   const body = (req.body || {}) as {
     threadId?: string;
     answer?: unknown;
-    provider?: string;
     model?: string;
     thinkingLevel?: string;
   };

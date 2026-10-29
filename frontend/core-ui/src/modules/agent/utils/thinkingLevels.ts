@@ -101,13 +101,13 @@ export const clampThinkingLevel = (
  */
 export const findModelThinking = (
   providerModels: readonly {
-    provider: string;
+    connectionId: string;
     models: readonly { id: string; thinking?: IAgentsModelThinking | null }[];
   }[],
-  choice: { provider: string; model: string } | undefined,
+  choice: { connectionId: string; model: string } | undefined,
 ): IAgentsModelThinking | null =>
   (choice &&
     providerModels
-      .find((group) => group.provider === choice.provider)
+      .find((group) => group.connectionId === choice.connectionId)
       ?.models.find((model) => model.id === choice.model)?.thinking) ??
   null;

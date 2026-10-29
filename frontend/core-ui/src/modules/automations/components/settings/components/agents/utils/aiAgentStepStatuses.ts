@@ -6,10 +6,12 @@ import {
   TAiAgentStepState,
   TAiAgentStepStatus,
 } from '@/automations/components/settings/components/agents/constants/aiAgentSteps';
+import { AI_AGENT_PROVIDERS_REQUIRING_API_KEY } from '@/automations/components/settings/components/agents/constants/providers';
 import {
-  AI_AGENT_PROVIDERS_REQUIRING_API_KEY,
-  TAiAgentProvider,
-} from '@/automations/components/settings/components/agents/constants/providers';
+  getConnectionProvider,
+  isConnectionSharedWithAutomations,
+  TAiAgentConnectionOption,
+} from '@/automations/components/settings/components/agents/hooks/useAiAgentConnections';
 import { TAiAgentHealth } from '@/automations/components/settings/components/agents/hooks/useAiAgentHealth';
 import { TAiAgentForm } from '@/automations/components/settings/components/agents/states/AiAgentFormSchema';
 import { hasSourceSelection } from '@/automations/components/settings/components/agents/utils/aiAgentKnowledgeSources';
@@ -22,12 +24,11 @@ export type TAiAgentStepStatusInput = {
   values: DeepPartial<TAiAgentForm>;
   isEditing: boolean;
   usageTotal?: number;
-  hasStoredApiKey: boolean;
+  connection?: TAiAgentConnectionOption;
+  connectionsLoaded: boolean;
   health?: TAiAgentHealth;
   healthLoading: boolean;
   knowledgeStatuses: TAiKnowledgeSourceIndexStatus[];
-  // A new agent starts from provider defaults; they count once the user
-  // has touched the step, so an unsaved agent never looks pre-assembled.
   untouched: { connection: boolean; brain: boolean };
 };
 
@@ -78,11 +79,44 @@ const getIdentityState = ({
 
 const getConnectionChecks = ({
   values,
-  hasStoredApiKey,
+  connection,
+  connectionsLoaded,
   health,
 }: TAiAgentStepStatusInput): TAiAgentStepState => {
   const checks = health?.checks || {};
-  const provider = values.connection?.provider as TAiAgentProvider | undefined;
+
+  if (!values.connection?.connectionId) {
+    return { status: 'missing', message: 'Choose a connection' };
+  }
+
+  if (connectionsLoaded && !connection) {
+    return {
+      status: 'error',
+      message: 'Connection gone',
+      detail:
+        'The connection this agent used was removed. Pick another one, or add it again in Settings > Connections.',
+    };
+  }
+
+  if (connection && !isConnectionSharedWithAutomations(connection)) {
+    return {
+      status: 'error',
+      message: 'Not shared with automations',
+      detail:
+        'Allow automations on this connection in Settings > Connections, or pick another one.',
+    };
+  }
+
+  if (connection?.secretsUnreadable.length) {
+    return {
+      status: 'error',
+      message: 'Key unreadable',
+      detail:
+        'The stored key can no longer be opened. Enter it again in Settings > Connections.',
+    };
+  }
+
+  const provider = getConnectionProvider(connection);
 
   if (checks.credentials === 'error' || checks.endpoint === 'error') {
     return {
@@ -90,17 +124,20 @@ const getConnectionChecks = ({
       message: 'Signal lost',
       detail:
         health?.errors?.[0] ||
-        'The provider rejected the last check. Replace the key or fix the endpoint, then save.',
+        'The provider rejected the last check. Fix the key or endpoint in Settings > Connections, then run the check again.',
     };
   }
 
   if (
     provider &&
     AI_AGENT_PROVIDERS_REQUIRING_API_KEY.includes(provider) &&
-    !values.connection?.config?.apiKey?.trim() &&
-    !hasStoredApiKey
+    !connection?.secretsSet.includes('apiKey')
   ) {
-    return { status: 'missing', message: 'Needs an API key' };
+    return {
+      status: 'missing',
+      message: 'Needs an API key',
+      detail: 'Add the API key to this connection in Settings > Connections.',
+    };
   }
 
   if (checks.credentials === 'warning' || checks.endpoint === 'warning') {
@@ -120,7 +157,7 @@ const getConnectionState = (
   unlessUntouched(
     getConnectionChecks(input),
     !input.isEditing && input.untouched.connection,
-    'Choose a provider',
+    'Choose a connection',
   );
 
 const getBrainChecks = (input: TAiAgentStepStatusInput): TAiAgentStepState => {
@@ -302,7 +339,7 @@ export type TAiAgentHeadline = {
 
 const MISSING_CTA: Record<TAiAgentStep, string> = {
   identity: 'Add a name',
-  connection: 'Connect provider',
+  connection: 'Choose connection',
   brain: 'Pick a model',
   memory: 'Add memory',
   test: 'Run check',

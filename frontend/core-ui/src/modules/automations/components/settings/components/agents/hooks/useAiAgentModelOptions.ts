@@ -1,4 +1,3 @@
-import { TAiAgentProvider } from '@/automations/components/settings/components/agents/constants/providers';
 import { AUTOMATIONS_AI_AGENT_MODELS } from '@/automations/components/settings/components/agents/graphql/automationsAiAgents';
 import { useQuery } from '@apollo/client';
 import { useMemo, useState } from 'react';
@@ -39,12 +38,12 @@ const GROUP_ORDER: TAiAgentModelGroup[] = [
 
 export const useAiAgentModelOptions = ({
   agentId,
-  provider,
+  connectionId,
   savedModel,
   value,
 }: {
   agentId?: string;
-  provider: TAiAgentProvider;
+  connectionId: string;
   // The stored model gets its status from the server; picks made in the form
   // are looked up in the returned list instead of refetching per selection.
   savedModel?: string;
@@ -55,8 +54,8 @@ export const useAiAgentModelOptions = ({
 
   const { data, previousData, loading, error } =
     useQuery<TAiAgentModelsResponse>(AUTOMATIONS_AI_AGENT_MODELS, {
-      variables: { agentId, provider, selectedModel: savedModel },
-      skip: !provider,
+      variables: { agentId, connectionId, selectedModel: savedModel },
+      skip: !connectionId,
       fetchPolicy: 'cache-and-network',
     });
 

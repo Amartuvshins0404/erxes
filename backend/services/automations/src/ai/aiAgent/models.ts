@@ -2,12 +2,14 @@ import { createHash } from 'crypto';
 import { redis } from 'erxes-api-shared/utils';
 import { getAiProviderBridge } from '../bridge';
 import type { TAiBridgeConnection, TAiBridgeRuntime } from '../bridge/types';
-import { resolveAiProviderConnection } from '../providers';
+import {
+  loadAiAgentConnectionSource,
+  resolveAiProviderConnection,
+} from '../providers';
 import {
   AI_AGENT_PROVIDER_DEFAULT_MODELS,
   AI_AGENT_RECOMMENDED_MODELS,
 } from './constants';
-import { aiAgentConnectionSchema } from './connection';
 import { aiAgentInputSchema, TAiAgentInput } from './contract';
 import {
   getAiModelCatalog,
@@ -161,16 +163,18 @@ const liveModelsCacheKey = (
 
 const getLiveModelIds = async ({
   subdomain,
-  connection: storedConnection,
+  connection: sourceConnection,
+  connectionName,
   runtime,
 }: {
   subdomain: string;
   connection: TAiBridgeConnection;
+  connectionName: string;
   runtime: TAiBridgeRuntime;
 }): Promise<string[] | null> => {
   const connection = resolveAiProviderConnection({
-    subdomain,
-    connection: storedConnection,
+    connection: sourceConnection,
+    connectionName,
   });
   const key = liveModelsCacheKey(subdomain, connection);
 
@@ -195,27 +199,27 @@ const getLiveModelIds = async ({
 
 export const listAiAgentModels = async ({
   subdomain,
+  connectionId,
   storedAgent,
-  provider,
   selectedModel,
 }: {
   subdomain: string;
+  connectionId: string;
   storedAgent: TAiAgentInput | null;
-  provider: TAiAgentProvider;
   selectedModel?: string;
 }): Promise<TAiAgentModelOption[]> => {
-  // A provider switched in the form must not receive the old provider's key;
-  // an empty config falls back to the platform env key on resolve.
-  const connection =
-    storedAgent && storedAgent.connection.provider === provider
-      ? storedAgent.connection
-      : aiAgentConnectionSchema.parse({ provider });
+  const source = await loadAiAgentConnectionSource({
+    subdomain,
+    connection: { connectionId },
+  });
+  const provider = source.connection.provider;
   const runtime =
     storedAgent?.runtime || aiAgentInputSchema.shape.runtime.parse(undefined);
 
   const liveIds = await getLiveModelIds({
     subdomain,
-    connection,
+    connection: source.connection,
+    connectionName: source.name,
     runtime,
   }).catch(() => null);
 

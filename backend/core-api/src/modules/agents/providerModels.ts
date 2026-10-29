@@ -1,20 +1,9 @@
 import { ExpectedError } from 'erxes-api-shared/utils';
 import type { IProviderModelEntry } from '@/agents/modelCatalog';
-import { canOpenSealedSecrets, isSealedSecret } from '@/agents/secretBox';
+import { canSealSecrets } from '@/connections/crypto';
 
-/** Providers offered on the BYOK surface (single source for the whitelist). */
 export const BYOK_PROVIDERS = ['openai', 'grok', 'kimi', 'kimi-code'] as const;
 
-export type IByokProvider = (typeof BYOK_PROVIDERS)[number];
-
-export const isByokProvider = (provider: string): boolean =>
-  (BYOK_PROVIDERS as readonly string[]).includes(provider);
-
-/**
- * Public per-provider models endpoints — the same hosts the provider
- * defaults in `providers.ts` use. A listing also contains non-chat models;
- * `modelCatalog.ts` filters it. Secrets are never part of these constants.
- */
 const PROVIDER_MODELS_ENDPOINTS: Record<string, string> = {
   openai: 'https://api.openai.com/v1/models',
   grok: 'https://api.x.ai/v1/models',
@@ -22,42 +11,38 @@ const PROVIDER_MODELS_ENDPOINTS: Record<string, string> = {
   'kimi-code': 'https://api.kimi.com/coding/v1/models',
 };
 
-/** Display names used in user-facing listing and probe errors. */
 const BYOK_PROVIDER_LABELS: Record<string, string> = {
   openai: 'OpenAI',
   grok: 'Grok',
   kimi: 'Kimi',
   'kimi-code': 'Kimi Code',
+  'cloudflare-ai-gateway': 'Cloudflare AI Gateway',
 };
 
 export const getByokProviderLabel = (provider: string): string =>
   BYOK_PROVIDER_LABELS[provider] ?? provider;
 
-/** Why a stored key cannot be used, without revealing anything about it. */
+export type TKeyState = 'missing' | 'unreadable';
+
 export const describeUnreadableKey = (
   provider: string,
-  stored: unknown,
+  state: TKeyState,
 ): string => {
   const label = getByokProviderLabel(provider);
 
-  if (!isSealedSecret(stored)) {
-    return `No ${label} API key is saved. Add it in Settings → API key.`;
+  if (state === 'missing') {
+    return `No ${label} API key is saved. Add it in Settings → Connections.`;
   }
 
-  return canOpenSealedSecrets()
-    ? `The saved ${label} key can't be decrypted on this server (its encryption secret changed). Re-enter it in Settings → API key.`
-    : `Saved API keys can't be read because key encryption isn't configured on this server (JWT_TOKEN_SECRET). Ask an administrator to set it, then re-enter the ${label} key.`;
+  return canSealSecrets()
+    ? `The saved ${label} key can't be decrypted on this server (its encryption key changed). Re-enter it in Settings → Connections.`
+    : `Saved API keys can't be read because key encryption isn't configured on this server (ERXES_MASTER_KEY). Ask an administrator to set it, then re-enter the ${label} key.`;
 };
 
-/** ExpectedError code for an endpoint that offers no model listing. */
 export const MODEL_LIST_UNSUPPORTED = 'MODEL_LIST_UNSUPPORTED';
 
 const PROVIDER_MESSAGE_LIMIT = 200;
 
-/**
- * Makes a provider error message safe to show: the key itself and anything
- * shaped like a (masked) credential are removed before it is truncated.
- */
 export const sanitizeProviderMessage = (
   message: unknown,
   apiKey: string,
@@ -69,7 +54,6 @@ export const sanitizeProviderMessage = (
   const withoutKey = apiKey ? message.split(apiKey).join('<key>') : message;
   const redacted = withoutKey
     .replace(/\b(sk|xai|key)[-_][\w*.-]+/gi, '<key>')
-    // Long unbroken tokens; model ids contain dashes or dots, so they stay.
     .replace(/[A-Za-z0-9_*]{32,}/g, '<redacted>')
     .replace(/\s+/g, ' ')
     .trim();
@@ -79,7 +63,6 @@ export const sanitizeProviderMessage = (
     : redacted;
 };
 
-/** OpenAI-, Anthropic- and Moonshot-style bodies all nest `error.message`. */
 export const readProviderErrorMessage = (body: unknown): unknown => {
   if (!body || typeof body !== 'object') {
     return undefined;
@@ -96,12 +79,6 @@ export const readProviderErrorMessage = (body: unknown): unknown => {
     : message;
 };
 
-/**
- * Turns a failed listing response into an actionable, key-free error. A key
- * that may chat but not list (OpenAI restricted keys need Models: Read,
- * `api.model.read`) is told so explicitly, because typing a model id still
- * works for it.
- */
 const describeListingFailure = (
   provider: string,
   status: number,
@@ -126,7 +103,7 @@ const describeListingFailure = (
 
   if (status === 401) {
     return new ExpectedError(
-      `${label} rejected the saved API key (401). Re-enter it in Settings → API key.${suffix}`,
+      `${label} rejected the saved API key (401). Re-enter it in Settings → Connections.${suffix}`,
       'UNAUTHORIZED',
     );
   }
@@ -163,7 +140,6 @@ const parseCreated = (value: unknown): number | undefined => {
     return value;
   }
 
-  // Anthropic-protocol listings report an ISO `created_at` instead.
   if (typeof value === 'string') {
     const time = Date.parse(value);
 
@@ -173,13 +149,6 @@ const parseCreated = (value: unknown): number | undefined => {
   return undefined;
 };
 
-/**
- * Fetches one provider's raw model entries from its public /models endpoint
- * using the acting user's stored key. The listing is unfiltered;
- * `buildProviderModelCatalog` decides which entries are usable. Both auth header styles are sent because
- * the Anthropic-protocol gateway (kimi-code) honors either, mirroring
- * `providers.ts`. The key is never included in any error message.
- */
 export const fetchProviderModels = async ({
   provider,
   apiKey,
@@ -192,7 +161,7 @@ export const fetchProviderModels = async ({
   if (!url) {
     throw new ExpectedError(
       `Model listing is not supported for "${provider}".`,
-      'VALIDATION_ERROR',
+      MODEL_LIST_UNSUPPORTED,
     );
   }
 

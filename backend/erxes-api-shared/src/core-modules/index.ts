@@ -14,3 +14,4 @@ export * from './import-export';
 export * from './templates';
 export * from './contact-fields';
 export * from './agent';
+export * from './connections';

@@ -12,7 +12,7 @@ import type { ProviderOptions } from '@mastra/core/llm/model/provider-options' w
 import type { RequestContext } from '@mastra/core/request-context' with {
   'resolution-mode': 'import',
 };
-import type { IAiAgentConnection } from 'erxes-api-shared/core-modules';
+import type { IResolvedConnection } from 'erxes-api-shared/core-modules';
 import {
   createModelConfig,
   getProviderDefaultModel,
@@ -39,18 +39,8 @@ import {
   type IAgentsThinkingLevel,
 } from '@/agents/modelThinking';
 import { generateModels } from '~/connectionResolvers';
-
-/**
- * Builds the single stable base Agent for a tenant. The agent's dynamic
- * model callback re-fetches the acting user's current BYOK credentials
- * server-side from the RequestContext snapshot (subdomain/userId/provider/
- * model), so the same agent instance serves every request and durable
- * resume without per-request agent creation leaks.
- *
- * The returned agent is intended to be wrapped by `createDurableAgent` and
- * registered in a Mastra instance — that makes the durable workflow
- * persistent and suspend/resume durable across requests and restarts.
- */
+import { resolveUsableConnection } from '@/agents/connectionAccess';
+import { describeUnreadableKey } from '@/agents/providerModels';
 
 export const DEFAULT_INSTRUCTIONS = `You are the user's working assistant in erxes, their business workspace. Help them understand their business and get work done here. Speak naturally, directly, and in the user's language. Refer to their workspace and records as part of the current conversation, not as an unfamiliar external system. Do not repeatedly introduce yourself, explain that you are an AI, or narrate internal tool names.
 
@@ -102,15 +92,6 @@ export const buildAgentsInstructions = (
   codeModeInstructions,
 ].filter(Boolean).join('\n\n');
 
-/**
- * Step budget for one agent run (a step is one model call plus its tool
- * executions). Mastra's default is 5, which real turns exhaust silently:
- * the model burns steps on GraphQL discovery and code-mode iterations
- * (and an ask_user step counts against the resumed run's budget), so a turn
- * that reached the cap ended right after its last tool result with no final
- * answer and nothing persisted. 32 keeps headroom for discover → code → fix
- * loops while still bounding a runaway run.
- */
 export const AGENTS_MAX_STEPS = 32;
 
 const TEMPERATURE = 0.2;
@@ -118,17 +99,6 @@ const TEMPERATURE = 0.2;
 // not a requested response length; concise answers still end naturally.
 const MAX_OUTPUT_TOKENS = 16384;
 
-/**
- * Returns the modelSettings for a stream call. Temperature is constant;
- * maxOutputTokens is raised for kimi-code when thinking is on so the
- * Anthropic thinking budget doesn't starve the visible response
- * (`modelThinking.ts`; `model` selects that model's thinking options).
- *
- * Installed durable serialization drops list-entry modelSettings but
- * serializes stream-level modelSettings, so callers pass this via
- * `runtime.agent.stream({ modelSettings })` rather than in the Agent
- * constructor's model list.
- */
 export const buildAgentsModelSettings = (
   provider: string,
   thinkingLevel: IAgentsThinkingLevel,
@@ -150,15 +120,10 @@ export const buildAgentsModelSettings = (
   return { temperature: TEMPERATURE, maxOutputTokens };
 };
 
-/**
- * Reads the non-secret selection fields from a RequestContext and resolves
- * the concrete BYOK connection + model config for this run. Errors are
- * actionable and never echo secrets.
- */
 const resolveRunConnection = async (
   requestContext: RequestContext<IAgentsRequestContext>,
 ): Promise<{
-  connection: IAiAgentConnection;
+  connection: IResolvedConnection;
   provider: string;
   model: string;
   thinkingLevel: IAgentsThinkingLevel;
@@ -166,7 +131,7 @@ const resolveRunConnection = async (
 }> => {
   const subdomain = requestContext.get('subdomain');
   const userId = requestContext.get('userId');
-  const provider = requestContext.get('provider');
+  const connectionId = requestContext.get('connectionId');
   const model = requestContext.get('model');
   const thinkingLevel = requestContext.get('thinkingLevel');
   const codeModeEnabled = requestContext.get('codeModeEnabled');
@@ -175,40 +140,29 @@ const resolveRunConnection = async (
     throw new Error('Agents request context is missing identity.');
   }
 
-  if (typeof provider !== 'string' || typeof model !== 'string') {
-    throw new Error('Agents request context is missing provider/model.');
+  if (typeof connectionId !== 'string' || typeof model !== 'string') {
+    throw new Error('Agents request context is missing connection/model.');
   }
 
   const models = await generateModels(subdomain);
-  const doc = await models.AgentsConnection.getConnections(userId);
+  const picked = await resolveUsableConnection(models, userId, connectionId);
 
-  if (!doc || doc.connections.length === 0) {
-    throw new Error('Add your API key to start using Agents.');
-  }
-
-  const storedConnection = doc.connections.find(
-    (c) => c.provider === provider,
-  );
-
-  if (!storedConnection) {
+  if (!picked) {
     throw new Error(
-      `No connection stored for provider "${provider}". Add it under Settings → API key.`,
+      'This connection is no longer available. Pick another one in the model picker.',
     );
   }
 
-  // Per-turn model override rides on the snapshot; the stored entry provides
-  // the apiKey/config.
-  const connection: IAiAgentConnection = {
-    ...storedConnection,
-    model,
-  };
+  if (picked.unreadable.length) {
+    throw new Error(describeUnreadableKey(picked.resolved.type, 'unreadable'));
+  }
+
+  const provider = picked.resolved.type;
 
   return {
-    connection,
+    connection: picked.resolved,
     provider,
     model,
-    // Clamped to the model's supported levels (stamped by the chat route,
-    // re-checked here for resumes of older runs).
     thinkingLevel: normalizeThinkingLevel(
       provider,
       model,
@@ -220,23 +174,11 @@ const resolveRunConnection = async (
   };
 };
 
-/**
- * One entry of the dynamic model-fallback list the base agent resolves.
- */
 export interface IAgentsModelEntry {
   model: Awaited<ReturnType<typeof createModelConfig>>;
   providerOptions?: ProviderOptions;
 }
 
-/**
- * Construction-safe fallback model entry for resolutions outside any run.
- * Mastra resolves the dynamic model callback when wrapping/registering the
- * agent (`new DurableAgent`), with no RequestContext identity — throwing
- * there fails runtime creation and crashes read paths such as the thread
- * list. Pure config construction, no I/O: the native OpenAI default model
- * with no credentials. It can never generate successfully (any accidental
- * use fails loudly at the provider), but it lets construction succeed.
- */
 export const buildFallbackAgentsModelEntry =
   async (): Promise<IAgentsModelEntry[]> => {
     const fallback = await createModelConfig({
@@ -250,14 +192,6 @@ export const buildFallbackAgentsModelEntry =
     return [{ model: fallback }];
   };
 
-/**
- * Resolves the base agent's model-fallback list. Real runs (chat, resume,
- * title generation) carry the stamped RequestContext snapshot and resolve
- * to the acting user's current BYOK credentials; resolutions without an
- * identity (agent construction/registration) get the inert fallback
- * instead of throwing. Accepts any `.get(key)` context shape, covering
- * both the RequestContext instance and the plain-record form.
- */
 export const resolveAgentsModelEntry = async (requestContext?: {
   get(key: string): unknown;
 } | null): Promise<IAgentsModelEntry[]> => {
@@ -272,7 +206,10 @@ export const resolveAgentsModelEntry = async (requestContext?: {
     await resolveRunConnection(
       requestContext as RequestContext<IAgentsRequestContext>,
     );
-  const resolved = resolveModelConnection({ connection });
+  const resolved = resolveModelConnection({
+    connection,
+    model: modelId,
+  });
   const model = await createModelConfig(resolved);
   const providerOptions = buildThinkingProviderOptions(
     provider,
@@ -288,14 +225,6 @@ export const resolveAgentsModelEntry = async (requestContext?: {
   ];
 };
 
-/**
- * Builds the stable base Agent for a tenant. The agent uses a dynamic
- * model callback that reads the per-run RequestContext to resolve the
- * acting user's current BYOK credentials and selected provider/model.
- *
- * Static tool objects are built once and never rebuilt per chunk. Code
- * mode instructions are included dynamically based on the context flag.
- */
 export const buildBaseAgentsAgent = async ({
   memory,
 }: {
@@ -345,14 +274,6 @@ export const buildBaseAgentsAgent = async ({
         codeModeEnabled ? codeModeAddition.instructions : undefined,
       );
     },
-    // Dynamic model: re-fetches current BYOK credentials from the
-    // RequestContext snapshot on every model resolution. Returns a
-    // single-entry model-fallback list carrying providerOptions derived
-    // from the snapshot thinkingLevel — installed durable serialization
-    // serializes list-entry providerOptions but drops list-entry
-    // modelSettings (those go via stream options instead). Resolutions
-    // without an identity (agent construction/registration) resolve to an
-    // inert fallback entry instead of throwing.
     model: async ({ requestContext }) =>
       resolveAgentsModelEntry(
         requestContext as { get(key: string): unknown } | undefined,

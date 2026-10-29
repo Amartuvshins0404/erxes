@@ -1,8 +1,9 @@
+import type { TAiProviderConnection } from '../aiAgent/connection';
 import { TAiAgentInput } from '../aiAgent';
 
 export type TAiBridgeHealthStatus = 'ok' | 'warning' | 'error' | 'skipped';
 
-export type TAiBridgeConnection = TAiAgentInput['connection'];
+export type TAiBridgeConnection = TAiProviderConnection;
 export type TAiBridgeRuntime = TAiAgentInput['runtime'];
 
 // JSON-schema-ish function definition sent to the provider

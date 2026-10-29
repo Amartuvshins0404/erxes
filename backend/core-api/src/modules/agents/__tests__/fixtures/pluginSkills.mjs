@@ -67,10 +67,13 @@ const virtualModules = {
   'fake:env': `export const getEnv = ({ name, defaultValue }) => process.env[name] || defaultValue || '';`,
   'fake:connection-resolvers': `
     export const generateModels = async () => ({
-      AgentsConnection: {
-        getConnections: async () => ({
-          connections: [{ provider: 'openai', model: 'mock', config: { apiKey: 'k' } }],
-        }),
+      Connections: {
+        listForUser: async () => [
+          { _id: 'c1', type: 'openai', name: 'Mock', scope: 'personal', config: {}, secrets: {} },
+        ],
+      },
+      AgentsUserPreferences: {
+        findOne: () => ({ lean: async () => null }),
       },
     });
   `,
@@ -197,7 +200,7 @@ const run = () =>
   new RequestContext([
     ['subdomain', 'tenant'],
     ['userId', 'user-1'],
-    ['provider', 'openai'],
+    ['connectionId', 'c1'],
     ['model', 'mock'],
     ['thinkingLevel', 'off'],
     ['approvalMode', 'writes'],

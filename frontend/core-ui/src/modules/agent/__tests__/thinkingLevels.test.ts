@@ -36,17 +36,23 @@ describe('thinking level utilities', () => {
   it('finds the thinking of the model a turn runs on', () => {
     const catalog = [
       {
-        provider: 'kimi-code',
+        connectionId: 'conn-kimi',
         models: [{ id: 'k3.1-pro', thinking: K31_PRO }],
       },
-      { provider: 'openai', models: [{ id: 'gpt-99' }] },
+      { connectionId: 'conn-openai', models: [{ id: 'gpt-99' }] },
     ];
 
     expect(
-      findModelThinking(catalog, { provider: 'kimi-code', model: 'k3.1-pro' }),
+      findModelThinking(catalog, {
+        connectionId: 'conn-kimi',
+        model: 'k3.1-pro',
+      }),
     ).toBe(K31_PRO);
     expect(
-      findModelThinking(catalog, { provider: 'openai', model: 'gpt-99' }),
+      findModelThinking(catalog, {
+        connectionId: 'conn-openai',
+        model: 'gpt-99',
+      }),
     ).toBeNull();
     expect(findModelThinking(catalog, undefined)).toBeNull();
   });

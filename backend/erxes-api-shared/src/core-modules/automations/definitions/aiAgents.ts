@@ -40,70 +40,9 @@ export interface IAiAgentFileVersion {
   uploadedAt?: Date | string;
 }
 
-export interface IAiAgentConnectionConfig {
-  apiKey?: string;
-  baseUrl?: string;
-  headers?: Record<string, string>;
-  [key: string]: any;
-}
-
-export interface ICloudflareAiGatewayAgentConnection {
-  provider: 'cloudflare-ai-gateway';
+export interface IAiAgentConnection {
+  connectionId: string;
   model: string;
-  config: IAiAgentConnectionConfig & {
-    accountId?: string;
-    gatewayId?: string;
-    gatewayToken?: string;
-    mode?: 'compat' | 'openai-provider';
-  };
-}
-
-export interface IOpenAIAgentConnection {
-  provider: 'openai';
-  model: string;
-  config: IAiAgentConnectionConfig;
-}
-
-export interface IKimiAgentConnection {
-  provider: 'kimi';
-  model: string;
-  config: IAiAgentConnectionConfig;
-}
-
-export interface IKimiCodingAgentConnection {
-  provider: 'kimi-code';
-  model: string;
-  config: IAiAgentConnectionConfig;
-}
-
-export interface IGrokAgentConnection {
-  provider: 'grok';
-  model: string;
-  config: IAiAgentConnectionConfig;
-}
-
-export type IAiAgentConnection =
-  | ICloudflareAiGatewayAgentConnection
-  | IOpenAIAgentConnection
-  | IKimiAgentConnection
-  | IKimiCodingAgentConnection
-  | IGrokAgentConnection;
-
-export interface ILegacyAiAgentConnectionConfig {
-  apiKey?: string;
-  baseUrl?: string;
-  headers?: Record<string, string>;
-  accountId?: string;
-  gatewayId?: string;
-  gatewayToken?: string;
-  mode?: 'compat' | 'openai-provider';
-  cloudflare?: {
-    accountId?: string;
-    gatewayId?: string;
-    gatewayToken?: string;
-    mode?: 'compat' | 'openai-provider';
-  };
-  [key: string]: any;
 }
 
 export interface IAiAgentRuntime {
@@ -221,17 +160,8 @@ const aiAgentFileSchema = new Schema<IAiAgentFile>(
 
 const aiAgentConnectionSchema = new Schema<IAiAgentConnection>(
   {
-    provider: {
-      type: String,
-      required: true,
-      enum: ['cloudflare-ai-gateway', 'openai', 'kimi', 'kimi-code', 'grok'],
-      default: 'cloudflare-ai-gateway',
-    },
-    model: { type: String, required: true, default: 'openai/gpt-5-mini' },
-    config: {
-      type: Object,
-      default: () => ({}),
-    },
+    connectionId: { type: String, required: true, trim: true },
+    model: { type: String, required: true, trim: true },
   },
   { _id: false },
 );

@@ -8,11 +8,9 @@ import { useTranslation } from 'react-i18next';
 
 export const AutomationAiAgentRecordTable = () => {
   const { t } = useTranslation('automations');
-  const { agents, loading, kind } = useAiAgentsList();
+  const { agents, loading } = useAiAgentsList();
   const columns = useMemo(() => automationAiAgentColumns(t), [t]);
-  const toCreateUrl = `${AutomationSettingsPath.AgentCreate}${
-    kind ? `?kind=${kind}` : ''
-  }`;
+  const toCreateUrl = AutomationSettingsPath.AgentCreate;
 
   return (
     <RecordTable.Provider

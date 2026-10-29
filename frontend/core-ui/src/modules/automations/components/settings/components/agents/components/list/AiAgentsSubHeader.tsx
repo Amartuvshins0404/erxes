@@ -31,9 +31,7 @@ const AiAgentsTotalCount = () => {
 
 export const AiAgentsSubHeader = () => {
   const { kind } = useAiAgentsList();
-  const createUrl = `${AutomationSettingsPath.AgentCreate}${
-    kind ? `?kind=${kind}` : ''
-  }`;
+  const createUrl = AutomationSettingsPath.AgentCreate;
 
   return (
     <Filter id="automation-ai-agents">

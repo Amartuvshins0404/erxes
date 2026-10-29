@@ -155,38 +155,45 @@ export const grokConnectionSchema = z.object({
     .default({}),
 });
 
-export const aiAgentConnectionSchema = z
-  .discriminatedUnion('provider', [
-    cloudflareAiGatewayConnectionSchema,
-    grokConnectionSchema,
-    kimiConnectionSchema,
-    kimiCodingConnectionSchema,
-    openAiConnectionSchema,
-  ])
-  .default({
-    provider: 'cloudflare-ai-gateway',
-    model: AI_AGENT_PROVIDER_DEFAULT_MODELS['cloudflare-ai-gateway'],
-    config: {},
-  });
+export const aiProviderConnectionSchema = z.discriminatedUnion('provider', [
+  cloudflareAiGatewayConnectionSchema,
+  grokConnectionSchema,
+  kimiConnectionSchema,
+  kimiCodingConnectionSchema,
+  openAiConnectionSchema,
+]);
+
+export const aiAgentConnectionSchema = z.object({
+  connectionId: z
+    .string()
+    .trim()
+    .min(1, 'Select an AI connection for this agent'),
+  model: z
+    .string()
+    .trim()
+    .min(1, 'Connection model is required')
+    .max(AI_AGENT_LIMITS.maxModelChars),
+});
 
 export type TAiAgentConnection = z.infer<typeof aiAgentConnectionSchema>;
+export type TAiProviderConnection = z.infer<typeof aiProviderConnectionSchema>;
 export type TCloudflareAiGatewayAgentConnection = Extract<
-  TAiAgentConnection,
+  TAiProviderConnection,
   { provider: 'cloudflare-ai-gateway' }
 >;
 export type TOpenAiAgentConnection = Extract<
-  TAiAgentConnection,
+  TAiProviderConnection,
   { provider: 'openai' }
 >;
 export type TKimiAgentConnection = Extract<
-  TAiAgentConnection,
+  TAiProviderConnection,
   { provider: 'kimi' }
 >;
 export type TKimiCodingAgentConnection = Extract<
-  TAiAgentConnection,
+  TAiProviderConnection,
   { provider: 'kimi-code' }
 >;
 export type TGrokAgentConnection = Extract<
-  TAiAgentConnection,
+  TAiProviderConnection,
   { provider: 'grok' }
 >;

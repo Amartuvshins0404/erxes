@@ -754,6 +754,23 @@ export const permissions: IPermissionConfig = {
         },
       ],
     },
+    {
+      name: 'connections',
+      description: 'Workspace connections to third-party services',
+      scopeField: null,
+      ownerFields: [],
+
+      scopes: [{ name: 'all', description: 'All connections' }],
+
+      actions: [
+        {
+          title: 'Manage connections',
+          name: 'connectionsManage',
+          description:
+            'Add, edit, test and remove workspace connections and their credentials',
+        },
+      ],
+    },
   ],
   defaultGroups: [
     {
@@ -907,6 +924,12 @@ export const permissions: IPermissionConfig = {
           plugin: 'core',
           module: 'agents',
           actions: ['showAgents', 'agentsChat', 'manageAgentsSettings'],
+          scope: 'all',
+        },
+        {
+          plugin: 'core',
+          module: 'connections',
+          actions: ['connectionsManage'],
           scope: 'all',
         },
         {

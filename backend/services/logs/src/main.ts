@@ -7,6 +7,7 @@ import {
   isDev,
   keyForConfig,
   redis,
+  setCurrentServiceName,
 } from 'erxes-api-shared/utils';
 import express from 'express';
 import * as http from 'http';
@@ -22,6 +23,8 @@ const {
 
 const port = process.env.PORT ? Number(process.env.PORT) : 3301;
 const serviceName = 'logs-service';
+
+setCurrentServiceName('logs');
 
 const app = express();
 applyTrustProxy(app);

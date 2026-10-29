@@ -150,8 +150,11 @@ describe('system-operation deny policy', () => {
     'agentsSettingsUpdate',
     'usersInvite',
     'permissionGroupsEdit',
-    'agentsConnectionUpsert',
-    'agentsConnectionSetDefault',
+    'connections',
+    'connectionsAdd',
+    'connectionsEdit',
+    'connectionsTest',
+    'agentsSetDefaultConnection',
     'agentsModelVerify',
   ])('refuses %s even behind aliases', (field) => {
     expect(() =>
@@ -196,10 +199,10 @@ it('still denies an actual account/security operation alongside introspection', 
     parseAgentGraphqlOperation(`
     query AgentsMixedIntrospection {
       __type(name: "Deal") { name }
-      hidden: agentsConnections { provider }
+      hidden: connections { _id }
     }
   `),
-  ).toThrow(/agentsConnections.*restricted by the agent security policy/);
+  ).toThrow(/connections.*restricted by the agent security policy/);
 });
 
 

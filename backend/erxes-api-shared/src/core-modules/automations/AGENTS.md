@@ -105,10 +105,25 @@ without saving.
   shows them as its preflight. Reach and owners only warn.
 - Nodes inside workflows are left to `validateWorkflowBindings`.
 
+## AI agent credentials
+
+- An AI agent's `connection` is `{ connectionId, model }` (`definitions/aiAgents.ts`).
+  `connectionId` names a workspace connection of the core `connections` module;
+  the agent document never holds a key, base URL or other provider config.
+- `services/automations` resolves it at run time with `resolveConnection`
+  (`erxes-api-shared/core-modules`) and maps it to
+  `{ provider: type, model, config: { ...config, ...secrets } }`
+  (`src/ai/providers/agentConnection.ts`). There is no env-var key fallback:
+  a missing, unshared or keyless connection fails with an error naming it.
+- core-api returns and logs an agent through `toAiAgentView`
+  (`modules/automations/utils/aiAgent.ts`), which keeps only `connectionId`
+  and `model`, so a legacy embedded key never reaches GraphQL or event logs.
+
 ## Validation
 
 - `pnpm nx test erxes-api-shared` (`configSchema.test.ts`,
   `coreActionConfigSchemas.test.ts`, `builderConfigContract.test.ts`)
 - `pnpm nx test core-api` (`modules/automations/utils/__tests__`)
+- `pnpm nx test automations-service` (`src/ai/providers/__tests__`)
 - After changing a schema: restart the declaring service, then core-api, which
   caches plugin meta until restart.

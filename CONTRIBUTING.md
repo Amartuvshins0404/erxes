@@ -51,8 +51,8 @@ have a real, current need for it.
 
 Use the same major toolchain as CI:
 
-- Node.js 22
-- pnpm 8 or newer; npm and Yarn are not supported
+- Node.js 24 or newer; `.nvmrc` pins 26, CI builds on 24 and 26
+- pnpm 9 as pinned by `packageManager`; npm and Yarn are not supported
 - MongoDB
 - Redis
 - Elasticsearch 7 when the affected feature requires search

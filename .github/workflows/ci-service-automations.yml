@@ -20,19 +20,22 @@ env:
 jobs:
   automations-ci:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: ['24', '26']
+    env:
+      PUBLISH: ${{ matrix.node == '26' && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: 9
+        uses: pnpm/action-setup@v6
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: '22'
+          node-version: ${{ matrix.node }}
 
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
@@ -49,20 +52,22 @@ jobs:
         run: pnpm nx build automations-service
 
       - name: Set up QEMU
+        if: env.PUBLISH == 'true'
         uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
+        if: env.PUBLISH == 'true'
         uses: docker/setup-buildx-action@v3
 
       - name: Login to Docker Hub
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: env.PUBLISH == 'true'
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build and push Docker image (multi-platform)
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: env.PUBLISH == 'true'
         uses: docker/build-push-action@v5
         with:
           context: .

@@ -1,5 +1,5 @@
 # Base image for building
-FROM --platform=linux/amd64 node:22-bookworm AS build
+FROM --platform=linux/amd64 node:26-bookworm AS build
 
 WORKDIR /app
 
@@ -28,7 +28,7 @@ RUN npx nx build:packageJson gateway \
     && npx nx build gateway
 
 # Production dependencies only
-FROM --platform=linux/amd64 node:22-bookworm AS prod-deps
+FROM --platform=linux/amd64 node:26-bookworm AS prod-deps
 
 WORKDIR /app
 
@@ -58,7 +58,7 @@ fs.writeFileSync( \
     && pnpm install --prod --shamefully-hoist --no-frozen-lockfile
 
 # Final image
-FROM --platform=linux/amd64 node:22-bookworm AS gateway
+FROM --platform=linux/amd64 node:26-bookworm AS gateway
 
 WORKDIR /app
 

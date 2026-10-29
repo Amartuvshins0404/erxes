@@ -85,7 +85,7 @@ function AttributeMenu({ items, selectedIndex }: Readonly<AttributeMenuProps>) {
 
     return Object.entries(grouped).map(([groupName, groupItems]) => (
       <div key={groupName}>
-        <div className="px-2 py-1 text-xs font-semibold text-gray-500 uppercase">
+        <div className="px-2 py-1 text-xs font-semibold text-muted-foreground uppercase">
           {groupName}
         </div>
         <div className="flex flex-col">

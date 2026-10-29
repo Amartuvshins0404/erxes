@@ -1,5 +1,5 @@
 import { IconChevronRight, IconTrash } from '@tabler/icons-react';
-import { Button, cn } from 'erxes-ui';
+import { Badge, Button } from 'erxes-ui';
 import { useTranslation } from 'react-i18next';
 import { useSegmentNodeValue } from '../../hooks/useSegmentNodeValue';
 import { TNodePath } from '../../types';
@@ -23,30 +23,22 @@ export const SegmentGroupSummary = ({
 
   return (
     <div className="flex flex-row items-center gap-2 py-1">
-      <button
-        type="button"
+      <Button
+        variant="outline"
         onClick={onEnter}
-        className={cn(
-          'flex flex-auto min-w-0 items-center gap-2 rounded-md border px-3 py-2',
-          'text-left text-sm hover:bg-accent/60 transition-colors',
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-        )}
+        className="h-auto min-w-0 flex-auto justify-start gap-2 rounded-lg px-3 py-2 text-left font-normal"
       >
-        <span
-          className={cn(
-            'shrink-0 rounded-full px-2 py-0.5 text-xs font-medium uppercase',
-            isAnd
-              ? 'bg-green-100 text-green-700'
-              : 'bg-amber-100 text-amber-700',
-          )}
+        <Badge
+          variant={isAnd ? 'success' : 'warning'}
+          className="shrink-0 rounded-full uppercase"
         >
           {isAnd ? t('and') : t('or')}
-        </span>
+        </Badge>
         <span className="flex-auto truncate text-muted-foreground">
           {t('group-of-conditions', { count: children })}
         </span>
         <IconChevronRight className="size-4 shrink-0 text-muted-foreground" />
-      </button>
+      </Button>
 
       <Button
         variant="ghost"

@@ -11,7 +11,7 @@ export const ManagePropertiesNodeContent = ({
   const contentType = (module || '').split(':')[1];
   return (
     <>
-      <div className="flex text-slate-600 text-xs ">
+      <div className="flex text-xs text-muted-foreground">
         <span className="font-mono">
           {t('manage-properties-content-type')}:{' '}
         </span>

@@ -271,12 +271,12 @@ const WorkflowEditorHeader = ({
         <IconChevronRight className="size-3.5 shrink-0 text-muted-foreground" />
         <Popover>
           <Popover.Trigger asChild>
-            <button
-              type="button"
-              className="-mx-1 max-w-[16rem] truncate rounded px-1 text-left font-medium hover:bg-accent"
+            <Button
+              variant="ghost"
+              className="-mx-1 block h-auto max-w-[16rem] truncate rounded-md px-1 py-0 text-left"
             >
               {meta.name || t('workflow-label')}
-            </button>
+            </Button>
           </Popover.Trigger>
           <Popover.Content align="start" className="w-80 space-y-2 p-3">
             <Input
@@ -301,7 +301,7 @@ const WorkflowEditorHeader = ({
         {isDirty && (
           <>
             <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <span className="size-1.5 rounded-full bg-amber-500" />
+              <span className="size-1.5 rounded-full bg-warning" />
               {t('workflow-editor-unsaved-changes')}
             </span>
             <Button onClick={onSave}>{saveLabel}</Button>

@@ -6,6 +6,7 @@ import { AutomationNodeType } from '@/automations/types';
 import { TAutomationBuilderForm } from '@/automations/utils/automationFormDefinitions';
 import { filterActionsForTargets } from '@/automations/utils/targetTypeCompat';
 import {
+  Button,
   Command,
   Empty,
   IconComponent,
@@ -51,21 +52,16 @@ export const BroadcastNodeLibrary = () => {
     | undefined;
 
   const hasSteps = !!actions?.length;
-
-  // Templates build a whole flow, steps add one thing to it — two questions
-  // that were stacked on one another, with the step search sitting under the
-  // templates as if it searched them. A flow with steps in it has no use for a
-  // template, so the choice only exists while it is empty.
   const offersTemplates = !hasSteps && !!templates.length;
 
   const renderTemplates = () => (
     <div className="flex flex-col gap-2 overflow-y-auto p-3">
       {templates.map((template) => (
-        <button
+        <Button
           key={template.id}
-          type="button"
+          variant="outline"
           onClick={() => setOpenTemplate(template)}
-          className="flex w-full items-center gap-3 rounded-lg border bg-background px-3 py-2.5 text-left transition-colors duration-150 hover:border-primary hover:bg-accent/40"
+          className="h-auto w-full justify-start gap-3 whitespace-normal rounded-xl px-3 py-2.5 text-left font-normal hover:border-primary"
         >
           <Empty.Media variant="icon" className="size-8 [&>svg]:size-4">
             <IconSparkles />
@@ -80,7 +76,7 @@ export const BroadcastNodeLibrary = () => {
               </div>
             )}
           </div>
-        </button>
+        </Button>
       ))}
     </div>
   );
@@ -137,7 +133,9 @@ export const BroadcastNodeLibrary = () => {
   return (
     <div className="flex h-full w-80 shrink-0 flex-col border-l bg-sidebar">
       <div className="shrink-0 space-y-0.5 px-4 py-3">
-        <h3 className="text-sm font-semibold leading-none">{t('workflow.add-step')}</h3>
+        <h3 className="text-sm font-semibold leading-none">
+          {t('workflow.add-step')}
+        </h3>
         <p className="text-xs leading-4 text-muted-foreground">
           {awaitingToConnectNodeId
             ? t('workflow.after-selected')
@@ -154,8 +152,12 @@ export const BroadcastNodeLibrary = () => {
           className="flex min-h-0 flex-1 flex-col"
         >
           <Tabs.List className="mx-3 mt-3 grid shrink-0 grid-cols-2">
-            <Tabs.Trigger value="templates">{t('workflow.templates')}</Tabs.Trigger>
-            <Tabs.Trigger value="steps">{t('workflow.single-step')}</Tabs.Trigger>
+            <Tabs.Trigger value="templates">
+              {t('workflow.templates')}
+            </Tabs.Trigger>
+            <Tabs.Trigger value="steps">
+              {t('workflow.single-step')}
+            </Tabs.Trigger>
           </Tabs.List>
           <Tabs.Content value="templates" className="min-h-0 flex-1">
             {renderTemplates()}

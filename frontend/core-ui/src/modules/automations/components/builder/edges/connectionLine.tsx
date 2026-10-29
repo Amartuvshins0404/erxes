@@ -71,9 +71,8 @@ const ConnectionLine = ({
       <circle
         cx={toX}
         cy={toY}
-        fill="#fff"
         r={10}
-        className={cn('fill-white stroke-success stroke-2', {
+        className={cn('fill-background stroke-success stroke-2', {
           'stroke-destructive': folkType === 'error',
         })}
         strokeWidth={4}

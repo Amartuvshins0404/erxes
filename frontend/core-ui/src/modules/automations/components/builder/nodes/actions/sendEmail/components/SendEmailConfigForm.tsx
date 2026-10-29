@@ -171,7 +171,7 @@ export const SendEmailConfigForm = ({
                     value={field.value}
                     onValueChange={(value) => field.onChange(value)}
                   >
-                    <label className="flex space-x-2 items-center">
+                    <div className="flex items-center gap-2">
                       <RadioGroup.Item value="default" id="env-sender" />
                       <Label htmlFor="env-sender">
                         {t('use-company-email')}
@@ -181,9 +181,9 @@ export const SendEmailConfigForm = ({
                           </span>
                         )}
                       </Label>
-                    </label>
+                    </div>
                     {supportsSenderVerification && (
-                      <label className="flex space-x-2 items-center">
+                      <div className="flex items-center gap-2">
                         <RadioGroup.Item
                           value="verified"
                           id="verified-sender"
@@ -191,14 +191,14 @@ export const SendEmailConfigForm = ({
                         <Label htmlFor="verified-sender">
                           {t('verified-sender-email')}
                         </Label>
-                      </label>
+                      </div>
                     )}
-                    <label className="flex space-x-2 items-center">
+                    <div className="flex items-center gap-2">
                       <RadioGroup.Item value="custom" id="custom-sender" />
                       <Label htmlFor="custom-sender">
                         {t('custom-sender-email')}
                       </Label>
-                    </label>
+                    </div>
                   </RadioGroup>
                 </Form.Item>
               )}

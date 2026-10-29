@@ -88,12 +88,12 @@ export const AiAgentContextFileEditor = ({
         <ScrollArea className="max-h-48 min-h-0 lg:max-h-none">
           <div className="grid gap-2">
             {sources.map((source, index) => (
-              <button
-                type="button"
+              <Button
+                variant="ghost"
                 key={`${source.key}-${source.uploadedAt || index}`}
                 onClick={() => void editor.loadSource(source)}
                 className={cn(
-                  'rounded-lg border px-3 py-2 text-left text-sm transition-colors',
+                  'h-auto flex-col items-stretch whitespace-normal rounded-lg border px-3 py-2 text-left font-normal',
                   editor.loadedKey === source.key
                     ? 'border-primary bg-primary/5'
                     : 'hover:bg-accent/40',
@@ -107,7 +107,7 @@ export const AiAgentContextFileEditor = ({
                   {formatContextFileUploadedAt(source.uploadedAt) &&
                     ` · ${formatContextFileUploadedAt(source.uploadedAt)}`}
                 </div>
-              </button>
+              </Button>
             ))}
           </div>
         </ScrollArea>

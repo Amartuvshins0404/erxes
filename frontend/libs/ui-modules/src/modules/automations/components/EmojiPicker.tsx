@@ -1,5 +1,5 @@
 import { IconLoader, IconSearch } from '@tabler/icons-react';
-import { cn } from 'erxes-ui';
+import { Button, cn } from 'erxes-ui';
 import {
   type EmojiPickerListCategoryHeaderProps,
   type EmojiPickerListEmojiProps,
@@ -57,16 +57,18 @@ function EmojiPickerEmoji({
   ...props
 }: EmojiPickerListEmojiProps) {
   return (
-    <button
+    <Button
       {...props}
+      variant="ghost"
+      size="icon"
       className={cn(
-        'data-[active]:bg-accent flex size-7 items-center justify-center rounded-sm text-base',
+        'size-7 rounded-md text-base data-[active]:bg-accent',
         className,
       )}
       data-slot="emoji-picker-emoji"
     >
       {emoji.emoji}
-    </button>
+    </Button>
   );
 }
 

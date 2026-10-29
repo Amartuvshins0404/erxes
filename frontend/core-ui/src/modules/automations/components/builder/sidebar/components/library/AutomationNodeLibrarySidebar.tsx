@@ -4,7 +4,7 @@ import { NodeLibraryPlacementNote } from '@/automations/components/builder/sideb
 import { useAutomationNodeLibrarySidebar } from '@/automations/components/builder/sidebar/hooks/useAutomationNodeLibrarySidebar';
 import { AutomationNodeType } from '@/automations/types';
 import { IconCheck, IconFilter, IconX } from '@tabler/icons-react';
-import { Badge, Button, cn, Command, Popover, Separator } from 'erxes-ui';
+import { Button, cn, Command, Popover, Separator, ToggleGroup } from 'erxes-ui';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAutomationBuilderSidebarHooks } from '../../hooks/useAutomationBuilderSidebarHooks';
@@ -207,43 +207,40 @@ const AutomationNodeLibrarySidebarFilters = ({
             {t('filter-by-type')}
           </span>
           {activeGroup ? (
-            <button
-              type="button"
-              className="text-xs font-medium text-primary hover:underline"
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-primary"
               onClick={() => {
                 setActiveGroup(null);
                 setIsGroupPopoverOpen(false);
               }}
             >
               {t('sidebar-clear')}
-            </button>
+            </Button>
           ) : null}
         </div>
-        <div className="flex flex-wrap gap-1.5">
-          {groups.map((group) => {
-            const isActive = activeGroup === group;
-
-            return (
-              <Badge
-                key={group}
-                variant={isActive ? 'default' : 'secondary'}
-                className={cn(
-                  'flex cursor-pointer items-center gap-1 rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors',
-                  isActive
-                    ? 'border-primary bg-primary text-primary-foreground shadow-xs'
-                    : 'border-border bg-muted/40 text-foreground hover:bg-muted',
-                )}
-                onClick={() => {
-                  setActiveGroup(isActive ? null : group);
-                  setIsGroupPopoverOpen(false);
-                }}
-              >
-                {isActive ? <IconCheck className="size-3" /> : null}
-                {group}
-              </Badge>
-            );
-          })}
-        </div>
+        <ToggleGroup
+          type="single"
+          size="sm"
+          value={activeGroup ?? ''}
+          onValueChange={(group) => {
+            setActiveGroup(group || null);
+            setIsGroupPopoverOpen(false);
+          }}
+          className="flex-wrap justify-start gap-1.5"
+        >
+          {groups.map((group) => (
+            <ToggleGroup.Item
+              key={group}
+              value={group}
+              className="rounded-full border px-2.5 text-xs data-[state=on]:border-primary data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+            >
+              {activeGroup === group ? <IconCheck className="size-3" /> : null}
+              {group}
+            </ToggleGroup.Item>
+          ))}
+        </ToggleGroup>
       </Popover.Content>
     </Popover>
   );

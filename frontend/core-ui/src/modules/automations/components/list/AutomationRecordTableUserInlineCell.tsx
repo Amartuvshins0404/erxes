@@ -25,7 +25,7 @@ export const AutomationRecordTableUserInlineCell = ({
             src={readImage(details?.avatar)}
             alt={details?.fullName || ''}
           />
-          <Avatar.Fallback className="rounded-lg text-black">
+          <Avatar.Fallback className="rounded-lg">
             {(details?.fullName || '').split('')[0]}
           </Avatar.Fallback>
         </Avatar>

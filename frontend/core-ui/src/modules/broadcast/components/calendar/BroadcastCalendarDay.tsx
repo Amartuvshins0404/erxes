@@ -1,4 +1,4 @@
-import { cn, Popover, PopoverScoped } from 'erxes-ui';
+import { Button, cn, Popover, PopoverScoped } from 'erxes-ui';
 import { format } from 'date-fns';
 import { TCalendarDay } from '../../utils/calendarMonth';
 import { BroadcastCalendarEntry } from './BroadcastCalendarEntry';
@@ -19,13 +19,14 @@ const DayEntries = ({ day }: { day: TCalendarDay }) => {
       {day.hiddenCount > 0 && (
         <PopoverScoped>
           <Popover.Trigger asChild>
-            <button
-              type="button"
+            <Button
+              variant="ghost"
+              size="sm"
               onPointerDown={(event) => event.stopPropagation()}
-              className="rounded px-1 py-0.5 text-left text-xs font-medium text-muted-foreground hover:bg-accent"
+              className="justify-start px-1 text-muted-foreground"
             >
               {t('calendar.more', { count: day.hiddenCount })}
-            </button>
+            </Button>
           </Popover.Trigger>
           <Popover.Content className="w-64 p-2">
             <p className="px-1 pb-1 text-xs font-medium text-muted-foreground">
@@ -58,8 +59,6 @@ export const BroadcastCalendarDay = ({
   onSelectExtend: (date: Date) => void;
 }) => (
   <div
-    // The pointer, not the mouse: a drag across the grid should work the same
-    // on a touchscreen.
     onPointerDown={() => onSelectStart(day.date)}
     onPointerEnter={() => onSelectExtend(day.date)}
     className={cn(

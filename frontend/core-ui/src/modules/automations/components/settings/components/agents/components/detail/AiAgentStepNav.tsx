@@ -12,7 +12,7 @@ import {
   IconCircleX,
   IconLoader2,
 } from '@tabler/icons-react';
-import { cn } from 'erxes-ui';
+import { Button, cn } from 'erxes-ui';
 
 const STATUS_META: Record<
   TAiAgentStepStatus,
@@ -53,16 +53,14 @@ export const AiAgentStepNav = () => {
         const isActive = step === activeStep;
 
         return (
-          <button
+          <Button
             key={step}
-            type="button"
+            variant="outline"
             onClick={() => setStep(step)}
             aria-current={isActive ? 'step' : undefined}
             className={cn(
-              'flex min-w-0 flex-col items-center gap-0.5 rounded-lg border px-1 py-2 text-xs transition-colors sm:px-2',
-              isActive
-                ? 'border-primary bg-primary/5 ring-1 ring-primary'
-                : 'hover:bg-accent/40',
+              'h-auto min-w-0 flex-col gap-0.5 rounded-lg px-1 py-2 text-xs font-normal sm:px-2',
+              isActive && 'bg-primary/5 text-primary ring-1 ring-primary',
             )}
           >
             <Icon className="size-4" />
@@ -78,7 +76,7 @@ export const AiAgentStepNav = () => {
               <StatusIcon className="size-3.5" />
               {status.label}
             </span>
-          </button>
+          </Button>
         );
       })}
     </nav>

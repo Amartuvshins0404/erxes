@@ -64,7 +64,7 @@ export const BroadcastAttachment = ({
               />
             </div>
           ) : (
-            <div className="h-12 w-12 shrink-0 rounded border bg-white flex items-center justify-center">
+            <div className="flex size-12 shrink-0 items-center justify-center rounded-lg border bg-muted">
               {getFileIcon(attachment.type, attachment.name)}
             </div>
           )}

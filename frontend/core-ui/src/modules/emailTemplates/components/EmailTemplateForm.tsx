@@ -185,15 +185,13 @@ export const EmailTemplateForm = ({ templateId }: { templateId?: string }) => {
           </Button>
         </PageHeaderEnd>
       </PageHeader>
-
-      {/* What the template is, and what can be done while writing it. */}
       <PageSubHeader className="items-center">
         <Popover open={isNameOpen} onOpenChange={setIsNameOpen}>
           <Popover.Trigger asChild>
-            <button
-              type="button"
+            <Button
+              variant="ghost"
               className={cn(
-                'flex min-w-0 items-baseline gap-2 rounded px-2 py-1 text-left hover:bg-accent',
+                'h-auto min-w-0 items-baseline justify-start gap-2 px-2 py-1 text-left font-normal',
                 form.formState.errors.name && 'text-destructive',
               )}
             >
@@ -203,7 +201,7 @@ export const EmailTemplateForm = ({ templateId }: { templateId?: string }) => {
               <span className="truncate text-sm text-muted-foreground">
                 {form.watch('description') || t('add-description')}
               </span>
-            </button>
+            </Button>
           </Popover.Trigger>
           <Popover.Content align="start" className="w-80 space-y-3 p-3">
             <Form.Field

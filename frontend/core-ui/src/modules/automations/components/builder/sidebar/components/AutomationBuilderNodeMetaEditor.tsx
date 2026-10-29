@@ -1,6 +1,6 @@
 import { useNodeMetaEdit } from '@/automations/components/builder/sidebar/hooks/useNodeMetaEdit';
 import { NodeData } from '@/automations/types';
-import { Input, cn } from 'erxes-ui';
+import { Button, Input, cn } from 'erxes-ui';
 import { KeyboardEvent, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -101,16 +101,16 @@ const AutomationNodeMetaInlineField = ({
   }
 
   return (
-    <button
-      type="button"
+    <Button
+      variant="ghost"
       onClick={() => setInitialValue(value)}
       className={cn(
-        '-mx-1 block w-fit max-w-full truncate rounded px-1 text-left hover:bg-accent',
+        '-mx-1 block h-auto w-fit max-w-full truncate rounded-md px-1 py-0 text-left',
         className,
         !value && 'font-normal text-muted-foreground',
       )}
     >
       {value || placeholder}
-    </button>
+    </Button>
   );
 };

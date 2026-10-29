@@ -1,4 +1,4 @@
-import { cn, IconComponent } from 'erxes-ui';
+import { Button, cn, IconComponent } from 'erxes-ui';
 import { TAutomationVariableSourceNode } from '../AutomationVariableBrowserTypes';
 import { AutomationNodeType } from '@/automations/types';
 import { useTranslation } from 'react-i18next';
@@ -14,14 +14,12 @@ export const AutomationVariableSourceNodeCard = ({
 }) => {
   const { t } = useTranslation('automations');
   return (
-    <button
-      type="button"
+    <Button
+      variant="outline"
       onClick={onClick}
       className={cn(
-        'flex w-full items-center gap-3 rounded-md border px-3 py-3 text-left transition-colors',
-        isSelected
-          ? 'border-primary bg-primary/5'
-          : 'bg-background hover:border-primary/50',
+        'h-auto w-full justify-start gap-3 whitespace-normal rounded-lg px-3 py-3 text-left font-normal',
+        isSelected ? 'border-primary bg-primary/5' : 'hover:border-primary/50',
       )}
     >
       {node.icon ? (
@@ -38,6 +36,6 @@ export const AutomationVariableSourceNodeCard = ({
             : t('action')}
         </div>
       </div>
-    </button>
+    </Button>
   );
 };

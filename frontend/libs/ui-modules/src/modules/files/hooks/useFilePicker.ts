@@ -73,6 +73,7 @@ export const useFilePicker = ({
 
   return {
     ...browser,
+    loadedCount: browser.files.length,
     files,
     space,
     changeSpace,

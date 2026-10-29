@@ -75,6 +75,7 @@ function DocumentsContent({
     <div className="h-full overflow-y-auto">
       <Component documents={documents} />
       <LoadMoreSentinel
+        key={documents.length}
         hasMore={Boolean(pageInfo?.hasNextPage)}
         loading={loading}
         onLoadMore={() => {

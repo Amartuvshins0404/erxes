@@ -113,6 +113,7 @@ export const NotificationList = () => {
               </div>
             ) : (
               <LoadMoreSentinel
+                key={notifications.length}
                 hasMore={hasMore}
                 loading={fetchingMore}
                 onLoadMore={() => void loadMore()}

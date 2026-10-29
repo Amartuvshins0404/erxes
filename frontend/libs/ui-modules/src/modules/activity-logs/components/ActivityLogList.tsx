@@ -90,6 +90,7 @@ export const ActivityLogList = ({
       ))}
       {!isBackward && (
         <LoadMoreSentinel
+          key={activityLogs.length}
           hasMore={canFetchMore}
           loading={loading}
           onLoadMore={fetchMore}

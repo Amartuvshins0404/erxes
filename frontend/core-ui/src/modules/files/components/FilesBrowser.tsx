@@ -212,6 +212,7 @@ export const FilesBrowser = () => {
       )}
 
       <LoadMoreSentinel
+        key={view.files.length}
         hasMore={view.hasMore}
         loading={view.fetchingMore}
         onLoadMore={view.loadMore}

@@ -143,6 +143,7 @@ export const FilePicker = (props: TFilePickerProps) => {
             ))}
 
             <LoadMoreSentinel
+              key={picker.loadedCount}
               hasMore={picker.hasMore}
               loading={picker.fetchingMore}
               onLoadMore={picker.loadMore}

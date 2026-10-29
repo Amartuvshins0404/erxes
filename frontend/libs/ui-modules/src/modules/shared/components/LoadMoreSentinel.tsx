@@ -1,4 +1,5 @@
 import { cn, Spinner } from 'erxes-ui';
+import { useEffect, useRef } from 'react';
 import { useInView } from 'react-intersection-observer';
 
 export const LoadMoreSentinel = ({
@@ -14,13 +15,13 @@ export const LoadMoreSentinel = ({
   className?: string;
   rootMargin?: string;
 }) => {
-  const { ref } = useInView({
-    rootMargin,
-    skip: !hasMore,
-    onChange: (inView) => {
-      if (inView && !loading) onLoadMore();
-    },
-  });
+  const { ref, inView } = useInView({ rootMargin, skip: !hasMore });
+  const onLoadMoreRef = useRef(onLoadMore);
+  onLoadMoreRef.current = onLoadMore;
+
+  useEffect(() => {
+    if (inView && hasMore && !loading) onLoadMoreRef.current();
+  }, [inView, hasMore, loading]);
 
   if (!hasMore) return null;
 

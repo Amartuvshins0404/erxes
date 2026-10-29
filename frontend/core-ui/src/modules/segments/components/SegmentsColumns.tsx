@@ -9,7 +9,7 @@ import {
 import { ISegment } from 'ui-modules';
 import { segmentMoreColumn } from './SegmentsMoreColumn';
 
-const columns: (t: (key: string) => string) => ColumnDef<ISegment>[] = (t) => [
+export const segmentColumns: (t: (key: string) => string) => ColumnDef<ISegment>[] = (t) => [
   segmentMoreColumn,
   {
     ...RecordTable.checkboxColumn,
@@ -97,4 +97,3 @@ const columns: (t: (key: string) => string) => ColumnDef<ISegment>[] = (t) => [
   },
 ];
 
-export default columns;

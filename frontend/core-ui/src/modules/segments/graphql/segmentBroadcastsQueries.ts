@@ -1,9 +1,9 @@
 import { gql } from '@apollo/client';
+import { GQL_CURSOR_PARAM_DEFS, GQL_CURSOR_PARAMS, GQL_PAGE_INFO } from 'erxes-ui';
 
-// The campaigns sent to this segment's members, nightly ones included.
 export const SEGMENT_BROADCASTS = gql`
-  query SegmentBroadcasts($segmentId: String, $limit: Int) {
-    engageMessages(segmentId: $segmentId, limit: $limit) {
+  query SegmentBroadcasts($segmentId: String, ${GQL_CURSOR_PARAM_DEFS}) {
+    engageMessages(segmentId: $segmentId, ${GQL_CURSOR_PARAMS}) {
       list {
         _id
         title
@@ -13,6 +13,7 @@ export const SEGMENT_BROADCASTS = gql`
           type
         }
       }
+      ${GQL_PAGE_INFO}
     }
   }
 `;

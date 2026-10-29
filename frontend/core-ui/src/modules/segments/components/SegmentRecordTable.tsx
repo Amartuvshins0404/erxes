@@ -1,17 +1,15 @@
 import { useSegments } from '@/segments/hooks/useSegments';
-import { RecordTable, Spinner, toast } from 'erxes-ui';
+import { RecordTable, toast } from 'erxes-ui';
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SegmentCommandBar } from './SegmentCommandBar';
 import { SegmentEmptyState, SegmentErrorState } from './SegmentStates';
-import columns from './SegmentsColumns';
+import { segmentColumns } from './SegmentsColumns';
 
 export function SegmentsRecordTable() {
   const { segments, loading, error, refetch } = useSegments();
   const { t } = useTranslation('segment');
-
-  if (loading) {
-    return <Spinner />;
-  }
+  const columns = useMemo(() => segmentColumns(t), [t]);
 
   if (error) {
     return (
@@ -26,16 +24,14 @@ export function SegmentsRecordTable() {
     );
   }
 
-  if (segments.length === 0) {
+  if (!loading && segments.length === 0) {
     return <SegmentEmptyState />;
   }
 
   return (
     <div className="flex flex-col h-full p-2 pt-0">
-      {/* Segments no longer nest under one another, so the list is flat rather
-          than a tree keyed on `order`. */}
       <RecordTable.Provider
-        columns={columns(t)}
+        columns={columns}
         data={segments}
         stickyColumns={['more', 'checkbox', 'name']}
         className="mt-1.5"
@@ -44,8 +40,10 @@ export function SegmentsRecordTable() {
           <RecordTable>
             <RecordTable.Header />
             <RecordTable.Body>
+              {loading && !segments.length && (
+                <RecordTable.RowSkeleton rows={20} />
+              )}
               <RecordTable.RowList />
-              {loading && <RecordTable.RowSkeleton rows={40} />}
             </RecordTable.Body>
           </RecordTable>
         </RecordTable.Scroll>

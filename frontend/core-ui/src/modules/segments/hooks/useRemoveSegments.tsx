@@ -7,7 +7,6 @@ import {
   ISegmentUsage,
   SEGMENT_REMOVE,
   SEGMENT_USAGE,
-  SEGMENTS,
 } from 'ui-modules';
 
 export const useRemoveSegments = () => {
@@ -31,7 +30,6 @@ export const useRemoveSegments = () => {
     await segmentsRemove({
       ...options,
       variables: { ids: segmentIds, ...options?.variables },
-      refetchQueries: [SEGMENTS],
     });
   };
 

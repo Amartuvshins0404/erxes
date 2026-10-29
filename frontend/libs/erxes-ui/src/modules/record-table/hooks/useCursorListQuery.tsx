@@ -23,22 +23,15 @@ export interface ICursorListResult<TItem> {
 
 type CursorListData<TItem> = Record<string, ICursorListResult<TItem>>;
 
-export interface UseCursorListQueryOptions<
-  TVariables extends OperationVariables,
-> extends Omit<
-    QueryHookOptions<CursorListData<unknown>, TVariables>,
-    'variables'
-  > {
+export interface UseCursorListQueryOptions<TItem>
+  extends Omit<QueryHookOptions<CursorListData<TItem>>, 'variables'> {
   field: string;
-  variables?: Omit<TVariables, 'cursor' | 'limit' | 'direction'>;
+  variables?: OperationVariables;
   sessionKey?: string;
   limit?: number;
 }
 
-export const useCursorListQuery = <
-  TItem,
-  TVariables extends OperationVariables = OperationVariables,
->(
+export const useCursorListQuery = <TItem,>(
   query: DocumentNode | TypedDocumentNode,
   {
     field,
@@ -46,7 +39,7 @@ export const useCursorListQuery = <
     sessionKey,
     limit = CURSOR_LIST_DEFAULT_LIMIT,
     ...options
-  }: UseCursorListQueryOptions<TVariables>,
+  }: UseCursorListQueryOptions<TItem>,
 ) => {
   const { cursor } = useRecordTableCursor({ sessionKey });
 

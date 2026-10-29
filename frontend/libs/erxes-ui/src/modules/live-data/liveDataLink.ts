@@ -183,9 +183,56 @@ const evictIds = (
   if (evicted) cache.gc();
 };
 
+const containsAnyId = (
+  value: unknown,
+  ids: Set<string>,
+  depth = 0,
+): boolean => {
+  if (!value || typeof value !== 'object' || depth > MAX_SCAN_DEPTH + 1) {
+    return false;
+  }
+
+  if (Array.isArray(value)) {
+    return value.some((item) => containsAnyId(item, ids, depth + 1));
+  }
+
+  const record = value as Record<string, unknown>;
+
+  if (
+    (typeof record._id === 'string' && ids.has(record._id)) ||
+    (typeof record.id === 'string' && ids.has(record.id))
+  ) {
+    return true;
+  }
+
+  return Object.values(record).some(
+    (entry) =>
+      !!entry &&
+      typeof entry === 'object' &&
+      containsAnyId(entry, ids, depth + 1),
+  );
+};
+
+const markRootFieldsStale = (
+  cache: ApolloCache<NormalizedCacheObject>,
+  stems: string[],
+) => {
+  if (!stems.length) return;
+
+  cache.modify({
+    id: 'ROOT_QUERY',
+    broadcast: false,
+    fields: (value, { fieldName, DELETE }) => {
+      const name = normalizeName(fieldName);
+      return stems.some((stem) => name.includes(stem)) ? DELETE : value;
+    },
+  });
+};
+
 type LiveTarget = {
   stems: string[];
   typenames: Set<string>;
+  ids: Set<string>;
 };
 
 const isRelatedQuery = (query: ObservableQuery, target: LiveTarget) => {
@@ -200,26 +247,20 @@ const isRelatedQuery = (query: ObservableQuery, target: LiveTarget) => {
     return true;
   }
 
-  if (!target.typenames.size) return false;
+  const data = query.getCurrentResult(false).data;
 
-  const present = new Set<string>();
-  collectTypenames(query.getCurrentResult(false).data, present);
+  if (target.typenames.size) {
+    const present = new Set<string>();
+    collectTypenames(data, present);
 
-  for (const typename of target.typenames) {
-    if (present.has(typename)) return true;
+    for (const typename of target.typenames) {
+      if (present.has(typename)) return true;
+    }
   }
 
-  return false;
+  return target.ids.size > 0 && containsAnyId(data, target.ids);
 };
 
-/**
- * Keeps every mounted query fresh after a mutation, so no screen needs a
- * browser refresh:
- * - remove mutations evict the removed ids from the cache;
- * - create/structural mutations, and edits that don't return the changed
- *   entity, refetch the active queries that read the same resource.
- * Opt out per mutation with `context: { live: false }`.
- */
 export const createLiveDataLink = (
   getClient: () => ApolloClient<NormalizedCacheObject> | undefined,
 ) =>
@@ -243,6 +284,7 @@ export const createLiveDataLink = (
       const stems: string[] = [];
       const typenames = new Set<string>();
       const removedIds = new Set<string>();
+      const touchedIds = new Set<string>();
       let shouldRefetch = false;
 
       for (const [fieldName, value] of Object.entries(result.data)) {
@@ -256,6 +298,7 @@ export const createLiveDataLink = (
           shouldRefetch = true;
           if (stem.length >= MIN_STEM_LENGTH) stems.push(stem);
           collectTypenames(value, typenames);
+          if (kind !== 'remove') collectIds(operation.variables, touchedIds);
         }
       }
 
@@ -263,14 +306,16 @@ export const createLiveDataLink = (
 
       setTimeout(() => {
         evictIds(client.cache, removedIds);
+        markRootFieldsStale(client.cache, stems);
 
-        if (!stems.length && !typenames.size) return;
+        if (!stems.length && !typenames.size && !touchedIds.size) return;
 
         client
           .refetchQueries({
             include: 'active',
             onQueryUpdated: (query) =>
-              isRelatedQuery(query, { stems, typenames }) && query.refetch(),
+              isRelatedQuery(query, { stems, typenames, ids: touchedIds }) &&
+              query.refetch(),
           })
           .catch(() => undefined);
       }, 0);

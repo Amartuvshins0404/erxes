@@ -10,7 +10,7 @@
     "release": "release-it"
   },
   "engines": {
-    "node": ">=24",
+    "node": "^24.15.0 || >=26.0.0",
     "pnpm": ">=9",
     "npm": "please-use-pnpm",
     "yarn": "please-use-pnpm"
@@ -215,7 +215,7 @@
     "@nx/webpack": "20.0.8",
     "@nx/workspace": "20.0.8",
     "@pmmmwh/react-refresh-webpack-plugin": "^0.5.7",
-    "@release-it/conventional-changelog": "^8.0.0",
+    "@release-it/conventional-changelog": "^12.0.2",
     "@rspack/cli": "1.0.5",
     "@rspack/core": "1.0.5",
     "@rspack/dev-server": "1.0.5",
@@ -276,7 +276,7 @@
     "postcss-loader": "^8.2.0",
     "prettier": "^2.8.8",
     "react-refresh": "~0.14.0",
-    "release-it": "^17.0.0",
+    "release-it": "^21.1.1",
     "storybook": "8.6.12",
     "tailwindcss": "^4.1.17",
     "testing": "link:@apollo/client/testing",

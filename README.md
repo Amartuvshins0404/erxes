@@ -111,7 +111,7 @@ erxes is built as an **Nx-powered monorepo** with a modern microservices archite
 
 ### Prerequisites
 
-- **Node.js** 24+ (`.nvmrc` pins 26)
+- **Node.js** 24.15+ or 26+ (`.nvmrc` pins 26)
 - **pnpm** 9 (required, pinned by `packageManager`)
 - **MongoDB** 27017
 - **Redis** 6379

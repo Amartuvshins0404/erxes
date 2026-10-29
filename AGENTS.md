@@ -115,7 +115,7 @@ These must hold in any new or modified code.
 monorepo of microservices (backend) and Module Federation micro-frontends
 (frontend), licensed AGPLv3 (core) with Enterprise plugins.
 
-- **Package manager:** pnpm 9 (`packageManager`) · **Node:** ≥ 24 (`.nvmrc` 26; CI builds on 24 and 26) · **TS:** 5.7.3
+- **Package manager:** pnpm 9 (`packageManager`) · **Node:** `^24.15.0 || >=26` (`.nvmrc` 26; CI builds on 24 and 26) · **TS:** 5.7.3
 - **Build:** Nx 20 with caching and affected-graph task orchestration
 
 ### Backend

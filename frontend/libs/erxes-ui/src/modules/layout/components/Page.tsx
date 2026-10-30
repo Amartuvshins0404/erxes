@@ -10,7 +10,7 @@ export const PagePanel = React.forwardRef<
       ref={ref}
       data-page-panel=""
       className={cn(
-        'relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden text-card-foreground not-has-[[data-app-layout]]:rounded-2xl not-has-[[data-app-layout]]:bg-card not-has-[[data-app-layout]]:shadow-card not-has-[[data-app-layout]]:[--background:var(--card)]',
+        'relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden text-card-foreground not-has-[[data-app-layout]]:rounded-2xl not-has-[[data-app-layout]]:bg-card not-has-[[data-app-layout]]:shadow-card not-has-[[data-app-layout]]:[--background:var(--card)] not-has-[[data-app-layout]]:[--color-background:var(--color-card)]',
         className,
       )}
       {...props}

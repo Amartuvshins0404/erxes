@@ -101,7 +101,7 @@ export const NavigationActivityActions = ({
           aria-label={favoriteLabel}
           className={cn(
             actionButtonClassName,
-            'text-yellow-500 hover:bg-yellow-500/10 hover:text-yellow-500',
+            'text-warning hover:bg-warning/10 hover:text-warning',
           )}
           size="icon"
           type="button"

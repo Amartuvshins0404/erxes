@@ -9,7 +9,7 @@ export const RecordTableRoot = React.forwardRef<
   return (
     <Table
       ref={ref}
-      className={cn('leading-0', className)}
+      className={cn('bg-transparent leading-0', className)}
       style={{ width: 'var(--table-width)', ...style }}
       {...props}
     />

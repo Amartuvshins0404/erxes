@@ -11,7 +11,7 @@ export const RecordTableScroll = forwardRef<
     <ScrollArea
       ref={ref}
       scrollBarClassName="z-10"
-      className={cn('h-full w-full pb-3 pr-3', className)}
+      className={cn('h-full w-full', className)}
       {...props}
     >
       {children}

@@ -85,7 +85,7 @@ export const TextField = React.forwardRef<
         }}
       >
         <RecordTableInlineCell.Trigger
-          className={cn('shadow-xs rounded-sm', props.className)}
+          className={cn('rounded-lg shadow-xs', props.className)}
           {...props}
           ref={ref}
         >

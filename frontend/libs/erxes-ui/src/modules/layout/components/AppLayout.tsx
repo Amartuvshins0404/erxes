@@ -8,11 +8,11 @@ import {
 import { useAtom } from 'jotai';
 
 import { Button } from 'erxes-ui/components/button';
-import { Separator } from 'erxes-ui/components/separator';
 import { Sidebar } from 'erxes-ui/components/sidebar';
 import { atomWithStorage } from 'jotai/utils';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from 'erxes-ui/lib/utils';
+import { PagePanel } from './Page';
 
 const APP_LAYOUT_DEFAULT_WIDTH = 240;
 const APP_LAYOUT_MIN_WIDTH = 180;
@@ -29,8 +29,6 @@ const createWidthAtom = (id: string) =>
     getOnInit: true,
   });
 
-// Derived from the factories so the type matches under every tsconfig
-// (the declaration build is non-strict, which widens atomWithStorage).
 type TAppLayoutAtoms = {
   open: ReturnType<typeof createOpenAtom>;
   width: ReturnType<typeof createWidthAtom>;
@@ -62,11 +60,13 @@ const clampWidth = (value: number) =>
 
 const AppLayoutResizeHandle = ({
   panelRef,
+  width,
   onResize,
   onReset,
   onResizingChange,
 }: {
   panelRef: React.RefObject<HTMLElement | null>;
+  width: number;
   onResize: (width: number) => void;
   onReset: () => void;
   onResizingChange: (resizing: boolean) => void;
@@ -75,7 +75,7 @@ const AppLayoutResizeHandle = ({
     null,
   );
 
-  const stopDrag = (event: React.PointerEvent<HTMLButtonElement>) => {
+  const stopDrag = (event: React.PointerEvent<HTMLDivElement>) => {
     if (!drag.current) {
       return;
     }
@@ -90,11 +90,16 @@ const AppLayoutResizeHandle = ({
   };
 
   return (
-    <button
-      type="button"
+    <div
+      role="separator"
+      tabIndex={0}
       aria-label="Resize sidebar"
+      aria-orientation="vertical"
+      aria-valuemin={APP_LAYOUT_MIN_WIDTH}
+      aria-valuemax={APP_LAYOUT_MAX_WIDTH}
+      aria-valuenow={width}
       title="Resize sidebar"
-      className="group/resize absolute inset-y-0 right-0 z-30 w-2 cursor-col-resize touch-none outline-none"
+      className="group/resize absolute inset-y-0 right-0 z-30 flex w-2 cursor-col-resize touch-none items-center justify-center outline-none"
       onDoubleClick={onReset}
       onKeyDown={(event) => {
         const panel = panelRef.current;
@@ -140,8 +145,8 @@ const AppLayoutResizeHandle = ({
       }}
       onPointerUp={stopDrag}
     >
-      <span className="absolute inset-y-0 right-0 w-0.5 bg-transparent transition-colors duration-150 group-hover/resize:bg-primary/40 group-focus-visible/resize:bg-primary group-active/resize:bg-primary" />
-    </button>
+      <span className="h-10 w-1 rounded-full bg-transparent transition-colors group-hover/resize:bg-border-strong group-focus-visible/resize:bg-primary group-active/resize:bg-primary" />
+    </div>
   );
 };
 
@@ -154,35 +159,27 @@ const AppLayoutFloatingButton = ({
   icon: React.ReactNode;
   onClick: () => void;
 }) => (
-  <div className="absolute top-0 left-0 z-30 flex h-10 w-10 items-center justify-center bg-sidebar">
-    <Button
-      aria-expanded={false}
-      aria-label={label}
-      className="size-7 shrink-0"
-      size="icon"
-      title={label}
-      type="button"
-      variant="ghost"
-      onClick={onClick}
-    >
-      {icon}
-    </Button>
-    <Separator.Inline className="absolute top-1/2 right-0 -translate-y-1/2" />
-  </div>
+  <Button
+    aria-expanded={false}
+    aria-label={label}
+    className="absolute top-1.5 left-1.5 z-30 size-7 shrink-0 text-muted-foreground hover:text-foreground"
+    size="icon"
+    title={label}
+    type="button"
+    variant="ghost"
+    onClick={onClick}
+  >
+    {icon}
+  </Button>
 );
 
-// Fade only: moving a full-height pane reads as a jolt.
 const AppLayoutFooter = ({ children }: { children?: React.ReactNode }) =>
   children ? (
-    <div className="shrink-0 border-t px-2 py-1.5">
+    <div className="shrink-0 p-2">
       <Sidebar.Menu>{children}</Sidebar.Menu>
     </div>
   ) : null;
 
-/**
- * A link pinned to the bottom of an app sidebar (`AppLayout` `footer`), e.g.
- * the plugin's own settings or the way back from them.
- */
 export const AppLayoutFooterLink = ({
   path,
   name,
@@ -208,13 +205,21 @@ export const AppLayoutFooterLink = ({
   );
 };
 
-const APP_LAYOUT_PAGE_ENTER: Keyframe[] = [{ opacity: 0.4 }, { opacity: 1 }];
+const APP_LAYOUT_PAGE_ENTER: Keyframe[] = [
+  { opacity: 0.4, transform: 'translateY(2px)' },
+  { opacity: 1, transform: 'translateY(0)' },
+];
 
 const getPageKey = (pathname: string) =>
   pathname.split('/').filter(Boolean).slice(0, 2).join('/');
 
-/** The page pane: replays a short enter on route change, never the sidebar. */
-const AppLayoutPage = ({ children }: { children: React.ReactNode }) => {
+const AppLayoutPage = ({
+  children,
+  overlay,
+}: {
+  children: React.ReactNode;
+  overlay?: React.ReactNode;
+}) => {
   const { pathname } = useLocation();
   const pageRef = React.useRef<HTMLDivElement>(null);
   const pageKey = getPageKey(pathname);
@@ -238,20 +243,26 @@ const AppLayoutPage = ({ children }: { children: React.ReactNode }) => {
 
     const animation = page.animate(APP_LAYOUT_PAGE_ENTER, {
       duration: 160,
-      easing: 'ease-out',
+      easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
     });
 
     return () => animation.cancel();
   }, [pageKey]);
 
   return (
-    <div
-      ref={pageRef}
-      className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
-    >
+    <PagePanel ref={pageRef}>
+      {overlay}
       {children}
-    </div>
+    </PagePanel>
   );
+};
+
+type TAppLayoutBodyProps = {
+  atoms: TAppLayoutAtoms;
+  children: React.ReactNode;
+  sidebar: React.ReactNode;
+  footer?: React.ReactNode;
+  title?: React.ReactNode;
 };
 
 const AppLayoutDesktop = ({
@@ -260,13 +271,7 @@ const AppLayoutDesktop = ({
   footer,
   sidebar,
   title,
-}: {
-  atoms: TAppLayoutAtoms;
-  children: React.ReactNode;
-  sidebar: React.ReactNode;
-  footer?: React.ReactNode;
-  title?: React.ReactNode;
-}) => {
+}: TAppLayoutBodyProps) => {
   const [open, setOpen] = useAtom(atoms.open);
   const [width, setWidth] = useAtom(atoms.width);
   const [resizing, setResizing] = React.useState(false);
@@ -275,9 +280,10 @@ const AppLayoutDesktop = ({
 
   return (
     <div
+      data-app-layout=""
       className={cn(
-        'relative flex min-h-0 min-w-0 flex-1',
-        !open && '[--navigation-panel-toggle-space:2.5rem]',
+        'relative flex min-h-0 min-w-0 flex-1 bg-sidebar pr-2 pb-2 text-sidebar-foreground',
+        !open && 'pl-2 [--navigation-panel-toggle-space:2rem]',
         resizing && 'cursor-col-resize select-none',
       )}
     >
@@ -285,25 +291,24 @@ const AppLayoutDesktop = ({
         ref={asideRef}
         aria-hidden={!open}
         className={cn(
-          'relative flex shrink-0 flex-col overflow-hidden border-r bg-sidebar',
+          'relative flex shrink-0 flex-col overflow-hidden',
           !resizing &&
-            'transition-[width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none',
-          !open && 'border-r-0',
+            'transition-[width] duration-300 ease-out motion-reduce:transition-none',
         )}
         style={{ width: open ? currentWidth : 0 }}
       >
         <div
-          className="flex h-full flex-col"
+          className="flex h-full flex-col pr-1"
           style={{ minWidth: currentWidth }}
         >
-          <div className="flex h-10 shrink-0 items-center px-2">
-            <div className="min-w-0 flex-1 truncate px-2 text-sm font-medium">
+          <div className="flex h-10 shrink-0 items-center gap-1 pr-1 pl-2">
+            <div className="min-w-0 flex-1 truncate px-2 text-sm font-semibold tracking-tight">
               {title}
             </div>
             <Button
               aria-expanded
               aria-label="Collapse sidebar"
-              className="size-8 shrink-0 rounded-md"
+              className="size-7 shrink-0 text-muted-foreground hover:text-foreground"
               size="icon"
               title="Collapse sidebar"
               type="button"
@@ -324,22 +329,26 @@ const AppLayoutDesktop = ({
         {open && (
           <AppLayoutResizeHandle
             panelRef={asideRef}
+            width={currentWidth}
             onResize={setWidth}
             onReset={() => setWidth(null)}
             onResizingChange={setResizing}
           />
         )}
       </aside>
-      <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-        {!open && (
-          <AppLayoutFloatingButton
-            label="Expand sidebar"
-            icon={<IconLayoutSidebarLeftExpand />}
-            onClick={() => setOpen(true)}
-          />
-        )}
-        <AppLayoutPage>{children}</AppLayoutPage>
-      </div>
+      <AppLayoutPage
+        overlay={
+          !open && (
+            <AppLayoutFloatingButton
+              label="Expand sidebar"
+              icon={<IconLayoutSidebarLeftExpand />}
+              onClick={() => setOpen(true)}
+            />
+          )
+        }
+      >
+        {children}
+      </AppLayoutPage>
     </div>
   );
 };
@@ -349,19 +358,17 @@ const AppLayoutMobile = ({
   footer,
   sidebar,
   title,
-}: {
-  children: React.ReactNode;
-  sidebar: React.ReactNode;
-  footer?: React.ReactNode;
-  title?: React.ReactNode;
-}) => {
+}: Omit<TAppLayoutBodyProps, 'atoms'>) => {
   const { toggleSidebar } = Sidebar.useSidebar();
 
   return (
-    <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden [--navigation-panel-toggle-space:2.5rem]">
+    <div
+      data-app-layout=""
+      className="relative flex min-h-0 min-w-0 flex-1 flex-col bg-sidebar px-2 pb-2 [--navigation-panel-toggle-space:2rem]"
+    >
       <Sidebar collapsible="offcanvas">
         {title && (
-          <Sidebar.Header className="px-4 text-sm font-medium">
+          <Sidebar.Header className="px-4 text-sm font-semibold tracking-tight">
             {title}
           </Sidebar.Header>
         )}
@@ -373,23 +380,22 @@ const AppLayoutMobile = ({
         </div>
         <AppLayoutFooter>{footer}</AppLayoutFooter>
       </Sidebar>
-      <AppLayoutFloatingButton
-        label="Open sidebar"
-        icon={<IconMenu2 className="size-4" />}
-        onClick={toggleSidebar}
-      />
-      <AppLayoutPage>{children}</AppLayoutPage>
+      <AppLayoutPage
+        overlay={
+          <AppLayoutFloatingButton
+            label="Open sidebar"
+            icon={<IconMenu2 />}
+            onClick={toggleSidebar}
+          />
+        }
+      >
+        {children}
+      </AppLayoutPage>
     </div>
   );
 };
 
-const AppLayoutBody = (props: {
-  atoms: TAppLayoutAtoms;
-  children: React.ReactNode;
-  sidebar: React.ReactNode;
-  footer?: React.ReactNode;
-  title?: React.ReactNode;
-}) => {
+const AppLayoutBody = (props: TAppLayoutBodyProps) => {
   const { isMobile } = Sidebar.useSidebar();
 
   return isMobile ? (
@@ -399,11 +405,6 @@ const AppLayoutBody = (props: {
   );
 };
 
-/**
- * Full-height layout for an app (plugin or core module) below the core top
- * bar: the app owns its sidebar and pages. `id` keys the persisted
- * open/width state, so use the plugin or module name.
- */
 export const AppLayout = ({
   id,
   sidebar,

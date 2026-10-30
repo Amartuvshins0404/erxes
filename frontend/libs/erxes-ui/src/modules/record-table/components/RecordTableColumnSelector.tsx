@@ -1,5 +1,6 @@
 import { isValidElement, type ReactNode } from 'react';
 import { DropdownMenu, Button, Checkbox, Label } from 'erxes-ui/components';
+import { cn } from 'erxes-ui/lib/utils';
 import { useRecordTable } from './RecordTableProvider';
 import {
   DragEndEvent,
@@ -72,16 +73,18 @@ const SortableColumnItem = ({
     <div
       ref={setNodeRef}
       style={style}
-      className={`flex items-center gap-2 px-2 py-1.5 hover:bg-muted/50 rounded-sm ${
-        isDragging && 'opacity-50 bg-muted'
-      }`}
+      className={cn(
+        'flex h-8 items-center gap-2 rounded-lg px-2 transition-colors hover:bg-accent',
+        isDragging && 'bg-accent opacity-60',
+      )}
     >
       <div
         {...attributes}
         {...listeners}
-        className={`text-muted-foreground flex-none flex items-center ${
-          isPinned ? 'cursor-default opacity-30' : 'cursor-grab'
-        }`}
+        className={cn(
+          'flex flex-none items-center text-muted-foreground',
+          isPinned ? 'cursor-default opacity-30' : 'cursor-grab',
+        )}
       >
         <IconGripVertical size={14} />
       </div>
@@ -108,7 +111,7 @@ const SortableColumnItem = ({
         size="icon"
         title={isPinned ? 'Unpin column' : 'Pin column to left'}
         aria-label={isPinned ? 'Unpin column' : 'Pin column to left'}
-        className="h-5 w-5 flex-none text-muted-foreground hover:text-foreground"
+        className="size-6 flex-none rounded-full text-muted-foreground hover:text-foreground"
         onClick={(e) => {
           e.preventDefault();
           column.pin(isPinned ? false : 'left');
@@ -175,7 +178,7 @@ export const RecordTableColumnSelector = ({
 
       <DropdownMenu.Content
         align={align}
-        className="hide-scroll max-h-(--radix-dropdown-menu-content-available-height) w-72 max-w-[calc(100vw-2rem)] overflow-y-auto overscroll-contain p-1"
+        className="hide-scroll max-h-(--radix-dropdown-menu-content-available-height) w-72 max-w-[calc(100vw-2rem)] overflow-y-auto overscroll-contain p-1.5"
       >
         <DndContext
           sensors={sensors}

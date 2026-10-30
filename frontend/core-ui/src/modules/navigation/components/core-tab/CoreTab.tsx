@@ -23,15 +23,10 @@ import { useTranslation } from 'react-i18next';
 
 const coreTabIconClassName = (active: boolean) =>
   cn(
-    'relative size-7 shrink-0',
+    'relative size-8 shrink-0 rounded-full text-muted-foreground hover:text-foreground',
     active && 'bg-primary/10 text-primary hover:bg-primary/15',
   );
 
-/**
- * The only navigation core draws: a top bar of browser-like app tabs plus
- * global actions. Everything below it, sidebar included, belongs to the
- * open app.
- */
 export const CoreTab = () => {
   const {
     activities,
@@ -54,7 +49,6 @@ export const CoreTab = () => {
   const inboxActivity = activities.find(
     (activity) => activity.id === INBOX_TAB_ID,
   );
-  // Inbox and organization settings have their own entry points.
   const appActivities = activities.filter(
     (activity) =>
       activity.id !== INBOX_TAB_ID && activity.id !== SETTINGS_TAB_ID,
@@ -62,7 +56,6 @@ export const CoreTab = () => {
   const companyName =
     organization?.orgShortName || organization?.name || 'erxes';
 
-  // Search scopes to the open plugin; inbox and settings tabs are not plugins.
   useEffect(() => {
     if (
       routeActivityId &&
@@ -76,16 +69,16 @@ export const CoreTab = () => {
 
   return (
     <Tooltip.Provider delayDuration={300}>
-      <header className="flex h-12 shrink-0 items-center gap-1 border-b bg-sidebar px-2">
+      <header className="flex h-12 shrink-0 items-center gap-1.5 bg-sidebar px-3">
         <CoreTabTooltip label={companyName}>
           <Button
             asChild
-            className="size-7 shrink-0 px-0"
+            className="size-8 shrink-0 rounded-lg px-0"
             size="icon"
             variant="ghost"
           >
             <Link aria-label={companyName} to={AppPath.Index}>
-              <span className="flex size-6 items-center justify-center rounded-md border border-border/60 bg-background shadow-xs [&>img]:size-4! [&>svg]:size-4!">
+              <span className="flex size-7 items-center justify-center rounded-lg bg-card shadow-xs [&>img]:size-4! [&>svg]:size-4!">
                 <OrgLogoIcon className="text-primary" />
               </span>
             </Link>
@@ -110,7 +103,7 @@ export const CoreTab = () => {
             <Button
               aria-keyshortcuts="Control+M Meta+M"
               aria-label={t('search')}
-              className="size-7 shrink-0 text-muted-foreground"
+              className="size-8 shrink-0 rounded-full text-muted-foreground hover:text-foreground"
               size="icon"
               type="button"
               variant="ghost"

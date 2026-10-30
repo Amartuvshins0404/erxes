@@ -11,11 +11,11 @@ export const ThemeSelector = () => {
   const { t } = useTranslation('organization');
 
   return (
-    <div className="flex h-7 items-center gap-2 px-2 text-sm font-medium">
+    <div className="flex h-8 items-center gap-2 px-2 text-sm font-medium">
       {t('theme')}
       <Tooltip.Provider delayDuration={100}>
         <ToggleGroup
-          className="ml-auto h-6 gap-0.5 rounded bg-accent text-muted-foreground"
+          className="ml-auto h-7 gap-0.5 rounded-full bg-muted p-0.5 text-muted-foreground"
           onValueChange={(value) => {
             if (value && isThemeOption(value)) {
               setTheme(value);
@@ -28,7 +28,7 @@ export const ThemeSelector = () => {
           <Tooltip>
             <ToggleGroup.Item
               asChild
-              className="h-full min-w-6 px-1 data-[state=on]:bg-background data-[state=on]:shadow-sm"
+              className="h-full min-w-7 rounded-full px-1.5 data-[state=on]:bg-card data-[state=on]:text-foreground data-[state=on]:shadow-xs"
               value="light"
             >
               <Tooltip.Trigger>
@@ -40,7 +40,7 @@ export const ThemeSelector = () => {
           <Tooltip>
             <ToggleGroup.Item
               asChild
-              className="h-full min-w-6 px-1 data-[state=on]:bg-background data-[state=on]:shadow-sm"
+              className="h-full min-w-7 rounded-full px-1.5 data-[state=on]:bg-card data-[state=on]:text-foreground data-[state=on]:shadow-xs"
               value="dark"
             >
               <Tooltip.Trigger>
@@ -52,7 +52,7 @@ export const ThemeSelector = () => {
           <Tooltip>
             <ToggleGroup.Item
               asChild
-              className="h-full min-w-6 px-1 data-[state=on]:bg-background data-[state=on]:shadow-sm"
+              className="h-full min-w-7 rounded-full px-1.5 data-[state=on]:bg-card data-[state=on]:text-foreground data-[state=on]:shadow-xs"
               value="system"
             >
               <Tooltip.Trigger>

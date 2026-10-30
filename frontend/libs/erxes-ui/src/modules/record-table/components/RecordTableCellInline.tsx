@@ -42,7 +42,7 @@ const RecordTableCellContent = React.forwardRef<
       sideOffset={-32}
       disableTransition
       className={cn(
-        'p-0 w-(--radix-popper-anchor-width) min-w-56 rounded',
+        'w-(--radix-popper-anchor-width) min-w-56 rounded-xl p-0',
         className,
       )}
       ref={ref}

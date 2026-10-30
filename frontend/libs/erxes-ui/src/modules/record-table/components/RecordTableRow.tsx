@@ -24,12 +24,16 @@ export const RecordTableRow = React.forwardRef<
     <Table.Row
       {...props}
       ref={mergeRefs([ref, inViewRef])}
-      className={cn('h-cell', inView ? 'in-view' : 'out-of-view', className)}
+      className={cn(
+        'h-cell hover:bg-transparent [&>td:first-child]:border-l-0',
+        inView ? 'in-view' : 'out-of-view',
+        className,
+      )}
       id={original?.cursor}
     >
       {table.getRowModel().rows.length > 200 && !inView ? (
         <td
-          className="h-cell bg-background"
+          className="h-cell border-b bg-background"
           colSpan={table.getAllColumns().length}
         />
       ) : (

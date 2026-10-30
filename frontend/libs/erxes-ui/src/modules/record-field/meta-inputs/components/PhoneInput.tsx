@@ -142,7 +142,7 @@ export const PhoneInput = React.forwardRef<HTMLInputElement, PhoneInputProps>(
       }
     };
     return (
-      <div className={'flex items-center justify-start rounded gap-1'}>
+      <div className="flex items-center justify-start gap-1 rounded-lg">
         <Popover open={open} onOpenChange={setOpen}>
           <Combobox.TriggerBase
             variant="secondary"

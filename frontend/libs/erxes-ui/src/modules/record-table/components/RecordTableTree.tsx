@@ -84,7 +84,7 @@ const RecordTableTreeArrow = React.forwardRef<
       ref={ref}
       variant="ghost"
       size="icon"
-      className={cn('hover:bg-border', className)}
+      className={cn('rounded-md hover:bg-accent', className)}
       tabIndex={-1}
       onClick={(e) => {
         e.stopPropagation();

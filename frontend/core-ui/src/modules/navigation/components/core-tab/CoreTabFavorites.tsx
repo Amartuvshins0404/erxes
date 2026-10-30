@@ -73,7 +73,7 @@ const CoreTabFavoriteItem = ({
       {...listeners}
       ref={setNodeRef}
       className={cn(
-        'group/favorite flex h-8 w-full min-w-0 items-center rounded hover:bg-accent',
+        'group/favorite flex h-8 w-full min-w-0 items-center rounded-lg transition-colors hover:bg-accent',
         isDragging && 'relative z-10 bg-accent opacity-80 shadow-sm',
       )}
       style={{ transform: CSS.Transform.toString(transform), transition }}
@@ -125,7 +125,7 @@ const CoreTabFavoriteItem = ({
       />
       <Button
         aria-label={t('remove-from-favorites', 'Remove from favorites')}
-        className="mr-1 size-6 text-yellow-500 hover:bg-yellow-500/10 hover:text-yellow-500"
+        className="mr-1 size-6 rounded-full text-warning hover:bg-warning/10 hover:text-warning"
         size="icon"
         type="button"
         variant="ghost"
@@ -184,7 +184,7 @@ export const CoreTabFavoritesSection = ({
 
   return (
     <section className="flex flex-col gap-0.5 py-1 first:pt-0">
-      <h2 className="flex h-7 items-center px-2 font-sans text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+      <h2 className="flex h-7 items-center px-2.5 text-xs font-medium text-muted-foreground">
         {t('favorites')}
       </h2>
       <DndContext

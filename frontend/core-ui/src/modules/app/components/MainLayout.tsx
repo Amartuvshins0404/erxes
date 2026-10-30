@@ -27,7 +27,7 @@ const AppWorkspace = () => {
   return (
     <main
       ref={pageRef}
-      className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background"
+      className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-sidebar"
     >
       <FloatingWidgets />
       <CoreAppOutlet />
@@ -48,7 +48,7 @@ export const DefaultLayout = () => {
   return (
     <RecordViewContext.Provider value={SidePanelRecord}>
       <Sidebar.Provider
-        className="h-svh w-screen overflow-hidden"
+        className="h-svh w-screen overflow-hidden bg-sidebar"
         sidebarKeyboardShortcut={false}
       >
         <GlobalSearch />

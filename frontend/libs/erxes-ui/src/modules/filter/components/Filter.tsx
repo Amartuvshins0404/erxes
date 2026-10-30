@@ -92,7 +92,7 @@ const FilterTrigger = React.forwardRef<
               size={isFiltered ? 'icon' : 'default'}
               {...props}
             >
-              <IconFilter2 className="w-4 h-4" />
+              <IconFilter2 />
               {!isFiltered && t('filter._')}
             </Button>
           </Popover.Trigger>
@@ -175,7 +175,7 @@ const FilterItem = React.forwardRef<
       {...props}
     >
       {children}
-      <IconChevronRight className="w-4 h-4 ml-auto" />
+      <IconChevronRight className="ml-auto text-muted-foreground" />
     </Command.Item>
   );
 });
@@ -207,14 +207,14 @@ const FilterBackButton = () => {
   const setView = useSetAtom(filterPopoverViewState(id));
 
   return (
-    <button
-      type="button"
+    <Button
+      variant="ghost"
       onClick={() => setView('root')}
-      className="flex h-8 w-full items-center gap-1 border-b px-2 text-sm text-muted-foreground hover:text-foreground"
+      className="mb-1 h-8 w-full justify-start gap-1 px-2 font-normal text-muted-foreground hover:text-foreground"
     >
-      <IconChevronLeft className="size-4" />
+      <IconChevronLeft />
       Back
-    </button>
+    </Button>
   );
 };
 
@@ -294,7 +294,7 @@ const FilterBarItem = React.forwardRef<
     <div
       ref={ref}
       className={cn(
-        'rounded flex gap-px h-7 items-stretch shadow-xs bg-muted text-sm font-medium',
+        'flex h-7 items-stretch divide-x divide-border overflow-hidden rounded-full border bg-background text-sm font-medium shadow-xs',
         className,
       )}
       {...props}
@@ -313,7 +313,7 @@ const FilterBarName = React.forwardRef<
     <div
       ref={ref}
       className={cn(
-        'bg-background rounded-l [&>svg]:size-4 flex items-center px-2 gap-2 w-fit',
+        'flex w-fit items-center gap-1.5 bg-muted/60 pr-2.5 pl-3 text-muted-foreground [&>svg]:size-3.5',
         className,
       )}
       {...props}
@@ -335,8 +335,7 @@ const FilterBarButton = React.forwardRef<
       ref={ref}
       variant="ghost"
       className={cn(
-        'rounded-none focus-visible:z-10 max-w-72 transition-[color,box-shadow] focus-visible:shadow-focus outline-hidden focus-visible:outline-hidden focus-visible:outline-offset-0 focus-visible:outline-transparent',
-        !props.variant && 'bg-background',
+        'h-full max-w-72 rounded-none px-2.5 font-medium outline-hidden transition-[color,background-color,box-shadow] focus-visible:z-10 focus-visible:shadow-focus focus-visible:outline-hidden focus-visible:outline-offset-0 focus-visible:outline-transparent',
         className,
       )}
       onClick={() => {
@@ -363,8 +362,7 @@ const FilterBarCloseButton = React.forwardRef<
       variant="ghost"
       size="icon"
       className={cn(
-        'rounded-l-none',
-        !props.variant && 'bg-background',
+        'h-full w-7 rounded-none text-muted-foreground hover:text-foreground [&>svg]:size-3.5',
         className,
       )}
       onClick={() => removeQuery(filterKey ?? '')}
@@ -486,7 +484,7 @@ const FilterBarDate = React.forwardRef<
         <Button
           ref={ref}
           variant="ghost"
-          className={cn('rounded-none h-7 bg-background', className)}
+          className={cn('h-full rounded-none px-2.5', className)}
           {...props}
         >
           {getDisplayValue(query ?? '')}

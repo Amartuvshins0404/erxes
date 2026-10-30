@@ -92,14 +92,13 @@ const CoreTabAppTab = ({
           }
           data-active={active}
           className={cn(
-            'group/tab flex h-7 min-w-24 max-w-48 shrink-0 cursor-default items-center gap-1.5 rounded-md border border-transparent pr-1 pl-2.5 text-sm font-medium text-muted-foreground transition-[background-color,border-color,box-shadow,color,opacity] select-none hover:bg-accent/70 hover:text-foreground',
-            'data-[active=true]:border-border data-[active=true]:bg-background data-[active=true]:text-foreground data-[active=true]:shadow-xs',
+            'group/tab flex h-8 min-w-24 max-w-48 shrink-0 cursor-default items-center gap-1.5 rounded-full pr-1 pl-3 text-sm font-medium text-muted-foreground transition-[background-color,box-shadow,color,opacity] select-none hover:bg-accent hover:text-foreground',
+            'data-[active=true]:bg-card data-[active=true]:text-foreground data-[active=true]:shadow-xs',
             isDragging && 'z-10 opacity-60',
           )}
           style={{ transform: CSS.Transform.toString(transform), transition }}
           onClick={onSelect}
           onAuxClick={(event) => {
-            // Middle click closes, like a browser tab.
             if (event.button === 1) {
               event.preventDefault();
               onClose();
@@ -112,7 +111,6 @@ const CoreTabAppTab = ({
             }
           }}
         >
-          {/* On hover the icon turns into a grip: tabs can be dragged. */}
           <span className="relative size-4 shrink-0">
             <Icon
               className={cn(
@@ -133,13 +131,13 @@ const CoreTabAppTab = ({
           {activity.platformMismatch && (
             <span
               aria-label={activity.platformMismatch}
-              className="size-1.5 shrink-0 rounded-full bg-amber-500"
+              className="size-1.5 shrink-0 rounded-full bg-warning"
             />
           )}
           <Button
             aria-label={closeLabel}
             className={cn(
-              'size-5 shrink-0 rounded text-muted-foreground opacity-0 transition-[background-color,opacity] hover:bg-accent hover:text-foreground group-hover/tab:opacity-100 group-focus-within/tab:opacity-100',
+              'size-5 shrink-0 rounded-full px-0 text-muted-foreground opacity-0 transition-[background-color,opacity] hover:bg-accent hover:text-foreground group-hover/tab:opacity-100 group-focus-within/tab:opacity-100',
               active && 'opacity-100',
             )}
             size="icon"

@@ -73,7 +73,7 @@ export const RecordTableHeader = ({
                     )}
                     {isAnchor && (
                       <div
-                        className="absolute top-0 z-20 h-full w-8 border-r bg-sidebar"
+                        className="absolute top-0 z-20 h-full w-8 border-r bg-background"
                         style={{ left: `${offset}px` }}
                       >
                         <RecordTableColumnSelector />

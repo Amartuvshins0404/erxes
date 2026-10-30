@@ -2,6 +2,7 @@ import {
   Button,
   CalendarTwoMonths,
   Dialog,
+  Label,
   RadioGroup,
   Tabs,
   ToggleGroup,
@@ -107,7 +108,7 @@ export const DateRangeDialogContent = ({
             </ToggleGroup>
           </div>
         </Dialog.Header>
-        <div className="border-y border-muted py-6 flex justify-center h-88 overflow-auto">
+        <div className="flex h-88 justify-center overflow-auto border-y py-6">
           <Tabs.Content value="day" className="self-center outline-hidden">
             <CalendarTwoMonths
               mode="range"
@@ -251,20 +252,20 @@ const DateFilterRadioGroupItem = ({
   return (
     <Button
       variant="secondary"
-      className="shadow-none has-data-[state=checked]:border-ring has-data-[state=checked]:bg-primary has-data-[state=checked]:text-primary-foreground has-focus-visible:outline-solid has-focus-visible:outline-2 has-focus-visible:outline-ring/70 capitalize"
+      className="rounded-full shadow-none has-data-[state=checked]:border-ring has-data-[state=checked]:bg-primary has-data-[state=checked]:text-primary-foreground has-focus-visible:outline-solid has-focus-visible:outline-2 has-focus-visible:outline-ring/70 capitalize"
       onClick={() => {
         ref.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }}
       asChild
     >
-      <label ref={ref} id={`${id}-${value}`}>
+      <Label ref={ref} id={`${id}-${value}`}>
         <RadioGroup.Item
           value={value}
           id={`${id}-${value}`}
           className="sr-only after:absolute after:inset-0"
         />
         {children}
-      </label>
+      </Label>
     </Button>
   );
 };

@@ -30,8 +30,8 @@ export const FinalSection = ({ onContinue }: { onContinue: () => void }) => {
         }}
         className="flex items-center justify-center"
       >
-        <div className="flex items-center justify-center w-20 h-20 rounded-2xl bg-muted">
-          <IconCircleCheck className="text-primary size-12" stroke={2} />
+        <div className="flex size-20 items-center justify-center rounded-3xl bg-success/10">
+          <IconCircleCheck className="size-10 text-success" stroke={1.75} />
         </div>
       </motion.div>
 
@@ -41,10 +41,10 @@ export const FinalSection = ({ onContinue }: { onContinue: () => void }) => {
         transition={{ duration: 0.5, delay: 0.4 }}
         className="flex flex-col gap-2 items-center"
       >
-        <h2 className="text-xl md:text-2xl font-semibold text-foreground text-center">
+        <h2 className="text-center text-2xl font-semibold tracking-tight text-foreground">
           {t('all-set')}
         </h2>
-        <p className="text-xs md:text-sm text-muted-foreground text-center px-4 max-w-md">
+        <p className="max-w-md px-4 text-center text-sm text-muted-foreground">
           {t('all-set-description')}
         </p>
       </motion.div>
@@ -59,9 +59,8 @@ export const FinalSection = ({ onContinue }: { onContinue: () => void }) => {
         tabIndex={-1}
       >
         <Button
-          className="w-full cursor-pointer"
+          className="w-full rounded-full"
           size="lg"
-          variant={'secondary'}
           onClick={onContinue}
         >
           {t('start-exploring')}

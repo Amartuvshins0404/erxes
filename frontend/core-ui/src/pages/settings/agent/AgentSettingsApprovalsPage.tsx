@@ -141,7 +141,7 @@ export const AgentSettingsApprovalsPage = () => {
           </p>
         ) : (
           <div className="mx-auto max-w-xl space-y-4 p-6">
-            <div className="rounded-xl border p-6">
+            <div className="rounded-2xl bg-card p-6 shadow-card">
               <Label className="font-sans text-sm font-medium normal-case">
                 {t('approvals-title', 'Tool approvals')}
               </Label>
@@ -152,9 +152,10 @@ export const AgentSettingsApprovalsPage = () => {
                 disabled={!canManage || saving}
               >
                 {MODES.map((option) => (
-                  <label
+                  <Label
+                    variant="peer"
                     key={option.value}
-                    className="flex items-start gap-3 rounded-lg border p-3 has-data-[state=checked]:border-primary/60 has-data-[state=checked]:bg-accent/40"
+                    className="flex cursor-pointer items-start gap-3 rounded-xl border p-3 leading-normal transition-colors hover:bg-accent has-data-[state=checked]:border-primary/60 has-data-[state=checked]:bg-primary/5"
                   >
                     <RadioGroup.Item
                       value={option.value}
@@ -169,11 +170,11 @@ export const AgentSettingsApprovalsPage = () => {
                         {t(option.descriptionKey)}
                       </span>
                     </span>
-                  </label>
+                  </Label>
                 ))}
               </RadioGroup>
               {!canManage && (
-                <p className="mt-4 rounded-lg border border-dashed p-3 text-xs text-muted-foreground">
+                <p className="mt-4 rounded-xl bg-muted/50 p-3 text-xs text-muted-foreground">
                   {t('managed-by-admins', 'Managed by your administrators.')}
                 </p>
               )}

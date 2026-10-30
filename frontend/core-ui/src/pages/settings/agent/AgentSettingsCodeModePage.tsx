@@ -118,7 +118,7 @@ export const AgentSettingsCodeModePage = () => {
           </p>
         ) : (
           <div className="mx-auto max-w-xl space-y-4 p-6">
-            <div className="rounded-xl border p-6">
+            <div className="rounded-2xl bg-card p-6 shadow-card">
               <div className="flex items-start justify-between gap-4">
                 <div className="space-y-1.5">
                   <Label className="font-sans text-sm font-medium normal-case">
@@ -138,24 +138,24 @@ export const AgentSettingsCodeModePage = () => {
                 />
               </div>
               {!canManage && (
-                <p className="mt-4 rounded-lg border border-dashed p-3 text-xs text-muted-foreground">
+                <p className="mt-4 rounded-xl bg-muted/50 p-3 text-xs text-muted-foreground">
                   Managed by your administrators.
                 </p>
               )}
             </div>
 
-            <div className="rounded-xl border p-6">
+            <div className="rounded-2xl bg-card p-6 shadow-card">
               <Label className="font-sans text-sm font-medium normal-case">
                 Sandbox environment
               </Label>
-              <div className="mt-3 flex items-start gap-3 rounded-lg border p-3">
-                <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-md bg-muted">
+              <div className="mt-3 flex items-start gap-3 rounded-xl bg-muted/50 p-3">
+                <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg bg-card shadow-card">
                   <IconServer className="size-4 text-muted-foreground" />
                 </span>
                 <div className="min-w-0">
                   <p className="text-sm font-medium">
                     In-process (built-in server)
-                    <span className="ml-2 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-primary">
+                    <span className="ml-2 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
                       Default
                     </span>
                   </p>

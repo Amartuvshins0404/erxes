@@ -38,10 +38,10 @@ export const ThemeSection = ({ onContinue }: { onContinue: () => void }) => {
         transition={{ duration: 0.5, delay: 0.2 }}
         className="flex flex-col gap-2 items-center"
       >
-        <h2 className="text-xl md:text-2xl font-semibold text-foreground text-center">
+        <h2 className="text-center text-2xl font-semibold tracking-tight text-foreground">
           {t('choose-theme')}
         </h2>
-        <p className="text-xs md:text-sm text-muted-foreground text-center px-4">
+        <p className="px-4 text-center text-sm text-muted-foreground">
           {t('choose-theme-description')}
         </p>
       </motion.div>
@@ -55,7 +55,7 @@ export const ThemeSection = ({ onContinue }: { onContinue: () => void }) => {
           <div key={value} className="flex flex-col gap-2 items-center">
             <div
               className={cn(
-                'aspect-[4/3] w-full max-w-[220px] overflow-hidden rounded-lg bg-muted transition-all',
+                'aspect-[4/3] w-full max-w-[220px] overflow-hidden rounded-2xl bg-muted shadow-card transition-shadow',
                 theme === value
                   ? 'ring-2 ring-primary ring-offset-2 ring-offset-background'
                   : 'hover:shadow-md',
@@ -70,7 +70,7 @@ export const ThemeSection = ({ onContinue }: { onContinue: () => void }) => {
                 onKeyDown={(e) => handleKeyDown(e, () => setTheme(value))}
                 draggable={false}
                 aria-pressed={theme === value}
-                className="h-full w-full cursor-pointer select-none rounded-lg object-cover"
+                className="size-full cursor-pointer select-none object-cover"
               />
             </div>
             <span
@@ -95,9 +95,8 @@ export const ThemeSection = ({ onContinue }: { onContinue: () => void }) => {
         tabIndex={-1}
       >
         <Button
-          className="w-full cursor-pointer"
+          className="w-full rounded-full"
           size="lg"
-          variant={'secondary'}
           onClick={onContinue}
         >
           {t('continue')}

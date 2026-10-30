@@ -5,6 +5,12 @@ import { useState } from 'react';
 import { useVersion } from 'ui-modules';
 import { motion } from 'motion/react';
 import { useTranslation } from 'react-i18next';
+
+const LOGIN_TABS = [
+  { value: 'magic-link', label: 'magic-link' },
+  { value: 'credential', label: 'email-and-password' },
+] as const;
+
 export const Login = () => {
   const { t } = useTranslation('common', { keyPrefix: 'auth' });
   const isOS = useVersion();
@@ -14,61 +20,39 @@ export const Login = () => {
 
   return (
     <>
-      <div className="flex flex-col items-center gap-3">
-        <div className="font-semibold text-xl leading-none">{t('welcome')}</div>
-        <div className="text-center text-muted-foreground">
+      <div className="flex flex-col items-center gap-2 text-center">
+        <h1 className="text-xl font-semibold tracking-tight">{t('welcome')}</h1>
+        <p className="text-sm text-muted-foreground">
           {t('sign-in-to-continue')}
-        </div>
+        </p>
       </div>
 
-      <Tabs
-        value={value}
-        onValueChange={(value) => setValue(value as string)}
-        className="flex flex-col h-full shadow-none"
-      >
-        <Tabs.List className="bg-foreground/5 rounded-lg border-none p-1 relative w-full grid grid-cols-2 gap-1 mb-4">
-          <Tabs.Trigger
-            className="font-normal after:content-none after:border-none after:shadow-none text-muted-foreground data-[state=active]:text-primary hover:bg-transparent rounded-md transition-colors cursor-pointer relative z-10"
-            value="magic-link"
-          >
-            {value === 'magic-link' && (
-              <motion.div
-                layoutId="activeLoginTab"
-                className="absolute inset-0 bg-background shadow-sm rounded-md"
-                transition={{
-                  type: 'spring',
-                  stiffness: 200,
-                  damping: 20,
-                }}
-              />
-            )}
-            <span className="relative z-10">{t('magic-link')}</span>
-          </Tabs.Trigger>
-          <Tabs.Trigger
-            className="font-normal after:content-none after:border-none after:shadow-none text-muted-foreground data-[state=active]:text-primary hover:bg-transparent rounded-md transition-colors cursor-pointer relative z-10"
-            value="credential"
-          >
-            {value === 'credential' && (
-              <motion.div
-                layoutId="activeLoginTab"
-                className="absolute inset-0 bg-background shadow-sm rounded-md"
-                transition={{
-                  type: 'spring',
-                  stiffness: 200,
-                  damping: 20,
-                }}
-              />
-            )}
-            <span className="relative z-10">{t('email-and-password')}</span>
-          </Tabs.Trigger>
+      <Tabs value={value} onValueChange={setValue} className="flex flex-col">
+        <Tabs.List
+          variant="segment"
+          className="mb-5 grid w-full grid-cols-2 rounded-full"
+        >
+          {LOGIN_TABS.map((tab) => (
+            <Tabs.Trigger
+              key={tab.value}
+              value={tab.value}
+              className="relative rounded-full data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:hover:bg-transparent"
+            >
+              {value === tab.value && (
+                <motion.span
+                  layoutId="activeLoginTab"
+                  className="absolute inset-0 rounded-full bg-card shadow-sm"
+                  transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+                />
+              )}
+              <span className="relative">{t(tab.label)}</span>
+            </Tabs.Trigger>
+          ))}
         </Tabs.List>
-        <Tabs.Content value="magic-link" className="h-full">
+        <Tabs.Content value="magic-link">
           <MagicLinkLoginForm />
         </Tabs.Content>
-        <Tabs.Content
-          value="credential"
-          className="h-full shadow-none border-none rounded-none"
-        >
+        <Tabs.Content value="credential">
           <CredentialLoginForm />
         </Tabs.Content>
       </Tabs>

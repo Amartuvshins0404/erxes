@@ -13,7 +13,7 @@ export const SettingsProfilePage = () => {
       <SettingsBreadcrumbs />
       <ScrollArea>
         <section className="mx-auto max-w-2xl w-full relative">
-          <h2 className="font-semibold text-lg mt-4 mb-12 px-4">{t('_')}</h2>
+          <h2 className="px-4 pt-8 pb-6 text-xl font-semibold tracking-tight">{t('_')}</h2>
           <div className="flex flex-col gap-10 px-4 w-full h-auto mb-5">
             <ProfileForm />
           </div>

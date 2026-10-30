@@ -39,30 +39,30 @@ export const DeviceAuthorize = () => {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-muted/20 px-4 py-10">
-      <Card className="w-full max-w-2xl rounded-lg border">
-        <Card.Header className="space-y-5 px-8 py-8">
+    <div className="flex min-h-screen items-center justify-center bg-background px-4 py-10">
+      <Card className="w-full max-w-2xl rounded-3xl shadow-lg">
+        <Card.Header className="space-y-5 p-8">
           <div className="flex items-start gap-4">
-            <Avatar size="xl" className="size-12 rounded-lg bg-primary/5">
+            <Avatar size="xl" className="size-12 rounded-xl bg-primary/10">
               {details?.client.logo ? (
                 <Avatar.Image
                   src={readImage(details.client.logo, 48)}
                   alt={details.client.name}
-                  className="rounded-lg object-contain"
+                  className="rounded-xl object-contain"
                 />
               ) : null}
-              <Avatar.Fallback className="rounded-lg bg-primary/10 text-base font-semibold text-primary">
+              <Avatar.Fallback className="rounded-xl bg-primary/10 text-base font-semibold text-primary">
                 {details?.client.logoText || 'ER'}
               </Avatar.Fallback>
             </Avatar>
 
             <div className="space-y-2">
-              <Card.Title className="text-2xl font-semibold leading-tight">
+              <Card.Title className="text-xl font-semibold leading-tight">
                 {t('wants-access', {
                   name: details?.client.name || t('application'),
                 })}
               </Card.Title>
-              <Card.Description className="text-sm leading-6">
+              <Card.Description className="text-sm font-normal leading-6">
                 {t('signed-in-as', { email: currentUser?.email })}
               </Card.Description>
               {details?.client.description ? (
@@ -74,10 +74,10 @@ export const DeviceAuthorize = () => {
           </div>
 
           <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            <Badge variant="secondary">
+            <Badge variant="secondary" className="rounded-full">
               {details?.client.id || 'oauth-client'}
             </Badge>
-            {userCode ? <Badge variant="ghost">{userCode}</Badge> : null}
+            {userCode ? <Badge variant="ghost" className="rounded-full">{userCode}</Badge> : null}
           </div>
         </Card.Header>
 
@@ -92,15 +92,19 @@ export const DeviceAuthorize = () => {
             onToggle={toggleScopes}
           />
 
-          <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
+          <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
             <Button
               variant="outline"
+              size="lg"
+              className="rounded-full"
               disabled={loading || loadingDetails || !details}
               onClick={deny}
             >
               {t('cancel')}
             </Button>
             <Button
+              size="lg"
+              className="rounded-full"
               disabled={
                 loading ||
                 loadingDetails ||

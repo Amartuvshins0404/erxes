@@ -213,7 +213,7 @@ export const AgentSettingsConnectionPage = () => {
           </p>
         ) : (
           <div className="mx-auto max-w-2xl space-y-4 p-6">
-            <div className="rounded-xl border p-6">
+            <div className="rounded-2xl bg-card p-6 shadow-card">
               <div className="mb-4">
                 <Label className="font-sans text-sm font-medium normal-case">
                   Configured providers
@@ -226,7 +226,7 @@ export const AgentSettingsConnectionPage = () => {
               </div>
 
               {connections.length === 0 ? (
-                <div className="flex flex-col items-center gap-1.5 rounded-lg border border-dashed p-6 text-center">
+                <div className="flex flex-col items-center gap-1.5 rounded-xl bg-muted/50 p-6 text-center">
                   <IconSparkles
                     className="size-5 text-muted-foreground"
                     aria-hidden="true"
@@ -243,7 +243,7 @@ export const AgentSettingsConnectionPage = () => {
                     return (
                       <li
                         key={connection.provider}
-                        className="flex items-center gap-3 rounded-lg border px-3 py-2.5"
+                        className="flex items-center gap-3 rounded-xl bg-muted/50 px-3 py-2.5"
                       >
                         <ProviderIcon
                           provider={connection.provider}
@@ -290,7 +290,7 @@ export const AgentSettingsConnectionPage = () => {
                         {connection.hasKey ? (
                           <span className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
                             <span
-                              className="size-1.5 shrink-0 rounded-full bg-emerald-500"
+                              className="size-1.5 shrink-0 rounded-full bg-success"
                               aria-hidden="true"
                             />
                             {connection.updatedAt
@@ -333,7 +333,7 @@ export const AgentSettingsConnectionPage = () => {
               )}
             </div>
 
-            <div className="rounded-xl border p-6">
+            <div className="rounded-2xl bg-card p-6 shadow-card">
               <div className="space-y-4">
                 <div className="space-y-1.5">
                   <Label className="font-sans text-sm font-medium normal-case">

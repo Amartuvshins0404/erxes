@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 
-import { Button } from 'erxes-ui';
+import { IconArrowLeft } from '@tabler/icons-react';
+import { Button, Empty } from 'erxes-ui';
 import { useAtomValue } from 'jotai';
 import { loadingPluginsConfigState } from 'ui-modules';
 import { LoadingScreen } from '@/auth/components/LoadingScreen';
@@ -16,12 +17,26 @@ export const NotFoundPage = () => {
   }
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
-      <h1 className="text-6xl font-bold text-gray-800 mb-4">404</h1>
-      <p className="text-xl text-gray-600 mb-8">{t('message')}</p>
-      <Button variant="link" onClick={() => navigate('/')}>
-        {t('go-back')}
-      </Button>
+    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+      <Empty className="w-full max-w-md flex-none rounded-3xl bg-card shadow-lg">
+        <Empty.Header>
+          <Empty.Media className="text-6xl font-semibold tracking-tight text-primary">
+            404
+          </Empty.Media>
+          <Empty.Title>{t('message')}</Empty.Title>
+        </Empty.Header>
+        <Empty.Content>
+          <Button
+            variant="outline"
+            size="lg"
+            className="rounded-full"
+            onClick={() => navigate('/')}
+          >
+            <IconArrowLeft />
+            {t('go-back')}
+          </Button>
+        </Empty.Content>
+      </Empty>
     </div>
   );
 };

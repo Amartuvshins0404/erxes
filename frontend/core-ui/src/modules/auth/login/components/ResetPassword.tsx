@@ -21,18 +21,19 @@ export const ResetPassword = ({ token }: { token: string }) => {
 
   return (
     <Form {...form}>
-      <form
-        onSubmit={form.handleSubmit(submitHandler)}
-        className="mx-auto grid w-[350px] gap-5"
-      >
+      <form onSubmit={form.handleSubmit(submitHandler)} className="grid gap-5">
         <Form.Field
           name="password"
           render={({ field }) => (
             <Form.Item>
+              <Form.Label className="text-sm font-medium normal-case text-foreground">
+                {t('password')}
+              </Form.Label>
               <Form.Control>
                 <Input
                   type="password"
                   placeholder={t('enter-password')}
+                  className="h-8"
                   {...field}
                 />
               </Form.Control>
@@ -44,10 +45,14 @@ export const ResetPassword = ({ token }: { token: string }) => {
           name="confirmPassword"
           render={({ field }) => (
             <Form.Item>
+              <Form.Label className="text-sm font-medium normal-case text-foreground">
+                {t('confirm-password')}
+              </Form.Label>
               <Form.Control>
                 <Input
                   type="password"
                   placeholder={t('confirm-password')}
+                  className="h-8"
                   {...field}
                 />
               </Form.Control>
@@ -55,8 +60,7 @@ export const ResetPassword = ({ token }: { token: string }) => {
             </Form.Item>
           )}
         />
-
-        <Button type="submit" onClick={form.handleSubmit(submitHandler)}>
+        <Button type="submit" size="lg" className="w-full rounded-full">
           {t('change-password')}
         </Button>
       </form>

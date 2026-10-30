@@ -1,6 +1,6 @@
 import { IconCheck } from '@tabler/icons-react';
 import type { OnboardingStepDef } from './onboardingSteps';
-import { cn } from 'erxes-ui';
+import { Button, cn } from 'erxes-ui';
 import { motion } from 'framer-motion';
 
 export const OnboardingStepItem = ({
@@ -18,71 +18,50 @@ export const OnboardingStepItem = ({
 
   return (
     <motion.div
-      className="flex w-full flex-row gap-4"
-      initial={{ opacity: 0.5, y: 100 }}
+      initial={{ opacity: 0, y: 24 }}
       whileInView={{ opacity: 1, y: 0 }}
-      transition={{
-        delay: 0.1,
-        duration: 0.5,
-        ease: 'easeInOut',
-      }}
+      transition={{ delay: 0.1, duration: 0.4, ease: 'easeOut' }}
     >
-      <motion.div
-        initial={{ scale: 0, opacity: 0 }}
-        animate={{ scale: isChecked ? 1 : 0, opacity: isChecked ? 1 : 0 }}
-        exit={{ scale: 0, opacity: 0 }}
-        transition={{
-          type: 'spring',
-          stiffness: 300,
-          damping: 20,
-        }}
-        className={`flex items-center justify-center ${
-          !isChecked ? 'opacity-0' : ''
-        }`}
+      <Button
+        variant="ghost"
+        disabled={!isChecked}
+        onClick={() => onSelect(step.step)}
+        aria-current={isSelected ? 'step' : undefined}
+        className={cn(
+          'h-auto w-full justify-start gap-4 whitespace-normal rounded-2xl p-3 text-left font-normal',
+          isSelected && 'bg-accent disabled:opacity-100',
+          !isSelected && !isChecked && 'disabled:opacity-60',
+        )}
       >
-        <div className={`rounded-lg bg-green-400 p-2 text-white`}>
-          <IconCheck className="h-6 w-6" />
-        </div>
-      </motion.div>
-      <motion.div
-        className={cn(`flex flex-1 flex-row gap-4 rounded-xl p-2 pr-12`, {
-          'cursor-pointer': isChecked,
-        })}
-        onClick={() => (isChecked ? onSelect(step.step) : '')}
-        animate={{
-          scale: isSelected ? 1 : 0.9,
-          backgroundColor: isSelected
-            ? 'rgba(107, 114, 128, 0.2)'
-            : 'transparent',
-        }}
-        transition={{
-          type: 'spring',
-          stiffness: 300,
-          damping: 20,
-        }}
-      >
-        <div className="flex h-[48px] w-[48px] items-center justify-center rounded-lg bg-gray-400/30 p-2 text-white">
-          {Icon && <Icon className="h-6 w-6" />}
-        </div>
-        <div className="flex flex-col gap-0.5">
-          <p
+        <span
+          className={cn(
+            'flex size-11 shrink-0 items-center justify-center rounded-xl shadow-card transition-colors',
+            isChecked
+              ? 'bg-success text-success-foreground'
+              : 'bg-card text-muted-foreground',
+            isSelected && 'text-primary',
+          )}
+        >
+          {isChecked ? (
+            <IconCheck className="size-5" />
+          ) : (
+            Icon && <Icon className="size-5" />
+          )}
+        </span>
+        <span className="flex flex-col gap-0.5">
+          <span
             className={cn(
-              'text-base font-semibold transition-colors',
-              isSelected ? 'text-white' : 'text-white/90',
+              'text-sm font-semibold transition-colors',
+              isSelected ? 'text-foreground' : 'text-muted-foreground',
             )}
           >
             {step.title}
-          </p>
-          <span
-            className={cn(
-              'text-xs leading-relaxed font-normal transition-colors',
-              isSelected ? 'text-white/70' : 'text-white/50',
-            )}
-          >
+          </span>
+          <span className="text-xs text-muted-foreground">
             {step.subtitle}
           </span>
-        </div>
-      </motion.div>
+        </span>
+      </Button>
     </motion.div>
   );
 };

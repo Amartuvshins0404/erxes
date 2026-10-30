@@ -1,10 +1,9 @@
-const WHITE = '#FFFFFF';
-const OUTLINE = '#C9C2EC';
-const SHADE = '#F1EEFC';
-const GLOW = '#A78BFA';
-const VISOR = '#2A1F5C';
+const WHITE = 'var(--chart-50)';
+const OUTLINE = 'var(--chart-200)';
+const SHADE = 'var(--chart-100)';
+const GLOW = 'var(--chart-400)';
+const VISOR = 'var(--chart-900)';
 
-// The erxes bot seen from the side; poses toggle through the parent's data-pose.
 export const BotRunnerSprite = () => (
   <svg
     viewBox="0 -4 48 60"

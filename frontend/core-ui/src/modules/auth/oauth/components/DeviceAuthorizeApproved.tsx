@@ -1,6 +1,6 @@
 import { IconShieldCheck } from '@tabler/icons-react';
 
-import { Card } from 'erxes-ui';
+import { Empty } from 'erxes-ui';
 import { useTranslation } from 'react-i18next';
 
 type Props = {
@@ -10,22 +10,25 @@ type Props = {
 export const DeviceAuthorizeApproved = ({ clientName }: Props) => {
   const { t } = useTranslation('common', { keyPrefix: 'auth' });
   return (
-    <div className="flex min-h-screen items-center justify-center bg-muted/20 px-4 py-10">
-      <Card className="w-full max-w-xl rounded-lg border">
-        <Card.Content className="space-y-4 px-8 py-10 text-center">
-          <div className="mx-auto flex size-14 items-center justify-center rounded-full bg-primary/10 text-primary">
-            <IconShieldCheck className="size-7" />
-          </div>
-          <div className="space-y-2">
-            <h1 className="text-2xl font-semibold">{t('access-granted')}</h1>
-            <p className="text-sm text-muted-foreground">
-              {t('access-granted-description', {
-                name: clientName || t('this-application'),
-              })}
-            </p>
-          </div>
-        </Card.Content>
-      </Card>
+    <div className="flex min-h-screen items-center justify-center bg-background px-4 py-10">
+      <Empty className="w-full max-w-md flex-none rounded-3xl bg-card shadow-lg">
+        <Empty.Header>
+          <Empty.Media
+            variant="icon"
+            className="size-12 rounded-full bg-success/10 text-success shadow-none"
+          >
+            <IconShieldCheck />
+          </Empty.Media>
+          <Empty.Title className="text-xl font-semibold">
+            {t('access-granted')}
+          </Empty.Title>
+          <Empty.Description>
+            {t('access-granted-description', {
+              name: clientName || t('this-application'),
+            })}
+          </Empty.Description>
+        </Empty.Header>
+      </Empty>
     </div>
   );
 };

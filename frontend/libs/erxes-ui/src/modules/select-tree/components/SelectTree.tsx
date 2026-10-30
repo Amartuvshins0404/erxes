@@ -82,6 +82,10 @@ export const SelectTreeArrow = React.forwardRef<
       variant="ghost"
       size="icon"
       {...props}
+      className={cn(
+        'size-6 shrink-0 rounded-full text-muted-foreground hover:text-foreground',
+        props.className,
+      )}
       tabIndex={-1}
       onClick={() => toggleHideChildren(order)}
       asChild
@@ -140,7 +144,7 @@ const SelectTreeItem = React.forwardRef<
   }
 
   return (
-    <div className="flex items-center gap-1 w-full">
+    <div className="flex w-full items-center gap-1">
       <SelectTreeIndentation order={fixedOrder ?? ''} />
       <SelectTreeArrow order={fixedOrder ?? ''} hasChildren={hasChildren} />
       <SelectTreeCommandItem
@@ -159,22 +163,27 @@ const SelectTreeItem = React.forwardRef<
 export const SelectTreeCommandItem = React.forwardRef<
   React.ElementRef<typeof Command.Item>,
   React.ComponentPropsWithoutRef<typeof Command.Item> & ISelectTreeItem
->(({ _id, name, order, hasChildren, selected, children, ...props }, ref) => {
-  return (
-    <Command.Item
-      className={cn(
-        'py-0 items-center flex-1 overflow-hidden justify-start',
-        props.className,
-        selected && 'text-primary',
-      )}
-      {...props}
-      ref={ref}
-    >
-      {children}
-      <Combobox.Check checked={selected} />
-    </Command.Item>
-  );
-});
+>(
+  (
+    { _id, name, order, hasChildren, selected, children, className, ...props },
+    ref,
+  ) => {
+    return (
+      <Command.Item
+        {...props}
+        className={cn(
+          'flex-1 items-center justify-start overflow-hidden rounded-lg py-0',
+          selected && 'font-medium text-foreground',
+          className,
+        )}
+        ref={ref}
+      >
+        {children}
+        <Combobox.Check checked={selected} />
+      </Command.Item>
+    );
+  },
+);
 
 export const SelectTree = Object.assign(SelectTreeRoot, {
   Item: SelectTreeItem,

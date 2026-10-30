@@ -1,6 +1,12 @@
 import { IconCheck, IconPaint } from '@tabler/icons-react';
 import type { Editor } from '@tiptap/core';
-import { Button, Popover, ToggleGroup, Tooltip } from 'erxes-ui/components';
+import {
+  Button,
+  Popover,
+  ToggleGroup,
+  Tooltip,
+  Input,
+} from 'erxes-ui/components';
 import { useState } from 'react';
 import type { TEmailTableBackgroundScope } from '../extensions/table';
 
@@ -54,7 +60,7 @@ export const EmailTableBackground = ({ editor }: { editor: Editor }) => {
               type="button"
               variant="ghost"
               size="icon"
-              className="size-7"
+              className="size-7 rounded-full"
               aria-label="Background color"
               // Keeps the cell selection, which every table command reads.
               onMouseDown={(event) => event.preventDefault()}
@@ -67,7 +73,7 @@ export const EmailTableBackground = ({ editor }: { editor: Editor }) => {
       </Tooltip>
 
       <Popover.Content
-        className="w-60 space-y-2 p-2"
+        className="w-64 space-y-3 rounded-2xl p-3"
         align="center"
         side="top"
         onMouseDown={(event) => event.preventDefault()}
@@ -78,37 +84,41 @@ export const EmailTableBackground = ({ editor }: { editor: Editor }) => {
           onValueChange={(next) =>
             next && setScope(next as TEmailTableBackgroundScope)
           }
-          className="grid grid-cols-4 gap-1"
+          className="grid grid-cols-4 gap-0.5 rounded-full bg-muted p-0.5"
         >
           {SCOPES.map(({ value: option, label }) => (
             <ToggleGroup.Item key={option} value={option} asChild>
-              <Button variant="secondary" size="sm" className="h-7 border">
-                <span className="text-xs font-normal">{label}</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 rounded-full text-muted-foreground data-[state=on]:bg-card data-[state=on]:text-foreground data-[state=on]:shadow-xs"
+              >
+                <span className="text-xs">{label}</span>
               </Button>
             </ToggleGroup.Item>
           ))}
         </ToggleGroup>
 
-        <div className="grid grid-cols-5 gap-1">
+        <div className="grid grid-cols-5 gap-1.5">
           {BACKGROUNDS.map((color) => (
-            <button
+            <Button
               key={color}
-              type="button"
+              variant="ghost"
               aria-label={color}
-              className="flex aspect-3/2 items-center justify-center rounded border transition-transform hover:scale-105"
+              className="aspect-3/2 h-auto rounded-lg p-0 text-primary shadow-2xs transition-transform hover:scale-105"
               style={{ backgroundColor: color }}
               onClick={() => apply(color)}
             >
-              {value === color && <IconCheck className="size-4" />}
-            </button>
+              {value === color && <IconCheck />}
+            </Button>
           ))}
         </div>
 
         <div className="relative">
-          <input
+          <Input
             type="color"
             aria-label="Custom background color"
-            className="h-7 w-full cursor-pointer rounded border bg-background"
+            className="h-8 cursor-pointer rounded-full p-1"
             value={value || '#ffffff'}
             onChange={(event) =>
               editor.commands.setTableBackground({
@@ -122,8 +132,7 @@ export const EmailTableBackground = ({ editor }: { editor: Editor }) => {
         <Button
           type="button"
           variant="secondary"
-          size="sm"
-          className="w-full"
+          className="w-full rounded-full"
           onClick={() => apply(null)}
         >
           No color

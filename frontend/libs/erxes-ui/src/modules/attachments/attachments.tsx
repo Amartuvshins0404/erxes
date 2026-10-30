@@ -22,10 +22,6 @@ import {
 import { RecordTableInlineCell } from 'erxes-ui/modules/record-table';
 import type { IAttachment } from './types';
 
-// ---------------------------------------------------------------------------
-// Shared constants
-// ---------------------------------------------------------------------------
-
 const SCROLL_STEP = 150;
 
 const DEFAULT_FILE_TYPES = new Set([
@@ -44,10 +40,6 @@ function stripTypename<T extends object>(obj: T): T {
   return rest as T;
 }
 
-// ---------------------------------------------------------------------------
-// Shared scroll track — used by both Files and Preview
-// ---------------------------------------------------------------------------
-
 type ScrollTrackProps = {
   children: React.ReactNode;
   label: string;
@@ -65,13 +57,15 @@ const ScrollTrack = ({ children, label }: ScrollTrackProps) => {
   return (
     <div className="relative">
       <div className="absolute top-1/2 -left-4 -translate-y-1/2 hidden lg:block z-10">
-        <button
-          className="bg-background p-1 rounded-full shadow"
+        <Button
+          variant="outline"
+          size="icon"
+          className="rounded-full shadow-md"
           onClick={() => scroll('left')}
           aria-label={`Scroll ${label} left`}
         >
-          <IconChevronLeft size={20} />
-        </button>
+          <IconChevronLeft />
+        </Button>
       </div>
 
       <div
@@ -84,21 +78,19 @@ const ScrollTrack = ({ children, label }: ScrollTrackProps) => {
       </div>
 
       <div className="absolute top-1/2 -right-4 -translate-y-1/2 hidden lg:block z-10">
-        <button
-          className="bg-background p-1 rounded-full shadow"
+        <Button
+          variant="outline"
+          size="icon"
+          className="rounded-full shadow-md"
           onClick={() => scroll('right')}
           aria-label={`Scroll ${label} right`}
         >
-          <IconChevronRight size={20} />
-        </button>
+          <IconChevronRight />
+        </Button>
       </div>
     </div>
   );
 };
-
-// ---------------------------------------------------------------------------
-// Attachments.Files
-// ---------------------------------------------------------------------------
 
 export type AttachmentFilesProps = {
   /** Override the accepted MIME type set. */
@@ -121,7 +113,7 @@ const AttachmentFiles = ({
 
   return (
     <div className="py-4 px-8">
-      <h4 className="uppercase text-sm text-muted-foreground pb-4">
+      <h4 className="pb-3 text-xs font-medium text-muted-foreground">
         {heading}
       </h4>
       <ScrollTrack label="File attachments">
@@ -132,13 +124,13 @@ const AttachmentFiles = ({
             <div
               key={attachment.url}
               role="listitem"
-              className="relative group p-2 bg-background text-primary rounded-md flex items-center gap-2 shrink-0"
+              className="group relative flex h-8 shrink-0 items-center gap-2 rounded-full bg-muted pl-3 pr-4 text-foreground"
             >
               <a
                 href={url}
                 target="_blank"
                 rel="noreferrer"
-                className="text-sm truncate max-w-40"
+                className="max-w-40 truncate text-sm hover:underline"
                 title={attachment.name}
               >
                 {attachment.name}
@@ -147,10 +139,10 @@ const AttachmentFiles = ({
                 variant="ghost"
                 disabled={isLoading && isRemoving}
                 onClick={(e) => handleRemoveAttachment(e, attachment)}
-                className="absolute hidden group-hover:flex items-center justify-center top-1 right-1 bg-destructive/40 hover:bg-destructive/80 text-background rounded-full p-1 w-5 h-5 shadow-md z-10"
+                className="absolute top-1.5 right-1.5 z-10 hidden size-6 items-center justify-center rounded-full bg-background/80 p-0 text-foreground shadow-sm backdrop-blur-sm hover:bg-destructive hover:text-destructive-foreground group-hover:flex"
                 aria-label={`Remove ${attachment.name}`}
               >
-                <IconX size={10} aria-hidden />
+                <IconX size={12} aria-hidden />
               </Button>
             </div>
           );
@@ -159,10 +151,6 @@ const AttachmentFiles = ({
     </div>
   );
 };
-
-// ---------------------------------------------------------------------------
-// Attachments.Preview  (image lightbox)
-// ---------------------------------------------------------------------------
 
 export type AttachmentPreviewProps = {
   heading?: string;
@@ -188,7 +176,6 @@ const AttachmentPreview = ({
   const current =
     mediaAttachments[Math.min(currentIndex, mediaAttachments.length - 1)];
 
-  // Clamp index when list shrinks
   useEffect(() => {
     if (
       currentIndex >= mediaAttachments.length &&
@@ -198,7 +185,6 @@ const AttachmentPreview = ({
     }
   }, [mediaAttachments.length, currentIndex]);
 
-  // Keyboard nav — only when dialog is open
   useEffect(() => {
     if (!open || mediaAttachments.length === 0) return;
     const onKey = (e: KeyboardEvent) => {
@@ -224,7 +210,7 @@ const AttachmentPreview = ({
   return (
     <div className={cn('py-4 px-8', className)}>
       {heading && (
-        <h4 className="uppercase text-sm text-muted-foreground pb-4">
+        <h4 className="pb-3 text-xs font-medium text-muted-foreground">
           {heading}
         </h4>
       )}
@@ -239,22 +225,22 @@ const AttachmentPreview = ({
               <div
                 key={attachment.url}
                 role="listitem"
-                className="group relative w-36 h-36 rounded-lg border border-border shadow-md shrink-0 cursor-zoom-in"
+                className="group relative size-36 shrink-0 cursor-zoom-in overflow-hidden rounded-2xl bg-muted shadow-card"
                 onClick={() => openPreview(index)}
               >
                 <img
-                  className="w-full h-full object-cover rounded-lg"
+                  className="size-full object-cover"
                   src={readImage(attachment.url)}
                   alt={attachment.name}
                   loading="lazy"
                 />
-                <div className="absolute inset-0 flex items-center justify-center bg-background/30 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg">
+                <div className="absolute inset-0 flex items-center justify-center bg-background/30 opacity-0 transition-opacity group-hover:opacity-100">
                   {isLoading && isRemoving ? (
                     <Spinner />
                   ) : (
                     <IconZoomIn
                       size={28}
-                      className="text-primary-foreground"
+                      className="text-foreground"
                       aria-hidden
                     />
                   )}
@@ -266,10 +252,10 @@ const AttachmentPreview = ({
                     e.stopPropagation();
                     handleRemoveAttachment(e, attachment);
                   }}
-                  className="absolute hidden group-hover:flex items-center justify-center top-1 right-1 bg-destructive/40 hover:bg-destructive/80 text-background rounded-full p-1 w-5 h-5 shadow-md z-10"
+                  className="absolute top-1.5 right-1.5 z-10 hidden size-6 items-center justify-center rounded-full bg-background/80 p-0 text-foreground shadow-sm backdrop-blur-sm hover:bg-destructive hover:text-destructive-foreground group-hover:flex"
                   aria-label={`Remove ${attachment.name}`}
                 >
-                  <IconX size={10} aria-hidden />
+                  <IconX size={12} aria-hidden />
                 </Button>
               </div>
             );
@@ -277,7 +263,6 @@ const AttachmentPreview = ({
         </ScrollTrack>
       )}
 
-      {/* Lightbox */}
       <Dialog open={open} onOpenChange={setOpen}>
         <Dialog.Content
           className="relative bg-transparent max-w-fit shadow-none border-0"
@@ -326,7 +311,7 @@ const AttachmentPreview = ({
               key={current.url}
               src={readImage(current.url)}
               alt={current.name}
-              className="max-w-[90vw] max-h-[90vh] object-contain rounded shadow-2xl select-none"
+              className="max-w-[90vw] max-h-[90vh] select-none rounded-2xl object-contain shadow-xl"
               draggable={false}
             />
           )}
@@ -371,7 +356,6 @@ const AttachmentVideo = ({
 
   const current = videoAttachments[currentIndex];
 
-  // Clamp index when list shrinks
   useEffect(() => {
     if (
       currentIndex >= videoAttachments.length &&
@@ -403,7 +387,7 @@ const AttachmentVideo = ({
 
   return (
     <div className="py-4 px-8">
-      <h4 className="uppercase text-sm text-muted-foreground pb-4">
+      <h4 className="pb-3 text-xs font-medium text-muted-foreground">
         {heading}
       </h4>
 
@@ -415,7 +399,7 @@ const AttachmentVideo = ({
             <div
               key={attachment.url}
               role="listitem"
-              className="group relative w-36 h-36 rounded-lg border border-border shadow-md shrink-0 cursor-pointer bg-black overflow-hidden"
+              className="group relative size-36 shrink-0 cursor-pointer overflow-hidden rounded-2xl bg-muted shadow-card"
               onClick={() => {
                 setCurrentIndex(index);
                 setOpen(true);
@@ -423,26 +407,26 @@ const AttachmentVideo = ({
             >
               {base ? (
                 <img
-                  className="w-full h-full object-cover rounded-lg"
+                  className="size-full object-cover"
                   src={`${base}/thumbnails/thumbnail.jpg`}
                   alt={attachment.name}
                   loading="lazy"
                 />
               ) : (
                 <video
-                  className="w-full h-full object-cover rounded-lg"
+                  className="size-full object-cover"
                   src={readImage(attachment.url)}
                   preload="metadata"
                   muted
                 />
               )}
-              <div className="absolute inset-0 flex items-center justify-center bg-background/30 group-hover:bg-background/40 transition-colors rounded-lg">
+              <div className="absolute inset-0 flex items-center justify-center bg-background/30 transition-colors group-hover:bg-background/40">
                 {isLoading && isRemoving ? (
                   <Spinner />
                 ) : (
                   <IconPlayerPlayFilled
                     size={28}
-                    className="text-primary-foreground"
+                    className="text-foreground"
                     aria-hidden
                   />
                 )}
@@ -454,10 +438,10 @@ const AttachmentVideo = ({
                   e.stopPropagation();
                   handleRemoveAttachment(e, attachment);
                 }}
-                className="absolute hidden group-hover:flex items-center justify-center top-1 right-1 bg-destructive/40 hover:bg-destructive/80 text-background rounded-full p-1 w-5 h-5 shadow-md z-10"
+                className="absolute top-1.5 right-1.5 z-10 hidden size-6 items-center justify-center rounded-full bg-background/80 p-0 text-foreground shadow-sm backdrop-blur-sm hover:bg-destructive hover:text-destructive-foreground group-hover:flex"
                 aria-label={`Remove ${attachment.name}`}
               >
-                <IconX size={10} aria-hidden />
+                <IconX size={12} aria-hidden />
               </Button>
             </div>
           );
@@ -490,7 +474,7 @@ const AttachmentVideo = ({
             (currentBase ? (
               <iframe
                 key={current.url}
-                className="w-[80vw] max-w-3xl aspect-video rounded shadow-2xl"
+                className="w-[80vw] max-w-3xl aspect-video rounded-2xl shadow-xl"
                 src={`${currentBase}/iframe`}
                 title={current.name}
                 allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
@@ -499,7 +483,7 @@ const AttachmentVideo = ({
             ) : (
               <video
                 key={current.url}
-                className="max-w-[90vw] max-h-[90vh] rounded shadow-2xl"
+                className="max-w-[90vw] max-h-[90vh] rounded-2xl shadow-xl"
                 src={readImage(current.url)}
                 controls
                 autoPlay
@@ -545,7 +529,7 @@ const AttachmentAudio = ({
 
   return (
     <div className="py-4 px-8">
-      <h4 className="uppercase text-sm text-muted-foreground pb-4">
+      <h4 className="pb-3 text-xs font-medium text-muted-foreground">
         {heading}
       </h4>
 
@@ -556,7 +540,7 @@ const AttachmentAudio = ({
             <div
               key={attachment.url}
               role="listitem"
-              className="group relative w-72 max-w-full rounded-lg border border-border shadow-sm bg-background p-2"
+              className="group relative w-72 max-w-full rounded-2xl bg-card p-3 shadow-card"
             >
               <div className="flex items-center gap-1.5 pb-1.5 pr-5">
                 <IconMusic
@@ -583,10 +567,10 @@ const AttachmentAudio = ({
                 variant="ghost"
                 disabled={isLoading && isRemoving}
                 onClick={(e) => handleRemoveAttachment(e, attachment)}
-                className="absolute hidden group-hover:flex items-center justify-center top-1 right-1 bg-destructive/40 hover:bg-destructive/80 text-background rounded-full p-1 w-5 h-5 shadow-md z-10"
+                className="absolute top-1.5 right-1.5 z-10 hidden size-6 items-center justify-center rounded-full bg-background/80 p-0 text-foreground shadow-sm backdrop-blur-sm hover:bg-destructive hover:text-destructive-foreground group-hover:flex"
                 aria-label={`Remove ${attachment.name}`}
               >
-                <IconX size={10} aria-hidden />
+                <IconX size={12} aria-hidden />
               </Button>
             </div>
           );
@@ -620,7 +604,6 @@ const AttachmentUploader = ({
     attachmentsRef.current = attachments;
   }, [attachments]);
 
-  // Batch-complete — fires once all files in a batch finish
   useEffect(() => {
     if (
       uploadProgress.total > 0 &&
@@ -665,7 +648,7 @@ const AttachmentUploader = ({
         size="sm"
         variant="ghost"
         type="button"
-        className="flex items-center gap-1 cursor-pointer text-sm"
+        className="cursor-pointer rounded-full text-sm text-muted-foreground hover:text-foreground"
       >
         {isUploading ? (
           <>
@@ -682,10 +665,6 @@ const AttachmentUploader = ({
     </Upload.Root>
   );
 };
-
-// ---------------------------------------------------------------------------
-// Attachments.Inline  (read-only summary pills for table cells)
-// ---------------------------------------------------------------------------
 
 export type AttachmentsInlineProps = {
   attachments: IAttachment[];
@@ -709,13 +688,13 @@ const AttachmentsInline = ({
       ) : (
         <div className="flex items-center gap-1.5">
           {images.length > 0 && (
-            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-muted text-muted-foreground text-xs font-medium">
+            <span className="inline-flex h-5 items-center gap-1 rounded-full bg-muted px-2 text-xs font-medium text-muted-foreground">
               <IconPhoto size={13} aria-hidden />
               {images.length}
             </span>
           )}
           {files.length > 0 && (
-            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-muted text-muted-foreground text-xs font-medium">
+            <span className="inline-flex h-5 items-center gap-1 rounded-full bg-muted px-2 text-xs font-medium text-muted-foreground">
               <IconFile size={13} aria-hidden />
               {files.length}
             </span>
@@ -725,10 +704,6 @@ const AttachmentsInline = ({
     </RecordTableInlineCell>
   );
 };
-
-// ---------------------------------------------------------------------------
-// Attachments namespace export
-// ---------------------------------------------------------------------------
 
 export const Attachments = {
   Root: AttachmentRoot,

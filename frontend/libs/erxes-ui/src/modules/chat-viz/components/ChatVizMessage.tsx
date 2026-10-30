@@ -85,13 +85,13 @@ function SanitizedChatVizMessage({
   return (
     <figure
       className={cn(
-        'rounded-xl border bg-card p-4 shadow-sm space-y-3 max-w-lg w-full',
+        'w-full max-w-lg space-y-4 rounded-2xl bg-card p-5 shadow-card',
         className,
       )}
       aria-label={payload.title}
     >
       <figcaption className="space-y-0.5">
-        <h4 className="font-semibold text-sm leading-tight">{payload.title}</h4>
+        <h4 className="text-sm font-medium leading-tight">{payload.title}</h4>
         {payload.description && (
           <p className="text-muted-foreground text-xs">{payload.description}</p>
         )}
@@ -130,7 +130,7 @@ function ChartVizControls({
 }>) {
   return (
     <div
-      className="space-y-3 rounded-lg border bg-muted/30 p-3"
+      className="space-y-3 rounded-xl bg-muted/50 p-3"
       aria-label="What-if controls"
     >
       {controls.map((control) => {
@@ -148,7 +148,7 @@ function ChartVizControls({
                 )}
               </div>
               <output
-                className="shrink-0 rounded-md border bg-background px-2 py-0.5 font-mono font-medium tabular-nums"
+                className="shrink-0 rounded-full bg-card px-2.5 py-0.5 font-medium tabular-nums shadow-2xs"
                 aria-live="polite"
               >
                 {control.valuePrefix}
@@ -166,7 +166,7 @@ function ChartVizControls({
                 if (nextValue !== undefined) onChange(control.key, nextValue);
               }}
             />
-            <div className="flex justify-between font-mono text-[10px] text-muted-foreground">
+            <div className="flex justify-between text-xs tabular-nums text-muted-foreground">
               <span>
                 {control.valuePrefix}
                 {VALUE_FORMATTER.format(control.min)}

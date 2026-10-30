@@ -67,7 +67,7 @@ const GalleryItem: FC<{
   const src = downloadUrl ?? image.url;
 
   return (
-    <div className="relative group aspect-square overflow-hidden rounded-md bg-muted">
+    <div className="group relative aspect-square overflow-hidden rounded-xl bg-muted">
       {isResolving ? (
         <div className="flex h-full w-full items-center justify-center">
           <Spinner size="sm" />
@@ -82,12 +82,7 @@ const GalleryItem: FC<{
           <img
             src={src}
             alt={image.caption ?? ''}
-            style={{
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-              display: 'block',
-            }}
+            className="block size-full object-cover"
             draggable={false}
           />
         </Button>
@@ -97,7 +92,7 @@ const GalleryItem: FC<{
         <Button
           variant="ghost"
           aria-label="Remove image"
-          className="absolute top-1 right-1 h-5 w-5 p-0 rounded-full bg-black/50 text-white opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity [&>svg]:size-3"
+          className="absolute top-1.5 right-1.5 size-6 rounded-full bg-background/80 p-0 text-foreground opacity-0 shadow-sm backdrop-blur-sm transition-opacity hover:bg-background group-hover:opacity-100 focus-visible:opacity-100 [&>svg]:size-3.5"
           onMouseDown={(e) => e.preventDefault()}
           onClick={onRemove}
         >
@@ -105,7 +100,7 @@ const GalleryItem: FC<{
         </Button>
       )}
       {image.caption && (
-        <div className="absolute bottom-0 inset-x-0 bg-black/50 text-white text-xs px-1.5 py-0.5 truncate">
+        <div className="absolute inset-x-1.5 bottom-1.5 truncate rounded-full bg-background/80 px-2 py-0.5 text-xs text-foreground backdrop-blur-sm">
           {image.caption}
         </div>
       )}
@@ -251,7 +246,7 @@ const GalleryBlockContent: FC<GalleryRenderProps> = ({ block, editor }) => {
             <Button
               variant="ghost"
               disabled={uploading}
-              className="flex-1 h-auto gap-1.5 py-2 text-muted-foreground border border-dashed rounded-md hover:bg-muted"
+              className="h-auto flex-1 gap-1.5 rounded-xl border border-dashed py-2.5 text-muted-foreground hover:bg-accent"
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => inputRef.current?.click()}
             >
@@ -260,7 +255,7 @@ const GalleryBlockContent: FC<GalleryRenderProps> = ({ block, editor }) => {
             </Button>
           ) : (
             images.length === 0 && (
-              <div className="flex flex-1 items-center justify-center gap-1.5 text-sm text-muted-foreground border border-dashed rounded-md px-3 py-2">
+              <div className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-dashed px-3 py-2.5 text-sm text-muted-foreground">
                 <IconPhoto size={15} />
                 <span>No upload handler configured</span>
               </div>
@@ -268,8 +263,11 @@ const GalleryBlockContent: FC<GalleryRenderProps> = ({ block, editor }) => {
           )}
 
           {images.length > 0 && (
-            <div className="flex items-center gap-1 shrink-0">
-              <IconLayoutGrid size={14} className="text-muted-foreground" />
+            <div className="flex shrink-0 items-center gap-0.5 rounded-full bg-muted p-0.5">
+              <IconLayoutGrid
+                size={14}
+                className="mx-1.5 text-muted-foreground"
+              />
               {COLUMN_OPTIONS.map((n) => (
                 <Button
                   key={n}
@@ -277,10 +275,10 @@ const GalleryBlockContent: FC<GalleryRenderProps> = ({ block, editor }) => {
                   aria-label={`${n} columns`}
                   aria-pressed={columns === n}
                   className={cn(
-                    'h-6 w-6 p-0 text-xs',
+                    'size-6 rounded-full p-0 text-xs',
                     columns === n
-                      ? 'bg-primary text-primary-foreground hover:bg-primary'
-                      : 'text-muted-foreground hover:bg-muted',
+                      ? 'bg-card text-foreground shadow-xs hover:bg-card'
+                      : 'text-muted-foreground hover:bg-accent',
                   )}
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => setColumns(n)}

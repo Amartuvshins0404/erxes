@@ -2,6 +2,7 @@ import * as React from 'react';
 import { Line, LineChart } from 'recharts';
 
 import { ChartContainer, type ChartConfig } from 'erxes-ui/components/charts';
+import { ChatVizSkeleton } from './ChatVizSkeleton';
 import { useIsClient } from '../hooks/useIsClient';
 import type { ChartVizPayload } from '../types/chatVizTypes';
 import {
@@ -31,7 +32,7 @@ export function ChatVizLine({ payload, className, domain }: Readonly<Props>) {
     [payload.series],
   );
 
-  if (!isClient) return <ChartSkeleton />;
+  if (!isClient) return <ChatVizSkeleton />;
 
   return (
     <ChartContainer config={config} className={className}>
@@ -54,15 +55,5 @@ export function ChatVizLine({ payload, className, domain }: Readonly<Props>) {
         ))}
       </LineChart>
     </ChartContainer>
-  );
-}
-
-function ChartSkeleton() {
-  return (
-    <div
-      className="animate-pulse rounded-md bg-muted"
-      style={{ width: '100%', aspectRatio: '16/9' }}
-      aria-hidden
-    />
   );
 }

@@ -19,19 +19,17 @@ export const EmailDisplay = ({
   );
 
   return (
-    <div className="flex gap-2">
+    <div className="flex flex-wrap gap-1.5">
       {emailsWithProperties.map(
         (email) =>
           email.email && (
             <span key={email.email} className="inline-flex">
               {onEmailClick ? (
-                // Rendered inside table/detail triggers, which are buttons
-                // themselves, so the chip is a span acting as a button.
                 <Button
                   asChild
                   size="sm"
                   variant="secondary"
-                  className="h-6 w-fit rounded-sm border gap-1 cursor-pointer hover:bg-primary/10 hover:text-primary focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+                  className="h-6 w-fit cursor-pointer gap-1 rounded-full bg-muted px-2.5 font-normal hover:bg-primary/10 hover:text-primary focus-visible:outline-hidden focus-visible:shadow-focus"
                 >
                   <span
                     role="button"

@@ -13,6 +13,7 @@ import {
 import { IconPhoto } from '@tabler/icons-react';
 import { CSSProperties, FC, SyntheticEvent, useEffect, useState } from 'react';
 import { Button, Dialog, Spinner } from 'erxes-ui/components';
+import { cn } from 'erxes-ui/lib';
 
 const MAX_IMAGE_HEIGHT = 320;
 
@@ -122,8 +123,10 @@ const CustomImagePreview: FC<
           <Button
             variant="ghost"
             aria-label="Preview image"
-            className="bn-visual-media mx-auto h-auto max-w-full cursor-pointer border-0 bg-transparent p-0 hover:bg-transparent"
-            style={imgLoaded ? undefined : { display: 'none' }}
+            className={cn(
+              'bn-visual-media mx-auto h-auto max-w-full cursor-pointer overflow-hidden rounded-xl border-0 bg-transparent p-0 hover:bg-transparent',
+              !imgLoaded && 'hidden',
+            )}
             contentEditable={false}
             onMouseDown={(event) => event.preventDefault()}
             onClick={(event) => {
@@ -132,13 +135,10 @@ const CustomImagePreview: FC<
             }}
           >
             <img
-              className="block h-auto w-full max-w-full object-contain"
+              className="block h-auto max-h-80 w-full max-w-full object-contain"
               src={src}
               alt={block.props.caption || block.props.name || ''}
               draggable={false}
-              style={{
-                maxHeight: MAX_IMAGE_HEIGHT,
-              }}
               onLoad={handleImageLoad}
               onError={() => setImgLoaded(true)}
             />
@@ -155,7 +155,7 @@ const CustomImagePreview: FC<
               <img
                 src={src}
                 alt={block.props.caption || block.props.name || ''}
-                className="max-h-[85vh] max-w-[90vw] rounded object-contain shadow-2xl"
+                className="max-h-[85vh] max-w-[90vw] rounded-2xl object-contain shadow-xl"
               />
             </Dialog.Content>
           </Dialog>

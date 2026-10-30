@@ -104,7 +104,7 @@ const BoardCard = <T extends BoardItemProps = BoardItemProps>({
       >
         <div
           className={cn(
-            'gap-4 rounded-lg shadow-sm outline-hidden bg-background',
+            'gap-4 rounded-xl bg-card shadow-card outline-hidden transition-shadow hover:shadow-sm',
             isDragging && 'pointer-events-none cursor-grabbing opacity-30',
             className,
           )}
@@ -118,8 +118,8 @@ const BoardCard = <T extends BoardItemProps = BoardItemProps>({
             <DragOverlay>
               <div
                 className={cn(
-                  'cursor-grab gap-4 rounded-lg bg-background',
-                  isDragging && 'cursor-grabbing shadow-focus',
+                  'cursor-grab gap-4 rounded-xl bg-card shadow-lg',
+                  isDragging && 'cursor-grabbing',
                   className,
                 )}
               >
@@ -219,7 +219,7 @@ const BoardProvider = <
       >
         <div
           className={cn(
-            'flex flex-auto gap-4 overflow-x-auto p-5 pb-0 styled-scroll',
+            'flex flex-auto gap-3 overflow-x-auto p-4 pb-0 styled-scroll',
             className,
           )}
         >
@@ -233,7 +233,7 @@ const BoardProvider = <
 export const BoardHeader = ({ className, ...props }: BoardHeaderProps) => (
   <div
     className={cn(
-      'm-0 px-2 min-h-10 flex-none font-semibold text-sm flex items-center justify-between',
+      'm-0 px-3 min-h-11 flex-none font-medium text-sm flex items-center justify-between',
       className,
     )}
     {...props}
@@ -259,7 +259,6 @@ export const BoardRoot = ({
     },
   });
 
-  // Determine if this column is active
   const isActive = isOver || dragOverBoardColumnId === id;
 
   return (
@@ -267,7 +266,7 @@ export const BoardRoot = ({
       ref={setNodeRef}
       data-type="column"
       className={cn(
-        'flex min-h-[400px] min-w-80 flex-col overflow-hidden transition-all bg-gradient-to-b from-[#e0e7ff] to-[#e0e7ff50] rounded-t-md dark:from-primary/40 dark:to-primary/20 relative',
+        'relative flex min-h-[400px] min-w-80 flex-col overflow-hidden rounded-2xl bg-muted/50 transition-shadow',
         isActive && 'shadow-subtle',
         className,
       )}
@@ -281,10 +280,12 @@ export const BoardRoot = ({
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.1 }}
-              className="absolute inset-0 top-8 rounded-t-md bg-background/30 backdrop-blur-xs flex items-center justify-center"
+              className="absolute inset-0 top-11 flex items-center justify-center rounded-2xl bg-background/40 text-sm text-muted-foreground backdrop-blur-xs"
             >
               Board ordered by
-              <span className="font-medium capitalize ml-1">{sortBy}</span>
+              <span className="ml-1 font-medium capitalize text-foreground">
+                {sortBy}
+              </span>
             </motion.div>
           )}
         </AnimatePresence>

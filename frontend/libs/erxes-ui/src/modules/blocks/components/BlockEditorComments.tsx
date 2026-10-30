@@ -30,7 +30,7 @@ const CommentCard = forwardRef<
     ref={ref}
     data-selected={selected}
     className={cn(
-      'erxes-block-controls erxes-comment-card bg-background text-foreground w-80 max-w-[calc(100vw-2rem)] space-y-3 rounded-lg p-5 text-sm',
+      'erxes-block-controls erxes-comment-card w-80 max-w-[calc(100vw-2rem)] space-y-3 rounded-2xl bg-popover p-4 text-sm text-foreground shadow-lg',
       className,
     )}
   >
@@ -76,7 +76,11 @@ const CommentAction = forwardRef<HTMLButtonElement, CommentActionProps>(
         type="button"
         variant={isSave ? 'default' : 'ghost'}
         size={isIcon ? 'icon' : 'default'}
-        className={cn(actionClass, className)}
+        className={cn(
+          actionClass,
+          isIcon ? 'rounded-full' : 'rounded-full px-3',
+          className,
+        )}
         onMouseDown={(event) => {
           if (isSave) event.preventDefault();
           onMouseDown?.(event);
@@ -236,19 +240,19 @@ const CommentComposer = () => {
     <CommentCard className="bn-thread">
       <Textarea
         autoFocus
-        className="min-h-24 resize-y border border-input p-3 text-sm"
+        className="min-h-24 resize-y rounded-xl p-3 text-sm"
         placeholder={dictionary.placeholders.new_comment}
         aria-label={dictionary.placeholders.new_comment}
         value={value}
         disabled={saving}
         onChange={(event) => setValue(event.target.value)}
       />
-      <div className="flex justify-end pt-4">
+      <div className="flex justify-end pt-1">
         <Button
           type="button"
           variant="default"
           size="default"
-          className="erxes-comment-save"
+          className="erxes-comment-save rounded-full px-4"
           disabled={!value.trim() || saving}
           onClick={() => void saveComment()}
         >

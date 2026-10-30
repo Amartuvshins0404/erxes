@@ -85,14 +85,14 @@ export const BarcodeAttribute = ({
         <path stroke="#000" strokeWidth="8" d="M120 69L120 0" />
       </svg>
       {canEdit && (
-        <span className="erxes-block-controls order-first mb-1 flex gap-1 rounded bg-background p-1 text-foreground shadow-sm print:hidden">
+        <span className="erxes-block-controls order-first mb-1 flex gap-0.5 rounded-full bg-popover p-1 text-foreground shadow-md print:hidden">
           <Button
             type="button"
-            variant="outline"
+            variant="ghost"
             size="icon"
             aria-label="Resize barcode"
             title="Drag up to increase height; drag right to increase width"
-            className="touch-none cursor-nesw-resize"
+            className="cursor-nesw-resize touch-none rounded-full"
             onPointerDown={handleResizeStart}
             onPointerMove={handleResize}
             onPointerUp={handleResizeEnd}
@@ -104,8 +104,9 @@ export const BarcodeAttribute = ({
             <Popover.Trigger asChild>
               <Button
                 type="button"
-                variant="outline"
+                variant="ghost"
                 size="icon"
+                className="rounded-full"
                 aria-label="Barcode settings"
                 title="Barcode settings"
               >
@@ -113,7 +114,7 @@ export const BarcodeAttribute = ({
               </Button>
             </Popover.Trigger>
             <Popover.Content
-              className="w-64 text-foreground"
+              className="w-64 rounded-2xl text-foreground"
               onClick={(event) => event.stopPropagation()}
             >
               <Form {...form}>
@@ -181,11 +182,11 @@ export const BarcodeAttribute = ({
           </Popover>
           <Button
             type="button"
-            variant="outline"
+            variant="ghost"
             size="icon"
             aria-label="Delete barcode"
             title="Delete barcode"
-            className="text-destructive"
+            className="rounded-full text-destructive hover:bg-destructive/10"
             onClick={(event) => {
               event.preventDefault();
               event.stopPropagation();

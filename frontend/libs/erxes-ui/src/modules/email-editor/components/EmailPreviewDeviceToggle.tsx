@@ -17,15 +17,25 @@ export const EmailPreviewDeviceToggle = ({
     type="single"
     value={value}
     onValueChange={(device) => device && onChange(device as EmailPreviewDevice)}
-    className={cn('gap-1', className)}
+    className={cn('gap-0.5 rounded-full bg-muted p-0.5', className)}
   >
     <ToggleGroup.Item value="desktop" asChild>
-      <Button variant="ghost" size="icon" aria-label="Desktop preview">
+      <Button
+        variant="ghost"
+        size="icon"
+        className="rounded-full text-muted-foreground data-[state=on]:bg-card data-[state=on]:text-foreground data-[state=on]:shadow-xs"
+        aria-label="Desktop preview"
+      >
         <IconDeviceDesktop className="size-4" />
       </Button>
     </ToggleGroup.Item>
     <ToggleGroup.Item value="mobile" asChild>
-      <Button variant="ghost" size="icon" aria-label="Mobile preview">
+      <Button
+        variant="ghost"
+        size="icon"
+        className="rounded-full text-muted-foreground data-[state=on]:bg-card data-[state=on]:text-foreground data-[state=on]:shadow-xs"
+        aria-label="Mobile preview"
+      >
         <IconDeviceMobile className="size-4" />
       </Button>
     </ToggleGroup.Item>

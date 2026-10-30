@@ -1,16 +1,17 @@
 import * as React from 'react';
 
+import { Table } from 'erxes-ui/components';
 import { cn } from 'erxes-ui/lib/utils';
 
 function ReportTableRoot({
   className,
   ...props
-}: React.ComponentProps<'table'>) {
+}: React.ComponentPropsWithoutRef<'table'>) {
   return (
-    <table
+    <Table
       data-slot="table"
       className={cn(
-        'w-full overflow-hidden caption-bottom text-[1em]',
+        'table-auto border-collapse overflow-hidden bg-transparent text-[1em]',
         className,
       )}
       {...props}
@@ -21,11 +22,11 @@ function ReportTableRoot({
 function ReportTableHeader({
   className,
   ...props
-}: React.ComponentProps<'thead'>) {
+}: React.ComponentPropsWithoutRef<'thead'>) {
   return (
-    <thead
+    <Table.Header
       data-slot="table-header"
-      className={cn('[&_tr]:border', className)}
+      className={cn('bg-muted/50', className)}
       {...props}
     />
   );
@@ -34,11 +35,11 @@ function ReportTableHeader({
 function ReportTableBody({
   className,
   ...props
-}: React.ComponentProps<'tbody'>) {
+}: React.ComponentPropsWithoutRef<'tbody'>) {
   return (
-    <tbody
+    <Table.Body
       data-slot="table-body"
-      className={cn('[&_tr:last-child]:border-0', className)}
+      className={cn('border-0 rounded-none', className)}
       {...props}
     />
   );
@@ -47,25 +48,25 @@ function ReportTableBody({
 function ReportTableFooter({
   className,
   ...props
-}: React.ComponentProps<'tfoot'>) {
+}: React.ComponentPropsWithoutRef<'tfoot'>) {
   return (
-    <tfoot
+    <Table.Footer
       data-slot="table-footer"
-      className={cn(
-        'border-t font-medium [&>tr]:last:border-b-0',
-        className,
-      )}
+      className={cn('bg-muted/50 font-medium', className)}
       {...props}
     />
   );
 }
 
-function ReportTableRow({ className, ...props }: React.ComponentProps<'tr'>) {
+function ReportTableRow({
+  className,
+  ...props
+}: React.ComponentPropsWithoutRef<'tr'>) {
   return (
-    <tr
+    <Table.Row
       data-slot="table-row"
       className={cn(
-        'hover:bg-muted/50 data-[state=selected]:bg-muted border transition-colors',
+        '[&>td]:border-b-0 [&>td:first-child]:border-l-0 hover:bg-muted/50 data-[state=selected]:bg-muted',
         className,
       )}
       {...props}
@@ -73,12 +74,15 @@ function ReportTableRow({ className, ...props }: React.ComponentProps<'tr'>) {
   );
 }
 
-function ReportTableHead({ className, ...props }: React.ComponentProps<'th'>) {
+function ReportTableHead({
+  className,
+  ...props
+}: React.ComponentPropsWithoutRef<'th'>) {
   return (
-    <th
+    <Table.Head
       data-slot="table-head"
       className={cn(
-        'text-foreground h-[2.5em] px-[0.5em] text-middle align-middle font-medium border',
+        'h-[2.5em] border border-border bg-transparent px-[0.5em] font-sans text-[1em] font-medium normal-case text-foreground',
         className,
       )}
       {...props}
@@ -86,12 +90,15 @@ function ReportTableHead({ className, ...props }: React.ComponentProps<'th'>) {
   );
 }
 
-function ReportTableCell({ className, ...props }: React.ComponentProps<'td'>) {
+function ReportTableCell({
+  className,
+  ...props
+}: React.ComponentPropsWithoutRef<'td'>) {
   return (
-    <td
+    <Table.Cell
       data-slot="table-cell"
       className={cn(
-        'p-[0.3em] align-middle border text-[1em] whitespace-normal break-all',
+        'h-auto border border-border bg-transparent p-[0.3em] text-[1em] whitespace-normal break-all group-hover/table-row:bg-transparent',
         className,
       )}
       {...props}
@@ -102,11 +109,11 @@ function ReportTableCell({ className, ...props }: React.ComponentProps<'td'>) {
 function ReportTableCaption({
   className,
   ...props
-}: React.ComponentProps<'caption'>) {
+}: React.ComponentPropsWithoutRef<'caption'>) {
   return (
-    <caption
+    <Table.Caption
       data-slot="table-caption"
-      className={cn('text-muted-foreground mt-[1em] text-[1em]', className)}
+      className={cn('mt-[1em] text-[1em]', className)}
       {...props}
     />
   );

@@ -8,6 +8,9 @@ export const ToolbarRoot = ({
 }: ComponentProps['FormattingToolbar']['Root']) => (
   <components.FormattingToolbar.Root
     {...props}
-    className={cn('min-w-0 max-w-full flex-wrap!', className)}
+    className={cn(
+      'min-w-0 max-w-full flex-wrap! gap-0.5! rounded-2xl! border-0! bg-popover! p-1! shadow-lg!',
+      className,
+    )}
   />
 );

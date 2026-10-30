@@ -56,70 +56,72 @@ export const ReportPageContainer = ({
 
   return (
     <PageContainer className="h-dvh print:h-auto print:block">
-      <header className="flex items-center justify-between h-10 px-3 box-border shrink-0 bg-sidebar overflow-auto styled-scroll print:hidden">
+      <header className="flex items-center justify-between h-12 px-4 box-border shrink-0 bg-sidebar overflow-auto styled-scroll print:hidden">
         <div className="flex items-center gap-2 flex-none pr-8">
-          <Button variant="ghost">Report</Button>
+          <span className="px-1 text-sm font-medium">Report</span>
           <Separator.Inline />
           <Toggle pressed={!!inPreview} onPressedChange={setInPreview}>
             {inPreview ? 'hide sidebar' : 'show sidebar'}
           </Toggle>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 rounded-full bg-muted p-1">
           <Button
-            variant="secondary"
+            variant="ghost"
             size="icon"
-            className="bg-border"
+            className="rounded-full"
             onClick={() => handlePrintsizeChange(printsize - 10)}
           >
             <IconMinus />
           </Button>
           <div className="relative">
-            <Input className="w-20 pr-8 text-center" value={printsize} />
-            <Button
-              variant="secondary"
-              size="icon"
-              className="absolute right-0.5 top-0.5 hover:bg-muted"
-            >
-              <IconPercentage />
-            </Button>
+            <Input
+              className="w-20 rounded-full pr-7 text-center"
+              value={printsize}
+              readOnly
+            />
+            <IconPercentage className="pointer-events-none absolute right-2 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           </div>
           <Button
-            variant="secondary"
+            variant="ghost"
             size="icon"
-            className="bg-border"
+            className="rounded-full"
             onClick={() => handlePrintsizeChange(printsize + 10)}
           >
             <IconPlus />
           </Button>
         </div>
         <div className="flex items-center gap-3">
-          <Button variant="outline">
+          <Button variant="outline" className="rounded-full">
             <IconFileSpreadsheet />
             Export to excel
           </Button>
-          <div className="inline-flex rounded shadow-sm">
+          <div className="inline-flex items-center rounded-full shadow-button-outline">
             <Button
               onClick={() => window.print()}
               variant="ghost"
-              className="rounded-r-none"
+              className="rounded-l-full rounded-r-none"
             >
               <IconPrinter />
               Print
             </Button>
-            <Separator orientation="vertical" className="h-7" />
+            <Separator orientation="vertical" className="h-4" />
             <Popover>
               <Popover.Trigger asChild>
-                <Button variant="ghost" size="icon" className="rounded-l-none">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="rounded-l-none rounded-r-full"
+                >
                   <IconChevronDown />
                 </Button>
               </Popover.Trigger>
-              <Popover.Content>
+              <Popover.Content className="rounded-2xl">
                 <Label variant="peer" className="font-medium">
                   Print settings
                 </Label>
                 <div className="flex flex-col gap-2 pt-4 pb-2">
-                  <Label>Table</Label>
+                  <Label className="text-xs text-muted-foreground">Table</Label>
                   <div className="flex items-center gap-2">
                     <Checkbox
                       id="show-table-header-on-every-page"
@@ -148,7 +150,7 @@ export const ReportPageContainer = ({
       <ReportStyle />
       <ScrollArea className="bg-sidebar flex-auto">
         <div
-          className="m-4 bg-background shadow-sm mx-auto max-w-5xl pl-15 p-8 print:shadow-none"
+          className="m-6 mx-auto max-w-5xl rounded-3xl bg-card p-8 pl-15 shadow-card print:rounded-none print:shadow-none"
           style={{ fontSize: printsizeToFontSize(printsize) }}
         >
           {children}

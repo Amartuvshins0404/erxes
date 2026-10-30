@@ -1,72 +1,68 @@
 import { OperationVariables, QueryHookOptions, useQuery } from '@apollo/client';
-import { TAG_BADGE_QUERY, TAGS_QUERY } from '../graphql/queries/tagsQueries';
-import { ITag } from 'ui-modules/modules';
-import { ICursorListResponse, EnumCursorDirection } from 'erxes-ui';
+import { EnumCursorDirection, useCursorListQuery } from 'erxes-ui';
+import { useCallback, useMemo } from 'react';
+import {
+  TAGS_LIST_QUERY,
+  TAGS_QUERY,
+} from 'ui-modules/modules/tags/graphql/tagQueries';
+import { ITag } from 'ui-modules/modules/tags/types/Tag';
 
-const TAGS_PER_PAGE = 20;
+export const useGetTags = (options?: QueryHookOptions) => {
+  const { data, loading, error } = useQuery(TAGS_QUERY, options);
+  const { allTags, rootTags, tagsByParentId, tagGroups } = useMemo(() => {
+    const allTags = (data?.tagsMain || []) as ITag[];
+    const rootTags: ITag[] = [];
+    const tagsByParentId: Record<string, ITag[]> = {};
+    const tagGroups: ITag[] = [];
 
-export const useTags = (
-  options?: QueryHookOptions<ICursorListResponse<ITag>>,
-) => {
-  const { data, loading, error, fetchMore } = useQuery<
-    ICursorListResponse<ITag>
-  >(TAGS_QUERY, {
-    ...options,
-  });
-  const { list: tags = [], totalCount = 0, pageInfo } = data?.tags || {};
-
-  const handleFetchMore = () => {
-    if (totalCount <= (tags?.length || 0)) return;
-    fetchMore({
-      variables: {
-        ...options?.variables,
-        cursor: pageInfo?.endCursor,
-        limit: TAGS_PER_PAGE,
-        direction: EnumCursorDirection.FORWARD,
-      },
-      updateQuery: (prev, { fetchMoreResult }) => {
-        if (!fetchMoreResult) return prev;
-        return Object.assign({}, prev, {
-          tags: {
-            list: [...(prev.tags?.list || []), ...fetchMoreResult.tags.list],
-            totalCount: fetchMoreResult.tags.totalCount,
-            pageInfo: fetchMoreResult.tags.pageInfo,
-          },
-        });
-      },
+    allTags.forEach((tag) => {
+      if (tag.isGroup) {
+        tagGroups.push(tag);
+      }
+      if (tag.parentId) {
+        if (!tagsByParentId[tag.parentId]) {
+          tagsByParentId[tag.parentId] = [];
+        }
+        tagsByParentId[tag.parentId].push(tag);
+      } else {
+        rootTags.push(tag);
+      }
     });
-  };
 
-  const tagsWithHasChildren = tags?.map((tag) => ({
-    ...tag,
-    hasChildren: tags?.some((t) => t.parentId === tag._id),
-  }));
+    return { allTags, rootTags, tagsByParentId, tagGroups };
+  }, [data?.tagsMain]);
 
   return {
-    tags: tagsWithHasChildren,
-    sortedTags: [...(tagsWithHasChildren || [])].sort((a, b) =>
-      (a.order || '').localeCompare(b.order || ''),
-    ),
-    pageInfo,
-    totalCount,
+    tags: allTags,
+    rootTags,
+    tagsByParentId,
+    tagGroups,
     loading,
     error,
-    handleFetchMore,
   };
 };
 
-export const useTagsByIds = (options: OperationVariables) => {
-  const { data, loading, error } = useQuery<{
-    tagDetail: ITag;
-  }>(TAG_BADGE_QUERY, {
-    ...options,
-  });
+export const useTags = ({
+  variables,
+  skip,
+}: { variables?: OperationVariables; skip?: boolean } = {}) => {
+  const { list, totalCount, loading, error, handleFetchMore } =
+    useCursorListQuery<ITag>(TAGS_LIST_QUERY, {
+      field: 'tags',
+      variables,
+      skip,
+    });
 
-  const { tagDetail } = data || {};
+  const fetchMore = useCallback(
+    () => handleFetchMore({ direction: EnumCursorDirection.FORWARD }),
+    [handleFetchMore],
+  );
 
   return {
-    tagDetail,
+    tags: list,
+    totalCount,
     loading,
     error,
+    handleFetchMore: fetchMore,
   };
 };

@@ -29,13 +29,12 @@ export type TCustomerFieldProps = {
 
 type TOption = { label: string; value: string };
 
-// Mirrors PHONE_VALIDATION_STATUSES in erxes-api-shared/core-modules/users/constants.
 const PHONE_VALIDATION_STATUSES = [
   {
     value: 'valid',
     label: 'Valid',
     Icon: IconCircleCheck,
-    className: 'text-green-500',
+    className: 'text-success',
   },
   {
     value: 'invalid',

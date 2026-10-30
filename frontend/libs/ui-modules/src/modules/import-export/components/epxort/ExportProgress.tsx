@@ -115,8 +115,16 @@ export function ExportProgress({
               <span>{t('status-processing')}</span>
               <span>{progress.percentage}%</span>
             </div>
-            <Progress.Root value={progress.percentage} className="h-1.5">
-              <Progress.Indicator className="bg-info" />
+            <Progress.Root
+              value={progress.percentage}
+              className="relative h-1.5 overflow-hidden rounded-full bg-muted"
+            >
+              <Progress.Indicator
+                className="h-full bg-info transition-transform"
+                style={{
+                  transform: `translateX(-${100 - progress.percentage}%)`,
+                }}
+              />
             </Progress.Root>
             <div className="text-xs text-muted-foreground mt-1">
               {t('time-remaining', {
@@ -159,7 +167,7 @@ const StatusIcon = ({
   switch (status) {
     case 'processing':
       return (
-        <div className="flex items-center justify-center size-8 rounded-full bg-success/10">
+        <div className="flex items-center justify-center size-8 rounded-full bg-info/10">
           <IconLoader className="size-4 text-info animate-spin" />
         </div>
       );

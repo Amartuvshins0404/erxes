@@ -1,6 +1,6 @@
 import { ControllerRenderProps, Path, useFormContext } from 'react-hook-form';
 import { FormType } from '@/settings/profile/hooks/useProfileForm';
-import { DatePicker, Form, Input, PhoneInput } from 'erxes-ui';
+import { cn, DatePicker, Form, Input, PhoneInput } from 'erxes-ui';
 
 type RenderProps = {
   field: ControllerRenderProps;
@@ -24,7 +24,8 @@ const RenderFormField = ({ field, element, attributes }: RenderProps) => {
         <Input
           {...field}
           {...attributes}
-          className={`${fieldState.error && ' focus-visible:ring-red-500'}`}
+          aria-invalid={!!fieldState.error}
+          className={cn(fieldState.error && 'ring-1 ring-destructive')}
         />
       );
     case 'date':
@@ -38,15 +39,15 @@ const RenderFormField = ({ field, element, attributes }: RenderProps) => {
   }
 };
 
-const FormField = ({ name, element, attributes }: Props) => {
-  const form = useFormContext<FormType>();
+export const FormField = ({ name, element, attributes }: Props) => {
+  const form = useFormContext();
 
   return (
     <Form.Field
       key={name}
       name={name}
       control={form.control}
-      render={({ field }: { field: any }) => (
+      render={({ field }) => (
         <Form.Item>
           <Form.Control>
             <RenderFormField
@@ -60,5 +61,3 @@ const FormField = ({ name, element, attributes }: Props) => {
     />
   );
 };
-
-export default FormField;

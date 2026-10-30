@@ -1,11 +1,11 @@
-import FormField from '@/settings/profile/components/fields/FormField';
+import { FormField } from '@/settings/profile/components/fields/FormField';
 import { PROFILE_ADVANCED_FIELDS } from '@/settings/profile/constants/profileFields';
 import { FormType } from '@/settings/profile/hooks/useProfileForm';
 import { Accordion, Form } from 'erxes-ui';
 import { useTranslation } from 'react-i18next';
 import { useMemo } from 'react';
 
-const AdvancedFields = () => {
+export const AdvancedFields = () => {
   const { t } = useTranslation('settings', {
     keyPrefix: 'profile',
   });
@@ -56,5 +56,3 @@ const AdvancedFields = () => {
     </Accordion>
   );
 };
-
-export default AdvancedFields;

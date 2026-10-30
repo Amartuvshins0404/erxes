@@ -221,7 +221,7 @@ export const PrintSettings = ({
                         field.onChange(value);
                       }}
                     >
-                      <div className="bg-white">
+                      <div>
                         <Select.Trigger>
                           <Select.Value placeholder="Select paper size" />
                         </Select.Trigger>
@@ -368,7 +368,7 @@ export const PrintSettings = ({
             {directPrint && (
               <>
                 <Select value={printer} onValueChange={setPrinter}>
-                  <div className="bg-white">
+                  <div>
                     <Select.Trigger>
                       <Select.Value
                         placeholder={

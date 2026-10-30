@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next';
 import { useNotificationSettingsContext } from '../context/NotificationSettingsProvider';
 import { NotificationSettingsChannelChip } from './NotificationSettingsChannelChip';
 
-/** The plugin's on/off switch and the channels its events may use. */
 export const NotificationSettingsPluginCard = () => {
   const { t } = useTranslation('common', { keyPrefix: 'notification' });
   const { plugin, togglePlugin } = useNotificationSettingsContext();
@@ -18,7 +17,7 @@ export const NotificationSettingsPluginCard = () => {
             </p>
             <span
               className={`w-1.5 h-1.5 rounded-full transition-colors ${
-                plugin.enabled ? 'bg-emerald-500' : 'bg-muted-foreground/30'
+                plugin.enabled ? 'bg-success' : 'bg-muted-foreground/30'
               }`}
             />
           </div>

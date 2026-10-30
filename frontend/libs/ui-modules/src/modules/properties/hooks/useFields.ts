@@ -36,7 +36,6 @@ export const useFields = ({
           limit,
         },
       },
-      // Field settings change elsewhere (another tab, another admin); revalidate on mount.
       fetchPolicy: 'cache-and-network',
     },
   );
@@ -117,7 +116,6 @@ export const useFields = ({
   return {
     fields: fields,
     totalCount: data?.fields?.totalCount || 0,
-    // Cached fields render while the revalidation runs.
     loading: loading && !data,
     refetch,
     handleFetchMore,

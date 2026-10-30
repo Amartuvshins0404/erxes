@@ -267,8 +267,7 @@ export const AgentMentionInput = ({
       <div
         ref={mirrorRef}
         aria-hidden
-        className="pointer-events-none absolute left-0 top-0 overflow-hidden whitespace-pre-wrap break-words text-transparent [overflow-wrap:break-word]"
-        style={{ borderStyle: 'solid', borderColor: 'transparent' }}
+        className="pointer-events-none absolute left-0 top-0 overflow-hidden whitespace-pre-wrap break-words border-solid border-transparent text-transparent [overflow-wrap:break-word]"
       >
         {mirrorContent}
       </div>

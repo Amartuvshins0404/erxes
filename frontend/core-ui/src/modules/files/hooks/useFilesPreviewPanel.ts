@@ -18,15 +18,12 @@ export type TFilesPreviewTab = 'preview' | 'versions';
 const TABS: TFilesPreviewTab[] = ['preview', 'versions'];
 
 const TONES: [RegExp, string][] = [
-  [/pdf/, 'bg-red-500/10 text-red-600 dark:text-red-400'],
-  [/sheet|excel|csv/, 'bg-green-500/10 text-green-600 dark:text-green-400'],
-  [
-    /presentation|powerpoint/,
-    'bg-orange-500/10 text-orange-600 dark:text-orange-400',
-  ],
-  [/word|document|text/, 'bg-blue-500/10 text-blue-600 dark:text-blue-400'],
-  [/^image\//, 'bg-violet-500/10 text-violet-600 dark:text-violet-400'],
-  [/^(video|audio)\//, 'bg-pink-500/10 text-pink-600 dark:text-pink-400'],
+  [/pdf/, 'bg-destructive/10 text-destructive'],
+  [/sheet|excel|csv/, 'bg-success/10 text-success'],
+  [/presentation|powerpoint/, 'bg-warning/10 text-warning'],
+  [/word|document|text/, 'bg-info/10 text-info'],
+  [/^image\//, 'bg-primary/10 text-primary'],
+  [/^(video|audio)\//, 'bg-chart-5/10 text-chart-5'],
 ];
 
 const toneOf = (mimeType: string) =>
@@ -57,7 +54,6 @@ export const useFilesPreviewPanel = () => {
   const { isSplit, toggleMode } = useFilesPreviewMode();
   const { download } = useFileDownload();
   const { upload } = useFilesUpload();
-  // Functional update: the upload may finish after the sheet changed.
   const keepFresh = (file: IFile) =>
     setPreviewFile((current) =>
       current?._id === file._id ? { ...current, ...file } : current,

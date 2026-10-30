@@ -1,11 +1,6 @@
-import { useTranslation } from 'react-i18next';
 import { useAtomValue } from 'jotai';
-import {
-  Button,
-  EnumCursorDirection,
-  Spinner,
-  useMultiQueryState,
-} from 'erxes-ui';
+import { EnumCursorDirection, Spinner, useMultiQueryState } from 'erxes-ui';
+import { LoadMoreSentinel } from 'ui-modules';
 import { useDocuments } from '../hooks/useDocuments';
 import { documentsViewAtom } from '../states/documentsViewState';
 import { DocumentFilterState, IDocument } from '../types';
@@ -47,7 +42,6 @@ function DocumentsContent({
     handleFetchMore,
   } = useDocuments();
   const Component = DOCUMENTS_VIEW_TYPES[viewType] ?? DocumentsList;
-  const { t } = useTranslation('documents');
 
   if (hasError) {
     return (
@@ -80,20 +74,14 @@ function DocumentsContent({
   return (
     <div className="h-full overflow-y-auto">
       <Component documents={documents} />
-      {pageInfo?.hasNextPage && (
-        <div className="flex justify-center p-4">
-          <Button
-            type="button"
-            variant="secondary"
-            disabled={loading}
-            onClick={() => {
-              void handleFetchMore({ direction: EnumCursorDirection.FORWARD });
-            }}
-          >
-            {loading ? t('loading') : t('load-more-documents')}
-          </Button>
-        </div>
-      )}
+      <LoadMoreSentinel
+        key={documents.length}
+        hasMore={Boolean(pageInfo?.hasNextPage)}
+        loading={loading}
+        onLoadMore={() => {
+          void handleFetchMore({ direction: EnumCursorDirection.FORWARD });
+        }}
+      />
     </div>
   );
 }

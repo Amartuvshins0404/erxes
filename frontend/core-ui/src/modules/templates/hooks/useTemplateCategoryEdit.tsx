@@ -1,7 +1,6 @@
 import { TEMPLATE_CATEGORY_UPDATE } from '@/templates/graphql/mutations';
 import { MutationHookOptions, useMutation } from '@apollo/client';
 import { toast } from 'erxes-ui';
-import { QUERY_TEMPLATE_CATEGORIES } from 'ui-modules';
 import { useTranslation } from 'react-i18next';
 
 export interface ITemplateCategoryEdit {
@@ -36,9 +35,7 @@ export const useTemplateCategoryEdit = () => {
   const [mutate, { loading }] = useMutation<
     ITemplateCategoryEditResponse,
     ITemplateCategoryEdit
-  >(TEMPLATE_CATEGORY_UPDATE, {
-    refetchQueries: [QUERY_TEMPLATE_CATEGORIES],
-  });
+  >(TEMPLATE_CATEGORY_UPDATE);
 
   const templateCategoryEdit = ({
     variables,

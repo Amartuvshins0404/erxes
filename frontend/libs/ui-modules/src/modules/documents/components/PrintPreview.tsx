@@ -4,7 +4,7 @@ import {
   IconZoomIn,
   IconZoomOut,
 } from '@tabler/icons-react';
-import { Button, Spinner } from 'erxes-ui';
+import { Button, Input, Spinner } from 'erxes-ui';
 import {
   PointerEvent as ReactPointerEvent,
   RefObject,
@@ -115,6 +115,9 @@ export const PrintPreview = ({
   const activeZoom = zoom ?? fitZoom;
 
   fitRef.current = fitZoom;
+
+  const zoomInputValue =
+    zoomDraft === null ? Math.round(activeZoom * 100) : Number(zoomDraft);
 
   const commitZoomDraft = () => {
     const parsed = Number(zoomDraft);
@@ -410,16 +413,20 @@ export const PrintPreview = ({
   };
 
   if (error) {
-    return <div>Can't process this document at the moment</div>;
+    return (
+      <div className="flex flex-1 items-center justify-center p-6 text-sm text-muted-foreground">
+        Can't process this document at the moment
+      </div>
+    );
   }
 
   return (
     <div
       id="print-preview"
-      className="relative flex-1 flex flex-col min-h-0 bg-gray-100"
+      className="relative flex-1 flex flex-col min-h-0 bg-muted"
     >
-      <div className="flex items-center gap-1 px-3 py-2 border-b border-gray-200 shrink-0">
-        <span className="text-xs text-gray-500 tabular-nums mr-auto">
+      <div className="flex items-center gap-1 px-3 py-2 border-b bg-background shrink-0">
+        <span className="text-xs text-muted-foreground tabular-nums mr-auto">
           {width} × {isContinuous ? paperHeight : height} mm
           {isContinuous && ' (continuous)'}
           {isRoll && ` • ${scale}% • ${offsetX}, ${offsetY} mm`}
@@ -446,14 +453,17 @@ export const PrintPreview = ({
         >
           <IconZoomOut className="size-4" />
         </Button>
-        <div className="flex items-center h-6 rounded border border-transparent px-1 hover:border-gray-300 focus-within:border-gray-400 focus-within:bg-white">
-          <input
-            className="w-8 bg-transparent text-right text-xs tabular-nums outline-none"
-            value={zoomDraft ?? String(Math.round(activeZoom * 100))}
+        <div className="flex items-center gap-1">
+          <Input.Number
+            className="h-6 w-14 rounded-full px-2 text-right text-xs tabular-nums"
+            value={zoomDraft === '' ? undefined : zoomInputValue}
             title="Zoom level"
             inputMode="numeric"
-            onChange={(event) =>
-              setZoomDraft(event.target.value.replace(/[^\d]/g, ''))
+            scale={0}
+            onChange={(value) =>
+              setZoomDraft(
+                value === undefined || value === '' ? '' : String(value),
+              )
             }
             onFocus={(event) => event.currentTarget.select()}
             onBlur={commitZoomDraft}
@@ -470,7 +480,7 @@ export const PrintPreview = ({
               }
             }}
           />
-          <span className="text-xs text-gray-500">%</span>
+          <span className="text-xs text-muted-foreground">%</span>
         </div>
         <Button
           size="icon"
@@ -494,7 +504,7 @@ export const PrintPreview = ({
       </div>
 
       {loading && (
-        <div className="absolute inset-0 z-10 flex items-center justify-center bg-gray-100/70">
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-muted/70">
           <Spinner />
         </div>
       )}
@@ -543,7 +553,7 @@ export const PrintPreview = ({
                 onPointerDown={startMove}
               />
               <div
-                className="absolute -right-1.5 -bottom-1.5 size-3 rounded-sm border border-white bg-primary cursor-nwse-resize shadow"
+                className="absolute -right-1.5 -bottom-1.5 size-3 rounded-sm border border-background bg-primary cursor-nwse-resize shadow"
                 title="Drag to scale the document"
                 onPointerDown={startScale}
               />

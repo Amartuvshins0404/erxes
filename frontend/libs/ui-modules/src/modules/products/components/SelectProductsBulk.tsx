@@ -17,7 +17,6 @@ import { useProductsWithPluginRemainders } from '../hooks/useProductsWithPluginR
 import { useInView } from 'react-intersection-observer';
 import { AddProduct } from './AddProduct';
 import { useDebounce } from 'use-debounce';
-import { GET_PRODUCTS } from '../graphql/queries/productsQueries';
 import { SelectCompany } from '../../contacts/components/SelectCompany';
 import { SelectCategory } from '../categories/components/SelectCategory';
 
@@ -42,8 +41,7 @@ interface SelectProductsProps {
 }
 
 interface SelectProductsBulkContentProps
-  extends
-    Pick<
+  extends Pick<
       SelectProductsProps,
       | 'onSelect'
       | 'productIds'
@@ -235,7 +233,6 @@ const SelectProductsBulkContent = ({
         <AddProduct
           options={{
             onCompleted: handleAddProduct,
-            refetchQueries: [GET_PRODUCTS],
           }}
         >
           <Button variant="outline" disabled={selectionLimitReached}>

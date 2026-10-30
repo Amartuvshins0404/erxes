@@ -55,7 +55,7 @@ export function IncomingWebhookJSONPropertyEditor({
                 )}
               </Button>
             )}
-            {hasIndent && <div className="w-px h-6 bg-gray-300 ml-2" />}
+            {hasIndent && <div className="ml-2 h-6 w-px bg-border" />}
           </div>
 
           <div>

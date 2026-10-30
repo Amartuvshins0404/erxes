@@ -5,46 +5,44 @@ import { BroadcastCommandBar } from './BroadcastCommandBar';
 import { BroadcastEmptyState, BroadcastErrorState } from './BroadcastStates';
 
 export const BroadcastRecordTable = () => {
-  const { messages, pageInfo, loading, error, refetch, handleFetchMore } =
-    useMessages();
+  const {
+    messages,
+    hasPreviousPage,
+    hasNextPage,
+    loading,
+    error,
+    refetch,
+    handleFetchMore,
+  } = useMessages();
   const columns = useBroadcastColumns();
-  const { hasPreviousPage, hasNextPage } = pageInfo || {};
 
   if (error) {
     return <BroadcastErrorState error={error} onRetry={() => refetch()} />;
   }
 
-  if (!loading && !messages?.length) {
+  if (!loading && !messages.length) {
     return <BroadcastEmptyState />;
   }
 
   return (
     <RecordTable.Provider
       columns={columns}
-      data={messages || []}
+      data={messages}
       stickyColumns={['more', 'checkbox', 'avatar', 'name']}
       className="m-3"
     >
       <RecordTable.CursorProvider
         hasPreviousPage={hasPreviousPage}
         hasNextPage={hasNextPage}
-        dataLength={messages?.length}
-        sessionKey={'broadcast-cursor'}
+        dataLength={messages.length}
+        loading={loading}
       >
         <RecordTable>
           <RecordTable.Header />
           <RecordTable.Body>
-            <RecordTable.CursorBackwardSkeleton
+            <RecordTable.CursorRows
               handleFetchMore={handleFetchMore}
-            />
-            {loading ? (
-              <RecordTable.RowSkeleton rows={32} />
-            ) : (
-              <RecordTable.RowList />
-            )}
-
-            <RecordTable.CursorForwardSkeleton
-              handleFetchMore={handleFetchMore}
+              loading={loading}
             />
           </RecordTable.Body>
         </RecordTable>

@@ -3,12 +3,7 @@ import {
   useApolloClient,
   useMutation,
 } from '@apollo/client';
-import {
-  ISegmentUsage,
-  SEGMENT_REMOVE,
-  SEGMENT_USAGE,
-  SEGMENTS,
-} from 'ui-modules';
+import { ISegmentUsage, SEGMENT_REMOVE, SEGMENT_USAGE } from 'ui-modules';
 
 export const useRemoveSegments = () => {
   const client = useApolloClient();
@@ -31,7 +26,6 @@ export const useRemoveSegments = () => {
     await segmentsRemove({
       ...options,
       variables: { ids: segmentIds, ...options?.variables },
-      refetchQueries: [SEGMENTS],
     });
   };
 

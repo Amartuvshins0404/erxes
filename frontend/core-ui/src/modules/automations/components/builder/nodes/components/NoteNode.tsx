@@ -15,7 +15,7 @@ import {
   NodeToolbar,
   Position,
 } from '@xyflow/react';
-import { Button, cn, Separator, Textarea } from 'erxes-ui';
+import { Button, cn, Separator, Textarea, ToggleGroup } from 'erxes-ui';
 import { memo, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -70,28 +70,32 @@ export const NoteNode = memo(
             updateNote(id, { width, height })
           }
         />
-        {/* Floats outside the note and keeps a constant screen size, so the
-            controls never eat into the writing area or shrink when zoomed out. */}
         <NodeToolbar
           isVisible={!!selected && !data.readOnly}
           position={Position.Top}
           offset={8}
         >
           <div className="nodrag flex items-center gap-1 rounded-md border bg-background p-1 shadow-md">
-            {Object.entries(NOTE_COLORS).map(([value, { swatch }]) => (
-              <button
-                key={value}
-                type="button"
-                aria-label={value}
-                aria-pressed={color === value}
-                className={cn(
-                  'size-4 rounded-full ring-offset-1 ring-offset-background transition-shadow',
-                  swatch,
-                  color === value && 'ring-2 ring-foreground/40',
-                )}
-                onClick={() => updateNote(id, { color: value })}
-              />
-            ))}
+            <ToggleGroup
+              type="single"
+              size="sm"
+              value={color}
+              onValueChange={(value) =>
+                value && updateNote(id, { color: value })
+              }
+              className="gap-0.5"
+            >
+              {Object.entries(NOTE_COLORS).map(([value, { swatch }]) => (
+                <ToggleGroup.Item
+                  key={value}
+                  value={value}
+                  aria-label={value}
+                  className="size-6 min-w-6 rounded-full p-0 data-[state=on]:bg-accent"
+                >
+                  <span className={cn('size-3.5 rounded-full', swatch)} />
+                </ToggleGroup.Item>
+              ))}
+            </ToggleGroup>
 
             <Separator orientation="vertical" className="h-5" />
 

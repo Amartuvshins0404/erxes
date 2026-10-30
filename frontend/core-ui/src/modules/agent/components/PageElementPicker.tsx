@@ -4,7 +4,7 @@ import {
   IconPointer,
   IconX,
 } from '@tabler/icons-react';
-import { Button, Spinner } from 'erxes-ui';
+import { Button, Spinner, cn } from 'erxes-ui';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
@@ -328,8 +328,10 @@ export const PageElementPicker = ({
                 }}
               >
                 <div
-                  className="absolute left-0 max-w-[min(280px,70vw)] truncate rounded bg-primary px-2 py-1 font-mono text-[10px] text-primary-foreground"
-                  style={{ top: rect.y > 96 ? -29 : 4 }}
+                  className={cn(
+                    'absolute left-0 max-w-[min(280px,70vw)] truncate rounded-full bg-primary px-2 py-1 font-mono text-[10px] text-primary-foreground',
+                    rect.y > 96 ? '-top-[29px]' : 'top-1',
+                  )}
                 >
                   {target.tagName.toLowerCase()} · {Math.round(rect.width)} ×{' '}
                   {Math.round(rect.height)}

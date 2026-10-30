@@ -1,4 +1,4 @@
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import {
   IconChevronLeft,
   IconChevronRight,
@@ -14,6 +14,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { useInView } from 'react-intersection-observer';
 import type { IUseAgentsThreadsResult } from '../hooks/useAgentsThreads';
 
 const NEW_TAB = 'new-conversation';
@@ -28,7 +29,6 @@ interface IThreadTabsProps {
   controls?: ReactNode;
 }
 
-/** Stable browser-style sessions: titles may change, positions do not. */
 export const ThreadTabs = ({
   threadsState,
   activeThreadId,
@@ -55,6 +55,12 @@ export const ThreadTabs = ({
   const [order, setOrder] = useState<string[]>([]);
   const [deleted, setDeleted] = useState<Set<string>>(() => new Set());
   const [closing, setClosing] = useState<Set<string>>(() => new Set());
+  const { ref: moreRef } = useInView({
+    skip: !hasMore,
+    onChange: (inView) => {
+      if (inView && !loadingMore) loadMore();
+    },
+  });
   const pending = useRef(new Set<string>());
   const deletedIds = useRef(new Set<string>());
   const viewport = useRef<HTMLDivElement>(null);
@@ -251,15 +257,15 @@ export const ThreadTabs = ({
                 })}
               </AnimatePresence>
               {hasMore && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="mx-1 shrink-0 text-xs text-muted-foreground"
-                  disabled={loadingMore}
-                  onClick={loadMore}
+                <div
+                  key={threads.length}
+                  ref={moreRef}
+                  data-testid="thread-tabs-load-more"
+                  aria-hidden
+                  className="flex h-full w-10 shrink-0 items-center px-1"
                 >
-                  {loadingMore ? 'Loading…' : 'More sessions'}
-                </Button>
+                  {loadingMore && <Skeleton className="h-7 w-full" />}
+                </div>
               )}
             </Tabs.List>
           </div>

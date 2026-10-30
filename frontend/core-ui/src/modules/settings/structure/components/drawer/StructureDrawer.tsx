@@ -98,7 +98,7 @@ export const StructureDrawer = ({
     <Sheet open modal={false} onOpenChange={(open) => !open && onClose()}>
       <aside
         {...STRUCTURE_DROP_BLOCKER_PROPS}
-        className="absolute inset-y-2 right-2 z-20 flex w-[28rem] max-w-[calc(100%-1rem)] flex-col overflow-hidden rounded-md border bg-background shadow-lg duration-200 animate-in fade-in-0 slide-in-from-right-8"
+        className="absolute inset-y-2 right-2 z-20 flex w-[28rem] max-w-[calc(100%-1rem)] flex-col overflow-hidden rounded-xl border bg-background shadow-xl duration-200 animate-in fade-in-0 slide-in-from-right-8"
       >
         {renderContent()}
       </aside>

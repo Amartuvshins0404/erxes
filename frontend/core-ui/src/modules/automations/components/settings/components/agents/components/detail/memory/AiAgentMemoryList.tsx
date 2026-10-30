@@ -1,6 +1,6 @@
 import { TAiAgentMemoryItem } from '@/automations/components/settings/components/agents/hooks/useAiAgentMemoryItems';
 import { IconAlertTriangle, IconSearch } from '@tabler/icons-react';
-import { cn, Input, Skeleton } from 'erxes-ui';
+import { Button, cn, Input, Skeleton } from 'erxes-ui';
 import { useState } from 'react';
 
 const GROUPS: TAiAgentMemoryItem['group'][] = ['Always on', 'Files', 'Sources'];
@@ -51,15 +51,15 @@ export const AiAgentMemoryList = ({
                 const Icon = item.icon;
 
                 return (
-                  <button
+                  <Button
                     key={item.key}
-                    type="button"
+                    variant="ghost"
                     onClick={() => onSelect(item.key)}
                     className={cn(
-                      'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors',
+                      'h-8 w-full justify-start rounded-lg px-2 text-left font-normal',
                       item.key === activeKey
-                        ? 'bg-muted font-medium text-foreground shadow-[inset_2px_0_0_var(--primary)]'
-                        : 'text-muted-foreground hover:bg-muted/60',
+                        ? 'bg-accent font-medium text-foreground'
+                        : 'text-muted-foreground',
                     )}
                   >
                     <Icon className="size-4 shrink-0" />
@@ -73,7 +73,7 @@ export const AiAgentMemoryList = ({
                         {item.meta}
                       </span>
                     )}
-                  </button>
+                  </Button>
                 );
               })}
               {group === 'Sources' && loading && (

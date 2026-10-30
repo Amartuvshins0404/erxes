@@ -107,17 +107,6 @@ const productCategoriesTotalCount = gql`
   }
 `;
 
-const productTags = gql`
-  query Tags($searchValue: String, $perPage: Int) {
-    tags(type: "core:product", searchValue: $searchValue, perPage: $perPage) {
-      _id
-      colorCode
-      order
-      name
-    }
-  }
-`;
-
 const productCategoryDetail = gql`
   query productCategoryDetail($_id: String) {
     productCategoryDetail(_id: $_id) {
@@ -152,6 +141,5 @@ export const productsQueries = {
   productsMain,
   productCategories,
   productCategoriesTotalCount,
-  productTags,
   productCategoryDetail,
 };

@@ -39,18 +39,14 @@ export const AutomationsRecordTableContent = ({
           hasPreviousPage={hasPreviousPage}
           hasNextPage={hasNextPage}
           dataLength={list.length}
-          sessionKey="automations_cursor"
+          loading={loading}
         >
           <RecordTable>
             <RecordTable.Header />
             <RecordTable.Body>
-              <RecordTable.CursorBackwardSkeleton
+              <RecordTable.CursorRows
                 handleFetchMore={handleFetchMore}
-              />
-              {loading && <RecordTable.RowSkeleton rows={40} />}
-              <RecordTable.RowList />
-              <RecordTable.CursorForwardSkeleton
-                handleFetchMore={handleFetchMore}
+                loading={loading}
               />
             </RecordTable.Body>
           </RecordTable>

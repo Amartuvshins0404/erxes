@@ -1,4 +1,4 @@
-import { Breadcrumb } from 'erxes-ui';
+import { Breadcrumb, Button } from 'erxes-ui';
 import { Fragment } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSegmentTreeSteps } from '../../hooks/useSegmentTreeSteps';
@@ -29,9 +29,14 @@ export const SegmentTreeSteps = ({ root = 'root' }: { root?: TNodePath }) => {
                     <Breadcrumb.Page>{label}</Breadcrumb.Page>
                   ) : (
                     <Breadcrumb.Link asChild>
-                      <button type="button" onClick={() => enter(crumb.path)}>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-auto px-1 font-normal"
+                        onClick={() => enter(crumb.path)}
+                      >
                         {label}
-                      </button>
+                      </Button>
                     </Breadcrumb.Link>
                   )}
                 </Breadcrumb.Item>

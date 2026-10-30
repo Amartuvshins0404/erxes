@@ -1,7 +1,7 @@
 import { cn } from 'erxes-ui';
 import { currentOrganizationState, currentUserState } from 'ui-modules/states';
 import { WelcomeMessageBackground } from 'ui-modules/modules/notifications/components/WelcomeMessageBackground';
-import { MotionConfig, motion } from 'framer-motion';
+import { MotionConfig, motion } from 'motion/react';
 import { useAtomValue } from 'jotai';
 import { WelcomeVideoPlayer } from 'ui-modules/modules/notifications/components/WelcomeVideoPlayer';
 import { WelcomeOnboardingStepsSection } from 'ui-modules/modules/notifications/components/WelcomeOnboardingStepsSection';

@@ -1,10 +1,8 @@
-import { QueryHookOptions, useQuery } from '@apollo/client';
+import { OperationVariables } from '@apollo/client';
 import {
   EnumCursorDirection,
-  ICursorListResponse,
-  mergeCursorData,
+  useCursorListQuery,
   useMultiQueryState,
-  validateFetchMore,
 } from 'erxes-ui';
 
 import { QUERY_TEMPLATE_CATEGORIES } from '../graphql/queries';
@@ -20,56 +18,25 @@ export const useTemplateCategoryVariables = () => {
   };
 };
 
-export const useTemplateCategories = (
-  options: QueryHookOptions<ICursorListResponse<TemplateCategory>>,
-) => {
+export const useTemplateCategories = (options: {
+  variables?: OperationVariables;
+  skip?: boolean;
+}) => {
   const variables = useTemplateCategoryVariables();
 
-  const { data, loading, error, fetchMore } = useQuery<
-    ICursorListResponse<TemplateCategory>
-  >(QUERY_TEMPLATE_CATEGORIES, {
-    ...options,
-    variables: { ...variables, ...options.variables },
-  });
-
-  const {
-    list: categories,
-    pageInfo,
-    totalCount,
-  } = data?.templateCategories || {};
-
-  const handleFetchMore = () => {
-    if (
-      !validateFetchMore({ direction: EnumCursorDirection.FORWARD, pageInfo })
-    ) {
-      return;
-    }
-
-    fetchMore({
-      variables: {
-        direction: EnumCursorDirection.FORWARD,
-        cursor: pageInfo?.endCursor,
-      },
-      updateQuery: (prev, { fetchMoreResult }) => {
-        if (!fetchMoreResult) return prev;
-
-        return Object.assign({}, prev, {
-          templateCategories: mergeCursorData({
-            direction: EnumCursorDirection.FORWARD,
-            fetchMoreResult: fetchMoreResult.templateCategories,
-            prevResult: prev.templateCategories,
-          }),
-        });
-      },
+  const { list, handleFetchMore, ...rest } =
+    useCursorListQuery<TemplateCategory>(QUERY_TEMPLATE_CATEGORIES, {
+      field: 'templateCategories',
+      skip: options.skip,
+      variables: { ...variables, ...options.variables },
     });
-  };
 
   return {
-    categories,
-    pageInfo,
-    loading,
-    error,
-    totalCount,
-    handleFetchMore,
+    categories: list,
+    ...rest,
+    handleFetchMore: (params?: { direction: EnumCursorDirection }) =>
+      handleFetchMore({
+        direction: params?.direction ?? EnumCursorDirection.FORWARD,
+      }),
   };
 };

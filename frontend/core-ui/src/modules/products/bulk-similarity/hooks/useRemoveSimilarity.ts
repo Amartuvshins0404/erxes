@@ -7,18 +7,16 @@ export const useRemoveSimilarity = () => {
   const { t } = useTranslation('product', { keyPrefix: 'bulk-similarity' });
   const { toast } = useToast();
 
-  const [removeMutation, { loading }] = useMutation(PRODUCT_SIMILARITY_REMOVE, {
-    refetchQueries: ['ProductSimilarities'],
-  });
+  const [removeMutation, { loading }] = useMutation(PRODUCT_SIMILARITY_REMOVE);
 
   const remove = async (_id: string) => {
     try {
       await removeMutation({ variables: { _id } });
       toast({ title: t('similarity-removed', 'Similarity removed') });
-    } catch (e: any) {
+    } catch (e) {
       toast({
         title: t('error', 'Error'),
-        description: e.message,
+        description: e instanceof Error ? e.message : undefined,
         variant: 'destructive',
       });
       throw e;

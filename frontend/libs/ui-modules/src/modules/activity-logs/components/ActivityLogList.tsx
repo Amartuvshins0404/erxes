@@ -4,6 +4,19 @@ import { useInView } from 'react-intersection-observer';
 import { useActivityLog } from '../context/ActivityLogProvider';
 import { ActivityLogLoading } from './ActivityLogLoading';
 import { ActivityLogRow } from './ActivityLogRow';
+import { LoadMoreSentinel } from '../../shared/components/LoadMoreSentinel';
+
+const ActivityLogRowsSkeleton = () => (
+  <div className="w-full flex flex-col gap-4">
+    {[...Array(4)].map((_, index) => (
+      <div key={index} className="flex gap-2 items-center">
+        <Skeleton className="size-6 rounded-full" />
+        <Skeleton className="w-1/2 h-3" />
+        <Skeleton className="w-20 ml-auto h-3" />
+      </div>
+    ))}
+  </div>
+);
 
 export const ActivityLogList = ({
   emptyMessage,
@@ -16,31 +29,27 @@ export const ActivityLogList = ({
     handleFetchMore,
     hasNextPage,
     hasPreviousPage,
-    limit,
     variant = 'forward',
     showExactDate,
   } = useActivityLog();
 
-  const reachedLimit = limit !== undefined && activityLogs.length >= limit;
-  const canFetchMore = variant === 'backward' ? hasPreviousPage : hasNextPage;
+  const isBackward = variant === 'backward';
+  const canFetchMore = Boolean(
+    handleFetchMore && (isBackward ? hasPreviousPage : hasNextPage),
+  );
 
-  const { ref: fetchMoreRef } = useInView({
+  const fetchMore = () =>
+    handleFetchMore?.({
+      direction: isBackward
+        ? EnumCursorDirection.BACKWARD
+        : EnumCursorDirection.FORWARD,
+    });
+
+  const { ref: backwardRef } = useInView({
     threshold: 0.1,
+    skip: !isBackward || !canFetchMore,
     onChange: (inView) => {
-      if (
-        inView &&
-        canFetchMore &&
-        handleFetchMore &&
-        !loading &&
-        !reachedLimit
-      ) {
-        handleFetchMore({
-          direction:
-            variant === 'backward'
-              ? EnumCursorDirection.BACKWARD
-              : EnumCursorDirection.FORWARD,
-        });
-      }
+      if (inView && !loading) fetchMore();
     },
   });
 
@@ -66,15 +75,9 @@ export const ActivityLogList = ({
 
   return (
     <div className="w-full flex flex-col">
-      {variant === 'backward' && canFetchMore && !loading && !reachedLimit && (
-        <div ref={fetchMoreRef} className="w-full flex flex-col gap-4">
-          {[...Array(4)].map((_, index) => (
-            <div key={index} className="flex gap-2 items-center">
-              <Skeleton className="size-6 rounded-full" />
-              <Skeleton className="w-1/2 h-3" />
-              <Skeleton className="w-20 ml-auto h-3" />
-            </div>
-          ))}
+      {isBackward && canFetchMore && (
+        <div ref={backwardRef}>
+          <ActivityLogRowsSkeleton />
         </div>
       )}
       {activityLogs.map((activity, index) => (
@@ -85,16 +88,13 @@ export const ActivityLogList = ({
           showExactDate={showExactDate}
         />
       ))}
-      {variant === 'forward' && canFetchMore && !loading && !reachedLimit && (
-        <div ref={fetchMoreRef} className="w-full flex flex-col gap-4">
-          {[...Array(4)].map((_, index) => (
-            <div key={index} className="flex gap-2 items-center">
-              <Skeleton className="size-6 rounded-full" />
-              <Skeleton className="w-1/2 h-3" />
-              <Skeleton className="w-20 ml-auto h-3" />
-            </div>
-          ))}
-        </div>
+      {!isBackward && (
+        <LoadMoreSentinel
+          key={activityLogs.length}
+          hasMore={canFetchMore}
+          loading={loading}
+          onLoadMore={fetchMore}
+        />
       )}
     </div>
   );

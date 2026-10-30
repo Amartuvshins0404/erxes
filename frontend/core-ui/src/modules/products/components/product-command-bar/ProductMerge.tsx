@@ -13,7 +13,7 @@ import {
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Can, IProduct } from 'ui-modules';
-import { productsMutations, productsQueries } from '../../graphql';
+import { productsMutations } from '../../graphql';
 
 type MergeField = {
   key: string;
@@ -196,11 +196,12 @@ const SourceCell = ({
   }
 
   return (
-    <button
+    <Button
       type="button"
+      variant="outline"
       onClick={onSelect}
       className={cn(
-        'flex w-full min-w-0 cursor-pointer items-center gap-2 rounded-md border px-2.5 py-1.5 text-left text-sm transition-colors',
+        'h-auto w-full min-w-0 justify-start gap-2 rounded-lg px-2.5 py-1.5 text-left font-normal shadow-none',
         selected
           ? 'border-primary bg-primary/5 font-medium text-primary'
           : 'border-border hover:border-primary/40 hover:bg-accent',
@@ -210,14 +211,14 @@ const SourceCell = ({
         className={cn(
           'flex size-3.5 shrink-0 items-center justify-center rounded-full border',
           selected
-            ? 'border-primary bg-primary text-white'
+            ? 'border-primary bg-primary text-primary-foreground'
             : 'border-muted-foreground/40 bg-background',
         )}
       >
         {selected && <IconCheck className="size-2.5" />}
       </span>
       <span className="truncate">{display}</span>
-    </button>
+    </Button>
   );
 };
 
@@ -254,7 +255,6 @@ const ProductMergeBody = ({
       values[field.key] = hasValue(a) ? a : b;
     }
     return values;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [productA?._id, productB?._id]);
 
   const [value, setValue] = useState<Record<string, any>>(initValues);
@@ -266,11 +266,10 @@ const ProductMergeBody = ({
       ...propertiesEntries(productA),
       ...propertiesEntries(productB).filter(([key]) => !(key in aProperties)),
     ];
-  }, [productA, productB]);
+  }, [productA?._id, productB?._id]);
 
   const [mergeProducts, { loading }] = useMutation(
     productsMutations.productsMerge,
-    { refetchQueries: [productsQueries.productsMain] },
   );
 
   const handleSave = () => {

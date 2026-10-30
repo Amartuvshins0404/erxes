@@ -283,7 +283,7 @@ const SelectCompanyValue = ({ placeholder }: { placeholder?: string }) => {
   if (hideAvatar) {
     return (
       <span className="text-muted-foreground flex items-center gap-1 -ml-1">
-        <IconBuilding className="w-4 h-4 text-gray-400" /> Company(s) +
+        <IconBuilding className="w-4 h-4 text-muted-foreground" /> Company(s) +
         {companyIds.length}
       </span>
     );

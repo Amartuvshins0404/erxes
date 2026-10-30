@@ -1,86 +1,24 @@
-import { MutationHookOptions, OperationVariables } from '@apollo/client';
-
-import { ITag } from 'ui-modules/index';
-
-export interface TTag {
+export interface ITag {
   _id: string;
   name: string;
-  type?: string;
+  type: string | null;
   colorCode?: string;
   createdAt?: string;
-  cursor?: string;
   objectCount?: number;
   parentId?: string;
   isGroup?: boolean;
-  order?: string;
   relatedIds?: string[];
   description?: string;
-  hasChildren?: boolean;
   totalObjectCount?: number;
+  __typename?: 'Tag';
 }
 
-export interface TTagQueryResponse {
-  name: string;
-  type?: string;
-  isGroup: boolean;
-  parentId?: string | null;
-}
-
-export type ISelectTagsProviderProps = {
-  tagType?: string;
-  targetIds?: string[];
-  value?: string[] | string;
-  onValueChange?: (tags: string[] | string) => void;
-  mode?: 'single' | 'multiple';
-  children: React.ReactNode;
-  options?: (newSelectedTagIds: string[]) => MutationHookOptions<
+export interface ITagTypes {
+  tagsGetTypes: Record<
+    string,
     {
-      tags: {
-        totalCount: number;
-        list: TTag[];
-      };
-    },
-    OperationVariables
+      description: string;
+      contentType: string;
+    }[]
   >;
-};
-
-export interface ISelectTagsContext {
-  tagType: string;
-  targetIds: string[];
-  selectedTags: ITag[];
-  value?: string[] | string;
-  setSelectedTags: React.Dispatch<React.SetStateAction<ITag[]>>;
-  onSelect: (tags: ITag) => void;
-  newTagName: string;
-  setNewTagName: (tagName: string) => void;
-  mode: 'single' | 'multiple';
-}
-
-export interface SelectTagFetchMoreProps {
-  fetchMore: () => void;
-  tagsLength: number;
-  totalCount: number;
-}
-
-export interface SelectTagsProps {
-  tagType: string;
-  selected?: string[];
-  onSelect?: (tags: string[]) => void;
-  loading?: boolean;
-  recordId: string;
-  fieldId?: string;
-  showAddButton?: boolean;
-  asTrigger?: boolean;
-  display?: () => React.ReactNode;
-  inDetail?: boolean;
-}
-
-export interface TagBadgesProps {
-  tagIds?: string[];
-  tags?: TTag[];
-}
-
-export interface ITagType {
-  description: string;
-  contentType: string;
 }

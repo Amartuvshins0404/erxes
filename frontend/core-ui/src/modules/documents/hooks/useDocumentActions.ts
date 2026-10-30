@@ -2,9 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { useMutation } from '@apollo/client';
 import { toast, useConfirm, useSetQueryStateByKey } from 'erxes-ui';
 import { useState } from 'react';
-import { DOCUMENTS_QUERY } from 'ui-modules';
 import { DUPLICATE_DOCUMENT } from '../graphql/documentMutations';
-import { GET_DOCUMENTS } from '../graphql/queries';
 import { IDocument } from '../types';
 import { useDocumentRemove } from './useDocumentRemove';
 
@@ -54,8 +52,6 @@ export const useDocumentActions = (document: IDocument): DocumentActions => {
     try {
       const { data } = await duplicateDocument({
         variables: { _id: document._id, contentType },
-        refetchQueries: [GET_DOCUMENTS, DOCUMENTS_QUERY],
-        awaitRefetchQueries: true,
       });
       if (!data?.documentsDuplicate) {
         throw new Error('The server did not return a duplicated document');

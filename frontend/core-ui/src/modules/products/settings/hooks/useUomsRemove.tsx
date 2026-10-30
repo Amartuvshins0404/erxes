@@ -29,7 +29,6 @@ export const useUomsRemove = (options?: MutationHookOptions) => {
         });
         options?.onCompleted?.(data);
       },
-      refetchQueries: ['Uoms'],
     });
   };
   return {

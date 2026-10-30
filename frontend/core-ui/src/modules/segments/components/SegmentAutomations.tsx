@@ -4,11 +4,11 @@ import { useSegmentAutomationCreate } from '@/segments/hooks/useSegmentAutomatio
 import { useSegmentAutomations } from '@/segments/hooks/useSegmentAutomations';
 import { useSegmentBroadcasts } from '@/segments/hooks/useSegmentBroadcasts';
 import { IconBolt, IconChevronRight, IconSend } from '@tabler/icons-react';
-import { Badge, Skeleton } from 'erxes-ui';
+import { Badge, Empty, Skeleton } from 'erxes-ui';
 import { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
-import { ISegment } from 'ui-modules';
+import { ISegment, LoadMoreSentinel } from 'ui-modules';
 
 type TSegmentFlowRow = {
   id: string;
@@ -50,10 +50,12 @@ const SegmentFlowList = ({
   loading,
   rows,
   emptyLabel,
+  footer,
 }: {
   loading: boolean;
   rows: TSegmentFlowRow[];
   emptyLabel: string;
+  footer?: ReactNode;
 }) => {
   if (loading) {
     return (
@@ -73,10 +75,14 @@ const SegmentFlowList = ({
 
   if (!rows.length) {
     return (
-      <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed px-6 py-10 text-center">
-        <IconBolt className="size-6 text-muted-foreground" />
-        <p className="text-sm text-muted-foreground">{emptyLabel}</p>
-      </div>
+      <Empty className="rounded-lg border border-dashed">
+        <Empty.Header>
+          <Empty.Media variant="icon">
+            <IconBolt />
+          </Empty.Media>
+          <Empty.Description>{emptyLabel}</Empty.Description>
+        </Empty.Header>
+      </Empty>
     );
   }
 
@@ -85,6 +91,7 @@ const SegmentFlowList = ({
       {rows.map(({ id, ...row }) => (
         <SegmentFlowRow key={id} {...row} />
       ))}
+      {footer}
     </div>
   );
 };
@@ -106,8 +113,13 @@ const broadcastStatus = ({
 export const SegmentAutomations = ({ segment }: { segment?: ISegment }) => {
   const { t } = useTranslation('segment', { keyPrefix: 'detail' });
   const { automations, loading } = useSegmentAutomations(segment);
-  const { broadcasts, loading: broadcastsLoading } =
-    useSegmentBroadcasts(segment);
+  const {
+    broadcasts,
+    loading: broadcastsLoading,
+    fetchingMore,
+    hasNextPage,
+    fetchMore,
+  } = useSegmentBroadcasts(segment);
   const { editPath } = useSegmentAutomationCreate(segment);
   const isLoading = loading || broadcastsLoading;
 
@@ -156,6 +168,13 @@ export const SegmentAutomations = ({ segment }: { segment?: ISegment }) => {
         loading={isLoading}
         rows={rows}
         emptyLabel={t('automations-empty')}
+        footer={
+          <LoadMoreSentinel
+            hasMore={hasNextPage}
+            loading={fetchingMore}
+            onLoadMore={fetchMore}
+          />
+        }
       />
     </div>
   );

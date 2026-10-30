@@ -14,7 +14,6 @@ export const useUsersGroupsAdd = () => {
     addUsersGroups({
       ...options,
       variables,
-      refetchQueries: ['UsersGroups'],
     });
   };
 
@@ -37,11 +36,9 @@ export function useRemoveUsersGroups() {
           toast({ title: 'Group has been removed', variant: 'success' }),
         onError: () =>
           toast({ title: 'Failed to remove group', variant: 'destructive' }),
-        refetchQueries: ['UsersGroups'],
       });
       return true;
-    } catch (err) {
-      console.error('Error removing group:', err);
+    } catch {
       return false;
     }
   };
@@ -91,11 +88,9 @@ export const useUsersGroupsCopy = () => {
           toast({ title: 'Group has been copied!', variant: 'success' }),
         onError: () =>
           toast({ title: 'Failed to copy group', variant: 'destructive' }),
-        refetchQueries: ['UsersGroups'],
       });
       return true;
-    } catch (err) {
-      console.error('Error copying group:', err);
+    } catch {
       return false;
     }
   };

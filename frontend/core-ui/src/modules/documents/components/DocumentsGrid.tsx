@@ -1,6 +1,11 @@
 import { IconCalendarPlus, IconFileText } from '@tabler/icons-react';
 import dayjs from 'dayjs';
-import { Card, RelativeDateDisplay, useSetQueryStateByKey } from 'erxes-ui';
+import {
+  Badge,
+  Card,
+  RelativeDateDisplay,
+  useSetQueryStateByKey,
+} from 'erxes-ui';
 import { ApprovalLockedBadge, MembersInline } from 'ui-modules';
 import { DOCUMENTS_TYPES_SET } from '../constants';
 import { IDocument } from '../types';
@@ -43,13 +48,12 @@ export const DocumentsGrid = ({ documents }: { documents: IDocument[] }) => {
               {document.approvalLockState?.hasAccess !== false && (
                 <DocumentPreview document={document} />
               )}
-              <span
-                className={`text-xs py-1 px-2 ${
-                  documentType?.color ?? ''
-                } border whitespace-nowrap absolute top-0 right-0 mt-2 mr-2 rounded-lg`}
+              <Badge
+                variant={documentType?.variant ?? 'secondary'}
+                className="absolute top-2 right-2 rounded-full"
               >
                 {documentTypeLabel}
-              </span>
+              </Badge>
             </Card.Content>
 
             <div className="flex items-start justify-between gap-2 p-4">

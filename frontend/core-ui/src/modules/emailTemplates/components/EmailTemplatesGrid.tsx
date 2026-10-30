@@ -16,10 +16,8 @@ import {
   ScrollArea,
   Skeleton,
 } from 'erxes-ui';
-import { useState } from 'react';
-import { useInView } from 'react-intersection-observer';
 import { useNavigate } from 'react-router';
-import { MembersInline } from 'ui-modules';
+import { LoadMoreSentinel, MembersInline } from 'ui-modules';
 import { useTranslation } from 'react-i18next';
 
 const FORMAT_LABEL = {
@@ -28,7 +26,6 @@ const FORMAT_LABEL = {
 };
 
 const INITIAL_SKELETON_COUNT = 8;
-const FETCH_MORE_SKELETON_COUNT = 4;
 
 const EmailTemplateCardSkeleton = () => (
   <Card className="flex flex-col gap-4 border p-4">
@@ -37,32 +34,6 @@ const EmailTemplateCardSkeleton = () => (
     <Skeleton className="h-3 w-1/2" />
   </Card>
 );
-
-/** Reaching the end of the grid fetches the next page, as the table does. */
-const EmailTemplateCardsForwardSkeleton = ({
-  root,
-  handleFetchMore,
-}: {
-  root: Element | null;
-  handleFetchMore: ({ direction }: { direction: EnumCursorDirection }) => void;
-}) => {
-  const { ref } = useInView({
-    root,
-    onChange: (inView) =>
-      inView && handleFetchMore({ direction: EnumCursorDirection.FORWARD }),
-  });
-
-  return (
-    <>
-      <div ref={ref}>
-        <EmailTemplateCardSkeleton />
-      </div>
-      {Array.from({ length: FETCH_MORE_SKELETON_COUNT - 1 }).map((_, index) => (
-        <EmailTemplateCardSkeleton key={index} />
-      ))}
-    </>
-  );
-};
 
 const EmailTemplateCard = ({ template }: { template: IEmailTemplate }) => {
   const { t } = useTranslation('settings', { keyPrefix: 'email-templates' });
@@ -123,13 +94,15 @@ const EmailTemplateCard = ({ template }: { template: IEmailTemplate }) => {
 };
 
 export const EmailTemplatesGrid = () => {
-  const { emailTemplates, pageInfo, loading, error, refetch, handleFetchMore } =
-    useEmailTemplates();
-
-  // Held in state so the observer re-registers once the viewport is mounted.
-  const [scrollElement, setScrollElement] = useState<HTMLDivElement | null>(
-    null,
-  );
+  const {
+    emailTemplates,
+    hasNextPage,
+    loading,
+    initialLoading,
+    error,
+    refetch,
+    handleFetchMore,
+  } = useEmailTemplates();
 
   if (error) {
     return <EmailTemplatesErrorState error={error} onRetry={() => refetch()} />;
@@ -141,22 +114,23 @@ export const EmailTemplatesGrid = () => {
 
   return (
     <ScrollArea.Root className="h-full w-full">
-      <ScrollArea.Viewport ref={setScrollElement}>
+      <ScrollArea.Viewport>
         <div className="grid grid-cols-[repeat(auto-fill,minmax(18rem,1fr))] gap-3 p-3">
           {emailTemplates.map((template) => (
             <EmailTemplateCard key={template._id} template={template} />
           ))}
-          {loading &&
+          {initialLoading &&
             Array.from({ length: INITIAL_SKELETON_COUNT }).map((_, index) => (
               <EmailTemplateCardSkeleton key={index} />
             ))}
-          {pageInfo?.hasNextPage && !loading && (
-            <EmailTemplateCardsForwardSkeleton
-              root={scrollElement}
-              handleFetchMore={handleFetchMore}
-            />
-          )}
         </div>
+        <LoadMoreSentinel
+          hasMore={!!hasNextPage}
+          loading={loading}
+          onLoadMore={() =>
+            handleFetchMore({ direction: EnumCursorDirection.FORWARD })
+          }
+        />
       </ScrollArea.Viewport>
       <ScrollArea.Bar orientation="vertical" />
     </ScrollArea.Root>

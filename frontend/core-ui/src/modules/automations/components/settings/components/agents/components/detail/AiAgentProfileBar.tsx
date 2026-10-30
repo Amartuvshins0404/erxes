@@ -85,16 +85,16 @@ export const AiAgentProfileBar = () => {
         </div>
       </div>
 
-      <button
-        type="button"
+      <Button
+        variant="ghost"
         onClick={() => setBotSize(isLarge ? 'compact' : 'large')}
         aria-expanded={isLarge}
         aria-label={isLarge ? 'Shrink the bot' : 'Enlarge the bot'}
-        className="group relative my-1.5 flex h-3 w-full items-center justify-center"
+        className="group relative my-1.5 h-3 w-full p-0 hover:bg-transparent"
       >
         <span className="absolute inset-x-0 top-1/2 h-px bg-border" />
         <span className="relative h-1.5 w-10 rounded-full bg-muted-foreground/30 transition-colors group-hover:bg-muted-foreground/60" />
-      </button>
+      </Button>
 
       {!!memoryChips.length && (
         <div className="flex flex-wrap items-center gap-1.5">

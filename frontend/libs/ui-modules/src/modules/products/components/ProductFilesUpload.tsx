@@ -1,5 +1,5 @@
 import { IconPaperclip, IconTrash } from '@tabler/icons-react';
-import { cn, formatBytes } from 'erxes-ui';
+import { Button, cn, formatBytes } from 'erxes-ui';
 import { useTranslation } from 'react-i18next';
 import { FilePicker } from '../../files/components/FilePicker';
 import { FileTypeIcon } from '../../files/components/FileTypeIcon';
@@ -62,27 +62,30 @@ export const ProductFilesUpload = ({
                   {body}
                 </div>
               )}
-              <button
+              <Button
+                variant="destructive"
+                size="icon"
                 type="button"
                 aria-label={t('remove')}
                 onClick={() => files.remove(key)}
-                className="absolute top-1 right-1 p-1 text-white rounded-md shadow opacity-0 transition group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100 bg-destructive"
+                className="absolute top-1 right-1 size-6 opacity-0 transition group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
               >
                 <IconTrash size={14} />
-              </button>
+              </Button>
             </div>
           );
         })}
 
         {files.canAdd && (
-          <button
+          <Button
+            variant="outline"
             type="button"
             onClick={() => files.setPickerOpen(true)}
-            className="flex flex-col justify-center items-center w-24 h-24 rounded-md border border-dashed transition cursor-pointer shrink-0 text-muted-foreground bg-background hover:bg-accent"
+            className="size-24 shrink-0 flex-col gap-1 rounded-xl border-dashed text-muted-foreground shadow-none"
           >
             <IconPaperclip size={18} />
             <span className="text-[11px]">{t('add')}</span>
-          </button>
+          </Button>
         )}
       </div>
 

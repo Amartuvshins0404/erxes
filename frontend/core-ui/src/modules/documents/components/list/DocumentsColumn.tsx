@@ -77,7 +77,7 @@ function DocumentTypeCell({ row }: CellContext<IDocument, unknown>) {
 
   return (
     <RecordTableInlineCell>
-      <Badge variant="secondary" className="gap-1">
+      <Badge variant={documentType?.variant ?? 'secondary'} className="gap-1">
         <DocumentTypeIcon className="size-4" />
         {documentType ? t(documentType.labelKey) : contentType}
       </Badge>

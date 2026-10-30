@@ -1,3 +1,4 @@
+import { Table } from 'erxes-ui';
 import { useMemo } from 'react';
 
 import { parseDelimitedTable } from '../converters/csv';
@@ -6,16 +7,6 @@ interface ISpreadsheetPreviewProps {
   content: string;
 }
 
-/**
- * Renders delimited-text (CSV/TSV/SV) artifact content as a read-only HTML
- * table. The CSV parser is the same one the download path uses, so what the
- * user sees matches what they get when they hit Download.
- *
- * Replaces an earlier Univer-based editor that rendered as an empty grid
- * whenever its heavy async bundle failed to mount — the lighter preview
- * either shows the data or an explicit empty state, so a blank card no
- * longer looks like a silent failure.
- */
 export const SpreadsheetPreview = ({ content }: ISpreadsheetPreviewProps) => {
   const { rows } = useMemo(() => parseDelimitedTable(content), [content]);
 
@@ -30,36 +21,29 @@ export const SpreadsheetPreview = ({ content }: ISpreadsheetPreviewProps) => {
   const [header, ...body] = rows;
 
   return (
-    <div className="max-h-[60vh] w-full overflow-auto rounded-md border bg-card">
-      <table className="w-full text-[13px]">
-        <thead className="sticky top-0 bg-muted/40">
-          <tr>
+    <div className="max-h-[60vh] w-full overflow-auto rounded-2xl border bg-card">
+      <Table className="text-[13px]">
+        <Table.Header className="sticky top-0 bg-muted/40">
+          <Table.Row>
             {header.map((cell, columnIndex) => (
-              <th
-                key={columnIndex}
-                scope="col"
-                className="border-b px-3 py-1.5 text-left font-medium"
-              >
+              <Table.Head key={columnIndex} scope="col">
                 {cell}
-              </th>
+              </Table.Head>
             ))}
-          </tr>
-        </thead>
-        <tbody>
+          </Table.Row>
+        </Table.Header>
+        <Table.Body>
           {body.map((row, rowIndex) => (
-            <tr key={rowIndex} className="hover:bg-muted/20">
+            <Table.Row key={rowIndex}>
               {row.map((cell, columnIndex) => (
-                <td
-                  key={columnIndex}
-                  className="border-b px-3 py-1.5 align-top"
-                >
+                <Table.Cell key={columnIndex} className="align-top">
                   {cell}
-                </td>
+                </Table.Cell>
               ))}
-            </tr>
+            </Table.Row>
           ))}
-        </tbody>
-      </table>
+        </Table.Body>
+      </Table>
     </div>
   );
 };

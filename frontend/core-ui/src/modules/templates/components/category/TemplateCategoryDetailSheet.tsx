@@ -1,6 +1,5 @@
 import { useTemplateCategoryDetail } from '@/templates/hooks/useTemplateCategoryDetail';
-import { IconLoader2 } from '@tabler/icons-react';
-import { Sheet, useQueryState, useToast } from 'erxes-ui';
+import { Sheet, Spinner, useQueryState, useToast } from 'erxes-ui';
 import { TemplateCategoryForm } from './TemplateCategoryForm';
 import { useTranslation } from 'react-i18next';
 
@@ -29,9 +28,7 @@ export const TemplateCategoryDetailSheet = () => {
     >
       <Sheet.View className="w-[50%] md:w-[50%] lg:w-[50%]">
         {loading ? (
-          <div className="flex flex-1 justify-center items-center p-5 min-h-[200px] text-muted-foreground">
-            <IconLoader2 className="w-4 h-4 animate-spin" />
-          </div>
+          <Spinner containerClassName="min-h-[200px]" />
         ) : (
           <>
             <Sheet.Header>

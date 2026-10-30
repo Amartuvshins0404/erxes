@@ -2,7 +2,6 @@ import { ApolloError, useMutation } from '@apollo/client';
 import { toast, useQueryState } from 'erxes-ui';
 import { useSegment } from '../context/SegmentProvider';
 import { SEGMENT_ADD, SEGMENT_EDIT } from '../graphql/mutations';
-import { SEGMENT_DETAIL, SEGMENTS } from '../graphql/queries';
 import { TSegmentForm } from '../types';
 
 export const useSegmentActions = ({
@@ -32,7 +31,6 @@ export const useSegmentActions = ({
         visibility: data.visibility,
         root: data.root,
       },
-      refetchQueries: [SEGMENTS, ...(segment ? [SEGMENT_DETAIL] : [])],
       onError: (error: ApolloError) =>
         toast({
           title: 'Could not save the segment',

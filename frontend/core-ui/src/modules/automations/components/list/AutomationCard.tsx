@@ -118,9 +118,12 @@ const AutomationCardStatus = ({
   return (
     <PopoverScoped open={open} onOpenChange={setOpen}>
       <Popover.Trigger asChild>
-        <button type="button" className="shrink-0">
+        <Button
+          variant="ghost"
+          className="h-auto shrink-0 p-0 hover:bg-transparent"
+        >
           <AutomationStatusBadge status={status} loading={loading} />
-        </button>
+        </Button>
       </Popover.Trigger>
       <Popover.Content align="end" className="w-auto p-1">
         <AutomationStatusToggle

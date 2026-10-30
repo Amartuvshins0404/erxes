@@ -1,13 +1,16 @@
 import { TAutomationStatsBucket } from '@/automations/types';
 import dayjs from 'dayjs';
-import { ChartContainer, ChartTooltipContent } from 'erxes-ui';
+import {
+  ChartConfig,
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+} from 'erxes-ui';
 import { useMemo } from 'react';
-import { Bar, BarChart, CartesianGrid, Tooltip, XAxis, YAxis } from 'recharts';
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts';
 import { useTranslation } from 'react-i18next';
 
-// Status colours follow STATUSES_BADGE_VARIABLES so the chart and the badges
-// tell the same story.
-const CHART_CONFIG = {
+const CHART_CONFIG: ChartConfig = {
   complete: { label: 'Complete', color: 'var(--success)' },
   error: { label: 'Error', color: 'var(--destructive)' },
   waiting: { label: 'Waiting', color: 'var(--warning)' },
@@ -73,23 +76,23 @@ export const AutomationStatsChart = ({
             minTickGap={16}
           />
           <YAxis tickLine={false} axisLine={false} allowDecimals={false} />
-          <Tooltip content={<ChartTooltipContent />} />
+          <ChartTooltip content={<ChartTooltipContent />} />
           <Bar
             dataKey="complete"
             stackId="runs"
-            fill="var(--success)"
+            fill="var(--color-complete)"
             name={t('stats-complete')}
           />
           <Bar
             dataKey="waiting"
             stackId="runs"
-            fill="var(--warning)"
+            fill="var(--color-waiting)"
             name={t('stats-waiting')}
           />
           <Bar
             dataKey="error"
             stackId="runs"
-            fill="var(--destructive)"
+            fill="var(--color-error)"
             name={t('error')}
             radius={[2, 2, 0, 0]}
           />

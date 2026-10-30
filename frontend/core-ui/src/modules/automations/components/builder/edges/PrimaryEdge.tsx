@@ -27,7 +27,7 @@ import {
   getStraightPath,
 } from '@xyflow/react';
 import { Button, cn } from 'erxes-ui';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion } from 'motion/react';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { FC } from 'react';
 import { useTranslation } from 'react-i18next';

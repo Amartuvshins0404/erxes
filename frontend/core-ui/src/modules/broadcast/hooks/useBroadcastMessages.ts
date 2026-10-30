@@ -1,11 +1,6 @@
-import { useQuery } from '@apollo/client';
-import {
-  EnumCursorDirection,
-  mergeCursorData,
-  useMultiQueryState,
-  validateFetchMore,
-} from 'erxes-ui';
+import { useCursorListQuery, useMultiQueryState } from 'erxes-ui';
 import { BROADCAST_MESSAGES } from '../graphql/queries';
+import { TBroadcastMessage } from '../types';
 
 export const useBroadcastMessageVariables = () => {
   const [{ searchValue, brand, fromUser, trigger, status, methods }] =
@@ -16,18 +11,8 @@ export const useBroadcastMessageVariables = () => {
       trigger: string;
       status: string;
       methods: string;
-    }>([
-      'searchValue',
-      'brand',
-      'fromUser',
-      'trigger',
-      'status',
-      'methods',
-    ]);
+    }>(['searchValue', 'brand', 'fromUser', 'trigger', 'status', 'methods']);
 
-  // `kind` is deliberately absent. What starts a campaign is read from its
-  // schedule and filtered as `trigger`; a leftover `kind` in a link used to go
-  // on narrowing the list with nothing on screen to say so or undo it.
   return {
     searchValue: searchValue || undefined,
     brandId: brand || undefined,
@@ -38,61 +23,13 @@ export const useBroadcastMessageVariables = () => {
   };
 };
 
-export const useMessages = () => {
+export const useMessages = <TItem = TBroadcastMessage>() => {
   const variables = useBroadcastMessageVariables();
 
-  const { data, loading, error, refetch, fetchMore } = useQuery(
-    BROADCAST_MESSAGES,
-    {
-      variables,
-    },
-  );
+  const { list, ...rest } = useCursorListQuery<TItem>(BROADCAST_MESSAGES, {
+    field: 'engageMessages',
+    variables,
+  });
 
-  const {
-    list: messages,
-    pageInfo,
-    totalCount = 0,
-  } = data?.engageMessages || {};
-
-  const handleFetchMore = ({
-    direction,
-  }: {
-    direction: EnumCursorDirection;
-  }) => {
-    if (!validateFetchMore({ direction, pageInfo })) {
-      return;
-    }
-
-    fetchMore({
-      variables: {
-        cursor:
-          direction === EnumCursorDirection.FORWARD
-            ? pageInfo?.endCursor
-            : pageInfo?.startCursor,
-        limit: 20,
-        direction,
-      },
-      updateQuery: (prev, { fetchMoreResult }) => {
-        if (!fetchMoreResult) return prev;
-
-        return Object.assign({}, prev, {
-          engageMessages: mergeCursorData({
-            direction,
-            fetchMoreResult: fetchMoreResult.engageMessages,
-            prevResult: prev.engageMessages,
-          }),
-        });
-      },
-    });
-  };
-
-  return {
-    messages,
-    pageInfo,
-    totalCount,
-    loading,
-    error,
-    refetch,
-    handleFetchMore,
-  };
+  return { messages: list, ...rest };
 };

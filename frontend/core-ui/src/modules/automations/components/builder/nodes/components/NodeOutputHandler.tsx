@@ -4,7 +4,7 @@ import { AutomationNodeType } from '@/automations/types';
 import { IconGripVertical, IconLinkPlus, IconPlus } from '@tabler/icons-react';
 import { Handle, Position, useConnection } from '@xyflow/react';
 import { Button, cn } from 'erxes-ui';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion } from 'motion/react';
 import React, { memo, useCallback } from 'react';
 
 interface NodeOutputHandlerProps extends React.HTMLAttributes<HTMLDivElement> {

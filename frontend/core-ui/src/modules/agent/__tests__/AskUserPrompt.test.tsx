@@ -3,6 +3,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import type {
   ButtonHTMLAttributes,
   HTMLAttributes,
+  LabelHTMLAttributes,
   TextareaHTMLAttributes,
 } from 'react';
 import { AskUserAnswered, AskUserPrompt } from '../components/AskUserPrompt';
@@ -22,6 +23,13 @@ jest.mock('erxes-ui', () => ({
     void _variant;
     void _size;
     return <button {...props} />;
+  },
+  Label: ({
+    variant: _variant,
+    ...props
+  }: LabelHTMLAttributes<HTMLLabelElement> & { variant?: string }) => {
+    void _variant;
+    return <label {...props} />;
   },
   Textarea: (props: TextareaHTMLAttributes<HTMLTextAreaElement>) => (
     <textarea {...props} />

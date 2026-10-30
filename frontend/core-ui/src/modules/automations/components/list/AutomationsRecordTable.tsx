@@ -8,14 +8,7 @@ import { AutomationErrorEmptyState } from '@/automations/components/common/Autom
 import { AutomationsCardList } from '@/automations/components/list/AutomationsCardList';
 import { useAutomationsListLayout } from '@/automations/components/list/AutomationsDisplayControl';
 import { IconAffiliate, IconSettings } from '@tabler/icons-react';
-import {
-  Breadcrumb,
-  Button,
-  Separator,
-  Spinner,
-  Kbd,
-  useScopedHotkeys,
-} from 'erxes-ui';
+import { Breadcrumb, Button, Separator, Kbd, useScopedHotkeys } from 'erxes-ui';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AutomationsHotKeyScope } from '@/automations/types';
@@ -60,9 +53,6 @@ export const AutomationsRecordTable = () => {
     AutomationsHotKeyScope.AutomationsPage,
     [canCreateAutomation, navigate],
   );
-  if (loading) {
-    return <Spinner />;
-  }
 
   return (
     <>
@@ -111,7 +101,7 @@ export const AutomationsRecordTable = () => {
           error={error}
           onRetry={() => refetch()}
         />
-      ) : list.length === 0 ? (
+      ) : !loading && list.length === 0 ? (
         <AutomationsRecordTableEmptyState />
       ) : layout === 'grid' ? (
         <AutomationsCardList

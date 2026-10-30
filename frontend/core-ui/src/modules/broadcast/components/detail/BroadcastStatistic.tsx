@@ -66,11 +66,8 @@ export const BroadcastStatistic = () => {
   return (
     <SideMenu>
       <SideMenu.Content value="statistic">
-        <SideMenu.Header
-          Icon={IconChartCandle}
-          label={t('stat.average')}
-        />
-        <div className="h-full bg-white p-4 space-y-3 overflow-y-auto">
+        <SideMenu.Header Icon={IconChartCandle} label={t('stat.average')} />
+        <div className="h-full space-y-3 overflow-y-auto bg-background p-4">
           {Object.entries(STATISTIC_KINDS).map(
             ([key, { labelKey, icon: Icon }]) => {
               const value =

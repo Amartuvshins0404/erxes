@@ -29,7 +29,6 @@ const CONTENT_TYPES: Record<TContactKind, string> = {
   company: 'core:company',
 };
 
-// One linked record: its avatar and name; clicking opens it in the panel.
 const RelationChip = ({
   name,
   avatar,
@@ -39,12 +38,14 @@ const RelationChip = ({
   avatar?: string;
   onOpen: () => void;
 }) => (
-  <button
+  <Button
     type="button"
+    variant="secondary"
+    size="sm"
     onClick={onOpen}
     title={name}
     data-panel-inline=""
-    className="group/chip inline-flex h-6 max-w-full items-center gap-1 rounded-sm bg-muted px-1.5 text-xs font-medium hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    className="group/chip h-6 max-w-full gap-1 rounded-full px-1.5 text-xs"
   >
     <Avatar className="size-4 flex-none">
       <Avatar.Image src={readImage(avatar)} />
@@ -53,9 +54,8 @@ const RelationChip = ({
       </Avatar.Fallback>
     </Avatar>
     <span className="truncate">{name}</span>
-    {/* It opens the record: say so on hover. */}
     <IconArrowUpRight className="size-3 flex-none text-muted-foreground opacity-0 transition-opacity group-hover/chip:opacity-100 group-focus-visible/chip:opacity-100" />
-  </button>
+  </Button>
 );
 
 const ChipSkeleton = () => <Skeleton className="h-5 w-20 rounded-sm" />;

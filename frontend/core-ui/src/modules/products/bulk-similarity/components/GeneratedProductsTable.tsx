@@ -1,4 +1,4 @@
-import { Badge, Button, Checkbox, Table, Tooltip, cn } from 'erxes-ui';
+import { Badge, Button, Checkbox, Input, Table, Tooltip, cn } from 'erxes-ui';
 import {
   IconAlertTriangle,
   IconStar,
@@ -6,7 +6,6 @@ import {
   IconSwitchHorizontal,
 } from '@tabler/icons-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { IMaskInput } from 'react-imask';
 import { Controller, useFormContext, useWatch } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { BulkSimilarityFormValues } from '../constants/bulkSimilaritySchema';
@@ -59,7 +58,7 @@ const EditableCell = ({
       onBlur={commit}
       onBeforeInput={(e) => {
         const data = (e.nativeEvent as InputEvent).data;
-        if (numeric && data && /[^0-9.\-]/.test(data)) {
+        if (numeric && data && /[^0-9.-]/.test(data)) {
           e.preventDefault();
         }
       }}
@@ -105,12 +104,8 @@ const NumericEditableCell = ({
 }) => {
   const shown = value ?? fallback;
   return (
-    <IMaskInput
-      mask={Number as any}
-      thousandsSeparator=","
-      radix="."
-      unmask
-      value={shown != null ? String(shown) : ''}
+    <Input.Number
+      value={shown}
       placeholder={placeholder}
       disabled={disabled}
       autoComplete="off"
@@ -125,7 +120,7 @@ const NumericEditableCell = ({
         }
       }}
       className={cn(
-        'block w-full h-8 px-2 text-right bg-transparent outline-none truncate leading-8 cursor-text',
+        'block w-full h-8 px-2 text-right bg-transparent shadow-none truncate leading-8 cursor-text',
         'placeholder:text-muted-foreground',
         edited && 'text-warning',
         disabled && 'cursor-not-allowed opacity-70',
@@ -235,7 +230,10 @@ const useColumnWidths = (defaults: Record<string, number>) => {
       const startWidth = widths[id] ?? defaults[id] ?? DEFAULT_COLUMN_WIDTH;
 
       const onMove = (e: MouseEvent) => {
-        const next = Math.max(MIN_COLUMN_WIDTH, startWidth + e.clientX - startX);
+        const next = Math.max(
+          MIN_COLUMN_WIDTH,
+          startWidth + e.clientX - startX,
+        );
         setWidths((prev) => ({ ...prev, [id]: next }));
       };
 
@@ -493,7 +491,9 @@ export const GeneratedProductsTable = ({
                               className="mr-1 text-destructive shrink-0"
                             />
                           </Tooltip.Trigger>
-                          <Tooltip.Content>{t('duplicate-code', 'Duplicate code')}</Tooltip.Content>
+                          <Tooltip.Content>
+                            {t('duplicate-code', 'Duplicate code')}
+                          </Tooltip.Content>
                         </Tooltip>
                       </Tooltip.Provider>
                     )}

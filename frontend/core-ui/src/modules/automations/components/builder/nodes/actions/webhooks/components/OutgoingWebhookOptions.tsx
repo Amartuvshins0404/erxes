@@ -5,7 +5,7 @@ import { Form, Input, Select, Switch } from 'erxes-ui';
 import { useFormContext } from 'react-hook-form';
 
 export const OutgoingWebhookOptions = () => {
-  const { control, getValues } = useFormContext<TOutgoingWebhookForm>();
+  const { control } = useFormContext<TOutgoingWebhookForm>();
   const { t } = useTranslation('automations');
 
   return (
@@ -140,7 +140,7 @@ export const OutgoingWebhookOptions = () => {
               min="100"
               max="60000"
             />
-            <Form.Description className="text-xs text-gray-500">
+            <Form.Description className="text-xs">
               {t('webhook-retry-delay-description')}
             </Form.Description>
             <Form.Message />

@@ -1,32 +1,15 @@
-import { ApolloCache, MutationHookOptions, useMutation } from '@apollo/client';
-import { ADD_BRANDS, GET_BRANDS } from '../graphql';
-import { IBrandData, TAddBrandResult } from '../types';
-import { useBrandsVariables } from './useBrands';
+import {
+  MutationHookOptions,
+  OperationVariables,
+  useMutation,
+} from '@apollo/client';
+import { ADD_BRANDS } from '../graphql';
+import { TAddBrandResult } from '../types';
+
 export function useBrandsAdd(
-  options?: MutationHookOptions<TAddBrandResult, any>,
+  options?: MutationHookOptions<TAddBrandResult, OperationVariables>,
 ) {
-  const variables = useBrandsVariables(options);
-  const [brandsAdd, { loading, error }] = useMutation(ADD_BRANDS, {
-    ...options,
-    update: (cache: ApolloCache<any>, { data }) => {
-      if (!data?.brandsAdd) return;
-
-      cache.updateQuery<IBrandData>(
-        { query: GET_BRANDS, variables },
-        (existingData) => {
-          if (!existingData?.brands?.list) return existingData;
-
-          return {
-            brands: {
-              ...existingData.brands,
-              list: [data.brandsAdd, ...existingData.brands.list],
-              totalCount: existingData.brands.totalCount + 1,
-            },
-          };
-        },
-      );
-    },
-  });
+  const [brandsAdd, { loading, error }] = useMutation(ADD_BRANDS, options);
 
   return {
     brandsAdd,

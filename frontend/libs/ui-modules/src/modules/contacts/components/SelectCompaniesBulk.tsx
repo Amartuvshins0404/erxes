@@ -225,11 +225,11 @@ const CompaniesList = ({
             })}
 
             {companies.length < totalCount && (
-              <div ref={bottomRef} className="flex items-center gap-2 h-8">
+              <div
+                ref={bottomRef}
+                className="flex items-center justify-center h-8"
+              >
                 <Spinner />
-                <span className="text-muted-foreground animate-pulse">
-                  Loading more companies...
-                </span>
               </div>
             )}
           </Tooltip.Provider>

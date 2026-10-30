@@ -1,11 +1,9 @@
 import { QUERY_TEMPLATES } from '@/templates/graphql/queries';
-import { useQuery } from '@apollo/client';
+import { Template } from '@/templates/types/Template';
 import {
-  EnumCursorDirection,
-  mergeCursorData,
   parseDateRangeFromString,
+  useCursorListQuery,
   useMultiQueryState,
-  validateFetchMore,
 } from 'erxes-ui';
 
 export const useTemplatesVariables = () => {
@@ -37,8 +35,8 @@ export const useTemplatesVariables = () => {
     'updatedBy',
   ]);
 
-  const variables: Record<string, any> = {};
-  const dateFilters: Record<string, any> = {};
+  const variables: Record<string, string | string[]> = {};
+  const dateFilters: Record<string, { gte?: Date; lte?: Date }> = {};
 
   if (contentType) {
     variables['contentType'] = contentType;
@@ -84,48 +82,10 @@ export const useTemplatesVariables = () => {
 export const useTemplates = () => {
   const variables = useTemplatesVariables();
 
-  const { data, loading, fetchMore } = useQuery(QUERY_TEMPLATES, {
+  const { list, ...rest } = useCursorListQuery<Template>(QUERY_TEMPLATES, {
+    field: 'templateList',
     variables,
   });
 
-  const { list: templates, pageInfo } = data?.templateList || {};
-
-  const handleFetchMore = ({
-    direction,
-  }: {
-    direction: EnumCursorDirection;
-  }) => {
-    if (!validateFetchMore({ direction, pageInfo })) {
-      return;
-    }
-
-    fetchMore({
-      variables: {
-        cursor:
-          direction === EnumCursorDirection.FORWARD
-            ? pageInfo?.endCursor
-            : pageInfo?.startCursor,
-        limit: 20,
-        direction,
-      },
-      updateQuery: (prev, { fetchMoreResult }) => {
-        if (!fetchMoreResult) return prev;
-
-        return Object.assign({}, prev, {
-          templateList: mergeCursorData({
-            direction,
-            fetchMoreResult: fetchMoreResult.templateList,
-            prevResult: prev.templateList,
-          }),
-        });
-      },
-    });
-  };
-
-  return {
-    templates,
-    pageInfo,
-    loading,
-    handleFetchMore,
-  };
+  return { templates: list, ...rest };
 };

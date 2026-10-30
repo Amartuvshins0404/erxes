@@ -8,7 +8,7 @@ import { addingTagAtom } from '@/settings/tags/states/addingTagAtom';
 import { childTagsMapAtomFamily } from '@/settings/tags/states/childTagsMap';
 import { tagGroupsAtomFamily } from '@/settings/tags/states/tagGroupsAtom';
 import { IconTagOff } from '@tabler/icons-react';
-import { ScrollArea, useQueryState } from 'erxes-ui';
+import { Empty, ScrollArea, useQueryState } from 'erxes-ui';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -74,10 +74,14 @@ export const TagsList = () => {
           ) : rootTags && rootTags.length > 0 ? (
             rootTags.map((tag) => <TagsListRow key={tag._id} tag={tag} />)
           ) : (
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col gap-3 text-muted-foreground items-center justify-center opacity-50 select-none">
-              <IconTagOff className="size-16" strokeWidth={1} />
-              <span className="font-medium text-lg">{t('not-found')}</span>
-            </div>
+            <Empty className="min-h-80">
+              <Empty.Header>
+                <Empty.Media variant="icon">
+                  <IconTagOff />
+                </Empty.Media>
+                <Empty.Title>{t('not-found')}</Empty.Title>
+              </Empty.Header>
+            </Empty>
           )}
         </ScrollArea>
       </div>

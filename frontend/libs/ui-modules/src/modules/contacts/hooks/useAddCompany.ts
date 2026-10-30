@@ -4,14 +4,10 @@ import { ICompany } from '../types';
 
 type AddCompanyResult = { companiesAdd: ICompany };
 
-const DEFAULT_OPTIONS: MutationHookOptions<AddCompanyResult> = {
-  refetchQueries: ['companies'],
-};
-
 export function useAddCompany(options?: MutationHookOptions<AddCompanyResult>) {
   const [companiesAdd, { loading, error }] = useMutation<AddCompanyResult>(
     COMPANIES_ADD,
-    { ...DEFAULT_OPTIONS, ...options },
+    options,
   );
 
   return { companiesAdd, loading, error };

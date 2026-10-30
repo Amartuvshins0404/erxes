@@ -26,7 +26,7 @@ export function LogUserInfo({
       <div className="flex items-center gap-3 rounded-2xl border bg-background px-4 py-4">
         <Avatar className="h-12 w-12 rounded-full">
           <Avatar.Image src={readImage(details?.avatar || '')} alt={fullName} />
-          <Avatar.Fallback className="rounded-full text-black">
+          <Avatar.Fallback className="rounded-full">
             {initials}
           </Avatar.Fallback>
         </Avatar>
@@ -50,7 +50,7 @@ export function LogUserInfo({
     >
       <Avatar className="h-6 w-6 rounded-full">
         <Avatar.Image src={readImage(details?.avatar || '')} alt={fullName} />
-        <Avatar.Fallback className="rounded-lg text-black">
+        <Avatar.Fallback className="rounded-full">
           {initials}
         </Avatar.Fallback>
       </Avatar>

@@ -1,5 +1,5 @@
 import { PasswordInput } from '@/settings/security/components/fields/password-field';
-import PasswordStrength from '@/settings/security/components/PasswordStrength';
+import { PasswordStrength } from '@/settings/security/components/PasswordStrength';
 import { useChangePassword } from '@/settings/security/hooks/useChangePassword';
 import { useChangePasswordForm } from '@/settings/security/hooks/useChangePasswordForm';
 import { IChangePassword } from '@/settings/security/types';
@@ -9,8 +9,7 @@ import { useTranslation } from 'react-i18next';
 export const ChangePasswordForm = () => {
   const { form } = useChangePasswordForm();
   const { changePassword, loading } = useChangePassword();
-  const { control, watch, handleSubmit, reset, formState } = form;
-  const { errors } = formState;
+  const { control, watch, handleSubmit, reset } = form;
 
   const [newPassword, reTypeValue, currentPassword] = watch([
     'newPassword',
@@ -98,11 +97,7 @@ export const ChangePasswordForm = () => {
               </Form.Item>
             )}
           />
-          <PasswordStrength
-            value={newPassword}
-            reTypeValue={reTypeValue}
-            errors={errors || {}}
-          />
+          <PasswordStrength value={newPassword} reTypeValue={reTypeValue} />
         </fieldset>
         <div className="mt-6 flex justify-end">
           <Button

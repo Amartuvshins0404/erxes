@@ -4,7 +4,7 @@ import { Button, Form, Input, Select, cn } from 'erxes-ui';
 import { MAIL_CONFIG_FIELDS } from '@/settings/mail-config/constants/formData';
 import { TInput, TMailConfigForm } from '@/settings/mail-config/types';
 import { Path, useFormContext, useWatch } from 'react-hook-form';
-import { AnimatePresence } from 'framer-motion';
+import { AnimatePresence } from 'motion/react';
 import { useConfig } from '@/settings/file-upload/hook/useConfigs';
 import { VerifiedSenders } from '@/settings/mail-config/components/VerifiedSenders';
 import { IconLoader2 } from '@tabler/icons-react';

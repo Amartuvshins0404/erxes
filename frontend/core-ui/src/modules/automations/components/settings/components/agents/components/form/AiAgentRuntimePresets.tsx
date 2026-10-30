@@ -1,6 +1,6 @@
 import { useAiAgentRuntimePresets } from '@/automations/components/settings/components/agents/hooks/useAiAgentRuntimePresets';
 import { TAiAgentForm } from '@/automations/components/settings/components/agents/states/AiAgentFormSchema';
-import { Badge, cn, Skeleton } from 'erxes-ui';
+import { Badge, ChoiceboxGroup, Skeleton } from 'erxes-ui';
 import { useFormContext, useWatch } from 'react-hook-form';
 
 const formatSeconds = (ms: number) => `${Math.round(ms / 1000)}s`;
@@ -30,35 +30,36 @@ export const AiAgentRuntimePresets = () => {
         <h4 className="text-sm font-medium">Budget</h4>
         {!activePreset && <Badge variant="secondary">Custom</Badge>}
       </div>
-      <div className="grid gap-3 md:grid-cols-3">
+      <ChoiceboxGroup
+        value={activePreset?.key ?? ''}
+        onValueChange={(key) => {
+          const preset = presets.find((item) => item.key === key);
+
+          if (preset) {
+            setValue('runtime', preset.runtime, {
+              shouldDirty: true,
+              shouldValidate: true,
+            });
+          }
+        }}
+        className="grid gap-3 md:grid-cols-3"
+      >
         {presets.map((preset) => (
-          <button
+          <ChoiceboxGroup.Item
             key={preset.key}
-            type="button"
-            onClick={() =>
-              setValue('runtime', preset.runtime, {
-                shouldDirty: true,
-                shouldValidate: true,
-              })
-            }
-            className={cn(
-              'rounded-lg border p-3 text-left transition-colors',
-              activePreset?.key === preset.key
-                ? 'border-primary bg-primary/5 ring-1 ring-primary'
-                : 'hover:bg-accent/40',
-            )}
+            value={preset.key}
+            title={preset.label}
           >
-            <span className="block text-sm font-medium">{preset.label}</span>
-            <span className="block text-xs text-muted-foreground">
+            <span className="block text-xs font-normal text-muted-foreground">
               {preset.description}
             </span>
-            <span className="mt-2 block text-xs text-muted-foreground">
+            <span className="mt-1 block text-xs font-normal text-muted-foreground">
               {preset.runtime.maxTokens.toLocaleString()} tokens ·{' '}
               {formatSeconds(preset.runtime.timeoutMs)} timeout
             </span>
-          </button>
+          </ChoiceboxGroup.Item>
         ))}
-      </div>
+      </ChoiceboxGroup>
     </div>
   );
 };

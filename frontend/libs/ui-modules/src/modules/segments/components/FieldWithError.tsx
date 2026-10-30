@@ -9,7 +9,10 @@ export const FieldWithError = ({ error, children }: Props) => {
   if (error) {
     return (
       <HoverCard>
-        <HoverCard.Trigger asChild className="ring-2 ring-red-300 rounded">
+        <HoverCard.Trigger
+          asChild
+          className="rounded-md shadow-focus-destructive"
+        >
           <div>{children}</div>
         </HoverCard.Trigger>
         <HoverCard.Content className="w-80">

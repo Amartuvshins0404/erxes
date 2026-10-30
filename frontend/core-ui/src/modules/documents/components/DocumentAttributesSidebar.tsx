@@ -3,7 +3,13 @@ import {
   insertAttribute,
 } from '@/documents/utils/attributeDnd';
 import { IconGripVertical, IconX } from '@tabler/icons-react';
-import { Button, Command, IBlockEditor, ScrollArea } from 'erxes-ui';
+import {
+  Button,
+  Command,
+  IBlockEditor,
+  ScrollArea,
+  SkeletonArray,
+} from 'erxes-ui';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -95,12 +101,7 @@ export const DocumentAttributesSidebar = ({
             <Command.List className="max-h-none px-2 py-2">
               {loading && (
                 <div className="space-y-2 px-2 py-3">
-                  {Array.from({ length: 5 }).map((_, i) => (
-                    <div
-                      key={i}
-                      className="h-8 animate-pulse rounded-md bg-muted"
-                    />
-                  ))}
+                  <SkeletonArray count={5} className="h-8" />
                 </div>
               )}
               {!loading && (

@@ -3,7 +3,7 @@ import { useAutomationHistories } from '@/automations/hooks/useAutomationHistori
 import { IconArchive, IconRefresh } from '@tabler/icons-react';
 import {
   Button,
-  Label,
+  Empty,
   PageSubHeader,
   RecordTable,
   Resizable,
@@ -22,8 +22,6 @@ type AutomationHistoriesTableProps = Omit<
   'refetch' | 'error'
 >;
 
-// Reuses the record table's own selected-row styling for the row shown in the
-// split panel.
 const AutomationHistoryRow = ({
   original,
   ...props
@@ -64,30 +62,28 @@ const AutomationHistoriesTable = ({
           hasNextPage={hasNextPage}
           dataLength={list?.length}
           sessionKey={AUTOMATION_HISTORIES_CURSOR_SESSION_KEY}
+          loading={loading}
         >
           <RecordTable>
             <RecordTable.Header />
             <RecordTable.Body>
-              <RecordTable.CursorBackwardSkeleton
+              <RecordTable.CursorRows
                 handleFetchMore={handleFetchMore}
-              />
-              {!totalCount && (
-                <tr className="h-[80vh]">
-                  <td colSpan={6} className="py-10 text-center">
-                    <div className="flex flex-col items-center justify-center text-muted-foreground">
-                      <IconArchive className="w-8 h-8 mb-2" />
-                      <Label>{t('no-results')}</Label>
-                    </div>
-                  </td>
-                </tr>
-              )}
-              {loading && <RecordTable.RowSkeleton rows={40} />}
-              <RecordTable.RowList Row={AutomationHistoryRow} />
-              <RecordTable.CursorForwardSkeleton
-                handleFetchMore={handleFetchMore}
+                loading={loading}
+                Row={AutomationHistoryRow}
               />
             </RecordTable.Body>
           </RecordTable>
+          {!loading && !totalCount && (
+            <Empty className="m-3 min-h-80">
+              <Empty.Header>
+                <Empty.Media variant="icon">
+                  <IconArchive />
+                </Empty.Media>
+                <Empty.Title>{t('no-results')}</Empty.Title>
+              </Empty.Header>
+            </Empty>
+          )}
         </RecordTable.CursorProvider>
       </RecordTable.Provider>
     </div>

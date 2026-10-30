@@ -1,5 +1,5 @@
 import { WelcomeMessageBackground } from 'ui-modules/modules/notifications/components/WelcomeMessageBackground';
-import { MotionConfig, motion } from 'framer-motion';
+import { MotionConfig, motion } from 'motion/react';
 import { WelcomeSocialSection } from 'ui-modules/modules/notifications/components/WelcomeSocialSection';
 import {
   WELCOME_FALLBACK_SOCIALS,

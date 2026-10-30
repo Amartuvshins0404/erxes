@@ -1,6 +1,6 @@
 import { useAtomValue } from 'jotai';
 import { cn } from 'erxes-ui';
-import { useReducedMotion } from 'framer-motion';
+import { useReducedMotion } from 'motion/react';
 
 import { BloubAvatar } from '../bloub/BloubAvatar';
 import type { ExpressionId } from '../bloub/engine/expressions';

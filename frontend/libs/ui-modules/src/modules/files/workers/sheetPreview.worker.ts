@@ -15,8 +15,13 @@ export type TSheetPreviewResult =
     }
   | { error: string };
 
+const workerScope = globalThis as unknown as {
+  onmessage: ((event: MessageEvent<TSheetPreviewRequest>) => void) | null;
+  postMessage: (message: TSheetPreviewResult) => void;
+};
+
 // Off the main thread: SheetJS holds several times the file size in memory.
-self.onmessage = async (event: MessageEvent<TSheetPreviewRequest>) => {
+workerScope.onmessage = async (event: MessageEvent<TSheetPreviewRequest>) => {
   const { url, isCsv, maxRows } = event.data;
 
   try {
@@ -57,10 +62,10 @@ self.onmessage = async (event: MessageEvent<TSheetPreviewRequest>) => {
       truncated: rows.length > maxRows,
     };
 
-    self.postMessage(result);
+    workerScope.postMessage(result);
   } catch (e) {
     const result: TSheetPreviewResult = { error: (e as Error).message };
 
-    self.postMessage(result);
+    workerScope.postMessage(result);
   }
 };

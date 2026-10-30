@@ -80,7 +80,7 @@ const FieldSaveStatus = ({ state }: { state: TFieldSaveState }) => {
   if (state === 'saved') {
     return (
       <span title="Saved">
-        <IconCheck className="mr-1 inline size-3.5 align-[-2px] text-green-500" />
+        <IconCheck className="mr-1 inline size-3.5 align-[-2px] text-success" />
       </span>
     );
   }

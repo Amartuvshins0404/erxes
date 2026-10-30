@@ -1,4 +1,4 @@
-import { cn, Tooltip, useMultiQueryState } from 'erxes-ui';
+import { Button, cn, Tooltip, useMultiQueryState } from 'erxes-ui';
 import { useTranslation } from 'react-i18next';
 import { broadcastMethodDisplay } from '../../utils/broadcastMethod';
 import {
@@ -21,24 +21,18 @@ export const BroadcastCalendarEntry = ({
 
   const { t } = useTranslation('broadcasts');
   const { dot, chip } = calendarEntryDisplay(entry.state);
-  const { Icon, labelKey } = broadcastMethodDisplay(
-    entry.method ?? undefined,
-  );
+  const { Icon, labelKey } = broadcastMethodDisplay(entry.method ?? undefined);
 
   return (
     <Tooltip.Provider>
       <Tooltip>
         <Tooltip.Trigger asChild>
-          <button
-            type="button"
-            onClick={() =>
-              setQueryParams({ messageId: entry.engageMessageId })
-            }
-            // The cell behind this one starts a day selection on press, which
-            // opening a campaign is not.
+          <Button
+            variant="ghost"
+            onClick={() => setQueryParams({ messageId: entry.engageMessageId })}
             onPointerDown={(event) => event.stopPropagation()}
             className={cn(
-              'flex w-full items-center gap-1.5 rounded px-1 py-0.5 text-left text-xs transition-colors',
+              'h-auto w-full justify-start gap-1.5 rounded px-1 py-0.5 text-left text-xs font-normal',
               chip,
               className,
             )}
@@ -50,7 +44,7 @@ export const BroadcastCalendarEntry = ({
             <span className="min-w-0 flex-1 truncate">
               {entry.title || t('untitled')}
             </span>
-          </button>
+          </Button>
         </Tooltip.Trigger>
         <Tooltip.Content className="flex items-center gap-1.5">
           <Icon className="size-3.5" />

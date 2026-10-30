@@ -87,7 +87,7 @@ const StatusCell = ({ pkg }: { pkg: IPackage }) => {
 
 const TagsCell = ({ pkg }: { pkg: IPackage }) => {
   const { t } = useTranslation('product', { keyPrefix: 'package' });
-  const { editPackage } = useEditPackage(pkg._id);
+  const { editPackage } = useEditPackage();
 
   return (
     <TagsSelect.InlineCell

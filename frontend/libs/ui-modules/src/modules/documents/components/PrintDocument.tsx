@@ -81,7 +81,7 @@ export const PrintDocument = ({
             className="flex-1 min-h-0"
           >
             <Resizable.Panel
-              className="h-full flex flex-col bg-gray-100 overflow-hidden"
+              className="h-full flex flex-col bg-muted overflow-hidden"
               minSize={40}
               defaultSize={80}
             >

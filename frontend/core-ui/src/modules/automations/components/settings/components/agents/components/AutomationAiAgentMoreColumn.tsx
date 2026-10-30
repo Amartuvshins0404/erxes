@@ -1,7 +1,4 @@
-import {
-  AUTOMATIONS_AI_AGENT_REMOVE,
-  AUTOMATIONS_AI_AGENTS,
-} from '@/automations/components/settings/components/agents/graphql/automationsAiAgents';
+import { AUTOMATIONS_AI_AGENT_REMOVE } from '@/automations/components/settings/components/agents/graphql/automationsAiAgents';
 import { useAiAgents } from '@/automations/components/settings/components/agents/hooks/useAiAgents';
 import { AutomationSettingsPath } from '@/types/paths/AutomationPath';
 import { ApolloError, useMutation } from '@apollo/client';
@@ -43,7 +40,6 @@ export const AutomationAiAgentMoreColumnCell = ({
     }).then(() => {
       removeAiAgent({
         variables: { id: _id },
-        refetchQueries: [AUTOMATIONS_AI_AGENTS],
         onError: (e: ApolloError) => {
           toast({
             title: t('error'),

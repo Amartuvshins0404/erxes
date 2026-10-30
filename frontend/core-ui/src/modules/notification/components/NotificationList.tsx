@@ -7,6 +7,7 @@ import {
   useNonNullMultiQueryState,
 } from 'erxes-ui';
 import { useTranslation } from 'react-i18next';
+import { LoadMoreSentinel } from 'ui-modules';
 import { NOTIFICATION_FILTER_QUERY_KEYS } from '@/notification/constants/notifications';
 import type { NotificationFilterQueryState } from '@/notification/types/notificationFilters';
 import { NotificationItem } from '@/notification/components/NotificationItem';
@@ -26,7 +27,6 @@ export const NotificationList = () => {
     notifications,
     groups,
     loading,
-    inViewRef,
     isEmpty,
     hasMore,
     error,
@@ -34,6 +34,7 @@ export const NotificationList = () => {
     fetchingMore,
     fetchMoreError,
     loadMore,
+    retryLoadMore,
   } = useNotificationList();
   const actions = useNotificationListActions({ notifications, loading });
   if (loading) return <Spinner />;
@@ -105,28 +106,18 @@ export const NotificationList = () => {
                 <Button
                   variant="ghost"
                   className="w-full"
-                  onClick={() => void loadMore()}
+                  onClick={() => void retryLoadMore()}
                 >
                   {t('retry', 'Retry')}
                 </Button>
               </div>
             ) : (
-              hasMore && (
-                <Button
-                  variant="ghost"
-                  ref={inViewRef}
-                  className="h-8 w-full text-muted-foreground"
-                  disabled={fetchingMore}
-                  onClick={() => void loadMore()}
-                >
-                  {fetchingMore && (
-                    <Spinner containerClassName="inline-flex flex-none" />
-                  )}
-                  {fetchingMore
-                    ? t('loading-more')
-                    : t('load-more', 'Load more')}
-                </Button>
-              )
+              <LoadMoreSentinel
+                key={notifications.length}
+                hasMore={hasMore}
+                loading={fetchingMore}
+                onLoadMore={() => void loadMore()}
+              />
             )}
           </div>
         </ScrollArea.Viewport>

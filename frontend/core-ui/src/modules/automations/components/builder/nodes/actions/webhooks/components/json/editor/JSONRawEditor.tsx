@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { Button } from 'erxes-ui';
+import { Button, Textarea } from 'erxes-ui';
 
 interface JSONRawEditorProps {
   isOpen: boolean;
@@ -19,7 +19,7 @@ export function JSONRawEditor({
   const { t } = useTranslation('automations');
 
   return (
-    <div className="mt-2 border rounded-md p-2 bg-muted/30">
+    <div className="mt-2 rounded-lg border bg-muted/30 p-2">
       <div className="flex items-center justify-between mb-2">
         <div className="text-[10px] text-muted-foreground">
           {t('webhook-json-summary')}
@@ -37,8 +37,8 @@ export function JSONRawEditor({
       </div>
 
       {isOpen ? (
-        <textarea
-          className="w-full h-40 text-[11px] font-mono p-2 rounded border bg-background"
+        <Textarea
+          className="h-40 font-mono text-[11px]"
           value={value}
           onChange={(e) => onChange(e.target.value)}
         />
@@ -49,12 +49,12 @@ export function JSONRawEditor({
   );
 }
 
-function JSONPreview({ value }: { value: any }) {
+function JSONPreview({ value }: { value: string }) {
   const jsonString = (() => {
     try {
-      return JSON.stringify(value ?? {}, null, 2);
+      return JSON.stringify(JSON.parse(value || '{}'), null, 2);
     } catch {
-      return '';
+      return value;
     }
   })();
 

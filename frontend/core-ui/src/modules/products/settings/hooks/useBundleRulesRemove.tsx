@@ -5,7 +5,6 @@ import {
   useMutation,
 } from '@apollo/client';
 import { BUNDLE_RULES_REMOVE } from '../graphql/mutations/bundleRules';
-import { BUNDLE_RULES } from '../graphql/queries/getBundleRules';
 import { useToast } from 'erxes-ui';
 
 export const useBundleRulesRemove = (options?: MutationHookOptions) => {
@@ -27,15 +26,14 @@ export const useBundleRulesRemove = (options?: MutationHookOptions) => {
         });
         options?.onError?.(e);
       },
-      onCompleted: () => {
+      onCompleted: (data) => {
         toast({
           title: t('success'),
           description: t('rule-removed'),
           variant: 'default',
         });
-        options?.onCompleted?.();
+        options?.onCompleted?.(data);
       },
-      refetchQueries: [{ query: BUNDLE_RULES }],
     });
   };
 

@@ -1,4 +1,4 @@
-import { Avatar, Button } from 'erxes-ui';
+import { Avatar, Button, cn, Empty } from 'erxes-ui';
 import {
   IconBellOff,
   IconCheck,
@@ -39,13 +39,17 @@ export const NotificationsPanel = () => {
 
   if (!notifications.length) {
     return (
-      <div className="flex flex-col items-center justify-center h-full gap-3 text-muted-foreground p-6">
-        <IconBellOff className="size-10 opacity-40" />
-        <p className="text-sm font-medium">No notifications yet</p>
-        <p className="text-xs text-center">
-          You'll see messages from the support team here.
-        </p>
-      </div>
+      <Empty className="h-full">
+        <Empty.Header>
+          <Empty.Media variant="icon">
+            <IconBellOff />
+          </Empty.Media>
+          <Empty.Title>No notifications yet</Empty.Title>
+          <Empty.Description>
+            You'll see messages from the support team here.
+          </Empty.Description>
+        </Empty.Header>
+      </Empty>
     );
   }
 
@@ -53,11 +57,11 @@ export const NotificationsPanel = () => {
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <div className="flex justify-between items-center px-3 pt-2 shrink-0">
+      <div className="flex justify-between items-center px-3 pt-3 shrink-0">
         <Button
           variant="ghost"
           size="sm"
-          className="text-xs text-muted-foreground gap-1.5"
+          className="rounded-full text-muted-foreground"
           onClick={playSound}
           title="Test notification sound"
         >
@@ -68,7 +72,7 @@ export const NotificationsPanel = () => {
           <Button
             variant="ghost"
             size="sm"
-            className="text-xs text-muted-foreground gap-1.5"
+            className="rounded-full text-muted-foreground"
             onClick={handleMarkAllRead}
             disabled={markingRead}
           >
@@ -78,19 +82,18 @@ export const NotificationsPanel = () => {
         )}
       </div>
 
-      <ul className="flex flex-col gap-1 p-3 overflow-y-auto styled-scroll flex-1 min-h-0">
+      <ul className="flex flex-col gap-2 p-3 overflow-y-auto styled-scroll flex-1 min-h-0">
         {notifications.map((item) => (
           <li key={item.message._id}>
             <button
               type="button"
               onClick={() => handleNotificationClick(item.conversationId)}
-              className={[
-                'w-full text-left flex items-start gap-3 rounded-lg p-3 transition-all',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+              className={cn(
+                'w-full text-left flex items-start gap-3 rounded-2xl p-3 outline-none transition-colors focus-visible:shadow-focus',
                 item.isRead
-                  ? 'opacity-50 hover:opacity-70 hover:bg-accent/30'
-                  : 'bg-primary/8 border border-primary/20 hover:bg-primary/12 shadow-sm',
-              ].join(' ')}
+                  ? 'text-muted-foreground hover:bg-accent/60'
+                  : 'bg-card shadow-card hover:bg-accent/60',
+              )}
             >
               <div className="relative shrink-0 mt-0.5">
                 <Avatar size="xl" className={item.isRead ? 'grayscale' : ''}>
@@ -102,45 +105,47 @@ export const NotificationsPanel = () => {
                   </Avatar.Fallback>
                 </Avatar>
                 {!item.isRead && (
-                  <span className="absolute -top-0.5 -right-0.5 size-2.5 rounded-full bg-primary border-2 border-background" />
+                  <span className="absolute -top-0.5 -right-0.5 size-2.5 rounded-full bg-primary ring-2 ring-card" />
                 )}
               </div>
 
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between gap-2 mb-0.5">
                   <span
-                    className={[
-                      'text-xs truncate',
-                      item.isRead ? 'font-medium' : 'font-bold text-foreground',
-                    ].join(' ')}
+                    className={cn(
+                      'text-sm truncate',
+                      item.isRead
+                        ? 'font-normal'
+                        : 'font-medium text-foreground',
+                    )}
                   >
                     {item.agentName}
                   </span>
                   <span
-                    className={[
-                      'text-[10px] shrink-0',
+                    className={cn(
+                      'text-xs shrink-0',
                       item.isRead
                         ? 'text-muted-foreground'
-                        : 'text-primary font-semibold',
-                    ].join(' ')}
+                        : 'text-primary font-medium',
+                    )}
                   >
                     {formatMessageDate(item.message.createdAt)}
                   </span>
                 </div>
                 <p
-                  className={[
-                    'text-xs line-clamp-2 leading-relaxed',
+                  className={cn(
+                    'text-xs line-clamp-2',
                     item.isRead
-                      ? 'text-muted-foreground/70'
+                      ? 'text-muted-foreground'
                       : 'text-foreground/80',
-                  ].join(' ')}
+                  )}
                 >
                   {item.message.content}
                 </p>
               </div>
 
               {item.isRead && (
-                <IconCheck className="size-3.5 text-muted-foreground/50 shrink-0 mt-1" />
+                <IconCheck className="size-3.5 text-muted-foreground shrink-0 mt-1" />
               )}
             </button>
           </li>

@@ -12,7 +12,6 @@ import { IconArrowLeft, IconChevronLeft } from '@tabler/icons-react';
 import { Avatar, Button, cn, readImage, Tooltip } from 'erxes-ui';
 import { cva } from 'class-variance-authority';
 import { useHeader } from '../hooks/useHeader';
-import { formatOnlineHours } from '@libs/formatOnlineHours';
 import { LinkFavicon } from './link-favicon';
 import { useMessenger } from '../hooks/useMessenger';
 import { AvatarGroup } from './avatar-group';
@@ -20,7 +19,7 @@ import { ISupporter } from '../types';
 import { useGetMessengerSupporters } from '../hooks/useGetMessengerSupporters';
 import { useGetKnowledgeBaseTopicDetails } from '../hooks/useGetKnowledgeBaseTopicDetails';
 import { SearchArticlesInput } from './faq/components/search-articles';
-import { CloseButton } from './CloseButton';
+import { CloseButton, HERO_ICON_BUTTON_CLASS } from './CloseButton';
 import { ContactChip } from './contact-chip';
 import { formatOnlineHoursLabel } from '@libs/format-online-hours';
 
@@ -29,15 +28,11 @@ const defaultLogo = `url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFAAAAB0C
 const heroVariants = cva('min-h-40 px-5 pt-4.5 pb-12 relative', {
   variants: {
     variant: {
-      // top-right white sheen + bottom-left primary glow on hero-dark
       glossy:
         'bg-[radial-gradient(120%_80%_at_88%_-10%,color-mix(in_oklch,var(--color-primary-foreground)_18%,transparent)_0%,transparent_55%),radial-gradient(80%_60%_at_10%_110%,color-mix(in_oklch,var(--color-primary)_22%,transparent)_0%,transparent_60%),linear-gradient(180deg,var(--color-hero)_0%,color-mix(in_oklch,var(--color-hero)_75%,black)_70%,color-mix(in_oklch,var(--color-hero)_60%,black)_100%)]',
-      // strong primary (top-right) + destructive (bottom-left) wash
       aurora:
         'bg-[radial-gradient(60%_50%_at_80%_20%,color-mix(in_oklch,var(--color-primary)_55%,transparent)_0%,transparent_60%),radial-gradient(60%_60%_at_15%_110%,color-mix(in_oklch,var(--color-destructive)_45%,transparent)_0%,transparent_60%),linear-gradient(180deg,var(--color-hero)_0%,color-mix(in_oklch,var(--color-hero)_70%,black)_100%)]',
-      // three soft blobs: primary, info, warning
       mesh: 'bg-[radial-gradient(50%_40%_at_30%_30%,color-mix(in_oklch,var(--color-primary)_35%,transparent)_0%,transparent_60%),radial-gradient(40%_30%_at_80%_60%,color-mix(in_oklch,var(--color-info)_25%,transparent)_0%,transparent_60%),radial-gradient(40%_40%_at_70%_10%,color-mix(in_oklch,var(--color-warning)_18%,transparent)_0%,transparent_60%),linear-gradient(180deg,var(--color-hero)_0%,color-mix(in_oklch,var(--color-hero)_70%,black)_100%)]',
-      // plain vertical gradient on hero color
       flat: 'bg-[linear-gradient(180deg,var(--color-hero)_0%,color-mix(in_oklch,var(--color-hero)_70%,black)_100%)]',
     },
   },
@@ -62,7 +57,7 @@ export const Header = () => {
   };
 
   return (
-    <div className="flex flex-col shrink-0 grow-0 gap-4 p-4 border-b border-accent">
+    <div className="flex flex-col shrink-0 grow-0 gap-4 p-4 border-b">
       {render()}
     </div>
   );
@@ -71,15 +66,14 @@ export const Header = () => {
 export const HeaderIntro = () => {
   const [connection] = useAtom(connectionAtom);
   const { messengerData } = connection.widgetsMessengerConnect || {};
-  const { messages, onlineHours, showTimezone, timezone, links } =
-    messengerData || {};
+  const { onlineHours, showTimezone, timezone, links } = messengerData || {};
 
   const formattedHours = onlineHours
     ? formatOnlineHoursLabel(onlineHours, showTimezone, timezone)
     : null;
 
   return (
-    <div className="flex flex-col gap-4 w-full p-4 rounded-2xl shadow-xs mx-auto bg-background">
+    <div className="flex flex-col gap-4 w-full p-4 rounded-2xl mx-auto bg-card shadow-card">
       <div className="gap-2 flex flex-col">
         <div className="font-semibold text-foreground text-base">
           {WelcomeMessage.TITLE}
@@ -174,7 +168,6 @@ export const HeaderHero = () => {
     details?.categories?.find((c) => c._id === currentCategoryId) ||
     details?.parentCategories?.find((c) => c._id === currentCategoryId);
 
-  // Find parent category for article breadcrumb
   const articleCategoryId = articleId
     ? details?.categories
         ?.flatMap((c) => c.articles || [])
@@ -207,7 +200,7 @@ export const HeaderHero = () => {
         <div className="flex items-center gap-4">
           <span className="flex flex-1 min-w-0 items-center gap-2">
             {uiOptions?.logo && uiOptions?.logo?.length > 0 ? (
-              <div className="bg-foreground/5 size-8 flex-none rounded flex items-center justify-center p-1">
+              <div className="bg-primary-foreground/10 size-8 flex-none rounded-xl flex items-center justify-center p-1">
                 <img
                   alt="logo"
                   src={readImage(uiOptions?.logo)}
@@ -253,26 +246,26 @@ export const HeaderHero = () => {
           <CloseButton />
         </div>
         <div className="mt-11">
-          <h1 className="text-primary-foreground text-[30px] tracking-tight leading-none">
+          <h1 className="text-primary-foreground text-3xl font-semibold tracking-tight">
             {messages?.greetings?.title ?? 'How can we help?'}
           </h1>
-          <span className="text-primary-foreground/60 text-[19px] -tracking-[0.015em] leading-none font-light">
+          <span className="mt-1 block text-primary-foreground/70 text-lg">
             {messages?.greetings?.message ?? 'Hello there'}
           </span>
           {(isOnline && (
-            <div className="mt-3 rounded-2xl py-1.75 ps-2.5 pe-3 flex-none w-auto bg-success/16 flex items-center gap-1.5 border border-success/30">
+            <div className="mt-4 inline-flex max-w-full h-7 rounded-full px-3 items-center gap-1.5 bg-success/15 border border-success/30">
               <div className="rounded-full bg-success size-1.5 flex-none" />
-              <span className="flex-1 overflow-x-hidden">
-                <span className="flex tracking-tight text-xs font-medium leading-snug text-primary-foreground text-justify">
+              <span className="min-w-0 truncate">
+                <span className="text-xs font-medium text-primary-foreground">
                   {messages?.welcome ?? 'Got any problems'}
                 </span>
               </span>
             </div>
           )) || (
-            <div className="mt-3 rounded-2xl py-1.75 ps-2.5 pe-3 flex-none w-auto bg-warning/16 flex items-center gap-1.5 border border-warning/30">
+            <div className="mt-4 inline-flex max-w-full h-7 rounded-full px-3 items-center gap-1.5 bg-warning/15 border border-warning/30">
               <div className="rounded-full bg-warning size-1.5 flex-none" />
-              <span className="flex-1 overflow-x-hidden">
-                <span className="flex tracking-tight text-xs font-medium leading-snug text-primary-foreground text-justify">
+              <span className="min-w-0 truncate">
+                <span className="text-xs font-medium text-primary-foreground">
                   {messages?.away ?? 'Please contact during operating hours'}
                 </span>
               </span>
@@ -283,21 +276,22 @@ export const HeaderHero = () => {
     );
   }
 
-  // FAQ: category detail header — tall gradient with category title + description
   if (activeTab === 'faq' && faqView === 'category' && currentCategory) {
     return (
-      <div className="pb-[22px] px-5 pt-[18px] bg-(--color-hero) flex-none relative">
-        <span className="flex items-center justify-between">
-          <button
+      <div className="px-5 pt-4 pb-5 bg-(--color-hero) flex-none relative">
+        <span className="mb-3 flex items-center justify-between">
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={handleFaqBack}
-            className="text-primary-foreground/70 hover:text-primary-foreground mb-3 flex items-center -ml-1 transition-colors"
+            className={cn('-ml-2', HERO_ICON_BUTTON_CLASS)}
             aria-label="Go back"
           >
-            <IconArrowLeft size={20} />
-          </button>
+            <IconArrowLeft />
+          </Button>
           <CloseButton />
         </span>
-        <h1 className="text-primary-foreground text-2xl font-bold leading-tight">
+        <h1 className="text-primary-foreground text-2xl font-semibold tracking-tight">
           {currentCategory.title}
         </h1>
         {currentCategory.description && (
@@ -309,28 +303,25 @@ export const HeaderHero = () => {
     );
   }
 
-  // FAQ: article view header — compact bar with breadcrumb
   if (activeTab === 'faq' && faqView === 'article') {
     return (
-      <div className="pb-[22px] px-5 pt-[18px] bg-(--color-hero) flex-none relative flex items-center justify-between">
-        <button
+      <div className="px-5 pt-4 pb-5 bg-(--color-hero) flex-none relative flex items-center justify-between">
+        <Button
+          variant="ghost"
           onClick={handleFaqBack}
-          className="flex items-center gap-2 text-primary-foreground/70 hover:text-primary-foreground transition-colors"
+          className="-ml-2 h-8 min-w-0 rounded-full px-2 text-primary-foreground/80 hover:bg-primary-foreground/15 hover:text-primary-foreground"
           aria-label="Go back"
         >
-          <IconArrowLeft size={18} />
+          <IconArrowLeft />
           {articleParentCategory && (
-            <span className="text-sm font-medium">
-              {articleParentCategory.title}
-            </span>
+            <span className="truncate">{articleParentCategory.title}</span>
           )}
-        </button>
+        </Button>
         <CloseButton />
       </div>
     );
   }
 
-  // FAQ: topic view header — tall gradient with title + search
   if (activeTab === 'faq') {
     return (
       <div
@@ -341,14 +332,14 @@ export const HeaderHero = () => {
       >
         <div className="flex flex-col">
           <span className="flex justify-between items-center">
-            <h1 className="text-primary-foreground text-2xl">
+            <h1 className="text-primary-foreground text-2xl font-semibold tracking-tight">
               {getCurrentTitle()}
             </h1>
             <CloseButton />
           </span>
           {title && (
             <div className="mt-4">
-              <h3 className="text-primary-foreground/80 text-xs font-normal mb-1.5">
+              <h3 className="text-primary-foreground/80 text-xs font-medium mb-2">
                 Browse {title}
               </h3>
               <SearchArticlesInput />
@@ -360,17 +351,20 @@ export const HeaderHero = () => {
   }
   if (activeTab === 'web-call') {
     return (
-      <div className="pb-5.5 px-5 pt-4.5 bg-(--color-hero) flex-none relative">
+      <div className="px-5 pt-4 pb-5 bg-(--color-hero) flex-none relative">
         <span className="flex justify-between items-center mb-1">
-          <button
-            className="text-primary-foreground cursor-pointer"
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={() => switchToTab('default')}
+            className={cn('-ml-2', HERO_ICON_BUTTON_CLASS)}
+            aria-label="Go back"
           >
             <IconArrowLeft />
-          </button>
+          </Button>
           <CloseButton />
         </span>
-        <h1 className="text-primary-foreground text-2xl">
+        <h1 className="text-primary-foreground text-2xl font-semibold tracking-tight">
           {getCurrentTitle()}
         </h1>
       </div>
@@ -378,12 +372,12 @@ export const HeaderHero = () => {
   }
 
   return (
-    <div className="pb-[22px] px-5 pt-[18px] bg-(--color-hero) flex-none relative flex justify-between">
+    <div className="px-5 pt-4 pb-5 bg-(--color-hero) flex-none relative flex justify-between">
       <div className="flex flex-col">
-        <h2 className="text-primary-foreground/60 text-xs font-light">
+        <h2 className="text-primary-foreground/70 text-xs">
           {getCurrentEyebrow()}
         </h2>
-        <h1 className="text-primary-foreground text-2xl">
+        <h1 className="text-primary-foreground text-2xl font-semibold tracking-tight">
           {getCurrentTitle()}
         </h1>
       </div>

@@ -20,7 +20,7 @@ export const KnowledgeBaseView = () => {
   });
 
   const currentView = useAtomValue(faqCurrentViewAtom);
-  const [_, setCategoryStack] = useAtom(faqCategoryStackAtom);
+  const [, setCategoryStack] = useAtom(faqCategoryStackAtom);
 
   const handleCategoryClick = (categoryId: string) => {
     setCategoryStack((prev) => [...prev, categoryId]);
@@ -31,9 +31,9 @@ export const KnowledgeBaseView = () => {
 
   if (error) {
     return (
-      <Empty className="py-32 text-foreground">
+      <Empty className="py-32">
         <Empty.Header>
-          <Empty.Media>
+          <Empty.Media variant="icon">
             <IconBook />
           </Empty.Media>
           <Empty.Title>{error.name}</Empty.Title>
@@ -51,7 +51,7 @@ export const KnowledgeBaseView = () => {
             key={parent._id}
             className={cn(
               { '-mt-8': index === 0 },
-              'group rounded-2xl shadow-xs p-3.5 bg-background flex items-center gap-3 transition-all duration-300 ease-in-out hover:-translate-y-0.5 cursor-pointer hover:shadow-sm',
+              'group rounded-2xl bg-card shadow-card p-3.5 flex items-center gap-3 cursor-pointer outline-none transition-colors hover:bg-accent/60 focus-visible:shadow-focus',
             )}
             onClick={() => handleCategoryClick(parent._id)}
             role="button"
@@ -61,27 +61,24 @@ export const KnowledgeBaseView = () => {
             }
           >
             <span
-              className="shrink-0 p-2 rounded-xl flex items-center justify-center"
-              style={{
-                backgroundColor:
-                  `color-mix(in srgb, ${details?.color} 60%, transparent)` ||
-                  'color-mix(in oklch, var(--primary) 60%, transparent)',
-              }}
+              className="shrink-0 size-9 rounded-xl bg-primary text-primary-foreground flex items-center justify-center"
+              style={
+                details?.color ? { backgroundColor: details.color } : undefined
+              }
             >
               <IconComponent
-                className="text-primary-foreground"
+                className="size-4"
                 name={parent.icon || 'help-circle'}
-                size={20}
               />
             </span>
             <span className="flex-1 overflow-hidden min-w-0">
-              <h1 className="text-base font-semibold text-foreground">
+              <h1 className="text-sm font-medium text-foreground">
                 {parent.title}
               </h1>
-              <p className="text-xs font-light mt-0.5 line-clamp-2 whitespace-break-spaces truncate text-muted-foreground">
+              <p className="text-xs mt-0.5 line-clamp-2 text-muted-foreground">
                 {parent.description}
               </p>
-              <span className="text-[11px] text-muted-foreground font-medium">
+              <span className="text-xs text-muted-foreground">
                 {parent.numOfArticles === 1
                   ? '1 article'
                   : `${parent.numOfArticles} articles`}
@@ -91,10 +88,7 @@ export const KnowledgeBaseView = () => {
               </span>
             </span>
             <span className="shrink-0">
-              <IconArrowRight
-                className="text-muted-foreground group-hover:translate-x-0.5 transition-all ease-in-out delay-300"
-                size={18}
-              />
+              <IconArrowRight className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
             </span>
           </div>
         ))}

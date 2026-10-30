@@ -1,7 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect, useRef, useState } from 'react';
 
-import { BackgroundGradientAnimation } from 'erxes-ui';
 import { Logo } from '@/auth/components/Logo';
 import type { OnboardingStepDef } from './onboardingSteps';
 import { OnboardingStepItem } from './OnboardingStepItem';
@@ -21,6 +20,13 @@ const mobileStepVariants = {
     x: direction > 0 ? -48 : 48,
   }),
 };
+
+const PanelGlow = () => (
+  <div
+    aria-hidden
+    className="pointer-events-none absolute -bottom-32 -left-32 -z-10 size-[32rem] rounded-full bg-primary/15 blur-3xl"
+  />
+);
 
 export const OnboardingLeftSideBar = ({
   steps,
@@ -48,16 +54,11 @@ export const OnboardingLeftSideBar = ({
 
   return (
     <>
-      <BackgroundGradientAnimation
-        containerClassName="hidden lg:flex"
-        className="gap-8"
-      >
-        <div className="flex flex-none flex-row items-center justify-between">
-          <Logo className="h-8 text-primary-foreground" />
-        </div>
-
-        <div className="flex flex-1 items-center justify-center px-12">
-          <div className="flex flex-1 flex-col items-center justify-center gap-4">
+      <div className="hidden h-full p-3 lg:flex lg:w-1/2">
+        <div className="relative isolate flex flex-1 flex-col gap-8 overflow-hidden rounded-3xl bg-sidebar p-8 shadow-card">
+          <PanelGlow />
+          <Logo className="h-8 text-foreground" />
+          <div className="flex flex-1 flex-col justify-center gap-2 px-4">
             {steps.map((step) => (
               <OnboardingStepItem
                 key={step.step}
@@ -69,13 +70,11 @@ export const OnboardingLeftSideBar = ({
             ))}
           </div>
         </div>
-      </BackgroundGradientAnimation>
+      </div>
 
-      <BackgroundGradientAnimation
-        containerClassName="lg:hidden min-h-[220px] w-full overflow-hidden"
-        className="justify-center"
-      >
-        <div className="flex w-full justify-center px-5 py-4 md:px-10">
+      <div className="w-full p-3 lg:hidden">
+        <div className="relative isolate flex min-h-[220px] items-center justify-center overflow-hidden rounded-3xl bg-sidebar px-5 py-6 shadow-card">
+          <PanelGlow />
           <AnimatePresence mode="wait" initial={false}>
             <motion.div
               key={currentStep}
@@ -87,19 +86,19 @@ export const OnboardingLeftSideBar = ({
               transition={{ duration: 0.16, ease: 'easeOut' }}
               className="flex flex-col items-center justify-center"
             >
-              <div className="flex h-[48px] w-[48px] items-center justify-center rounded-lg bg-gray-400/30 p-2 text-white">
-                <CurrentIcon className="h-6 w-6" />
+              <div className="flex size-12 items-center justify-center rounded-2xl bg-card text-primary shadow-card">
+                <CurrentIcon className="size-6" />
               </div>
-              <h4 className="mt-3 max-w-[280px] text-center text-xl leading-tight text-white">
+              <h4 className="mt-3 max-w-[280px] text-center text-xl font-semibold leading-tight tracking-tight text-foreground">
                 {current.title}
               </h4>
-              <span className="mt-1 block max-w-[320px] text-center text-xs leading-5 text-white/70">
+              <span className="mt-1 block max-w-[320px] text-center text-sm text-muted-foreground">
                 {current.subtitle}
               </span>
             </motion.div>
           </AnimatePresence>
         </div>
-      </BackgroundGradientAnimation>
+      </div>
     </>
   );
 };

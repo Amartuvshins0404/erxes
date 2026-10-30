@@ -54,7 +54,7 @@ const CoreTabAppSwitcherItem = ({
       ref={setNodeRef}
       aria-current={active ? 'page' : undefined}
       className={cn(
-        'group/app h-8 min-w-0 justify-start gap-2 pr-1 pl-2 text-sm font-medium',
+        'group/app h-9 min-w-0 justify-start gap-2 rounded-xl pr-1 pl-2.5 text-sm font-medium',
         active &&
           'bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary',
         isDragging && 'relative z-10 bg-accent opacity-80 shadow-sm',
@@ -114,7 +114,7 @@ const CoreTabAppSwitcherGroup = ({
 
   return (
     <section className="py-1 first:pt-0">
-      <h2 className="flex h-7 items-center px-2 font-sans text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+      <h2 className="flex h-7 items-center px-2.5 text-xs font-medium text-muted-foreground">
         {label}
       </h2>
       <DndContext
@@ -199,7 +199,7 @@ export const CoreTabAppSwitcher = ({
       </CoreTabTooltip>
       <Popover.Content
         align="start"
-        className="flex max-h-[var(--radix-popover-content-available-height)] w-80 flex-col overflow-hidden rounded-xl border-border/60 p-1.5 shadow-lg"
+        className="flex max-h-[var(--radix-popover-content-available-height)] w-80 flex-col overflow-hidden rounded-2xl p-2 shadow-lg"
         side="bottom"
         sideOffset={8}
       >

@@ -11,17 +11,11 @@ import { usePropertyTypes } from '@/properties/hooks/usePropertyTypes';
 import { useTagTypes } from 'ui-modules/modules/tags-new/hooks/useTagTypes';
 import { useTranslation } from 'react-i18next';
 
-/**
- * Organization settings a plugin uses (tags, properties, notifications),
- * appended to the plugin's own settings list and filtered to that plugin's
- * types. Hidden entirely for plugins with none of them.
- */
 export const PluginSharedSettingsNavigation = ({
   pluginName,
   pathPrefix,
 }: {
   pluginName: string;
-  /** The plugin's settings base, e.g. `sales/settings`. */
   pathPrefix: string;
 }) => {
   const { t } = useTranslation('common');
@@ -34,7 +28,6 @@ export const PluginSharedSettingsNavigation = ({
   const showTags = Boolean(types[pluginName]?.length) && canUse('tags');
   const showProperties =
     Boolean(propertyTypes[pluginName]?.length) && canUse('properties');
-  // each member's own choices: shown whenever the plugin declares events
   const showNotifications = pluginsNotifications.some(
     (plugin) => plugin.pluginName === pluginName && plugin.modules?.length,
   );
@@ -44,12 +37,12 @@ export const PluginSharedSettingsNavigation = ({
   }
 
   return (
-    // No heading: continues the plugin's own settings list.
-    <Sidebar.Group className="pt-0">
+    <Sidebar.Group className="px-2 pt-0">
       <Sidebar.GroupContent>
         <Sidebar.Menu>
           {showTags && (
             <NavigationMenuLinkItem
+              className="px-2"
               pathPrefix={pathPrefix}
               path="/tags"
               name={t('sidebar.tags')}
@@ -58,6 +51,7 @@ export const PluginSharedSettingsNavigation = ({
           )}
           {showProperties && (
             <NavigationMenuLinkItem
+              className="px-2"
               pathPrefix={pathPrefix}
               path="/properties"
               name={t('sidebar.properties', 'Properties')}
@@ -66,6 +60,7 @@ export const PluginSharedSettingsNavigation = ({
           )}
           {showNotifications && (
             <NavigationMenuLinkItem
+              className="px-2"
               pathPrefix={pathPrefix}
               path="/notifications"
               name={t('sidebar.notification')}

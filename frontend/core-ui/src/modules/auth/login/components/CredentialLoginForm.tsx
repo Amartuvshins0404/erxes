@@ -27,14 +27,14 @@ export const CredentialLoginForm = () => {
     <Form {...form}>
       <form
         onSubmit={form.handleSubmit((data) => handleCrendentialsLogin(data))}
-        className="mx-auto grid gap-6"
+        className="grid gap-5"
       >
         <Form.Field
           name="email"
           control={form.control}
           render={({ field }) => (
             <Form.Item>
-              <Form.Label className="font-sans normal-case text-foreground text-sm font-medium leading-none">
+              <Form.Label className="text-sm font-medium normal-case text-foreground">
                 {t('email-or-username')}
               </Form.Label>
               <Form.Control>
@@ -42,6 +42,7 @@ export const CredentialLoginForm = () => {
                   autoFocus
                   type="text"
                   placeholder={t('enter-email-or-username')}
+                  className="h-8"
                   {...field}
                 />
               </Form.Control>
@@ -53,15 +54,28 @@ export const CredentialLoginForm = () => {
           name="password"
           render={({ field }) => (
             <Form.Item>
-              <Form.Label className="font-sans normal-case text-foreground text-sm font-medium leading-none">
-                {t('password')}
-              </Form.Label>
+              <div className="flex items-center justify-between">
+                <Form.Label className="text-sm font-medium normal-case text-foreground">
+                  {t('password')}
+                </Form.Label>
+                <Link
+                  className="text-xs text-muted-foreground transition-colors hover:text-foreground"
+                  to={(() => {
+                    const email = form.getValues('email');
+                    return `/forgot-password${
+                      email ? `?email=${encodeURIComponent(email)}` : ''
+                    }`;
+                  })()}
+                >
+                  {t('forgot-password')}
+                </Link>
+              </div>
               <Form.Control>
                 <div className="relative">
                   <Input
                     type={showPassword ? 'text' : 'password'}
                     placeholder={t('enter-your-password')}
-                    className="pr-9"
+                    className="h-8 pr-9"
                     {...field}
                   />
                   <Button
@@ -72,13 +86,9 @@ export const CredentialLoginForm = () => {
                     aria-label={
                       showPassword ? t('hide-password') : t('show-password')
                     }
-                    className="absolute inset-y-0 right-1 my-auto size-6 rounded-sm p-0 text-muted-foreground/60 hover:text-foreground"
+                    className="absolute inset-y-0 right-1 my-auto size-6 rounded-full p-0 text-muted-foreground hover:text-foreground"
                   >
-                    {showPassword ? (
-                      <IconEyeOff size={15} stroke={1.75} />
-                    ) : (
-                      <IconEye size={15} stroke={1.75} />
-                    )}
+                    {showPassword ? <IconEyeOff /> : <IconEye />}
                   </Button>
                 </div>
               </Form.Control>
@@ -86,26 +96,8 @@ export const CredentialLoginForm = () => {
             </Form.Item>
           )}
         />
-        <Button type="submit" className="h-8">
+        <Button type="submit" size="lg" className="w-full rounded-full">
           {t('sign-in')}
-        </Button>
-
-        <Button
-          type="button"
-          variant="link"
-          asChild
-          className="flex text-foreground hover:bg-transparent"
-        >
-          <Link
-            to={(() => {
-              const email = form.getValues('email');
-              return `/forgot-password${
-                email ? `?email=${encodeURIComponent(email)}` : ''
-              }`;
-            })()}
-          >
-            {t('forgot-password')}
-          </Link>
         </Button>
       </form>
     </Form>

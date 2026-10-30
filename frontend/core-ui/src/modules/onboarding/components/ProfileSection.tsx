@@ -58,7 +58,7 @@ const PasswordField = ({
               <Input
                 type={visible ? 'text' : 'password'}
                 placeholder={placeholder}
-                className="peer"
+                className="peer h-8 pr-9"
                 {...field}
               />
               <Button
@@ -67,12 +67,12 @@ const PasswordField = ({
                 size="icon"
                 variant="ghost"
                 tabIndex={-1}
-                className="absolute right-1 top-1/2 -translate-y-1/2 peer-focus:opacity-100 peer-hover:opacity-100 hover:opacity-100 opacity-0"
+                className="absolute right-1 top-1/2 size-6 -translate-y-1/2 rounded-full p-0 text-muted-foreground opacity-0 hover:text-foreground hover:opacity-100 peer-hover:opacity-100 peer-focus:opacity-100"
               >
                 {visible ? (
-                  <IconEyeClosed className="text-muted-foreground/70 size-4" />
+                  <IconEyeClosed />
                 ) : (
-                  <IconEye className="text-muted-foreground/70 size-4" />
+                  <IconEye />
                 )}
               </Button>
             </div>
@@ -136,7 +136,7 @@ export const ProfileSection = ({ onContinue }: { onContinue: () => void }) => {
         duration: 0.6,
         ease: [0.25, 0.46, 0.45, 0.94],
       }}
-      className="grid gap-5 shadow-sm px-5 pt-7 pb-10 rounded-2xl bg-background h-fit max-sm:mx-2 sm:min-w-md"
+      className="grid h-fit gap-5 rounded-3xl bg-card px-6 pt-8 pb-8 shadow-lg max-sm:mx-2 sm:min-w-md"
     >
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -144,7 +144,7 @@ export const ProfileSection = ({ onContinue }: { onContinue: () => void }) => {
         transition={{ duration: 0.5, delay: 0.2 }}
         className="flex flex-col gap-2 text-center mb-2"
       >
-        <h2 className="text-2xl font-semibold text-foreground">
+        <h2 className="text-2xl font-semibold tracking-tight text-foreground">
           {t('create-profile')}
         </h2>
         <p className="text-sm text-muted-foreground">
@@ -269,7 +269,7 @@ export const ProfileSection = ({ onContinue }: { onContinue: () => void }) => {
                 />
               </>
             )}
-            <Button type="submit" className="w-full cursor-pointer" size="lg">
+            <Button type="submit" className="w-full rounded-full" size="lg">
               {t('continue')}
             </Button>
           </form>

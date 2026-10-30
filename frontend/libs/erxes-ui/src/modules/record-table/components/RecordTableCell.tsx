@@ -15,15 +15,14 @@ export const RecordTableCell = React.forwardRef<
     <Table.Cell
       ref={ref}
       className={cn(
-        'p-0 transition-colors isolate',
+        'isolate border-r border-b bg-background p-0 transition-colors last:border-r-0 group-hover/table-row:bg-accent/60 group-data-[state=selected]/table-row:bg-primary/8',
         column.getIsPinned() && [
           'sticky z-1',
-          'bg-background',
           'group-hover/table-row:bg-background',
           'group-data-[state=selected]/table-row:bg-background',
-          'before:content-[""] before:absolute before:inset-0 before:-z-1',
-          'group-hover/table-row:before:bg-muted',
-          'group-data-[state=selected]/table-row:before:bg-primary/10',
+          'before:absolute before:inset-0 before:-z-1 before:transition-colors before:content-[""]',
+          'group-hover/table-row:before:bg-accent/60',
+          'group-data-[state=selected]/table-row:before:bg-primary/8',
         ],
         className,
       )}

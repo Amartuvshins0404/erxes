@@ -43,7 +43,7 @@ export const FullNameValue = () => {
 const FullNameFieldContent = () => {
   const { firstName, lastName, setFirstName, setLastName } = useFullNameField();
   return (
-    <div className="flex gap-px bg-border w-72 rounded shadow-sm">
+    <div className="flex w-72 gap-px overflow-hidden rounded-sm bg-border shadow-xs">
       <Input
         value={firstName}
         onChange={(e: React.ChangeEvent<HTMLInputElement>) => {

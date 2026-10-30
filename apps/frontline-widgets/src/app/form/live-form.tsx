@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useWidgetConnect } from './hooks/useWidgetConnect';
-import { Dialog, hexToOklch, Skeleton } from 'erxes-ui';
+import { Dialog, Skeleton } from 'erxes-ui';
+import { applyPrimaryColor } from '@libs/tw-utils';
 import { ErxesFormProvider } from './context/erxesFormContext';
 import { useAtomValue, useSetAtom } from 'jotai';
 import {
@@ -20,7 +21,7 @@ import { getVisitorId } from '@libs/utils';
 export const LiveForm = () => {
   const { id: channelId, formId } = useParams<{ id: string; formId: string }>();
   const { connectMutation, form, loading } = useWidgetConnect();
-  const [settingAppearance, setSettingAppearance] = useState<any>(true);
+  const [settingAppearance, setSettingAppearance] = useState(true);
   const activeStep = useAtomValue(activeStepAtom);
   const setBrowserInfo = useSetAtom(browserInfoAtom);
   const showConfirmation = useAtomValue(showConfirmationAtom);
@@ -36,11 +37,7 @@ export const LiveForm = () => {
   }, []);
 
   useEffect(() => {
-    const storedTheme = localStorage.getItem('theme');
-    const prefersDark = window.matchMedia?.(
-      '(prefers-color-scheme: dark)',
-    ).matches;
-    if (storedTheme === 'dark' || (!storedTheme && prefersDark)) {
+    if (localStorage.getItem('theme') === 'dark') {
       document.documentElement.classList.add('dark');
     } else {
       document.documentElement.classList.remove('dark');
@@ -64,12 +61,7 @@ export const LiveForm = () => {
   }, [connectMutation, formId, channelId, customerId]);
 
   useEffect(() => {
-    if (form?.leadData?.primaryColor) {
-      document.documentElement.style.setProperty(
-        '--primary',
-        hexToOklch(form?.leadData?.primaryColor, true) || '',
-      );
-    }
+    applyPrimaryColor(form?.leadData?.primaryColor);
     setTimeout(() => setSettingAppearance(false));
   }, [form?.leadData?.primaryColor]);
 

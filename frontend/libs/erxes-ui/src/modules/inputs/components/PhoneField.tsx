@@ -113,7 +113,7 @@ const PhoneItem = forwardRef<
       ref={ref}
       variant="secondary"
       className={cn(
-        'w-full font-medium text-left justify-start px-2 flex-auto overflow-hidden',
+        'w-full flex-auto justify-start overflow-hidden rounded-lg px-2.5 text-left font-medium',
         isPrimary && 'text-primary bg-primary/10 hover:bg-primary/20',
         className,
       )}
@@ -178,7 +178,7 @@ const PhoneOptions = forwardRef<
         <Button
           ref={ref}
           variant="secondary"
-          className={cn('w-full font-medium size-8 shrink-0', className)}
+          className={cn('size-8 shrink-0 rounded-lg', className)}
           size="icon"
           {...props}
         >
@@ -187,7 +187,7 @@ const PhoneOptions = forwardRef<
       </DropdownMenu.Trigger>
       <DropdownMenu.Content
         side="right"
-        className="min-w-48 text-sm"
+        className="min-w-48 rounded-xl text-sm"
         sideOffset={8}
         alignOffset={-4}
         align="start"
@@ -213,7 +213,7 @@ const PhoneOptions = forwardRef<
               onValueChange={handleVerificationChange}
             >
               <DropdownMenu.RadioItem value={ValidationStatus.Valid}>
-                <IconCircleDashedCheck className="text-success data-[state=active]:bg-muted " />
+                <IconCircleDashedCheck className="text-success" />
                 Verified
               </DropdownMenu.RadioItem>
               <DropdownMenu.RadioItem value={ValidationStatus.Invalid}>
@@ -225,7 +225,7 @@ const PhoneOptions = forwardRef<
         )}
         <DropdownMenu.Separator />
         <DropdownMenu.Item
-          className="text-destructive"
+          className="text-destructive focus:bg-destructive/10 focus:text-destructive"
           onClick={handleDeleteClick}
         >
           <IconTrash />
@@ -454,7 +454,7 @@ export const PhonesBadgeDisplay = ({
   const phonesToDisplay = phones || phonesFromAtom;
 
   return (
-    <div className="flex gap-2">
+    <div className="flex flex-wrap gap-1.5">
       {phonesToDisplay?.map((phone) =>
         phone.phone ? (
           <Badge key={phone.phone} variant="secondary">

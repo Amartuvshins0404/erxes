@@ -1,7 +1,7 @@
 import { IconChevronDown, IconChevronRight } from '@tabler/icons-react';
 import { useState } from 'react';
 
-import { Checkbox, Separator } from 'erxes-ui';
+import { Button, Checkbox, Label, Separator } from 'erxes-ui';
 
 import { formatLabel } from '../utils/buildActionGroups';
 import type { ActionGroup } from '../types';
@@ -34,7 +34,7 @@ export const DeviceAuthorizeScopeGroup = ({
     <div>
       {groupIndex > 0 ? <Separator /> : null}
 
-      <div className="p-5">
+      <div className="p-4">
         <div className="flex items-center gap-3">
           <Checkbox
             checked={groupIndeterminate ? 'indeterminate' : groupChecked}
@@ -47,22 +47,22 @@ export const DeviceAuthorizeScopeGroup = ({
             }
           />
 
-          <button
-            type="button"
-            className="flex flex-1 items-center justify-between text-left"
+          <Button
+            variant="ghost"
+            className="h-8 flex-1 justify-between rounded-lg px-2"
             onClick={() => setOpen((prev) => !prev)}
           >
-            <span className="text-base font-semibold">{group.title}</span>
+            <span className="text-sm font-semibold">{group.title}</span>
             {open ? (
               <IconChevronDown className="size-4 text-muted-foreground" />
             ) : (
               <IconChevronRight className="size-4 text-muted-foreground" />
             )}
-          </button>
+          </Button>
         </div>
 
         {open ? (
-          <div className="mt-4 space-y-4 pl-7">
+          <div className="mt-3 space-y-4 pl-7">
             {group.modules.map((moduleGroup) => {
               const moduleChecked = moduleGroup.scopes.every((s) =>
                 selectedScopes.includes(s.scope),
@@ -73,7 +73,7 @@ export const DeviceAuthorizeScopeGroup = ({
                   key={`${group.action}-${moduleGroup.module}`}
                   className="space-y-3"
                 >
-                  <label className="flex items-center gap-3">
+                  <Label variant="peer" className="flex items-center gap-3">
                     <Checkbox
                       checked={moduleChecked}
                       disabled={loading}
@@ -87,13 +87,14 @@ export const DeviceAuthorizeScopeGroup = ({
                     <span className="text-sm font-medium">
                       {formatLabel(moduleGroup.module)}
                     </span>
-                  </label>
+                  </Label>
 
                   <div className="space-y-2 pl-7">
                     {moduleGroup.scopes.map((scope) => (
-                      <label
+                      <Label
+                        variant="peer"
                         key={scope.scope}
-                        className="flex items-start gap-3 rounded-md border p-3"
+                        className="flex cursor-pointer items-start gap-3 rounded-xl bg-muted/50 p-3 leading-normal transition-colors hover:bg-accent"
                       >
                         <Checkbox
                           checked={selectedScopes.includes(scope.scope)}
@@ -110,7 +111,7 @@ export const DeviceAuthorizeScopeGroup = ({
                             {scope.description}
                           </div>
                         </div>
-                      </label>
+                      </Label>
                     ))}
                   </div>
                 </div>

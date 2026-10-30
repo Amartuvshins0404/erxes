@@ -213,17 +213,13 @@ const FocusSheetSideContentHeader = forwardRef<
       <div
         ref={ref}
         className={cn(
-          'h-10 px-4 flex items-center gap-2 flex-none bg-background',
+          'flex h-11 flex-none items-center gap-2 bg-sidebar px-4',
           className,
         )}
         {...props}
       >
-        {!!Icon && (
-          <Icon className="size-4 flex-none text-primary" strokeWidth={3} />
-        )}
-        <div className="mr-auto font-medium text-primary capitalize">
-          {label}
-        </div>
+        {!!Icon && <Icon className="size-4 flex-none text-muted-foreground" />}
+        <div className="mr-auto text-sm font-medium capitalize">{label}</div>
         {children}
       </div>
       {!hideSeparator && <Separator />}
@@ -240,7 +236,7 @@ const FocusSheetSideTabsList = forwardRef<
     <Tabs.List
       ref={ref}
       className={cn(
-        'w-12 flex-none border-l bg-sidebar h-full py-3 flex flex-col items-center justify-start gap-3 border-b-0',
+        'flex h-full w-12 flex-none flex-col items-center justify-start gap-1 border-b-0 border-l bg-sidebar py-3',
         className,
       )}
       {...props}
@@ -266,7 +262,7 @@ const FocusSheetSideTabsTrigger = forwardRef<
         <Tabs.Trigger
           ref={ref}
           className={cn(
-            'size-10 bg-sidebar data-[state=active]:bg-primary/10 data-[state=active]:text-foreground data-[state=active]:shadow-none [&_svg]:size-5 data-[state=active]:after:hidden [&_svg]:text-primary hover:bg-primary/10 data-[state=active]:hover:bg-primary/10 rounded group/side-tabs-trigger',
+            'group/side-tabs-trigger size-9 rounded-full bg-transparent text-muted-foreground transition-colors hover:bg-accent hover:text-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none data-[state=active]:after:hidden data-[state=active]:hover:bg-primary/10 [&_svg]:size-4.5',
             className,
           )}
           value={value}
@@ -279,14 +275,14 @@ const FocusSheetSideTabsTrigger = forwardRef<
           {!!Icon && (
             <Icon
               className={cn(
-                'size-5 flex-none',
+                'size-4.5 flex-none',
                 activeSideTab === value &&
                   'group-hover/side-tabs-trigger:hidden',
               )}
             />
           )}
           {activeSideTab === value && (
-            <IconX className="size-5 flex-none hidden group-hover/side-tabs-trigger:block" />
+            <IconX className="hidden size-4.5 flex-none group-hover/side-tabs-trigger:block" />
           )}
         </Tabs.Trigger>
       </Tooltip.Trigger>

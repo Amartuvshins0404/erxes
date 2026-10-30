@@ -1,4 +1,4 @@
-import { AppLayout } from 'erxes-ui';
+import { AppLayout, PagePanel } from 'erxes-ui';
 import { DocumentsContextNavigation } from '@/documents/components/DocumentsContextNavigation';
 import { INavigationActivity } from '@/navigation/types/NavigationActivity';
 import { NavigationChildControlsProvider } from '@/navigation/components/app-sidebar/NavigationChildControlsProvider';
@@ -61,16 +61,16 @@ export const CoreAppOutlet = () => {
   const sidebar =
     activity?.kind === 'core' ? getCoreModuleSidebar(activity, pathname) : null;
 
-  // One element shape for every route without a core sidebar: a plugin's
-  // nested pages may match none of its module paths, and switching the
-  // wrapper would remount (reload) the whole plugin. The provider lets plugin
-  // menu items (NavigationMenuLinkItem) offer favorite/reorder.
   if (!activity || !sidebar) {
     return (
       <NavigationChildControlsProvider
         activity={activity?.kind === 'plugin' ? activity : undefined}
       >
-        <Outlet />
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col px-2 pb-2 has-[[data-app-layout]]:p-0">
+          <PagePanel>
+            <Outlet />
+          </PagePanel>
+        </div>
       </NavigationChildControlsProvider>
     );
   }

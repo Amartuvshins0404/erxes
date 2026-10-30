@@ -1,4 +1,4 @@
-import { Button, useScopedHotkeys } from 'erxes-ui';
+import { Button, Kbd, useScopedHotkeys } from 'erxes-ui';
 
 import type { OnboardingStepDef } from './onboardingSteps';
 import { currentOrganizationState } from 'ui-modules';
@@ -42,7 +42,7 @@ export const WelcomeSection = ({
         transition={{ duration: 0.6, delay: 0.1 }}
         className="flex flex-col gap-2"
       >
-        <h1 className="text-3xl font-bold tracking-tight text-foreground">
+        <h1 className="text-3xl font-semibold tracking-tight text-foreground">
           {t('lets-get-started')}
         </h1>
         <p className="text-lg text-muted-foreground">
@@ -54,7 +54,7 @@ export const WelcomeSection = ({
         variants={listVariants}
         initial="hidden"
         animate="show"
-        className="flex flex-col rounded-xl border bg-background px-4 shadow-xs"
+        className="flex flex-col rounded-3xl bg-card px-5 shadow-card"
       >
         {milestoneRows.map(({ step, cardTitle, cardSubtitle, icon: Icon }) => (
           <motion.li
@@ -63,11 +63,11 @@ export const WelcomeSection = ({
             transition={{ duration: 0.4, ease: 'easeOut' }}
             className="flex items-center gap-4 border-b py-4 last:border-b-0"
           >
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
               <Icon className="size-5" />
             </span>
             <span className="flex flex-col">
-              <span className="text-base font-semibold text-foreground">
+              <span className="text-sm font-semibold text-foreground">
                 {cardTitle}
               </span>
               <span className="text-xs text-muted-foreground">
@@ -87,14 +87,19 @@ export const WelcomeSection = ({
         <p className="text-sm text-muted-foreground">
           {t('takes-few-minutes')}
         </p>
-        <Button size="lg" className="w-full" onClick={onContinue} autoFocus>
+        <Button
+          size="lg"
+          className="w-full rounded-full"
+          onClick={onContinue}
+          autoFocus
+        >
           {t('get-started')}
         </Button>
         <p className="text-xs text-muted-foreground">
           Press
-          <kbd className="mx-1 rounded-md border bg-muted px-1.5 py-0.5 font-mono text-[10px] text-foreground">
+          <Kbd variant="foreground" className="mx-1">
             Enter
-          </kbd>
+          </Kbd>
           to continue
         </p>
       </motion.div>

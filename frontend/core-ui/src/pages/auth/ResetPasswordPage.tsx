@@ -4,6 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router';
 import { currentUserState } from 'ui-modules';
 
 import { ResetPassword } from '@/auth/login/components/ResetPassword';
+import { AuthenticationLayout } from '@/auth/components/AuthenticationLayout';
 import { AppPath } from '@/types/paths/AppPath';
 import { useAtomValue } from 'jotai';
 import { useTranslation } from 'react-i18next';
@@ -24,13 +25,13 @@ const ResetPasswordPage = () => {
   }, [currentUser, navigate]);
 
   return (
-    <div className="flex items-center justify-center my-48">
-      <div className="motion-preset-slide-down-md grid gap-5">
-        <div className="flex flex-col items-center">
-          <h2 className="font-semibold text-2xl">{t('reset-password')}</h2>
-        </div>
+    <div className="flex min-h-screen w-full">
+      <AuthenticationLayout>
+        <h1 className="text-center text-xl font-semibold tracking-tight">
+          {t('reset-password')}
+        </h1>
         <ResetPassword token={token} />
-      </div>
+      </AuthenticationLayout>
     </div>
   );
 };

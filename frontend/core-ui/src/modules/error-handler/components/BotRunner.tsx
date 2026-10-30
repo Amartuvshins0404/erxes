@@ -7,13 +7,11 @@ import {
 
 const GROUND = 28;
 
-// Scoped to the runner: poses, the bouncy run cycle and obstacle looks keyed by data attributes.
 const RUNNER_STYLES = `
 @keyframes runner-bob {
   0%, 100% { transform: translateY(0) rotate(8deg); }
   50% { transform: translateY(-2.5px) rotate(5deg); }
 }
-/* Planted foot pushes back along the ground, then swings forward through the air. */
 @keyframes runner-patter {
   0%, 100% { transform: translate(3px, 0); }
   50% { transform: translate(-3px, 0); }
@@ -41,12 +39,12 @@ const RUNNER_STYLES = `
 .bot-runner[data-pose='slide'] .runner-dust circle { animation: runner-dust 0.3s linear infinite; }
 .bot-runner[data-pose='slide'] .runner-dust circle:nth-child(2) { animation-delay: -0.1s; }
 .bot-runner[data-pose='slide'] .runner-dust circle:nth-child(3) { animation-delay: -0.2s; }
-.bot-runner[data-pose='dead'] .runner-eye { fill: #E5484D; }
+.bot-runner[data-pose='dead'] .runner-eye { fill: var(--destructive); }
 .runner-slot { display: none; position: absolute; left: 0; }
 .runner-slot[data-kind='box'] {
   display: block; bottom: ${GROUND}px; border-radius: 3px;
-  background: repeating-linear-gradient(90deg, #8B5A2B 0 5px, #7A4E25 5px 7px);
-  border: 2px solid #5C3A1B;
+  background: repeating-linear-gradient(90deg, var(--warning) 0 5px, color-mix(in oklch, var(--warning) 80%, var(--foreground)) 5px 7px);
+  border: 2px solid color-mix(in oklch, var(--warning) 60%, var(--foreground));
 }
 .runner-slot[data-kind='hole'] {
   display: block; bottom: 0; height: ${GROUND - 2}px;
@@ -55,7 +53,7 @@ const RUNNER_STYLES = `
 }
 .runner-slot[data-kind='laser'] {
   display: block; bottom: ${GROUND + 34}px; height: 6px; border-radius: 3px;
-  background: #E5484D; box-shadow: 0 0 8px 2px rgba(229, 72, 77, 0.65);
+  background: var(--destructive); box-shadow: 0 0 8px 2px color-mix(in oklch, var(--destructive) 65%, transparent);
   animation: runner-laser 0.2s linear infinite;
 }
 @media (prefers-reduced-motion: reduce) {
@@ -69,7 +67,6 @@ const HINTS = {
   running: '',
 };
 
-// Something to do while the backend gets back on its feet.
 export const BotRunner = () => {
   const {
     status,
@@ -85,7 +82,7 @@ export const BotRunner = () => {
   return (
     <div className="w-full max-w-2xl px-4">
       <style>{RUNNER_STYLES}</style>
-      <div className="flex justify-end gap-4 font-mono text-xs text-muted-foreground tabular-nums">
+      <div className="flex justify-end gap-4 text-xs text-muted-foreground tabular-nums">
         <span>HI {best}</span>
         <span ref={scoreRef} className="text-foreground">
           00000
@@ -98,7 +95,7 @@ export const BotRunner = () => {
       >
         <div
           ref={groundRef}
-          className="absolute inset-x-0 h-0.5 bg-foreground/25"
+          className="absolute inset-x-0 h-0.5 rounded-full bg-border-strong"
           style={{ bottom: GROUND }}
         />
         {Array.from({ length: RUNNER_SLOTS }, (_, index) => (

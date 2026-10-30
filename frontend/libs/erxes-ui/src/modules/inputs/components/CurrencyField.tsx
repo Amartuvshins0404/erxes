@@ -21,7 +21,7 @@ const CurrencyFieldRoot = React.forwardRef<
     <div
       ref={ref}
       className={cn(
-        'flex shadow-xs h-auto items-stretch rounded gap-px bg-muted',
+        'flex h-auto items-stretch gap-px overflow-hidden rounded-sm bg-muted shadow-xs',
         className,
       )}
       {...props}

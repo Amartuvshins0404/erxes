@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useAtomValue } from 'jotai';
 import { useQuery } from '@apollo/client';
-import { Combobox, Command, Popover, Badge } from 'erxes-ui';
+import { Badge, Button, Combobox, Command, Popover } from 'erxes-ui';
 import { IconX } from '@tabler/icons-react';
 import { selectedTicketConfigAtom } from '../../../states';
 import { GET_WIDGET_TAGS } from '../../graphql/queries';
@@ -129,17 +129,19 @@ export function SelectTicketTag({
             <Badge
               key={tag._id}
               variant="secondary"
-              className="text-xs px-2 py-1 flex items-center gap-1"
+              className="h-7 rounded-full px-3 text-xs flex items-center gap-1"
             >
               {tag.name}
               {mode === 'multiple' && (
-                <button
-                  type="button"
+                <Button
+                  variant="ghost"
+                  size="icon"
                   onClick={() => handleRemove(tag._id)}
-                  className="ml-1 hover:bg-secondary rounded-full p-0.5"
+                  aria-label={`Remove ${tag.name}`}
+                  className="-mr-1.5 size-5 rounded-full hover:bg-accent [&>svg]:size-3"
                 >
-                  <IconX className="h-3 w-3" />
-                </button>
+                  <IconX />
+                </Button>
               )}
             </Badge>
           ))}

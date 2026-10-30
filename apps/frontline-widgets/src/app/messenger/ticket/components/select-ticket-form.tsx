@@ -14,7 +14,7 @@ export const SelectTicketForm = () => {
   const setPage = useSetAtom(ticketTabAtom);
   return (
     <section className="flex flex-col flex-1 h-full items-center justify-start p-4 overflow-hidden">
-      <span className="font-mono uppercase self-start ps-2 mb-2 text-muted-foreground font-semibold text-sm flex-0">
+      <span className="self-start ps-2 mb-2 text-xs font-medium text-muted-foreground flex-0">
         Choose a ticket form
       </span>
       <div className="flex flex-col gap-2 flex-1 w-full overflow-y-auto hide-scroll styled-scroll">

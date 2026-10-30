@@ -53,7 +53,7 @@ export const PhoneVerificationInput = ({
           size={16}
         />
       </Select.Trigger>
-      <Select.Content className="text-base font-medium shadow-lg">
+      <Select.Content className="text-sm font-medium">
         {PHONE_VALIDATION_STATUS_INFOS.map((info) => {
           const ItemIcon = PhoneIconComponents[info.icon];
           return (

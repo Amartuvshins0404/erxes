@@ -2,6 +2,7 @@ import * as React from 'react';
 import { Bar, BarChart } from 'recharts';
 
 import { ChartContainer, type ChartConfig } from 'erxes-ui/components/charts';
+import { ChatVizSkeleton } from './ChatVizSkeleton';
 import { useIsClient } from '../hooks/useIsClient';
 import type { ChartVizPayload } from '../types/chatVizTypes';
 import { getDefaultChartVizColor } from '../utils/chartVizPresentation';
@@ -29,7 +30,7 @@ export function ChatVizBar({ payload, className, domain }: Readonly<Props>) {
   );
 
   // Recharts uses window/document — defer until client-side to prevent SSR errors.
-  if (!isClient) return <ChartSkeleton />;
+  if (!isClient) return <ChatVizSkeleton />;
 
   return (
     <ChartContainer config={config} className={className}>
@@ -48,15 +49,5 @@ export function ChatVizBar({ payload, className, domain }: Readonly<Props>) {
         ))}
       </BarChart>
     </ChartContainer>
-  );
-}
-
-function ChartSkeleton() {
-  return (
-    <div
-      className="animate-pulse rounded-md bg-muted"
-      style={{ width: '100%', aspectRatio: '16/9' }}
-      aria-hidden
-    />
   );
 }

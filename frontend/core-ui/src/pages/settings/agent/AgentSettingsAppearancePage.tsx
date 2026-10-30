@@ -134,7 +134,7 @@ export const AgentSettingsAppearancePage = () => {
             {t('appearance-saved-locally', 'Saved on this device')}
           </p>
 
-          <div className="rounded-xl border p-6">
+          <div className="rounded-2xl bg-card p-6 shadow-card">
             <Label className="font-sans text-sm font-medium normal-case">
               {t('appearance-preview', 'Preview')}
             </Label>
@@ -164,7 +164,7 @@ export const AgentSettingsAppearancePage = () => {
             </div>
           </div>
 
-          <div className="rounded-xl border p-6">
+          <div className="rounded-2xl bg-card p-6 shadow-card">
             <Label className="font-sans text-sm font-medium normal-case">
               {t('appearance-shape', 'Shape')}
             </Label>
@@ -197,7 +197,7 @@ export const AgentSettingsAppearancePage = () => {
             </ToggleGroup>
           </div>
 
-          <div className="rounded-xl border p-6">
+          <div className="rounded-2xl bg-card p-6 shadow-card">
             <Label className="font-sans text-sm font-medium normal-case">
               {t('appearance-color', 'Colour')}
             </Label>
@@ -225,7 +225,7 @@ export const AgentSettingsAppearancePage = () => {
             </ToggleGroup>
           </div>
 
-          <div className="rounded-xl border p-6">
+          <div className="rounded-2xl bg-card p-6 shadow-card">
             <Label className="font-sans text-sm font-medium normal-case">
               {t('appearance-expression', 'Rest expression')}
             </Label>
@@ -258,7 +258,7 @@ export const AgentSettingsAppearancePage = () => {
             </ToggleGroup>
           </div>
 
-          <div className="rounded-xl border p-6">
+          <div className="rounded-2xl bg-card p-6 shadow-card">
             <div className="flex items-start justify-between gap-4">
               <Label className="font-sans text-sm font-medium normal-case">
                 {t('appearance-animations', 'Animations')}
@@ -274,10 +274,10 @@ export const AgentSettingsAppearancePage = () => {
             </div>
             <div className="mt-4 grid grid-cols-4 gap-2 sm:grid-cols-7">
               {SEQUENCE.map((id) => (
-                <button
+                <Button
                   key={id}
-                  type="button"
-                  className="flex flex-col items-center gap-1 rounded-lg p-2 transition-colors hover:bg-muted"
+                  variant="ghost"
+                  className="h-auto flex-col gap-1 rounded-xl p-2 font-normal"
                   onClick={() => playState(id)}
                   aria-label={t(`state-${id}`)}
                 >
@@ -292,7 +292,7 @@ export const AgentSettingsAppearancePage = () => {
                   <span className="text-[10px] text-muted-foreground">
                     {t(`state-${id}`)}
                   </span>
-                </button>
+                </Button>
               ))}
             </div>
             <p className="mt-3 text-xs text-muted-foreground">

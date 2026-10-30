@@ -13,7 +13,7 @@ export const BroadcastSettingsPage = () => {
       <BroadcastSettingsBreadcrumbs />
       <ScrollArea className="h-full">
         <section className="mx-auto max-w-2xl w-full h-full relative">
-          <h2 className="font-semibold text-lg mt-4 mb-12 px-4">
+          <h2 className="px-4 pt-8 pb-6 text-xl font-semibold tracking-tight">
             {t('broadcast-config')}
           </h2>
           <div className="flex flex-col items-center justify-center gap-8 px-4 w-full h-full">

@@ -44,11 +44,11 @@ const DocumentPlaceholderBlockContent: FC<DocumentPlaceholderRenderProps> = ({
 
   return (
     <div
-      className="my-2 rounded-md border bg-muted/30 px-3 py-2"
+      className="my-2 rounded-xl bg-muted/50 px-3 py-2.5"
       contentEditable={false}
     >
-      <div className="flex items-start gap-2">
-        <div className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded bg-background text-muted-foreground">
+      <div className="flex items-start gap-3">
+        <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-card text-muted-foreground shadow-2xs">
           <IconFileText size={16} />
         </div>
         <div className="min-w-0 flex-1">
@@ -69,9 +69,9 @@ const DocumentPlaceholderBlockContent: FC<DocumentPlaceholderRenderProps> = ({
   );
 };
 
-const DocumentPlaceholderExternalHTML: FC<
-  DocumentPlaceholderRenderProps
-> = ({ block }) => {
+const DocumentPlaceholderExternalHTML: FC<DocumentPlaceholderRenderProps> = ({
+  block,
+}) => {
   const { documentId, documentName } = block.props;
 
   if (!documentId) {

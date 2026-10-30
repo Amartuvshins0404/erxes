@@ -30,16 +30,16 @@ export const CoreTabUserMenu = () => {
         <DropdownMenu.Trigger asChild>
           <Button
             aria-label={sidebarT('profile')}
-            className="size-7 shrink-0 p-0"
+            className="size-8 shrink-0 rounded-full p-0"
             size="icon"
             variant="ghost"
           >
-            <Avatar className="size-6 rounded-md">
+            <Avatar className="size-7 rounded-full">
               <Avatar.Image
                 src={readImage(userDetails?.avatar || '')}
                 alt={userName}
               />
-              <Avatar.Fallback className="rounded-md text-xs">
+              <Avatar.Fallback className="rounded-full text-xs">
                 {userName.charAt(0)}
               </Avatar.Fallback>
             </Avatar>
@@ -48,7 +48,7 @@ export const CoreTabUserMenu = () => {
       </CoreTabTooltip>
       <DropdownMenu.Content
         align="end"
-        className="w-56 min-w-56! space-y-1 p-1.5"
+        className="w-60 min-w-60! space-y-1 p-1.5"
         side="bottom"
         sideOffset={8}
       >
@@ -58,7 +58,7 @@ export const CoreTabUserMenu = () => {
             <IconChevronRight className="text-muted-foreground" />
           </Link>
         </DropdownMenu.Item>
-        <DropdownMenu.Item asChild className="h-7 py-0 text-sm">
+        <DropdownMenu.Item asChild className="h-8 py-0 text-sm">
           <Link to={`/${AppPath.Settings}`}>
             <IconSettings className="text-muted-foreground" />
             {navigationT('app-settings', 'Settings')}
@@ -69,7 +69,7 @@ export const CoreTabUserMenu = () => {
         <SelectLanguages />
         <DropdownMenu.Separator />
         <DropdownMenu.Item
-          className="h-7 py-0 text-sm"
+          className="h-8 py-0 text-sm"
           onClick={() => handleLogout()}
         >
           {organizationT('logout')}

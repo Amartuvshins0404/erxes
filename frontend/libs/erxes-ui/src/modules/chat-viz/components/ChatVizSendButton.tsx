@@ -37,12 +37,13 @@ export function ChatVizSendButton({
     <Button
       type="button"
       variant="outline"
+      className="rounded-full"
       size="sm"
       onClick={handleClick}
       disabled={disabled}
       aria-label={label}
     >
-      <IconChartBar className="size-4 mr-1.5" aria-hidden />
+      <IconChartBar aria-hidden />
       {label}
     </Button>
   );

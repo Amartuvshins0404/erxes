@@ -20,17 +20,17 @@ export const IconPicker = forwardRef<
       <Combobox.TriggerBase
         variant="ghost"
         size="icon"
-        className="px-2"
+        className="rounded-full px-2"
         ref={ref}
         {...props}
       >
         <IconComponent name={_value} />
       </Combobox.TriggerBase>
 
-      <Combobox.Content className="w-60 min-w-60">
+      <Combobox.Content className="w-64 min-w-64 rounded-2xl">
         <Command>
           <Command.Input placeholder="Search icon..." />
-          <Command.List className="max-h-[200px] overflow-y-auto hide-scroll [&>div]:flex [&>div]:flex-wrap [&>div]:gap-2 justify-center">
+          <Command.List className="hide-scroll max-h-56 justify-center overflow-y-auto p-1 [&>div]:flex [&>div]:flex-wrap [&>div]:gap-1">
             {Object.entries(getIcons())
               .sort((a, b) => (a[0] === _value ? -1 : 1))
               .map(([key, Icon]) => (
@@ -42,7 +42,10 @@ export const IconPicker = forwardRef<
                     setOpen(false);
                   }}
                   value={key}
-                  className={cn(_value === key && 'text-primary')}
+                  className={cn(
+                    'size-8 justify-center rounded-lg p-0',
+                    _value === key && 'bg-primary/10 text-primary',
+                  )}
                 >
                   <Icon />
                 </Command.Item>

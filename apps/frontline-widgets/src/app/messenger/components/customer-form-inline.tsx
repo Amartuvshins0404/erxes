@@ -1,7 +1,16 @@
 import { useCallback } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { type SubmitHandler } from 'react-hook-form';
-import { Button, cn, Form, Input, PhoneInput, Spinner, toast } from 'erxes-ui';
+import {
+  Button,
+  cn,
+  Form,
+  Input,
+  PhoneInput,
+  Spinner,
+  toast,
+  ToggleGroup,
+} from 'erxes-ui';
 import { useEditCustomer } from '../hooks/useEditCustomer';
 import { useCreateCustomerForm } from '../ticket/hooks/useCreateCustomerForm';
 import { TCreateCustomerForm } from '../ticket/types';
@@ -99,16 +108,13 @@ export const CustomerFormInline = ({ className, onDone }: Props) => {
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: 8 }}
       transition={{ duration: 0.2 }}
-      className={cn(
-        'shrink-0 border-t border-border bg-background px-4 py-3',
-        className,
-      )}
+      className={cn('shrink-0 border-t bg-card px-4 py-3', className)}
     >
       <div className="flex items-center gap-2 mb-2.5">
         <span className="flex items-center justify-center size-6 rounded-full bg-primary/10">
           <IconUser className="size-3.5 text-primary" />
         </span>
-        <p className="flex-1 text-xs font-semibold text-foreground">
+        <p className="flex-1 text-xs font-medium text-foreground">
           {onDone
             ? 'Your contact info'
             : 'Please provide your contact info to continue'}
@@ -118,7 +124,7 @@ export const CustomerFormInline = ({ className, onDone }: Props) => {
             type="button"
             variant="ghost"
             size="sm"
-            className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
+            className="h-6 rounded-full px-2 text-xs text-muted-foreground hover:text-foreground"
             onClick={onDone}
           >
             Cancel
@@ -167,30 +173,26 @@ export const CustomerFormInline = ({ className, onDone }: Props) => {
               name="type"
               render={({ field }) => (
                 <Form.Item className="space-y-0 shrink-0">
-                  <div className="flex rounded-md border border-input overflow-hidden text-xs h-8">
-                    <button
-                      type="button"
-                      onClick={() => field.onChange('email')}
-                      className={`px-2.5 transition-colors ${
-                        field.value === 'email'
-                          ? 'bg-primary text-primary-foreground'
-                          : 'bg-background text-muted-foreground hover:bg-muted'
-                      }`}
+                  <ToggleGroup
+                    type="single"
+                    variant="outline"
+                    value={field.value}
+                    onValueChange={(value) => value && field.onChange(value)}
+                    className="h-8 rounded-full p-0.5"
+                  >
+                    <ToggleGroup.Item
+                      value="email"
+                      className="h-7 rounded-full px-3 text-xs"
                     >
                       Email
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => field.onChange('phone')}
-                      className={`px-2.5 transition-colors ${
-                        field.value === 'phone'
-                          ? 'bg-primary text-primary-foreground'
-                          : 'bg-background text-muted-foreground hover:bg-muted'
-                      }`}
+                    </ToggleGroup.Item>
+                    <ToggleGroup.Item
+                      value="phone"
+                      className="h-7 rounded-full px-3 text-xs"
                     >
                       Phone
-                    </button>
-                  </div>
+                    </ToggleGroup.Item>
+                  </ToggleGroup>
                 </Form.Item>
               )}
             />
@@ -241,7 +243,7 @@ export const CustomerFormInline = ({ className, onDone }: Props) => {
                           <Form.Control>
                             <PhoneInput
                               defaultCountry="MN"
-                              className="bg-background h-8 text-xs"
+                              className="h-8 text-xs"
                               {...field}
                             />
                           </Form.Control>
@@ -258,7 +260,7 @@ export const CustomerFormInline = ({ className, onDone }: Props) => {
               type="submit"
               size="sm"
               disabled={loading}
-              className="shrink-0 h-8 px-3 text-xs"
+              className="shrink-0 h-8 rounded-full px-4 text-xs"
             >
               {loading ? <Spinner size="sm" /> : 'Save'}
             </Button>

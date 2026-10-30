@@ -56,7 +56,7 @@ const RecordTableContainer = forwardRef<
         } as CSSProperties
       }
       className={cn(
-        'grow-0 basis-full overflow-hidden rounded-lg bg-sidebar border-t-4 border-l-4 border-sidebar',
+        'grow-0 basis-full overflow-hidden bg-background',
         className,
       )}
     >

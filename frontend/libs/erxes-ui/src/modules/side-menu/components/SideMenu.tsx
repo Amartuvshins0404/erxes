@@ -42,7 +42,7 @@ export const SideMenuContent = forwardRef<
     <Tabs.Content
       ref={ref}
       className={cn(
-        'data-[state=active]:border-l data-[state=active]:w-80 w-full transition-all data-[state=active]:flex flex-col overflow-hidden bg-sidebar',
+        'w-full flex-col overflow-hidden bg-background transition-[width] data-[state=active]:flex data-[state=active]:w-80 data-[state=active]:border-l',
         className,
       )}
       {...props}
@@ -67,15 +67,15 @@ export const SideMenuContentHeader = forwardRef<
         ref={ref}
         data-side-menu-header=""
         className={cn(
-          'h-10 px-4 flex items-center gap-2 flex-none bg-background',
+          'flex h-11 flex-none items-center gap-2 bg-background px-4',
           className,
         )}
         {...props}
       >
         {!!Icon && (
-          <Icon className="size-4 flex-none text-primary" strokeWidth={3} />
+          <Icon className="size-4 flex-none text-muted-foreground" />
         )}
-        <div className="mr-auto font-medium text-primary">{label}</div>
+        <div className="mr-auto text-sm font-semibold tracking-tight">{label}</div>
         {children}
       </div>
       {!hideSeparator && <Separator />}
@@ -92,7 +92,7 @@ export const SideMenuSidebar = forwardRef<
     <Tabs.List
       ref={ref}
       className={cn(
-        'w-12 flex-none border-l bg-sidebar h-full py-3 flex flex-col items-center justify-start gap-3',
+        'flex h-full w-12 flex-none flex-col items-center justify-start gap-1 border-l bg-background py-2',
         className,
       )}
       {...props}
@@ -116,7 +116,7 @@ export const SideMenuTrigger = forwardRef<
       <Tabs.Trigger
         ref={ref}
         className={cn(
-          'size-10 bg-sidebar data-[state=active]:bg-primary/10 data-[state=active]:text-foreground data-[state=active]:shadow-none [&_svg]:size-5 data-[state=active]:after:hidden [&_svg]:text-primary hover:bg-primary/10 data-[state=active]:hover:bg-primary/10 rounded',
+          'size-9 rounded-xl bg-transparent text-muted-foreground transition-colors hover:bg-accent hover:text-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none data-[state=active]:after:hidden data-[state=active]:hover:bg-primary/15 [&_svg]:size-[18px]',
           className,
         )}
         onClick={(e) => {
@@ -127,7 +127,7 @@ export const SideMenuTrigger = forwardRef<
         asChild
       >
         <Tooltip.Trigger>
-          {!!Icon && <Icon className="size-5 flex-none" />}
+          {!!Icon && <Icon className="flex-none" />}
         </Tooltip.Trigger>
       </Tabs.Trigger>
 

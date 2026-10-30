@@ -9,6 +9,7 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from 'erxes-ui/components/charts';
+import { ChatVizSkeleton } from './ChatVizSkeleton';
 import { useIsClient } from '../hooks/useIsClient';
 import type { ChartVizPayload } from '../types/chatVizTypes';
 import { getDefaultChartVizColor } from '../utils/chartVizPresentation';
@@ -60,7 +61,7 @@ export function ChatVizPie({ payload, className }: Readonly<Props>) {
     });
   }, [payload.data, payload.series, valueKey]);
 
-  if (!isClient) return <ChartSkeleton />;
+  if (!isClient) return <ChatVizSkeleton shape="square" />;
 
   return (
     <ChartContainer config={config} className={className}>
@@ -90,15 +91,5 @@ export function ChatVizPie({ payload, className }: Readonly<Props>) {
         />
       </PieChart>
     </ChartContainer>
-  );
-}
-
-function ChartSkeleton() {
-  return (
-    <div
-      className="animate-pulse rounded-md bg-muted"
-      style={{ width: '100%', aspectRatio: '1/1', maxWidth: 300 }}
-      aria-hidden
-    />
   );
 }

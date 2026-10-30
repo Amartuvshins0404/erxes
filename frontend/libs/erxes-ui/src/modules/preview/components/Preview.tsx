@@ -16,6 +16,9 @@ import {
 } from '@tabler/icons-react';
 import { Link } from 'react-router-dom';
 
+const ITEM_CLASS =
+  'h-7 gap-1.5 rounded-full px-3 data-[state=on]:bg-card data-[state=on]:text-foreground data-[state=on]:shadow-xs';
+
 const PreviewProvider = ({ children }: { children: React.ReactNode }) => {
   const resizablePanelRef = React.useRef<ImperativePanelHandle>(null);
 
@@ -33,33 +36,38 @@ export const PreviewToolbar = ({ path }: { path?: string }) => {
       <ToggleGroup
         type="single"
         defaultValue="100"
-        className="text-muted-foreground py-2"
+        className="w-fit gap-0.5 rounded-full bg-muted p-0.5 text-muted-foreground"
         onValueChange={(value) => {
           if (resizablePanelRef?.current) {
             resizablePanelRef.current.resize(parseInt(value));
           }
         }}
       >
-        <ToggleGroup.Item value="100" className="" title="Desktop">
-          <IconDeviceImacFilled className="h-3.5 w-3.5" />
+        <ToggleGroup.Item value="100" className={ITEM_CLASS} title="Desktop">
+          <IconDeviceImacFilled className="size-3.5" />
           <span>Desktop</span>
         </ToggleGroup.Item>
-        <ToggleGroup.Item value="60" title="Tablet">
-          <IconDeviceIpadFilled className="h-3.5 w-3.5" />
+        <ToggleGroup.Item value="60" className={ITEM_CLASS} title="Tablet">
+          <IconDeviceIpadFilled className="size-3.5" />
           <span>Tablet</span>
         </ToggleGroup.Item>
-        <ToggleGroup.Item value="30" title="Mobile">
-          <IconDeviceMobileFilled className="h-3.5 w-3.5" />
+        <ToggleGroup.Item value="30" className={ITEM_CLASS} title="Mobile">
+          <IconDeviceMobileFilled className="size-3.5" />
           <span>Mobile</span>
         </ToggleGroup.Item>
 
         {path && (
           <>
             <Separator.Inline />
-            <Button variant="ghost" asChild title="Open in New Tab">
+            <Button
+              variant="ghost"
+              className="rounded-full"
+              asChild
+              title="Open in New Tab"
+            >
               <Link to={path} target="_blank">
                 <span>Open in New Tab</span>
-                <IconWindowMaximize className="h-3.5 w-3.5" />
+                <IconWindowMaximize className="size-3.5" />
               </Link>
             </Button>
           </>
@@ -92,8 +100,8 @@ export const View = React.forwardRef<
         <iframe
           src={iframeSrc}
           width="100%"
-          title="Button Primary Story"
-          className="h-full"
+          title="Preview"
+          className="h-full rounded-2xl bg-card shadow-card"
         />
       </Resizable.Panel>
       <Resizable.Handle className="relative hidden w-3 bg-transparent p-0 after:absolute after:right-0 after:top-1/2 after:h-8 after:w-[6px] after:-translate-y-1/2 after:-translate-x-px after:rounded-full after:bg-border after:transition-all hover:after:h-10 md:block" />

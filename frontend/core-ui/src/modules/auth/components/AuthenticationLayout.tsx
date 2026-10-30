@@ -1,56 +1,49 @@
 import { Logo } from '@/auth/components/Logo';
-import { Polygons } from './Polygons';
 import { useTranslation } from 'react-i18next';
 
 interface AuthenticationLayoutProps {
   children: React.ReactNode;
 }
+
 export const AuthenticationLayout = ({
   children,
 }: AuthenticationLayoutProps) => {
   const { t } = useTranslation('common', { keyPrefix: 'auth' });
   return (
-    <div className="relative overflow-hidden lg:w-1/2 lg:flex-none flex-1 flex flex-col sm:pt-28 py-8 h-dvh bg-[radial-gradient(#F0F1FE,#F7F8FA)] dark:bg-[radial-gradient(#0D0D0D,#161616)]">
-      <div className="px-1 sm:px-6 mx-auto w-full max-w-md flex flex-col gap-8 relative">
-        <div className="absolute inset-0 hidden sm:block">
-          <Polygons
-            variant="light"
-            className="absolute left-1/2 -translate-x-1/2 w-[170%] -top-[18.5%]"
-          />
+    <div className="relative isolate flex h-dvh flex-1 flex-col overflow-y-auto bg-background px-4 py-10">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 -z-10 overflow-hidden"
+      >
+        <div className="absolute -top-32 left-1/2 size-[36rem] -translate-x-1/2 rounded-full bg-primary/10 blur-3xl" />
+        <div className="absolute -bottom-40 -right-24 size-[28rem] rounded-full bg-info/10 blur-3xl" />
+      </div>
+      <div className="m-auto flex w-full max-w-sm flex-col gap-8">
+        <Logo className="mx-auto h-9 text-primary" />
+        <div className="flex flex-col gap-6 rounded-3xl bg-card p-8 text-card-foreground shadow-lg">
+          {children}
         </div>
-        <Logo className="h-10 mx-auto text-primary relative hidden sm:block" />
-        <div className="relative sm:min-h-144">
-          <div className="rounded-xl shadow-xl overflow-hidden bg-sidebar">
-            <div className="overflow-hidden">
-              <div className="w-auto h-full bg-background p-6 pt-8 border border-t-0 rounded-b-xl -mx-px space-y-6">
-                {children}
-              </div>
-              <div className="flex flex-col text-muted-foreground space-y-1 py-5 w-full m-0 px-0">
-                <span className="text-sm text-center">
-                  {t('accept-terms-prefix')}
-                </span>
-                <span className="text-sm text-center inline-flex gap-1 justify-center">
-                  <a
-                    className="text-primary font-medium hover:underline"
-                    href="https://erxes.io/legal/terms"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    {t('terms-of-use')}
-                  </a>
-                  {t('and')}
-                  <a
-                    className="text-primary font-medium hover:underline"
-                    href="https://erxes.io/legal/privacy"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    {t('privacy-policy')}
-                  </a>
-                </span>
-              </div>
-            </div>
-          </div>
+        <div className="flex flex-col items-center gap-1 text-center text-xs text-muted-foreground">
+          <span>{t('accept-terms-prefix')}</span>
+          <span className="inline-flex gap-1">
+            <a
+              className="font-medium text-foreground transition-colors hover:text-primary"
+              href="https://erxes.io/legal/terms"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {t('terms-of-use')}
+            </a>
+            {t('and')}
+            <a
+              className="font-medium text-foreground transition-colors hover:text-primary"
+              href="https://erxes.io/legal/privacy"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {t('privacy-policy')}
+            </a>
+          </span>
         </div>
       </div>
     </div>

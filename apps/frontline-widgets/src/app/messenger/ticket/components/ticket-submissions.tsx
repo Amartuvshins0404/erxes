@@ -99,13 +99,13 @@ export const TicketSubmissionItem = ({
   return (
     <Collapsible
       key={ticket._id}
-      className="bg-background rounded-lg shadow-2xs text-foreground"
+      className="rounded-2xl bg-card text-card-foreground shadow-card"
       open={open}
       onOpenChange={setOpen}
     >
-      <Collapsible.Trigger className="flex flex-row px-1.5 py-0 h-9 gap-2 items-center w-full cursor-pointer justify-between">
+      <Collapsible.Trigger className="flex flex-row px-3 py-0 h-11 gap-2 items-center w-full cursor-pointer justify-between">
         <TicketStatusInlineValue.Icon status={ticket.status} />
-        <div className="text-base font-semibold flex-1 inline-flex items-center shrink-0 truncate m-0">
+        <div className="text-sm font-medium flex-1 inline-flex items-center shrink-0 truncate m-0">
           {ticket.name || 'Untitled ticket'}
           <AnimatePresence mode="popLayout">
             {open && (
@@ -319,9 +319,7 @@ export const TicketNotes = ({ _id: contentId }: { _id: string }) => {
   return (
     <>
       <Separator />
-      <h4 className="font-mono uppercase text-sm text-muted-foreground">
-        Activity
-      </h4>
+      <h4 className="text-xs font-medium text-muted-foreground">Activity</h4>
       <div className="ml-2.5 relative before:absolute before:left-1.5 before:top-1 before:bottom-1 before:w-px before:bg-muted flex flex-col">
         <TicketNoteItem note={latestNote} />
         <AnimatePresence initial={false}>
@@ -384,9 +382,9 @@ export const TicketNoteItem = ({ note }: { note: ITicketNote }) => {
         <div className="flex flex-1 flex-col">
           <span className="text-xs inline-flex gap-1">
             {isSystem ? (
-              <span className="font-bold">System</span>
+              <span className="font-medium">System</span>
             ) : (
-              <WdigetMembersInline.Title className="font-bold" />
+              <WdigetMembersInline.Title className="font-medium" />
             )}
             <p>left a note</p>
             <p className="text-muted-foreground">

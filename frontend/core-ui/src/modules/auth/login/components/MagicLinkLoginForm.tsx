@@ -1,6 +1,6 @@
 import { useLoginMagicLink } from '@/auth/login/hooks/useLoginMagicLink';
 import { IconBrandGoogleFilled } from '@tabler/icons-react';
-import { Button, Form, Input, Label } from 'erxes-ui';
+import { Button, Form, Input } from 'erxes-ui';
 import { useTranslation } from 'react-i18next';
 
 export const MagicLinkLoginForm = () => {
@@ -9,19 +9,18 @@ export const MagicLinkLoginForm = () => {
 
   return (
     <Form {...form}>
-      <form onSubmit={onMagicLinkSubmit} className="mx-auto grid gap-5">
-        <div className="text-center text-sm text-muted-foreground">
+      <form onSubmit={onMagicLinkSubmit} className="grid gap-5">
+        <p className="text-center text-sm text-muted-foreground">
           {t('magic-link-description')}
-        </div>
+        </p>
         <Form.Field
           name="email"
           control={form.control}
           render={({ field }) => (
             <Form.Item>
-              <Form.Label className="font-sans normal-case text-foreground text-sm font-medium leading-none">
+              <Form.Label className="text-sm font-medium normal-case text-foreground">
                 {t('email')}
               </Form.Label>
-              <Form.Message />
               <Form.Control>
                 <Input
                   type="email"
@@ -30,15 +29,25 @@ export const MagicLinkLoginForm = () => {
                   {...field}
                 />
               </Form.Control>
+              <Form.Message />
             </Form.Item>
           )}
         />
-
-        <Button type="submit" className="h-8">
+        <Button type="submit" size="lg" className="w-full rounded-full">
           {t('continue')}
         </Button>
-        <Label className="text-center">{t('or')}</Label>
-        <Button variant="secondary" onClick={onGoogleLogin} type="button">
+        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+          <span className="h-px flex-1 bg-border" />
+          {t('or')}
+          <span className="h-px flex-1 bg-border" />
+        </div>
+        <Button
+          variant="outline"
+          size="lg"
+          type="button"
+          onClick={onGoogleLogin}
+          className="w-full rounded-full"
+        >
           <IconBrandGoogleFilled />
           {t('continue-with-google')}
         </Button>

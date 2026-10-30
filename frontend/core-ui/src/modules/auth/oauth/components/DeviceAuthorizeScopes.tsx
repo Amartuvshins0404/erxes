@@ -1,5 +1,7 @@
 import { IconCheck } from '@tabler/icons-react';
 
+import { Skeleton } from 'erxes-ui';
+
 import { DeviceAuthorizeScopeGroup } from './DeviceAuthorizeScopeGroup';
 import type { ActionGroup } from '../types';
 import { useTranslation } from 'react-i18next';
@@ -27,16 +29,16 @@ export const DeviceAuthorizeScopes = ({
   if (loadingDetails) {
     return (
       <div className="space-y-3">
-        <div className="h-5 w-40 animate-pulse rounded bg-muted" />
-        <div className="h-24 animate-pulse rounded-lg bg-muted" />
-        <div className="h-24 animate-pulse rounded-lg bg-muted" />
+        <Skeleton className="h-5 w-40 rounded-full" />
+        <Skeleton className="h-24 rounded-2xl" />
+        <Skeleton className="h-24 rounded-2xl" />
       </div>
     );
   }
 
   if (isCodeMissing) {
     return (
-      <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+      <div className="rounded-2xl bg-destructive/10 p-4 text-sm text-destructive">
         {t('device-code-missing')}
       </div>
     );
@@ -61,11 +63,11 @@ export const DeviceAuthorizeScopes = ({
       </div>
 
       {hasNoGrantableScopes ? (
-        <div className="rounded-lg border p-4 text-sm text-muted-foreground">
+        <div className="rounded-2xl bg-muted/50 p-4 text-sm text-muted-foreground">
           {t('no-grantable-permissions')}
         </div>
       ) : (
-        <div className="overflow-hidden rounded-lg border">
+        <div className="overflow-hidden rounded-2xl border">
           {actionGroups.map((group, groupIndex) => (
             <DeviceAuthorizeScopeGroup
               key={group.action}

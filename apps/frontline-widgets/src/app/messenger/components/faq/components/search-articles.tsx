@@ -1,17 +1,14 @@
 import { IconSearch } from '@tabler/icons-react';
+import { Input } from 'erxes-ui';
 
-export const SearchArticlesInput = () => {
-  return (
-    <label
-      htmlFor="search"
-      className="rounded-xl bg-muted text-foreground w-full py-2.5 px-3 flex items-center mt-4"
-    >
-      <IconSearch className="size-4.5 text-muted-foreground" />
-      <input
-        placeholder="Search for help"
-        id="search"
-        className="bg-transparent text-foreground placeholder:text-foreground p-0 m-0 text-xs leading-none focus-visible:outline-none focus-visible:border-none focus-visible:ring-0 ps-4"
-      />
-    </label>
-  );
-};
+export const SearchArticlesInput = () => (
+  <div className="flex h-10 w-full items-center gap-2 rounded-full bg-card px-4 text-card-foreground shadow-card">
+    <IconSearch className="size-4 shrink-0 text-muted-foreground" />
+    <Input
+      type="search"
+      placeholder="Search for help"
+      aria-label="Search articles"
+      className="h-auto min-w-0 flex-1 bg-transparent px-0 shadow-none focus-visible:shadow-none"
+    />
+  </div>
+);

@@ -14,7 +14,7 @@ export const KnowledgeBaseWidget = () => {
   const heading = article ? '' : category?.title || topic?.title || 'Help';
 
   return (
-    <div className="flex h-dvh flex-col bg-sidebar">
+    <div className="flex h-dvh flex-col bg-background">
       <KbHeader
         topic={topic}
         heading={heading}

@@ -19,7 +19,7 @@ function PreviewDialogClose() {
         type="button"
         variant="ghost"
         size="icon"
-        className="absolute right-3 top-3 z-10 bg-background/80"
+        className="absolute right-3 top-3 z-10 rounded-full bg-popover/90 shadow-sm"
         aria-label="Close attachment preview"
       >
         <IconX />
@@ -33,10 +33,6 @@ type PreviewTriggerProps = {
   name: string;
 } & React.ComponentProps<'button'>;
 
-/** forwardRef + prop spreading are required: Radix `Dialog.Trigger asChild`
- *  injects its open-toggle `onClick` (and ref) into this component, and any
- *  prop that is not forwarded never reaches the underlying button — which is
- *  exactly why the preview previously never opened. */
 const ImagePreviewTrigger = React.forwardRef<
   HTMLButtonElement,
   PreviewTriggerProps
@@ -45,7 +41,7 @@ const ImagePreviewTrigger = React.forwardRef<
     ref={ref}
     type="button"
     {...props}
-    className="group relative block max-w-72 overflow-hidden rounded-2xl border border-border/60 bg-muted/30 shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+    className="group relative block max-w-72 overflow-hidden rounded-2xl bg-muted shadow-card outline-none focus-visible:shadow-focus"
     aria-label={`Preview ${name}`}
   >
     <PreviewImage
@@ -53,8 +49,8 @@ const ImagePreviewTrigger = React.forwardRef<
       alt={name}
       className="max-h-64 w-full rounded-2xl object-cover"
     />
-    <span className="absolute inset-0 hidden items-center justify-center bg-black/25 transition-opacity group-hover:flex group-focus-visible:flex [@media(hover:hover)]:flex [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:group-focus-visible:opacity-100">
-      <span className="flex items-center gap-1.5 rounded-full bg-black/60 px-2.5 py-1 text-xs font-medium text-white">
+    <span className="absolute inset-0 hidden items-center justify-center bg-overlay transition-opacity group-hover:flex group-focus-visible:flex [@media(hover:hover)]:flex [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:group-focus-visible:opacity-100">
+      <span className="flex items-center gap-1.5 rounded-full bg-popover/90 px-2.5 py-1 text-xs font-medium text-popover-foreground shadow-sm">
         <IconZoomIn className="size-3.5" />
         Preview
       </span>
@@ -85,7 +81,7 @@ function ImagePreviewContent({
   name: string;
 }) {
   return (
-    <Dialog.Content className="flex! h-auto! max-h-[90vh]! w-auto! max-w-[90vw]! items-center justify-center overflow-hidden! border-0! bg-black/90! p-2!">
+    <Dialog.Content className="flex! h-auto! max-h-[90vh]! w-auto! max-w-[90vw]! items-center justify-center overflow-hidden! rounded-3xl! border-0! bg-popover! p-2!">
       <Dialog.Title className="sr-only">{name}</Dialog.Title>
       <Dialog.Description className="sr-only">
         Full-size image preview
@@ -94,7 +90,7 @@ function ImagePreviewContent({
         src={readImage(attachment.url)}
         alt={name}
         fit="contain"
-        className="block max-h-[85vh] max-w-[88vw] rounded-lg object-contain"
+        className="block max-h-[85vh] max-w-[88vw] rounded-2xl object-contain"
       />
       <PreviewDialogClose />
     </Dialog.Content>
@@ -120,7 +116,7 @@ const VideoPreviewTrigger = React.forwardRef<
     ref={ref}
     type="button"
     {...props}
-    className="group relative flex max-w-72 items-center overflow-hidden rounded-2xl border border-border/60 bg-black/80 p-2 text-white shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+    className="group relative flex max-w-72 items-center overflow-hidden rounded-2xl bg-muted p-2 text-foreground shadow-card outline-none focus-visible:shadow-focus"
     aria-label={`Play ${name}`}
   >
     <video
@@ -130,8 +126,8 @@ const VideoPreviewTrigger = React.forwardRef<
       preload="metadata"
       className="max-h-40 w-full rounded-xl object-contain"
     />
-    <span className="absolute inset-0 flex items-center justify-center bg-black/30">
-      <span className="flex items-center gap-1.5 rounded-full bg-black/70 px-2.5 py-1 text-xs font-medium text-white">
+    <span className="absolute inset-0 flex items-center justify-center bg-overlay">
+      <span className="flex items-center gap-1.5 rounded-full bg-popover/90 px-2.5 py-1 text-xs font-medium text-popover-foreground shadow-sm">
         <IconZoomIn className="size-3.5" />
         Play video
       </span>
@@ -162,7 +158,7 @@ function VideoPreviewContent({
   name: string;
 }) {
   return (
-    <Dialog.Content className="flex! h-auto! max-h-[90vh]! w-auto! max-w-[90vw]! items-center justify-center overflow-hidden! border-0! bg-black/90! p-2!">
+    <Dialog.Content className="flex! h-auto! max-h-[90vh]! w-auto! max-w-[90vw]! items-center justify-center overflow-hidden! rounded-3xl! border-0! bg-popover! p-2!">
       <Dialog.Title className="sr-only">{name}</Dialog.Title>
       <Dialog.Description className="sr-only">
         Video attachment preview
@@ -172,7 +168,7 @@ function VideoPreviewContent({
         controls
         autoPlay
         playsInline
-        className="block max-h-[85vh] max-w-[88vw] rounded-lg object-contain"
+        className="block max-h-[85vh] max-w-[88vw] rounded-2xl object-contain"
       />
       <PreviewDialogClose />
     </Dialog.Content>
@@ -212,15 +208,15 @@ function AttachmentFile({ attachment }: { attachment: IAttachment }) {
       type="button"
       onClick={handleDownload}
       disabled={isDownloading}
-      className="flex w-fit max-w-full min-w-44 items-center gap-2.5 rounded-xl border border-border/70 bg-card p-2 text-left text-card-foreground shadow-2xs transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 disabled:cursor-wait disabled:opacity-70"
+      className="flex w-fit max-w-full min-w-44 items-center gap-2.5 rounded-2xl bg-card p-2 pr-3 text-left text-card-foreground shadow-card outline-none transition-colors hover:bg-accent/60 focus-visible:shadow-focus disabled:cursor-wait disabled:opacity-70"
       aria-label={`Download ${name}`}
     >
-      <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-primary">
+      <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
         <IconComponent className="size-5" />
       </span>
       <span className="min-w-0 flex-1 leading-tight">
-        <span className="block truncate text-xs font-semibold">{name}</span>
-        <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">
+        <span className="block truncate text-xs font-medium">{name}</span>
+        <span className="mt-0.5 block truncate text-xs text-muted-foreground">
           {formatFileSize(attachment.size || 0)} ·{' '}
           {isDownloading ? 'Downloading…' : 'Download'}
         </span>

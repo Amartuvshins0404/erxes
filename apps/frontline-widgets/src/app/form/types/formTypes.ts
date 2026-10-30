@@ -107,3 +107,8 @@ export type IAttachment = {
   type: string;
   duration?: number;
 };
+
+export interface FormWidgetSettings {
+  form_id?: string;
+  channel_id?: string;
+}

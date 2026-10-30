@@ -24,8 +24,8 @@ const REVEAL_CLASSES = {
 } as const;
 
 const actionButtonClassName =
-  'size-6 shrink-0 text-muted-foreground transition-colors duration-150 hover:text-foreground';
-const menuItemClassName = 'text-[13px] font-normal [&>svg]:size-3.5';
+  'size-6 shrink-0 rounded-full text-muted-foreground transition-colors hover:text-foreground';
+const menuItemClassName = 'text-sm font-normal [&>svg]:size-3.5';
 
 export const NavigationActivityActions = ({
   canMoveDown,
@@ -71,7 +71,7 @@ export const NavigationActivityActions = ({
       ref={containerRef}
       data-nav-actions
       className={cn(
-        'pointer-events-none absolute top-0 flex h-7 items-center gap-0.5 opacity-0 transition-opacity duration-150 ease-out motion-reduce:transition-none',
+        'pointer-events-none absolute top-0 flex h-7 items-center gap-0.5 opacity-0 transition-opacity motion-reduce:transition-none',
         REVEAL_CLASSES[revealGroup],
         menuOpen && 'pointer-events-auto opacity-100',
         className,
@@ -101,7 +101,7 @@ export const NavigationActivityActions = ({
           aria-label={favoriteLabel}
           className={cn(
             actionButtonClassName,
-            'text-yellow-500 hover:bg-yellow-500/10 hover:text-yellow-500',
+            'text-warning hover:bg-warning/10 hover:text-warning',
           )}
           size="icon"
           type="button"

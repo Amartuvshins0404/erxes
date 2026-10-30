@@ -49,7 +49,7 @@ export const EmailTableToolbar = ({ editor }: { editor: Editor | null }) => {
   }
 
   return (
-    <div className="flex items-center gap-1 rounded-md border bg-background p-1 shadow-sm">
+    <div className="flex items-center gap-0.5 rounded-full bg-popover p-1 shadow-lg">
       {ACTIONS.map(({ label, icon: Icon, run }) => (
         <Tooltip key={run}>
           <Tooltip.Trigger asChild>
@@ -57,7 +57,7 @@ export const EmailTableToolbar = ({ editor }: { editor: Editor | null }) => {
               type="button"
               variant="ghost"
               size="icon"
-              className="size-7"
+              className="size-7 rounded-full"
               aria-label={label}
               // Without this the editor loses the cell selection on mousedown
               // and every table command becomes a no-op.

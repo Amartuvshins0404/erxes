@@ -72,7 +72,7 @@ export const RecordTableCursorProvider = ({
         loading,
       }}
     >
-      <ScrollArea.Root className="h-full w-full pb-2 pr-2 relative">
+      <ScrollArea.Root className="relative h-full w-full">
         <ScrollArea.Viewport ref={scrollRef} onScroll={handleScroll}>
           <div className="min-h-[calc(100vh-8rem)]">{children}</div>
         </ScrollArea.Viewport>

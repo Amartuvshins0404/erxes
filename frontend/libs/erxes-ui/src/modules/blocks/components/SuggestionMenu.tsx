@@ -12,11 +12,11 @@ export const SuggestionMenu = React.forwardRef<
     ref={ref}
     {...props}
     className={cn(
-      'w-72 rounded-md bg-background shadow-md border border/50 p-2 outline-hidden overflow-hidden',
+      'w-72 overflow-hidden rounded-2xl bg-popover p-1.5 shadow-lg outline-hidden',
       className,
     )}
   >
-    <div className="overflow-auto flex flex-col gap-1 h-full">{children}</div>
+    <div className="flex h-full flex-col gap-0.5 overflow-auto">{children}</div>
   </div>
 ));
 
@@ -48,8 +48,8 @@ export const SuggestionMenuItem = React.forwardRef<
       }}
       className={cn(
         buttonVariants({ variant: 'ghost', size: 'lg' }),
-        'justify-between p-2 font-medium [&>svg]:size-4 hover:bg-transparent',
-        isSelected && 'bg-muted',
+        'h-auto min-h-8 justify-between rounded-lg px-2 py-1.5 font-normal [&>svg]:size-4 hover:bg-accent',
+        isSelected && 'bg-accent text-foreground',
         props.className,
       )}
     />

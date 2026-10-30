@@ -13,7 +13,7 @@ import { isStructuralColumn } from 'erxes-ui/modules/record-table/utils/columnUt
 import { useRecordTable } from './RecordTableProvider';
 
 export const recordTableHeadVariants = cva(
-  'sticky z-2 top-0 transition-transform duration-200 whitespace-nowrap text-xs [&_svg]:flex-none',
+  'sticky top-0 z-2 h-9 border-r border-b bg-background font-sans text-xs font-medium normal-case text-muted-foreground transition-transform whitespace-nowrap last:border-r-0 [&_svg]:flex-none',
   {
     variants: {
       isDragging: {
@@ -78,7 +78,7 @@ export const RecordTableHead = ({
 
           {isDragging && (
             <div
-              className="absolute top-0 left-0 w-full h-screen bg-muted opacity-50"
+              className="absolute top-0 left-0 h-screen w-full bg-accent/60"
               style={{ transform: CSS.Translate.toString(transform) }}
             />
           )}
@@ -110,7 +110,7 @@ const RecordTableOverLine = ({
       return (
         <div
           className={cn(
-            'absolute top-0 w-0.5 bg-primary/40 h-screen',
+            'absolute top-0 h-screen w-0.5 rounded-full bg-primary/60',
             isOnRight ? 'right-0' : 'left-0',
           )}
         />
@@ -131,9 +131,9 @@ const RecordTableHeadSize = React.forwardRef<
     <span
       ref={ref}
       className={cn(
-        'absolute bottom-0 cursor-col-resize w-4 h-full right-0 z-10 select-none touch-none after:absolute after:inset-y-2 after:w-px after:right-0 hover:after:bg-border',
+        'absolute right-0 bottom-0 z-10 h-full w-3 cursor-col-resize touch-none select-none after:absolute after:inset-y-2 after:right-0 after:w-0.5 after:rounded-full after:transition-colors hover:after:bg-border-strong',
         header.column.getIsResizing() &&
-          'after:w-0.5 hover:after:bg-primary after:inset-y-1',
+          'after:inset-y-1 after:bg-primary hover:after:bg-primary',
       )}
       {...props}
       onMouseDown={header.getResizeHandler()}

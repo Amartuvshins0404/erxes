@@ -91,6 +91,7 @@ export const SelectTriggerOperation = ({
       <Popover.Trigger asChild>
         <Badge
           variant="secondary"
+          className="cursor-pointer rounded-full"
           onClick={(e) => {
             e.stopPropagation();
           }}
@@ -111,7 +112,7 @@ export const SelectTriggerOperation = ({
   if (variant === SelectTriggerVariant.FORM) {
     return (
       <Form.Control>
-        <Combobox.TriggerBase className="w-fit h-7 font-medium max-w-64">
+        <Combobox.TriggerBase className="h-7 w-fit max-w-64 font-medium">
           {children}
         </Combobox.TriggerBase>
       </Form.Control>
@@ -124,6 +125,7 @@ export const SelectTriggerOperation = ({
         <Button
           variant="ghost"
           size="icon"
+          className="rounded-full"
           onClick={(e) => {
             e.stopPropagation();
           }}
@@ -135,7 +137,7 @@ export const SelectTriggerOperation = ({
   }
 
   return (
-    <Combobox.TriggerBase className="w-fit h-7 shadow-none py-0 pr-0">
+    <Combobox.TriggerBase className="h-7 w-fit rounded-full py-0 pr-0 shadow-none hover:bg-accent">
       {children}
     </Combobox.TriggerBase>
   );

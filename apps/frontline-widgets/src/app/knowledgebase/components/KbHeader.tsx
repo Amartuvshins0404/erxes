@@ -1,10 +1,10 @@
 import { IconArrowLeft, IconSearch, IconX } from '@tabler/icons-react';
-import { cn } from 'erxes-ui';
+import { Button, Input, cn } from 'erxes-ui';
 import { TKbTopic } from '../types/knowledgeBaseTypes';
 import { postToHost } from '../utils/knowledgeBaseUtils';
 
 const HEADER_BUTTON_CLASS =
-  'flex size-8 items-center justify-center rounded-lg transition-colors hover:bg-white/15';
+  'size-8 rounded-full text-primary-foreground hover:bg-primary-foreground/15';
 
 export const KbHeader = ({
   topic,
@@ -24,32 +24,34 @@ export const KbHeader = ({
   onTermChange: (term: string) => void;
 }) => (
   <header
-    className="shrink-0 px-4 pb-4 pt-3 text-primary-foreground"
-    style={{ backgroundColor: topic?.color || 'var(--primary)' }}
+    className="shrink-0 bg-primary px-4 pb-4 pt-3 text-primary-foreground"
+    style={topic?.color ? { backgroundColor: topic.color } : undefined}
   >
     <div className="flex min-h-8 items-center gap-2">
       {canGoBack && (
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="icon"
           onClick={onBack}
           aria-label="Back"
           className={cn('-ml-1', HEADER_BUTTON_CLASS)}
         >
-          <IconArrowLeft size={18} />
-        </button>
+          <IconArrowLeft />
+        </Button>
       )}
       <span className="min-w-0 flex-1 truncate text-base font-semibold">
         {heading}
       </span>
       {isFloating && (
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="icon"
           onClick={() => postToHost({ type: 'close' })}
           aria-label="Close"
           className={cn('-mr-1', HEADER_BUTTON_CLASS)}
         >
-          <IconX size={18} />
-        </button>
+          <IconX />
+        </Button>
       )}
     </div>
 
@@ -60,17 +62,17 @@ export const KbHeader = ({
     )}
 
     {!canGoBack && (
-      <label className="mt-3 flex items-center gap-2 rounded-xl bg-background px-3 py-2.5 text-foreground">
-        <IconSearch size={16} className="shrink-0 text-muted-foreground" />
-        <input
+      <div className="mt-3 flex h-10 items-center gap-2 rounded-full bg-card px-4 text-card-foreground shadow-card">
+        <IconSearch className="size-4 shrink-0 text-muted-foreground" />
+        <Input
           type="search"
           value={term}
           onChange={(event) => onTermChange(event.target.value)}
           placeholder="Search for help"
           aria-label="Search articles"
-          className="min-w-0 flex-1 bg-transparent text-sm placeholder:text-muted-foreground focus-visible:outline-none"
+          className="h-auto min-w-0 flex-1 bg-transparent px-0 shadow-none focus-visible:shadow-none"
         />
-      </label>
+      </div>
     )}
   </header>
 );

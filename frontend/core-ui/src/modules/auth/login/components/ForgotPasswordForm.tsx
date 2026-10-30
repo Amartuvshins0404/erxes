@@ -36,21 +36,19 @@ export const ForgotPasswordForm = () => {
 
   return (
     <Form {...form}>
-      <form
-        onSubmit={form.handleSubmit(submitHandler)}
-        className="mx-auto grid gap-5"
-      >
+      <form onSubmit={form.handleSubmit(submitHandler)} className="grid gap-5">
         <Form.Field
           name="email"
           control={form.control}
           render={({ field }) => (
             <Form.Item>
-              <Form.Label className="font-sans normal-case text-foreground text-sm font-medium leading-none">
+              <Form.Label className="text-sm font-medium normal-case text-foreground">
                 {t('email')}
               </Form.Label>
               <Form.Control>
                 <Input
                   placeholder={t('enter-work-email')}
+                  className="h-8"
                   {...field}
                   ref={(e) => {
                     field.ref(e);
@@ -63,9 +61,8 @@ export const ForgotPasswordForm = () => {
             </Form.Item>
           )}
         />
-
-        <Button type="submit" className={`h-8`}>
-          {t('sign-in')}
+        <Button type="submit" size="lg" className="w-full rounded-full">
+          {t('continue')}
         </Button>
       </form>
     </Form>

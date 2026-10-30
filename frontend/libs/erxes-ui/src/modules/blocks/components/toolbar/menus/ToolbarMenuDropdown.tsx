@@ -9,7 +9,7 @@ export const ToolbarMenuDropdown = ({
   <components.Generic.Menu.Dropdown
     {...props}
     className={cn(
-      'max-h-[min(20rem,50dvh)]! overflow-y-auto! overscroll-contain',
+      'max-h-[min(20rem,50dvh)]! overflow-y-auto! overscroll-contain rounded-2xl! p-1.5! shadow-lg!',
       className,
     )}
   />

@@ -59,11 +59,11 @@ export const MainOnboarding = () => {
             initial={{ opacity: 0, y: -6 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3 }}
-            className="text-xs font-semibold uppercase tracking-wider text-primary"
+            className="rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary"
           >
             Step {currentStep} of {steps.length}
           </motion.span>
-          <span className="h-px flex-1 bg-gradient-to-r from-primary/60 to-transparent" />
+          <span className="h-px flex-1 bg-border" />
         </div>
         <div className="flex w-5/6 flex-col items-center justify-center gap-4 lg:w-4/6">
           {currentStep === 1 && (

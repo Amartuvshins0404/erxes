@@ -52,6 +52,7 @@ export function SettingsSidebar() {
         <SettingsNavigationGroup name={t('account')}>
           {sidebar.account.map((item) => (
             <NavigationMenuLinkItem
+              className="px-2"
               key={item.name}
               pathPrefix={AppPath.Settings}
               path={item.path}
@@ -125,6 +126,7 @@ function SettingsNavigationItem({
   if (!subPaths?.length) {
     return (
       <NavigationMenuLinkItem
+        className="px-2"
         pathPrefix={AppPath.Settings}
         path={path}
         name={name}
@@ -145,6 +147,7 @@ function SettingsNavigationItem({
 
   return (
     <NavigationMenuLinkItem
+      className="px-2"
       pathPrefix={AppPath.Settings}
       path={path}
       name={name}
@@ -153,7 +156,7 @@ function SettingsNavigationItem({
       onClick={handleParentClick}
       action={
         <NavigationDisclosure open={open}>
-          <Sidebar.Sub className="border-l">
+          <Sidebar.Sub className="border-l border-border">
             {subPaths.map((subPath) => (
               <Sidebar.SubItem key={subPath.path}>
                 <Sidebar.SubButton
@@ -170,7 +173,7 @@ function SettingsNavigationItem({
     >
       <span
         className={cn(
-          'ml-auto flex shrink-0 text-muted-foreground transition-transform duration-200',
+          'ml-auto flex shrink-0 text-muted-foreground transition-transform',
           open && 'rotate-90',
         )}
       >
@@ -190,8 +193,10 @@ export function SettingsNavigationGroup({
   if (React.Children.count(children) === 0) return null;
 
   return (
-    <Sidebar.Group className="px-4 py-1">
-      <Sidebar.GroupLabel>{name}</Sidebar.GroupLabel>
+    <Sidebar.Group className="px-2 py-1">
+      <Sidebar.GroupLabel className="text-xs font-medium normal-case tracking-normal">
+        {name}
+      </Sidebar.GroupLabel>
       <Sidebar.GroupContent>
         <Sidebar.Menu>{children}</Sidebar.Menu>
       </Sidebar.GroupContent>
@@ -214,10 +219,13 @@ export function SettingsExitButton() {
   });
 
   return (
-    <Sidebar.Header className="sticky top-0 z-10 bg-sidebar px-2 pt-0 pb-1 after:pointer-events-none after:absolute after:inset-x-0 after:top-full after:h-4 after:bg-gradient-to-b after:from-sidebar after:to-transparent">
+    <Sidebar.Header className="sticky top-0 z-10 bg-sidebar px-2 pt-0 pb-1 after:pointer-events-none after:absolute after:inset-x-0 after:top-full after:h-4 after:bg-linear-to-b after:from-sidebar after:to-transparent">
       <Sidebar.Menu>
         <Sidebar.MenuItem>
-          <Sidebar.MenuButton onClick={handleExitSettings}>
+          <Sidebar.MenuButton
+            className="px-2 text-muted-foreground hover:text-foreground"
+            onClick={handleExitSettings}
+          >
             <IconChevronLeft />
             <span>{t('exit-settings')}</span>
           </Sidebar.MenuButton>

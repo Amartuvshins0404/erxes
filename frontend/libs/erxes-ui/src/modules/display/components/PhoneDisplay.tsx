@@ -17,7 +17,7 @@ export const PhoneDisplay = ({
   );
 
   return (
-    <div className="flex gap-2">
+    <div className="flex flex-wrap gap-1.5">
       {formattedPhones.map(
         (phone) =>
           phone.phone && (

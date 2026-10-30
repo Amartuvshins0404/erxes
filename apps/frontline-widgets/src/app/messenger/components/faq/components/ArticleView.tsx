@@ -2,6 +2,7 @@ import { useAtom, useAtomValue } from 'jotai';
 import { connectionAtom, faqArticleIdAtom } from '../../../states';
 import { useGetKnowledgeBaseTopicDetails } from '../../../hooks/useGetKnowledgeBaseTopicDetails';
 import { format } from 'date-fns';
+import DOMPurify from 'dompurify';
 import { cn } from 'erxes-ui';
 
 export const ArticleView = () => {
@@ -9,7 +10,6 @@ export const ArticleView = () => {
   const { messengerData } = connection.widgetsMessengerConnect;
   const { knowledgeBaseTopicId } = messengerData || {};
   const articleId = useAtomValue(faqArticleIdAtom);
-  // const [selectedReaction, setSelectedReaction] = useState<string | null>(null);
 
   const { details } = useGetKnowledgeBaseTopicDetails({
     variables: { _id: knowledgeBaseTopicId },
@@ -37,8 +37,8 @@ export const ArticleView = () => {
 
   return (
     <div className="flex flex-col bg-transparent overflow-hidden">
-      <div className="p-5 pb-4 border-b border-border/50">
-        <h1 className="text-xl font-bold text-foreground leading-snug mb-2">
+      <div className="p-5 pb-4 border-b">
+        <h1 className="text-xl font-semibold tracking-tight text-foreground mb-1">
           {title}
         </h1>
         {modifiedDate && (
@@ -52,7 +52,7 @@ export const ArticleView = () => {
         className={cn(
           'flex-1 px-5 py-4 text-sm text-foreground leading-relaxed',
           'prose prose-sm max-w-none',
-          '[&_h1]:text-lg [&_h1]:font-bold [&_h1]:mt-4 [&_h1]:mb-2',
+          '[&_h1]:text-lg [&_h1]:font-semibold [&_h1]:mt-4 [&_h1]:mb-2',
           '[&_h2]:text-base [&_h2]:font-semibold [&_h2]:mt-4 [&_h2]:mb-2',
           '[&_h3]:text-sm [&_h3]:font-semibold [&_h3]:mt-3 [&_h3]:mb-1',
           '[&_p]:mb-3 [&_p]:leading-relaxed',
@@ -61,44 +61,12 @@ export const ArticleView = () => {
           '[&_li]:mb-1',
           '[&_strong]:font-semibold',
           '[&_a]:text-primary [&_a]:underline',
-          '[&_blockquote]:border-l-2 [&_blockquote]:border-muted [&_blockquote]:pl-3 [&_blockquote]:text-muted-foreground',
-          '[&_code]:bg-muted [&_code]:rounded [&_code]:px-1 [&_code]:text-xs',
-          '[&_pre]:bg-muted [&_pre]:rounded-lg [&_pre]:p-3 [&_pre]:overflow-x-auto',
+          '[&_blockquote]:border-l-2 [&_blockquote]:border-border-strong [&_blockquote]:pl-3 [&_blockquote]:text-muted-foreground',
+          '[&_code]:bg-muted [&_code]:rounded-xs [&_code]:px-1 [&_code]:text-xs',
+          '[&_pre]:bg-muted [&_pre]:rounded-xl [&_pre]:p-3 [&_pre]:overflow-x-auto',
         )}
-        dangerouslySetInnerHTML={{ __html: content || '' }}
+        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(content || '') }}
       />
-
-      {/* {reactionChoices && reactionChoices.length > 0 && (
-        <div className="px-5 py-5 border-t border-border/50 flex flex-col items-center gap-3">
-          <span className="text-sm font-medium text-muted-foreground">
-            Was this helpful?
-          </span>
-          <div className="flex items-center gap-2">
-            {reactionChoices.map((emoji) => (
-              <button
-                key={emoji}
-                onClick={() =>
-                  setSelectedReaction((prev) => (prev === emoji ? null : emoji))
-                }
-                className={cn(
-                  'size-11 rounded-full flex items-center justify-center text-xl transition-all duration-200',
-                  'hover:scale-110 active:scale-95',
-                  selectedReaction === emoji
-                    ? 'bg-primary/10 ring-2 ring-primary/30 scale-110'
-                    : 'bg-muted hover:bg-muted/80',
-                )}
-                aria-label={`React with ${emoji}`}
-              >
-                <img
-                  alt={emoji}
-                  src={emoji}
-                  className="size-6 object-contain"
-                />
-              </button>
-            ))}
-          </div>
-        </div>
-      )} */}
     </div>
   );
 };

@@ -9,10 +9,10 @@ export const ToolbarMenuItem = ({
   ...props
 }: ToolbarMenuItemProps) => {
   const itemClassName = cn(
-    'pl-2! [&>.bn-absolute]:hidden!',
-    'hover:bg-(--color-primary)/15! hover:text-(--color-primary)!',
-    'focus:bg-(--color-primary)/15! focus:text-(--color-primary)!',
-    'data-[state=checked]:bg-(--color-primary)/10! data-[state=checked]:text-(--color-primary)!',
+    'rounded-lg! pl-2! [&>.bn-absolute]:hidden!',
+    'hover:bg-accent! hover:text-foreground!',
+    'focus:bg-accent! focus:text-foreground!',
+    'data-[state=checked]:bg-primary/10! data-[state=checked]:text-primary!',
     className,
   );
 

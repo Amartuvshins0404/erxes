@@ -1,23 +1,23 @@
-import { IconCheck, IconMinus } from '@tabler/icons-react';
-import { RadioGroup, ThemeOption, themeState } from 'erxes-ui';
+import { IconCheck } from '@tabler/icons-react';
+import { Label, RadioGroup, ThemeOption, themeState } from 'erxes-ui';
 import { useAtom } from 'jotai';
 import { useTranslation } from 'react-i18next';
 
 const items = [
   {
-    id: 'radio-18-r1',
+    id: 'theme-light',
     value: 'light',
     label: 'Light',
     image: '/assets/ui-light.webp',
   },
   {
-    id: 'radio-18-r2',
+    id: 'theme-dark',
     value: 'dark',
     label: 'Dark',
     image: '/assets/ui-dark.webp',
   },
   {
-    id: 'radio-18-r3',
+    id: 'theme-system',
     value: 'system',
     label: 'System',
     image: '/assets/ui-system.webp',
@@ -29,42 +29,42 @@ export function ChooseTheme() {
   const { t } = useTranslation('common', { keyPrefix: 'sidebar' });
 
   return (
-    <fieldset className="space-y-4">
-      <legend className="text-sm font-medium leading-none text-foreground">
+    <fieldset className="flex flex-col gap-4">
+      <legend className="mb-4 text-sm font-medium text-foreground">
         {t('appearance')}
       </legend>
       <RadioGroup
-        className="flex gap-4"
+        className="flex flex-wrap gap-4"
         value={theme}
         onValueChange={(value) => setTheme(value as ThemeOption)}
       >
         {items.map((item) => (
-          <label key={item.id}>
+          <Label
+            key={item.id}
+            variant="peer"
+            htmlFor={item.id}
+            className="group flex cursor-pointer flex-col gap-2"
+          >
             <RadioGroup.Item
               id={item.id}
               value={item.value}
-              className="peer sr-only after:absolute after:inset-0"
+              className="peer sr-only"
             />
             <img
               src={item.image}
               alt={item.label}
               width={140}
               height={70}
-              className="relative cursor-pointer overflow-hidden rounded-lg border shadow-sm shadow-black/5 ring-offset-background transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-ring/70 peer-focus-visible:ring-offset-2 peer-data-disabled:cursor-not-allowed peer-data-[state=checked]:border-ring peer-data-[state=checked]:bg-accent peer-data-disabled:opacity-50"
+              className="overflow-hidden rounded-xl shadow-card transition-shadow peer-focus-visible:shadow-focus peer-data-[state=checked]:ring-2 peer-data-[state=checked]:ring-primary peer-data-[state=checked]:ring-offset-2 peer-data-[state=checked]:ring-offset-background peer-data-disabled:cursor-not-allowed peer-data-disabled:opacity-50"
             />
-            <span className="group mt-2 flex items-center gap-1 peer-data-[state=unchecked]:text-muted-foreground/70">
-              <span
-                className={'in-[.group]:peer-data-[state=unchecked]:hidden'}
-              >
-                <IconCheck size={16} aria-hidden="true" />
-              </span>
-              <span className={'in-[.group]:peer-data-[state=checked]:hidden'}>
-                <IconMinus size={16} aria-hidden="true" />
-              </span>
-
-              <span className="text-xs font-medium">{item.label}</span>
+            <span className="flex items-center gap-1 text-xs font-medium text-muted-foreground peer-data-[state=checked]:text-foreground">
+              <IconCheck
+                className="size-3.5 text-primary opacity-0 transition-opacity group-has-data-[state=checked]:opacity-100"
+                aria-hidden="true"
+              />
+              {item.label}
             </span>
-          </label>
+          </Label>
         ))}
       </RadioGroup>
     </fieldset>

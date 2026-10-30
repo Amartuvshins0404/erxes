@@ -59,7 +59,7 @@ export const EmailVerificationInput = ({
           size={16}
         />
       </Select.Trigger>
-      <Select.Content className="text-base font-medium shadow-lg">
+      <Select.Content className="text-sm font-medium">
         {EMAIL_VALIDATION_STATUS_INFOS.map((info) => {
           const ItemIcon = EmailIconComponents[info.icon];
           return (
@@ -81,7 +81,7 @@ export const EmailVerificationInput = ({
         <Select.Separator />
         <Button
           variant="ghost"
-          className="flex items-center border-transparent py-1.5 pl-2 pr-8 gap-2 rounded-sm w-full justify-start h-cell"
+          className="flex h-cell w-full items-center justify-start gap-2 rounded-lg border-transparent py-1.5 pr-8 pl-2"
           onClick={onCopy}
         >
           <IconCopy size={16} />

@@ -17,10 +17,7 @@ export const RecordTableRowSkeleton = ({
   backward?: boolean;
   root?: Element | null;
 }) => {
-  // get column count
   const { table } = useRecordTable();
-  // fall back to visible leaf columns so skeleton cells still render when there
-  // is no data yet (e.g. initial load before any rows have arrived)
   const columnCount =
     table.getRowModel().rows[0]?.getVisibleCells().length ||
     table.getVisibleLeafColumns().length;
@@ -45,6 +42,8 @@ export const RecordTableRowSkeleton = ({
   );
 };
 
+const SKELETON_WIDTHS = ['w-3/5', 'w-4/5', 'w-2/5', 'w-3/4', 'w-1/2'];
+
 const SkeletonRow = React.forwardRef<
   HTMLTableRowElement,
   React.HTMLAttributes<HTMLTableRowElement> & {
@@ -52,13 +51,25 @@ const SkeletonRow = React.forwardRef<
   }
 >(({ columnCount, className, ...props }, ref) => {
   return (
-    <Table.Row ref={ref} className={cn('h-cell', className)} {...props}>
+    <Table.Row
+      ref={ref}
+      className={cn(
+        'h-cell hover:bg-transparent [&>td:first-child]:border-l-0',
+        className,
+      )}
+      {...props}
+    >
       {Array.from({ length: columnCount }).map((_, index) => (
         <Table.Cell
           key={index}
-          className={cn('border-r-0 px-2 group-hover/table-row:bg-background')}
+          className="border-r-0 border-b bg-background px-2.5 group-hover/table-row:bg-background"
         >
-          <Skeleton className="h-4 w-full min-w-4" />
+          <Skeleton
+            className={cn(
+              'h-3 min-w-3 rounded-full',
+              SKELETON_WIDTHS[index % SKELETON_WIDTHS.length],
+            )}
+          />
         </Table.Cell>
       ))}
     </Table.Row>

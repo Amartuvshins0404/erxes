@@ -16,7 +16,7 @@ export const EmailPreviewFrame = ({
   <div
     className={cn(
       'flex min-h-0 w-full justify-center',
-      device === 'mobile' && 'bg-muted/40 p-4',
+      device === 'mobile' && 'bg-muted/50 p-6',
       className,
     )}
   >
@@ -27,7 +27,7 @@ export const EmailPreviewFrame = ({
       className={cn(
         'h-full border-0 bg-white',
         device === 'mobile'
-          ? 'w-[390px] max-w-full rounded-xl border shadow-sm'
+          ? 'w-[390px] max-w-full rounded-3xl shadow-lg'
           : 'w-full',
       )}
     />

@@ -1,5 +1,4 @@
 import { useUsersInvite } from '@/settings/team-member/hooks/useUsersInvite';
-import { IconX } from '@tabler/icons-react';
 import { Badge, Button, Input, TextOverflowTooltip, cn } from 'erxes-ui';
 import { motion } from 'framer-motion';
 import { useState } from 'react';
@@ -99,7 +98,7 @@ export const InviteTeamMemberSection = ({
           duration: 0.6,
           ease: [0.25, 0.46, 0.45, 0.94],
         }}
-        className="grid gap-5 shadow-sm px-5 pt-7 pb-10 rounded-2xl bg-background max-sm:mx-2 w-sm"
+        className="grid w-sm gap-5 rounded-3xl bg-card px-6 pt-8 pb-8 shadow-lg max-sm:mx-2"
       >
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -107,7 +106,7 @@ export const InviteTeamMemberSection = ({
           transition={{ duration: 0.5, delay: 0.2 }}
           className="flex flex-col gap-2 text-center mb-2"
         >
-          <h2 className="text-2xl font-semibold text-foreground">
+          <h2 className="text-2xl font-semibold tracking-tight text-foreground">
             {t('invite-team-members')}
           </h2>
           <p className="text-sm text-muted-foreground">
@@ -129,14 +128,15 @@ export const InviteTeamMemberSection = ({
                 onChange={handleChange}
                 onKeyDown={handleKeyDown}
                 className={cn(
+                  'h-8',
                   error && 'focus-visible:shadow-focus-destructive',
                 )}
               />
               {error && (
-                <p className="text-sm text-destructive mt-1.5">{error}</p>
+                <p className="mt-1.5 text-xs text-destructive">{error}</p>
               )}
               {!error && (
-                <p className="text-sm text-muted-foreground mt-1.5">
+                <p className="mt-1.5 text-xs text-muted-foreground">
                   {t('separate-emails')}
                 </p>
               )}
@@ -147,31 +147,27 @@ export const InviteTeamMemberSection = ({
                   <Badge
                     key={tag}
                     variant="secondary"
-                    className="gap-1.5 pr-1.5 max-w-full"
+                    className="h-7 max-w-full rounded-full px-3"
+                    onClose={() => removeTag(tag)}
                   >
                     <TextOverflowTooltip value={tag} className="truncate" />
-                    <button
-                      onClick={() => removeTag(tag)}
-                      className="hover:bg-secondary-foreground/20 rounded-sm p-0.5 shrink-0"
-                    >
-                      <IconX className="size-3" />
-                    </button>
                   </Badge>
                 ))}
               </div>
             )}
           </div>
-          <Button onClick={onClick} className="w-full cursor-pointer" size="lg">
+          <Button onClick={onClick} className="w-full rounded-full" size="lg">
             {t('continue')}
           </Button>
         </motion.div>
       </motion.div>
-      <span
-        className="absolute bottom-1/4 text-muted-foreground hover:text-foreground cursor-pointer"
+      <Button
+        variant="ghost"
+        className="absolute bottom-1/4 rounded-full text-muted-foreground hover:text-foreground"
         onClick={() => onContinue()}
       >
         {t('do-this-later')}
-      </span>
+      </Button>
     </>
   );
 };

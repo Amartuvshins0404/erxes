@@ -1,11 +1,12 @@
 import { useAtomValue } from 'jotai';
+import { Spinner } from 'erxes-ui';
 import { webAppCredentialsUrlAtom } from '../states';
 
 export const WebCall = () => {
   const webAppUrl = useAtomValue(webAppCredentialsUrlAtom);
 
   if (!webAppUrl) {
-    return <div>Loading communication portal...</div>;
+    return <Spinner containerClassName="py-32" />;
   }
 
   return (
@@ -13,8 +14,7 @@ export const WebCall = () => {
       title="web-call"
       src={webAppUrl}
       sandbox="allow-scripts allow-same-origin"
-      className='*:hide-scroll!'
-      style={{ width: '100%', height: '100%', border: 'none' }}
+      className="size-full border-0"
     />
   );
 };

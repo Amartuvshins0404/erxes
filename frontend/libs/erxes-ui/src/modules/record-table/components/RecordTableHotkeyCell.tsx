@@ -86,7 +86,7 @@ export const RecordTableHotKeyControl = React.forwardRef<
         }}
         className={cn(
           isFocused &&
-            '*:outline-solid *:outline-1 *:outline-primary *:rounded *:outline-offset-0',
+            '*:rounded-md *:outline-solid *:outline-1 *:outline-offset-0 *:outline-ring',
           className,
         )}
       />

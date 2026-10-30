@@ -154,15 +154,15 @@ export const NavigationMenuGroup = forwardRef<
         >
           <Sidebar.Group
             {...props}
-            className={cn('group/navigation-menu py-4', className)}
+            className={cn('group/navigation-menu py-2', className)}
             ref={ref}
           >
             <Sidebar.GroupLabel asChild>
               <Collapsible.Trigger className="group/collapsible-trigger flex items-center gap-2">
-                <span className="flex shrink-0 transition-transform duration-250 ease-[cubic-bezier(0.22,1,0.36,1)] group-data-[state=open]/collapsible-menu:rotate-90 motion-reduce:transition-none">
-                  <IconChevronRight className="size-3.5" />
+                <span className="flex shrink-0 text-muted-foreground transition-transform duration-200 ease-out group-data-[state=open]/collapsible-menu:rotate-90 motion-reduce:transition-none">
+                  <IconChevronRight className="size-3" />
                 </span>
-                <span className="font-sans text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                <span className="text-xs font-medium text-muted-foreground">
                   {name}
                 </span>
                 {actions && (
@@ -173,7 +173,7 @@ export const NavigationMenuGroup = forwardRef<
               </Collapsible.Trigger>
             </Sidebar.GroupLabel>
             <Collapsible.Content>
-              <Sidebar.GroupContent className="pt-2">
+              <Sidebar.GroupContent className="pt-1">
                 <Sidebar.Menu>{children}</Sidebar.Menu>
               </Sidebar.GroupContent>
             </Collapsible.Content>

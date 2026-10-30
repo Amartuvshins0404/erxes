@@ -4,7 +4,7 @@ import { KbArticleRows, KbCategoryRows } from './KbRowLists';
 import { KbEmptyState } from './KbStates';
 
 const SectionLabel = ({ children }: { children: string }) => (
-  <h2 className="mb-2 mt-4 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground first:mt-0">
+  <h2 className="mb-2 mt-5 text-xs font-medium text-muted-foreground first:mt-0">
     {children}
   </h2>
 );

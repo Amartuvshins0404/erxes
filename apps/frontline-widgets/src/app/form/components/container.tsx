@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { postMessage } from '@libs/utils';
+import { FormWidgetSettings } from '../types/formTypes';
 
 export const Container = ({
   children,
@@ -7,7 +8,7 @@ export const Container = ({
   loading,
 }: {
   children: React.ReactNode;
-  settings: { form_id: string; channel_id: string };
+  settings: FormWidgetSettings;
   loading: boolean;
 }) => {
   const ref = useRef<HTMLDivElement>(null);

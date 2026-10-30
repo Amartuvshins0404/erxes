@@ -1,33 +1,22 @@
-import { FC } from 'react';
-import { useMessenger } from '../hooks/useMessenger';
 import { Button, cn } from 'erxes-ui';
 import { IconX } from '@tabler/icons-react';
+import { useMessenger } from '../hooks/useMessenger';
 
-type Props = {
-  className?: string;
-  iconClassName?: string;
-  size?: number;
-};
+export const HERO_ICON_BUTTON_CLASS =
+  'size-8 flex-none rounded-full text-primary-foreground hover:bg-primary-foreground/15 hover:text-primary-foreground';
 
-export const CloseButton: FC<Props> = ({
-  className,
-  iconClassName,
-  size = 20,
-}) => {
+export const CloseButton = ({ className }: { className?: string }) => {
   const { closeWindow } = useMessenger();
 
   return (
     <Button
-      variant={'ghost'}
-      size={'icon'}
+      variant="ghost"
+      size="icon"
       onClick={closeWindow}
       aria-label="Close messenger"
-      className={cn(
-        'flex-none text-primary-foreground size-6 flex items-center justify-center',
-        className,
-      )}
+      className={cn(HERO_ICON_BUTTON_CLASS, className)}
     >
-      <IconX size={size} className={cn(iconClassName)} />
+      <IconX />
     </Button>
   );
 };

@@ -7,7 +7,7 @@ export const KbArticleView = ({ article }: { article: TKbArticle }) => {
 
   return (
     <article>
-      <h1 className="text-xl font-bold leading-snug text-foreground">
+      <h1 className="text-xl font-semibold tracking-tight text-foreground">
         {article.title}
       </h1>
       {updatedAt && (

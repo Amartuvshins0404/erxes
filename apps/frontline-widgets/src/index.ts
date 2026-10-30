@@ -88,14 +88,7 @@ const getHostTheme = (settings?: { theme?: string }) => {
     return settings.theme;
   }
 
-  const storedTheme = localStorage.getItem('theme');
-  const prefersDark = window.matchMedia?.(
-    '(prefers-color-scheme: dark)',
-  )?.matches;
-
-  return storedTheme === 'dark' || (!storedTheme && prefersDark)
-    ? 'dark'
-    : 'light';
+  return localStorage.getItem('theme') === 'dark' ? 'dark' : 'light';
 };
 
 // Re-sends the host page's current erxesSettings/theme/storage to an

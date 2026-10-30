@@ -409,9 +409,9 @@ export const ErxesForm = ({
                               (field.value as string[]) || []
                             ).includes(option);
                             return (
-                              <label
+                              <div
                                 key={option}
-                                className="flex items-center gap-2 cursor-pointer"
+                                className="flex items-center gap-2"
                               >
                                 <Checkbox
                                   checked={checked}
@@ -434,7 +434,7 @@ export const ErxesForm = ({
                                 >
                                   {option}
                                 </Label>
-                              </label>
+                              </div>
                             );
                           })}
                         </div>

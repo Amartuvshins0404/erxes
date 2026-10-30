@@ -4,7 +4,6 @@ import { IconPencil, IconUser } from '@tabler/icons-react';
 import { useCustomerData } from '../hooks/useCustomerData';
 import { contactEditOpenAtom } from '../states';
 
-// Shows who this browser is talking as; the session's own customer only.
 export const ContactChip = () => {
   const { customer, hasEmailOrPhone } = useCustomerData();
   const setEditing = useSetAtom(contactEditOpenAtom);
@@ -22,7 +21,7 @@ export const ContactChip = () => {
     <button
       type="button"
       onClick={() => setEditing(true)}
-      className="flex items-center gap-2 rounded-full bg-primary-foreground/10 hover:bg-primary-foreground/20 transition-colors h-8 pl-1 pr-3 min-w-0 max-w-[220px]"
+      className="flex h-8 min-w-0 max-w-56 items-center gap-2 rounded-full bg-primary-foreground/10 pl-1 pr-3 outline-none transition-colors hover:bg-primary-foreground/20 focus-visible:shadow-focus"
       aria-label={hasEmailOrPhone ? 'Edit your contact info' : 'Leave your email'}
     >
       {hasEmailOrPhone && contact ? (
@@ -36,7 +35,7 @@ export const ContactChip = () => {
             {contact}
           </span>
           <IconPencil
-            size={12}
+            size={14}
             className="flex-none text-primary-foreground/60"
           />
         </>

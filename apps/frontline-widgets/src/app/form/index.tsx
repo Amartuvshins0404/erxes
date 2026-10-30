@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useWidgetConnect } from './hooks/useWidgetConnect';
-import { Dialog, hexToOklch, Skeleton } from 'erxes-ui';
+import { Dialog, Skeleton } from 'erxes-ui';
+import { applyPrimaryColor } from '@libs/tw-utils';
 import { Container } from './components/container';
 import { ErxesFormProvider } from './context/erxesFormContext';
 import { useAtomValue, useSetAtom } from 'jotai';
@@ -16,12 +17,13 @@ import { getVisitorId, postMessage } from '@libs/utils';
 import { ErxesFormFinal } from './components/ErxesFormFinal';
 import { ErxesFormCallout } from './components/ErxesFormCallout';
 import { isCalloutVisible } from './utils/formUtils';
+import { FormWidgetSettings } from './types/formTypes';
 import { replayEarlyPublisherMessages } from '@libs/earlyPublisherMessages';
 
 export const Form = () => {
-  const [settings, setSettings] = useState<any>({});
+  const [settings, setSettings] = useState<FormWidgetSettings>({});
   const { connectMutation, form, loading } = useWidgetConnect();
-  const [settingAppearance, setSettingAppearance] = useState<any>(true);
+  const [settingAppearance, setSettingAppearance] = useState(true);
   const activeStep = useAtomValue(activeStepAtom);
   const setBrowserInfo = useSetAtom(browserInfoAtom);
   const showConfirmation = useAtomValue(showConfirmationAtom);
@@ -33,11 +35,7 @@ export const Form = () => {
   const isPopup = loadType === 'popup';
 
   useEffect(() => {
-    const storedTheme = localStorage.getItem('theme');
-    const prefersDark = window.matchMedia?.(
-      '(prefers-color-scheme: dark)',
-    ).matches;
-    if (storedTheme === 'dark' || (!storedTheme && prefersDark)) {
+    if (localStorage.getItem('theme') === 'dark') {
       document.documentElement.classList.add('dark');
     } else {
       document.documentElement.classList.remove('dark');
@@ -97,12 +95,7 @@ export const Form = () => {
   }, [connectMutation, settings, customerId]);
 
   useEffect(() => {
-    if (form?.leadData?.primaryColor) {
-      document.documentElement.style.setProperty(
-        '--primary',
-        hexToOklch(form?.leadData?.primaryColor, true) || '',
-      );
-    }
+    applyPrimaryColor(form?.leadData?.primaryColor);
     setTimeout(() => setSettingAppearance(false));
   }, [form?.leadData?.primaryColor]);
 

@@ -12,20 +12,16 @@ const messageContentVariants = cva(
     variants: {
       variant: {
         incoming:
-          'font-normal text-sm leading-snug text-foreground/85 bg-background whitespace-break-spaces wrap-break-word break-all',
-        bot: 'font-normal text-sm leading-snug text-foreground/85 bg-background whitespace-break-spaces wrap-break-word text-pretty',
+          'font-normal text-sm leading-snug text-foreground bg-card whitespace-break-spaces wrap-break-word break-all',
+        bot: 'font-normal text-sm leading-snug text-foreground bg-card whitespace-break-spaces wrap-break-word text-pretty',
         outgoing:
-          'font-medium text-[13px] leading-relaxed bg-primary text-primary-foreground',
+          'font-normal text-sm leading-snug bg-primary text-primary-foreground',
       },
     },
     defaultVariants: { variant: 'incoming' },
   },
 );
 
-/**
- * Corner-radius + shadow rules, transcribed 1:1 from the previous inline
- * `cn()` chains. Order is significant — do not "tidy" these into a switch.
- */
 function bubbleRadius(
   variant: MessageVariant,
   position: MessagePosition,
@@ -35,26 +31,27 @@ function bubbleRadius(
     position;
 
   if (variant === 'bot') {
-    // The bot bubble never renders attachments, so there is no attached case.
     return cn(
-      isSingleMessage && 'rounded-2xl rounded-bl-sm shadow-sm',
-      isFirstMessage && 'rounded-2xl rounded-b-sm shadow-2xs',
-      isMiddleMessage && 'rounded-sm shadow-2xs',
-      isLastMessage && 'rounded-2xl rounded-bl-sm rounded-t-sm shadow-2xs',
+      isSingleMessage && 'rounded-2xl rounded-bl-sm shadow-card',
+      isFirstMessage && 'rounded-2xl rounded-b-sm shadow-card',
+      isMiddleMessage && 'rounded-sm shadow-card',
+      isLastMessage && 'rounded-2xl rounded-bl-sm rounded-t-sm shadow-card',
       isLastMessage &&
         isSingleMessage &&
-        'rounded-2xl rounded-bl-sm shadow-2xs',
+        'rounded-2xl rounded-bl-sm shadow-card',
     );
   }
 
   if (variant === 'outgoing') {
     return cn(
-      !hasAttachments && isSingleMessage && 'rounded-2xl shadow-sm',
+      !hasAttachments && isSingleMessage && 'rounded-2xl shadow-card',
       !hasAttachments && isFirstMessage && 'rounded-2xl rounded-br-sm',
       !hasAttachments &&
         isMiddleMessage &&
         'rounded-2xl rounded-tr-sm rounded-br-sm',
-      !hasAttachments && isLastMessage && 'rounded-2xl rounded-tr-sm shadow-sm',
+      !hasAttachments &&
+        isLastMessage &&
+        'rounded-2xl rounded-tr-sm shadow-card',
       hasAttachments && (isSingleMessage || isFirstMessage) && 'rounded-t-2xl',
       hasAttachments &&
         (isMiddleMessage || isLastMessage) &&
@@ -63,19 +60,21 @@ function bubbleRadius(
   }
 
   return cn(
-    !hasAttachments && isSingleMessage && 'rounded-2xl rounded-bl-sm shadow-sm',
-    !hasAttachments && isFirstMessage && 'rounded-2xl rounded-b-sm shadow-2xs',
-    !hasAttachments && isMiddleMessage && 'rounded-sm shadow-2xs',
+    !hasAttachments &&
+      isSingleMessage &&
+      'rounded-2xl rounded-bl-sm shadow-card',
+    !hasAttachments && isFirstMessage && 'rounded-2xl rounded-b-sm shadow-card',
+    !hasAttachments && isMiddleMessage && 'rounded-sm shadow-card',
     !hasAttachments &&
       isLastMessage &&
-      'rounded-2xl rounded-l-sm rounded-tr-sm shadow-2xs',
+      'rounded-2xl rounded-l-sm rounded-tr-sm shadow-card',
     !hasAttachments &&
       isSingleMessage &&
       isFirstMessage &&
-      'rounded-2xl rounded-bl-sm shadow-2xs',
+      'rounded-2xl rounded-bl-sm shadow-card',
     hasAttachments &&
       (isSingleMessage || isFirstMessage) &&
-      'rounded-t-2xl rounded-bl-sm shadow-sm',
+      'rounded-t-2xl rounded-bl-sm shadow-card',
     hasAttachments &&
       (isMiddleMessage || isLastMessage) &&
       'rounded-tr-2xl rounded-bl-sm rounded-tl-sm',

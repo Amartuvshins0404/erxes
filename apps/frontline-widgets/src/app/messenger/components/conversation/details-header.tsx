@@ -7,7 +7,7 @@ import {
   IconSparkles,
 } from '@tabler/icons-react';
 import { useMessenger } from '../../hooks/useMessenger';
-import { CloseButton } from '../CloseButton';
+import { CloseButton, HERO_ICON_BUTTON_CLASS } from '../CloseButton';
 
 type ConversationDetailsHeaderProps = {
   agentName: string;
@@ -34,14 +34,14 @@ export function ConversationDetailsHeader({
         variant="ghost"
         size="icon"
         onClick={onBack}
-        className="text-primary-foreground rounded-2xl hover:bg-primary-foreground/10 size-8 shrink-0"
+        className={HERO_ICON_BUTTON_CLASS}
         aria-label="Back to conversations"
       >
-        <IconArrowLeft className="size-4" />
+        <IconArrowLeft />
       </Button>
       <div className="relative shrink-0">
         {isLastMessageFromBot ? (
-          <div className="size-9 border-[0.5px] border-primary backdrop-blur-md rounded-lg bg-linear-120 from-primary to-primary-foreground/20 flex items-center justify-center">
+          <div className="size-9 rounded-full bg-primary-foreground/15 flex items-center justify-center">
             <IconSparkles className="size-5 text-primary-foreground" />
           </div>
         ) : (
@@ -53,13 +53,13 @@ export function ConversationDetailsHeader({
                 className="object-cover"
               />
             )}
-            <Avatar.Fallback className="bg-primary-foreground/20 text-primary-foreground font-semibold text-sm">
+            <Avatar.Fallback className="bg-primary-foreground/15 text-primary-foreground font-medium text-sm">
               {agentName.charAt(0).toUpperCase()}
             </Avatar.Fallback>
           </Avatar>
         )}
         {isOnline && !isLastMessageFromBot && (
-          <span className="absolute bottom-0 right-0 size-2.5 rounded-full bg-success border-2 border-primary" />
+          <span className="absolute bottom-0 right-0 size-2.5 rounded-full bg-success ring-2 ring-(--color-hero)" />
         )}
       </div>
       <div className="flex-1 min-w-0">
@@ -67,7 +67,7 @@ export function ConversationDetailsHeader({
           {isLastMessageFromBot ? (
             <>
               {aiAgentLabel}
-              <span className="inline-flex items-center rounded-sm px-1.5 text-xs font-medium h-5 bg-primary/20 text-primary-foreground border border-primary/30 shrink-0">
+              <span className="inline-flex items-center rounded-full px-2 text-xs font-medium h-5 bg-primary-foreground/15 text-primary-foreground shrink-0">
                 AI
               </span>
             </>
@@ -75,7 +75,7 @@ export function ConversationDetailsHeader({
             agentName
           )}
         </div>
-        <div className="text-primary-foreground/60 text-xs truncate flex items-center gap-1">
+        <div className="text-primary-foreground/70 text-xs truncate">
           {isLastMessageFromBot ? 'Automated · replies instantly' : subtitle}
         </div>
       </div>
@@ -99,16 +99,14 @@ const ConversationDetailsDropdown = () => {
     setExpanded(!expanded);
   };
   return (
-    <button
+    <Button
+      variant="ghost"
+      size="icon"
       onClick={handleExpanded}
-      className="text-primary-foreground hover:bg-primary-foreground/10 size-8 rounded-xl shrink-0 flex items-center justify-center cursor-pointer"
+      className={HERO_ICON_BUTTON_CLASS}
       aria-label={expanded ? 'Collapse messenger' : 'Expand messenger'}
     >
-      {expanded ? (
-        <IconArrowsDiagonalMinimize className="size-4" />
-      ) : (
-        <IconArrowsDiagonal2 className="size-4" />
-      )}
-    </button>
+      {expanded ? <IconArrowsDiagonalMinimize /> : <IconArrowsDiagonal2 />}
+    </Button>
   );
 };

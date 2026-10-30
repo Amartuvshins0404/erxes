@@ -7,7 +7,7 @@ import {
 import { useGetKnowledgeBaseTopicDetails } from '../../../hooks/useGetKnowledgeBaseTopicDetails';
 import { IKnowledgeBaseArticle } from '../../../types/knowledgeBase';
 import { IconArrowRight, IconBook } from '@tabler/icons-react';
-import { cn, IconComponent } from 'erxes-ui';
+import { cn, Empty, IconComponent } from 'erxes-ui';
 import { format } from 'date-fns';
 
 export const CategoryView = () => {
@@ -53,11 +53,11 @@ export const CategoryView = () => {
     <div className="p-4 flex flex-col gap-2.5 relative">
       {subCategories.length > 0 && (
         <>
-          {subCategories.map((subCat, index) => (
+          {subCategories.map((subCat) => (
             <div
               key={subCat._id}
               className={cn(
-                'group rounded-2xl shadow-xs p-3.5 bg-background flex items-center gap-3 transition-all duration-300 ease-in-out hover:-translate-y-0.5 cursor-pointer hover:shadow-sm',
+                'group rounded-2xl bg-card shadow-card p-3.5 flex items-center gap-3 cursor-pointer outline-none transition-colors hover:bg-accent/60 focus-visible:shadow-focus',
               )}
               onClick={() => handleSubCategoryClick(subCat._id)}
               role="button"
@@ -67,34 +67,30 @@ export const CategoryView = () => {
               }
             >
               <span
-                className="shrink-0 p-2 rounded-xl flex items-center justify-center"
-                style={{
-                  backgroundColor:
-                    `color-mix(in srgb, ${details?.color} 60%, transparent)` ||
-                    'color-mix(in oklch, var(--primary) 60%, transparent)',
-                }}
+                className="shrink-0 size-9 rounded-xl bg-primary text-primary-foreground flex items-center justify-center"
+                style={
+                  details?.color
+                    ? { backgroundColor: details.color }
+                    : undefined
+                }
               >
                 <IconComponent
-                  className="text-primary-foreground"
+                  className="size-4"
                   name={subCat.icon || 'help-circle'}
-                  size={20}
                 />
               </span>
               <span className="flex-1 overflow-hidden min-w-0">
-                <h2 className="text-base font-semibold text-foreground">
+                <h2 className="text-sm font-medium text-foreground">
                   {subCat.title}
                 </h2>
-                <span className="text-[11px] text-muted-foreground font-medium">
+                <span className="text-xs text-muted-foreground">
                   {subCat.numOfArticles === 1
                     ? '1 article'
                     : `${subCat.numOfArticles} articles`}
                 </span>
               </span>
               <span className="shrink-0">
-                <IconArrowRight
-                  className="text-muted-foreground group-hover:translate-x-0.5 transition-all ease-in-out delay-300"
-                  size={18}
-                />
+                <IconArrowRight className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
               </span>
             </div>
           ))}
@@ -104,15 +100,15 @@ export const CategoryView = () => {
       {articles.length > 0 && (
         <div className={cn('flex flex-col gap-2')}>
           {subCategories.length > 0 && (
-            <span className="text-[11px] uppercase tracking-widest font-semibold text-muted-foreground px-1 pt-1">
+            <span className="text-xs font-medium text-muted-foreground px-1 pt-2">
               Articles
             </span>
           )}
-          {articles.map((article, index) => (
+          {articles.map((article) => (
             <div
               key={article._id}
               className={cn(
-                'group rounded-2xl shadow-xs p-3.5 bg-background flex items-center gap-3 transition-all duration-300 ease-in-out hover:-translate-y-0.5 cursor-pointer hover:shadow-sm',
+                'group rounded-2xl bg-card shadow-card p-3.5 flex items-center gap-3 cursor-pointer outline-none transition-colors hover:bg-accent/60 focus-visible:shadow-focus',
               )}
               onClick={() => handleArticleClick(article)}
               role="button"
@@ -121,24 +117,21 @@ export const CategoryView = () => {
                 e.key === 'Enter' && handleArticleClick(article)
               }
             >
-              <span className="shrink-0 p-2 rounded-xl bg-muted flex items-center justify-center">
-                <IconBook className="text-muted-foreground" size={18} />
+              <span className="shrink-0 size-9 rounded-xl bg-muted flex items-center justify-center">
+                <IconBook className="size-4 text-muted-foreground" />
               </span>
               <span className="flex-1 overflow-hidden min-w-0">
-                <h2 className="text-sm font-semibold text-foreground truncate">
+                <h2 className="text-sm font-medium text-foreground truncate">
                   {article.title}
                 </h2>
                 {article.modifiedDate && (
-                  <span className="text-[11px] text-muted-foreground font-medium">
+                  <span className="text-xs text-muted-foreground">
                     {formatDate(article.modifiedDate)}
                   </span>
                 )}
               </span>
               <span className="shrink-0">
-                <IconArrowRight
-                  className="text-muted-foreground group-hover:translate-x-0.5 transition-all ease-in-out delay-300"
-                  size={18}
-                />
+                <IconArrowRight className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
               </span>
             </div>
           ))}
@@ -146,11 +139,17 @@ export const CategoryView = () => {
       )}
 
       {subCategories.length === 0 && articles.length === 0 && (
-        <div className="rounded-2xl shadow-xs p-6 bg-background flex flex-col items-center gap-2 text-center">
-          <span className="text-muted-foreground text-sm">
-            No articles in this category yet.
-          </span>
-        </div>
+        <Empty className="rounded-2xl bg-card py-10 shadow-card">
+          <Empty.Header>
+            <Empty.Media variant="icon">
+              <IconBook />
+            </Empty.Media>
+            <Empty.Title>No articles yet</Empty.Title>
+            <Empty.Description>
+              This category does not have any published articles.
+            </Empty.Description>
+          </Empty.Header>
+        </Empty>
       )}
     </div>
   );

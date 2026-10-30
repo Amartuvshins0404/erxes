@@ -85,7 +85,7 @@ export const FluidTabs = () => {
                       'rounded-l-sm rounded-tr-sm rounded-br-2xl':
                         ind === visibleMenu.length - 1,
                     },
-                    'absolute inset-x-1 inset-y-0 bg-primary/8 dark:bg-primary/20',
+                    'absolute inset-x-1 inset-y-0 bg-primary/10',
                   )}
                   transition={{ type: 'spring', stiffness: 500, damping: 35 }}
                 />
@@ -95,7 +95,7 @@ export const FluidTabs = () => {
                 className={cn(
                   'relative w-full flex flex-col items-center justify-center gap-1 cursor-pointer',
                   isActive
-                    ? 'text-primary dark:text-foreground'
+                    ? 'text-primary'
                     : 'text-muted-foreground',
                 )}
                 animate={{
@@ -129,10 +129,10 @@ export const FluidTabs = () => {
                 <span
                   className={cn(
                     {
-                      'text-primary dark:text-primary-foreground': isActive,
+                      'text-primary': isActive,
                       'text-muted-foreground': !isActive,
                     },
-                    'text-[11px] font-normal',
+                    'text-xs font-normal',
                   )}
                 >
                   {item.label}
@@ -179,9 +179,9 @@ export const PillTabs = () => {
   );
 
   return (
-    <nav className="py-2 px-3 flex items-center justify-center bg-muted flex-none">
+    <nav className="py-2 px-3 flex items-center justify-center bg-background flex-none">
       <ul
-        className="inline-flex flex-none items-center w-auto bg-background/20 dark:bg-background/10 backdrop-blur-xl border border-background/10 dark:border-background/15 shadow-lg rounded-full p-1.5"
+        className="inline-flex flex-none items-center w-auto bg-card/90 backdrop-blur-xl shadow-md rounded-full p-1.5"
         onMouseLeave={() => setHoveredIndex(null)}
       >
         {visibleMenu.map((item, ind) => {
@@ -197,7 +197,7 @@ export const PillTabs = () => {
               {isActive && (
                 <motion.span
                   layoutId="pill-active-bg"
-                  className="absolute inset-0 rounded-full bg-primary/5 dark:bg-primary/25 backdrop-blur-sm shadow-sm border border-primary-foreground/50 dark:border-primary-foreground/20"
+                  className="absolute inset-0 rounded-full bg-primary/10"
                   transition={{ type: 'spring', stiffness: 500, damping: 35 }}
                 />
               )}
@@ -207,8 +207,8 @@ export const PillTabs = () => {
                 className={cn(
                   'relative flex items-center gap-1.5 px-2.5 py-2 rounded-full cursor-pointer group',
                   isActive
-                    ? 'text-primary dark:text-foreground'
-                    : 'text-muted-foreground hover:text-primary dark:hover:text-primary-foreground',
+                    ? 'text-primary'
+                    : 'text-muted-foreground hover:text-foreground transition-colors',
                 )}
                 whileTap={{ scale: 0.9 }}
                 transition={{ type: 'spring', stiffness: 400, damping: 28 }}
@@ -248,9 +248,9 @@ export const PillTabs = () => {
                       }}
                       className={cn(
                         isActive
-                          ? 'text-primary dark:text-primary-foreground'
-                          : 'text-muted-foreground group-hover:text-primary dark:group-hover:text-primary-foreground',
-                        'text-xs font-semibold whitespace-nowrap overflow-hidden block',
+                          ? 'text-primary'
+                          : 'text-muted-foreground group-hover:text-foreground',
+                        'text-xs font-medium whitespace-nowrap overflow-hidden block',
                       )}
                     >
                       {item.label}

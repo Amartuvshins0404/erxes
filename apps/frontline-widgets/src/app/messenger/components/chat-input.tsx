@@ -5,7 +5,7 @@ import {
   IconPaperclip,
   IconX,
 } from '@tabler/icons-react';
-import { Button, cn, Popover } from 'erxes-ui';
+import { Button, cn, Input, Popover } from 'erxes-ui';
 import { EmojiPicker } from 'ui-modules/modules/automations/components/EmojiPicker';
 import { useAtom } from 'jotai';
 import { InitialMessage } from '../constants';
@@ -76,9 +76,9 @@ export const ChatInput: FC<ChatInputProps> = ({ className, ...inputProps }) => {
       )}
 
       {replyTo && (
-        <div className="flex items-center justify-between gap-2 border-b border-border/60 bg-muted/50 px-3 py-1.5 text-xs text-muted-foreground">
+        <div className="mx-2 mt-2 flex items-center justify-between gap-2 rounded-2xl bg-muted px-3 py-1.5 text-xs text-muted-foreground">
           <div className="min-w-0">
-            <span className="font-semibold text-foreground">
+            <span className="font-medium text-foreground">
               Replying to {replyTo.authorName}:{' '}
             </span>
             <span className="truncate">{replyTo.content}</span>
@@ -110,10 +110,10 @@ export const ChatInput: FC<ChatInputProps> = ({ className, ...inputProps }) => {
         }
         autoComplete="off"
       >
-        <div className="relative flex items-center gap-1 w-full rounded-2xl shadow-xs p-1.5 ps-2.5 bg-background">
+        <div className="relative flex items-center gap-1.5 w-full rounded-full bg-card shadow-card p-1.5 ps-3 transition-shadow focus-within:shadow-focus">
           {shouldDisable && (
             <div
-              className="absolute inset-0 z-10 rounded-2xl cursor-pointer"
+              className="absolute inset-0 z-10 rounded-full cursor-pointer"
               onClick={handleDisabledClick}
               aria-label="Sign in to send a message"
             />
@@ -131,20 +131,20 @@ export const ChatInput: FC<ChatInputProps> = ({ className, ...inputProps }) => {
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="size-5 hover:bg-transparent group"
+                className="size-7 rounded-full text-muted-foreground hover:text-primary"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={shouldDisable}
                 aria-label="Attach files"
               >
-                <IconPaperclip className="size-4 text-muted-foreground shrink-0 group-hover:text-primary dark:group-hover:text-primary-foreground transition-all" />
+                <IconPaperclip />
               </Button>
             </>
           )}
-          <input
+          <Input
             ref={messageInputRef}
             id={id}
             className={cn(
-              'border-none py-1.5 h-auto px-1 text-xs bg-transparent text-foreground shadow-none focus-visible:outline-none! focus-visible:ring-0! focus-visible:border-0! placeholder:text-muted-foreground placeholder:font-medium placeholder:text-sm flex-1',
+              'h-8 flex-1 bg-transparent px-1 shadow-none focus-visible:shadow-none',
               className,
             )}
             placeholder={
@@ -162,16 +162,20 @@ export const ChatInput: FC<ChatInputProps> = ({ className, ...inputProps }) => {
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="size-5 hover:bg-transparent group"
+                  className="size-7 rounded-full text-muted-foreground hover:text-primary"
                   disabled={shouldDisable}
                   aria-label="Choose emoji"
                 >
-                  <IconMoodSmile className="size-5 text-muted-foreground shrink-0 group-hover:text-primary dark:group-hover:text-primary-foreground transition-all" />
+                  <IconMoodSmile />
                 </Button>
               </Popover.Trigger>
-              <Popover.Content className="p-0 w-auto" align="end" side="top">
+              <Popover.Content
+                className="p-0 w-auto overflow-hidden rounded-2xl"
+                align="end"
+                side="top"
+              >
                 <EmojiPicker
-                  className="max-h-80 w-[280px] shadow-none border-0 rounded-none"
+                  className="max-h-80 w-72 shadow-none border-0 rounded-none"
                   onEmojiSelect={({ emoji }) => {
                     setMessage(message + emoji);
                     setEmojiOpen(false);
@@ -189,7 +193,7 @@ export const ChatInput: FC<ChatInputProps> = ({ className, ...inputProps }) => {
             type="submit"
             aria-label="Send"
             variant="secondary"
-            className="aspect-square text-primary-foreground rounded-full bg-primary size-8 p-2 shrink-0"
+            className="size-8 shrink-0 rounded-full bg-primary text-primary-foreground hover:bg-primary/90"
             disabled={!canSend || loading || shouldDisable}
           >
             <IconArrowRight />

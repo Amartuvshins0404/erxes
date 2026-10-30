@@ -68,7 +68,7 @@ export function ConversationMessage({
         role="tabpanel"
         id={lastMessage?._id}
         tabIndex={0}
-        className="flex items-center gap-3 cursor-pointer p-3 rounded-2xl bg-background shadow-xs hover:shadow-lg hover:-translate-y-1 transition-all duration-200 hover:bg-accent/40 opacity-60 hover:opacity-80"
+        className="flex items-center gap-3 cursor-pointer p-3 rounded-2xl bg-card shadow-card outline-none transition-colors hover:bg-accent/60 focus-visible:shadow-focus opacity-70"
         onClick={handleClick}
       >
         <Avatar className="size-10 grayscale">
@@ -76,10 +76,10 @@ export function ConversationMessage({
           <Avatar.Fallback className="bg-background">C</Avatar.Fallback>
         </Avatar>
         <div className="flex flex-col gap-0.5 overflow-x-hidden flex-1 min-w-0">
-          <span className="truncate text-xs text-muted-foreground font-bold">
+          <span className="truncate text-xs text-muted-foreground font-semibold">
             you
           </span>
-          <span className="text-xs text-muted-foreground/70">
+          <span className="text-xs text-muted-foreground">
             Sent a message·{' '}
             {formatDateISOStringToRelativeDate(
               lastMessage?.createdAt as unknown as string,
@@ -95,10 +95,8 @@ export function ConversationMessage({
         id={lastMessage?._id}
         tabIndex={0}
         className={cn(
-          'flex items-center gap-3 rounded-2xl cursor-pointer bg-background shadow-xs p-3 transition-all duration-200',
-          isUnread
-            ? 'bg-primary/8 hover:bg-primary/12'
-            : 'hover:opacity-75 hover:bg-accent/30',
+          'flex items-center gap-3 rounded-2xl cursor-pointer bg-card shadow-card p-3 outline-none transition-colors focus-visible:shadow-focus',
+          isUnread ? 'bg-primary/10 hover:bg-primary/15' : 'hover:bg-accent/60',
         )}
         onClick={handleClick}
       >
@@ -106,7 +104,6 @@ export function ConversationMessage({
           <div
             className={cn(
               'size-10 rounded-xl flex items-center justify-center bg-linear-to-br from-primary to-primary/40',
-              // !isUnread && 'grayscale',
             )}
           >
             <IconSparkles size={20} className="text-primary-foreground" />
@@ -122,7 +119,7 @@ export function ConversationMessage({
               className={cn(
                 'text-xs truncate',
                 isUnread
-                  ? 'font-bold text-foreground'
+                  ? 'font-semibold text-foreground'
                   : 'font-medium text-muted-foreground',
               )}
             >
@@ -130,7 +127,7 @@ export function ConversationMessage({
             </span>
             <span
               className={cn(
-                'text-[10px] shrink-0',
+                'text-xs shrink-0',
                 isUnread
                   ? 'text-primary font-semibold'
                   : 'text-muted-foreground/60',
@@ -151,7 +148,7 @@ export function ConversationMessage({
                 'truncate line-clamp-2 text-xs',
                 isUnread
                   ? 'font-semibold text-foreground/90'
-                  : 'font-normal text-muted-foreground/70',
+                  : 'font-normal text-muted-foreground',
               )}
               dangerouslySetInnerHTML={{
                 __html: DOMPurify.sanitize(lastMessage?.content || ''),
@@ -160,7 +157,7 @@ export function ConversationMessage({
           )}
           <Badge
             variant={'ghost'}
-            className="text-[10px] leading-none rounded-xl bg-primary/15 text-primary h-auto py-0.5 mt-0.5"
+            className="mt-0.5 h-5 rounded-full bg-primary/10 px-2 text-xs text-primary"
           >
             <IconCircleDashed size={10} />
             AI Bot · Automated
@@ -168,7 +165,7 @@ export function ConversationMessage({
         </div>
 
         {isUnread && unreadCount && (
-          <span className="shrink-0 min-w-5 h-5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center px-1.5">
+          <span className="shrink-0 min-w-5 h-5 rounded-full bg-primary text-primary-foreground text-[10px] font-semibold flex items-center justify-center px-1.5">
             {unreadCount > 99 ? '99+' : unreadCount}
           </span>
         )}
@@ -181,10 +178,10 @@ export function ConversationMessage({
         id={lastMessage?._id}
         tabIndex={0}
         className={cn(
-          'flex items-center gap-3 rounded-2xl cursor-pointer bg-background shadow-xs p-3 transition-all duration-200',
+          'flex items-center gap-3 rounded-2xl cursor-pointer bg-card shadow-card p-3 outline-none transition-colors focus-visible:shadow-focus',
           isUnread
-            ? 'bg-primary/8 hover:bg-primary/12'
-            : 'opacity-55 hover:opacity-75 hover:bg-accent/30',
+            ? 'bg-primary/10 hover:bg-primary/15'
+            : 'opacity-70 hover:bg-accent/60',
         )}
         onClick={handleClick}
       >
@@ -212,7 +209,7 @@ export function ConversationMessage({
               className={cn(
                 'text-xs truncate',
                 isUnread
-                  ? 'font-bold text-foreground'
+                  ? 'font-semibold text-foreground'
                   : 'font-medium text-muted-foreground',
               )}
             >
@@ -222,7 +219,7 @@ export function ConversationMessage({
             </span>
             <span
               className={cn(
-                'text-[10px] shrink-0',
+                'text-xs shrink-0',
                 isUnread
                   ? 'text-primary font-semibold'
                   : 'text-muted-foreground/60',
@@ -243,7 +240,7 @@ export function ConversationMessage({
                 'truncate line-clamp-1 text-sm',
                 isUnread
                   ? 'font-semibold text-foreground/90'
-                  : 'font-normal text-muted-foreground/70',
+                  : 'font-normal text-muted-foreground',
               )}
               dangerouslySetInnerHTML={{
                 __html: DOMPurify.sanitize(content || ''),
@@ -253,7 +250,7 @@ export function ConversationMessage({
         </div>
 
         {isUnread && unreadCount && (
-          <span className="shrink-0 min-w-5 h-5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center px-1.5">
+          <span className="shrink-0 min-w-5 h-5 rounded-full bg-primary text-primary-foreground text-[10px] font-semibold flex items-center justify-center px-1.5">
             {unreadCount > 99 ? '99+' : unreadCount}
           </span>
         )}

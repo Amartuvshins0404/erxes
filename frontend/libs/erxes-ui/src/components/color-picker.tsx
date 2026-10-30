@@ -82,7 +82,7 @@ const ColorPickerTrigger = React.forwardRef<
     <Combobox.TriggerBase
       ref={ref}
       variant="outline"
-      className={cn('pl-1 pr-2 h-7', className)}
+      className={cn('pl-1 pr-2', className)}
       {...props}
     >
       {children}
@@ -100,12 +100,12 @@ const ColorPickerContent = ({
   const { value, onValueChange, colors } = useColorPickerContext();
 
   return (
-    <Popover.Content className="p-1 w-64" align="start" sideOffset={8}>
-      <div className="grid grid-cols-5 gap-1">
+    <Popover.Content className="w-64 p-2" align="start" sideOffset={6}>
+      <div className="grid grid-cols-8 gap-1.5">
         {Object.entries(colors).map(([key, color]) => (
           <div
             key={key}
-            className="aspect-3/2 rounded flex items-center justify-center cursor-pointer hover:scale-105 transition-transform"
+            className="flex aspect-square cursor-pointer items-center justify-center rounded-full shadow-[inset_0_0_0_1px_var(--border)] transition-transform ease-out hover:scale-110"
             style={{ backgroundColor: color }}
             onClick={() => {
               onValueChange?.(color);
@@ -113,13 +113,13 @@ const ColorPickerContent = ({
             }}
           >
             {value === color && (
-              <IconCheck className="h-4 w-4 text-primary-foreground" />
+              <IconCheck className="size-3.5 text-primary-foreground" />
             )}
           </div>
         ))}
-        <div className="relative col-span-5">
+        <div className="relative col-span-8 mt-1">
           <div
-            className="absolute size-7 rounded-[3px] top-0.5 left-0.5 flex items-center justify-center text-primary-foreground"
+            className="absolute left-1 top-1 flex size-6 items-center justify-center rounded-md text-xs text-primary-foreground shadow-[inset_0_0_0_1px_var(--border)]"
             style={{ backgroundColor: value }}
           >
             <input
@@ -174,7 +174,7 @@ const ColorPickerRoot = React.forwardRef<
       <ColorPickerTrigger ref={ref} className={className} {...props}>
         <div
           className={cn(
-            'h-full w-full rounded shadow-inner',
+            'h-6 w-full rounded-md shadow-[inset_0_0_0_1px_var(--border)]',
             !value && 'bg-primary',
           )}
           style={{ backgroundColor: value }}

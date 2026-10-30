@@ -39,7 +39,7 @@ const Root = ({
           }
         }}
         className={cn(
-          'z-50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2',
+          'z-50 duration-200 ease-out data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=open]:slide-in-from-bottom-2 data-[state=closed]:slide-out-to-bottom-2',
         )}
       >
         {children}
@@ -56,12 +56,12 @@ const Value = React.forwardRef<
   }
 >(({ className, onClose, children, ...props }, ref) => {
   return (
-    <div className="flex items-center -space-x-px">
+    <div className="flex items-center rounded-full bg-secondary">
       <Button
-        variant="outline"
+        variant="secondary"
         className={cn(
-          'shadow-none border-dashed border',
-          onClose && 'rounded-r-none',
+          'cursor-default active:scale-100',
+          onClose && 'pr-1.5',
           className,
         )}
         asChild
@@ -72,8 +72,8 @@ const Value = React.forwardRef<
       </Button>
       {onClose && (
         <Button
-          variant="outline"
-          className="shadow-none border-dashed border rounded-l-none"
+          variant="ghost"
+          className="mr-1 size-7 text-muted-foreground hover:text-foreground"
           size="icon"
           onClick={onClose}
         >
@@ -93,7 +93,7 @@ const Bar = React.forwardRef<
     <div
       ref={ref}
       className={cn(
-        'relative flex items-center overflow-hidden rounded-lg p-1 shadow-focus bg-background gap-x-1',
+        'relative flex items-center gap-x-1 overflow-hidden rounded-full bg-popover p-1.5 text-popover-foreground shadow-xl',
         className,
       )}
       {...props}

@@ -9,12 +9,12 @@ export const Checkbox = React.forwardRef<
   <CheckboxPrimitive.Root
     ref={ref}
     className={cn(
-      'peer size-4 shrink-0 rounded border border-scroll outline-offset-2 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-ring/70 disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:border-primary data-[state=indeterminate]:border-primary data-[state=checked]:bg-primary data-[state=indeterminate]:bg-primary data-[state=checked]:text-primary-foreground data-[state=indeterminate]:text-primary-foreground bg-background',
+      'peer grid size-4 shrink-0 cursor-pointer place-items-center rounded-[5px] bg-card shadow-[inset_0_0_0_1px_var(--border-strong)] outline-hidden transition-[background-color,box-shadow] ease-out hover:shadow-[inset_0_0_0_1px_var(--scroll)] focus-visible:shadow-focus disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:shadow-focus-destructive data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground data-[state=checked]:shadow-button-primary data-[state=indeterminate]:bg-primary data-[state=indeterminate]:text-primary-foreground data-[state=indeterminate]:shadow-button-primary',
       className,
     )}
     {...props}
   >
-    <CheckboxPrimitive.Indicator className="flex items-center justify-center text-current">
+    <CheckboxPrimitive.Indicator className="flex items-center justify-center text-current animate-in zoom-in-75 fade-in-0 duration-150">
       {props.checked === 'indeterminate' ? (
         <svg
           width="9"

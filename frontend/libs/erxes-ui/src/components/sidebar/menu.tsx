@@ -35,18 +35,18 @@ export const SidebarMenuItem = React.forwardRef<
 SidebarMenuItem.displayName = 'SidebarMenuItem';
 
 const sidebarMenuButtonVariants = cva(
-  'peer/menu-button flex w-full min-w-0 max-w-full items-center gap-2 overflow-hidden rounded p-2 text-left font-medium outline-hidden transition-[width,height,padding] hover:bg-accent focus-visible:ring-2 active:bg-accent disabled:pointer-events-none disabled:opacity-50 group-has-data-[sidebar=menu-action]/menu-item:pr-8 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[active=true]:bg-primary/10 data-[active=true]:text-primary data-[active=true]:[&>svg]:text-primary data-[active=true]:[&>svg]:animate-icon-pop motion-reduce:[&>svg]:animate-none [&>svg]:transition-transform active:[&>svg]:scale-90 group-has-data-[sidebar=menu-sub]/menu-item:data-[active=true]:bg-foreground/5 group-has-data-[sidebar=menu-sub]/menu-item:data-[active=true]:text-foreground group-has-data-[sidebar=menu-sub]/menu-item:data-[active=true]:[&>svg]:text-foreground data-[state=open]:hover:bg-accent data-[state=active]:bg-primary/10 data-[state=active]:text-primary group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-2! [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0',
+  'peer/menu-button flex w-full min-w-0 max-w-full cursor-pointer items-center gap-2 overflow-hidden rounded-lg px-2.5 text-left text-muted-foreground outline-hidden transition-[width,height,padding,background-color,color] ease-out hover:bg-accent hover:text-foreground focus-visible:shadow-focus active:bg-accent disabled:pointer-events-none disabled:opacity-50 group-has-data-[sidebar=menu-action]/menu-item:pr-8 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[active=true]:bg-accent data-[active=true]:font-medium data-[active=true]:text-accent-foreground [&>svg]:transition-transform active:[&>svg]:scale-90 group-has-data-[sidebar=menu-sub]/menu-item:data-[active=true]:bg-transparent data-[state=open]:hover:bg-accent data-[state=active]:bg-accent data-[state=active]:font-medium data-[state=active]:text-accent-foreground group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-2! [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0',
   {
     variants: {
       variant: {
         default: 'hover:bg-accent',
         outline:
-          'bg-background shadow-[0_0_0_1px_var(--border)] hover:bg-accent  hover:shadow-[0_0_0_1px_var(--accent)]',
+          'bg-card text-foreground shadow-button-outline hover:bg-accent',
       },
       size: {
-        default: 'h-7 text-sm',
-        sm: 'h-6 text-xs',
-        lg: 'h-8 text-sm group-data-[collapsible=icon]:p-0!',
+        default: 'h-8 text-sm',
+        sm: 'h-7 text-xs',
+        lg: 'h-9 text-sm group-data-[collapsible=icon]:p-0!',
       },
     },
     defaultVariants: {
@@ -134,7 +134,7 @@ export const SidebarMenuAction = React.forwardRef<
       ref={ref}
       data-sidebar="menu-action"
       className={cn(
-        'absolute right-1 top-1.5 flex aspect-square w-5 items-center justify-center rounded-md p-0 text-foreground outline-hidden transition-transform hover:bg-accent [&>svg]:size-4 [&>svg]:shrink-0',
+        'absolute right-1.5 top-1.5 flex aspect-square w-5 items-center justify-center rounded-full p-0 text-muted-foreground outline-hidden transition-colors ease-out hover:bg-accent hover:text-foreground focus-visible:shadow-focus [&>svg]:size-4 [&>svg]:shrink-0',
         // Increases the hit area of the button on mobile.
         'after:absolute after:-inset-2 md:after:hidden',
         'peer-data-[size=sm]/menu-button:top-1',
@@ -159,7 +159,7 @@ export const SidebarMenuBadge = React.forwardRef<
     ref={ref}
     data-sidebar="menu-badge"
     className={cn(
-      'pointer-events-none absolute right-1 flex h-5 min-w-5 select-none items-center justify-center rounded-md px-1 text-xs font-medium tabular-nums text-foreground',
+      'pointer-events-none absolute right-1.5 flex h-5 min-w-5 select-none items-center justify-center rounded-full px-1.5 text-xs font-medium tabular-nums text-muted-foreground',
       'peer-data-[size=sm]/menu-button:top-1',
       'peer-data-[size=default]/menu-button:top-1.5',
       'peer-data-[size=lg]/menu-button:top-2.5',
@@ -192,7 +192,7 @@ export const SidebarMenuSkeleton = React.forwardRef<
     <div
       ref={ref}
       data-sidebar="menu-skeleton"
-      className={cn('flex h-8 items-center gap-2 rounded-md px-2', className)}
+      className={cn('flex h-8 items-center gap-2 rounded-lg px-2.5', className)}
       {...props}
     >
       {showIcon && (

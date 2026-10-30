@@ -1,13 +1,16 @@
 import * as React from 'react';
 import { Popover as PopoverPrimitive } from 'radix-ui';
 import { cn } from 'erxes-ui/lib/utils';
+import { floatingAnimationClassName, floatingSurfaceClassName } from './styles';
 
 export type PopoverProps = React.ComponentPropsWithoutRef<
   typeof PopoverPrimitive.Root
 >;
 
-export const popoverClassName =
-  'z-50 w-72 rounded-md bg-background p-4 shadow-lg outline-hidden data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0';
+export const popoverClassName = cn(
+  floatingSurfaceClassName,
+  'w-72 p-1.5 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 duration-150 ease-out',
+);
 
 const PopoverPortal = ({
   ...props
@@ -26,7 +29,7 @@ const PopoverContent = React.forwardRef<
       className,
       align = 'center',
       disableTransition,
-      sideOffset = 4,
+      sideOffset = 6,
       ...props
     },
     ref,
@@ -38,8 +41,7 @@ const PopoverContent = React.forwardRef<
         sideOffset={sideOffset}
         className={cn(
           popoverClassName,
-          !disableTransition &&
-            'data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2',
+          !disableTransition && floatingAnimationClassName,
           className,
         )}
         {...props}

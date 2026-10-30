@@ -57,3 +57,6 @@ export * from './stepper';
 export * from './color-picker';
 export * from './copy-text';
 export * from './erxes-logo-icon';
+export * from './progress';
+export * from './styles';
+export { Slot } from 'radix-ui';

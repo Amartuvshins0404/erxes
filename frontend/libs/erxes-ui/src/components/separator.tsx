@@ -34,7 +34,7 @@ const SeparatorInline = React.forwardRef<
     <SeparatorPrimitive.Root
       ref={ref}
       className={cn(
-        'inline-block bg-border rounded-lg flex-none',
+        'inline-block flex-none rounded-full bg-border-strong',
         orientation === 'horizontal' ? 'w-3 h-0.5' : 'w-0.5 h-3',
         className,
       )}

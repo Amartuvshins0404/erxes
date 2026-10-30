@@ -24,22 +24,22 @@ export type CalendarProps = React.ComponentProps<typeof DayPicker>;
 // Common classNames for both calendar variants
 const getBaseClassNames = (customClassNames = {}) => ({
   [UI.CaptionLabel]: 'text-sm font-medium',
-  [UI.MonthGrid]: 'w-full border-collapse space-y-1',
+  [UI.MonthGrid]: 'w-full border-collapse',
   [SelectionState.range_end]: 'day-range-end',
   [SelectionState.selected]:
-    'bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground',
+    'rounded-full bg-primary text-primary-foreground shadow-button-primary',
   [SelectionState.range_middle]:
-    'aria-selected:bg-accent aria-selected:text-foreground aria-selected:rounded-none',
-  [DayFlag.today]: 'bg-accent text-foreground',
+    'rounded-lg shadow-none aria-selected:bg-accent aria-selected:text-accent-foreground',
+  [DayFlag.today]: 'font-semibold not-data-selected:text-primary',
   [DayFlag.outside]:
-    'day-outside text-muted-foreground opacity-50 aria-selected:bg-accent/50 aria-selected:text-muted-foreground aria-selected:opacity-30',
+    'day-outside text-muted-foreground opacity-60 aria-selected:opacity-50',
   [DayFlag.disabled]: 'text-muted-foreground opacity-50',
   [DayFlag.hidden]: 'invisible',
   [UI.Day]:
-    'h-8 w-8 text-center rounded-md text-sm p-0 relative [&:has([aria-selected].day-range-end)]:rounded-r-md [&:has([aria-selected].day-outside)]:bg-accent/50 [&:has([aria-selected])]:bg-accent first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md focus-within:relative focus-within:z-20',
+    'relative size-8 rounded-full p-0 text-center text-sm focus-within:relative focus-within:z-20',
   [UI.DayButton]: cn(
     buttonVariants({ variant: 'ghost' }),
-    'h-8 w-8 p-0 font-normal aria-selected:opacity-100 hover:bg-primary hover:text-primary-foreground',
+    'size-8 rounded-full p-0 font-normal hover:bg-accent in-data-selected:hover:bg-transparent',
   ),
   ...customClassNames,
 });
@@ -66,16 +66,15 @@ export const Calendar = React.forwardRef<React.JSX.Element, CalendarProps>(
           [UI.Month]: 'space-y-4 ml-0',
           [UI.MonthCaption]: 'flex justify-center items-center h-7',
           [UI.PreviousMonthButton]: cn(
-            buttonVariants({ variant: 'secondary' }),
-            'absolute left-0 top-0 size-7 p-0',
+            buttonVariants({ variant: 'ghost', size: 'icon' }),
+            'absolute left-0 top-0 size-7 text-muted-foreground hover:text-foreground',
           ),
           [UI.NextMonthButton]: cn(
-            buttonVariants({ variant: 'secondary' }),
-            'absolute right-0 top-0 size-7 p-0',
+            buttonVariants({ variant: 'ghost', size: 'icon' }),
+            'absolute right-0 top-0 size-7 text-muted-foreground hover:text-foreground',
           ),
-          [UI.Weekdays]: 'flex',
-          [UI.Weekday]:
-            'text-muted-foreground rounded-md w-9 font-normal text-[0.8rem]',
+          [UI.Weekdays]: 'flex gap-1',
+          [UI.Weekday]: 'w-8 text-xs font-medium text-muted-foreground',
           [UI.Week]: 'flex w-full mt-2 gap-1',
           ...classNames,
         })}
@@ -101,7 +100,10 @@ export const Calendar = React.forwardRef<React.JSX.Element, CalendarProps>(
                   }
                 }}
               >
-                <Select.Trigger className="w-fit font-medium flex-none">
+                <Select.Trigger
+                  size="sm"
+                  className="w-fit flex-none rounded-full font-medium"
+                >
                   <Select.Value className="gap-1" />
                 </Select.Trigger>
                 <Select.Content className="max-h-[min(26rem,var(--radix-select-content-available-height))]">
@@ -137,19 +139,18 @@ export const CalendarTwoMonths = React.forwardRef<
       classNames={getBaseClassNames({
         [UI.Months]: 'relative inline-flex',
         [UI.Month]:
-          'space-y-4 ml-0 first-of-type:mr-12 first-of-type:relative first-of-type:after:absolute first-of-type:after:w-px first-of-type:after:h-auto first-of-type:after:inset-y-0 first-of-type:after:-right-6 first-of-type:after:bg-muted',
+          'space-y-4 ml-0 first-of-type:mr-12 first-of-type:relative first-of-type:after:absolute first-of-type:after:w-px first-of-type:after:h-auto first-of-type:after:inset-y-0 first-of-type:after:-right-6 first-of-type:after:bg-border',
         [UI.MonthCaption]: 'flex items-center h-7',
         [UI.PreviousMonthButton]: cn(
-          buttonVariants({ variant: 'ghost' }),
-          'absolute right-10 top-0 h-7 w-7 bg-muted p-0 opacity-80 hover:opacity-100',
+          buttonVariants({ variant: 'secondary', size: 'icon' }),
+          'absolute right-10 top-0 size-7',
         ),
         [UI.NextMonthButton]: cn(
-          buttonVariants({ variant: 'ghost' }),
-          'absolute right-1 top-0 h-7 w-7 bg-muted p-0 opacity-80 hover:opacity-100',
+          buttonVariants({ variant: 'secondary', size: 'icon' }),
+          'absolute right-1 top-0 size-7',
         ),
-        [UI.Weekdays]: 'flex w-full border-b border-muted',
-        [UI.Weekday]:
-          'text-muted-foreground rounded-md w-8 h-6 font-normal text-[0.8rem]',
+        [UI.Weekdays]: 'flex w-full border-b border-border',
+        [UI.Weekday]: 'h-7 w-8 text-xs font-medium text-muted-foreground',
         [UI.Week]: 'flex w-full mt-0.5',
         ...classNames,
       })}

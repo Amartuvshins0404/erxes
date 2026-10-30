@@ -64,7 +64,7 @@ const ChoiceboxItem = forwardRef<HTMLLabelElement, ChoiceboxItemProps>(
         key={`${id}-${value}`}
         ref={ref}
         className={cn(
-          ' relative cursor-pointer justify-center  h-min rounded-sm  transition-[color,box-shadow] w-full outline-hidden bg-accent hover:bg-border hover:cursor-pointer ',
+          'relative h-min w-full cursor-pointer justify-center rounded-xl bg-card shadow-button-outline outline-hidden transition-[background-color,box-shadow] ease-out hover:bg-accent has-focus-visible:shadow-focus',
         )}
       >
         <RadioGroup.Item
@@ -75,19 +75,19 @@ const ChoiceboxItem = forwardRef<HTMLLabelElement, ChoiceboxItemProps>(
         />
         <div
           className={cn(
-            'w-full h-full rounded-sm border border-transparent peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/10 peer-data-[state=checked]:text-primary  p-3 flex-col gap-[6px] flex',
+            'flex h-full w-full flex-col gap-1.5 rounded-xl p-3 transition-[background-color,box-shadow,color] ease-out peer-data-[state=checked]:bg-primary/8 peer-data-[state=checked]:text-primary peer-data-[state=checked]:shadow-[inset_0_0_0_1.5px_var(--primary)]',
             className,
           )}
         >
           {title && (
             <Label
               htmlFor={`${id}-${value}`}
-              className=" text-xs font-semibold text-muted-foreground normal-case font-sans"
+              className="text-xs font-medium text-muted-foreground"
             >
               {title}
             </Label>
           )}
-          <span id={`${id}-1-description`} className="font-semibold text-sm">
+          <span id={`${id}-1-description`} className="text-sm font-medium">
             {children}
           </span>
         </div>

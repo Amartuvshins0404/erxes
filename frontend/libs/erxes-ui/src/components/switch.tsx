@@ -4,12 +4,12 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from 'erxes-ui/lib/utils';
 
 const switchVariants = cva(
-  'peer inline-flex shrink-0 cursor-pointer items-center rounded-full border-transparent transition-colors focus-visible:outline-hidden focus-visible:shadow-focus disabled:cursor-not-allowed disabled:opacity-50 aria-checked:bg-primary aria-[checked=false]:bg-accent shadow-inner',
+  'peer inline-flex shrink-0 cursor-pointer items-center rounded-full p-0.5 outline-hidden transition-[background-color,box-shadow] duration-200 ease-out focus-visible:shadow-focus disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted data-[state=unchecked]:shadow-[inset_0_0_0_1px_var(--border-strong)]',
   {
     variants: {
       size: {
-        default: 'h-6 w-10 p-1',
-        sm: 'h-4 w-7 p-0.5',
+        default: 'h-5 w-9',
+        sm: 'h-4 w-7',
       },
     },
     defaultVariants: {
@@ -19,7 +19,7 @@ const switchVariants = cva(
 );
 
 const switchThumbVariants = cva(
-  'pointer-events-none block rounded-full bg-background dark:bg-foreground shadow-sm ring-0 transition-transform data-[state=unchecked]:translate-x-0',
+  'pointer-events-none block rounded-full bg-card shadow-sm ring-0 dark:bg-foreground transition-transform duration-200 ease-out data-[state=unchecked]:translate-x-0',
   {
     variants: {
       size: {

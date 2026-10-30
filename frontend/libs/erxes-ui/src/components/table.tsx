@@ -9,7 +9,8 @@ const TableRoot = React.forwardRef<
   <table
     ref={ref}
     className={cn(
-      'w-full caption-bottom text-sm border-separate bg-sidebar table-fixed border-spacing-0',
+      'w-full table-fixed caption-bottom border-separate border-spacing-0 rounded-2xl bg-card text-sm text-card-foreground shadow-card',
+      '[&>thead>tr:first-child>*:first-child]:rounded-tl-2xl [&>thead>tr:first-child>*:last-child]:rounded-tr-2xl [&>tbody:last-child>tr:last-child>*:first-child]:rounded-bl-2xl [&>tbody:last-child>tr:last-child>*:last-child]:rounded-br-2xl',
       className,
     )}
     {...props}
@@ -31,10 +32,7 @@ const TableBody = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <tbody
     ref={ref}
-    className={cn(
-      '[&_tr:last-child]:border-0 border border-collapse rounded-lg',
-      className,
-    )}
+    className={cn('[&>tr:last-child>td]:border-b-0', className)}
     {...props}
   />
 ));
@@ -44,7 +42,14 @@ const TableFooter = React.forwardRef<
   HTMLTableSectionElement,
   React.HTMLAttributes<HTMLTableSectionElement>
 >(({ className, ...props }, ref) => (
-  <tfoot ref={ref} className={className} {...props} />
+  <tfoot
+    ref={ref}
+    className={cn(
+      'font-medium [&>tr>td]:border-t [&>tr>td]:border-border [&>tr>td]:bg-muted/50',
+      className,
+    )}
+    {...props}
+  />
 ));
 TableFooter.displayName = 'TableFooter';
 
@@ -55,7 +60,7 @@ const TableRow = React.forwardRef<
   <tr
     ref={ref}
     className={cn(
-      '[&>td]:border-b [&>td:first-child]:border-l transition-colors group/table-row hover:bg-muted',
+      'group/table-row transition-colors ease-out [&>td]:border-b [&>td]:border-border',
       className,
     )}
     {...props}
@@ -70,7 +75,7 @@ const TableHead = React.forwardRef<
   <th
     ref={ref}
     className={cn(
-      'h-9 px-2 text-left align-middle font-semibold text-xs text-muted-foreground *:[[role=checkbox]]:translate-y-[2px] border-spacing-0 font-mono uppercase bg-sidebar',
+      'h-9 border-b border-border bg-card px-3 text-left align-middle text-xs font-medium text-muted-foreground *:[[role=checkbox]]:translate-y-[2px]',
       className,
     )}
     {...props}
@@ -85,7 +90,7 @@ const TableCell = React.forwardRef<
   <td
     ref={ref}
     className={cn(
-      'align-middle p-0 *:[[role=checkbox]]:translate-y-[2px] bg-background whitespace-nowrap h-cell border-r border-spacing-0 group-data-[state=selected]/table-row:bg-primary/10 group-hover/table-row:bg-muted',
+      'h-cell whitespace-nowrap bg-card p-0 align-middle transition-colors ease-out *:[[role=checkbox]]:translate-y-[2px] group-hover/table-row:bg-accent/60 group-data-[state=selected]/table-row:bg-primary/8',
       className,
     )}
     {...props}

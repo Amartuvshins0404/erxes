@@ -3,28 +3,31 @@ import { Tabs as TabsPrimitive } from 'radix-ui';
 import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from 'erxes-ui/lib';
 
-const tabsListVariants = cva('h-auto text-muted-foreground', {
-  variants: {
-    variant: {
-      underline:
-        'gap-2 rounded-none border-b border-border bg-transparent px-0 py-1',
-      segment: 'w-fit gap-1 rounded-lg bg-muted p-1',
-    },
-  },
-  defaultVariants: {
-    variant: 'underline',
-  },
-});
-
-const tabsTriggerVariants = cva(
-  'inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50',
+const tabsListVariants = cva(
+  'inline-flex h-auto items-center text-muted-foreground',
   {
     variants: {
       variant: {
         underline:
-          'relative after:absolute after:inset-x-0 after:bottom-0 after:-mb-1 after:h-0.5 hover:bg-accent data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:after:bg-primary data-[state=active]:hover:bg-accent data-[state=active]:text-primary',
+          'flex gap-1 rounded-none border-b border-border bg-transparent px-0 pb-1.5',
+        segment: 'w-fit gap-0.5 rounded-full bg-muted p-1',
+      },
+    },
+    defaultVariants: {
+      variant: 'underline',
+    },
+  },
+);
+
+const tabsTriggerVariants = cva(
+  'inline-flex cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-3 text-sm font-medium outline-hidden transition-[background-color,color,box-shadow] ease-out focus-visible:shadow-focus disabled:pointer-events-none disabled:opacity-50 [&>svg]:size-4 [&>svg]:shrink-0',
+  {
+    variants: {
+      variant: {
+        underline:
+          'relative h-8 after:absolute after:inset-x-3 after:-bottom-1.5 after:h-0.5 after:rounded-full after:transition-colors hover:bg-accent hover:text-foreground data-[state=active]:text-foreground data-[state=active]:after:bg-primary',
         segment:
-          'gap-2 rounded-md text-muted-foreground hover:bg-accent data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=active]:hover:bg-background',
+          'h-7 text-muted-foreground hover:text-foreground data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-xs',
       },
     },
     defaultVariants: {

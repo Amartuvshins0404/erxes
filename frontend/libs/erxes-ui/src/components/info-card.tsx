@@ -18,12 +18,12 @@ const InfoCardRoot = ({
   return (
     <div
       className={cn(
-        'flex flex-col bg-foreground/5 rounded-xl p-1 pt-0',
+        'flex flex-col rounded-2xl bg-muted p-1 pt-0 shadow-2xs',
         className,
       )}
     >
-      <div className="flex items-center justify-between h-7 pl-2 pr-1 shrink-0">
-        <h3 className="font-medium text-xs font-mono uppercase">{title}</h3>
+      <div className="flex h-9 shrink-0 items-center justify-between pl-3 pr-1">
+        <h3 className="text-xs font-medium text-muted-foreground">{title}</h3>
         {!!description && (
           <Tooltip.Provider>
             <Tooltip>
@@ -31,7 +31,7 @@ const InfoCardRoot = ({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="size-6 text-muted-foreground"
+                  className="size-6 text-muted-foreground hover:text-foreground"
                 >
                   <IconInfoCircle className="size-4" />
                 </Button>
@@ -54,7 +54,7 @@ const InfoCardContent = React.forwardRef<
     <div
       ref={ref}
       className={cn(
-        'flex flex-col gap-3 bg-background rounded-lg p-3 shadow-sm flex-auto',
+        'flex flex-auto flex-col gap-3 rounded-xl bg-card p-4 shadow-card',
         className,
       )}
       {...props}

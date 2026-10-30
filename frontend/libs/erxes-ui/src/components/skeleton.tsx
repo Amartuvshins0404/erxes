@@ -6,7 +6,7 @@ export const Skeleton = ({
 }: React.HTMLAttributes<HTMLDivElement>) => {
   return (
     <div
-      className={cn('animate-pulse rounded-md bg-accent', className)}
+      className={cn('animate-pulse rounded-lg bg-muted', className)}
       {...props}
     />
   );
@@ -22,7 +22,7 @@ export const SkeletonArray = ({
   return Array.from({ length: count }).map((_, index) => (
     <div
       key={index}
-      className={cn('animate-pulse rounded-md bg-accent', className)}
+      className={cn('animate-pulse rounded-lg bg-muted', className)}
       {...props}
     />
   ));

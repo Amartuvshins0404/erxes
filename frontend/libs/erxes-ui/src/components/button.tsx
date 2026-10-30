@@ -2,29 +2,32 @@ import * as React from 'react';
 
 import { Slot } from 'radix-ui';
 import { cva, type VariantProps } from 'class-variance-authority';
+import { IconLoader2 } from '@tabler/icons-react';
 
 import { cn } from 'erxes-ui/lib';
 
 export const buttonVariants = cva(
-  'inline-flex items-center justify-center gap-2 px-3 whitespace-nowrap rounded text-sm transition-colors outline-offset-2 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-ring/70 disabled:pointer-events-none disabled:opacity-50 [&>svg]:pointer-events-none [&>svg]:size-4 [&>svg]:shrink-0 font-medium cursor-pointer',
+  'relative inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-3.5 text-sm font-medium cursor-pointer select-none outline-hidden transition-[background-color,color,box-shadow,transform,opacity] ease-out focus-visible:shadow-focus active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50 [&>svg]:pointer-events-none [&>svg]:size-4 [&>svg]:shrink-0',
   {
     variants: {
       variant: {
         default:
-          'border-primary border relative transition duration-300 ease-in-out before:duration-300 before:ease-in-out before:transtion-opacity rounded shadow-button-primary before:pointer-events-none before:absolute before:inset-0 before:rounded-[0.1875rem] before:bg-linear-to-b before:from-white/20 before:opacity-50 hover:before:opacity-100 bg-primary text-primary-foreground after:pointer-events-none after:absolute after:inset-0 after:bg-white/10 after:bottom-1/2 after:rounded-[0.1875rem] after:mix-blend-overlay [text-shadow:0_0.0625rem_0.0625rem_rgb(0_0_0/25%)]',
+          'bg-primary text-primary-foreground shadow-button-primary hover:brightness-110',
         destructive:
-          'border-destructive border relative transition duration-300 ease-in-out before:duration-300 before:ease-in-out before:transtion-opacity rounded shadow-button-primary before:pointer-events-none before:absolute before:inset-0 before:rounded before:bg-linear-to-b before:from-white/20 before:opacity-50 hover:before:opacity-100 bg-destructive text-destructive-foreground after:pointer-events-none after:absolute after:inset-0 after:bg-white/10 after:bottom-1/2 after:rounded after:mix-blend-overlay [text-shadow:0_1px_1px_rgb(0_0_0/25%)]',
+          'bg-destructive text-destructive-foreground shadow-button-primary hover:brightness-110 focus-visible:shadow-focus-destructive',
         outline:
-          'shadow-sm bg-background shadow-button-outline hover:bg-accent',
-        secondary: 'bg-accent text-foreground hover:bg-border',
-        ghost: 'hover:bg-accent',
-        link: 'bg-background shadow-button-outline hover:bg-accent text-primary',
+          'bg-card text-foreground shadow-button-outline hover:bg-accent',
+        secondary: 'bg-secondary text-secondary-foreground hover:bg-accent',
+        ghost: 'bg-transparent hover:bg-accent',
+        link: 'bg-transparent text-primary underline-offset-4 hover:underline active:scale-100',
+        contrast:
+          'bg-foreground text-background shadow-xs hover:bg-foreground/85',
       },
       size: {
-        default: 'h-7 py-1',
-        sm: 'h-6 rounded text-xs after:rounded-[2px] after:absolute px-2 gap-1',
-        lg: 'h-8 rounded font-semibold',
-        icon: 'h-7 w-7',
+        default: 'h-8',
+        sm: 'h-7 px-3 text-xs gap-1 [&>svg]:size-3.5',
+        lg: 'h-9 px-4',
+        icon: 'size-8 px-0',
       },
     },
     defaultVariants: {
@@ -38,18 +41,35 @@ export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,
     VariantProps<typeof buttonVariants> {
   asChild?: boolean;
+  loading?: boolean;
 }
 
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, asChild = false, children, ...props }, ref) => {
+  (
+    {
+      className,
+      variant,
+      size,
+      asChild = false,
+      loading = false,
+      disabled,
+      children,
+      ...props
+    },
+    ref,
+  ) => {
     const Comp = asChild ? Slot.Root : 'button';
     return (
       <Comp
         className={cn(buttonVariants({ variant, size, className }))}
         type="button"
         ref={ref}
+        disabled={disabled || loading}
+        aria-busy={loading || undefined}
+        data-loading={loading || undefined}
         {...props}
       >
+        {loading && !asChild && <IconLoader2 className="animate-spin" />}
         {children}
       </Comp>
     );

@@ -9,6 +9,7 @@ import { mergeRefs } from 'react-merge-refs';
 import { Skeleton } from './skeleton';
 import type { ApolloError } from '@apollo/client';
 import { Spinner } from './spinner';
+import { fieldClassName, fieldSizeClassNames } from './styles';
 
 export const ComboboxTriggerBase = React.forwardRef<
   React.ElementRef<typeof Button>,
@@ -25,9 +26,12 @@ export const ComboboxTriggerBase = React.forwardRef<
         {...props}
         type="button"
         className={cn(
-          'flex truncate h-7 rounded pl-3 transition-[color,box-shadow] focus-visible:shadow-focus outline-hidden focus-visible:outline-hidden focus-visible:outline-offset-0 focus-visible:outline-transparent justify-start overflow-hidden font-normal text-left w-full gap-1',
-          (!props.variant || props.variant === 'outline') && 'shadow-xs',
-          props.size === 'lg' && 'gap-2',
+          (!props.variant || props.variant === 'outline') && fieldClassName,
+          (props.size === 'sm' || props.size === 'lg') &&
+            fieldSizeClassNames[props.size],
+          (!props.size || props.size === 'default') &&
+            fieldSizeClassNames.default,
+          'group/combobox justify-start gap-1.5 overflow-hidden truncate rounded-lg text-left font-normal active:scale-100 data-[state=open]:shadow-focus',
           className,
         )}
       >
@@ -47,7 +51,7 @@ export const ComboboxTrigger = React.forwardRef<
     <ComboboxTriggerBase {...props} ref={ref}>
       {children}
       {!hideChevron && (
-        <IconChevronDown className="size-4 opacity-50 text-muted-foreground  ml-auto" />
+        <IconChevronDown className="ml-auto size-4 shrink-0 text-muted-foreground transition-transform ease-out group-data-[state=open]/combobox:rotate-180" />
       )}
     </ComboboxTriggerBase>
   );
@@ -65,7 +69,7 @@ export const ComboboxTriggerIcon = React.forwardRef<
       size={16}
       strokeWidth={2}
       aria-hidden="true"
-      className={cn('flex-none opacity-50', className)}
+      className={cn('flex-none text-muted-foreground', className)}
       {...props}
     />
   );
@@ -157,14 +161,13 @@ export const ComboboxChipTrigger = ({
   const trigger = (
     <ComboboxTriggerBase
       className={cn(
-        'group w-fit max-w-sm h-7 rounded p-0 gap-0 overflow-hidden',
-        'data-[state=open]:border-primary/40',
+        'group h-7 w-fit max-w-sm gap-0 overflow-hidden rounded-full p-0',
         className,
       )}
       disabled={disabled}
     >
       {label && (
-        <span className="flex h-full shrink-0 items-center whitespace-nowrap px-3 text-muted-foreground bg-muted/40 border-r">
+        <span className="flex h-full shrink-0 items-center whitespace-nowrap border-r border-border bg-muted/60 px-3 text-muted-foreground">
           {label}
         </span>
       )}
